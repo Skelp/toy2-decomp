@@ -7,14 +7,6 @@ namespace Numerics
 	// GLOBAL: TOY2 0x0088334C
 	float* g_trigLUT;
 
-	// FUNCTION: TOY2 0x004A91E0
-	void VertexSubtract(Vector3F* result, Vector3F* v1, Vector3F* v2)
-	{
-		result->x = v1->x - v2->x;
-		result->y = v1->y - v2->y;
-		result->z = v1->z - v2->z;
-	}
-
 	// FUNCTION: TOY2 0x004B0740
 	int32_t RoundUpToPowerOf2(int32_t number)
 	{

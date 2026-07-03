@@ -2,6 +2,7 @@
 #include "NGNLoader/NGNLoader.h"
 #include "Renderer/Renderer.h"
 #include "Logger.h"
+#include "Nu3D/Math.h"
 
 namespace NGNLoader
 {
@@ -46,13 +47,34 @@ namespace NGNLoader
 		// GLOBAL: TOY2 0x00B626A8
 		int32_t g_curVertexFlags;
 
+		// GLOBAL: TOY2 0x00B0092C
+		int16_t g_primVertexData[10000];
+
+		// GLOBAL: TOY2 0x00B06BA0
+		Nu3D::Vertex g_processedPrimVerts[2000];
+
+		// GLOBAL: TOY2 0x00AFBB0C
+		int16_t g_indexDataConversion[17702];
+
+		// GLOBAL: TOY2 0x00508A6C
+		int32_t g_drawTypeConversion[8] = { 0, 0, 2, 1, 3, 5, 4, -1 };
+
+		// GLOBAL: TOY2 0x00B184E0
+		int32_t g_mergedVerts[2000];
+
+		// GLOBAL: TOY2 0x00B1A478
+		int32_t g_groupMemberList[2000];
+
+		// GLOBAL: TOY2 0x00AAD8B4
+		int32_t g_groupMetadata[60000];
+
 		// FUNCTION: TOY2 0x004CC430
 		int32_t ExtractShapeName(FILE* stream)
 		{
-			fread(&g_curShapeNameLen, 1, 1, stream);
-			fread(g_curShapeName, 1, g_curShapeNameLen, stream);
+			fread(&g_curShapeNameLen, sizeof(uint8_t), 1, stream);
+			fread(g_curShapeName, sizeof(char), g_curShapeNameLen, stream);
+			
 			g_curShapeName[g_curShapeNameLen] = '\0';
-
 			return 1;
 		}
 
@@ -427,7 +449,387 @@ namespace NGNLoader
 		}
 
 		// FUNCTION: TOY2 0x004CBC90
-		int32_t ExtractShapePrimitives(FILE* stream) { return 0; }
+		int32_t ExtractShapePrimitives(FILE* stream)
+		{
+			uint32_t curPrim = 0;
+			Nu3D::Primitive* primListHead = 0;
+			int32_t totalLocalVertCount = 0;
+
+			if (g_curPrimObject)
+				Logger::GetErrorHandler("C:\\projects\\nu3d\\objload.c", 591)("object contains more than one primhd array");
+
+			if (! g_curVertexCount)
+				Logger::GetErrorHandler("C:\\projects\\nu3d\\objload.c", 594)("vertex array must be loaded prior to primhd array");
+
+			uint32_t primitiveCount;
+			fread(&primitiveCount, sizeof(uint32_t), 1, stream);
+
+			uint32_t type;
+			int16_t materialIndex;
+			int16_t primCount;
+			Nu3D::Primitive* primObject;
+			int32_t localVertCount;
+			int32_t verticesSize;
+			uint32_t processedPrimCount = 0;
+
+			if (primitiveCount)
+			{
+				while (true)
+				{
+					fread(&type, sizeof(uint32_t), 1, stream);
+					fread(&materialIndex, sizeof(int16_t), 1, stream);
+					fread(&primCount, sizeof(int16_t), 1, stream);
+
+					if (primCount >= 10000)
+						Logger::GetErrorHandler("C:\\projects\\nu3d\\objload.c", 607)("primitive count %d has exceeded maximum allowed %d", primCount, 10000);
+
+					fread(g_primVertexData, sizeof(int16_t), primCount, stream);
+
+					if (type)
+					{
+						if (type < 7)
+							break;
+					}
+
+					verticesSize = localVertCount;
+
+				LBL_NEXT_PRIM:
+
+					++curPrim;
+
+					totalLocalVertCount += verticesSize;
+					processedPrimCount = curPrim;
+
+					if (curPrim >= primitiveCount)
+						goto LBL_FINISH;
+				}
+
+				int32_t curVertex = 0;
+
+				verticesSize = 0;
+				localVertCount = 0;
+
+				int32_t curVertIdx = 0;
+				int16_t* indexData;
+				int16_t indexCount;
+				int32_t primVertexIndex;
+
+				if (primCount)
+				{
+					Nu3D::Vertex* processedVerts = g_processedPrimVerts;
+
+					do
+					{
+						int16_t* primVertexData = &g_primVertexData[curVertex];
+
+						if (*primVertexData >= g_curVertexCount)
+							Logger::GetErrorHandler("C:\\projects\\nu3d\\objload.c", 617)("out of range vrt id");
+
+						int32_t shapeVertIndex = *primVertexData;
+
+						if (g_shapeVertices[shapeVertIndex].primIndex == curPrim)
+						{
+							*primVertexData = g_shapeVertices[*primVertexData].primVerticesSize;
+						}
+						else
+						{
+							g_shapeVertices[*primVertexData].primIndex = curPrim;
+							Nu3D::Vertex* copyDestVert = processedVerts;
+
+							g_shapeVertices[shapeVertIndex].primVerticesSize = verticesSize;
+
+							Nu3D::ShapeVertex* copySrcVert = &g_shapeVertices[shapeVertIndex];
+							Nu3D::Vertex* processedVertsNext = processedVerts;
+
+							*primVertexData = verticesSize++;
+
+							memcpy(copyDestVert, copySrcVert, sizeof(Nu3D::Vertex));
+
+							curPrim = processedPrimCount;
+							curVertex = curVertIdx;
+							processedVerts = processedVertsNext + 1;
+						}
+
+						curVertIdx = ++curVertex;
+
+					} while (curVertex < primCount);
+
+					localVertCount = verticesSize;
+				}
+
+				Nu3D::Primitive* primObject = Nu3D::Primitive::Build(verticesSize, 1);
+
+				if (! primObject)
+					Logger::GetErrorHandler("C:\\projects\\nu3d\\objload.c", 634)("unable to alloc OBJ3D with %d vrts", verticesSize);
+
+				int32_t flagsTemp = Nu3D::g_defaultPrimitiveFlags | primObject->renderFlags;
+				primObject->renderFlags = flagsTemp;
+
+				if ((g_curVertexFlags & 4) != 0)
+					primObject->renderFlags = flagsTemp | 0x40001000;
+
+				if (materialIndex >= g_curMaterialCount)
+				{
+					RGBColor whiteColor;
+					whiteColor.r = 1.0;
+					whiteColor.g = 1.0;
+					whiteColor.b = 1.0;
+
+					primObject->materialIndex = Nu3D::Material::CreateFromColor(&whiteColor)->id;
+				}
+				else
+				{
+					primObject->materialIndex = g_curMaterialList[materialIndex]->id;
+				}
+
+				memcpy(primObject->patchVerts.data.vertices, g_processedPrimVerts, 4 * ((sizeof(Nu3D::Vertex) * verticesSize) >> 2));
+
+				if (type == 4)
+				{
+					indexCount = primCount;
+
+					if (g_isHardwareRendering)
+					{
+						int16_t* primVertexData = &g_primVertexData[primCount];
+						int32_t newIndexCount = 3 * primCount / 2;
+
+						for (indexData = &g_indexDataConversion[newIndexCount]; indexData != g_indexDataConversion; indexData[5] = primVertexData[3])
+						{
+							int16_t quadVertIdx = *(primVertexData - 4);
+
+							primVertexData -= 4;
+							indexData -= 6;
+
+							*indexData = quadVertIdx;
+
+							indexData[1] = primVertexData[1];
+							indexData[2] = primVertexData[2];
+							indexData[3] = primVertexData[0];
+							indexData[4] = primVertexData[2];
+						}
+
+						indexCount = newIndexCount;
+						type = 1;
+						primCount = newIndexCount;
+
+						goto LBL_EMIT_INDICES;
+					}
+
+					primVertexIndex = primCount;
+					indexData = &g_indexDataConversion[primVertexIndex];
+
+					if (indexData == g_indexDataConversion)
+					{
+					LBL_EMIT_INDICES:
+
+						if (! Nu3D::Primitive::InitHeader(primObject->header, g_drawTypeConversion[type], indexCount))
+							Logger::GetErrorHandler("C:\\projects\\nu3d\\objload.c", 692)(
+								"unable to initialise primheader %d for %hd vid", processedPrimCount, primCount);
+
+						memcpy(primObject->header->indices, indexData, 2 * primCount);
+
+						if (type != 5 && type != 6)
+						{
+							Nu3D::Vertex* patchVertVertices = primObject->patchVerts.data.vertices;
+							uint16_t* headerIndices = primObject->header->indices;
+
+							memset(g_mergedVerts, 0, 4 * localVertCount);
+
+							Nu3D::Vertex* vertices_ = patchVertVertices;
+							int32_t mergedVertIndex = 0;
+
+							memset(g_groupMemberList, 0, sizeof(g_groupMemberList));
+
+							int32_t groupMember = 0;
+							uint16_t* indices = headerIndices;
+							curVertIdx = 0;
+
+							if (localVertCount > 0)
+							{
+								int32_t groupMetadataOffset = 0;
+								int32_t* groupMetadataPtr = g_groupMemberList;
+
+								do
+								{
+									if (! g_mergedVerts[mergedVertIndex])
+									{
+										int32_t prevGroupMemberCount = groupMetadataPtr[1];
+										++groupMetadataPtr;
+										groupMetadataOffset += 30;
+
+										int32_t groupMemberListIdx = prevGroupMemberCount + groupMetadataOffset;
+										int32_t currentGroupIdx = prevGroupMemberCount + 1;
+										uint32_t totalVertCount = localVertCount;
+
+										g_groupMetadata[groupMemberListIdx] = mergedVertIndex;
+
+										int32_t nextMergedVertIndex = mergedVertIndex + 1;
+										int32_t nextGroupMember = ++groupMember;
+
+										g_mergedVerts[mergedVertIndex] = groupMember;
+
+										*groupMetadataPtr = currentGroupIdx;
+
+										if (mergedVertIndex + 1 < totalVertCount)
+										{
+											int32_t* mergedVertPtr = &g_mergedVerts[nextMergedVertIndex];
+											Vector3F* curVert = &vertices_[nextMergedVertIndex].position;
+
+											do
+											{
+												if (! *mergedVertPtr)
+												{
+													Vector3F* vertPos = &vertices_[mergedVertIndex].position;
+
+													if (curVert->x == vertPos->x && curVert->y == vertPos->y && curVert->z == vertPos->z)
+													{
+														groupMember = nextGroupMember;
+														*mergedVertPtr = nextGroupMember;
+
+														int32_t memberListIdx = currentGroupIdx + groupMetadataOffset;
+														*groupMetadataPtr = ++currentGroupIdx;
+
+														g_groupMetadata[memberListIdx] = nextMergedVertIndex;
+													}
+													else
+													{
+														groupMember = nextGroupMember;
+													}
+												}
+
+												++nextMergedVertIndex;
+												curVert += 3;
+												++mergedVertPtr;
+
+											} while (nextMergedVertIndex < localVertCount);
+
+											headerIndices = indices;
+										}
+
+										if (*groupMetadataPtr == 1)
+										{
+											int32_t groupBaseOffset = groupMetadataOffset - 30;
+											*groupMetadataPtr = 0;
+											--groupMember;
+
+											groupMetadataOffset = groupBaseOffset;
+											--groupMetadataPtr;
+											g_mergedVerts[mergedVertIndex] = 0;
+										}
+									}
+
+									mergedVertIndex = ++curVertIdx;
+								} while (curVertIdx < localVertCount);
+							}
+
+							if ((primObject->renderFlags & 32) == 0)
+							{
+								int32_t triangleIdx = 0;
+
+								if (primCount / 3)
+								{
+									int32_t triMetaIdx = 0;
+
+									do
+									{
+										Nu3D::Math::CalculatePlaneFromTriangle(&vertices_[headerIndices[0]].position,
+											&vertices_[headerIndices[1]].position,
+											&vertices_[headerIndices[2]].position,
+											&primObject->header->triMeta[triMetaIdx]);
+
+										headerIndices += 3;
+										triMetaIdx = ++triangleIdx;
+
+									} while (triangleIdx < primCount / 3);
+								}
+							}
+
+							primObject = primObject;
+							verticesSize = localVertCount;
+						}
+
+						if ((g_curVertexFlags & 4) != 0)
+						{
+							if (Nu3D::g_useAsDiffuseModulation)
+							{
+								int32_t primCount = 0;
+
+								if (verticesSize > 0)
+								{
+									int32_t vertexLoopIndex = 0;
+
+									do
+									{
+										float red = g_curMaterialList[materialIndex]->d3dMaterial.diffuse.r * 255.0;
+
+										if (red >= 255.0)
+											red = 255.0;
+
+										primObject->patchVerts.data.vertices[vertexLoopIndex].diffuse.b = red;
+										float green = g_curMaterialList[materialIndex]->d3dMaterial.diffuse.g * 255.0;
+
+										if (green >= 255.0)
+											green = 255.0;
+
+										primObject->patchVerts.data.vertices[vertexLoopIndex].diffuse.g = green;
+										float blue = g_curMaterialList[materialIndex]->d3dMaterial.diffuse.b * 255.0;
+
+										if (blue >= 255.0)
+											blue = 255.0;
+
+										primObject->patchVerts.data.vertices[vertexLoopIndex].diffuse.r = blue;
+										float alpha = g_curMaterialList[materialIndex]->d3dMaterial.diffuse.a * 255.0;
+
+										if (alpha >= 255.0)
+											alpha = 255.0;
+
+										++primCount;
+										primObject->patchVerts.data.vertices[vertexLoopIndex].diffuse.a = alpha;
+										vertexLoopIndex = primCount;
+
+									} while (primCount < verticesSize);
+								}
+							}
+						}
+
+						curPrim = processedPrimCount;
+						primObject->listNext = primListHead;
+						primListHead = primObject;
+
+						goto LBL_NEXT_PRIM;
+					}
+
+					int16_t* primConvertData = &g_primVertexData[primVertexIndex];
+
+					do
+					{
+						primConvertData -= 4;
+						indexData -= 4;
+
+						indexData[0] = primConvertData[3];
+						indexData[1] = primConvertData[0];
+						indexData[2] = primConvertData[2];
+						indexData[3] = primConvertData[1];
+
+					} while (indexData != g_indexDataConversion);
+				}
+				else
+				{
+					indexData = g_primVertexData;
+				}
+
+				indexCount = primCount;
+				goto LBL_EMIT_INDICES;
+			}
+
+		LBL_FINISH:
+
+			if (totalLocalVertCount != g_curVertexCount)
+				Logger::DebugLog("VTX Duplications From %d To %d\r", g_curVertexCount, totalLocalVertCount);
+
+			g_curPrimObject = primObject;
+			return 1;
+		}
 
 		// FUNCTION: TOY2 0x004CB270
 		void PrepareGlobals()
@@ -457,8 +859,6 @@ namespace NGNLoader
 
 					fread(&size, sizeof(int32_t), 1, stream);
 					ftell(stream);
-
-					DECOMP_PRINT(("Found chunk id -> %d\n", chunkId));
 
 					switch (chunkId)
 					{

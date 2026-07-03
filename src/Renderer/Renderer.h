@@ -5,6 +5,9 @@
 #include <directx6/ddraw.h>
 #include <directx6/d3d.h>
 
+#define D3DFVF_0x152 (D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_DIFFUSE | D3DFVF_TEX1)
+#define D3DFVF_0x1C4 (D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | D3DFVF_TEX1)
+
 namespace Nu3D
 {
 	struct Primitive;

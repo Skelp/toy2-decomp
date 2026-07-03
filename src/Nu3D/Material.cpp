@@ -44,7 +44,7 @@ namespace Nu3D
 		g_materialFreeList[0].id = 0;
 		g_materialFreeList[0].prev = 0;
 		g_materialFreeListHead = g_materialFreeList;
-		g_materialFreeList[0].next = 0;
+		g_materialFreeList[2999].next = 0;
 
 		DrawingDevice::BindTexToStage0(0);
 	}

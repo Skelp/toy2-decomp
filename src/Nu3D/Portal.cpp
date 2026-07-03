@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Nu3D/Portal.h"
+#include "Nu3D/Math.h"
 #include "Numerics.h"
 #include <cmath>
 
@@ -58,7 +59,7 @@ namespace Nu3D
 		portal->center.y = (vector.y + y) * 0.5;
 		portal->center.z = (vector.z + z) * 0.5;
 
-		Numerics::VertexSubtract(&vector, &vector, &portal->center);
+		Nu3D::Math::VertexSubtract(&vector, &vector, &portal->center);
 
 		double radSqrt = vector.x * vector.x + vector.y * vector.y + vector.z * vector.z;
 

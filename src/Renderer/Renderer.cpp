@@ -474,21 +474,21 @@ namespace Renderer
 
 		Set508718(5);
 
-		g_FVF_14C_Buffer_2.format = D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | D3DFVF_TEX1;
+		g_FVF_14C_Buffer_2.format = D3DFVF_0x1C4;
 		g_FVF_14C_Buffer_2.vertexCount = 1000;
 		g_FVF_14C_Buffer_2.vertexBuffer = 0;
 		g_FVF_14C_Buffer_2.data.verticesTL = (Nu3D::VertexTL*)malloc(sizeof(Nu3D::VertexTL) * 1000);
 
 		Nu3D::Patch::PatchVertices::CreateVertexBuffer(&g_FVF_14C_Buffer_2, 12);
 
-		g_FVF_14C_Buffer_1.format = D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | D3DFVF_TEX1;
+		g_FVF_14C_Buffer_1.format = D3DFVF_0x1C4;
 		g_FVF_14C_Buffer_1.vertexCount = 1000;
 		g_FVF_14C_Buffer_1.vertexBuffer = 0;
 		g_FVF_14C_Buffer_1.data.verticesTL = (Nu3D::VertexTL*)malloc(sizeof(Nu3D::VertexTL) * 1000);
 
 		Nu3D::Patch::PatchVertices::CreateVertexBuffer(&g_FVF_14C_Buffer_1, 2);
 
-		g_FVF_152_Buffer.format = D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_DIFFUSE | D3DFVF_TEX1;
+		g_FVF_152_Buffer.format = D3DFVF_0x152;
 		g_FVF_152_Buffer.vertexCount = 1000;
 		g_FVF_152_Buffer.vertexBuffer = 0;
 		g_FVF_152_Buffer.data.vertices = (Nu3D::Vertex*)malloc(sizeof(Nu3D::Vertex) * 1000);

@@ -1,4 +1,5 @@
 #include "Nu3D/Math.h"
+#include <MATH.H>
 
 namespace Nu3D
 {
@@ -6,7 +7,7 @@ namespace Nu3D
 	{
 		// NOTE: Methods in this class are kind of critical to get correct, since minor changes in how
 		// math is calculated could cause weeks of debugging effort to fix. So I take extra care ensuring
-		// that most, if not all of these methods are instruction matched.
+		// that most, if not all of these methods are instruction matched from the moment they are implemented.
 
 		// GLOBAL: TOY2 0x004DDA48
 		D3DMATRIX g_identityMatrix = { 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 };
@@ -130,6 +131,56 @@ namespace Nu3D
 			result->x = transformedX + transformedZ;
 			result->y = transformedY;
 			result->z = tempZ;
+		}
+
+		// FUNCTION: TOY2 0x004A91E0 [MATCHED]
+		void VertexSubtract(Vector3F* result, Vector3F* v1, Vector3F* v2)
+		{
+			result->x = v1->x - v2->x;
+			result->y = v1->y - v2->y;
+			result->z = v1->z - v2->z;
+		}
+
+		// FUNCTION: TOY2 0x004A9270 [MATCHED]
+		void VertexCrossProduct(Vector3F* result, Vector3F* v1, Vector3F* v2)
+		{
+			float y = v2->x * v1->z - v2->z * v1->x;
+			float z = v2->y * v1->x - v2->x * v1->y;
+
+			result->x = v2->z * v1->y - v2->y * v1->z;
+			result->y = y;
+			result->z = z;
+		}
+
+		// FUNCTION: TOY2 0x004A9340
+		float VectorNormalize(Vector3F* output, Vector3F* vector)
+		{
+			float lengthSquared = vector->x * vector->x + vector->y * vector->y + vector->z * vector->z;
+			float magnitude = sqrt(lengthSquared);
+			float scale = 1.0f / magnitude;
+
+			output->x = scale * vector->x;
+			output->y = scale * vector->y;
+			output->z = scale * vector->z;
+
+			return magnitude;
+		}
+
+		// FUNCTION: TOY2 0x004DA850 [MATCHED]
+		void CalculatePlaneFromTriangle(Vector3F* point1, Vector3F* point2, Vector3F* point3, Plane* plane)
+		{
+			Vector3F edge1;
+			Vector3F edge2;
+
+			VertexSubtract(&edge2, point2, point1);
+			VertexSubtract(&edge1, point3, point1);
+
+			Vector3F normal;
+
+			VertexCrossProduct(&normal, &edge2, &edge1);
+			VectorNormalize(&plane->normal, &normal);
+
+			plane->distance = -(point1->z * plane->normal.z + point1->y * plane->normal.y + point1->x * plane->normal.x);
 		}
 	}
 }
