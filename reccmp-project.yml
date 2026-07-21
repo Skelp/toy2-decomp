@@ -1,7 +1,7 @@
 targets:
   TOY2:
     filename: toy2.exe
-    source_root: .
+    source_root: src
     hash:
       sha256: 023eb6a9459443b34d24cf685591bfeb3b95e1acf579405f6d8fa4407ccbdaf0
     data_sources: []

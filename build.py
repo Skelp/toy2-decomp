@@ -1,174 +1,102 @@
-import sys
-sys.dont_write_bytecode = True
+"""Compatibility entry point for the platform decompilation commands.
 
+New contributors should prefer tools/decomp on Linux or tools/decomp.ps1 on
+Windows. This wrapper remains for existing workflows that invoke build.py.
+"""
+
+from __future__ import annotations
+
+import argparse
 import os
 import subprocess
-import argparse
+from pathlib import Path
 
-# Constants
-PROJECT_NAME = "toy2"
-BUILD_FOLDER = "build"
 
-def track_process(command, custom_name=""):
-    proc = subprocess.Popen(
+ROOT = Path(__file__).resolve().parent
+BUILD_FOLDER = ROOT / "build"
+
+
+def track_process(command: list[str], custom_name: str = "", cwd: Path = ROOT) -> None:
+    process = subprocess.Popen(
         command,
+        cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        text=True
+        text=True,
     )
-
-    name = command[0] if custom_name == "" else custom_name
-
-    for line in proc.stdout:
-        print(f"[{name}]: {line.strip()}")
-
-    proc.wait()
-    if proc.returncode != 0:
-        raise subprocess.CalledProcessError(proc.returncode, command)
+    name = custom_name or command[0]
+    assert process.stdout is not None
+    for line in process.stdout:
+        print(f"[{name}]: {line.rstrip()}")
+    return_code = process.wait()
+    if return_code:
+        raise subprocess.CalledProcessError(return_code, command)
 
 
-def set_environment():
-    vs6_bin = os.environ.get('VS6_BIN_PATH')
-    if not vs6_bin:
-        print("[set_environment]: VS6_BIN_PATH is not set", file=sys.stderr)
-        sys.exit(1)
+def decomp_command(command: str) -> list[str]:
+    if os.name == "nt":
+        return [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "tools" / "decomp.ps1"),
+            command,
+        ]
+    return [str(ROOT / "tools" / "decomp"), command]
 
-    vcvars_path = f"{vs6_bin}\\VCVARS32.bat"
 
-    # Run the batch file and capture the environment
-    result = subprocess.run(
-        f'"{vcvars_path}" && set',
-        shell=True,
-        capture_output=True,
-        text=True
+def build_tools(build_type: str) -> None:
+    if os.name != "nt":
+        raise SystemExit("The optional injected/debugging tools currently build on Windows only.")
+    tools_build = BUILD_FOLDER / "build_tools"
+    track_process(
+        [
+            "cmake",
+            "-S",
+            str(ROOT / "tools"),
+            "-B",
+            str(tools_build),
+            "-G",
+            "Ninja",
+            f"-DCMAKE_BUILD_TYPE={build_type}",
+            "-DCMAKE_C_COMPILER=clang",
+            "-DCMAKE_CXX_COMPILER=clang++",
+        ],
+        "configure-tools",
     )
-    
-    # Parse the environment variables from the output
-    env_vars = {}
-    for line in result.stdout.split('\n'):
-        if '=' in line:
-            key, value = line.split('=', 1)
-            env_vars[key] = value
-    
-    # Update os.environ
-    os.environ.update(env_vars)
-
-def copy_assets():
-    # Placeholder for asset copy logic
-    print("[build]: Assets have been copied to build folder.")
+    track_process(["cmake", "--build", str(tools_build)], "build-tools")
 
 
-def get_executable_name():
-    return f"{PROJECT_NAME}.exe" if os.name == 'nt' else f"./{PROJECT_NAME}"
-
-
-def run_build(launch_app, build_type):
-    print(f"[build]: Running build for {PROJECT_NAME} with type {build_type}")
-
-    # Set up VS6 environment
-    set_environment()
-
-    # Prepare build directory
-    os.makedirs(BUILD_FOLDER, exist_ok=True)
-    os.chdir(BUILD_FOLDER)
-
-    # Configure with CMake
-    track_process([
-        'cmake',
-        '..',
-        '-G', 'NMake Makefiles',
-        f'-DCMAKE_BUILD_TYPE={build_type}'
-    ])
-
-    # Build with NMake
-    track_process(['nmake'])
-
-    # Copy any assets
-    copy_assets()
-
-    # Launch application if requested
-    if launch_app:
-        exe_path = os.path.join(os.getcwd(), get_executable_name())
-        print(f"----------------- Starting {PROJECT_NAME} -----------------")
-        subprocess.run([exe_path])
-
-
-def check_executable_size(build_test_type):
-    exe_name = get_executable_name()
-    exe_path = os.path.join(BUILD_FOLDER, exe_name)
-
-    # Remove old executable
-    if os.path.exists(exe_path):
-        os.remove(exe_path)
-
-    # Save current directory to restore later
-    old_cwd = os.getcwd()
-
-    # Run a fresh build
-    run_build(launch_app=False, build_type=build_test_type)
-
-    # Restore working directory
-    os.chdir(old_cwd)
-
-    # Measure size
-    size_bytes = os.path.getsize(exe_path)
-    size_kb = size_bytes / 1024
-    size_mb = size_bytes / (1024 * 1024)
-    print(f"[size]: Executable is {size_kb:.2f} KB ({size_mb:.2f} MB)")
-
-
-def build_tools(app, build_type):
-    # we want to use clang for toy2 tools
-    os.environ['CC'] = 'clang'
-    os.environ['CXX'] = 'clang++'
-
-    TOOLS_BUILD_FOLDER = f"{BUILD_FOLDER}//build_tools"
-
-    os.makedirs(TOOLS_BUILD_FOLDER, exist_ok=True)
-    os.chdir(TOOLS_BUILD_FOLDER)
-
-    build_arguments = [
-        'cmake',
-        '-G', 'Ninja',
-        f'-DCMAKE_BUILD_TYPE={build_type}',
-        '-Wno-dev',
-        '../../tools'
-    ]
-
-    track_process(build_arguments)
-    track_process(['ninja'])
-
-def main():
-    parser = argparse.ArgumentParser(
-        description=f"Build script for {PROJECT_NAME} using VS6 NMake."
-    )
-    parser.add_argument("--nl", action="store_true", help="Don't launch the app after build")
-    parser.add_argument("--cs", action="store_true", help="Check executable size after build")
-
-    parser.add_argument(
-        "--tools", 
-        action="store_true",
-        help="Build and launch the Toy2 tools",
-    )
-
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Build Toy Story 2 decompilation targets.")
+    parser.add_argument("--nl", action="store_true", help="Do not launch the game after building")
+    parser.add_argument("--cs", action="store_true", help="Print the executable size after building")
+    parser.add_argument("--tools", action="store_true", help="Build the optional Windows helper tools")
     parser.add_argument(
         "--bt",
         choices=["Debug", "Release", "RelWithDebInfo", "MinSizeRel"],
         default="RelWithDebInfo",
-        help="CMake build type (default: RelWithDebInfo)"
+        help="Build type for optional helper tools; the matching game build uses RelWithDebInfo",
     )
-
     args = parser.parse_args()
 
     if args.tools:
-        build_tools(args.tools, args.bt)
-        return
+        build_tools(args.bt)
+        return 0
 
+    if args.bt != "RelWithDebInfo":
+        parser.error("The matching game build is fixed to RelWithDebInfo")
+    track_process(decomp_command("build"), "build")
+    executable = BUILD_FOLDER / "toy2.exe"
     if args.cs:
-        check_executable_size(build_test_type=args.bt)
-    else:
-        run_build(launch_app=not args.nl, build_type=args.bt)
+        size = executable.stat().st_size
+        print(f"[size]: Executable is {size / 1024:.2f} KiB ({size / 1024 / 1024:.2f} MiB)")
+    if not args.nl and not args.cs:
+        track_process(decomp_command("run"), "run")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

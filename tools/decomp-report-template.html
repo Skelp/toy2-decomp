@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toy Story 2 · Decompilation Report</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #071018;
+      --panel: #0d1924;
+      --panel-2: #122332;
+      --line: #203747;
+      --text: #edf6f8;
+      --muted: #91a8b6;
+      --cyan: #56d9e9;
+      --green: #62d99f;
+      --lime: #a9e34b;
+      --gold: #f4c95d;
+      --orange: #ed8b4a;
+      --red: #ef6262;
+      --purple: #ad8cff;
+      --unknown: #536471;
+      --radius: 16px;
+      --shadow: 0 18px 60px rgb(0 0 0 / 25%);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background:
+        radial-gradient(circle at 15% -10%, rgb(39 118 142 / 26%), transparent 34rem),
+        radial-gradient(circle at 90% 12%, rgb(86 76 170 / 15%), transparent 30rem),
+        var(--bg);
+      color: var(--text);
+    }
+
+    button, input, select { font: inherit; }
+    button { color: inherit; }
+    .shell { width: min(1500px, calc(100% - 40px)); margin: 0 auto; padding: 34px 0 70px; }
+    .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
+    .eyebrow { margin: 0 0 8px; color: var(--cyan); font: 700 12px/1.2 ui-monospace, monospace; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(30px, 5vw, 58px); line-height: .98; letter-spacing: -.045em; }
+    .subtitle { max-width: 760px; margin: 14px 0 0; color: var(--muted); font-size: 15px; line-height: 1.55; }
+    .generated { flex: none; padding: 11px 14px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: rgb(8 19 28 / 75%); font: 12px ui-monospace, monospace; }
+
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+    .metric, .panel { border: 1px solid var(--line); background: linear-gradient(145deg, rgb(17 34 47 / 96%), rgb(9 21 31 / 96%)); box-shadow: var(--shadow); }
+    .metric { min-height: 144px; padding: 20px; border-radius: var(--radius); position: relative; overflow: hidden; }
+    .metric::after { content: ""; position: absolute; width: 140px; height: 140px; right: -62px; bottom: -76px; border: 24px solid color-mix(in srgb, var(--accent) 17%, transparent); border-radius: 50%; }
+    .metric-label { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .metric-value { margin-top: 13px; font-size: clamp(28px, 4vw, 44px); font-weight: 750; letter-spacing: -.045em; }
+    .metric-detail { margin-top: 7px; color: var(--muted); font: 12px/1.4 ui-monospace, monospace; }
+
+    .panel { border-radius: var(--radius); padding: 20px; min-width: 0; }
+    .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 17px; }
+    .panel-title { margin: 0; font-size: 17px; letter-spacing: -.015em; }
+    .panel-copy { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .grid-main { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(290px, .8fr); gap: 14px; margin-top: 14px; }
+
+    .legend { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 11px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .swatch { width: 9px; height: 9px; border-radius: 3px; background: var(--swatch); box-shadow: 0 0 14px color-mix(in srgb, var(--swatch) 45%, transparent); }
+
+    .treemap-nav { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; min-height: 28px; }
+    .crumb { border: 0; background: transparent; padding: 4px 6px; color: var(--muted); cursor: pointer; border-radius: 6px; }
+    .crumb:hover { color: var(--text); background: var(--panel-2); }
+    .crumb:last-child { color: var(--text); font-weight: 700; }
+    .crumb-sep { color: #486070; }
+    #treemap { position: relative; height: min(58vw, 570px); min-height: 390px; border-radius: 12px; overflow: hidden; background: #07131c; border: 1px solid #1a3344; }
+    .tree-node { position: absolute; padding: 0; border: 2px solid #07131c; border-radius: 7px; overflow: hidden; background: var(--node-color); cursor: pointer; text-align: left; transition: filter .15s ease, transform .15s ease; }
+    .tree-node:hover { filter: brightness(1.18); z-index: 4; transform: translateY(-1px); }
+    .tree-node:focus-visible { outline: 2px solid white; outline-offset: -4px; z-index: 5; }
+    .tree-label { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; padding: 10px; background: linear-gradient(180deg, rgb(0 0 0 / 5%), rgb(0 0 0 / 36%)); text-shadow: 0 1px 3px rgb(0 0 0 / 70%); pointer-events: none; }
+    .tree-name { font-weight: 750; font-size: clamp(10px, 1vw, 14px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tree-meta { color: rgb(255 255 255 / 78%); font: 10px ui-monospace, monospace; }
+    .tree-mosaic { position: absolute; inset: 34px 8px 26px; display: grid; grid-template-columns: repeat(auto-fill, minmax(5px, 1fr)); grid-auto-rows: minmax(5px, 1fr); gap: 2px; opacity: .72; pointer-events: none; }
+    .tree-dot { min-height: 4px; border-radius: 1px; background: var(--dot); }
+    .tree-leaf .tree-label { padding: 7px; }
+    .tree-leaf .tree-name { font-size: 10px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+    .histogram { height: 220px; display: flex; align-items: stretch; gap: 7px; padding-top: 12px; }
+    .hist-bucket { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 7px; }
+    .hist-count { color: var(--muted); font: 10px ui-monospace, monospace; }
+    .hist-bar-wrap { width: 100%; height: 160px; display: flex; align-items: flex-end; background: rgb(0 0 0 / 12%); border-radius: 7px; overflow: hidden; }
+    .hist-bar { width: 100%; min-height: 2px; border-radius: 7px 7px 0 0; background: var(--bar); box-shadow: 0 -8px 28px color-mix(in srgb, var(--bar) 28%, transparent); }
+    .hist-label { color: var(--muted); font: 9px ui-monospace, monospace; white-space: nowrap; }
+
+    .breakdown { margin-top: 18px; display: grid; gap: 10px; }
+    .break-row { display: grid; grid-template-columns: 84px 1fr 35px; align-items: center; gap: 9px; font-size: 11px; }
+    .break-label { color: var(--muted); }
+    .bar-track { height: 7px; border-radius: 99px; overflow: hidden; background: #07131c; }
+    .bar-fill { height: 100%; width: var(--width); background: var(--color); border-radius: inherit; }
+    .break-count { text-align: right; font: 10px ui-monospace, monospace; }
+
+    .files-panel { margin-top: 14px; }
+    .file-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+    .file-card { border: 1px solid var(--line); border-radius: 12px; padding: 13px; background: rgb(7 17 25 / 58%); cursor: pointer; }
+    .file-card:hover { border-color: #3c6174; background: #102432; }
+    .file-card-top { display: flex; justify-content: space-between; gap: 12px; }
+    .file-name { font: 12px ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-score { font: 700 12px ui-monospace, monospace; color: var(--score); }
+    .file-bar { height: 5px; margin-top: 10px; border-radius: 99px; overflow: hidden; background: #07131c; }
+    .file-bar > div { height: 100%; width: var(--width); background: var(--score); }
+    .file-meta { margin-top: 7px; color: var(--muted); font-size: 10px; }
+
+    .explorer { margin-top: 14px; }
+    .controls { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(3, auto); gap: 9px; width: min(100%, 850px); }
+    .control { min-height: 39px; border: 1px solid var(--line); border-radius: 9px; padding: 0 11px; color: var(--text); background: #091722; }
+    input.control { width: 100%; }
+    .check { display: flex; align-items: center; gap: 7px; padding: 0 10px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .check input { accent-color: var(--cyan); }
+    .result-line { margin: 12px 0 8px; color: var(--muted); font: 11px ui-monospace, monospace; }
+    .table-wrap { overflow: auto; max-height: 720px; border: 1px solid var(--line); border-radius: 11px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead { position: sticky; top: 0; z-index: 2; background: #10202d; }
+    th { padding: 11px 12px; text-align: left; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+    td { padding: 10px 12px; border-top: 1px solid rgb(32 55 71 / 58%); }
+    tbody tr { cursor: pointer; background: rgb(7 17 25 / 35%); }
+    tbody tr:hover { background: #132836; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .name-cell { min-width: 260px; max-width: 600px; overflow-wrap: anywhere; }
+    .source-cell { max-width: 260px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .score-pill { display: inline-flex; min-width: 66px; justify-content: center; padding: 4px 7px; border: 1px solid color-mix(in srgb, var(--score) 45%, transparent); border-radius: 99px; color: var(--score); background: color-mix(in srgb, var(--score) 9%, transparent); font: 700 10px ui-monospace, monospace; }
+    .empty { padding: 40px; text-align: center; color: var(--muted); }
+
+    dialog { width: min(1280px, calc(100% - 30px)); height: min(880px, calc(100% - 30px)); padding: 0; color: var(--text); border: 1px solid #315166; border-radius: 18px; background: #09151f; box-shadow: 0 30px 100px rgb(0 0 0 / 65%); }
+    dialog::backdrop { background: rgb(1 6 10 / 76%); backdrop-filter: blur(5px); }
+    .dialog-shell { height: 100%; display: flex; flex-direction: column; }
+    .dialog-head { display: flex; justify-content: space-between; gap: 20px; padding: 20px 22px; border-bottom: 1px solid var(--line); background: #10212e; }
+    .dialog-title { margin: 0; font-size: 19px; overflow-wrap: anywhere; }
+    .dialog-meta { margin-top: 7px; color: var(--muted); font: 11px ui-monospace, monospace; }
+    .close { align-self: flex-start; width: 35px; height: 35px; border: 1px solid var(--line); border-radius: 9px; background: #0a1822; cursor: pointer; }
+    .close:hover { background: #193044; }
+    .diff-body { flex: 1; overflow: auto; padding: 18px; }
+    .diff-empty { display: grid; place-items: center; min-height: 300px; color: var(--muted); text-align: center; }
+    .diff-group { margin-bottom: 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    .diff-slug { padding: 8px 11px; color: var(--cyan); background: #102433; font: 11px ui-monospace, monospace; }
+    .asm { width: 100%; table-layout: fixed; font: 11px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .asm td { padding: 3px 8px; vertical-align: top; white-space: pre-wrap; overflow-wrap: anywhere; border-color: rgb(38 62 77 / 40%); }
+    .asm .addr { width: 84px; color: #7090a3; user-select: all; }
+    .asm .orig { background: rgb(239 98 98 / 10%); color: #ffc4c4; }
+    .asm .recomp { background: rgb(98 217 159 / 9%); color: #c8ffe3; }
+    .asm .same { color: #c4d2d9; }
+    .asm .divider { border-left: 1px solid var(--line); }
+
+    .footer { margin-top: 20px; display: flex; justify-content: space-between; gap: 20px; color: #66808f; font-size: 10px; }
+
+    @media (max-width: 1000px) {
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid-main { grid-template-columns: 1fr; }
+      #treemap { height: 520px; }
+      .controls { grid-template-columns: 1fr 1fr; }
+      .controls input { grid-column: 1 / -1; }
+    }
+    @media (max-width: 620px) {
+      .shell { width: min(100% - 20px, 1500px); padding-top: 22px; }
+      .topbar { display: block; }
+      .generated { display: inline-block; margin-top: 18px; }
+      .metrics { grid-template-columns: 1fr; }
+      .panel { padding: 14px; }
+      .panel-head { display: block; }
+      .legend { margin-top: 12px; }
+      #treemap { min-height: 470px; }
+      .controls { grid-template-columns: 1fr; }
+      .controls input { grid-column: auto; }
+      .check { min-height: 34px; }
+      th:nth-child(2), td:nth-child(2), th:nth-child(5), td:nth-child(5) { display: none; }
+      .name-cell { min-width: 190px; }
+      .footer { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Recompilation intelligence</p>
+        <h1>Toy Story 2</h1>
+        <p class="subtitle">A source-aware view of the Windows recompilation: project coverage, machine-code accuracy, subsystem health, and instruction-level differences in one portable report.</p>
+      </div>
+      <div class="generated" id="generated"></div>
+    </header>
+
+    <section class="metrics" id="metrics" aria-label="Project metrics"></section>
+
+    <section class="grid-main">
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Project treemap</h2>
+            <p class="panel-copy">Area represents function count. Color represents machine-code accuracy. Select a region to drill down.</p>
+          </div>
+          <div class="legend" aria-label="Accuracy legend">
+            <span><i class="swatch" style="--swatch:var(--green)"></i> exact</span>
+            <span><i class="swatch" style="--swatch:var(--gold)"></i> close</span>
+            <span><i class="swatch" style="--swatch:var(--orange)"></i> partial</span>
+            <span><i class="swatch" style="--swatch:var(--red)"></i> zero</span>
+            <span><i class="swatch" style="--swatch:var(--unknown)"></i> unmatched</span>
+          </div>
+        </div>
+        <nav class="treemap-nav" id="treemap-nav" aria-label="Treemap breadcrumb"></nav>
+        <div id="treemap" aria-label="Function accuracy treemap"></div>
+      </article>
+
+      <aside class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Accuracy distribution</h2>
+            <p class="panel-copy">Comparable functions grouped by their raw instruction similarity.</p>
+          </div>
+        </div>
+        <div class="histogram" id="histogram"></div>
+        <div class="breakdown" id="breakdown"></div>
+      </aside>
+    </section>
+
+    <section class="panel files-panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Subsystem health</h2>
+          <p class="panel-copy">Source groups ranked by effective accuracy. Select a card to focus the explorer.</p>
+        </div>
+      </div>
+      <div class="file-grid" id="group-cards"></div>
+    </section>
+
+    <section class="panel explorer">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Function explorer</h2>
+          <p class="panel-copy">Search symbols, source paths, or addresses. Select a function to inspect its assembly diff.</p>
+        </div>
+        <div class="controls">
+          <input class="control" id="search" type="search" placeholder="Search functions, files, addresses…" autocomplete="off">
+          <select class="control" id="status-filter" aria-label="Status filter">
+            <option value="all">All statuses</option>
+            <option value="exact">Exact</option>
+            <option value="effective">Effective</option>
+            <option value="partial">Partial</option>
+            <option value="zero">Zero</option>
+            <option value="unmatched">Unmatched</option>
+            <option value="stub">Stubs</option>
+          </select>
+          <select class="control" id="sort" aria-label="Sort order">
+            <option value="accuracy-asc">Lowest accuracy</option>
+            <option value="accuracy-desc">Highest accuracy</option>
+            <option value="address">Address</option>
+            <option value="name">Name</option>
+            <option value="source">Source</option>
+          </select>
+          <label class="check"><input id="show-stubs" type="checkbox"> Include stubs</label>
+        </div>
+      </div>
+      <div class="result-line" id="result-line"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Address</th><th>Recompiled</th><th>Function</th><th>Match</th><th>Source</th><th>Status</th></tr></thead>
+          <tbody id="function-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Generated locally by tools/decomp report · no external dependencies</span>
+      <span id="report-meta"></span>
+    </footer>
+  </main>
+
+  <dialog id="function-dialog">
+    <div class="dialog-shell">
+      <header class="dialog-head">
+        <div><h2 class="dialog-title" id="dialog-title"></h2><div class="dialog-meta" id="dialog-meta"></div></div>
+        <button class="close" id="dialog-close" type="button" aria-label="Close">✕</button>
+      </header>
+      <div class="diff-body" id="diff-body"></div>
+    </div>
+  </dialog>
+
+  <script id="report-data" type="application/json">__DECOMP_REPORT_DATA__</script>
+  <script>
+  (() => {
+    "use strict";
+    const report = JSON.parse(document.getElementById("report-data").textContent);
+    const entities = report.entities;
+    const metrics = report.metrics;
+    const state = { group: null, file: null, search: "", status: "all", sort: "accuracy-asc", showStubs: false };
+    const $ = id => document.getElementById(id);
+    const pct = value => `${Number(value).toFixed(2)}%`;
+    const effectiveAccuracy = entity => entity.effective ? 1 : Number(entity.matching || 0);
+    const topGroup = source => source.startsWith("[") ? source.split("/")[0] : (source.includes("/") ? source.split("/")[0] : "Core");
+    const statusLabel = status => ({ exact:"Exact", effective:"Effective", partial:"Partial", zero:"Zero", unmatched:"Unmatched", stub:"Stub" }[status] || status);
+    const colorFor = entity => {
+      if (entity.stub) return "var(--purple)";
+      if (entity.status === "unmatched") return "var(--unknown)";
+      const value = effectiveAccuracy(entity);
+      if (value >= 1) return "var(--green)";
+      if (value >= .9) return "var(--lime)";
+      if (value >= .7) return "var(--gold)";
+      if (value > 0) return "var(--orange)";
+      return "var(--red)";
+    };
+    const numericColor = value => value >= .999 ? "var(--green)" : value >= .9 ? "var(--lime)" : value >= .7 ? "var(--gold)" : value > 0 ? "var(--orange)" : "var(--red)";
+
+    function element(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    function renderMetrics() {
+      const cards = [
+        ["Overall progress", pct(metrics.progress), `${metrics.effective_score.toFixed(2)} effective matches / ${metrics.total} expected`, "var(--cyan)"],
+        ["Implemented", pct(metrics.implemented / metrics.total * 100), `${metrics.implemented} / ${metrics.total} comparable functions`, "var(--purple)"],
+        ["Code accuracy", pct(metrics.accuracy), "Average effective accuracy of implemented functions", "var(--green)"],
+        ["Exact matches", String(metrics.exact), `${metrics.effective} additional effective · ${metrics.stubs} stubs`, "var(--gold)"]
+      ];
+      const host = $("metrics");
+      cards.forEach(([label, value, detail, accent]) => {
+        const card = element("article", "metric");
+        card.style.setProperty("--accent", accent);
+        card.append(element("div", "metric-label", label), element("div", "metric-value", value), element("div", "metric-detail", detail));
+        host.append(card);
+      });
+    }
+
+    function groupedFunctions() {
+      const map = new Map();
+      entities.filter(e => !e.stub).forEach(entity => {
+        const group = topGroup(entity.source);
+        if (!map.has(group)) map.set(group, []);
+        map.get(group).push(entity);
+      });
+      return map;
+    }
+
+    function aggregate(items) {
+      const comparable = items.filter(item => !item.stub && item.status !== "unmatched");
+      return {
+        count: items.length,
+        accuracy: comparable.length ? comparable.reduce((sum, item) => sum + effectiveAccuracy(item), 0) / comparable.length : 0,
+        exact: items.filter(item => item.status === "exact" || item.status === "effective").length,
+        unmatched: items.filter(item => item.status === "unmatched").length
+      };
+    }
+
+    // Balanced binary treemap: deterministic, compact, and dependency-free.
+    function layout(items, x, y, width, height, depth = 0) {
+      if (!items.length) return [];
+      if (items.length === 1) return [{ ...items[0], x, y, width, height }];
+      const ordered = [...items].sort((a, b) => b.weight - a.weight || a.name.localeCompare(b.name));
+      const total = ordered.reduce((sum, item) => sum + item.weight, 0);
+      let running = 0, split = 1, best = Infinity;
+      for (let index = 1; index < ordered.length; index++) {
+        running += ordered[index - 1].weight;
+        const distance = Math.abs(total / 2 - running);
+        if (distance < best) { best = distance; split = index; }
+      }
+      const first = ordered.slice(0, split), second = ordered.slice(split);
+      const firstWeight = first.reduce((sum, item) => sum + item.weight, 0);
+      const ratio = firstWeight / total;
+      const horizontal = width >= height;
+      if (horizontal) {
+        const firstWidth = width * ratio;
+        return [...layout(first, x, y, firstWidth, height, depth + 1), ...layout(second, x + firstWidth, y, width - firstWidth, height, depth + 1)];
+      }
+      const firstHeight = height * ratio;
+      return [...layout(first, x, y, width, firstHeight, depth + 1), ...layout(second, x, y + firstHeight, width, height - firstHeight, depth + 1)];
+    }
+
+    function renderTreemapNav() {
+      const nav = $("treemap-nav"); nav.replaceChildren();
+      const parts = [{ label: "Project", action: () => { state.group = null; state.file = null; renderTreemap(); } }];
+      if (state.group) parts.push({ label: state.group, action: () => { state.file = null; renderTreemap(); } });
+      if (state.file) parts.push({ label: state.file.split("/").pop(), action: () => {} });
+      parts.forEach((part, index) => {
+        if (index) nav.append(element("span", "crumb-sep", "/"));
+        const button = element("button", "crumb", part.label); button.type = "button"; button.addEventListener("click", part.action); nav.append(button);
+      });
+    }
+
+    function renderTreemap() {
+      renderTreemapNav();
+      const host = $("treemap"); host.replaceChildren();
+      let items;
+      if (!state.group) {
+        items = [...groupedFunctions()].map(([name, members]) => ({ name, members, weight: members.length, kind: "group" }));
+      } else if (!state.file) {
+        const members = groupedFunctions().get(state.group) || [];
+        const files = new Map();
+        members.forEach(item => { if (!files.has(item.source)) files.set(item.source, []); files.get(item.source).push(item); });
+        items = [...files].map(([name, fileMembers]) => ({ name, members: fileMembers, weight: fileMembers.length, kind: "file" }));
+      } else {
+        items = entities.filter(item => !item.stub && item.source === state.file).map(item => ({ name: item.name, members: [item], weight: 1, kind: "function", entity: item }));
+      }
+      const rects = layout(items, 0, 0, 100, 100);
+      rects.forEach(item => {
+        const stats = aggregate(item.members);
+        const button = element("button", `tree-node ${item.kind === "function" ? "tree-leaf" : ""}`);
+        button.type = "button";
+        button.style.left = `${item.x}%`; button.style.top = `${item.y}%`; button.style.width = `${item.width}%`; button.style.height = `${item.height}%`;
+        button.style.setProperty("--node-color", item.kind === "function" ? colorFor(item.entity) : numericColor(stats.accuracy));
+        button.title = `${item.name}\n${stats.count} function${stats.count === 1 ? "" : "s"} · ${pct(stats.accuracy * 100)} effective accuracy`;
+        const label = element("span", "tree-label");
+        label.append(element("span", "tree-name", item.name.split("/").pop()), element("span", "tree-meta", item.kind === "function" ? (item.entity.status === "unmatched" ? "unmatched" : pct(effectiveAccuracy(item.entity) * 100)) : `${stats.count} fn · ${pct(stats.accuracy * 100)}`));
+        button.append(label);
+        if (item.kind !== "function" && item.width > 12 && item.height > 12) {
+          const mosaic = element("span", "tree-mosaic");
+          item.members.slice(0, 300).forEach(member => { const dot = element("i", "tree-dot"); dot.style.setProperty("--dot", colorFor(member)); mosaic.append(dot); });
+          button.append(mosaic);
+        }
+        button.addEventListener("click", () => {
+          if (item.kind === "group") { state.group = item.name; state.file = null; renderTreemap(); }
+          else if (item.kind === "file") { state.file = item.name; renderTreemap(); }
+          else openEntity(item.entity);
+        });
+        host.append(button);
+      });
+    }
+
+    function renderHistogram() {
+      const comparable = entities.filter(e => !e.stub && e.status !== "unmatched");
+      const definitions = [
+        ["0%", 0, 0, "var(--red)"], ["1–49", .00001, .5, "var(--orange)"], ["50–69", .5, .7, "#e9a34f"],
+        ["70–89", .7, .9, "var(--gold)"], ["90–98", .9, .99, "var(--lime)"], ["99%", .99, 1, "#7cdea4"], ["100%", 1, 1.0001, "var(--green)"]
+      ];
+      const buckets = definitions.map(([label, min, max, color]) => ({ label, color, count: comparable.filter(e => e.matching >= min && e.matching < max).length }));
+      const maximum = Math.max(1, ...buckets.map(b => b.count));
+      const host = $("histogram");
+      buckets.forEach(bucket => {
+        const column = element("div", "hist-bucket");
+        const wrap = element("div", "hist-bar-wrap"); const bar = element("div", "hist-bar");
+        bar.style.height = `${bucket.count / maximum * 100}%`; bar.style.setProperty("--bar", bucket.color); wrap.append(bar);
+        column.append(element("div", "hist-count", String(bucket.count)), wrap, element("div", "hist-label", bucket.label)); host.append(column);
+      });
+      const breakdown = $("breakdown");
+      const parts = [["Exact", metrics.exact, "var(--green)"], ["Effective", metrics.effective, "var(--cyan)"], ["Partial", metrics.partial, "var(--gold)"], ["Zero", metrics.zero, "var(--red)"], ["Unmatched", metrics.unmatched, "var(--unknown)"]];
+      parts.forEach(([label, count, color]) => {
+        const row = element("div", "break-row"); const track = element("div", "bar-track"); const fill = element("div", "bar-fill");
+        fill.style.setProperty("--width", `${Number(count) / metrics.total * 100}%`); fill.style.setProperty("--color", color); track.append(fill);
+        row.append(element("span", "break-label", label), track, element("span", "break-count", String(count))); breakdown.append(row);
+      });
+    }
+
+    function renderGroupCards() {
+      const host = $("group-cards");
+      [...groupedFunctions()].map(([name, members]) => ({ name, members, ...aggregate(members) }))
+        .sort((a, b) => a.accuracy - b.accuracy || b.count - a.count).forEach(group => {
+          const card = element("article", "file-card"); const color = numericColor(group.accuracy);
+          card.style.setProperty("--score", color); card.tabIndex = 0;
+          const top = element("div", "file-card-top"); top.append(element("div", "file-name", group.name), element("div", "file-score", pct(group.accuracy * 100)));
+          const bar = element("div", "file-bar"); const fill = element("div"); fill.style.setProperty("--width", `${group.accuracy * 100}%`); bar.append(fill);
+          card.append(top, bar, element("div", "file-meta", `${group.count} functions · ${group.exact} exact/effective · ${group.unmatched} unmatched`));
+          const activate = () => { state.group = group.name; state.file = null; renderTreemap(); renderExplorer(); $("treemap").scrollIntoView({ behavior: "smooth", block: "center" }); };
+          card.addEventListener("click", activate); card.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") activate(); });
+          host.append(card);
+        });
+    }
+
+    function filteredEntities() {
+      const needle = state.search.trim().toLowerCase();
+      let output = entities.filter(entity => state.showStubs || !entity.stub);
+      if (state.group) output = output.filter(entity => topGroup(entity.source) === state.group);
+      if (state.file) output = output.filter(entity => entity.source === state.file);
+      if (state.status !== "all") output = output.filter(entity => entity.status === state.status);
+      if (needle) output = output.filter(entity => `${entity.name} ${entity.source} ${entity.address} ${entity.recomp || ""}`.toLowerCase().includes(needle));
+      const sorts = {
+        "accuracy-asc": (a,b) => effectiveAccuracy(a) - effectiveAccuracy(b) || a.name.localeCompare(b.name),
+        "accuracy-desc": (a,b) => effectiveAccuracy(b) - effectiveAccuracy(a) || a.name.localeCompare(b.name),
+        address: (a,b) => String(a.address).localeCompare(String(b.address), undefined, { numeric:true }),
+        name: (a,b) => a.name.localeCompare(b.name), source: (a,b) => a.source.localeCompare(b.source) || a.name.localeCompare(b.name)
+      };
+      return output.sort(sorts[state.sort]);
+    }
+
+    function renderExplorer() {
+      const output = filteredEntities(); const body = $("function-body"); body.replaceChildren();
+      $("result-line").textContent = `${output.length} function${output.length === 1 ? "" : "s"}${state.group ? ` in ${state.group}` : ""}${state.file ? ` / ${state.file.split("/").pop()}` : ""}`;
+      if (!output.length) { const row = element("tr"); const cell = element("td", "empty", "No functions match the current filters."); cell.colSpan = 6; row.append(cell); body.append(row); return; }
+      output.forEach(entity => {
+        const row = element("tr"); const score = entity.status === "unmatched" ? "—" : pct(effectiveAccuracy(entity) * 100); const color = colorFor(entity);
+        const scoreNode = element("span", "score-pill", score); scoreNode.style.setProperty("--score", color);
+        const scoreCell = element("td"); scoreCell.append(scoreNode);
+        row.append(element("td", "mono", entity.address), element("td", "mono", entity.recomp || "—"), element("td", "name-cell", entity.name), scoreCell, element("td", "source-cell mono", entity.source), element("td", "mono", statusLabel(entity.status)));
+        row.addEventListener("click", () => openEntity(entity)); body.append(row);
+      });
+    }
+
+    function diffRow(origAddr, origText, recompAddr, recompText, same = false) {
+      const row = element("tr");
+      row.append(element("td", "addr", origAddr || ""), element("td", same ? "same" : origText ? "orig" : "", origText || ""), element("td", "addr divider", recompAddr || ""), element("td", same ? "same" : recompText ? "recomp" : "", recompText || ""));
+      return row;
+    }
+
+    function openEntity(entity) {
+      $("dialog-title").textContent = entity.name;
+      $("dialog-meta").textContent = `${entity.address} → ${entity.recomp || "not paired"} · ${entity.source} · ${entity.status === "unmatched" ? "unmatched" : pct(effectiveAccuracy(entity) * 100)}`;
+      const body = $("diff-body"); body.replaceChildren();
+      if (!entity.diff || !entity.diff.length) {
+        body.append(element("div", "diff-empty", entity.status === "exact" ? "Exact machine-code match. No differing instructions to display." : entity.stub ? "Stub functions are excluded from instruction comparison." : "No assembly diff is available for this function."));
+      } else {
+        entity.diff.forEach(([slug, groups]) => {
+          const section = element("section", "diff-group"); section.append(element("div", "diff-slug", slug));
+          const table = element("table", "asm"); const tableBody = element("tbody");
+          groups.forEach(group => {
+            (group.both || []).forEach(row => tableBody.append(diffRow(row[0], row[1], row[2], row[1], true)));
+            const orig = group.orig || [], recomp = group.recomp || [], count = Math.max(orig.length, recomp.length);
+            for (let index = 0; index < count; index++) {
+              const left = orig[index] || [], right = recomp[index] || [];
+              tableBody.append(diffRow(left[0], left[1], right[0], right[1]));
+            }
+          });
+          table.append(tableBody); section.append(table); body.append(section);
+        });
+      }
+      $("function-dialog").showModal();
+    }
+
+    function bindControls() {
+      $("search").addEventListener("input", event => { state.search = event.target.value; renderExplorer(); });
+      $("status-filter").addEventListener("change", event => { state.status = event.target.value; if (state.status === "stub") { state.showStubs = true; $("show-stubs").checked = true; } renderExplorer(); });
+      $("sort").addEventListener("change", event => { state.sort = event.target.value; renderExplorer(); });
+      $("show-stubs").addEventListener("change", event => { state.showStubs = event.target.checked; renderExplorer(); });
+      $("dialog-close").addEventListener("click", () => $("function-dialog").close());
+      $("function-dialog").addEventListener("click", event => { if (event.target === $("function-dialog")) $("function-dialog").close(); });
+    }
+
+    $("generated").textContent = `Generated ${new Date(report.generated * 1000).toLocaleString()}`;
+    $("report-meta").textContent = `${metrics.report_entities} reccmp entities · ${entities.length} visualized records`;
+    renderMetrics(); renderTreemap(); renderHistogram(); renderGroupCards(); bindControls(); renderExplorer();
+  })();
+  </script>
+</body>
+</html>

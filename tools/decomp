@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+configure() {
+    cmake -S . -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_SYSTEM_NAME=Windows \
+        -DCMAKE_C_COMPILER=cl \
+        -DCMAKE_CXX_COMPILER=cl \
+        -DCMAKE_RC_COMPILER=rc \
+        -DCMAKE_C_DEPFILE_FORMAT=msvc \
+        -DCMAKE_DEPFILE_FLAGS_C=/showIncludes \
+        -DCMAKE_CXX_DEPFILE_FORMAT=msvc \
+        -DCMAKE_DEPFILE_FLAGS_CXX=/showIncludes
+}
+
+build() {
+    if [[ ! -f build/build.ninja ]]; then
+        configure
+    fi
+    cmake --build build -- -j1
+    (
+        cd build
+        reccmp-project detect --what recompiled
+    )
+}
+
+ensure_build() {
+    if [[ ! -f build/reccmp-build.yml || ! -f build/toy2.exe || ! -f build/toy2.pdb ]]; then
+        build
+    fi
+}
+
+report() {
+    local output="${1:-build/decomp-report.html}"
+    local report_json="build/decomp-report-data.json"
+    local report_summary="build/decomp-report-summary.txt"
+
+    if [[ $# -gt 1 ]]; then
+        echo "Usage: tools/decomp report [output.html]" >&2
+        return 2
+    fi
+    ensure_build
+
+    (
+        cd build
+        reccmp-reccmp \
+            --target TOY2 \
+            --silent \
+            --no-color \
+            --json "$(basename "$report_json")"
+    ) > "$report_summary"
+    cat "$report_summary"
+
+    python tools/generate-decomp-report.py \
+        --input "$report_json" \
+        --summary "$report_summary" \
+        --source-root src \
+        --functions-map tools/Resources/functions_map.txt \
+        --template tools/decomp-report-template.html \
+        --output "$output"
+}
+
+usage() {
+    cat <<'EOF'
+Usage: tools/decomp <command> [arguments]
+
+Commands:
+  configure         Configure the VC6 SP3 build through Wine
+  build             Build toy2.exe/patcher.dll and register the output
+  compare [args]    Run reccmp against the reference and recompiled EXEs
+  report [file]     Generate the self-contained HTML decompilation dashboard
+  progress [scope]  Show annotation progress, optionally for a namespace
+  run [args]        Run the recompiled toy2.exe through Wine
+  shell             Start a shell with the decompilation environment active
+EOF
+}
+
+command="${1:-}"
+if [[ $# -gt 0 ]]; then
+    shift
+fi
+
+case "$command" in
+    help|-h|--help|"")
+        usage
+        exit 0
+        ;;
+esac
+
+source tools/linux-decomp-env.sh
+
+case "$command" in
+    configure)
+        configure "$@"
+        ;;
+    build)
+        build "$@"
+        ;;
+    compare)
+        ensure_build
+        (cd build && reccmp-reccmp --target TOY2 "$@")
+        ;;
+    report)
+        report "$@"
+        ;;
+    progress)
+        if [[ $# -gt 1 ]]; then
+            echo "Usage: tools/decomp progress [namespace]" >&2
+            exit 2
+        elif [[ $# -eq 1 ]]; then
+            python decomp_utils.py --progress "$1"
+        else
+            python decomp_utils.py --progress
+        fi
+        ;;
+    run)
+        ensure_build
+        exec wine build/toy2.exe "$@"
+        ;;
+    shell)
+        exec "${SHELL:-/bin/bash}" -i
+        ;;
+    *)
+        echo "Unknown command: $command" >&2
+        usage >&2
+        exit 2
+        ;;
+esac

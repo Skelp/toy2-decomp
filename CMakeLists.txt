@@ -166,8 +166,9 @@ add_executable(toy2decomp WIN32
     resources/toy2.rc
 )
 
-# Build the testing dll(s)
-add_library(patcher SHARED
+# Build the dynamically loaded testing dll(s). MODULE avoids declaring an
+# import library output: patcher exports no symbols, so VC6 does not create one.
+add_library(patcher MODULE
     patcher/main.cpp
 
     patcher/Loader.cpp
