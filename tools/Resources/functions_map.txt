@@ -765,8 +765,8 @@
 0x004B2D50 Renderer::BeginScene
 0x004B2D80 Renderer::ApplyFogSettings
 0x004B2DE0 Renderer::EndScene
-0x004B2E30 Nu3D::PrimitiveHeader::Destroy
-0x004B2E60 Nu3D::PrimitiveHeader::Init
+0x004B2E30 Nu3D::Primitive::DestroyHeader
+0x004B2E60 Nu3D::Primitive::InitHeader
 0x004B2EB0 Nu3D::Patch::PatchVertices::ReleaseBuffer
 0x004B2ED0 Nu3D::Patch::PatchVertices::CreateVertexBuffer
 0x004B3050 Nu3D::Patch::PatchVertices::UpdateVertexBuffer
@@ -775,9 +775,11 @@
 0x004B3190 Nu3D::Primitive::Remove
 0x004B31D0 Nu3D::Primitive::Build
 0x004B3210 Nu3D::Patch::PatchVertices::Resize
-0x004B3240 Nu3D::PrimitiveHeader::Build
+0x004B3240 Nu3D::Primitive::BuildHeader
 0x004B3280 Nu3D::Primitive::Alloc
+0x004B32C0 Nu3D::Primitive::ReleaseAllVertexBuffers
 0x004B32E0 Nu3D::Primitive::CreateAllVertexBuffers
+0x004B3320 Nu3D::Primitive::UpdateAllVertexBuffers
 0x004B3350 NGNLoader::AllocPortalVertices
 0x004B33A0 NGNImage::DestroyPortal
 0x004B33B0 Nu3D::AreaPortal::CalculateBoundingSphere

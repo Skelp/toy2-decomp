@@ -30,10 +30,15 @@ namespace Nu3D
 		float boundSphereRadius;
 		float boundSphereRadiusSq;
 
-		static int32_t CreateAllVertexBuffers(Primitive* prim, int32_t flags);
+		static void DestroyHeader(Header* primHeader);
+		static void Destroy(Primitive* primitive);
+		static void Remove(Primitive* primitive);
+		static void ReleaseAllVertexBuffers(Primitive* primitive);
+		static int32_t CreateAllVertexBuffers(Primitive* primitive, int32_t flags);
+		static int32_t UpdateAllVertexBuffers(Primitive* primitive);
 		static void ComputeBounds(Primitive* primitive);
 		static Primitive* Alloc();
-		static Header* BuildHeader(int32_t size);
+		static Header* BuildHeader(int32_t headerCount);
 		static Primitive* Build(int32_t verticesSize, int32_t headerCount);
 		static int32_t InitHeader(Header* primHeader, int32_t drawType, int32_t indexCount);
 	};

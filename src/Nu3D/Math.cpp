@@ -133,12 +133,28 @@ namespace Nu3D
 			result->z = tempZ;
 		}
 
+		// FUNCTION: TOY2 0x004A91B0
+		void VertexAdd(Vector3F* result, Vector3F* v1, Vector3F* v2)
+		{
+			result->x = v1->x + v2->x;
+			result->y = v1->y + v2->y;
+			result->z = v1->z + v2->z;
+		}
+
 		// FUNCTION: TOY2 0x004A91E0 [MATCHED]
 		void VertexSubtract(Vector3F* result, Vector3F* v1, Vector3F* v2)
 		{
 			result->x = v1->x - v2->x;
 			result->y = v1->y - v2->y;
 			result->z = v1->z - v2->z;
+		}
+
+		// FUNCTION: TOY2 0x004A9210
+		void ScaleVector(Vector3F* result, Vector3F* vector, float scale)
+		{
+			result->x = scale * vector->x;
+			result->y = scale * vector->y;
+			result->z = scale * vector->z;
 		}
 
 		// FUNCTION: TOY2 0x004A9270 [MATCHED]
