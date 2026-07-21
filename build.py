@@ -12,6 +12,7 @@ import subprocess
 from pathlib import Path
 
 
+PROJECT_NAME = "toy2"
 ROOT = Path(__file__).resolve().parent
 BUILD_FOLDER = ROOT / "build"
 
