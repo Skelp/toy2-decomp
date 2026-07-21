@@ -74,6 +74,7 @@ namespace Renderer
 	extern int32_t g_deviceBlendShadeCapsCpy;
 	extern int32_t g_boundTextureIndices[8];
 	extern Nu3D::Material* g_boundMaterial;
+	extern LPDIRECT3DDEVICE3 g_drawDeviceD3DDevice;
 
 	void Cleanup();
 	void Init();

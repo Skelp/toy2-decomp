@@ -13,6 +13,13 @@ namespace Nu3D
 		Vector2F coords;
 	};
 
+	struct VertexUncolored
+	{
+		Vector3F position;
+		Vector3F normals;
+		Vector2F coords;
+	};
+
 	struct VertexTL
 	{
 		Vector3F position;
@@ -43,6 +50,7 @@ namespace Nu3D
 	void SetDefaultPrimFlags(int32_t option);
 
 	STATIC_ASSERT(sizeof(VertexTL) == 32);
+	STATIC_ASSERT(sizeof(VertexUncolored) == 32);
 	STATIC_ASSERT(sizeof(Vertex) == 36);
 	STATIC_ASSERT(sizeof(ShapeVertex) == 40);
 }

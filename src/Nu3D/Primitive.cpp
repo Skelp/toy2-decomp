@@ -36,22 +36,6 @@ namespace Nu3D
 		return prim;
 	}
 
-	// FUNCTION: TOY2 0x004B3210
-	void Primitive::ResizePatchVerts(Patch::PatchVertices* patchVerts, int32_t verticesSize)
-	{
-		Nu3D::Vertex* vertexList = (Nu3D::Vertex*)malloc(sizeof(Nu3D::Vertex) * verticesSize);
-
-		if (vertexList)
-		{
-			if (patchVerts)
-			{
-				patchVerts->format = D3DFVF_0x152;
-				patchVerts->data.vertices = vertexList;
-				patchVerts->vertexCount = verticesSize;
-			}
-		}
-	}
-
 	// FUNCTION: TOY2 0x004B3240
 	Primitive::Header* Primitive::BuildHeader(int32_t size)
 	{
@@ -75,7 +59,7 @@ namespace Nu3D
 
 		if (prim)
 		{
-			ResizePatchVerts(&prim->patchVerts, verticesSize);
+			Patch::PatchVertices::Resize(&prim->patchVerts, verticesSize);
 
 			prim->headerCount = headerCount;
 			prim->header = BuildHeader(headerCount);
