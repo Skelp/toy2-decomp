@@ -7,7 +7,7 @@ import argparse
 import json
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -246,7 +246,9 @@ def enrich_report(
         "project": "Toy Story 2",
         "binary": report.get("file", "toy2.exe"),
         "generated": report.get("timestamp", 0),
-        "generated_iso": datetime.fromtimestamp(report.get("timestamp", 0)).astimezone().isoformat(),
+        "generated_iso": datetime.fromtimestamp(
+            report.get("timestamp", 0), timezone.utc
+        ).astimezone().isoformat(),
         "metrics": summary,
         "entities": entities,
     }
