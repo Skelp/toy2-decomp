@@ -47,6 +47,8 @@ namespace Nu3D
 		extern D3DMATRIX g_screenToClipMatrix;
 		extern D3DMATRIX g_screenViewProjectionMatrix;
 		extern CameraData g_activeCamera;
+		extern CameraData* g_currentCamera;
+		extern ActiveCameraTransform g_activeCameraTransform;
 		extern ReflectionState g_reflectionState;
 		extern int32_t g_effectMode;
 

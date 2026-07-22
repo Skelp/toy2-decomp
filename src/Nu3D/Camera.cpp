@@ -39,6 +39,12 @@ namespace Nu3D
 		// GLOBAL: TOY2 0x00E4D880
 		CameraData g_activeCamera;
 
+		// GLOBAL: TOY2 0x00B623FC
+		CameraData* g_currentCamera;
+
+		// GLOBAL: TOY2 0x00B223C8
+		ActiveCameraTransform g_activeCameraTransform;
+
 		// GLOBAL: TOY2 0x00A4C410
 		int32_t g_effectMode;
 
