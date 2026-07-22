@@ -7,6 +7,9 @@ struct Vector3F
 	float x;
 	float y;
 	float z;
+
+	static float DotProduct(const Vector3F* left, const Vector3F* right);
+	static float Length(const Vector3F* vector);
 };
 
 struct Vector3I

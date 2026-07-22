@@ -1,6 +1,12 @@
 #include "Nu3D/Math.h"
 #include <MATH.H>
 
+// FUNCTION: TOY2 0x004A92C0 [MATCHED]
+float Vector3F::DotProduct(const Vector3F* left, const Vector3F* right) { return left->x * right->x + left->y * right->y + left->z * right->z; }
+
+// FUNCTION: TOY2 0x004A92E0 [MATCHED]
+float Vector3F::Length(const Vector3F* vector) { return (float)sqrt(vector->x * vector->x + vector->y * vector->y + vector->z * vector->z); }
+
 namespace Nu3D
 {
 	namespace Math
@@ -12,8 +18,87 @@ namespace Nu3D
 		// GLOBAL: TOY2 0x004DDA48
 		D3DMATRIX g_identityMatrix = { 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 };
 
+		// GLOBAL: TOY2 0x00505548
+		D3DMATRIX g_matrixMultiplyResult;
+
+		// FUNCTION: TOY2 0x004A8B30
+		float Abs(float value)
+		{
+			union FloatBits
+			{
+				float value;
+				uint32_t bits;
+			} scalar;
+
+			scalar.value = value;
+			scalar.bits &= 0x7FFFFFFF;
+			return scalar.value;
+		}
+
+		// FUNCTION: TOY2 0x004A8BF0 [MATCHED]
+		void TransformPointByMatrix(Vector3F* result, const Vector3F* sourceVector, const D3DMATRIX* matrix)
+		{
+			float transformedY = matrix->_32 * sourceVector->z + matrix->_12 * sourceVector->x + matrix->_22 * sourceVector->y + matrix->_42;
+			float transformedZ = matrix->_33 * sourceVector->z + matrix->_13 * sourceVector->x + matrix->_23 * sourceVector->y + matrix->_43;
+			float transformedX = matrix->_31 * sourceVector->z + matrix->_21 * sourceVector->y;
+
+			result->x = transformedX + sourceVector->x * matrix->_11 + matrix->_41;
+			result->y = transformedY;
+			result->z = transformedZ;
+		}
+
+		// FUNCTION: TOY2 0x004A8C60
+		void ProjectPoint(Vector3F* result, const Vector3F* sourceVector, const D3DMATRIX* matrix)
+		{
+			float inverseW = 1.0f / (matrix->_34 * sourceVector->z + matrix->_14 * sourceVector->x + matrix->_24 * sourceVector->y + matrix->_44);
+			float transformedY = matrix->_32 * sourceVector->z + matrix->_12 * sourceVector->x + matrix->_22 * sourceVector->y + matrix->_42;
+			float transformedZ = matrix->_33 * sourceVector->z + matrix->_13 * sourceVector->x + matrix->_23 * sourceVector->y + matrix->_43;
+			float transformedX = matrix->_31 * sourceVector->z + matrix->_21 * sourceVector->y;
+
+			result->x = (transformedX + sourceVector->x * matrix->_11 + matrix->_41) * inverseW;
+			result->y = transformedY * inverseW;
+			result->z = transformedZ * inverseW;
+		}
+
+		// FUNCTION: TOY2 0x004A8D80
+		void TransformPointPerspective(Vector3F* result, const Vector3F* sourceVector, const D3DMATRIX* matrix)
+		{
+			float inverseW = 1.0f / (matrix->_34 * sourceVector->z + matrix->_14 * sourceVector->x + matrix->_24 * sourceVector->y);
+			float transformedY = matrix->_32 * sourceVector->z + matrix->_12 * sourceVector->x + matrix->_22 * sourceVector->y;
+			float transformedZ = matrix->_33 * sourceVector->z + matrix->_13 * sourceVector->x + matrix->_23 * sourceVector->y;
+			float transformedX = matrix->_31 * sourceVector->z + matrix->_21 * sourceVector->y;
+
+			result->x = (transformedX + sourceVector->x * matrix->_11) * inverseW;
+			result->y = transformedY * inverseW;
+			result->z = transformedZ * inverseW;
+		}
+
 		// FUNCTION: TOY2 0x004A9400 [MATCHED]
 		void BuildIdentityMatrix(D3DMATRIX* matrix) { memcpy(matrix, &g_identityMatrix, sizeof(D3DMATRIX)); }
+
+		// FUNCTION: TOY2 0x004A94C0
+		void ApplyRotateXFromLut(D3DMATRIX* matrix, int32_t trigOffset)
+		{
+			float cosine = Numerics::g_trigLUT[(trigOffset + 0x4000) & 0xFFFF];
+			float sine = Numerics::g_trigLUT[trigOffset & 0xFFFF];
+
+			matrix->_11 = 1.0f;
+			matrix->_12 = 0.0f;
+			matrix->_13 = 0.0f;
+			matrix->_14 = 0.0f;
+			matrix->_21 = 0.0f;
+			matrix->_22 = cosine;
+			matrix->_23 = sine;
+			matrix->_24 = 0.0f;
+			matrix->_31 = 0.0f;
+			matrix->_32 = -sine;
+			matrix->_33 = cosine;
+			matrix->_34 = 0.0f;
+			matrix->_41 = 0.0f;
+			matrix->_42 = 0.0f;
+			matrix->_43 = 0.0f;
+			matrix->_44 = 1.0f;
+		}
 
 		// FUNCTION: TOY2 0x004A9530
 		void SetRotationYFromU16AngleLUT(D3DMATRIX* matrix, int32_t trigOffset)
@@ -54,6 +139,20 @@ namespace Nu3D
 			matrix->_41 = matrix->_41 * vector->x;
 			matrix->_42 = matrix->_42 * vector->y;
 			matrix->_43 = matrix->_43 * vector->z;
+		}
+
+		// FUNCTION: TOY2 0x004A98D0 [MATCHED]
+		void MatrixApplyScale(D3DMATRIX* matrix, const Vector3F* scale)
+		{
+			matrix->_11 *= scale->x;
+			matrix->_12 *= scale->x;
+			matrix->_13 *= scale->x;
+			matrix->_21 *= scale->y;
+			matrix->_22 *= scale->y;
+			matrix->_23 *= scale->y;
+			matrix->_31 *= scale->z;
+			matrix->_32 *= scale->z;
+			matrix->_33 *= scale->z;
 		}
 
 		// FUNCTION: TOY2 0x004A9D50 [MATCHED]
@@ -135,6 +234,57 @@ namespace Nu3D
 			matrix->_43 = temp42 * sinAngle + cosAngle * matrix->_43;
 		}
 
+		// FUNCTION: TOY2 0x004A9AA0
+		void MatrixRotatePitch(D3DMATRIX* matrix, int32_t trigOffset)
+		{
+			float cosine = Numerics::g_trigLUT[(trigOffset + 0x4000) & 0xFFFF];
+			float sine = Numerics::g_trigLUT[trigOffset & 0xFFFF];
+			float m21 = matrix->_21;
+			float m22 = matrix->_22;
+			float m23 = matrix->_23;
+
+			matrix->_21 = m21 * cosine + sine * matrix->_31;
+			matrix->_22 = m22 * cosine + sine * matrix->_32;
+			matrix->_23 = m23 * cosine + sine * matrix->_33;
+			matrix->_31 = cosine * matrix->_31 - m21 * sine;
+			matrix->_32 = cosine * matrix->_32 - m22 * sine;
+			matrix->_33 = cosine * matrix->_33 - m23 * sine;
+		}
+
+		// FUNCTION: TOY2 0x004A9CB0
+		void MatrixRotateYaw(D3DMATRIX* matrix, int32_t trigOffset)
+		{
+			float cosine = Numerics::g_trigLUT[(trigOffset + 0x4000) & 0xFFFF];
+			float sine = Numerics::g_trigLUT[trigOffset & 0xFFFF];
+			float m11 = matrix->_11;
+			float m12 = matrix->_12;
+			float m13 = matrix->_13;
+
+			matrix->_11 = m11 * cosine - sine * matrix->_31;
+			matrix->_12 = m12 * cosine - sine * matrix->_32;
+			matrix->_13 = m13 * cosine - sine * matrix->_33;
+			matrix->_31 = cosine * matrix->_31 + m11 * sine;
+			matrix->_32 = cosine * matrix->_32 + m12 * sine;
+			matrix->_33 = cosine * matrix->_33 + m13 * sine;
+		}
+
+		// FUNCTION: TOY2 0x004A9EC0 [MATCHED]
+		void MatrixRotateRoll(D3DMATRIX* matrix, int32_t trigOffset)
+		{
+			float cosine = Numerics::g_trigLUT[(trigOffset + 0x4000) & 0xFFFF];
+			float sine = Numerics::g_trigLUT[trigOffset & 0xFFFF];
+			float m11 = matrix->_11;
+			float m12 = matrix->_12;
+			float m13 = matrix->_13;
+
+			matrix->_11 = m11 * cosine + sine * matrix->_21;
+			matrix->_12 = m12 * cosine + sine * matrix->_22;
+			matrix->_13 = m13 * cosine + sine * matrix->_23;
+			matrix->_21 = cosine * matrix->_21 - m11 * sine;
+			matrix->_22 = cosine * matrix->_22 - m12 * sine;
+			matrix->_23 = cosine * matrix->_23 - m13 * sine;
+		}
+
 		// FUNCTION: TOY2 0x004A9750 [MATCHED]
 		void AddWorldSpaceTransform(D3DMATRIX* matrix, Vector3F* offset)
 		{
@@ -149,6 +299,22 @@ namespace Nu3D
 			output->x = matrix->_41;
 			output->y = matrix->_42;
 			output->z = matrix->_43;
+		}
+
+		// FUNCTION: TOY2 0x004A9800 [MATCHED]
+		void GetRightVector(D3DMATRIX* matrix, Vector3F* output)
+		{
+			output->x = matrix->_11;
+			output->y = matrix->_12;
+			output->z = matrix->_13;
+		}
+
+		// FUNCTION: TOY2 0x004A9820 [MATCHED]
+		void GetUpVector(D3DMATRIX* matrix, Vector3F* output)
+		{
+			output->x = matrix->_21;
+			output->y = matrix->_22;
+			output->z = matrix->_23;
 		}
 
 		// FUNCTION: TOY2 0x004A9840
@@ -220,6 +386,29 @@ namespace Nu3D
 			output->z = scale * vector->z;
 
 			return magnitude;
+		}
+
+		// FUNCTION: TOY2 0x004A9F60
+		void MultiplyMatrix3x4(D3DMATRIX* output, const D3DMATRIX* left, const D3DMATRIX* right)
+		{
+			g_matrixMultiplyResult._11 = left->_13 * right->_31 + left->_11 * right->_11 + left->_12 * right->_21;
+			g_matrixMultiplyResult._12 = left->_13 * right->_32 + left->_11 * right->_12 + left->_12 * right->_22;
+			g_matrixMultiplyResult._13 = left->_13 * right->_33 + left->_11 * right->_13 + left->_12 * right->_23;
+			g_matrixMultiplyResult._14 = 0.0f;
+			g_matrixMultiplyResult._21 = left->_23 * right->_31 + left->_21 * right->_11 + left->_22 * right->_21;
+			g_matrixMultiplyResult._22 = left->_23 * right->_32 + left->_21 * right->_12 + left->_22 * right->_22;
+			g_matrixMultiplyResult._23 = left->_23 * right->_33 + left->_21 * right->_13 + left->_22 * right->_23;
+			g_matrixMultiplyResult._24 = 0.0f;
+			g_matrixMultiplyResult._31 = left->_33 * right->_31 + left->_31 * right->_11 + left->_32 * right->_21;
+			g_matrixMultiplyResult._32 = left->_33 * right->_32 + left->_31 * right->_12 + left->_32 * right->_22;
+			g_matrixMultiplyResult._33 = left->_33 * right->_33 + left->_31 * right->_13 + left->_32 * right->_23;
+			g_matrixMultiplyResult._34 = 0.0f;
+			g_matrixMultiplyResult._41 = left->_43 * right->_31 + left->_41 * right->_11 + left->_42 * right->_21 + right->_41;
+			g_matrixMultiplyResult._42 = left->_43 * right->_32 + left->_41 * right->_12 + left->_42 * right->_22 + right->_42;
+			g_matrixMultiplyResult._43 = left->_43 * right->_33 + left->_41 * right->_13 + left->_42 * right->_23 + right->_43;
+			g_matrixMultiplyResult._44 = 1.0f;
+
+			memcpy(output, &g_matrixMultiplyResult, sizeof(D3DMATRIX));
 		}
 
 		// FUNCTION: TOY2 0x004AA100
