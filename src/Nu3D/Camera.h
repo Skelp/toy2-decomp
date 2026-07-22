@@ -2,6 +2,7 @@
 
 #include "Common.h"
 #include "Numerics.h"
+#include <directx6/d3d.h>
 
 namespace Nu3D
 {
@@ -24,6 +25,9 @@ namespace Nu3D
 		void FadeToTargetTint();
 		void ApplyTransformToCamera(ActiveCameraTransform* camera);
 		void RebuildTransformPipeline();
+		void ScaleMatrix(D3DMATRIX* matrix);
+		void SetMatrixScaleVector(const Vector3F* scale);
+		void GetMatrixScaleVector(Vector3F* scale);
 
 		STATIC_ASSERT(sizeof(ActiveCameraTransform) == 0x14);
 	}

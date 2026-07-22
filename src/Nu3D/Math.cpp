@@ -21,6 +21,206 @@ namespace Nu3D
 		// GLOBAL: TOY2 0x00505548
 		D3DMATRIX g_matrixMultiplyResult;
 
+		// GLOBAL: TOY2 0x00508898
+		Vector3F g_matrixScale = { 1.0f, 1.0f, 1.0f };
+
+		static __forceinline int32_t ShiftFixedTowardZero(int32_t value, int32_t bits) { return (value + ((value >> 31) & ((1 << bits) - 1))) >> bits; }
+
+		static __forceinline int32_t MultiplyFixed12(int32_t left, int32_t right) { return ShiftFixedTowardZero(left * right, 12); }
+
+		static int32_t Cross2D32(const PointI& point1, const PointI& point2, const PointI& point3)
+		{ return (point1.y - point2.y) * (point3.x - point2.x) - (point3.y - point2.y) * (point1.x - point2.x); }
+
+		static int32_t PointNearLineSegment(const Vector3I* point, const Vector3I* edge, int32_t tolerance)
+		{
+			int32_t projection = point->x * edge->x + point->y * edge->y + point->z * edge->z;
+			int32_t lengthSquared = edge->x * edge->x + edge->y * edge->y + edge->z * edge->z;
+
+			if (projection < 0 || projection > lengthSquared)
+				return 0;
+
+			int32_t divisor = lengthSquared;
+			if ((divisor & 0xFFFFFF00) == 0)
+				divisor = 0x100;
+
+			int32_t fraction = (projection << 6) / (divisor >> 8);
+			int32_t deltaX = point->x - ((fraction * edge->x) >> 14);
+			int32_t deltaY = point->y - ((fraction * edge->y) >> 14);
+			int32_t deltaZ = point->z - ((fraction * edge->z) >> 14);
+			int32_t radius = tolerance / 31;
+
+			return deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ < 2 * radius * radius;
+		}
+
+		// FUNCTION: TOY2 0x00450C70
+		Matrix3x3I16* EulerToRotationMatrix(const Vector3I16* angles, Matrix3x3I16* output)
+		{
+			int32_t sineX = Numerics::g_fixedTrigLUT[angles->x & 0xFFF];
+			sineX += (sineX >> 31) & 3;
+			int32_t cosineX = Numerics::g_fixedTrigLUT[(angles->x + 0x400) & 0xFFF];
+			cosineX = ShiftFixedTowardZero(cosineX, 2);
+
+			int32_t sineY = Numerics::g_fixedTrigLUT[angles->y & 0xFFF];
+			sineY = ShiftFixedTowardZero(sineY, 2);
+			int32_t cosineY = Numerics::g_fixedTrigLUT[(angles->y + 0x400) & 0xFFF];
+			cosineY += (cosineY >> 31) & 3;
+
+			int32_t sineZ = Numerics::g_fixedTrigLUT[angles->z & 0xFFF];
+			sineZ += (sineZ >> 31) & 3;
+			int32_t cosineZ = Numerics::g_fixedTrigLUT[(angles->z + 0x400) & 0xFFF];
+			cosineZ = ShiftFixedTowardZero(cosineZ, 2);
+
+			cosineY >>= 2;
+			sineZ >>= 2;
+
+			output->m00 = (int16_t)MultiplyFixed12(cosineZ, cosineY);
+			output->m01 = (int16_t)-MultiplyFixed12(sineZ, cosineY);
+			output->m02 = (int16_t)sineY;
+
+			sineX >>= 2;
+			int32_t sineXsineY = MultiplyFixed12(sineY, sineX);
+			output->m10 = (int16_t)ShiftFixedTowardZero(sineXsineY * cosineZ + sineZ * cosineX, 12);
+			output->m11 = (int16_t)ShiftFixedTowardZero(cosineZ * cosineX - sineXsineY * sineZ, 12);
+			output->m12 = (int16_t)-MultiplyFixed12(cosineY, sineX);
+
+			int32_t cosineXsineY = MultiplyFixed12(sineY, cosineX);
+			output->m20 = (int16_t)ShiftFixedTowardZero(sineZ * sineX - cosineXsineY * cosineZ, 12);
+			output->m21 = (int16_t)ShiftFixedTowardZero(cosineXsineY * sineZ + cosineZ * sineX, 12);
+			output->m22 = (int16_t)MultiplyFixed12(cosineY, cosineX);
+
+			return output;
+		}
+
+		// FUNCTION: TOY2 0x00451F80
+		int32_t Cross2D(Point2I16 point1, Point2I16 point2, Point2I16 point3)
+		{ return (point1.y - point2.y) * (point3.x - point2.x) - (point3.y - point2.y) * (point1.x - point2.x); }
+
+		// FUNCTION: TOY2 0x00451FD0
+		int32_t NormalizeToFixedPoint(const Vector3I* input, Vector3I* output)
+		{
+			float x = (float)input->x;
+			float y = (float)input->y;
+			float z = (float)input->z;
+			float magnitude = (float)sqrt(x * x + y * y + z * z);
+			output->x = (int32_t)((float)input->x * 4096.0f / magnitude);
+			output->y = (int32_t)((float)input->y * 4096.0f / magnitude);
+			output->z = (int32_t)((float)input->z * 4096.0f / magnitude);
+			return 0;
+		}
+
+		// FUNCTION: TOY2 0x00452040 [MATCHED]
+		int32_t NormalizeToFixedPoint16(const Vector3I16* input, Vector3I16* output)
+		{
+			int16_t x = input->x;
+			int32_t z = input->z;
+			int32_t y = input->y;
+			int32_t magnitude = (int32_t)sqrt((float)((int32_t)x * x + y * y + z * z));
+
+			if (x != 0)
+				output->x = (int16_t)(((int32_t)x << 12) / magnitude);
+			if (input->y != 0)
+				output->y = (int16_t)(((int32_t)input->y << 12) / magnitude);
+			if (input->z != 0)
+				output->z = (int16_t)(((int32_t)input->z << 12) / magnitude);
+
+			return 0;
+		}
+
+		// FUNCTION: TOY2 0x004520D0
+		int32_t CartesianToFixedAngle(int32_t x, int32_t y)
+		{ return (int32_t)(atan2(x * 0.000244140625 * 6.283185308, y * 0.000244140625 * 6.283185308) * 0.15915494307111402 * 4096.0); }
+
+		// FUNCTION: TOY2 0x00480AE0
+		int16_t PointIntersectsTriangle(int32_t pointX,
+			int32_t pointY,
+			int32_t pointZ,
+			int32_t edge1X,
+			int32_t edge1Y,
+			int32_t edge1Z,
+			int32_t edge2X,
+			int32_t edge2Y,
+			int32_t edge2Z,
+			const Vector3I16* normal,
+			int32_t tolerance)
+		{
+			PointI point;
+			PointI edge1;
+			PointI edge2;
+			int32_t normalDirection;
+
+			int32_t absNormalX = normal->x < 0 ? -normal->x : normal->x;
+			int32_t absNormalY = normal->y < 0 ? -normal->y : normal->y;
+			int32_t absNormalZ = normal->z < 0 ? -normal->z : normal->z;
+
+			if (absNormalX >= absNormalY && absNormalX >= absNormalZ)
+			{
+				point.x = pointY;
+				point.y = pointZ;
+				edge1.x = edge1Y;
+				edge1.y = edge1Z;
+				edge2.x = edge2Y;
+				edge2.y = edge2Z;
+				normalDirection = normal->x;
+			}
+			else if (absNormalY >= absNormalZ)
+			{
+				point.x = pointX;
+				point.y = pointZ;
+				edge1.x = edge1X;
+				edge1.y = edge1Z;
+				edge2.x = edge2X;
+				edge2.y = edge2Z;
+				normalDirection = -normal->y;
+			}
+			else
+			{
+				point.x = pointX;
+				point.y = pointY;
+				edge1.x = edge1X;
+				edge1.y = edge1Y;
+				edge2.x = edge2X;
+				edge2.y = edge2Y;
+				normalDirection = normal->z;
+			}
+
+			PointI origin = { 0, 0 };
+			int32_t side1 = Cross2D32(origin, edge1, point);
+			int32_t side2 = Cross2D32(edge1, edge2, point);
+			int32_t side3 = Cross2D32(edge2, origin, point);
+			if (normalDirection < 0 ? side1 >= 0 && side2 >= 0 && side3 >= 0 : side1 <= 0 && side2 <= 0 && side3 <= 0)
+				return 1;
+
+			Vector3I point3D = { pointX, pointY, pointZ };
+			Vector3I edge1_3D = { edge1X, edge1Y, edge1Z };
+			Vector3I edge2_3D = { edge2X, edge2Y, edge2Z };
+			if (PointNearLineSegment(&point3D, &edge1_3D, tolerance) || PointNearLineSegment(&point3D, &edge2_3D, tolerance))
+				return 1;
+
+			Vector3I finalEdge = { edge1X - edge2X, edge1Y - edge2Y, edge1Z - edge2Z };
+			Vector3I pointFromEdge2 = { pointX - edge2X, pointY - edge2Y, pointZ - edge2Z };
+			return (int16_t)PointNearLineSegment(&pointFromEdge2, &finalEdge, tolerance);
+		}
+
+		// FUNCTION: TOY2 0x00490B90
+		void CrossProduct3D(const Vector3I* left, const Vector3I* right, Vector3I* output)
+		{
+			int32_t z = right->y * left->x - right->x * left->y;
+			int32_t y = right->x * left->z - right->z * left->x;
+			int32_t x = right->z * left->y - right->y * left->z;
+
+			output->x = x;
+			output->y = y;
+			output->z = z;
+		}
+
+		// FUNCTION: TOY2 0x0049F3C0 [MATCHED]
+		int32_t IsWithinDistanceXZ(const Vector3I* left, const Vector3I* right, int32_t radius)
+		{
+			int32_t deltaX = (left->x - right->x) >> 8;
+			int32_t deltaZ = (left->z - right->z) >> 8;
+			return deltaX * deltaX + deltaZ * deltaZ < radius * radius;
+		}
+
 		// FUNCTION: TOY2 0x004A8B30
 		float Abs(float value)
 		{
@@ -79,8 +279,8 @@ namespace Nu3D
 		// FUNCTION: TOY2 0x004A94C0
 		void ApplyRotateXFromLut(D3DMATRIX* matrix, int32_t trigOffset)
 		{
-			float cosine = Numerics::g_trigLUT[(trigOffset + 0x4000) & 0xFFFF];
 			float sine = Numerics::g_trigLUT[trigOffset & 0xFFFF];
+			float cosine = Numerics::g_trigLUT[(trigOffset + 0x4000) & 0xFFFF];
 
 			matrix->_11 = 1.0f;
 			matrix->_12 = 0.0f;
@@ -414,54 +614,155 @@ namespace Nu3D
 		// FUNCTION: TOY2 0x004AA100
 		void FullMatrixMultiply(D3DMATRIX* output, const D3DMATRIX* left, const D3DMATRIX* right)
 		{
-			D3DMATRIX result;
-			const float* lhs = &left->_11;
-			const float* rhs = &right->_11;
-			float* dst = &result._11;
+			g_matrixMultiplyResult._11 = left->_14 * right->_41 + left->_13 * right->_31 + left->_11 * right->_11 + left->_12 * right->_21;
+			g_matrixMultiplyResult._12 = left->_14 * right->_42 + left->_13 * right->_32 + left->_11 * right->_12 + left->_12 * right->_22;
+			g_matrixMultiplyResult._13 = left->_14 * right->_43 + left->_13 * right->_33 + left->_11 * right->_13 + left->_12 * right->_23;
+			g_matrixMultiplyResult._14 = left->_14 * right->_44 + left->_13 * right->_34 + left->_11 * right->_14 + left->_12 * right->_24;
+			g_matrixMultiplyResult._21 = left->_24 * right->_41 + left->_23 * right->_31 + left->_21 * right->_11 + left->_22 * right->_21;
+			g_matrixMultiplyResult._22 = left->_24 * right->_42 + left->_23 * right->_32 + left->_21 * right->_12 + left->_22 * right->_22;
+			g_matrixMultiplyResult._23 = left->_24 * right->_43 + left->_23 * right->_33 + left->_21 * right->_13 + left->_22 * right->_23;
+			g_matrixMultiplyResult._24 = left->_24 * right->_44 + left->_23 * right->_34 + left->_21 * right->_14 + left->_22 * right->_24;
+			g_matrixMultiplyResult._31 = left->_34 * right->_41 + left->_33 * right->_31 + left->_31 * right->_11 + left->_32 * right->_21;
+			g_matrixMultiplyResult._32 = left->_34 * right->_42 + left->_33 * right->_32 + left->_31 * right->_12 + left->_32 * right->_22;
+			g_matrixMultiplyResult._33 = left->_34 * right->_43 + left->_33 * right->_33 + left->_31 * right->_13 + left->_32 * right->_23;
+			g_matrixMultiplyResult._34 = left->_34 * right->_44 + left->_33 * right->_34 + left->_31 * right->_14 + left->_32 * right->_24;
+			g_matrixMultiplyResult._41 = left->_44 * right->_41 + left->_43 * right->_31 + left->_41 * right->_11 + left->_42 * right->_21;
+			g_matrixMultiplyResult._42 = left->_44 * right->_42 + left->_43 * right->_32 + left->_41 * right->_12 + left->_42 * right->_22;
+			g_matrixMultiplyResult._43 = left->_44 * right->_43 + left->_43 * right->_33 + left->_41 * right->_13 + left->_42 * right->_23;
+			g_matrixMultiplyResult._44 = left->_44 * right->_44 + left->_43 * right->_34 + left->_41 * right->_14 + left->_42 * right->_24;
 
-			for (int32_t row = 0; row < 4; ++row)
-			{
-				for (int32_t column = 0; column < 4; ++column)
-				{
-					dst[row * 4 + column] =
-						lhs[row * 4] * rhs[column] +
-						lhs[row * 4 + 1] * rhs[4 + column] +
-						lhs[row * 4 + 2] * rhs[8 + column] +
-						lhs[row * 4 + 3] * rhs[12 + column];
-				}
-			}
-
-			memcpy(output, &result, sizeof(result));
+			output->_11 = g_matrixMultiplyResult._11;
+			output->_12 = g_matrixMultiplyResult._12;
+			output->_13 = g_matrixMultiplyResult._13;
+			output->_14 = g_matrixMultiplyResult._14;
+			output->_21 = g_matrixMultiplyResult._21;
+			output->_22 = g_matrixMultiplyResult._22;
+			output->_23 = g_matrixMultiplyResult._23;
+			output->_24 = g_matrixMultiplyResult._24;
+			output->_31 = g_matrixMultiplyResult._31;
+			output->_32 = g_matrixMultiplyResult._32;
+			output->_33 = g_matrixMultiplyResult._33;
+			output->_34 = g_matrixMultiplyResult._34;
+			output->_41 = g_matrixMultiplyResult._41;
+			output->_42 = g_matrixMultiplyResult._42;
+			output->_43 = g_matrixMultiplyResult._43;
+			output->_44 = g_matrixMultiplyResult._44;
 		}
 
 		// FUNCTION: TOY2 0x004AA620
 		void InvertAffineMatrix(D3DMATRIX* output, const D3DMATRIX* input)
 		{
-			float determinant =
-				input->_11 * (input->_22 * input->_33 - input->_23 * input->_32) -
-				input->_12 * (input->_21 * input->_33 - input->_23 * input->_31) +
-				input->_13 * (input->_21 * input->_32 - input->_22 * input->_31);
-			float inverseDeterminant = 1.0f / determinant;
-			D3DMATRIX result;
+			D3DMATRIX source = *input;
+			BuildIdentityMatrix(output);
 
-			result._11 = (input->_22 * input->_33 - input->_23 * input->_32) * inverseDeterminant;
-			result._12 = (input->_13 * input->_32 - input->_12 * input->_33) * inverseDeterminant;
-			result._13 = (input->_12 * input->_23 - input->_13 * input->_22) * inverseDeterminant;
-			result._14 = 0.0f;
-			result._21 = (input->_23 * input->_31 - input->_21 * input->_33) * inverseDeterminant;
-			result._22 = (input->_11 * input->_33 - input->_13 * input->_31) * inverseDeterminant;
-			result._23 = (input->_13 * input->_21 - input->_11 * input->_23) * inverseDeterminant;
-			result._24 = 0.0f;
-			result._31 = (input->_21 * input->_32 - input->_22 * input->_31) * inverseDeterminant;
-			result._32 = (input->_12 * input->_31 - input->_11 * input->_32) * inverseDeterminant;
-			result._33 = (input->_11 * input->_22 - input->_12 * input->_21) * inverseDeterminant;
-			result._34 = 0.0f;
-			result._41 = -(input->_41 * result._11 + input->_42 * result._21 + input->_43 * result._31);
-			result._42 = -(input->_41 * result._12 + input->_42 * result._22 + input->_43 * result._32);
-			result._43 = -(input->_41 * result._13 + input->_42 * result._23 + input->_43 * result._33);
-			result._44 = 1.0f;
+			float* row0 = &source._11;
+			float* row1 = &source._21;
+			float* row2 = &source._31;
 
-			memcpy(output, &result, sizeof(result));
+			if (Abs(row2[0]) < Abs(row1[0]))
+			{
+				if (Abs(row0[0]) < Abs(row1[0]))
+				{
+					row0 = &source._21;
+					row1 = &source._11;
+					output->_11 = 0.0f;
+					output->_12 = 1.0f;
+					output->_21 = 1.0f;
+					output->_22 = 0.0f;
+				}
+			}
+			else if (Abs(row0[0]) < Abs(row2[0]))
+			{
+				row0 = &source._31;
+				row2 = &source._11;
+				output->_11 = 0.0f;
+				output->_13 = 1.0f;
+				output->_31 = 1.0f;
+				output->_33 = 0.0f;
+			}
+
+			float scale = 1.0f / row0[0];
+			row0[1] *= scale;
+			row0[2] *= scale;
+			output->_11 *= scale;
+			output->_12 *= scale;
+			output->_13 *= scale;
+
+			float factor1 = row1[0];
+			float factor2 = row2[0];
+			float factor3 = source._41;
+			row1[1] -= factor1 * row0[1];
+			row2[1] -= factor2 * row0[1];
+			source._42 -= factor3 * row0[1];
+			row1[2] -= factor1 * row0[2];
+			row2[2] -= factor2 * row0[2];
+			source._43 -= factor3 * row0[2];
+			output->_21 -= factor1 * output->_11;
+			output->_22 -= factor1 * output->_12;
+			output->_23 -= factor1 * output->_13;
+			output->_31 -= factor2 * output->_11;
+			output->_32 -= factor2 * output->_12;
+			output->_33 -= factor2 * output->_13;
+			output->_41 -= factor3 * output->_11;
+			output->_42 -= factor3 * output->_12;
+			output->_43 -= factor3 * output->_13;
+
+			if (Abs(row1[1]) < Abs(row2[1]))
+			{
+				float* rowSwap = row1;
+				row1 = row2;
+				row2 = rowSwap;
+
+				float value = output->_21;
+				output->_21 = output->_31;
+				output->_31 = value;
+				value = output->_22;
+				output->_22 = output->_32;
+				output->_32 = value;
+				value = output->_23;
+				output->_23 = output->_33;
+				output->_33 = value;
+			}
+
+			scale = 1.0f / row1[1];
+			row1[2] *= scale;
+			output->_21 *= scale;
+			output->_22 *= scale;
+			output->_23 *= scale;
+
+			factor1 = row0[1];
+			factor2 = row2[1];
+			factor3 = source._42;
+			row0[2] -= factor1 * row1[2];
+			row2[2] -= factor2 * row1[2];
+			source._43 -= factor3 * row1[2];
+			output->_11 -= factor1 * output->_21;
+			output->_12 -= factor1 * output->_22;
+			output->_13 -= factor1 * output->_23;
+			output->_31 -= factor2 * output->_21;
+			output->_32 -= factor2 * output->_22;
+			output->_33 -= factor2 * output->_23;
+			output->_41 -= factor3 * output->_21;
+			output->_42 -= factor3 * output->_22;
+			output->_43 -= factor3 * output->_23;
+
+			scale = 1.0f / row2[2];
+			output->_31 *= scale;
+			output->_32 *= scale;
+			output->_33 *= scale;
+
+			factor1 = row0[2];
+			factor2 = row1[2];
+			factor3 = source._43;
+			output->_11 -= factor1 * output->_31;
+			output->_12 -= factor1 * output->_32;
+			output->_13 -= factor1 * output->_33;
+			output->_21 -= factor2 * output->_31;
+			output->_22 -= factor2 * output->_32;
+			output->_23 -= factor2 * output->_33;
+			output->_41 -= factor3 * output->_31;
+			output->_42 -= factor3 * output->_32;
+			output->_43 -= factor3 * output->_33;
 		}
 
 		// FUNCTION: TOY2 0x004AAC40
@@ -530,6 +831,23 @@ namespace Nu3D
 			}
 		}
 
+		// FUNCTION: TOY2 0x004BB920 [MATCHED]
+		void ScaleMatrix(D3DMATRIX* matrix)
+		{
+			matrix->_11 *= g_matrixScale.x;
+			matrix->_12 *= g_matrixScale.x;
+			matrix->_13 *= g_matrixScale.x;
+			matrix->_14 *= g_matrixScale.x;
+			matrix->_21 *= g_matrixScale.y;
+			matrix->_22 *= g_matrixScale.y;
+			matrix->_23 *= g_matrixScale.y;
+			matrix->_24 *= g_matrixScale.y;
+			matrix->_31 *= g_matrixScale.z;
+			matrix->_32 *= g_matrixScale.z;
+			matrix->_33 *= g_matrixScale.z;
+			matrix->_34 *= g_matrixScale.z;
+		}
+
 		// FUNCTION: TOY2 0x004DA850 [MATCHED]
 		void CalculatePlaneFromTriangle(Vector3F* point1, Vector3F* point2, Vector3F* point3, Plane* plane)
 		{
@@ -546,5 +864,8 @@ namespace Nu3D
 
 			plane->distance = -(point1->z * plane->normal.z + point1->y * plane->normal.y + point1->x * plane->normal.x);
 		}
+
+		// FUNCTION: TOY2 0x004DB040 [MATCHED]
+		float GetSignedDistanceToPlane(const Vector3F* point, const Plane* plane) { return Vector3F::DotProduct(point, &plane->normal) + plane->distance; }
 	}
 }

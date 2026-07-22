@@ -1,4 +1,5 @@
 #include "Nu3D/Camera.h"
+#include "Nu3D/Math.h"
 #include "Renderer/Renderer.h"
 
 namespace Nu3D
@@ -125,5 +126,14 @@ namespace Nu3D
 
 		// STUB: TOY2 0x004CE050
 		void ApplyTransformToCamera(ActiveCameraTransform* camera) {}
+
+		// FUNCTION: TOY2 0x004BB9C0 [MATCHED]
+		void ScaleMatrix(D3DMATRIX* matrix) { Math::ScaleMatrix(matrix); }
+
+		// FUNCTION: TOY2 0x004BB9D0 [MATCHED]
+		void SetMatrixScaleVector(const Vector3F* scale) { Math::g_matrixScale = *scale; }
+
+		// FUNCTION: TOY2 0x004BB9F0 [MATCHED]
+		void GetMatrixScaleVector(Vector3F* scale) { *scale = Math::g_matrixScale; }
 	}
 }

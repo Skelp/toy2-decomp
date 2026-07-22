@@ -135,8 +135,7 @@ namespace Nu3D
 			float width = right - left + 1.0f;
 			float height = bottom - top + 1.0f;
 
-			if (left == g_currentViewportX && top == g_currentViewportY &&
-				width == g_currentViewportWidth && height == g_currentViewportHeight)
+			if (left == g_currentViewportX && top == g_currentViewportY && width == g_currentViewportWidth && height == g_currentViewportHeight)
 				return;
 
 			if (left < g_minViewportX)
@@ -224,8 +223,7 @@ namespace Nu3D
 			// Force SetClipRect past its unchanged-rectangle fast path so the new
 			// centre offsets are submitted to the drawing device.
 			g_currentViewportX += 1.0f;
-			SetClipRect(left, top, left + g_currentViewportWidth - 1.0f,
-				top + g_currentViewportHeight - 1.0f);
+			SetClipRect(left, top, left + g_currentViewportWidth - 1.0f, top + g_currentViewportHeight - 1.0f);
 		}
 
 		// FUNCTION: TOY2 0x004B5AA0
@@ -330,8 +328,7 @@ namespace Nu3D
 
 			if (g_viewportClippingEnabled)
 			{
-				SetClipRect(g_viewClipRect.bottom, g_viewClipRect.top,
-					g_viewClipRect.right, g_viewClipRect.left);
+				SetClipRect(g_viewClipRect.bottom, g_viewClipRect.top, g_viewClipRect.right, g_viewClipRect.left);
 			}
 
 			Camera::RebuildTransformPipeline();
@@ -373,7 +370,7 @@ namespace Nu3D
 		// GLOBAL: TOY2 0x00E4D824
 		D3DMATRIX g_activeViewProjectionMatrix;
 
-		// FUNCTION: TOY2 0x004BBA10
+		// FUNCTION: TOY2 0x004BBA10 [MATCHED]
 		void RebuildTransformPipeline()
 		{
 			Viewport::GetClipNormMatrix(&g_clipNormMatrix);
@@ -384,8 +381,7 @@ namespace Nu3D
 			Math::FullMatrixMultiply(&g_clipToScreenMatrix, &g_clipNormMatrix, &g_screenSpaceMatrix);
 			Math::InvertAffineMatrix(&g_screenToClipMatrix, &g_clipToScreenMatrix);
 			Math::InvertAffineMatrix(&g_screenToWorldMatrix, &g_screenViewProjectionMatrix);
-			memcpy(&g_activeViewProjectionMatrix, &g_normalizedViewProjectionMatrix,
-				sizeof(g_activeViewProjectionMatrix));
+			memcpy(&g_activeViewProjectionMatrix, &g_normalizedViewProjectionMatrix, sizeof(g_activeViewProjectionMatrix));
 		}
 	}
 }
