@@ -6,6 +6,11 @@
 
 namespace Nu3D
 {
+	namespace ViewMatrix
+	{
+		Matrix3x3I16* MultiplyFixed(const Matrix3x3I16* left, const Matrix3x3I16* right, Matrix3x3I16* output);
+	}
+
 	namespace Math
 	{
 		extern Vector3F g_matrixScale;

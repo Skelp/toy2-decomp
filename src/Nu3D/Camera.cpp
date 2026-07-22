@@ -74,6 +74,36 @@ namespace Nu3D
 		// GLOBAL: TOY2 0x009F6014
 		int32_t g_billboardYaw;
 
+		// GLOBAL: TOY2 0x00554F0C
+		int32_t g_viewHeightHistory[32];
+
+		// GLOBAL: TOY2 0x0054BEF8
+		int32_t g_viewMatrixHistory[128];
+
+		// GLOBAL: TOY2 0x0050A1F8
+		int32_t g_viewHistoryInitialized;
+
+		// GLOBAL: TOY2 0x0054DEC0
+		int16_t g_viewSwayPhase;
+
+		// GLOBAL: TOY2 0x0054F620
+		int16_t g_viewBobPhase;
+
+		// GLOBAL: TOY2 0x00553034
+		int16_t g_viewHeightTarget;
+
+		// GLOBAL: TOY2 0x0054E04C
+		int16_t g_viewHeightVelocity;
+
+		// GLOBAL: TOY2 0x00547EDC
+		int16_t g_viewHistoryPhase;
+
+		// GLOBAL: TOY2 0x0054DEB2
+		int16_t g_viewHistoryIndex;
+
+		// GLOBAL: TOY2 0x00556FA0
+		int16_t g_viewMotionState;
+
 		// GLOBAL: TOY2 0x00A4C410
 		int32_t g_effectMode;
 
@@ -87,8 +117,20 @@ namespace Nu3D
 			g_tintBlend = -1;
 		}
 
-		// STUB: TOY2 0x0044DF90
-		void InitViewMatrixGlobals() {}
+		// FUNCTION: TOY2 0x0044DF90 [MATCHED]
+		void InitViewMatrixGlobals()
+		{
+			memset(g_viewHeightHistory, 0, sizeof(g_viewHeightHistory));
+			memset(g_viewMatrixHistory, 0, sizeof(g_viewMatrixHistory));
+			g_viewHistoryInitialized = 0;
+			g_viewSwayPhase = 0;
+			g_viewBobPhase = 0;
+			g_viewHeightTarget = 0;
+			g_viewHeightVelocity = 0;
+			g_viewHistoryPhase = 0;
+			g_viewHistoryIndex = 0;
+			g_viewMotionState = 0;
+		}
 
 		// FUNCTION: TOY2 0x004A1BE0
 		void FadeToTargetTint()
@@ -179,6 +221,9 @@ namespace Nu3D
 
 		// FUNCTION: TOY2 0x004CE020 [MATCHED]
 		void ToggleCameraSkew(int32_t enabled) { g_cameraSkewEnabled = enabled; }
+
+		// FUNCTION: TOY2 0x0044F820 [MATCHED]
+		void EnableCameraSkew() { ToggleCameraSkew(1); }
 
 		// FUNCTION: TOY2 0x004CE030 [MATCHED]
 		void SetSkewPhase(int32_t phaseDelta) { g_cameraSkewPhase += phaseDelta; }

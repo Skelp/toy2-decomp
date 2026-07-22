@@ -9,6 +9,26 @@ float Vector3F::Length(const Vector3F* vector) { return (float)sqrt(vector->x * 
 
 namespace Nu3D
 {
+	namespace ViewMatrix
+	{
+		// FUNCTION: TOY2 0x00450AC0 [MATCHED]
+		Matrix3x3I16* MultiplyFixed(const Matrix3x3I16* left, const Matrix3x3I16* right, Matrix3x3I16* output)
+		{
+			Matrix3x3I16 result;
+			result.m00 = (int16_t)((left->m00 * right->m00 + left->m01 * right->m10 + left->m02 * right->m20) >> 12);
+			result.m01 = (int16_t)((left->m00 * right->m01 + left->m01 * right->m11 + left->m02 * right->m21) >> 12);
+			result.m02 = (int16_t)((left->m00 * right->m02 + left->m01 * right->m12 + left->m02 * right->m22) >> 12);
+			result.m10 = (int16_t)((left->m10 * right->m00 + left->m11 * right->m10 + left->m12 * right->m20) >> 12);
+			result.m11 = (int16_t)((left->m10 * right->m01 + left->m11 * right->m11 + left->m12 * right->m21) >> 12);
+			result.m12 = (int16_t)((left->m10 * right->m02 + left->m11 * right->m12 + left->m12 * right->m22) >> 12);
+			result.m20 = (int16_t)((left->m20 * right->m00 + left->m21 * right->m10 + left->m22 * right->m20) >> 12);
+			result.m21 = (int16_t)((left->m20 * right->m01 + left->m21 * right->m11 + left->m22 * right->m21) >> 12);
+			result.m22 = (int16_t)((left->m20 * right->m02 + left->m21 * right->m12 + left->m22 * right->m22) >> 12);
+			*output = result;
+			return output;
+		}
+	}
+
 	namespace Math
 	{
 		// NOTE: Methods in this class are kind of critical to get correct, since minor changes in how

@@ -64,6 +64,7 @@ namespace Nu3D
 		void SetupViewMatrix(ActiveCameraTransform* camera);
 		void SetBillboardYaw(int32_t yaw);
 		void ToggleCameraSkew(int32_t enabled);
+		void EnableCameraSkew();
 		void SetSkewPhase(int32_t phaseDelta);
 		void ApplyTransformToCamera(ActiveCameraTransform* camera);
 		D3DMATRIX* GetViewMatrix();
