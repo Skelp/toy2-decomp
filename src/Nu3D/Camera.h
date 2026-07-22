@@ -23,6 +23,7 @@ namespace Nu3D
 		void InitViewMatrixGlobals();
 		void FadeToTargetTint();
 		void ApplyTransformToCamera(ActiveCameraTransform* camera);
+		void RebuildTransformPipeline();
 
 		STATIC_ASSERT(sizeof(ActiveCameraTransform) == 0x14);
 	}

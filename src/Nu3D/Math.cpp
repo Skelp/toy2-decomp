@@ -182,6 +182,59 @@ namespace Nu3D
 			return magnitude;
 		}
 
+		// FUNCTION: TOY2 0x004AA100
+		void FullMatrixMultiply(D3DMATRIX* output, const D3DMATRIX* left, const D3DMATRIX* right)
+		{
+			D3DMATRIX result;
+			const float* lhs = &left->_11;
+			const float* rhs = &right->_11;
+			float* dst = &result._11;
+
+			for (int32_t row = 0; row < 4; ++row)
+			{
+				for (int32_t column = 0; column < 4; ++column)
+				{
+					dst[row * 4 + column] =
+						lhs[row * 4] * rhs[column] +
+						lhs[row * 4 + 1] * rhs[4 + column] +
+						lhs[row * 4 + 2] * rhs[8 + column] +
+						lhs[row * 4 + 3] * rhs[12 + column];
+				}
+			}
+
+			memcpy(output, &result, sizeof(result));
+		}
+
+		// FUNCTION: TOY2 0x004AA620
+		void InvertAffineMatrix(D3DMATRIX* output, const D3DMATRIX* input)
+		{
+			float determinant =
+				input->_11 * (input->_22 * input->_33 - input->_23 * input->_32) -
+				input->_12 * (input->_21 * input->_33 - input->_23 * input->_31) +
+				input->_13 * (input->_21 * input->_32 - input->_22 * input->_31);
+			float inverseDeterminant = 1.0f / determinant;
+			D3DMATRIX result;
+
+			result._11 = (input->_22 * input->_33 - input->_23 * input->_32) * inverseDeterminant;
+			result._12 = (input->_13 * input->_32 - input->_12 * input->_33) * inverseDeterminant;
+			result._13 = (input->_12 * input->_23 - input->_13 * input->_22) * inverseDeterminant;
+			result._14 = 0.0f;
+			result._21 = (input->_23 * input->_31 - input->_21 * input->_33) * inverseDeterminant;
+			result._22 = (input->_11 * input->_33 - input->_13 * input->_31) * inverseDeterminant;
+			result._23 = (input->_13 * input->_21 - input->_11 * input->_23) * inverseDeterminant;
+			result._24 = 0.0f;
+			result._31 = (input->_21 * input->_32 - input->_22 * input->_31) * inverseDeterminant;
+			result._32 = (input->_12 * input->_31 - input->_11 * input->_32) * inverseDeterminant;
+			result._33 = (input->_11 * input->_22 - input->_12 * input->_21) * inverseDeterminant;
+			result._34 = 0.0f;
+			result._41 = -(input->_41 * result._11 + input->_42 * result._21 + input->_43 * result._31);
+			result._42 = -(input->_41 * result._12 + input->_42 * result._22 + input->_43 * result._32);
+			result._43 = -(input->_41 * result._13 + input->_42 * result._23 + input->_43 * result._33);
+			result._44 = 1.0f;
+
+			memcpy(output, &result, sizeof(result));
+		}
+
 		// FUNCTION: TOY2 0x004DA850 [MATCHED]
 		void CalculatePlaneFromTriangle(Vector3F* point1, Vector3F* point2, Vector3F* point3, Plane* plane)
 		{

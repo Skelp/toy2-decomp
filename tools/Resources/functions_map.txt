@@ -621,7 +621,7 @@
 0x004A9D50 Nu3D::Math::RotateZFromLut
 0x004A9EC0 Nu3D::Math::MatrixRotateRoll
 0x004A9F60 Nu3D::Math::MultiplyMatrix3x4
-0x004AA100 Math::FullMatrixMultiply
+0x004AA100 Nu3D::Math::FullMatrixMultiply
 0x004AA520 Nu3D::Camera::CreateInverseMatrix
 0x004AA620 Nu3D::Math::InvertAffineMatrix
 0x004AAC40 Nu3D::Math::BuildMatrixFromDirection
@@ -821,10 +821,13 @@
 0x004B5310 Nu3D::Font::ComputeUnscaledCharClip
 0x004B53D0 Nu3D::Font::CalculateScaledTextSize
 0x004B5480 Nu3D::Font::CalculateUnscaledTextSize
-0x004B5590 Nu3D::GetViewportRect
+0x004B5590 Nu3D::Viewport::GetViewportRect
 0x004B55D0 Nu3D::Viewport::Init
 0x004B5630 Nu3D::Viewport::Reset
 0x004B5700 Nu3D::Viewport::SetClipRect
+0x004B5900 Nu3D::Viewport::SetViewportRect
+0x004B5A00 Nu3D::Viewport::SetZRange
+0x004B5A30 Nu3D::Viewport::SetCentre
 0x004B5AA0 Nu3D::Viewport::GetClipNormMatrix
 0x004B5AD0 Nu3D::Viewport::BuildClipNormMatrix
 0x004B5BD0 Nu3D::Viewport::GetScreenSpaceMatrix
