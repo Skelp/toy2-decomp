@@ -55,6 +55,8 @@ source annotation, not how closely the machine code matches.
 - Build `toy2.exe` and `patcher.dll` successfully.
 - Run reccmp and describe relevant accuracy changes in the pull request.
 - Open `build/decomp-report.html` when a change affects multiple functions.
+- When a change affects startup, loading, rendering, or other runtime behavior,
+  run the platform runtime check described below using your own installation.
 - Run `git diff --check`.
 - Keep the change focused; do not mix generated files or unrelated cleanup into
   a function reconstruction.
@@ -63,6 +65,10 @@ source annotation, not how closely the machine code matches.
 Compiler warnings already exist in partially reconstructed code. New warnings
 should be avoided unless they are required to reproduce original behavior and
 explained in the change.
+
+The `toy2decomp` executable always compiles retail behavior for reccmp. Runtime
+convenience changes guarded by `APPLY_FIXES` are enabled only in `patcher.dll`;
+do not define that macro globally or for the comparison executable.
 
 ## Files that must remain local
 
@@ -89,3 +95,22 @@ keep both entry points equivalent:
 
 If a change cannot be exercised on both platforms, document which platform was
 tested and perform at least a syntax/static review of the other path.
+
+## Runtime validation
+
+Runtime testing is distinct from reccmp validation and requires a complete,
+legitimately owned installation. On Linux, use the bounded helper:
+
+```sh
+tools/smoke-test-linux.sh /path/to/installed-game
+```
+
+The helper verifies the retail executable hash, copies the installation to a
+temporary directory, substitutes the rebuilt executable in that copy, and
+temporarily configures both Wine registry views. It passes only after the game
+reaches Direct3D driver selection without producing `toy2.err`. Registry state
+is restored and the temporary copy is deleted even when the test fails.
+
+On Windows, follow the runtime section in `docs/windows-decomp.md`. Never
+overwrite the installation's retail `toy2.exe`; use a separately named copy of
+the rebuilt executable.

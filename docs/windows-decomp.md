@@ -75,6 +75,35 @@ powershell -ExecutionPolicy Bypass -File tools/decomp.ps1 compare `
 The compatibility command `python build.py --nl` also builds the game, but new
 workflows should use `tools/decomp.ps1` directly.
 
+## Runtime startup test
+
+Runtime testing requires a complete, legitimately installed copy of the game;
+`original/toy2.exe` alone is not sufficient. The original installer creates
+`HKLM\Software\TravellersTalesToyStory2` with `path` and `cdpath` values, which
+the game checks during startup.
+
+Build first, then copy the rebuilt executable beside the installed retail
+executable under a different name:
+
+```powershell
+$GameDir = "C:\Games\Toy Story 2"
+Copy-Item build\toy2.exe (Join-Path $GameDir "toy2-decomp-smoke.exe")
+Push-Location $GameDir
+try {
+    .\toy2-decomp-smoke.exe
+} finally {
+    Pop-Location
+    Remove-Item (Join-Path $GameDir "toy2-decomp-smoke.exe") -ErrorAction SilentlyContinue
+}
+```
+
+Confirm that the game reaches display/Direct3D initialization and does not
+write a new `toy2.err`. Close the game after startup. This preserves the retail
+`toy2.exe` and uses the runtime assets and registry configuration created by
+the contributor's own installation. An extracted directory that has never
+been installed must first be configured by its legitimate installer; do not
+guess or globally distribute registry files.
+
 ## Optional helper tools
 
 The injected/debugging utilities under `tools/` are separate from the matching
@@ -99,6 +128,8 @@ They are not required for reccmp work.
 - If the clone is shallow, run `git fetch --unshallow` before setup.
 - Do not reuse a `build/` directory configured on Linux. Platform generators
   are different; move or remove the generated build directory before switching.
-- Running the recompiled executable may require files and configuration from a
-  legitimate installed copy of the game. Those runtime assets are not needed
-  for compilation or comparison and must remain outside Git.
+- `tools/decomp.ps1 run` launches `build/toy2.exe` directly and assumes runtime
+  assets and registry configuration are already available. The procedure above
+  is safer for validating against an installed copy because it also makes the
+  installation-local compatibility DLLs available without replacing the
+  retail executable.

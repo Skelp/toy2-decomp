@@ -274,6 +274,7 @@
 0x00447DB0 Toy2::Collectables::BuildPickupTable
 0x00448080 Toy2::AndysNeighbourhood::Method1
 0x00448F00 Nu3D::Camera::LineOfSightCheck
+0x00449090 Nullsub3
 0x0044DD80 Renderer::DrawTintOverlay
 0x0044DF90 Nu3D::Camera::InitViewMatrixGlobals
 0x0044E100 Renderer::Beam::QueueBeam

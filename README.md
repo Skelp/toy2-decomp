@@ -13,8 +13,10 @@ the supported `toy2.exe`:
 SHA-256  023eb6a9459443b34d24cf685591bfeb3b95e1acf579405f6d8fa4407ccbdaf0
 ```
 
-No disc image is needed to compile or compare the program. Other files from an
-installed copy may be needed only if you choose to run the recompiled game.
+No disc image is needed to compile or compare the program. Running the
+recompiled game requires the files and registry configuration from a complete,
+legitimately owned installation; see the platform guides for safe runtime
+testing that does not replace the retail executable.
 
 ## Quick start
 
@@ -69,11 +71,21 @@ Both expose the same workflow:
 | `compare` | Run detailed reccmp machine-code comparison |
 | `report` | Generate `build/decomp-report.html` |
 | `progress [namespace]` | Count source annotations against the function map |
-| `run` | Run the recompiled executable; original runtime data may be required |
+| `run` | Launch `build/toy2.exe`; requires an already configured runtime environment |
 | `shell` | Open a shell with the local compiler environment active |
 
 The report is a single offline HTML file with project/source treemaps,
 function filtering, accuracy distributions, and instruction-level diffs.
+
+On Linux, a reproducible bounded startup test against an owned installation is
+available separately:
+
+```sh
+tools/smoke-test-linux.sh /path/to/installed-game
+```
+
+It uses a temporary copy and restores the project-local Wine registry when it
+finishes. Game files and generated runtime output remain outside Git.
 
 ## Toolchain identity
 

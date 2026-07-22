@@ -11,7 +11,8 @@ Wine while CMake, Ninja, Python, and reccmp run natively.
 - Wine with support for 32-bit Windows executables (`wine`, `wineboot`,
   `wineserver`, and `winepath` on `PATH`)
 - Python 3.11 with the `venv` module, exposed as `python3.11`
-- standard Unix utilities including Bash, `sed`, and `sha256sum`
+- standard Unix utilities including Bash, `awk`, `grep`, `realpath`, `sed`,
+  `sha256sum`, and `timeout`
 - network access during initial setup
 - a genuine supported `toy2.exe`
 
@@ -94,6 +95,37 @@ tools/decomp progress Nu3D
 The compatibility command `python3.11 build.py --nl` also builds the game, but
 new workflows should use `tools/decomp` directly.
 
+## Reproducible runtime smoke test
+
+Compilation and comparison need only `original/toy2.exe`. A startup test also
+needs a complete, legitimately owned installed-game directory containing at
+least `toy2.exe`, `validate.tta`, and `data/`. Do not put that directory inside
+this repository.
+
+After building, run:
+
+```sh
+tools/smoke-test-linux.sh /path/to/installed-game
+```
+
+The optional second argument changes the default 20-second timeout:
+
+```sh
+tools/smoke-test-linux.sh /path/to/installed-game 30
+```
+
+The helper verifies that the installation contains the supported retail
+executable, stages a temporary copy under `/tmp`, replaces only the copy's
+executable with `build/toy2.exe`, and temporarily writes the installer's
+`path`/`cdpath` values to both Wine registry views. It succeeds when the game
+reaches Direct3D driver selection without creating `toy2.err`. A game window
+may appear briefly. Existing registry keys are backed up and restored, and the
+temporary installation is removed on success, failure, or interruption.
+
+The test uses the project-local Wine prefix created by setup. Harmless
+`libEGL`/DRI warnings may still appear; the success check is based on the game's
+own initialization output and fatal-error file.
+
 ## Environment and troubleshooting
 
 Use `tools/decomp shell` or source `tools/linux-decomp-env.sh` to run individual
@@ -107,6 +139,6 @@ compiler/reccmp commands in the configured environment.
 - Harmless `libEGL` warnings may appear when Wine starts without a usable DRI
   display. They do not affect compilation or comparison.
 - Do not reuse a `build/` directory configured by native Windows CMake.
-- Running the recompiled game may require data/configuration from a legitimate
-  installation. These files are not required for compilation or comparison and
-  must remain outside Git.
+- `tools/decomp run` only launches `build/toy2.exe`; it does not stage runtime
+  assets or registry configuration. Prefer `tools/smoke-test-linux.sh` for the
+  reproducible startup check.

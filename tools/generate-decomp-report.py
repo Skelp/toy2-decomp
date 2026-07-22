@@ -6,13 +6,13 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from decomp_annotations import canonical_address, read_source_annotations
 
-ANNOTATION_RE = re.compile(
-    r"//\s*(FUNCTION|STUB|LIBRARY):\s*TOY2\s+0x([0-9a-fA-F]+)"
-)
 SUMMARY_RE = {
     "implemented": re.compile(r"Implemented:\s+[\d.]+%\s+\((\d+)\s*/\s*(\d+)\)"),
     "accuracy": re.compile(r"Accuracy:\s+([\d.]+)%"),
@@ -20,20 +20,19 @@ SUMMARY_RE = {
 }
 
 
-def canonical_address(value: str | int) -> str:
-    return f"0x{int(value, 0) if isinstance(value, str) else value:x}"
-
-
 def read_annotations(source_root: Path) -> dict[str, dict[str, str]]:
     annotations: dict[str, dict[str, str]] = {}
-    for path in sorted((*source_root.rglob("*.cpp"), *source_root.rglob("*.h"))):
-        text = path.read_text(encoding="utf-8", errors="ignore")
-        relative = path.relative_to(source_root).as_posix()
-        for kind, address in ANNOTATION_RE.findall(text):
-            annotations.setdefault(
-                canonical_address(f"0x{address}"),
-                {"kind": kind.lower(), "source": relative},
-            )
+    for annotation in read_source_annotations(source_root):
+        if annotation.kind == "global":
+            continue
+        annotations.setdefault(
+            annotation.address,
+            {
+                "kind": annotation.kind,
+                "source": annotation.source,
+                "line": annotation.line,
+            },
+        )
     return annotations
 
 
@@ -117,7 +116,9 @@ def enrich_report(
         source = annotation["source"] if annotation else None
         if source is None:
             source = infer_source_from_diff(entity, basename_index)
-        entity["source"] = source or "[linked-runtime]/unknown"
+        is_project = source is not None or address in names
+        entity["source"] = source or ("[unmapped]/project" if is_project else "[linked-runtime]/unknown")
+        entity["category"] = "project" if is_project else "runtime"
         entity["annotation"] = annotation["kind"] if annotation else "report-only"
         entity["status"] = (
             "stub"
@@ -143,6 +144,7 @@ def enrich_report(
             "name": names.get(address, "Unmatched annotated function"),
             "matching": 0,
             "source": annotation["source"],
+            "category": "project",
             "annotation": annotation["kind"],
             "stub": is_stub,
             "status": "stub" if is_stub else "unmatched",
@@ -150,15 +152,16 @@ def enrich_report(
         }
 
     entities = sorted(entities_by_address.values(), key=lambda item: int(item["address"], 16))
-    known_nonstubs = sum(not item.get("stub") for item in entities)
-    missing_expected = max(0, int(summary["total"]) - known_nonstubs)
-    for index in range(missing_expected):
+    for address, name in names.items():
+        if address in entities_by_address:
+            continue
         entities.append(
             {
-                "address": f"unknown-{index + 1}",
-                "name": "Unidentified expected function",
+                "address": address,
+                "name": name,
                 "matching": 0,
-                "source": "[unmapped]/expected",
+                "source": "[unmapped]/project",
+                "category": "project",
                 "annotation": "unmatched",
                 "stub": False,
                 "status": "unmatched",
@@ -166,7 +169,42 @@ def enrich_report(
             }
         )
 
+    entities.sort(
+        key=lambda item: int(item["address"], 16)
+        if str(item["address"]).startswith("0x")
+        else 0xFFFFFFFF
+    )
+
     comparable = [item for item in entities if not item.get("stub")]
+    mapped_addresses = set(names)
+    mapped_annotations = {
+        address: annotation
+        for address, annotation in annotations.items()
+        if address in mapped_addresses and annotation["kind"] in ("function", "stub")
+    }
+    project_compared = [
+        item
+        for item in entities
+        if item.get("category") == "project"
+        and item.get("address") in mapped_addresses
+        and not item.get("stub")
+        and item["status"] != "unmatched"
+    ]
+    runtime_compared = [
+        item
+        for item in entities
+        if item.get("category") == "runtime"
+        and not item.get("stub")
+        and item["status"] != "unmatched"
+    ]
+    project_effective_score = sum(
+        1.0 if item.get("effective") else float(item.get("matching", 0))
+        for item in project_compared
+    )
+    runtime_effective_score = sum(
+        1.0 if item.get("effective") else float(item.get("matching", 0))
+        for item in runtime_compared
+    )
     summary.update(
         {
             "exact": sum(item["status"] == "exact" for item in comparable),
@@ -176,6 +214,31 @@ def enrich_report(
             "unmatched": sum(item["status"] == "unmatched" for item in comparable),
             "stubs": sum(bool(item.get("stub")) for item in entities),
             "report_entities": len(report.get("data", [])),
+            "visualized_nonstubs": sum(not item.get("stub") for item in entities),
+            "project_total": len(mapped_addresses),
+            "project_implemented": sum(
+                item["kind"] == "function" for item in mapped_annotations.values()
+            ),
+            "project_started": len(mapped_annotations),
+            "project_compared": len(project_compared),
+            "project_effective_score": project_effective_score,
+            "project_accuracy": (
+                project_effective_score / len(project_compared) * 100
+                if project_compared
+                else 0.0
+            ),
+            "project_progress": (
+                project_effective_score / len(mapped_addresses) * 100
+                if mapped_addresses
+                else 0.0
+            ),
+            "runtime_compared": len(runtime_compared),
+            "runtime_effective_score": runtime_effective_score,
+            "runtime_accuracy": (
+                runtime_effective_score / len(runtime_compared) * 100
+                if runtime_compared
+                else 0.0
+            ),
         }
     )
 

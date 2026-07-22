@@ -245,6 +245,12 @@
             <option value="unmatched">Unmatched</option>
             <option value="stub">Stubs</option>
           </select>
+          <select class="control" id="scope-filter" aria-label="Code scope filter">
+            <option value="all">Project and runtime</option>
+            <option value="project">Project code</option>
+            <option value="runtime">Linked runtime</option>
+            <option value="unmapped">Unmapped expectations</option>
+          </select>
           <select class="control" id="sort" aria-label="Sort order">
             <option value="accuracy-asc">Lowest accuracy</option>
             <option value="accuracy-desc">Highest accuracy</option>
@@ -287,7 +293,7 @@
     const report = JSON.parse(document.getElementById("report-data").textContent);
     const entities = report.entities;
     const metrics = report.metrics;
-    const state = { group: null, file: null, search: "", status: "all", sort: "accuracy-asc", showStubs: false };
+    const state = { group: null, file: null, search: "", status: "all", scope: "all", sort: "accuracy-asc", showStubs: false };
     const $ = id => document.getElementById(id);
     const pct = value => `${Number(value).toFixed(2)}%`;
     const effectiveAccuracy = entity => entity.effective ? 1 : Number(entity.matching || 0);
@@ -314,10 +320,10 @@
 
     function renderMetrics() {
       const cards = [
-        ["Overall progress", pct(metrics.progress), `${metrics.effective_score.toFixed(2)} effective matches / ${metrics.total} expected`, "var(--cyan)"],
-        ["Implemented", pct(metrics.implemented / metrics.total * 100), `${metrics.implemented} / ${metrics.total} comparable functions`, "var(--purple)"],
-        ["Code accuracy", pct(metrics.accuracy), "Average effective accuracy of implemented functions", "var(--green)"],
-        ["Exact matches", String(metrics.exact), `${metrics.effective} additional effective · ${metrics.stubs} stubs`, "var(--gold)"]
+        ["Project coverage", pct(metrics.project_implemented / metrics.project_total * 100), `${metrics.project_implemented} implemented · ${metrics.project_started} started / ${metrics.project_total} mapped`, "var(--cyan)"],
+        ["Project accuracy", pct(metrics.project_accuracy), `${metrics.project_compared} project functions paired by reccmp`, "var(--green)"],
+        ["Project progress", pct(metrics.project_progress), `${metrics.project_effective_score.toFixed(2)} effective matches / ${metrics.project_total} mapped`, "var(--purple)"],
+        ["Linked runtime", pct(metrics.runtime_accuracy), `${metrics.runtime_compared} separately classified runtime functions`, "var(--gold)"]
       ];
       const host = $("metrics");
       cards.forEach(([label, value, detail, accent]) => {
@@ -441,7 +447,7 @@
       const parts = [["Exact", metrics.exact, "var(--green)"], ["Effective", metrics.effective, "var(--cyan)"], ["Partial", metrics.partial, "var(--gold)"], ["Zero", metrics.zero, "var(--red)"], ["Unmatched", metrics.unmatched, "var(--unknown)"]];
       parts.forEach(([label, count, color]) => {
         const row = element("div", "break-row"); const track = element("div", "bar-track"); const fill = element("div", "bar-fill");
-        fill.style.setProperty("--width", `${Number(count) / metrics.total * 100}%`); fill.style.setProperty("--color", color); track.append(fill);
+        fill.style.setProperty("--width", `${Number(count) / metrics.visualized_nonstubs * 100}%`); fill.style.setProperty("--color", color); track.append(fill);
         row.append(element("span", "break-label", label), track, element("span", "break-count", String(count))); breakdown.append(row);
       });
     }
@@ -467,6 +473,7 @@
       if (state.group) output = output.filter(entity => topGroup(entity.source) === state.group);
       if (state.file) output = output.filter(entity => entity.source === state.file);
       if (state.status !== "all") output = output.filter(entity => entity.status === state.status);
+      if (state.scope !== "all") output = output.filter(entity => entity.category === state.scope);
       if (needle) output = output.filter(entity => `${entity.name} ${entity.source} ${entity.address} ${entity.recomp || ""}`.toLowerCase().includes(needle));
       const sorts = {
         "accuracy-asc": (a,b) => effectiveAccuracy(a) - effectiveAccuracy(b) || a.name.localeCompare(b.name),
@@ -523,6 +530,7 @@
     function bindControls() {
       $("search").addEventListener("input", event => { state.search = event.target.value; renderExplorer(); });
       $("status-filter").addEventListener("change", event => { state.status = event.target.value; if (state.status === "stub") { state.showStubs = true; $("show-stubs").checked = true; } renderExplorer(); });
+      $("scope-filter").addEventListener("change", event => { state.scope = event.target.value; renderExplorer(); });
       $("sort").addEventListener("change", event => { state.sort = event.target.value; renderExplorer(); });
       $("show-stubs").addEventListener("change", event => { state.showStubs = event.target.checked; renderExplorer(); });
       $("dialog-close").addEventListener("click", () => $("function-dialog").close());
@@ -530,7 +538,7 @@
     }
 
     $("generated").textContent = `Generated ${new Date(report.generated * 1000).toLocaleString()}`;
-    $("report-meta").textContent = `${metrics.report_entities} reccmp entities · ${entities.length} visualized records`;
+    $("report-meta").textContent = `${metrics.project_total} mapped project functions · ${metrics.report_entities} reccmp entities · runtime separated`;
     renderMetrics(); renderTreemap(); renderHistogram(); renderGroupCards(); bindControls(); renderExplorer();
   })();
   </script>

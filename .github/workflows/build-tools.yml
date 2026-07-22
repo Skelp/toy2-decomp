@@ -4,19 +4,47 @@ on:
   push:
     paths:
       - "tools/**"
+      - "decomp_utils.py"
       - "external/**"
       - ".github/workflows/build-tools.yml"
   pull_request:
     paths:
       - "tools/**"
+      - "decomp_utils.py"
       - "external/**"
       - ".github/workflows/build-tools.yml"
   workflow_dispatch:
 
 jobs:
+  validate-decomp-tooling:
+    name: Validate Decomp Tooling (${{ matrix.os }})
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Run report and annotation tests
+        run: python -m unittest discover -s tools/tests -v
+
+      - name: Validate Linux entry points
+        if: runner.os == 'Linux'
+        run: bash -n tools/decomp tools/linux-decomp-env.sh tools/setup-linux-decomp.sh tools/smoke-test-linux.sh
+
+      - name: Validate PowerShell entry points
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Get-Content tools/decomp.ps1 -Raw | ForEach-Object { [void][scriptblock]::Create($_) }
+          Get-Content tools/setup-windows-decomp.ps1 -Raw | ForEach-Object { [void][scriptblock]::Create($_) }
+
   build-tools:
     name: Build Toy2 Tools
     runs-on: windows-latest
+    needs: validate-decomp-tooling
 
     steps:
       - name: Checkout repo

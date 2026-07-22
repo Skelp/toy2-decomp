@@ -9,6 +9,7 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 import build as build_script
+from tools.decomp_annotations import read_source_annotations
 
 # Templates
 #
@@ -29,41 +30,18 @@ def parse_source_files():
     func_occurrences = {}
     global_occurrences = {}
 
-    func_pattern = re.compile(
-        r'//\s*(FUNCTION|STUB):\s*TOY2\s+0x([0-9A-Fa-f]+)'
-    )
-    global_pattern = re.compile(
-        r'//\s*GLOBAL:\s*TOY2\s+0x([0-9A-Fa-f]+)'
-    )
-
-    source_files = list(src_main_path.glob("**/*.h")) + list(src_main_path.glob("**/*.cpp"))
-
-    for file_path in source_files:
-        try:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                content = f.read()
-
-            rel_path = str(file_path.relative_to(src_main_path))
-
-            matches = func_pattern.findall(content)
-
-            for kind, address in matches:
-                address = address.upper().zfill(8)
-
-                status = "IMPLEMENTED" if kind.upper() == "FUNCTION" else "UNFINISHED"
-
-                implemented_functions[address] = {
-                    "status": status,
-                    "file": rel_path,
-                }
-                func_occurrences.setdefault(address, []).append(rel_path)
-
-            for address in global_pattern.findall(content):
-                address = address.upper().zfill(8)
-                global_occurrences.setdefault(address, []).append(rel_path)
-
-        except Exception as e:
-            print(f"Warning: Could not read file {file_path}: {e}")
+    for annotation in read_source_annotations(src_main_path):
+        address = annotation.address[2:].upper().zfill(8)
+        location = f"{annotation.source}:{annotation.line}"
+        if annotation.kind in ("function", "stub"):
+            status = "IMPLEMENTED" if annotation.kind == "function" else "UNFINISHED"
+            implemented_functions[address] = {
+                "status": status,
+                "file": annotation.source,
+            }
+            func_occurrences.setdefault(address, []).append(location)
+        elif annotation.kind == "global":
+            global_occurrences.setdefault(address, []).append(location)
 
     duplicate_funcs = {
         address: files
