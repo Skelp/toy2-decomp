@@ -15,6 +15,30 @@ namespace Nu3D
 		// FUNCTION: TOY2 0x004A9400 [MATCHED]
 		void BuildIdentityMatrix(D3DMATRIX* matrix) { memcpy(matrix, &g_identityMatrix, sizeof(D3DMATRIX)); }
 
+		// FUNCTION: TOY2 0x004A9530
+		void SetRotationYFromU16AngleLUT(D3DMATRIX* matrix, int32_t trigOffset)
+		{
+			float cosine = Numerics::g_trigLUT[(trigOffset + 0x4000) & 0xFFFF];
+			float sine = Numerics::g_trigLUT[trigOffset & 0xFFFF];
+
+			matrix->_11 = cosine;
+			matrix->_12 = 0.0f;
+			matrix->_13 = -sine;
+			matrix->_14 = 0.0f;
+			matrix->_21 = 0.0f;
+			matrix->_22 = 1.0f;
+			matrix->_23 = 0.0f;
+			matrix->_24 = 0.0f;
+			matrix->_31 = sine;
+			matrix->_32 = 0.0f;
+			matrix->_33 = cosine;
+			matrix->_34 = 0.0f;
+			matrix->_41 = 0.0f;
+			matrix->_42 = 0.0f;
+			matrix->_43 = 0.0f;
+			matrix->_44 = 1.0f;
+		}
+
 		// FUNCTION: TOY2 0x004A9860 [MATCHED]
 		void ScaleMatrixByVector(D3DMATRIX* matrix, Vector3F* vector)
 		{
@@ -117,6 +141,22 @@ namespace Nu3D
 			matrix->_41 = offset->x + matrix->_41;
 			matrix->_42 = offset->y + matrix->_42;
 			matrix->_43 = offset->z + matrix->_43;
+		}
+
+		// FUNCTION: TOY2 0x004A97E0
+		void GetPositionVector(D3DMATRIX* matrix, Vector3F* output)
+		{
+			output->x = matrix->_41;
+			output->y = matrix->_42;
+			output->z = matrix->_43;
+		}
+
+		// FUNCTION: TOY2 0x004A9840
+		void GetForwardVector(D3DMATRIX* matrix, Vector3F* output)
+		{
+			output->x = matrix->_31;
+			output->y = matrix->_32;
+			output->z = matrix->_33;
 		}
 
 		// FUNCTION: TOY2 0x004A8D20 [MATCHED]
@@ -233,6 +273,72 @@ namespace Nu3D
 			result._44 = 1.0f;
 
 			memcpy(output, &result, sizeof(result));
+		}
+
+		// FUNCTION: TOY2 0x004AAC40
+		void BuildMatrixFromDirection(D3DMATRIX* matrix, Vector3F* direction)
+		{
+			Vector3F* right = (Vector3F*)&matrix->_11;
+			Vector3F* up = (Vector3F*)&matrix->_21;
+			Vector3F* forward = (Vector3F*)&matrix->_31;
+
+			float rightLengthSquared = right->x * right->x + right->y * right->y + right->z * right->z;
+			float upLengthSquared = up->x * up->x + up->y * up->y + up->z * up->z;
+			float forwardLengthSquared = forward->x * forward->x + forward->y * forward->y + forward->z * forward->z;
+			float directionLengthSquared = direction->x * direction->x + direction->y * direction->y + direction->z * direction->z;
+			float scale = 0.0f;
+
+			if (directionLengthSquared != 0.0f)
+				scale = (float)sqrt(forwardLengthSquared / directionLengthSquared);
+
+			forward->x = direction->x * scale;
+			forward->y = direction->y * scale;
+			forward->z = direction->z * scale;
+
+			float alignment = (float)fabs(up->x * forward->x + up->y * forward->y + up->z * forward->z);
+
+			if (alignment <= 0.8660253882408142f)
+			{
+				VertexCrossProduct(right, up, forward);
+
+				float newLengthSquared = right->x * right->x + right->y * right->y + right->z * right->z;
+				scale = 0.0f;
+				if (newLengthSquared != 0.0f)
+					scale = (float)sqrt(rightLengthSquared / newLengthSquared);
+				right->x *= scale;
+				right->y *= scale;
+				right->z *= scale;
+
+				VertexCrossProduct(up, forward, right);
+				newLengthSquared = up->x * up->x + up->y * up->y + up->z * up->z;
+				scale = 0.0f;
+				if (newLengthSquared != 0.0f)
+					scale = (float)sqrt(upLengthSquared / newLengthSquared);
+				up->x *= scale;
+				up->y *= scale;
+				up->z *= scale;
+			}
+			else
+			{
+				VertexCrossProduct(up, forward, right);
+
+				float newLengthSquared = up->x * up->x + up->y * up->y + up->z * up->z;
+				scale = 0.0f;
+				if (newLengthSquared != 0.0f)
+					scale = (float)sqrt(upLengthSquared / newLengthSquared);
+				up->x *= scale;
+				up->y *= scale;
+				up->z *= scale;
+
+				VertexCrossProduct(right, up, forward);
+				newLengthSquared = right->x * right->x + right->y * right->y + right->z * right->z;
+				scale = 0.0f;
+				if (newLengthSquared != 0.0f)
+					scale = (float)sqrt(rightLengthSquared / newLengthSquared);
+				right->x *= scale;
+				right->y *= scale;
+				right->z *= scale;
+			}
 		}
 
 		// FUNCTION: TOY2 0x004DA850 [MATCHED]

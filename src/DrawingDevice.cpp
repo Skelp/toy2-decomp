@@ -569,6 +569,9 @@ namespace DrawingDevice
 	// FUNCTION: TOY2 0x004ABA80
 	LPDIRECT3DDEVICE3 GetD3DDevice() { return g_drawingDevice->m_pd3dDevice; }
 
+	// FUNCTION: TOY2 0x004ABAE0
+	LPDIRECT3DVIEWPORT3 GetViewport() { return g_drawingDevice->m_pvViewport; }
+
 	// FUNCTION: TOY2 0x004ABBC0
 	int32_t GetWidth() { return g_drawingDevice->m_dwRenderWidth; }
 
@@ -621,6 +624,24 @@ namespace DrawingDevice
 
 		g_drawingDevice = 0;
 	}
+
+	// FUNCTION: TOY2 0x004ABF30
+	HRESULT CreateLight(LPDIRECT3DLIGHT* outLight) { return GetD3D()->CreateLight(outLight, 0); }
+
+	// FUNCTION: TOY2 0x004ABF50
+	HRESULT SetLight(LPDIRECT3DLIGHT light, LPD3DLIGHT2 description)
+	{
+		return light->SetLight((LPD3DLIGHT)description);
+	}
+
+	// FUNCTION: TOY2 0x004ABF60
+	HRESULT AddLight(LPDIRECT3DLIGHT light) { return GetViewport()->AddLight(light); }
+
+	// FUNCTION: TOY2 0x004ABF80
+	HRESULT DeleteLight(LPDIRECT3DLIGHT light) { return GetViewport()->DeleteLight(light); }
+
+	// FUNCTION: TOY2 0x004ABFC0
+	ULONG ReleaseLight(LPDIRECT3DLIGHT light) { return light->Release(); }
 
 	// FUNCTION: TOY2 0x00412B10
 	void Quit()

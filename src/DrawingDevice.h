@@ -109,6 +109,7 @@ namespace DrawingDevice
 	LPDIRECTDRAW4 GetDDraw4();
 	LPDIRECT3D3 GetD3D();
 	LPDIRECT3DDEVICE3 GetD3DDevice();
+	LPDIRECT3DVIEWPORT3 GetViewport();
 	int32_t GetWidth();
 	int32_t GetHeight();
 	int32_t GetDestWidth();
@@ -117,6 +118,11 @@ namespace DrawingDevice
 	int32_t SetViewport(LPD3DVIEWPORT2 viewport);
 	int32_t BuildFreshViewport(LPD3DVIEWPORT2 viewport);
 	HRESULT CreateMaterial(LPDIRECT3DMATERIAL3* outMaterial);
+	HRESULT CreateLight(LPDIRECT3DLIGHT* outLight);
+	HRESULT SetLight(LPDIRECT3DLIGHT light, LPD3DLIGHT2 description);
+	HRESULT AddLight(LPDIRECT3DLIGHT light);
+	HRESULT DeleteLight(LPDIRECT3DLIGHT light);
+	ULONG ReleaseLight(LPDIRECT3DLIGHT light);
 	RECT* GetDestRect();
 	void Quit();
 	HRESULT GetChosenDevice_T(DDAppDevice::App** outApp, DDAppDevice** outDevice);

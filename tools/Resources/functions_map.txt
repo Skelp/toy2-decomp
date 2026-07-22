@@ -991,7 +991,9 @@
 0x004C29D0 Nu3D::Light::Free
 0x004C2A20 Nu3D::Light::BuildAmbient
 0x004C2A70 Nu3D::Light::Alloc
-0x004C2BE0 Nu3D::Light::BuildLight
+0x004C2AB0 Nu3D::Light::BuildPoint
+0x004C2BE0 Nu3D::Light::BuildDirectional
+0x004C2D20 Nu3D::Light::BuildSpot
 0x004C2E70 Nu3D::Light::Update
 0x004C2FF0 Nu3D::Light::InitPool
 0x004C3090 Nu3D::Light::DestroyAllLights
