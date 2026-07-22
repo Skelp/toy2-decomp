@@ -182,6 +182,8 @@ add_library(patcher MODULE
     ${TOY2_SOURCES}
 )
 
+target_compile_definitions(patcher PRIVATE APPLY_FIXES)
+
 target_link_directories(patcher PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/external/libs
     ${CMAKE_CURRENT_SOURCE_DIR}/external/libs/directx6
