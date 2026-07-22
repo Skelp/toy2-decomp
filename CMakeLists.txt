@@ -118,6 +118,8 @@ set(TOY2_SOURCES
     src/Nu3D/Patch.cpp
     src/Nu3D/Portal.h
     src/Nu3D/Portal.cpp
+    src/Nu3D/Scene.h
+    src/Nu3D/Scene.cpp
     src/Nu3D/Primitive.h
     src/Nu3D/Primitive.cpp
     src/Nu3D/Sprite.h
