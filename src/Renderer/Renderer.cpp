@@ -6,12 +6,14 @@
 #include "Nu3D/Camera.h"
 #include "Nu3D/BmpDataNode.h"
 #include "Nu3D/Material.h"
+#include "Nu3D/Math.h"
 #include "NGNLoader/NGNLoader.h"
 #include "Nu3D/Patch.h"
 #include "Renderer/Sprite.h"
 #include "Toy2/Toy2.h"
 #include "Renderer/Glue.h"
 #include "Toy2/D3DApp.h"
+#include "Logger.h"
 
 namespace Renderer
 {
@@ -57,6 +59,56 @@ namespace Renderer
 	// GLOBAL: TOY2 0x0094FCD8
 	int32_t g_additionalRenderFlags;
 
+	// GLOBAL: TOY2 0x00508718
+	int32_t g_primitiveRenderFlags = 5;
+
+	// GLOBAL: TOY2 0x005088B0
+	float g_primaryRenderDistanceSquared = 144000000.0f;
+
+	// GLOBAL: TOY2 0x005088B4
+	float g_secondaryRenderDistanceSquared = 1000000.0f;
+
+	// GLOBAL: TOY2 0x009F2F24
+	int32_t g_instanceDataFreeCount;
+
+	// GLOBAL: TOY2 0x0088C7D0
+	Nu3D::InstanceData g_instanceDataPool[1000];
+
+	// GLOBAL: TOY2 0x0094FCD0
+	int32_t g_renderEntryFreeCount;
+
+	// GLOBAL: TOY2 0x00508728
+	int32_t g_primitiveBufferFreeCount = 3000;
+
+	// GLOBAL: TOY2 0x0095C860
+	RenderEntry g_renderEntryPool[3000];
+
+	// GLOBAL: TOY2 0x0095B860
+	void* g_renderBuckets[1024];
+
+	// FUNCTION: TOY2 0x004B92B0 [MATCHED]
+	int32_t SetAdditionalRenderFlags(int32_t flags)
+	{
+		int32_t previousFlags = g_additionalRenderFlags;
+		g_additionalRenderFlags = flags;
+		return previousFlags;
+	}
+
+	// FUNCTION: TOY2 0x004B5CE0 [MATCHED]
+	int32_t Set508718(int32_t value)
+	{
+		int32_t previousValue = g_primitiveRenderFlags;
+		g_primitiveRenderFlags = value;
+		return previousValue;
+	}
+
+	// FUNCTION: TOY2 0x004BC410 [MATCHED]
+	void SetRenderDistance(float primaryDistance, float secondaryDistance)
+	{
+		g_primaryRenderDistanceSquared = primaryDistance * primaryDistance;
+		g_secondaryRenderDistanceSquared = secondaryDistance * secondaryDistance;
+	}
+
 	// GLOBAL: TOY2 0x0094FCD4
 	float g_lodFactor;
 
@@ -68,6 +120,15 @@ namespace Renderer
 
 	// GLOBAL: TOY2 0x009F6000
 	int32_t g_useVertexColorMod;
+
+	// GLOBAL: TOY2 0x009F5FD8
+	float g_materialHorzOffset;
+
+	// GLOBAL: TOY2 0x009F5FDC
+	float g_materialVertOffset;
+
+	// GLOBAL: TOY2 0x009F2EA0
+	Nu3D::Sprite g_instanceSpriteTemplate;
 
 	// GLOBAL: TOY2 0x009F5FB0
 	Nu3D::Patch::PatchVertices g_FVF_14C_Buffer_2;
@@ -237,9 +298,6 @@ namespace DrawingAPI
 
 namespace Renderer
 {
-	// STUB: TOY2 0x004B5CE0
-	int32_t Set508718(int32_t value) { return 0; }
-
 	// FUNCTION: TOY2 0x004B2CE0
 	void DisableFog() { g_fogEnabled = 0; }
 
@@ -448,8 +506,16 @@ namespace Renderer
 			SetTextureStageState(0, texture);
 	}
 
-	// STUB: TOY2 0x004B62C0
-	void ResetRenderPools() {}
+	// FUNCTION: TOY2 0x004B62C0 [MATCHED]
+	void ResetRenderPools()
+	{
+		memset(Nu3D::g_spriteBuckets, 0, sizeof(Nu3D::g_spriteBuckets));
+		memset(g_renderBuckets, 0, sizeof(g_renderBuckets));
+		g_instanceDataFreeCount = 1000;
+		g_primitiveBufferFreeCount = 3000;
+		g_renderEntryFreeCount = 3000;
+		Renderer::Sprite::g_spriteBuffer3DCount = 2000;
+	}
 
 	// FUNCTION: TOY2 0x004B9710
 	void InitResources()
@@ -1141,6 +1207,157 @@ namespace Renderer
 				}
 			}
 		}
+	}
+
+	// FUNCTION: TOY2 0x004B8490 [MATCHED]
+	void RenderPrimitive(Nu3D::Primitive* primitive, const D3DMATRIX* transform, int32_t renderFlags)
+	{
+		if (0.0f != primitive->originRadius)
+		{
+			renderFlags |= g_additionalRenderFlags;
+			Nu3D::InstanceData* instanceData = Nu3D::InstanceData::AllocFromMatrix(transform, renderFlags);
+			if (instanceData)
+			{
+				for (; primitive; primitive = primitive->listNext)
+					ProcessPrimitive(instanceData, primitive);
+			}
+		}
+	}
+
+}
+
+namespace Nu3D
+{
+	using namespace Renderer;
+
+	// FUNCTION: TOY2 0x004B84E0
+	InstanceData* InstanceData::AllocFromMatrix(const D3DMATRIX* matrix, int32_t renderFlags)
+	{
+		if (! g_instanceDataFreeCount)
+			return 0;
+
+		Nu3D::InstanceData* instanceData = &g_instanceDataPool[--g_instanceDataFreeCount];
+		memcpy(instanceData->matrices, matrix, sizeof(D3DMATRIX));
+		instanceData->renderFlags = renderFlags;
+		instanceData->lodFactor = g_lodFactor;
+		instanceData->horzOffset = g_materialHorzOffset;
+		instanceData->vertOffset = g_materialVertOffset;
+		instanceData->renderModeFlags = g_unk9F5FF8 != 0;
+
+		if (g_useVertexColorMod)
+		{
+			instanceData->renderModeFlags |= 2;
+			instanceData->vertexModColor.r = g_vertexColorModRed;
+			instanceData->vertexModColor.g = g_vertexColorModGreen;
+			instanceData->vertexModColor.b = g_vertexColorModBlue;
+		}
+
+		Nu3D::Viewport::GetViewClipRect(&instanceData->clipRect);
+		instanceData->unkInt6 = g_primitiveRenderFlags;
+		instanceData->sprite = g_instanceSpriteTemplate;
+		return instanceData;
+	}
+}
+
+namespace Renderer
+{
+
+	// FUNCTION: TOY2 0x004B85E0 [MATCHED]
+	void ProcessPrimitive(Nu3D::InstanceData* instanceData, Nu3D::Primitive* primitive)
+	{
+		Nu3D::Material* material = Nu3D::Material::GetFreeByIndex(primitive->materialIndex);
+		for (;;)
+		{
+			if (! material)
+				return;
+
+			RenderEntry::AllocObj(material, primitive, instanceData);
+			if ((material->metadata & 4) != 0)
+				RenderEntry::AllocObj(NGNLoader::g_tex14Materials[0], primitive, instanceData);
+			if ((material->metadata & 0x40) != 0)
+				RenderEntry::AllocObj(NGNLoader::g_tex14Materials[1], primitive, instanceData);
+			if ((material->metadata & 0x80) != 0)
+				RenderEntry::AllocObj(NGNLoader::g_tex14Materials[2], primitive, instanceData);
+
+			for (int32_t textureStage = 0; textureStage < g_maxSimultaneousTextures; ++textureStage)
+			{
+				if (! material)
+					return;
+				material = material->nextPass;
+			}
+		}
+	}
+
+	// FUNCTION: TOY2 0x004B8670 [MATCHED]
+	RenderEntry* RenderEntry::AllocObj(Nu3D::Material* material, Nu3D::Primitive* primitive, Nu3D::InstanceData* instanceData)
+	{
+		if (g_renderEntryFreeCount)
+		{
+			RenderEntry* entry = &g_renderEntryPool[--g_renderEntryFreeCount];
+			entry->primitive = primitive;
+			entry->instanceData = instanceData;
+			entry->material = material;
+
+			if (instanceData->lodFactor == 1.0f && (material->metadata & 0xE33) == 0)
+			{
+				entry->type = RENDER_TYPE7;
+				entry->next = material->renderEntryHead;
+				material->renderEntryHead = entry;
+			}
+			else
+			{
+				entry->type = RENDER_TYPE9;
+				InsertIntoBucket(entry);
+			}
+			return entry;
+		}
+
+		Logger::DebugLog("rndrentryAllocObj - out of rndrentries");
+		return 0;
+	}
+
+	// FUNCTION: TOY2 0x004B86F0
+	void RenderEntry::InsertIntoBucket(RenderEntry* entry)
+	{
+		Vector3F cameraPosition;
+		Vector3F instancePosition;
+		Nu3D::Math::GetPositionVector(&Nu3D::Camera::g_activeCamera.transform, &cameraPosition);
+		Nu3D::Math::GetPositionVector(&entry->instanceData->matrices[0], &instancePosition);
+		Nu3D::Math::VertexSubtract(&cameraPosition, &cameraPosition, &instancePosition);
+
+		float distanceSquared = cameraPosition.x * cameraPosition.x + cameraPosition.y * cameraPosition.y + cameraPosition.z * cameraPosition.z;
+		if (distanceSquared < 1.0f)
+			distanceSquared = 1.0f;
+		entry->distanceSquared = distanceSquared;
+
+		union
+		{
+			float value;
+			uint32_t bits;
+		} distance;
+		distance.value = distanceSquared;
+		int32_t bucketIndex = (distance.bits >> 20) - 0x3F8;
+		if (bucketIndex > 255)
+			return;
+
+		int32_t depth = 0;
+		RenderEntry* previous = 0;
+		RenderEntry* current = (RenderEntry*)Nu3D::g_spriteBuckets[bucketIndex];
+		while (current && distanceSquared < current->distanceSquared)
+		{
+			++depth;
+			previous = current;
+			current = current->next;
+		}
+
+		entry->next = current;
+		if (previous)
+			previous->next = entry;
+		else
+			Nu3D::g_spriteBuckets[bucketIndex] = (Nu3D::Sprite*)entry;
+
+		if (depth >= Nu3D::g_maxBucketDepth)
+			Nu3D::g_maxBucketDepth = depth;
 	}
 
 	// FUNCTION: TOY2 0x004B8400

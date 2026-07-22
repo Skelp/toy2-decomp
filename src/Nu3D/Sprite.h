@@ -27,6 +27,8 @@ namespace Nu3D
 		RGBA color;
 		int32_t renderFlags;
 		Viewport::ViewportRect viewportRect;
+
+		static void InsertIntoBucket(Sprite* sprite);
 	};
 
 	struct InstanceData
@@ -41,7 +43,12 @@ namespace Nu3D
 		RGB32 vertexModColor;
 		Viewport::ViewportRect clipRect;
 		Sprite sprite;
+
+		static InstanceData* AllocFromMatrix(const D3DMATRIX* matrix, int32_t renderFlags);
 	};
+
+	extern Sprite* g_spriteBuckets[256];
+	extern int32_t g_maxBucketDepth;
 
 	STATIC_ASSERT(sizeof(InstanceData) == 0x1B8);
 	STATIC_ASSERT(sizeof(Sprite) == 0x84);

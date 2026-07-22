@@ -2,6 +2,8 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/SpriteSheets.h"
 #include "Nu3D/Sprite.h"
+#include "Nu3D/Camera.h"
+#include "Nu3D/Math.h"
 #include "SoftwareRenderer.h"
 #include "NGNLoader/NGNLoader.h"
 #include "DrawingDevice.h"
@@ -15,6 +17,12 @@ namespace Renderer
 	{
 		// GLOBAL: TOY2 0x005087E8
 		float g_parallaxDepthZPos = 0.99989998;
+
+		// GLOBAL: TOY2 0x00508700
+		int32_t g_spriteBuffer3DCount = 2000;
+
+		// GLOBAL: TOY2 0x009B2760
+		Nu3D::Sprite g_spriteBuffer3D[2000];
 
 		// GLOBAL: TOY2 0x00884AC0
 		Nu3D::Sprite* g_queued2DSprite;
@@ -195,6 +203,26 @@ namespace Renderer
 			}
 		}
 
+		// FUNCTION: TOY2 0x004B9210 [MATCHED]
+		void QueueType10(Vector3F* start, Vector3F* end, RGBA color)
+		{
+			if (g_spriteBuffer3DCount)
+			{
+				Nu3D::Sprite* sprite = &g_spriteBuffer3D[--g_spriteBuffer3DCount];
+				sprite->type = RENDER_TYPE10;
+				sprite->position = *start;
+				sprite->triVerts[0] = *end;
+				sprite->color = Renderer::ApplyGammaCorrection(color);
+				sprite->renderFlags = Renderer::g_additionalRenderFlags;
+				Nu3D::Viewport::GetViewClipRect(&sprite->viewportRect);
+				Nu3D::Sprite::InsertIntoBucket(sprite);
+			}
+			else
+			{
+				Logger::DebugLog("sprite buffer underrun");
+			}
+		}
+
 		// FUNCTION: TOY2 0x00493F40
 		int16_t DrawScaled(int16_t xPos,
 			int16_t yPos,
@@ -335,5 +363,54 @@ namespace Renderer
 				SoftwareRenderer::UnkFunc32();
 			}
 		}
+	}
+}
+
+namespace Nu3D
+{
+	// GLOBAL: TOY2 0x008846B8
+	Nu3D::Sprite* g_spriteBuckets[256];
+
+	// GLOBAL: TOY2 0x009F600C
+	int32_t g_maxBucketDepth;
+
+	// FUNCTION: TOY2 0x004B8B10
+	void Sprite::InsertIntoBucket(Nu3D::Sprite* sprite)
+	{
+		Vector3F cameraPosition;
+		Math::GetPositionVector(&Camera::g_activeCamera.transform, &cameraPosition);
+		Math::VertexSubtract(&cameraPosition, &cameraPosition, &sprite->position);
+
+		float distanceSquared = cameraPosition.x * cameraPosition.x + cameraPosition.y * cameraPosition.y + cameraPosition.z * cameraPosition.z;
+		if (distanceSquared < 1.0f)
+			distanceSquared = 1.0f;
+		sprite->distanceSquared = distanceSquared;
+
+		union
+		{
+			float value;
+			uint32_t bits;
+		} distance;
+		distance.value = distanceSquared;
+		uint32_t bucketIndex = ((distance.bits >> 20) + 8) & 0xFF;
+
+		int32_t depth = 0;
+		Nu3D::Sprite* previous = 0;
+		Nu3D::Sprite* current = g_spriteBuckets[bucketIndex];
+		while (current && distanceSquared < current->distanceSquared)
+		{
+			++depth;
+			previous = current;
+			current = current->next;
+		}
+
+		sprite->next = current;
+		if (previous)
+			previous->next = sprite;
+		else
+			g_spriteBuckets[bucketIndex] = sprite;
+
+		if (depth >= g_maxBucketDepth)
+			g_maxBucketDepth = depth;
 	}
 }

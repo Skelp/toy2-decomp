@@ -1,5 +1,6 @@
 #include "Nu3D/Camera.h"
 #include "Nu3D/Math.h"
+#include "Nu3D/Portal.h"
 #include "Nu3D/Viewport.h"
 #include "DrawingDevice.h"
 #include "Renderer/Renderer.h"
@@ -312,6 +313,108 @@ namespace Nu3D
 			Viewport::g_frustumPlaneCount = 8;
 		}
 
+		// FUNCTION: TOY2 0x004BACF0
+		int32_t ClipViewToPortal(D3DMATRIX* cameraTransform, Portal::AreaPortal* portal)
+		{
+			Vector3F cameraPosition;
+			Math::GetPositionVector(cameraTransform, &cameraPosition);
+
+			Vector3F projectedVertices[100];
+			Nu3D::TransformPointProjective(projectedVertices, portal->vertices, portal->vertexCount, 0);
+
+			float minX = FLT_MAX;
+			float minY = FLT_MAX;
+			float minZ = FLT_MAX;
+			float maxX = -FLT_MAX;
+			float maxY = -FLT_MAX;
+			float maxZ = -FLT_MAX;
+
+			for (int32_t index = 0; index < portal->vertexCount; ++index)
+			{
+				Vector3F* point = &projectedVertices[index];
+				if (point->x <= minX)
+					minX = point->x;
+				if (point->y <= minY)
+					minY = point->y;
+				if (point->z <= minZ)
+					minZ = point->z;
+				if (point->x >= maxX)
+					maxX = point->x;
+				if (point->y >= maxY)
+					maxY = point->y;
+				if (point->z >= maxZ)
+					maxZ = point->z;
+			}
+
+			if (maxZ > 1.0f || minZ < 0.0f)
+				return 1;
+
+			Viewport::ViewportRectAlt& clip = Viewport::g_viewClipRect;
+			if (minX > clip.bottom || maxX < clip.top || minY > clip.right || maxY < clip.left)
+				return 0;
+
+			Vector3F edge1;
+			Vector3F edge2;
+			Vector3F facing;
+			Math::VertexSubtract(&edge1, &projectedVertices[1], &projectedVertices[0]);
+			Math::VertexSubtract(&edge2, &projectedVertices[1], &projectedVertices[2]);
+			Math::VertexCrossProduct(&facing, &edge1, &edge2);
+
+			if (minX <= clip.top)
+				minX = clip.top;
+			if (maxX >= clip.bottom)
+				maxX = clip.bottom;
+			if (minY <= clip.left)
+				minY = clip.left;
+			if (maxY >= clip.right)
+				maxY = clip.right;
+
+			if (facing.z > 0.0f || minX >= maxX || minY >= maxY)
+				return 0;
+
+			Vector3F corners[4];
+			corners[0].x = minX;
+			corners[0].y = maxY;
+			corners[0].z = 0.5f;
+			corners[1].x = minX;
+			corners[1].y = minY;
+			corners[1].z = 0.5f;
+			corners[2].x = maxX;
+			corners[2].y = minY;
+			corners[2].z = 0.5f;
+			corners[3].x = maxX;
+			corners[3].y = maxY;
+			corners[3].z = 0.5f;
+
+			UnprojectPointsFromCamera(corners, corners, 4);
+
+			if (Viewport::g_drawPortalOutlines)
+			{
+				Portal::AreaPortal debugPortal;
+				debugPortal.vertexCount = 4;
+				debugPortal.vertices = corners;
+				Nu3D::DrawDebugPortalOutlines(&debugPortal);
+			}
+
+			Math::CalculatePlaneFromTriangle(&corners[1], &corners[0], &cameraPosition, &Viewport::g_frustumPlanes[4]);
+			Math::CalculatePlaneFromTriangle(&corners[3], &corners[2], &cameraPosition, &Viewport::g_frustumPlanes[5]);
+			Math::CalculatePlaneFromTriangle(&corners[2], &corners[1], &cameraPosition, &Viewport::g_frustumPlanes[6]);
+			Math::CalculatePlaneFromTriangle(&corners[0], &corners[3], &cameraPosition, &Viewport::g_frustumPlanes[7]);
+
+			clip.top = minX;
+			clip.bottom = maxX;
+			clip.left = minY;
+			clip.right = maxY;
+
+			if (Viewport::g_viewportClippingEnabled)
+			{
+				Viewport::SetClipRect(minX, minY, maxX, maxY);
+				RebuildTransformPipeline();
+			}
+
+			return 1;
+		}
+
 		// FUNCTION: TOY2 0x004BBAB0
 		void ApplyCameraTransforms(const CameraData* camera)
 		{
@@ -360,6 +463,29 @@ namespace Nu3D
 
 		// FUNCTION: TOY2 0x004BBCB0 [MATCHED]
 		void SetEffectMode(int32_t effectMode) { g_effectMode = effectMode; }
+
+		// FUNCTION: TOY2 0x004BC080
+		void UnprojectPointsFromCamera(Vector3F* output, const Vector3F* input, int32_t count)
+		{
+			const Vector3F* end = input + count;
+			float projectionX = g_projectionMatrix._11;
+			float projectionOffset = -g_projectionMatrix._43;
+			float projectionY = g_projectionMatrix._22;
+			float projectionZ = g_projectionMatrix._33;
+
+			while (input < end)
+			{
+				Math::TransformPointByMatrix(output, input++, &g_screenToClipMatrix);
+
+				float depth = (projectionOffset + output->z) / projectionZ;
+				output->z = depth;
+				output->x = depth * output->x / projectionX;
+				output->y = depth * output->y / projectionY;
+
+				Math::TransformPointByMatrix(output, output, &g_activeCamera.transform);
+				++output;
+			}
+		}
 
 		// FUNCTION: TOY2 0x004BB9C0 [MATCHED]
 		void ScaleMatrix(D3DMATRIX* matrix) { Math::ScaleMatrix(matrix); }

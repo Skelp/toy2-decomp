@@ -6,6 +6,11 @@
 
 namespace Nu3D
 {
+	namespace Portal
+	{
+		struct AreaPortal;
+	}
+
 	namespace Camera
 	{
 		struct CameraData
@@ -39,6 +44,7 @@ namespace Nu3D
 		extern D3DMATRIX g_projectionMatrix;
 		extern D3DMATRIX g_clipNormMatrix;
 		extern D3DMATRIX g_screenSpaceMatrix;
+		extern D3DMATRIX g_screenToClipMatrix;
 		extern D3DMATRIX g_screenViewProjectionMatrix;
 		extern CameraData g_activeCamera;
 		extern ReflectionState g_reflectionState;
@@ -59,9 +65,11 @@ namespace Nu3D
 		CameraData* Build();
 		void Destroy(CameraData* camera);
 		void CalculateFrustumPlanes(CameraData* camera);
+		int32_t ClipViewToPortal(D3DMATRIX* cameraTransform, Portal::AreaPortal* portal);
 		void ApplyCameraTransforms(const CameraData* camera);
 		void ApplyCameraTransformsWithReflection(const CameraData* camera, ReflectionState* reflection);
 		void SetEffectMode(int32_t effectMode);
+		void UnprojectPointsFromCamera(Vector3F* output, const Vector3F* input, int32_t count);
 		void RebuildTransformPipeline();
 		void BuildPerspectiveProjectionLH(D3DMATRIX* output, float fieldOfView, float aspectRatio, float nearClip, float farClip);
 		void CreateInverseMatrix_T(D3DMATRIX* output, const D3DMATRIX* input);

@@ -58,6 +58,12 @@ namespace Nu3D
 		void RestoreViewportCache(const ViewportCache* cache);
 	}
 
+	namespace Frustum
+	{
+		uint32_t TestSphereAllPlanesAlt(const Vector3F* center, float radius);
+		uint32_t TestSphereDepthPlanes(const Vector3F* center, float radius);
+	}
+
 	void TransformPointProjective(Vector3F* output, const Vector3F* input, int32_t count, const D3DMATRIX* transform);
 
 	STATIC_ASSERT(sizeof(Viewport::ViewportRect) == 0x10);

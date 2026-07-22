@@ -58,7 +58,7 @@ namespace Nu3D
 		{
 			g_materialFreeListHead = g_materialFreeListHead->next;
 
-			result->alwaysZero = 0;
+			result->nextPass = 0;
 			result->vertOffset = 0.0;
 			result->horzOffset = 0.0;
 
