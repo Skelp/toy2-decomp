@@ -1,71 +1,62 @@
-#pragma once
-
 #include "Nu3D/Portal.h"
 #include "Nu3D/Math.h"
-#include "Numerics.h"
-#include <cmath>
+#include "NGNLoader/NGNTypes.h"
+
+#include <FLOAT.H>
+#include <MATH.H>
+#include <MEMORY.H>
 
 namespace Nu3D
 {
 	// GLOBAL: TOY2 0x00A4C414
-	uint8_t Portal::g_visibleAreaFlags[64];
+	int8_t Portal::g_visibleAreaFlags[64];
 
 	// FUNCTION: TOY2 0x004B33B0
-	void Portal::AreaPortal::CalculateBoundingSphere(Nu3D::Portal::AreaPortal* portal)
+	void Portal::AreaPortal::CalculateBoundingSphere(AreaPortal* portal)
 	{
-		float z = 3.4028235e38;
-		float y = 3.4028235e38;
-		float x = 3.4028235e38;
+		float minimumZ = FLT_MAX;
+		float minimumY = FLT_MAX;
+		float minimumX = FLT_MAX;
 
-		int32_t vertexCount = portal->vertexCount;
+		Vector3F maximum;
+		maximum.z = -FLT_MAX;
+		maximum.y = -FLT_MAX;
+		maximum.x = -FLT_MAX;
 
-		Vector3F vector;
-		vector.z = -3.4028235e38;
-		vector.y = -3.4028235e38;
-		vector.x = -3.4028235e38;
-
-		if (vertexCount > 0)
+		if (portal->vertexCount > 0)
 		{
-			Vector3F* vertices = portal->vertices;
-			int32_t verticesLeft = vertexCount;
+			Vector3F* vertex = portal->vertices;
+			int32_t verticesLeft = portal->vertexCount;
 
 			do
 			{
-				if (vertices->x <= x)
-					x = vertices->x;
+				if (vertex->x <= minimumX)
+					minimumX = vertex->x;
+				if (vertex->x >= maximum.x)
+					maximum.x = vertex->x;
+				if (vertex->y <= minimumY)
+					minimumY = vertex->y;
+				if (vertex->y >= maximum.y)
+					maximum.y = vertex->y;
+				if (minimumZ >= vertex->z)
+					minimumZ = vertex->z;
+				if (vertex->z >= maximum.z)
+					maximum.z = vertex->z;
 
-				if (vertices->x >= vector.x)
-					vector.x = vertices->x;
-
-				if (vertices->y <= y)
-					y = vertices->y;
-
-				if (vertices->y >= vector.y)
-					vector.y = vertices->y;
-
-				if (z >= vertices->z)
-					z = vertices->z;
-
-				if (vertices->z >= vector.z)
-					vector.z = vertices->z;
-
-				++vertices;
-				--verticesLeft;
-
-			} while (verticesLeft);
+				++vertex;
+			} while (--verticesLeft);
 		}
 
-		portal->center.x = (vector.x + x) * 0.5;
-		portal->center.y = (vector.y + y) * 0.5;
-		portal->center.z = (vector.z + z) * 0.5;
+		portal->center.x = (maximum.x + minimumX) * 0.5f;
+		portal->center.y = (maximum.y + minimumY) * 0.5f;
+		portal->center.z = (maximum.z + minimumZ) * 0.5f;
 
-		Nu3D::Math::VertexSubtract(&vector, &vector, &portal->center);
+		Math::VertexSubtract(&maximum, &maximum, &portal->center);
 
-		double radSqrt = vector.x * vector.x + vector.y * vector.y + vector.z * vector.z;
-
-		// TODO: naming is wrong here
-		portal->radius = radSqrt;
-		portal->radiusSquared = sqrt(radSqrt);
+		const double radiusSquared = maximum.x * maximum.x + maximum.y * maximum.y
+			+ maximum.z * maximum.z;
+		portal->radiusSquared = (float)radiusSquared;
+		portal->radius = (float)sqrt(radiusSquared);
 	}
 
 	// FUNCTION: TOY2 0x004BC120
@@ -73,5 +64,42 @@ namespace Nu3D
 	{
 		g_visibleAreaFlags[0] = 1;
 		memset(&g_visibleAreaFlags[1], 0, sizeof(g_visibleAreaFlags) - 1);
+	}
+
+	// FUNCTION: TOY2 0x004BC140
+	void Portal::MarkAllAreasVisible()
+	{
+		memset(g_visibleAreaFlags, 1, sizeof(g_visibleAreaFlags));
+	}
+
+	// FUNCTION: TOY2 0x004BC160
+	int32_t Portal::IsAreaVisible(int32_t areaIndex)
+	{
+		return g_visibleAreaFlags[areaIndex & 63];
+	}
+
+	// FUNCTION: TOY2 0x004BC360
+	int32_t Portal::AreaPortal::BuildScalerEntry(NGNLoader::NGNImage* image, int32_t areaIndex,
+		Nu3D::Link::DynamicScaler* scaler)
+	{
+		ScalerEntry* entry = AllocScalerEntry(image);
+		if (entry)
+		{
+			entry->scaler = scaler;
+			entry->next = image->portalHashTable->buckets[areaIndex].scalerHead;
+			image->portalHashTable->buckets[areaIndex].scalerHead = entry;
+			return 1;
+		}
+
+		return 0;
+	}
+
+	// FUNCTION: TOY2 0x004BC3A0
+	Portal::ScalerEntry* Portal::AreaPortal::AllocScalerEntry(NGNLoader::NGNImage* image)
+	{
+		if (image->scalerEntryCount >= image->maxScalerEntries || !image->scalerEntryPool)
+			return 0;
+
+		return &image->scalerEntryPool[image->scalerEntryCount++];
 	}
 }

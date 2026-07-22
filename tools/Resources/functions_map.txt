@@ -782,7 +782,7 @@
 0x004B3320 Nu3D::Primitive::UpdateAllVertexBuffers
 0x004B3350 NGNLoader::AllocPortalVertices
 0x004B33A0 NGNImage::DestroyPortal
-0x004B33B0 Nu3D::AreaPortal::CalculateBoundingSphere
+0x004B33B0 Nu3D::Portal::AreaPortal::CalculateBoundingSphere
 0x004B34F0 Nu3D::Patch::Destroy
 0x004B3530 Nu3D::Patch::Remove
 0x004B3570 Nu3D::Patch::AllocAndResize
@@ -939,8 +939,8 @@
 0x004BC230 NGNLoader::AllocPools
 0x004BC2C0 NGNLoader::InsertPortal
 0x004BC320 NGNLoader::AllocAreaPortal
-0x004BC360 Nu3D::AreaPortal::BuildScalerEntry
-0x004BC3A0 Nu3D::AreaPortal::AllocScalerEntry
+0x004BC360 Nu3D::Portal::AreaPortal::BuildScalerEntry
+0x004BC3A0 Nu3D::Portal::AreaPortal::AllocScalerEntry
 0x004BC410 Renderer::SetRenderDistance
 0x004BC430 SoftwareRenderer::UnkFunc18
 0x004BC460 Nu3D::Area::RenderBucketThroughPortals
