@@ -75,29 +75,18 @@ namespace Nu3D
 		// FUNCTION: TOY2 0x00450C70
 		Matrix3x3I16* EulerToRotationMatrix(const Vector3I16* angles, Matrix3x3I16* output)
 		{
-			int32_t sineX = Numerics::g_fixedTrigLUT[angles->x & 0xFFF];
-			sineX += (sineX >> 31) & 3;
-			int32_t cosineX = Numerics::g_fixedTrigLUT[(angles->x + 0x400) & 0xFFF];
-			cosineX = ShiftFixedTowardZero(cosineX, 2);
-
-			int32_t sineY = Numerics::g_fixedTrigLUT[angles->y & 0xFFF];
-			sineY = ShiftFixedTowardZero(sineY, 2);
-			int32_t cosineY = Numerics::g_fixedTrigLUT[(angles->y + 0x400) & 0xFFF];
-			cosineY += (cosineY >> 31) & 3;
-
-			int32_t sineZ = Numerics::g_fixedTrigLUT[angles->z & 0xFFF];
-			sineZ += (sineZ >> 31) & 3;
-			int32_t cosineZ = Numerics::g_fixedTrigLUT[(angles->z + 0x400) & 0xFFF];
-			cosineZ = ShiftFixedTowardZero(cosineZ, 2);
-
-			cosineY >>= 2;
-			sineZ >>= 2;
+			int16_t sineXRaw = Numerics::g_fixedTrigLUT[angles->x & 0xFFF];
+			int32_t cosineX = ShiftFixedTowardZero(Numerics::g_fixedTrigLUT[(angles->x + 0x400) & 0xFFF], 2);
+			int32_t sineY = ShiftFixedTowardZero(Numerics::g_fixedTrigLUT[angles->y & 0xFFF], 2);
+			int32_t cosineZ = ShiftFixedTowardZero(Numerics::g_fixedTrigLUT[(angles->z + 0x400) & 0xFFF], 2);
+			int32_t cosineY = ShiftFixedTowardZero(Numerics::g_fixedTrigLUT[(angles->y + 0x400) & 0xFFF], 2);
+			int32_t sineZ = ShiftFixedTowardZero(Numerics::g_fixedTrigLUT[angles->z & 0xFFF], 2);
 
 			output->m00 = (int16_t)MultiplyFixed12(cosineZ, cosineY);
 			output->m01 = (int16_t)-MultiplyFixed12(sineZ, cosineY);
+			int32_t sineX = ShiftFixedTowardZero(sineXRaw, 2);
 			output->m02 = (int16_t)sineY;
 
-			sineX >>= 2;
 			int32_t sineXsineY = MultiplyFixed12(sineY, sineX);
 			output->m10 = (int16_t)ShiftFixedTowardZero(sineXsineY * cosineZ + sineZ * cosineX, 12);
 			output->m11 = (int16_t)ShiftFixedTowardZero(cosineZ * cosineX - sineXsineY * sineZ, 12);
