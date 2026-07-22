@@ -57,6 +57,7 @@ namespace Nu3D
 		float VectorNormalize(Vector3F* output, Vector3F* vector);
 		void MultiplyMatrix3x4(D3DMATRIX* output, const D3DMATRIX* left, const D3DMATRIX* right);
 		void FullMatrixMultiply(D3DMATRIX* output, const D3DMATRIX* left, const D3DMATRIX* right);
+		void CreateInverseMatrix(D3DMATRIX* output, const D3DMATRIX* input);
 		void InvertAffineMatrix(D3DMATRIX* output, const D3DMATRIX* input);
 		void BuildMatrixFromDirection(D3DMATRIX* matrix, Vector3F* direction);
 		void ScaleMatrix(D3DMATRIX* matrix);

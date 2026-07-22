@@ -350,7 +350,7 @@ namespace Nu3D
 		D3DMATRIX g_screenViewProjectionMatrix;
 
 		// GLOBAL: TOY2 0x00A4C290
-		D3DMATRIX g_viewMatrix;
+		D3DMATRIX g_projectionMatrix;
 
 		// GLOBAL: TOY2 0x00A4C2D0
 		D3DMATRIX g_clipNormMatrix;
@@ -365,7 +365,7 @@ namespace Nu3D
 		D3DMATRIX g_viewProjectionMatrix;
 
 		// GLOBAL: TOY2 0x00A4C3D0
-		D3DMATRIX g_projectionMatrix;
+		D3DMATRIX g_viewMatrix;
 
 		// GLOBAL: TOY2 0x00E4D824
 		D3DMATRIX g_activeViewProjectionMatrix;
@@ -375,7 +375,7 @@ namespace Nu3D
 		{
 			Viewport::GetClipNormMatrix(&g_clipNormMatrix);
 			Viewport::GetScreenSpaceMatrix(&g_screenSpaceMatrix);
-			Math::FullMatrixMultiply(&g_viewProjectionMatrix, &g_projectionMatrix, &g_viewMatrix);
+			Math::FullMatrixMultiply(&g_viewProjectionMatrix, &g_viewMatrix, &g_projectionMatrix);
 			Math::FullMatrixMultiply(&g_normalizedViewProjectionMatrix, &g_viewProjectionMatrix, &g_clipNormMatrix);
 			Math::FullMatrixMultiply(&g_screenViewProjectionMatrix, &g_normalizedViewProjectionMatrix, &g_screenSpaceMatrix);
 			Math::FullMatrixMultiply(&g_clipToScreenMatrix, &g_clipNormMatrix, &g_screenSpaceMatrix);

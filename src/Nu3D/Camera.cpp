@@ -1,6 +1,10 @@
 #include "Nu3D/Camera.h"
 #include "Nu3D/Math.h"
+#include "DrawingDevice.h"
 #include "Renderer/Renderer.h"
+#include <FLOAT.H>
+#include <MATH.H>
+#include <STDLIB.H>
 
 namespace Nu3D
 {
@@ -127,6 +131,44 @@ namespace Nu3D
 		// STUB: TOY2 0x004CE050
 		void ApplyTransformToCamera(ActiveCameraTransform* camera) {}
 
+		// FUNCTION: TOY2 0x004BB850 [MATCHED]
+		D3DMATRIX* GetViewMatrix() { return &g_viewMatrix; }
+
+		// FUNCTION: TOY2 0x004BB860 [MATCHED]
+		D3DMATRIX* GetProjectionMatrix() { return &g_projectionMatrix; }
+
+		// FUNCTION: TOY2 0x004BB870 [MATCHED]
+		D3DMATRIX* GetClipNormMatrix() { return &g_clipNormMatrix; }
+
+		// FUNCTION: TOY2 0x004BB880 [MATCHED]
+		D3DMATRIX* GetScreenSpaceMatrix() { return &g_screenSpaceMatrix; }
+
+		// FUNCTION: TOY2 0x004BB890 [MATCHED]
+		CameraData* Build()
+		{
+			CameraData* camera = (CameraData*)malloc(sizeof(CameraData));
+
+			Math::BuildIdentityMatrix(&camera->transform);
+			camera->fieldOfView = 0.75f;
+			camera->aspectRatio = 1.0f;
+			camera->nearClip = 1.0f;
+			camera->portalNearClip = 0.0f;
+			camera->farClip = 1000.0f;
+			camera->fogFarClip = FLT_MAX;
+			camera->aspectRatio = (float)DrawingDevice::GetDestHeight() / (float)DrawingDevice::GetDestWidth();
+			camera->scale.z = 1.0f;
+			camera->scale.y = 1.0f;
+			camera->scale.x = 1.0f;
+			return camera;
+		}
+
+		// FUNCTION: TOY2 0x004BB910 [MATCHED]
+		void Destroy(CameraData* camera)
+		{
+			if (camera)
+				free(camera);
+		}
+
 		// FUNCTION: TOY2 0x004BB9C0 [MATCHED]
 		void ScaleMatrix(D3DMATRIX* matrix) { Math::ScaleMatrix(matrix); }
 
@@ -135,5 +177,23 @@ namespace Nu3D
 
 		// FUNCTION: TOY2 0x004BB9F0 [MATCHED]
 		void GetMatrixScaleVector(Vector3F* scale) { *scale = Math::g_matrixScale; }
+
+		// FUNCTION: TOY2 0x004BBC00 [MATCHED]
+		void BuildPerspectiveProjectionLH(D3DMATRIX* output, float fieldOfView, float aspectRatio, float nearClip, float farClip)
+		{
+			float depthScale = farClip / (farClip - nearClip);
+			float halfFieldOfView = fieldOfView * 0.5f;
+			float cotangent = (float)(cos(halfFieldOfView) / sin(halfFieldOfView));
+
+			memset(output, 0, sizeof(*output));
+			output->_34 = 1.0f;
+			output->_11 = cotangent * aspectRatio;
+			output->_22 = cotangent;
+			output->_33 = depthScale;
+			output->_43 = -depthScale * nearClip;
+		}
+
+		// FUNCTION: TOY2 0x004BBC50 [MATCHED]
+		void CreateInverseMatrix_T(D3DMATRIX* output, const D3DMATRIX* input) { Math::CreateInverseMatrix(output, input); }
 	}
 }

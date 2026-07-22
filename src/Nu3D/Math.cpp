@@ -649,6 +649,34 @@ namespace Nu3D
 			output->_44 = g_matrixMultiplyResult._44;
 		}
 
+		// FUNCTION: TOY2 0x004AA520 [MATCHED]
+		void CreateInverseMatrix(D3DMATRIX* output, const D3DMATRIX* input)
+		{
+			float translationX = -input->_41;
+			float translationY = -input->_42;
+			float translationZ = -input->_43;
+
+			float transposeValue = input->_12;
+			output->_12 = input->_21;
+			output->_21 = transposeValue;
+			transposeValue = input->_13;
+			output->_13 = input->_31;
+			output->_31 = transposeValue;
+			transposeValue = input->_23;
+			output->_23 = input->_32;
+			output->_32 = transposeValue;
+			output->_11 = input->_11;
+			output->_22 = input->_22;
+			output->_33 = input->_33;
+			output->_34 = 0.0f;
+			output->_24 = 0.0f;
+			output->_14 = 0.0f;
+			output->_44 = 1.0f;
+			output->_41 = translationZ * output->_31 + translationX * output->_11 + translationY * output->_21;
+			output->_42 = translationZ * output->_32 + translationX * output->_12 + translationY * output->_22;
+			output->_43 = translationZ * output->_33 + translationX * output->_13 + translationY * output->_23;
+		}
+
 		// FUNCTION: TOY2 0x004AA620
 		void InvertAffineMatrix(D3DMATRIX* output, const D3DMATRIX* input)
 		{
