@@ -73,7 +73,7 @@ namespace NGNLoader
 		{
 			fread(&g_curShapeNameLen, sizeof(uint8_t), 1, stream);
 			fread(g_curShapeName, sizeof(char), g_curShapeNameLen, stream);
-			
+
 			g_curShapeName[g_curShapeNameLen] = '\0';
 			return 1;
 		}
@@ -915,5 +915,18 @@ namespace NGNLoader
 			else
 				return g_curMaterialList[index];
 		}
+	}
+}
+
+namespace Nu3D
+{
+	// FUNCTION: TOY2 0x004CBC40
+	int32_t CopyShapeVertex(int32_t index, Vertex* output)
+	{
+		if (index < 0 || index >= NGNLoader::ObjectLoad::g_curVertexCount || ! output)
+			return 0;
+
+		memcpy(output, &NGNLoader::ObjectLoad::g_shapeVertices[index], sizeof(Vertex));
+		return 1;
 	}
 }

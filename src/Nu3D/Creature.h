@@ -18,11 +18,11 @@ namespace Nu3D
 		char** nodeNames;
 		Primitive** primitives;
 		Patch* patch;
-		int32_t** flagsList;
-		int32_t** unkVar10;
+		int32_t* flagsList;
+		int32_t* nodeMetadata;
 		void** animData;
 		int32_t animCount;
 	};
 
-    STATIC_ASSERT(sizeof(Creature) == 0x30);
+	STATIC_ASSERT(sizeof(Creature) == 0x30);
 }

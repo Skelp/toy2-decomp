@@ -36,6 +36,9 @@ namespace NGNLoader
 	// GLOBAL: TOY2 0x00508A58
 	Vector3F g_vertexScaleVector = { 1.0, 1.0, 1.0 };
 
+	// GLOBAL: TOY2 0x009F5FE4
+	Nu3D::Material* g_tex14Materials[3];
+
 	// FUNCTION: TOY2 0x004B1190
 	void FreeAllBmpDataNodes() { Nu3D::FreeAllBmpDataNodes_T(); }
 
@@ -116,6 +119,71 @@ namespace NGNLoader
 		}
 
 		return result;
+	}
+
+	// FUNCTION: TOY2 0x004BB150
+	void ReleaseTextureData(NGNTextureData* textureData)
+	{
+		if (textureData->bmpDataNode)
+			Nu3D::ReleaseBmpDataNode_T(textureData->bmpDataNode);
+
+		textureData->bmpDataNode = 0;
+
+		if (textureData->next)
+			textureData->next->prev = textureData->prev;
+
+		if (textureData->prev)
+		{
+			textureData->prev->next = textureData->next;
+		}
+		else
+		{
+			g_textureData.activeList = textureData->next;
+		}
+
+		textureData->next = g_textureData.freeList;
+		g_textureData.freeList = textureData;
+	}
+
+	// FUNCTION: TOY2 0x004BB2F0
+	uint32_t GetTextureDataIndexByName(char* textureName)
+	{
+		NGNTextureParams texParams;
+		texParams.rawTexStr = textureName;
+
+		NGNTextureData* textureData = GetTextureData(&texParams, 1);
+		return textureData ? textureData->textureIndex : 0;
+	}
+
+	// FUNCTION: TOY2 0x004BB810
+	void ReleaseTextureCache(NGNTextureCache* textureCache)
+	{
+		if (textureCache->next)
+			textureCache->next->prev = textureCache->prev;
+
+		if (textureCache->prev)
+		{
+			textureCache->prev->next = textureCache->next;
+		}
+		else
+		{
+			g_textureCache.activeList = textureCache->next;
+		}
+
+		textureCache->next = g_textureCache.freeList;
+		g_textureCache.freeList = textureCache;
+	}
+
+	// FUNCTION: TOY2 0x004BB7D0
+	void ReleaseAllTextures()
+	{
+		while (g_textureData.activeList)
+			ReleaseTextureData(g_textureData.activeList);
+
+		while (g_textureCache.activeList)
+			ReleaseTextureCache(g_textureCache.activeList);
+
+		Nu3D::FreeAllBmpDataNodes_T();
 	}
 
 	// FUNCTION: TOY2 0x004AC240
@@ -394,7 +462,145 @@ namespace NGNLoader
 	}
 
 	// FUNCTION: TOY2 0x004CA420
-	Nu3D::Creature* ExtractCreatureData(FILE* stream) { return 0; }
+	Nu3D::Creature* ExtractCreatureData(FILE* stream)
+	{
+		Nu3D::Creature* creature = 0;
+		int32_t stop = 0;
+		int32_t chunkId;
+
+		while (! stop && fread(&chunkId, sizeof(chunkId), 1, stream))
+		{
+			int32_t chunkSize;
+			fread(&chunkSize, sizeof(chunkSize), 1, stream);
+			int32_t chunkEnd = ftell(stream) + chunkSize;
+
+			switch (chunkId)
+			{
+				case 0:
+					stop = 1;
+					break;
+
+				case 0x200:
+					creature = (Nu3D::Creature*)malloc(sizeof(Nu3D::Creature));
+					if (creature)
+					{
+						memset(creature, 0, sizeof(Nu3D::Creature));
+						fread(&creature->nodeCount, sizeof(creature->nodeCount), 1, stream);
+						creature->flagsList = (int32_t*)malloc(sizeof(int32_t) * creature->nodeCount);
+						if (creature->flagsList)
+							memset(creature->flagsList, 0, sizeof(int32_t) * creature->nodeCount);
+					}
+					break;
+
+				case 0x201:
+					if (creature)
+					{
+						creature->dataFlags |= 1;
+						creature->matrixList1 = (D3DMATRIX*)malloc(sizeof(D3DMATRIX) * creature->nodeCount);
+						creature->matrixList2 = (D3DMATRIX*)malloc(sizeof(D3DMATRIX) * creature->nodeCount);
+						creature->matrixList3 = (D3DMATRIX*)malloc(sizeof(D3DMATRIX) * creature->nodeCount);
+
+						if (creature->matrixList1 && creature->matrixList2 && creature->matrixList3)
+						{
+							fread(creature->matrixList1, sizeof(D3DMATRIX), creature->nodeCount, stream);
+							memcpy(creature->matrixList3, creature->matrixList1, sizeof(D3DMATRIX) * creature->nodeCount);
+							for (int32_t index = 0; index < creature->nodeCount; ++index)
+								Nu3D::Math::BuildIdentityMatrix(&creature->matrixList2[index]);
+						}
+					}
+					break;
+
+				case 0x202:
+					if (creature)
+					{
+						creature->dataFlags |= 2;
+						creature->nodeNames = (char**)malloc(sizeof(char*) * creature->nodeCount);
+						if (creature->nodeNames)
+						{
+							for (int32_t index = 0; index < creature->nodeCount; ++index)
+							{
+								uint8_t nameLength;
+								fread(&nameLength, sizeof(nameLength), 1, stream);
+								creature->nodeNames[index] = (char*)malloc(nameLength + 1);
+								if (creature->nodeNames[index])
+								{
+									fread(creature->nodeNames[index], sizeof(char), nameLength, stream);
+									creature->nodeNames[index][nameLength] = '\0';
+								}
+							}
+						}
+					}
+					break;
+
+				case 0x203:
+					if (creature)
+					{
+						creature->dataFlags |= 4;
+						creature->primitives = (Nu3D::Primitive**)malloc(sizeof(Nu3D::Primitive*) * creature->nodeCount);
+						creature->nodeMetadata = (int32_t*)malloc(sizeof(int32_t) * creature->nodeCount);
+
+						if (creature->primitives)
+						{
+							for (int32_t index = 0; index < creature->nodeCount; ++index)
+							{
+								uint16_t nodeFlags;
+								fread(&nodeFlags, sizeof(nodeFlags), 1, stream);
+
+								creature->nodeMetadata[index] = 0;
+								fread(&creature->nodeMetadata[index], sizeof(uint16_t), 1, stream);
+
+								if (nodeFlags & 1)
+								{
+									if (nodeFlags & 2)
+										creature->flagsList[index] |= 2;
+									if (nodeFlags & 4)
+										creature->flagsList[index] |= 4;
+
+									creature->primitives[index] = ObjectLoad::ExtractShapeData(stream);
+									Nu3D::Primitive::CreateAllVertexBuffers(creature->primitives[index], 3);
+								}
+								else
+								{
+									creature->primitives[index] = 0;
+								}
+							}
+						}
+					}
+					break;
+
+				case 0x204:
+					ExtractAnimations(stream, creature, chunkSize);
+					break;
+
+				case 0x205:
+					ObjectLoad::PrepareGlobals();
+					ObjectLoad::ExtractShapeTextures(stream);
+					break;
+
+				case 0x206:
+					ObjectLoad::ExtractShapeMaterials(stream);
+					break;
+
+				case 0x207:
+					ObjectLoad::ExtractShapeVertices(stream);
+					break;
+
+				case 0x208:
+					ExtractShapePatch(stream, creature);
+					break;
+
+				default:
+					Logger::GetErrorHandler("C:\\projects\\nu3d\\hobjload.c", 354)("err");
+					fseek(stream, chunkSize, SEEK_CUR);
+					break;
+			}
+
+			if (ftell(stream) != chunkEnd)
+				fseek(stream, chunkEnd, SEEK_SET);
+		}
+
+		return creature;
+	}
 
 	// FUNCTION: TOY2 0x004C4220
 	uint32_t ParseCreatures(FILE* stream, NGNImage* ngnImage)
@@ -801,14 +1007,155 @@ namespace NGNLoader
 		return result;
 	}
 
-	// STUB: TOY2 0x004B9630
-	void BuildTex14(int32_t unused) {}
+	// FUNCTION: TOY2 0x004B9630
+	void BuildTex14(int32_t unused)
+	{
+		RGBColor color;
 
-	// STUB: TOY2 0x004C36A0
-	void BuildGrid(int32_t gridWidth, int32_t gridHeight, int32_t type, NGNImage* ngnImage) {}
+		g_tex14Materials[0] = Nu3D::Material::CreateFromColor(&color);
+		if (g_tex14Materials[0])
+		{
+			Nu3D::Material::SetOpacity(g_tex14Materials[0], 0.5f);
+			Nu3D::Material::AttachTexture(g_tex14Materials[0], GetTextureDataIndexByName("tex14"));
+			g_tex14Materials[0]->metadata |= 2;
+		}
 
-	// STUB: TOY2 0x004C3240
-	void BuildScalerEntries(NGNImage* ngnImage) {}
+		g_tex14Materials[1] = Nu3D::Material::CreateFromColor(&color);
+		if (g_tex14Materials[1])
+		{
+			Nu3D::Material::SetOpacity(g_tex14Materials[1], 0.5f);
+			Nu3D::Material::AttachTexture(g_tex14Materials[1], GetTextureDataIndexByName("tex14"));
+			g_tex14Materials[1]->metadata |= 0x10;
+		}
+
+		g_tex14Materials[2] = Nu3D::Material::CreateFromColor(&color);
+		if (g_tex14Materials[2])
+		{
+			Nu3D::Material::SetOpacity(g_tex14Materials[2], 0.5f);
+			Nu3D::Material::AttachTexture(g_tex14Materials[2], GetTextureDataIndexByName("tex14"));
+			g_tex14Materials[2]->metadata |= 0x20;
+		}
+	}
+
+	// FUNCTION: TOY2 0x004C36A0
+	void BuildGrid(int32_t gridWidth, int32_t gridHeight, int32_t type, NGNImage* ngnImage)
+	{
+		int32_t gridSize = gridWidth * gridHeight;
+		ngnImage->spacialGrid[type] = (Nu3D::Link::DynamicScaler**)malloc(sizeof(Nu3D::Link::DynamicScaler*) * gridSize);
+
+		if (&ngnImage->spacialGrid[type])
+		{
+			memset(ngnImage->spacialGrid[type], 0, sizeof(Nu3D::Link::DynamicScaler*) * gridSize);
+
+			ngnImage->gridWidth = gridWidth;
+			ngnImage->gridHeight = gridHeight;
+			ngnImage->cellWidthInWorldUnits = (ngnImage->worldMaxX - ngnImage->worldMinX) / gridWidth;
+			ngnImage->cellHeightInWorldUnits = (ngnImage->worldMaxZ - ngnImage->worldMinZ) / gridHeight;
+
+			for (int32_t index = 0; index < ngnImage->shapeCounts[type]; ++index)
+				Nu3D::Spatial::InsertScalerAtComputedCell(&ngnImage->dynamicScalers[type][index], type, ngnImage);
+		}
+	}
+
+	// FUNCTION: TOY2 0x004C3240
+	void BuildScalerEntries(NGNImage* ngnImage)
+	{
+		for (int32_t type = 0; type < 2 && ngnImage->dynamicScalers[type]; ++type)
+		{
+			for (int32_t index = 0; index < ngnImage->shapeCounts[type]; ++index)
+			{
+				Nu3D::Link::DynamicScaler* scaler = &ngnImage->dynamicScalers[type][index];
+				Nu3D::Portal::AreaPortal::BuildScalerEntry(ngnImage, scaler->areaIndex, scaler);
+			}
+		}
+	}
+
+	// FUNCTION: TOY2 0x004CA040
+	int32_t ExtractAnimations(FILE* stream, Nu3D::Creature* creature, uint32_t dataSize)
+	{
+		if (! creature->animData)
+		{
+			creature->animData = (void**)malloc(sizeof(void*) * 100);
+			creature->animCount = 0;
+			if (! creature->animData)
+				return -1;
+		}
+
+		if (creature->animCount >= 100)
+			return -1;
+
+		creature->animData[creature->animCount] = malloc(dataSize);
+		if (! creature->animData[creature->animCount])
+			return -1;
+
+		fread(creature->animData[creature->animCount], dataSize, 1, stream);
+		return ++creature->animCount;
+	}
+
+	// FUNCTION: TOY2 0x004CA1D0
+	int32_t ExtractShapePatch(FILE* stream, Nu3D::Creature* creature)
+	{
+		int32_t patchCount;
+		fread(&patchCount, sizeof(patchCount), 1, stream);
+
+		for (int32_t patchIndex = 0; patchIndex < patchCount; ++patchIndex)
+		{
+			int16_t stripVertexCount;
+			int16_t materialIndex;
+			int16_t controlPointIndices[4];
+			int16_t vertexIndices[4];
+
+			fread(&stripVertexCount, sizeof(stripVertexCount), 1, stream);
+			fread(&materialIndex, sizeof(materialIndex), 1, stream);
+			fread(controlPointIndices, sizeof(int16_t), 4, stream);
+			fread(vertexIndices, sizeof(int16_t), 4, stream);
+
+			Nu3D::Patch* patch;
+			if (stripVertexCount)
+			{
+				patch = Nu3D::Patch::AllocAndResize(stripVertexCount * 2, 2);
+				if (! patch)
+				{
+					Logger::GetErrorHandler("C:\\projects\\nu3d\\hobjload.c", 220)("unable to create patch");
+					continue;
+				}
+
+				for (int32_t index = 0; index < stripVertexCount; ++index)
+				{
+					Nu3D::CopyShapeVertex(vertexIndices[0] + index, &patch->patchVertices.data.vertices[index]);
+					Nu3D::CopyNormalsFromNearestVertex(creature, controlPointIndices[0], &patch->patchVertices.data.vertices[index]);
+
+					Nu3D::CopyShapeVertex(vertexIndices[1] + index, &patch->patchVertices.data.vertices[stripVertexCount + index]);
+					Nu3D::CopyNormalsFromNearestVertex(creature, controlPointIndices[1], &patch->patchVertices.data.vertices[stripVertexCount + index]);
+				}
+			}
+			else
+			{
+				patch = Nu3D::Patch::AllocAndResize(4, 4);
+				if (! patch)
+				{
+					Logger::GetErrorHandler("C:\\projects\\nu3d\\hobjload.c", 220)("unable to create patch");
+					continue;
+				}
+
+				for (int32_t index = 0; index < 4; ++index)
+				{
+					Nu3D::CopyShapeVertex(vertexIndices[index], &patch->patchVertices.data.vertices[index]);
+					Nu3D::CopyNormalsFromNearestVertex(creature, controlPointIndices[index], &patch->patchVertices.data.vertices[index]);
+				}
+			}
+
+			for (int32_t index = 0; index < 4; ++index)
+				patch->controlPointIndices[index] = controlPointIndices[index];
+
+			patch->materialId = ObjectLoad::GetCurrentMatByIndex(materialIndex)->id;
+			patch->listNext = creature->patch;
+			creature->patch = patch;
+			Nu3D::Patch::CreateAllVertexBuffers(patch);
+		}
+
+		return patchCount;
+	}
 
 	// FUNCTION: TOY2 0x004C33F0
 	NGNImage* BuildImage(char* fileName)
@@ -1071,5 +1418,38 @@ namespace NGNLoader
 			return Nu3D::CopyToDDSurface(g_textureDataFreeList[texIndex].bmpDataNode, ddSurface);
 		else
 			return 0;
+	}
+}
+
+namespace Nu3D
+{
+	// FUNCTION: TOY2 0x004CA0C0
+	void CopyNormalsFromNearestVertex(Creature* creature, int32_t nodeIndex, Vertex* vertex)
+	{
+		float closestDistanceSquared = 3.402823466e+38F;
+		Primitive* primitive = creature->primitives[nodeIndex];
+
+		for (; primitive; primitive = primitive->next)
+		{
+			for (int32_t index = 0; index < primitive->patchVerts.vertexCount; ++index)
+			{
+				Vertex* candidate = &primitive->patchVerts.data.vertices[index];
+				float deltaX = candidate->position.x - vertex->position.x;
+				float deltaY = candidate->position.y - vertex->position.y;
+				float deltaZ = candidate->position.z - vertex->position.z;
+				float distanceSquared = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
+
+				if (distanceSquared < closestDistanceSquared && distanceSquared < 1024.0f)
+				{
+					vertex->normals = candidate->normals;
+					closestDistanceSquared = distanceSquared;
+					if (distanceSquared < 1.0f)
+						return;
+				}
+			}
+		}
+
+		if (closestDistanceSquared == 3.402823466e+38F)
+			Logger::DebugLog("warning - unable to find similar vertex in limb\r\n");
 	}
 }

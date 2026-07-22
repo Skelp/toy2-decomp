@@ -5,6 +5,8 @@
 
 namespace Nu3D
 {
+	struct Creature;
+
 	struct Vertex
 	{
 		Vector3F position;
@@ -48,6 +50,8 @@ namespace Nu3D
 
 	void SetUseAsDiffuseModulation(int32_t option);
 	void SetDefaultPrimFlags(int32_t option);
+	int32_t CopyShapeVertex(int32_t index, Vertex* output);
+	void CopyNormalsFromNearestVertex(Creature* creature, int32_t nodeIndex, Vertex* vertex);
 
 	STATIC_ASSERT(sizeof(VertexTL) == 32);
 	STATIC_ASSERT(sizeof(VertexUncolored) == 32);
