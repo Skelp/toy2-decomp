@@ -20,7 +20,9 @@ namespace SoftwareRenderer
 	extern int32_t g_topOffset;
 	extern int32_t g_bottomOffset;
 	extern int32_t g_bitsPerPixel;
-	
+	extern float g_cameraNearZ;
+	extern float g_cameraFarZ;
+
 	void SwapRenderBuffer();
 	void SetLevelFileIndex(int32_t index);
 	void InitialisePrimarySurface();
@@ -29,6 +31,7 @@ namespace SoftwareRenderer
 	void ZoomOut();
 	void ZoomIn();
 	void PresentFrame();
+	void SetCameraNearFarZ(float nearZ, float farZ);
 
 	void UnkFunc67(int32_t param1, int32_t param2);
 	void UnkFunc2();

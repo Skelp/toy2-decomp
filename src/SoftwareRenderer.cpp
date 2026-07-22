@@ -41,6 +41,19 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00882910
 	int32_t g_bitsPerPixel;
 
+	// GLOBAL: TOY2 0x00DBB080
+	float g_cameraNearZ;
+
+	// GLOBAL: TOY2 0x00DBB090
+	float g_cameraFarZ;
+
+	// FUNCTION: TOY2 0x004C1C20 [MATCHED]
+	void SetCameraNearFarZ(float nearZ, float farZ)
+	{
+		g_cameraNearZ = nearZ;
+		g_cameraFarZ = farZ;
+	}
+
 	// STUB: TOY2 0x00452130
 	void SwapRenderBuffer() {}
 

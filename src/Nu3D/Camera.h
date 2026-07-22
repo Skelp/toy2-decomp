@@ -51,6 +51,8 @@ namespace Nu3D
 		extern ActiveCameraTransform g_activeCameraTransform;
 		extern ReflectionState g_reflectionState;
 		extern int32_t g_effectMode;
+		extern int32_t g_cameraSkewEnabled;
+		extern int32_t g_cameraSkewPhase;
 
 		extern int16_t g_cameraTintBlue;
 		extern int16_t g_cameraTintGreen;
@@ -59,6 +61,10 @@ namespace Nu3D
 		void SetTint(uint8_t blue, uint8_t green, uint8_t red, uint8_t fadeSpeed);
 		void InitViewMatrixGlobals();
 		void FadeToTargetTint();
+		void SetupViewMatrix(ActiveCameraTransform* camera);
+		void SetBillboardYaw(int32_t yaw);
+		void ToggleCameraSkew(int32_t enabled);
+		void SetSkewPhase(int32_t phaseDelta);
 		void ApplyTransformToCamera(ActiveCameraTransform* camera);
 		D3DMATRIX* GetViewMatrix();
 		D3DMATRIX* GetProjectionMatrix();

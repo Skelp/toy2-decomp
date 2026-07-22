@@ -1,9 +1,11 @@
 #include "Nu3D/Camera.h"
 #include "Nu3D/Math.h"
 #include "Nu3D/Portal.h"
+#include "Nu3D/Scene.h"
 #include "Nu3D/Viewport.h"
 #include "DrawingDevice.h"
 #include "Renderer/Renderer.h"
+#include "SoftwareRenderer.h"
 #include <FLOAT.H>
 #include <MATH.H>
 #include <STDLIB.H>
@@ -44,6 +46,33 @@ namespace Nu3D
 
 		// GLOBAL: TOY2 0x00B223C8
 		ActiveCameraTransform g_activeCameraTransform;
+
+		// GLOBAL: TOY2 0x00B62404
+		int32_t g_cameraSkewEnabled;
+
+		// GLOBAL: TOY2 0x00B62408
+		int32_t g_cameraSkewPhase;
+
+		// GLOBAL: TOY2 0x00E4D980
+		Vector3F g_cameraPosition;
+
+		// GLOBAL: TOY2 0x00E4D994
+		int32_t g_cameraRoll;
+
+		// GLOBAL: TOY2 0x00E4D998
+		int32_t g_cameraPitch;
+
+		// GLOBAL: TOY2 0x00E4D99C
+		int32_t g_cameraYaw;
+
+		// GLOBAL: TOY2 0x00E4D970
+		float g_softwareProjectionScaleX;
+
+		// GLOBAL: TOY2 0x00E4D9A0
+		float g_softwareProjectionScaleY;
+
+		// GLOBAL: TOY2 0x009F6014
+		int32_t g_billboardYaw;
 
 		// GLOBAL: TOY2 0x00A4C410
 		int32_t g_effectMode;
@@ -142,8 +171,72 @@ namespace Nu3D
 			}
 		}
 
-		// STUB: TOY2 0x004CE050
-		void ApplyTransformToCamera(ActiveCameraTransform* camera) {}
+		// STUB: TOY2 0x00446FC0
+		void SetupViewMatrix(ActiveCameraTransform* camera) {}
+
+		// FUNCTION: TOY2 0x004B68A0 [MATCHED]
+		void SetBillboardYaw(int32_t yaw) { g_billboardYaw = yaw; }
+
+		// FUNCTION: TOY2 0x004CE020 [MATCHED]
+		void ToggleCameraSkew(int32_t enabled) { g_cameraSkewEnabled = enabled; }
+
+		// FUNCTION: TOY2 0x004CE030 [MATCHED]
+		void SetSkewPhase(int32_t phaseDelta) { g_cameraSkewPhase += phaseDelta; }
+
+		// FUNCTION: TOY2 0x004CE050 [MATCHED]
+		void ApplyTransformToCamera(ActiveCameraTransform* camera)
+		{
+			if (! g_currentCamera)
+			{
+				Vector3F scale = { 1.0f, -1.0f, 1.0f };
+				SetMatrixScaleVector(&scale);
+				g_currentCamera = Build();
+				g_currentCamera->aspectRatio = 0.75f;
+				g_currentCamera->fieldOfView = 1.25f;
+				g_currentCamera->farClip = 32768.0f;
+				g_currentCamera->nearClip = 50.0f;
+
+				float halfFieldOfView = g_currentCamera->fieldOfView * 0.5f;
+				float cotangent = (float)(cos(halfFieldOfView) / sin(halfFieldOfView));
+				g_softwareProjectionScaleX = DrawingDevice::GetDestWidth() * g_currentCamera->aspectRatio * cotangent;
+				g_softwareProjectionScaleY = DrawingDevice::GetDestHeight() * cotangent;
+			}
+
+			if (! camera)
+				return;
+
+			g_activeCameraTransform = *camera;
+			g_cameraPitch = -(int16_t)camera->angles.pitch * 16;
+			g_cameraYaw = (int16_t)camera->angles.yaw << 4;
+			g_cameraRoll = camera->roll << 4;
+
+			Math::ApplyRotateXFromLut(&g_currentCamera->transform, g_cameraPitch);
+			Math::RotateYFromLut(&g_currentCamera->transform, g_cameraYaw);
+			Math::RotateZFromLut(&g_currentCamera->transform, g_cameraRoll);
+
+			g_cameraPosition.x = camera->pos.x * 0.03125f;
+			g_cameraPosition.y = camera->pos.y * 0.03125f;
+			g_cameraPosition.z = camera->pos.z * 0.03125f;
+			Math::AddWorldSpaceTransform(&g_currentCamera->transform, &g_cameraPosition);
+
+			if (! g_cameraSkewEnabled || Renderer::GetIsSoftwareRendering())
+			{
+				g_currentCamera->scale.z = 1.0f;
+				g_currentCamera->scale.y = 1.0f;
+				g_currentCamera->scale.x = 1.0f;
+			}
+			else
+			{
+				g_currentCamera->scale.x = Numerics::g_trigLUT[g_cameraSkewPhase & 0xFFFF] * 0.05f + 1.0f;
+				g_currentCamera->scale.y = Numerics::g_trigLUT[(g_cameraSkewPhase - 0x8000) & 0xFFFF] * 0.05f + 1.0f;
+				g_currentCamera->scale.z = Numerics::g_trigLUT[(g_cameraSkewPhase * 2) & 0xFFFF] * 0.05f + 1.0f;
+			}
+
+			ApplyCameraTransforms(g_currentCamera);
+			SetBillboardYaw(g_cameraYaw);
+			SetupViewMatrix(camera);
+			SoftwareRenderer::SetCameraNearFarZ(Scene::g_primaryNearClip, Scene::g_primaryFarClip);
+		}
 
 		// FUNCTION: TOY2 0x004BB850 [MATCHED]
 		D3DMATRIX* GetViewMatrix() { return &g_viewMatrix; }
