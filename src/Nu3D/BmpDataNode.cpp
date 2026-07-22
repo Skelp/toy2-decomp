@@ -526,6 +526,46 @@ namespace Nu3D
 	// FUNCTION: TOY2 0x004AFAF0
 	void SetMinTexSize(int32_t minTexSize) { g_minTextureSize = minTexSize; }
 
+	// FUNCTION: TOY2 0x004AD060
+	HRESULT BuildBmpNode(HBITMAP bitmap, const char* textureName, int32_t unused, int32_t flags)
+	{
+		return BuildRawBmpNode(bitmap, 0, textureName, flags) ? S_OK : E_OUTOFMEMORY;
+	}
+
+	// FUNCTION: TOY2 0x004AD090
+	HRESULT BuildBmpNodeWithAlpha(HBITMAP bitmap, const char* textureName, int32_t unused, int32_t flags,
+		HBITMAP alphaBitmap)
+	{
+		return BuildRawBmpNode(bitmap, alphaBitmap, textureName, flags) ? S_OK : E_OUTOFMEMORY;
+	}
+
+	// FUNCTION: TOY2 0x004B0620
+	BmpDataNode* BuildRawBmpNode(HBITMAP bitmap, HBITMAP alphaBitmap, const char* textureName,
+		int32_t flags)
+	{
+		uint32_t* texData = ProcessBmpPixelData(bitmap, alphaBitmap, flags);
+		if (texData)
+		{
+			BmpDataNode* bmpDataNode = AllocateBmpDataNode();
+			if (bmpDataNode)
+			{
+				bmpDataNode->texData = texData;
+				bmpDataNode->textureWidth = bmpDataNode->textureHeight = CalculateTexSize(bitmap, flags);
+				bmpDataNode->bitmapWidth = GetBitmapWidth(bitmap);
+				bmpDataNode->bitmapHeight = GetBitmapHeight(bitmap);
+				bmpDataNode->flags = flags;
+				strcpy(bmpDataNode->texName, textureName);
+				InitialiseTextureSurface(bmpDataNode);
+
+				return bmpDataNode;
+			}
+
+			free(texData);
+		}
+
+		return 0;
+	}
+
 	// FUNCTION: TOY2 0x004B0A30
 	BmpDataNode* LoadTextureByStream(FILE* handle, const char* rawTexStr, int32_t flags)
 	{
@@ -601,8 +641,32 @@ namespace Nu3D
 		return nodeIter;
 	}
 
+	// FUNCTION: TOY2 0x004AD0C0
+	BmpDataNode* GetBmpDataNodeByName_T(const char* textureName)
+	{
+		return GetBmpDataNodeByName(textureName);
+	}
+
 	// FUNCTION: TOY2 0x004B0CF0
 	void AddRef(BmpDataNode* bmpDataNode) { ++bmpDataNode->refCount; }
+
+	// FUNCTION: TOY2 0x004AD130
+	LPDIRECT3DTEXTURE2 GetTexture(BmpDataNode* bmpDataNode)
+	{
+		return bmpDataNode ? bmpDataNode->d3dTexture : 0;
+	}
+
+	// FUNCTION: TOY2 0x004AD1C0
+	int32_t InitBmpNodeSurface(BmpDataNode* bmpDataNode, int32_t unused)
+	{
+		if (bmpDataNode)
+		{
+			InitialiseTextureSurface(bmpDataNode);
+			return 0;
+		}
+
+		return -1;
+	}
 
 	// FUNCTION: TOY2 0x004B0C90
 	BmpDataNode* LoadLocalBmpTexture(const char* rawTexStr, int32_t flags)
@@ -856,6 +920,13 @@ namespace Nu3D
 
 			free(bmpDataNode);
 		}
+	}
+
+	// FUNCTION: TOY2 0x004AC260
+	int32_t ReleaseBmpDataNode_T(BmpDataNode* bmpDataNode)
+	{
+		ReleaseBmpDataNode(bmpDataNode);
+		return 0;
 	}
 
 	// FUNCTION: TOY2 0x004B1150
