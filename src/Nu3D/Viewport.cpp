@@ -79,6 +79,12 @@ namespace Nu3D
 		// GLOBAL: TOY2 0x009F6230
 		int32_t g_frustumPlaneCount;
 
+		// GLOBAL: TOY2 0x009F6234
+		int32_t g_reverseFrustumWinding;
+
+		// GLOBAL: TOY2 0x009F6238
+		int32_t g_drawPortalOutlines;
+
 		// GLOBAL: TOY2 0x009F623C
 		int32_t g_viewportClippingEnabled;
 
@@ -367,8 +373,8 @@ namespace Nu3D
 		// GLOBAL: TOY2 0x00A4C3D0
 		D3DMATRIX g_viewMatrix;
 
-		// GLOBAL: TOY2 0x00E4D824
-		D3DMATRIX g_activeViewProjectionMatrix;
+		// GLOBAL: TOY2 0x00E4D7E0
+		ReflectionState g_reflectionState;
 
 		// FUNCTION: TOY2 0x004BBA10 [MATCHED]
 		void RebuildTransformPipeline()
@@ -381,7 +387,7 @@ namespace Nu3D
 			Math::FullMatrixMultiply(&g_clipToScreenMatrix, &g_clipNormMatrix, &g_screenSpaceMatrix);
 			Math::InvertAffineMatrix(&g_screenToClipMatrix, &g_clipToScreenMatrix);
 			Math::InvertAffineMatrix(&g_screenToWorldMatrix, &g_screenViewProjectionMatrix);
-			memcpy(&g_activeViewProjectionMatrix, &g_normalizedViewProjectionMatrix, sizeof(g_activeViewProjectionMatrix));
+			memcpy(&g_reflectionState.uvTransform, &g_normalizedViewProjectionMatrix, sizeof(g_reflectionState.uvTransform));
 		}
 	}
 }

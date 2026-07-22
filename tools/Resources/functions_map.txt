@@ -935,6 +935,8 @@
 0x004BBAB0 Nu3D::Camera::ApplyCameraTransforms
 0x004BBC00 Nu3D::Camera::BuildPerspectiveProjectionLH
 0x004BBC50 Nu3D::Camera::CreateInverseMatrix_T
+0x004BBC70 Nu3D::Camera::ApplyCameraTransformsWithReflection
+0x004BBCB0 Nu3D::Camera::SetEffectMode
 0x004BBE10 Nu3D::TransformPointProjective
 0x004BC080 Nu3D::Camera::UnprojectPointsFromCamera
 0x004BC120 Nu3D::Portal::ClearVisibleAreaFlags

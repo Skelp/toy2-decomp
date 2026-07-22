@@ -1,5 +1,6 @@
 #include "Nu3D/Camera.h"
 #include "Nu3D/Math.h"
+#include "Nu3D/Viewport.h"
 #include "DrawingDevice.h"
 #include "Renderer/Renderer.h"
 #include <FLOAT.H>
@@ -33,6 +34,12 @@ namespace Nu3D
 
 		// GLOBAL: TOY2 0x00557A9C
 		int16_t g_tintBlend;
+
+		// GLOBAL: TOY2 0x00E4D880
+		CameraData g_activeCamera;
+
+		// GLOBAL: TOY2 0x00A4C410
+		int32_t g_effectMode;
 
 		// FUNCTION: TOY2 0x004A1BB0
 		void SetTint(uint8_t blue, uint8_t green, uint8_t red, uint8_t fadeSpeed)
@@ -169,6 +176,191 @@ namespace Nu3D
 				free(camera);
 		}
 
+		// FUNCTION: TOY2 0x004BA420
+		void CalculateFrustumPlanes(CameraData* camera)
+		{
+			Vector3F right;
+			Vector3F up;
+			Vector3F forward;
+			Vector3F position;
+			Math::GetRightVector(&camera->transform, &right);
+			Math::GetUpVector(&camera->transform, &up);
+			Math::GetForwardVector(&camera->transform, &forward);
+			Math::GetPositionVector(&camera->transform, &position);
+
+			float tangent = (float)tan(camera->fieldOfView * 0.5f);
+			float nearY = tangent * camera->nearClip;
+			float nearX = nearY / camera->aspectRatio;
+			float farY = tangent * camera->farClip;
+			float farX = farY / camera->aspectRatio;
+			float portalY = tangent * camera->portalNearClip;
+			float portalX = portalY / camera->aspectRatio;
+			float fogY = tangent * camera->fogFarClip;
+			float fogX = fogY / camera->aspectRatio;
+
+			Vector3F localPoint;
+			Vector3F nearTopLeft;
+			Vector3F nearTopRight;
+			Vector3F nearBottomRight;
+			Vector3F nearBottomLeft;
+			Vector3F farTopLeft;
+			Vector3F farTopRight;
+			Vector3F farBottomRight;
+			Vector3F farBottomLeft;
+			Vector3F portalTopLeft;
+			Vector3F portalTopRight;
+			Vector3F portalBottomRight;
+			Vector3F portalBottomLeft;
+			Vector3F fogTopLeft;
+			Vector3F fogTopRight;
+			Vector3F fogBottomRight;
+			Vector3F fogBottomLeft;
+
+			localPoint.x = -nearX;
+			localPoint.y = nearY;
+			localPoint.z = camera->nearClip;
+			Math::TransformPointByMatrix(&nearTopLeft, &localPoint, &camera->transform);
+			localPoint.x = nearX;
+			Math::TransformPointByMatrix(&nearTopRight, &localPoint, &camera->transform);
+			localPoint.y = -nearY;
+			Math::TransformPointByMatrix(&nearBottomRight, &localPoint, &camera->transform);
+			localPoint.x = -nearX;
+			Math::TransformPointByMatrix(&nearBottomLeft, &localPoint, &camera->transform);
+
+			localPoint.x = -farX;
+			localPoint.y = farY;
+			localPoint.z = camera->farClip;
+			Math::TransformPointByMatrix(&farTopLeft, &localPoint, &camera->transform);
+			localPoint.x = farX;
+			Math::TransformPointByMatrix(&farTopRight, &localPoint, &camera->transform);
+			localPoint.y = -farY;
+			Math::TransformPointByMatrix(&farBottomRight, &localPoint, &camera->transform);
+			localPoint.x = -farX;
+			Math::TransformPointByMatrix(&farBottomLeft, &localPoint, &camera->transform);
+
+			if (camera->portalNearClip > camera->nearClip)
+			{
+				localPoint.x = -portalX;
+				localPoint.y = portalY;
+				localPoint.z = camera->portalNearClip;
+				Math::TransformPointByMatrix(&portalTopLeft, &localPoint, &camera->transform);
+				localPoint.x = portalX;
+				Math::TransformPointByMatrix(&portalTopRight, &localPoint, &camera->transform);
+				localPoint.y = -portalY;
+				Math::TransformPointByMatrix(&portalBottomRight, &localPoint, &camera->transform);
+				localPoint.x = -portalX;
+				Math::TransformPointByMatrix(&portalBottomLeft, &localPoint, &camera->transform);
+			}
+
+			if (camera->fogFarClip < camera->farClip)
+			{
+				localPoint.x = -fogX;
+				localPoint.y = fogY;
+				localPoint.z = camera->fogFarClip;
+				Math::TransformPointByMatrix(&fogTopLeft, &localPoint, &camera->transform);
+				localPoint.x = fogX;
+				Math::TransformPointByMatrix(&fogTopRight, &localPoint, &camera->transform);
+				localPoint.y = -fogY;
+				Math::TransformPointByMatrix(&fogBottomRight, &localPoint, &camera->transform);
+				localPoint.x = -fogX;
+				Math::TransformPointByMatrix(&fogBottomLeft, &localPoint, &camera->transform);
+			}
+
+			Plane* planes = Viewport::g_frustumPlanes;
+			if (Viewport::g_reverseFrustumWinding)
+			{
+				Math::CalculatePlaneFromTriangle(&farTopLeft, &farBottomLeft, &farBottomRight, &planes[1]);
+				if (camera->fogFarClip < camera->farClip)
+					Math::CalculatePlaneFromTriangle(&fogTopLeft, &fogBottomLeft, &fogBottomRight, &planes[3]);
+				else
+					planes[3] = planes[1];
+				Math::CalculatePlaneFromTriangle(&nearBottomRight, &nearBottomLeft, &nearTopLeft, &planes[0]);
+				if (camera->portalNearClip > camera->nearClip)
+					Math::CalculatePlaneFromTriangle(&portalBottomRight, &portalBottomLeft, &portalTopLeft, &planes[2]);
+				else
+					planes[2] = planes[0];
+				Math::CalculatePlaneFromTriangle(&farTopLeft, &nearBottomLeft, &farBottomLeft, &planes[4]);
+				Math::CalculatePlaneFromTriangle(&farTopRight, &farBottomRight, &nearTopRight, &planes[5]);
+				Math::CalculatePlaneFromTriangle(&farTopLeft, &farTopRight, &nearTopLeft, &planes[6]);
+				Math::CalculatePlaneFromTriangle(&farBottomRight, &farBottomLeft, &nearBottomLeft, &planes[7]);
+			}
+			else
+			{
+				Math::CalculatePlaneFromTriangle(&farBottomRight, &farBottomLeft, &farTopLeft, &planes[1]);
+				if (camera->fogFarClip < camera->farClip)
+					Math::CalculatePlaneFromTriangle(&fogBottomRight, &fogBottomLeft, &fogTopLeft, &planes[3]);
+				else
+					planes[3] = planes[1];
+				Math::CalculatePlaneFromTriangle(&nearTopLeft, &nearBottomLeft, &nearBottomRight, &planes[0]);
+				if (camera->portalNearClip > camera->nearClip)
+					Math::CalculatePlaneFromTriangle(&portalTopLeft, &portalBottomLeft, &portalBottomRight, &planes[2]);
+				else
+					planes[2] = planes[0];
+				Math::CalculatePlaneFromTriangle(&farBottomLeft, &nearBottomLeft, &farTopLeft, &planes[4]);
+				Math::CalculatePlaneFromTriangle(&nearTopRight, &farBottomRight, &farTopRight, &planes[5]);
+				Math::CalculatePlaneFromTriangle(&nearTopLeft, &farTopRight, &farTopLeft, &planes[6]);
+				Math::CalculatePlaneFromTriangle(&nearBottomLeft, &farBottomLeft, &farBottomRight, &planes[7]);
+			}
+
+			Vector3F projected;
+			Nu3D::TransformPointProjective(&projected, &farBottomLeft, 1, 0);
+			Viewport::g_viewClipRect.top = projected.x;
+			Viewport::g_viewClipRect.right = projected.y;
+			Nu3D::TransformPointProjective(&projected, &farTopRight, 1, 0);
+			Viewport::g_viewClipRect.bottom = projected.x;
+			Viewport::g_viewClipRect.left = projected.y;
+			Viewport::g_frustumPlaneCount = 8;
+		}
+
+		// FUNCTION: TOY2 0x004BBAB0
+		void ApplyCameraTransforms(const CameraData* camera)
+		{
+			g_activeCamera = *camera;
+			ScaleMatrix(&g_activeCamera.transform);
+
+			if (g_effectMode == 0)
+			{
+				CreateInverseMatrix_T(&g_viewMatrix, &g_activeCamera.transform);
+				Math::ScaleMatrixByVector(&g_viewMatrix, &g_activeCamera.scale);
+			}
+			else
+			{
+				D3DMATRIX reflectionFlip;
+				D3DMATRIX reflectionInverse;
+				D3DMATRIX cameraInverse;
+
+				Math::BuildIdentityMatrix(&reflectionFlip);
+				reflectionFlip._22 = -1.0f;
+				Math::CreateInverseMatrix(&cameraInverse, &g_activeCamera.transform);
+				Math::CreateInverseMatrix(&reflectionInverse, &g_reflectionState.transform);
+				g_viewMatrix = reflectionInverse;
+
+				if (g_effectMode == 1)
+					Math::MultiplyMatrix3x4(&g_viewMatrix, &g_viewMatrix, &reflectionFlip);
+
+				Math::MultiplyMatrix3x4(&g_viewMatrix, &g_viewMatrix, &g_reflectionState.transform);
+				Math::MultiplyMatrix3x4(&g_viewMatrix, &g_viewMatrix, &cameraInverse);
+			}
+
+			DrawingDevice::SetViewTransform(&g_viewMatrix);
+			BuildPerspectiveProjectionLH(
+				&g_projectionMatrix, g_activeCamera.fieldOfView, g_activeCamera.aspectRatio, g_activeCamera.nearClip, g_activeCamera.farClip);
+			DrawingDevice::SetProjectionTransform(&g_projectionMatrix);
+			RebuildTransformPipeline();
+			CalculateFrustumPlanes(&g_activeCamera);
+		}
+
+		// FUNCTION: TOY2 0x004BBC70 [MATCHED]
+		void ApplyCameraTransformsWithReflection(const CameraData* camera, ReflectionState* reflection)
+		{
+			g_reflectionState = *reflection;
+			ApplyCameraTransforms(camera);
+			*reflection = g_reflectionState;
+		}
+
+		// FUNCTION: TOY2 0x004BBCB0 [MATCHED]
+		void SetEffectMode(int32_t effectMode) { g_effectMode = effectMode; }
+
 		// FUNCTION: TOY2 0x004BB9C0 [MATCHED]
 		void ScaleMatrix(D3DMATRIX* matrix) { Math::ScaleMatrix(matrix); }
 
@@ -195,5 +387,24 @@ namespace Nu3D
 
 		// FUNCTION: TOY2 0x004BBC50 [MATCHED]
 		void CreateInverseMatrix_T(D3DMATRIX* output, const D3DMATRIX* input) { Math::CreateInverseMatrix(output, input); }
+	}
+
+	// FUNCTION: TOY2 0x004BBE10 [MATCHED]
+	void TransformPointProjective(Vector3F* output, const Vector3F* input, int32_t count, const D3DMATRIX* transform)
+	{
+		const Vector3F* end = input + count;
+		D3DMATRIX matrix;
+
+		if (transform)
+			Math::MultiplyMatrix3x4(&matrix, transform, &Camera::g_screenViewProjectionMatrix);
+		else
+			memcpy(&matrix, &Camera::g_screenViewProjectionMatrix, sizeof(matrix));
+
+		while (input < end)
+		{
+			Math::ProjectPoint(output, input, &matrix);
+			++input;
+			++output;
+		}
 	}
 }

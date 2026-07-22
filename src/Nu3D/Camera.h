@@ -20,6 +20,13 @@ namespace Nu3D
 			Vector3F scale;
 		};
 
+		struct ReflectionState
+		{
+			float distortion;
+			D3DMATRIX transform;
+			D3DMATRIX uvTransform;
+		};
+
 		struct ActiveCameraTransform
 		{
 			Vector3I pos;
@@ -32,6 +39,10 @@ namespace Nu3D
 		extern D3DMATRIX g_projectionMatrix;
 		extern D3DMATRIX g_clipNormMatrix;
 		extern D3DMATRIX g_screenSpaceMatrix;
+		extern D3DMATRIX g_screenViewProjectionMatrix;
+		extern CameraData g_activeCamera;
+		extern ReflectionState g_reflectionState;
+		extern int32_t g_effectMode;
 
 		extern int16_t g_cameraTintBlue;
 		extern int16_t g_cameraTintGreen;
@@ -47,6 +58,10 @@ namespace Nu3D
 		D3DMATRIX* GetScreenSpaceMatrix();
 		CameraData* Build();
 		void Destroy(CameraData* camera);
+		void CalculateFrustumPlanes(CameraData* camera);
+		void ApplyCameraTransforms(const CameraData* camera);
+		void ApplyCameraTransformsWithReflection(const CameraData* camera, ReflectionState* reflection);
+		void SetEffectMode(int32_t effectMode);
 		void RebuildTransformPipeline();
 		void BuildPerspectiveProjectionLH(D3DMATRIX* output, float fieldOfView, float aspectRatio, float nearClip, float farClip);
 		void CreateInverseMatrix_T(D3DMATRIX* output, const D3DMATRIX* input);
@@ -56,5 +71,6 @@ namespace Nu3D
 
 		STATIC_ASSERT(sizeof(ActiveCameraTransform) == 0x14);
 		STATIC_ASSERT(sizeof(CameraData) == 0x64);
+		STATIC_ASSERT(sizeof(ReflectionState) == 0x84);
 	}
 }
