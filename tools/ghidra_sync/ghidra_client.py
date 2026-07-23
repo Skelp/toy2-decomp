@@ -137,14 +137,19 @@ def rename_function(old_name: str, new_name: str) -> bool:
     """Rename a function in Ghidra.
 
     Args:
-        old_name: Current name (e.g. "FUN_00414720" or "00414720")
+        old_name: Current name (e.g. "FUN_00414720")
         new_name: New name (e.g. "EnterLevel")
 
     Returns:
         True if rename succeeded.
     """
     result = _run_ghidra(["symbol", "rename", old_name, new_name], check=False)
-    return result.returncode == 0
+    if result.returncode != 0:
+        return False
+
+    # Persist the change to the Ghidra project database
+    _run_ghidra(["analyze"], check=False)
+    return True
 
 
 def set_function_comment(address: str, comment: str) -> bool:
