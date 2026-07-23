@@ -77,6 +77,12 @@ Commands:
   progress [scope]  Show annotation progress, optionally for a namespace
   run [args]        Run the recompiled toy2.exe through Wine
   shell             Start a shell with the decompilation environment active
+  sync <subcmd>     Sync Ghidra metadata with source annotations
+
+Sync subcommands:
+  sync diff         Show differences between Ghidra and source (safe: push only)
+  sync push ADDR    Push Ghidra name to source annotation (dry run by default)
+  sync reconcile ADDR  Diff + smart push for one address
 EOF
 }
 
@@ -124,6 +130,9 @@ case "$command" in
         ;;
     shell)
         exec "${SHELL:-/bin/bash}" -i
+        ;;
+    sync)
+        python tools/ghidra_sync.py "$@"
         ;;
     *)
         echo "Unknown command: $command" >&2
