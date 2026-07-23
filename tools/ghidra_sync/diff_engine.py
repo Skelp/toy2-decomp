@@ -24,29 +24,168 @@ def _normalize_address(address: str) -> str:
     return f"0x{int(addr, 16):08x}"
 
 
-def _extract_name_from_source(annotation: SourceAnnotation, source_text: str) -> Optional[str]:
-    """Try to extract a meaningful name from the source context around an annotation.
+def _signatures_match(sig_a: Optional[str], sig_b: Optional[str]) -> bool:
+    """Check if two function signatures are equivalent, ignoring parameter names.
 
-    Looks at the function signature line following the annotation.
+    Args:
+        sig_a: First signature (e.g. "void SetTint(uint8_t param_1, ...)")
+        sig_b: Second signature (e.g. "void SetTint(uint8_t, ...)")
+
+    Returns:
+        True if signatures are equivalent.
     """
+    if sig_a is None or sig_b is None:
+        return sig_a == sig_b
+
+    import re
+
+    def _strip_param_names(sig: str) -> str:
+        """Remove parameter names from a signature, keeping only types."""
+        # Match the part between the parentheses
+        match = re.match(r'^(.+?)\(([^)]*)\)(.*)$', sig)
+        if not match:
+            return sig
+
+        prefix = match.group(1)  # e.g. "void SetTint"
+        params = match.group(2)  # e.g. "uint8_t param_1, uint8_t param_2"
+        suffix = match.group(3)  # e.g. " const"
+
+        # Strip parameter names: split by comma, take only the type part
+        if params:
+            clean_params = []
+            for p in params.split(','):
+                p = p.strip()
+                if not p:
+                    continue
+                # Remove default values
+                p = p.split('=')[0].strip()
+                # Split by space and take everything except the last word (the name)
+                parts = p.split()
+                if parts:
+                    if len(parts) > 1:
+                        clean_params.append(' '.join(parts[:-1]))
+                    else:
+                        clean_params.append(parts[0])
+            params_str = ', '.join(clean_params)
+        else:
+            params_str = ''
+
+        return f"{prefix}({params_str}){suffix}"
+
+    return _strip_param_names(sig_a) == _strip_param_names(sig_b)
+
+
+def _extract_source_signature(annotation: SourceAnnotation, source_text: str) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """Extract the full source signature from the source file.
+
+    Looks at the function definition following the annotation and returns:
+    (full_signature, function_name, calling_convention)
+
+    full_signature: C-style string for Ghidra, e.g. "void SetTint(uint8_t, uint8_t, uint8_t, uint8_t)"
+    calling_convention: e.g. "__stdcall" or None
+    """
+    import re
     lines = source_text.split('\n')
-    # Find the line after the annotation
-    for i in range(annotation.line, min(annotation.line + 20, len(lines))):
+
+    # Look at the lines following the annotation for the function signature
+    for i in range(annotation.line, min(annotation.line + 10, len(lines))):
         line = lines[i].strip()
-        # Skip empty lines, comments, braces
-        if not line or line.startswith('//') or line in ('{', '}', '}', 'void', 'int32_t', 'int', 'uint32_t', 'bool', 'char', 'float', 'double'):
+
+        # Skip empty lines, comments, braces, preprocessor directives
+        if not line or line.startswith('//') or line.startswith('#'):
             continue
-        # Look for function name pattern: Name( or Name::Name(
-        import re
-        match = re.match(r'(?:[\w:]+::)?(\w+)\s*\(', line)
+        if line in ('{', '}', '}', 'STUB'):
+            continue
+
+        # Check for __stdcall or other calling convention
+        cc = None
+        cleaned = line
+        for cc_marker in ('__stdcall', '__cdecl', '__fastcall'):
+            if cc_marker in line:
+                cc = cc_marker
+                cleaned = line.replace(cc_marker, '').strip()
+                break
+
+        # Look for function signature pattern:
+        # [CC] ReturnType [ClassName::]FunctionName(Params)
+        # or: ReturnType ClassName::FunctionName(Params)
+        match = re.match(
+            r'(?:([\w]+::)?(\w+)\s*\(([^)]*)\))|(\w+)\s+([\w:]+)::(\w+)\s*\(([^)]*)\)|(\w+)\s+(\w+)\s*\(([^)]*)\)',
+            cleaned
+        )
         if match:
-            return match.group(1)
-        break
-    return None
+            # Try group set 1: ClassName::FunctionName(Params)
+            if match.group(1) and match.group(2):
+                class_prefix = match.group(1)[:-2]  # Remove trailing ::
+                func_name = match.group(2)
+                params_raw = match.group(3).strip()
+            # Try group set 2: ReturnType ClassName::FunctionName(Params)
+            elif match.group(4) and match.group(5) and match.group(6):
+                class_prefix = match.group(5)[:-2]  # Remove trailing ::
+                func_name = match.group(6)
+                params_raw = match.group(7).strip()
+            # Try group set 3: ReturnType FunctionName(Params)
+            elif match.group(8) and match.group(9):
+                class_prefix = None
+                func_name = match.group(9)
+                params_raw = match.group(10).strip()
+            else:
+                continue
+
+            # Skip if it looks like a control flow statement
+            if func_name in ('if', 'else', 'for', 'while', 'switch', 'return', 'catch'):
+                continue
+
+            # Skip common types/functions that might be parsed as function defs
+            if func_name in ('memset', 'sizeof', 'strlen', 'strcpy', 'sprintf', 'fprintf',
+                             'memset', 'new', 'delete'):
+                continue
+
+            # Rebuild the Ghidra signature (strip parameter names, keep types)
+            if params_raw:
+                # Split params and keep only types
+                param_types = []
+                for p in params_raw.split(','):
+                    p = p.strip()
+                    if not p:
+                        continue
+                    # Remove default values
+                    p = p.split('=')[0].strip()
+                    # Split by space and take everything except the last word (the name)
+                    parts = p.split()
+                    if parts:
+                        if len(parts) > 1:
+                            type_str = ' '.join(parts[:-1])
+                            param_types.append(type_str)
+                        else:
+                            param_types.append(parts[0])
+                params_str = ', '.join(param_types)
+            else:
+                params_str = ''
+
+            # Build the full signature
+            # Extract the return type from the cleaned line
+            # The cleaned line is like "void SetTint(...)" or "int MyClass::Method(...)"
+            if class_prefix:
+                # Return type is everything before ClassName::
+                return_type = cleaned.split(f"{class_prefix}::")[0].strip()
+                full_sig = f"{return_type} {class_prefix}{func_name}({params_str})"
+            else:
+                # Return type is everything before FunctionName
+                return_type = cleaned.split(func_name)[0].strip()
+                full_sig = f"{return_type} {func_name}({params_str})"
+
+            return full_sig, func_name, cc
+
+        # If we hit a brace, stop
+        if line == '{':
+            break
+
+    return None, None, None
 
 
 def load_source_annotations() -> dict[str, SourceAnnotation]:
-    """Load all source annotations.
+    """Load all source annotations with full signatures.
 
     Returns:
         Dict mapping normalized address to SourceAnnotation.
@@ -54,14 +193,34 @@ def load_source_annotations() -> dict[str, SourceAnnotation]:
     src_path = Path("src")
     annotations = read_source_annotations(src_path)
 
+    # Pre-load all source file contents
+    source_texts: dict[str, str] = {}
+    for ann in annotations:
+        if ann.source not in source_texts:
+            source_file = src_path / ann.source
+            if source_file.exists():
+                source_texts[ann.source] = source_file.read_text(encoding="utf-8", errors="ignore")
+
     result = {}
     for ann in annotations:
         addr = _normalize_address(ann.address)
+        source_text = source_texts.get(ann.source, "")
+
+        # Extract signature for function annotations
+        sig = None
+        name = None
+        cc = None
+        if ann.kind == "function":
+            sig, name, cc = _extract_source_signature(ann, source_text)
+
         result[addr] = SourceAnnotation(
             address=addr,
             kind=ann.kind,
             source=ann.source,
             line=ann.line,
+            name=name,
+            signature=sig,
+            calling_convention=cc,
         )
     return result
 
@@ -155,7 +314,10 @@ def compare_address(
     elif not gh_is_unnamed and src_is_function:
         # Both have names — check if they match
         # They match if Ghidra already has the same name as reccmp reports
-        status = SyncStatus.OK
+        if source_ann.signature and not _signatures_match(ghidra_func.signature, source_ann.signature):
+            status = SyncStatus.SIGNATURE_MISMATCH
+        else:
+            status = SyncStatus.OK
     else:
         status = SyncStatus.MISSING
 
@@ -232,6 +394,7 @@ def format_diff_report(entries: list[SyncEntry]) -> str:
         SyncStatus.OK: Fore.GREEN,
         SyncStatus.PULLABLE: Fore.GREEN,
         SyncStatus.GHIDRA_HAS_NAME_STUB_SOURCE: Fore.RED,
+        SyncStatus.SIGNATURE_MISMATCH: Fore.YELLOW,
         SyncStatus.MISSING: Fore.RED,
         SyncStatus.ORPHAN: Fore.YELLOW,
         SyncStatus.GHIDRA_UNNAMED: Fore.CYAN,
@@ -274,6 +437,7 @@ def format_diff_report(entries: list[SyncEntry]) -> str:
     ok_count = sum(1 for e in entries if e.status == SyncStatus.OK)
     pullable_count = sum(1 for e in entries if e.status == SyncStatus.PULLABLE)
     mismatch_count = sum(1 for e in entries if e.status == SyncStatus.GHIDRA_HAS_NAME_STUB_SOURCE)
+    sig_mismatch_count = sum(1 for e in entries if e.status == SyncStatus.SIGNATURE_MISMATCH)
     unnamed_count = sum(1 for e in entries if e.status == SyncStatus.GHIDRA_UNNAMED)
     missing_count = sum(1 for e in entries if e.status == SyncStatus.MISSING)
     orphan_count = sum(1 for e in entries if e.status == SyncStatus.ORPHAN)
@@ -283,6 +447,7 @@ def format_diff_report(entries: list[SyncEntry]) -> str:
                  f"{Fore.GREEN}OK: {ok_count}{Style.RESET_ALL}  |  "
                  f"{Fore.GREEN}Pullable to Ghidra: {pullable_count}{Style.RESET_ALL}  |  "
                  f"{Fore.CYAN}Unnamed: {unnamed_count}{Style.RESET_ALL}  |  "
+                 f"{Fore.YELLOW}Sig mismatch: {sig_mismatch_count}{Style.RESET_ALL}  |  "
                  f"{Fore.RED}Mismatch: {mismatch_count}{Style.RESET_ALL}  |  "
                  f"{Fore.RED}Missing: {missing_count}{Style.RESET_ALL}  |  "
                  f"{Fore.YELLOW}Orphan: {orphan_count}{Style.RESET_ALL}")

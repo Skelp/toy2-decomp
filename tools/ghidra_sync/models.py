@@ -16,6 +16,7 @@ class SyncStatus(Enum):
     GHIDRA_UNNAMED = "GHIDRA_UNNAMED"  # Ghidra still has FUN_*, match < 100% — not safe to pull
     SOURCE_UNNAMED = "SOURCE_UNNAMED"  # Source has STUB (unimplemented)
     GHIDRA_HAS_NAME_STUB_SOURCE = "GHIDRA_HAS_NAME_STUB_SOURCE"  # Ghidra has name, source is STUB
+    SIGNATURE_MISMATCH = "SIGNATURE_MISMATCH"  # Names match but signature/calling convention differs
     MISSING = "MISSING"                # Address in Ghidra but not in source
     ORPHAN = "ORPHAN"                  # Address in source but not in Ghidra
 
@@ -43,6 +44,8 @@ class SourceAnnotation:
     source: str                        # e.g. "src/Toy2/Toy2.cpp"
     line: int
     name: Optional[str] = None         # Extracted from surrounding context if available
+    signature: Optional[str] = None    # Full C-style signature, e.g. "void SetTint(uint8_t, uint8_t, uint8_t, uint8_t)"
+    calling_convention: Optional[str] = None  # e.g. "__stdcall"
 
     @property
     def is_stub(self) -> bool:

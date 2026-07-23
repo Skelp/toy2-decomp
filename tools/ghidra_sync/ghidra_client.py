@@ -152,6 +152,120 @@ def rename_function(old_name: str, new_name: str) -> bool:
     return True
 
 
+def _ensure_type_exists(type_name: str) -> bool:
+    """Ensure a type exists in Ghidra, creating it if necessary.
+
+    Handles simple typedefs (uint8_t -> uchar) and basic types.
+    For complex types (structs, classes), returns False and lets the
+    caller handle it.
+
+    Args:
+        type_name: Type name from source (e.g. "uint8_t", "MyClass")
+
+    Returns:
+        True if type exists or was created, False if it's a complex type.
+    """
+    # Check if type already exists
+    result = _run_ghidra(["type", "get", type_name], check=False)
+    if result.returncode == 0:
+        return True
+
+    # Map simple C types to Ghidra base types
+    simple_map = {
+        "uint8_t": "uchar",
+        "int8_t": "char",
+        "uint16_t": "ushort",
+        "int16_t": "short",
+        "uint32_t": "ulong",
+        "int32_t": "long",
+        "uintptr_t": "pointer",
+        "size_t": "ulong",
+        "ptrdiff_t": "long",
+    }
+
+    if type_name in simple_map:
+        base = simple_map[type_name]
+        result = _run_ghidra(["type", "typedef", type_name, base], check=False)
+        return result.returncode == 0
+
+    # For complex types (structs, classes), we can't auto-create them
+    # Return False so the caller can handle it
+    return False
+
+
+def set_function_signature(address: str, signature: str) -> bool:
+    """Set the function signature in Ghidra.
+
+    Args:
+        address: Address string (e.g. "004a1bb0" or "FUN_004a1bb0")
+        signature: C-style signature string (e.g. "void SetTint(uint8_t, uint8_t, uint8_t, uint8_t)")
+
+    Returns:
+        True if signature was set.
+    """
+    # Get the current function name to use as target
+    ghidra_func = get_function(address)
+    target = ghidra_func.name if ghidra_func else address
+
+    # Try to apply the signature
+    result = _run_ghidra([
+        "function", "set-signature",
+        "--signature", signature,
+        target
+    ], check=False)
+
+    if result.returncode == 0:
+        # Persist the change
+        _run_ghidra(["analyze"], check=False)
+        return True
+
+    # If it failed, try to create missing types and retry
+    output = (result.stdout + " " + result.stderr).lower()
+    if "can't resolve datatype" in output or "cannot resolve" in output:
+        # Extract the missing type from the error
+        import re
+        match = re.search(r"(?:can't|cannot) resolve datatype: (\S+)", result.stderr)
+        if not match:
+            match = re.search(r"(?:can't|cannot) resolve (?:datatype|type): (\S+)", result.stderr)
+        if match:
+            missing_type = match.group(1).rstrip('.,;')
+            if _ensure_type_exists(missing_type):
+                # Retry with the type now available
+                result = _run_ghidra([
+                    "function", "set-signature",
+                    "--signature", signature,
+                    target
+                ], check=False)
+                if result.returncode == 0:
+                    _run_ghidra(["analyze"], check=False)
+                    return True
+
+    return False
+
+
+def set_function_calling_convention(address: str, convention: str) -> bool:
+    """Set the function calling convention in Ghidra.
+
+    Args:
+        address: Address string (e.g. "004a1bb0" or "FUN_004a1bb0")
+        convention: Calling convention (e.g. "__stdcall")
+
+    Returns:
+        True if calling convention was set.
+    """
+    result = _run_ghidra([
+        "function", "set-calling-convention",
+        convention,
+        address
+    ], check=False)
+    if result.returncode != 0:
+        return False
+
+    # Persist the change
+    _run_ghidra(["analyze"], check=False)
+    return True
+
+
 def set_function_comment(address: str, comment: str) -> bool:
     """Set a function comment in Ghidra.
 
