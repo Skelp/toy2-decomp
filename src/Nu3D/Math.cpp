@@ -233,15 +233,11 @@ namespace Nu3D
 		// FUNCTION: TOY2 0x004A8B30
 		float Abs(float value)
 		{
-			union FloatBits
-			{
-				float value;
-				uint32_t bits;
-			} scalar;
-
-			scalar.value = value;
-			scalar.bits &= 0x7FFFFFFF;
-			return scalar.value;
+			float result;
+			uint32_t bits = *reinterpret_cast<const uint32_t*>(&value);
+			bits &= 0x7FFFFFFF;
+			*reinterpret_cast<uint32_t*>(&result) = bits;
+			return result;
 		}
 
 		// FUNCTION: TOY2 0x004A8BF0 [MATCHED]
