@@ -119,9 +119,9 @@ def cmd_pull(args: argparse.Namespace) -> int:
     print(f"  Ghidra name: {entry.ghidra.name if entry.ghidra else '(not found)'}")
 
     if args.apply:
-        addr_clean = entry.address[2:].upper() if entry.address.startswith("0x") else entry.address.upper()
-        if rename_function(addr_clean, src_name):
-            print(f"\n  Renamed {addr_clean} → {src_name} in Ghidra.")
+        gh_name = entry.ghidra.name if entry.ghidra else None
+        if gh_name and rename_function(gh_name, src_name):
+            print(f"\n  Renamed {gh_name} → {src_name} in Ghidra.")
         else:
             print(f"\n  Error: Failed to rename in Ghidra.", file=sys.stderr)
             return 1
@@ -190,9 +190,9 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
             print(f"  Ghidra name: {entry.ghidra.name}")
 
             if args.apply:
-                addr_clean = entry.address[2:].upper() if entry.address.startswith("0x") else entry.address.upper()
-                if rename_function(addr_clean, src_name):
-                    print(f"\n  Renamed {addr_clean} → {src_name} in Ghidra.")
+                gh_name = entry.ghidra.name if entry.ghidra else None
+                if gh_name and rename_function(gh_name, src_name):
+                    print(f"\n  Renamed {gh_name} → {src_name} in Ghidra.")
                 else:
                     print(f"\n  Error: Failed to rename in Ghidra.", file=sys.stderr)
                     return 1
