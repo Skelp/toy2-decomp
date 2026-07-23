@@ -77,12 +77,13 @@ Commands:
   progress [scope]  Show annotation progress, optionally for a namespace
   run [args]        Run the recompiled toy2.exe through Wine
   shell             Start a shell with the decompilation environment active
-  sync <subcmd>     Sync Ghidra metadata with source annotations
+  sync <subcmd>     Sync exact source/PDB metadata into Ghidra
 
 Sync subcommands:
-  sync diff         Show differences between Ghidra and source (safe: push only)
-  sync push ADDR    Push Ghidra name to source annotation (dry run by default)
-  sync reconcile ADDR  Diff + smart push for one address
+  sync diff [--target ADDR...]          Preview exact-match differences
+  sync apply (--target ADDR...|--all)   Plan/apply one transactional update
+  sync verify [--target ADDR...|--all]  Fail on exact metadata/source-map drift
+  sync pull ADDR                        Compatibility alias for apply --target
 EOF
 }
 

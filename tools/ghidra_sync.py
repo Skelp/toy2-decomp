@@ -1,297 +1,231 @@
 #!/usr/bin/env python3
-"""Ghidra sync tool for Toy2 decompilation.
-
-Synchronizes metadata (names, signatures, calling conventions) between
-Ghidra and source code annotations. Only operates on exact (100% matched)
-functions to prevent polluting the Ghidra database with speculative names.
-
-Usage:
-    tools/decomp sync diff [--target <addr>...]   Show differences
-    tools/decomp sync pull <address> [--apply]    Pull source to Ghidra
-    tools/decomp sync reconcile <address>         Diff + pull for one address
-"""
+"""Synchronize exact Toy Story 2 reconstruction metadata into Ghidra."""
 
 from __future__ import annotations
 
 import argparse
+import json
+import os
+import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
-# Ensure tools/ is on the path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from ghidra_sync.ghidra_client import (
-    ensure_bridge_running,
-    rename_function,
-    set_function_signature,
-    set_function_calling_convention,
-)
-from ghidra_sync.diff_engine import build_diff, format_diff_report
-from ghidra_sync.reccmp_reader import load_match_scores
+from ghidra_sync.ghidra_client import ensure_bridge_running, get_all_functions
+from ghidra_sync.manifest import ROOT, SyncManifest, build_manifest
 
 
-def _apply_pull(entry, ghidra_name: str, src_name: str,
-                sig: str | None, cc: str | None, dry_run: bool) -> int:
-    """Apply the pull: rename + signature + calling convention.
+MANIFEST_PATH = ROOT / "build" / "ghidra-sync-manifest.json"
 
-    Returns 0 on success, 1 on failure.
-    """
-    changes = []
 
-    # 1. Rename
-    if ghidra_name != src_name:
-        changes.append(f"rename {ghidra_name} → {src_name}")
+def _eligible(manifest: SyncManifest) -> list[Any]:
+    return [record for record in manifest.functions if record.reason is None]
 
-    # 2. Signature
-    if sig and sig != entry.ghidra.signature:
-        changes.append(f"set signature → {sig}")
 
-    # 3. Calling convention
-    if cc and cc != entry.ghidra.calling_convention:
-        changes.append(f"set calling convention → {cc}")
+def _ghidra_by_address() -> dict[str, Any]:
+    return {function.address.lower(): function for function in get_all_functions()}
 
-    if not changes:
-        print("  No changes needed.")
-        return 0
 
-    print(f"\n  Changes ({len(changes)}):")
-    for c in changes:
-        print(f"    - {c}")
+def _record_status(record: Any, current: dict[str, Any]) -> tuple[str, str]:
+    if record.reason is not None:
+        return "SKIP", record.reason
+    ghidra_function = current.get(record.address.lower())
+    if ghidra_function is None:
+        return "CREATE", "create a function at this exact-matched entry point"
+    expected_name = record.name.rsplit("::", 1)[-1]
+    if ghidra_function.name != expected_name:
+        return "UPDATE", f"rename {ghidra_function.name} -> {record.name}"
+    return "READY", "exact PDB signature/types and source maps are eligible"
 
-    if dry_run:
-        print(f"\n  Dry run. Add --apply to apply changes.")
-        return 0
 
-    # Apply changes
-    if ghidra_name != src_name:
-        if not rename_function(ghidra_name, src_name):
-            print(f"\n  Error: Failed to rename {ghidra_name} → {src_name}.", file=sys.stderr)
-            return 1
-        print(f"\n  Renamed {ghidra_name} → {src_name}.")
-        ghidra_name = src_name  # Update for subsequent operations
+def _render(manifest: SyncManifest, *, json_output: bool = False) -> tuple[str, bool]:
+    if not ensure_bridge_running():
+        raise RuntimeError("could not start the Ghidra CLI bridge")
+    current = _ghidra_by_address()
+    rows = []
+    drift = False
+    for record in manifest.functions:
+        status, detail = _record_status(record, current)
+        drift |= status in {"CREATE", "UPDATE", "CONFLICT"}
+        rows.append(
+            {
+                "address": record.address,
+                "name": record.name,
+                "status": status,
+                "detail": detail,
+                "match": record.matching,
+                "effective": record.effective,
+                "signature_available": record.signature_available,
+                "source_ranges": len(record.source_ranges),
+            }
+        )
+    if json_output:
+        return json.dumps({"version": manifest.version, "functions": rows}, indent=2), drift
 
-    if sig and sig != entry.ghidra.signature:
-        if not set_function_signature(entry.address, sig):
-            print(f"\n  Error: Failed to set signature.", file=sys.stderr)
-            return 1
-        print(f"  Set signature → {sig}.")
+    lines = [
+        "",
+        "GHIDRA EXACT-SYNC DIFF",
+        f"{'Address':<12} {'Status':<10} {'Name':<42} Detail",
+        "-" * 100,
+    ]
+    for row in rows:
+        lines.append(
+            f"{row['address']:<12} {row['status']:<10} {row['name']:<42} {row['detail']}"
+        )
+    counts = {
+        status: sum(row["status"] == status for row in rows)
+        for status in ("READY", "CREATE", "UPDATE", "CONFLICT", "SKIP")
+    }
+    lines.append("-" * 100)
+    lines.append("  ".join(f"{key}: {value}" for key, value in counts.items()))
+    return "\n".join(lines), drift
 
-    if cc and cc != entry.ghidra.calling_convention:
-        if not set_function_calling_convention(entry.address, cc):
-            print(f"\n  Error: Failed to set calling convention.", file=sys.stderr)
-            return 1
-        print(f"  Set calling convention → {cc}.")
 
-    return 0
+def _config_value(name: str) -> str:
+    result = subprocess.run(
+        ["ghidra", "config", "get", name], capture_output=True, text=True, check=False
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        raise RuntimeError(f"could not read Ghidra configuration key {name}")
+    return result.stdout.strip()
+
+
+def _run_headless(manifest: SyncManifest, *, verify_only: bool = False) -> int:
+    manifest.write(MANIFEST_PATH)
+    install_dir = _config_value("ghidra_install_dir")
+    project_dir = _config_value("ghidra_project_dir")
+    project = _config_value("default_project")
+    program = _config_value("default_program")
+
+    status = subprocess.run(["ghidra", "status"], capture_output=True, text=True, check=False)
+    bridge_was_running = status.returncode == 0
+    if bridge_was_running:
+        stopped = subprocess.run(["ghidra", "stop"], check=False)
+        if stopped.returncode != 0:
+            raise RuntimeError("could not stop the Ghidra bridge before transactional import")
+
+    environment = os.environ.copy()
+    environment["GHIDRA_INSTALL_DIR"] = install_dir
+    command = [
+        sys.executable,
+        str(ROOT / "tools" / "ghidra_sync" / "headless_apply.py"),
+        "--manifest",
+        str(MANIFEST_PATH),
+        "--root",
+        str(ROOT),
+        "--project-dir",
+        project_dir,
+        "--project",
+        project,
+        "--program",
+        program,
+    ]
+    if verify_only:
+        command.append("--verify-only")
+    try:
+        result = subprocess.run(command, cwd=ROOT, env=environment, check=False)
+        return result.returncode
+    finally:
+        if bridge_was_running:
+            subprocess.run(["ghidra", "start"], check=False)
+
+
+def _build(args: argparse.Namespace, *, require_target: bool = False) -> SyncManifest:
+    targets = getattr(args, "target", None)
+    if require_target and not targets and not getattr(args, "all", False):
+        raise RuntimeError("select --target ADDR... or --all")
+    type_scope = getattr(args, "type_scope", "exact")
+    manifest = build_manifest(targets, type_scope=type_scope)
+    manifest.write(MANIFEST_PATH)
+    return manifest
 
 
 def cmd_diff(args: argparse.Namespace) -> int:
-    """Run sync diff command."""
-    if not ensure_bridge_running():
-        print("Error: Could not start Ghidra bridge", file=sys.stderr)
-        return 1
-
-    target = getattr(args, "target", None)
-    if target:
-        entries = build_diff(target_addresses=target)
-    else:
-        entries = build_diff()
-
-    print(format_diff_report(entries))
-
-    # Show actionable items
-    pullable = [e for e in entries if e.status.value == "PULLABLE"]
-    if pullable:
-        print(f"Found {len(pullable)} address(es) pullable to Ghidra (100% match).")
-        print("Run: tools/decomp sync pull <address> --apply")
-
+    manifest = _build(args)
+    output, _ = _render(manifest, json_output=args.json)
+    print(output)
     return 0
 
 
-def cmd_pull(args: argparse.Namespace) -> int:
-    """Run sync pull command for a single address."""
-    if not args.address:
-        print("Error: Address required. Usage: tools/decomp sync pull <address> [--apply]",
-              file=sys.stderr)
+def cmd_verify(args: argparse.Namespace) -> int:
+    manifest = _build(args)
+    output, _ = _render(manifest, json_output=args.json)
+    print(output)
+    if not _eligible(manifest):
+        print("No eligible exact functions.", file=sys.stderr)
         return 1
+    return _run_headless(manifest, verify_only=True)
 
-    if not ensure_bridge_running():
-        print("Error: Could not start Ghidra bridge", file=sys.stderr)
+
+def cmd_apply(args: argparse.Namespace) -> int:
+    manifest = _build(args, require_target=True)
+    output, _ = _render(manifest, json_output=args.json)
+    print(output)
+    rejected = [record for record in manifest.functions if record.reason is not None]
+    if args.target and rejected:
+        print("Refusing requested non-exact target(s).", file=sys.stderr)
         return 1
-
-    addresses = [args.address]
-    entries = build_diff(target_addresses=addresses)
-
-    if not entries:
-        print(f"No data found for {args.address}", file=sys.stderr)
+    if not _eligible(manifest):
+        print("No eligible exact functions.", file=sys.stderr)
         return 1
-
-    entry = entries[0]
-    print(f"\nTarget: {entry.address}")
-    print(f"  Ghidra: {entry.ghidra.name if entry.ghidra else '(not found)'}")
-    print(f"  Source: {entry.source.source}:{entry.source.line if entry.source else '(not found)'}")
-    print(f"  Match:  {entry.match_score:.0%}")
-
-    if entry.match_score < 1.0:
-        print(f"\n  Match is {entry.match_score:.0%}, not 100%. Cannot pull for safety.",
-              file=sys.stderr)
+    if not args.apply:
+        print("\nDry run. Add --apply to commit one transactional Ghidra update.")
         return 0
-
-    if entry.ghidra and not entry.ghidra.is_unnamed:
-        # Check if signature/calling convention need updating
-        sig_diff = entry.source.signature and entry.ghidra.signature != entry.source.signature
-        cc_diff = entry.source.calling_convention and entry.ghidra.calling_convention != entry.source.calling_convention
-        if not sig_diff and not cc_diff:
-            print(f"\n  Ghidra already has a real name ({entry.ghidra.name}). Nothing to pull.")
-            return 0
-        print(f"\n  Ghidra has name {entry.ghidra.name} but signature/calling convention differ.")
-        print(f"  Source signature: {entry.source.signature}")
-        print(f"  Source calling convention: {entry.source.calling_convention}")
-    else:
-        print(f"\n  Source name: {entry.source.name or '(unknown)'}")
-        print(f"  Source signature: {entry.source.signature or '(none)'}")
-        print(f"  Source calling convention: {entry.source.calling_convention or '(none)'}")
-
-    if not entry.source:
-        print(f"\n  No source annotation found.", file=sys.stderr)
-        return 1
-
-    print(f"\n  Source name: {entry.source.name or '(unknown)'}")
-    print(f"  Source signature: {entry.source.signature or '(none)'}")
-    print(f"  Source calling convention: {entry.source.calling_convention or '(none)'}")
-    print(f"  Ghidra name: {entry.ghidra.name if entry.ghidra else '(not found)'}")
-    print(f"  Ghidra signature: {entry.ghidra.signature or '(unknown)'}")
-
-    if args.apply:
-        return _apply_pull(
-            entry,
-            entry.ghidra.name if entry.ghidra else "",
-            entry.source.name or "",
-            entry.source.signature,
-            entry.source.calling_convention,
-            dry_run=False,
-        )
-    else:
-        print(f"\n  Dry run. Add --apply to apply changes.")
-
-    return 0
-
-    return 0
+    return _run_headless(manifest)
 
 
-def cmd_reconcile(args: argparse.Namespace) -> int:
-    """Run reconcile for a single address: diff + pull to Ghidra if safe."""
-    if not args.address:
-        print("Error: Address required. Usage: tools/decomp sync reconcile <address>",
-              file=sys.stderr)
-        return 1
-
-    if not ensure_bridge_running():
-        print("Error: Could not start Ghidra bridge", file=sys.stderr)
-        return 1
-
-    addresses = [args.address]
-    entries = build_diff(target_addresses=addresses)
-
-    if not entries:
-        print(f"No data found for {args.address}", file=sys.stderr)
-        return 1
-
-    entry = entries[0]
-    print(f"\nReconcile: {entry.address}")
-    print(f"  Status:    {entry.status.value}")
-    print(f"  Match:     {entry.match_score:.0%}")
-    print(f"  Ghidra:    {entry.ghidra.name if entry.ghidra else '(not found)'}")
-    print(f"  Source:    {entry.source.source}:{entry.source.line if entry.source else '(not found)'}")
-    print()
-
-    if entry.match_score == 1.0 and entry.ghidra and entry.ghidra.is_unnamed and entry.source:
-        print(f"  This address has a 100% match but Ghidra still has FUN_*.")
-        print(f"  Safe to pull the source name into Ghidra.")
-
-        print(f"\n  Source name: {entry.source.name or '(unknown)'}")
-        print(f"  Source signature: {entry.source.signature or '(none)'}")
-        print(f"  Source calling convention: {entry.source.calling_convention or '(none)'}")
-        print(f"  Ghidra name: {entry.ghidra.name}")
-        print(f"  Ghidra signature: {entry.ghidra.signature or '(unknown)'}")
-
-        if args.apply:
-            return _apply_pull(
-                entry,
-                entry.ghidra.name if entry.ghidra else "",
-                entry.source.name or "",
-                entry.source.signature,
-                entry.source.calling_convention,
-                dry_run=False,
-            )
-        else:
-            print(f"\n  Dry run. Add --apply to apply changes.")
-    else:
-        print(f"  Not safe to pull (match < 100% or Ghidra already has a real name).")
-
-    return 0
+def _add_selection(parser: argparse.ArgumentParser, *, required: bool = False) -> None:
+    group = parser.add_mutually_exclusive_group(required=required)
+    group.add_argument("--target", nargs="+", metavar="ADDRESS")
+    group.add_argument("--all", action="store_true", help="consider every exact function")
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Sync Ghidra metadata with source annotations."
-    )
-    subparsers = parser.add_subparsers(dest="command", help="Sync command")
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # diff subcommand
-    diff_parser = subparsers.add_parser("diff", help="Show differences between Ghidra and source")
-    diff_parser.add_argument(
-        "--target",
-        nargs="+",
-        metavar="ADDRESS",
-        help="Only check these addresses (hex, e.g. 0x00414720)",
-    )
+    diff_parser = subparsers.add_parser("diff", help="compare exact source/PDB state with Ghidra")
+    _add_selection(diff_parser)
+    diff_parser.add_argument("--json", action="store_true")
+    diff_parser.set_defaults(handler=cmd_diff)
 
-    # pull subcommand
-    pull_parser = subparsers.add_parser("pull", help="Pull source name to Ghidra for one address")
-    pull_parser.add_argument(
-        "address",
-        help="Address to pull (hex, e.g. 0x00414720)",
+    apply_parser = subparsers.add_parser("apply", help="apply source/PDB state; dry-run by default")
+    _add_selection(apply_parser, required=True)
+    apply_parser.add_argument("--apply", action="store_true", help="commit the transaction")
+    apply_parser.add_argument("--json", action="store_true")
+    apply_parser.add_argument(
+        "--type-scope", choices=("exact", "all"), default="exact"
     )
-    pull_parser.add_argument(
-        "--apply",
-        action="store_true",
-        help="Actually rename in Ghidra (default: dry run)",
-    )
+    apply_parser.set_defaults(handler=cmd_apply)
 
-    # reconcile subcommand
-    reconcile_parser = subparsers.add_parser(
-        "reconcile", help="Diff + pull to Ghidra for one address"
+    verify_parser = subparsers.add_parser(
+        "verify", help="fail if exact signatures, datatypes, or source maps drift"
     )
-    reconcile_parser.add_argument(
-        "address",
-        help="Address to reconcile (hex, e.g. 0x00414720)",
-    )
-    reconcile_parser.add_argument(
-        "--apply",
-        action="store_true",
-        help="Actually rename in Ghidra (default: dry run)",
-    )
+    _add_selection(verify_parser)
+    verify_parser.add_argument("--json", action="store_true")
+    verify_parser.set_defaults(handler=cmd_verify)
+
+    # Backwards-compatible single-address spellings.
+    for name in ("pull", "reconcile"):
+        alias = subparsers.add_parser(
+            name, help="compatibility alias for apply --target"
+        )
+        alias.add_argument("address")
+        alias.add_argument("--apply", action="store_true")
+        alias.add_argument("--json", action="store_true")
+        alias.set_defaults(handler=cmd_apply, type_scope="exact", all=False)
 
     args = parser.parse_args()
-
-    if not args.command:
-        parser.print_help()
-        return 1
-
-    commands = {
-        "diff": cmd_diff,
-        "pull": cmd_pull,
-        "reconcile": cmd_reconcile,
-    }
-
-    handler = commands.get(args.command)
-    if handler:
-        return handler(args)
-    else:
-        print(f"Unknown command: {args.command}", file=sys.stderr)
+    if args.command in {"pull", "reconcile"}:
+        args.target = [args.address]
+    try:
+        return args.handler(args)
+    except (RuntimeError, ValueError) as error:
+        print(f"Error: {error}", file=sys.stderr)
         return 1
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

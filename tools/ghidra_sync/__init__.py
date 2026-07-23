@@ -1,22 +1,17 @@
-"""Ghidra sync package for Toy2 decompilation.
-
-Synchronizes metadata (names, signatures, calling conventions) between
-Ghidra and source code annotations. Only operates on exact (100% matched)
-functions to prevent polluting the Ghidra database with speculative names.
-"""
+"""Exact reccmp/PDB-to-Ghidra synchronization for Toy Story 2."""
 
 from .ghidra_client import (
     ensure_bridge_running,
+    get_all_functions,
     get_function,
-    rename_function,
-    set_function_signature,
-    set_function_calling_convention,
 )
+from .manifest import SyncManifest, build_manifest, canonical_address
 
 __all__ = [
+    "SyncManifest",
+    "build_manifest",
+    "canonical_address",
     "ensure_bridge_running",
+    "get_all_functions",
     "get_function",
-    "rename_function",
-    "set_function_signature",
-    "set_function_calling_convention",
 ]

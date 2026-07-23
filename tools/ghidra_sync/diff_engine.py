@@ -50,7 +50,7 @@ def _signatures_match(sig_a: Optional[str], sig_b: Optional[str]) -> bool:
         params = match.group(2)  # e.g. "uint8_t param_1, uint8_t param_2"
         suffix = match.group(3)  # e.g. " const"
 
-        # Strip parameter names: split by comma, take only the type part
+        # Strip parameter names and const/volatile: split by comma, take only the type part
         if params:
             clean_params = []
             for p in params.split(','):
@@ -59,6 +59,9 @@ def _signatures_match(sig_a: Optional[str], sig_b: Optional[str]) -> bool:
                     continue
                 # Remove default values
                 p = p.split('=')[0].strip()
+                # Strip const/volatile qualifiers
+                p = re.sub(r'\bconst\b', '', p).strip()
+                p = re.sub(r'\bvolatile\b', '', p).strip()
                 # Split by space and take everything except the last word (the name)
                 parts = p.split()
                 if parts:
@@ -141,7 +144,7 @@ def _extract_source_signature(annotation: SourceAnnotation, source_text: str) ->
                              'memset', 'new', 'delete'):
                 continue
 
-            # Rebuild the Ghidra signature (strip parameter names, keep types)
+            # Rebuild the Ghidra signature (strip const, param names, keep types)
             if params_raw:
                 # Split params and keep only types
                 param_types = []
@@ -151,6 +154,9 @@ def _extract_source_signature(annotation: SourceAnnotation, source_text: str) ->
                         continue
                     # Remove default values
                     p = p.split('=')[0].strip()
+                    # Strip const/volatile qualifiers
+                    p = re.sub(r'\bconst\b', '', p).strip()
+                    p = re.sub(r'\bvolatile\b', '', p).strip()
                     # Split by space and take everything except the last word (the name)
                     parts = p.split()
                     if parts:
