@@ -135,7 +135,7 @@ namespace Nu3D
 			g_drawDeviceHeight = (float)g_renderHeight;
 		}
 
-		// FUNCTION: TOY2 0x004B5700
+		// FUNCTION: TOY2 0x004B5700 [MATCHED]
 		void SetClipRect(float left, float top, float right, float bottom)
 		{
 			float width = right - left + 1.0f;
@@ -144,13 +144,13 @@ namespace Nu3D
 			if (left == g_currentViewportX && top == g_currentViewportY && width == g_currentViewportWidth && height == g_currentViewportHeight)
 				return;
 
-			if (left < g_minViewportX)
+			if (left <= g_minViewportX)
 				left = g_minViewportX;
-			if (top < g_minViewportY)
+			if (top <= g_minViewportY)
 				top = g_minViewportY;
-			if (width > g_drawDeviceWidth - 1.0f)
+			if (width >= g_drawDeviceWidth - 1.0f)
 				width = g_drawDeviceWidth - 1.0f;
-			if (height > g_drawDeviceHeight - 1.0f)
+			if (height >= g_drawDeviceHeight - 1.0f)
 				height = g_drawDeviceHeight - 1.0f;
 
 			if (width < 0.0f || height < 0.0f)
