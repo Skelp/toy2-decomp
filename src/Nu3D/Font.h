@@ -44,6 +44,7 @@ namespace Nu3D
 		static void SetTextClipRect(int32_t x1, int32_t y1, int32_t x2, int32_t y2);
 		static void BuildFontTextures();
 		static void SetTextCursor(float x, float y);
+		static void SetRenderFlags(int32_t flags);
 	};
 
 	extern float g_scaledFontAscent;
@@ -59,6 +60,7 @@ namespace Nu3D
 	extern int32_t g_textClipY2;
 	extern float g_fontScaleY;
 	extern float g_scaledFontHeight;
+	extern int32_t g_fontRenderFlags;
 
 	STATIC_ASSERT(sizeof(Font) == 0x130);
 	STATIC_ASSERT(sizeof(GlyphInfo) == 0x14);

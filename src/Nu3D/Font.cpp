@@ -42,6 +42,9 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x00884590
 	int32_t g_textClipY1 = 0;
 
+	// GLOBAL: TOY2 0x00884598
+	int32_t g_fontRenderFlags = 0;
+
 	// STUB: TOY2 0x004B3AD0
 	int32_t Font::Init() { return 0; }
 
@@ -103,4 +106,7 @@ namespace Nu3D
 		g_textCursorX = x;
 		g_textCursorY = y;
 	}
+
+	// FUNCTION: TOY2 0x004B38C0 [MATCHED]
+	void Font::SetRenderFlags(int32_t flags) { g_fontRenderFlags = flags ? 0x200 : 0; }
 }
