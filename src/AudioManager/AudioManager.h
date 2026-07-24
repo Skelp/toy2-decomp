@@ -8,6 +8,7 @@ namespace AudioManager
 
 	void StopAndFlush();
 	int32_t IsStreamActive();
+	void PlayTrackByIndex(int32_t trackIndex, int32_t fadeMode);
 	void ReleaseBuffers();
 	void Init();
 	void SetVolumesProcessed(int32_t musicVolume, int32_t sfxVolume);

@@ -51,12 +51,27 @@ namespace AudioManager
 	// STUB: TOY2 0x004A37E0
 	int32_t PlayOneShotSoundGlobal(int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume) { return 0; }
 
-	// STUB: TOY2 0x0047D7F0
-	void PlayMusicOneShot(int32_t trackIndex) {}
+	// FUNCTION: TOY2 0x0047D7F0 [MATCHED]
+	void PlayMusicOneShot(int32_t trackIndex)
+	{
+		if (g_audioInitialized)
+		{
+			if (IsStreamActive())
+			{
+				StopAndWait();
+				while (IsStreamActive()) {}
+			}
+			g_streamPending = 0;
+			PlayTrackByIndex(trackIndex, 0);
+		}
+	}
 
 	// STUB: TOY2 0x004A3BE0
 	void UpdateChannels() {}
 
 	// STUB: TOY2 0x00413300
 	int32_t IsStreamActive() { return 0; }
+
+	// STUB: TOY2 0x00413150
+	void PlayTrackByIndex(int32_t trackIndex, int32_t fadeMode) {}
 }
