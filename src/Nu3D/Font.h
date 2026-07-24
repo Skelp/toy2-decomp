@@ -47,12 +47,17 @@ namespace Nu3D
 		static void SetFontScale(float scaleX, float scaleY);
 		static void SetTextCursor(float x, float y);
 		static void SetRenderFlags(int32_t flags);
+		static void ResetContext();
 		static void Destroy(Font* font);
 		static void ClearList();
 		static Font* BuildObject(int32_t numGlyphs);
 	};
 
 	extern float g_scaledFontAscent;
+
+	extern HDC g_fontDC;
+	extern int32_t g_fontDCReady;
+	extern HGDIOBJ g_oldBitmap;
 
 	extern VertexTL g_textVertices[6];
 	extern Font* g_currentFont;

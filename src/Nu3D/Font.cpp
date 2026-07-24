@@ -31,11 +31,20 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x00884490
 	VertexTL g_textVertices[6];
 
+	// GLOBAL: TOY2 0x00884558
+	HGDIOBJ g_oldBitmap = 0;
+
 	// GLOBAL: TOY2 0x00884560
 	int32_t g_currentFontTexIndex = 0;
 
 	// GLOBAL: TOY2 0x00884574
 	Font* g_currentFont = 0;
+
+	// GLOBAL: TOY2 0x00884578
+	HDC g_fontDC = 0;
+
+	// GLOBAL: TOY2 0x0088457C
+	int32_t g_fontDCReady = 0;
 
 	// GLOBAL: TOY2 0x00884580
 	float g_textCursorX = 0.0;
@@ -95,6 +104,19 @@ namespace Nu3D
 		SetFontScale(1.0f, 1.0f);
 		SetRenderFlags(0);
 		return 1;
+	}
+
+	// FUNCTION: TOY2 0x004B3FD0
+	void Font::ResetContext()
+	{
+		if (g_fontDC)
+		{
+			if (g_fontDCReady)
+				SelectObject(g_fontDC, g_oldBitmap);
+			DeleteDC(g_fontDC);
+		}
+		g_fontDC = 0;
+		g_fontDCReady = 0;
 	}
 
 	// STUB: TOY2 0x004B4110
