@@ -99,6 +99,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x00503840
 	int16_t g_levelTokenTarget[16];
 
+	// GLOBAL: TOY2 0x00503AD4
+	char g_pathBinName[16] = "PAD\\PATH00.BIN";
+
 	// GLOBAL: TOY2 0x0052AD8A
 	int16_t g_levelIndex;
 
@@ -113,6 +116,9 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x0052B818
 	int16_t g_isPaused;
+
+	// GLOBAL: TOY2 0x0052B820
+	int16_t g_demoInputBuffer[2048];
 
 	// GLOBAL: TOY2 0x00529E48
 	int16_t g_pauseMenuBlinkTimer;
@@ -235,8 +241,15 @@ namespace Toy2
 	// STUB: TOY2 0x00414720
 	int32_t EnterLevel(int32_t levelIndex) { return 0; }
 
-	// STUB: TOY2 0x004A3770
-	void LoadPathBin() {}
+	// FUNCTION: TOY2 0x004A3770 [MATCHED]
+	void LoadPathBin()
+	{
+		int32_t levelFile = g_levelFileIndex;
+		int32_t tens = levelFile / 10;
+		g_pathBinName[8] = (char)(tens + '0');
+		g_pathBinName[9] = (char)(levelFile - tens * 10 + '0');
+		FileUtils::LoadFile(g_pathBinName, g_demoInputBuffer);
+	}
 
 	// FUNCTION: TOY2 0x00453CF0 [MATCHED]
 	int32_t ShowLevelSelect()
