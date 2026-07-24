@@ -96,6 +96,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x00830D58
 	int32_t g_saveLoaded;
 
+	// GLOBAL: TOY2 0x00503840
+	int16_t g_levelTokenTarget[16];
+
 	// GLOBAL: TOY2 0x0052AD8A
 	int16_t g_levelIndex;
 
@@ -113,6 +116,9 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x00529E48
 	int16_t g_pauseMenuBlinkTimer;
+
+	// GLOBAL: TOY2 0x0052F0D7
+	uint8_t g_levelTokenBits[16];
 
 	// GLOBAL: TOY2 0x0052F0E7
 	uint8_t g_movieUnlocked[19];
@@ -205,8 +211,26 @@ namespace Toy2
 	// STUB: TOY2 0x00453D90
 	void ShowActClearScreen() {}
 
-	// STUB: TOY2 0x0049EB50
-	int32_t ComputeTokenProgress() { return 1; }
+	// FUNCTION: TOY2 0x0049EB50
+	int32_t ComputeTokenProgress()
+	{
+		int32_t collected = 0;
+		int32_t levelCount = 0;
+		for (int32_t i = 0; i < 15; i++)
+		{
+			int32_t bits = g_levelTokenBits[g_levelFileConversion[i]];
+			if (! bits)
+				break;
+			for (int32_t j = 0; j < 5; j++)
+			{
+				if (bits & 1)
+					collected++;
+				bits >>= 1;
+			}
+			levelCount++;
+		}
+		return (g_levelTokenTarget[levelCount] + collected * 0x100) * 0x100 + levelCount;
+	}
 
 	// STUB: TOY2 0x00414720
 	int32_t EnterLevel(int32_t levelIndex) { return 0; }
