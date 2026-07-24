@@ -466,4 +466,7 @@ namespace InputManager
 		UpdateInputState();
 		g_curButtonsPressed = g_buttonsPressed;
 	}
+
+	// STUB: TOY2 0x00415460
+	void Cleanup() {}
 }

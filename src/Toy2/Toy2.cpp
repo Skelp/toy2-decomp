@@ -1056,8 +1056,16 @@ namespace Toy2
 		return 0;
 	}
 
-	// STUB: TOY2 0x00412E80
-	int32_t CleanupManagers() { return 0; }
+	// FUNCTION: TOY2 0x00412E80
+	int32_t CleanupManagers()
+	{
+		InputManager::Cleanup();
+		AudioManager::StopAndFlush();
+		AudioManager::ReleaseBuffers();
+		Renderer::Cleanup();
+		DrawingDevice::Quit();
+		return 1;
+	}
 
 	// STUB: TOY2 0x0047D7C0
 	void UpdateAudioChannels() {}

@@ -8,6 +8,9 @@ namespace AudioManager
 	// STUB: TOY2 0x0047D840
 	void StopAndFlush() {}
 
+	// STUB: TOY2 0x0047E850
+	void ReleaseBuffers() {}
+
 	// STUB: TOY2 0x0047EDE0
 	void Init() {}
 
