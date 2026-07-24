@@ -96,8 +96,16 @@ namespace SaveManager
 		AddInputEntry(TOY_INPUT_F2, INPUT_MENU);
 	}
 
-	// STUB: TOY2 0x004A2C20
-	void InitProgressData(Save0Data* save) {}
+	// FUNCTION: TOY2 0x004A2C20
+	void InitProgressData(Save0Data* save)
+	{
+		save->lastLevel = 0;
+		save->unlocks = 0;
+		save->health = 0xe;
+		save->lives = 5;
+		memset(&save->tokens[1], 0, sizeof(save->tokens) - 1);
+		memset(&save->moviesUnlocked, 0, sizeof(save->moviesUnlocked) + sizeof(save->padInt) + sizeof(save->padBytes));
+	}
 
 	// STUB: TOY2 0x004A2CC0
 	void LoadProgressData(Save0Data* save) {}
