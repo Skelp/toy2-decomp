@@ -43,6 +43,9 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x00884584
 	float g_textCursorY = 0.0;
 
+	// GLOBAL: TOY2 0x00884588
+	int32_t g_textCursorOffsetX = 0;
+
 	// GLOBAL: TOY2 0x0088458C
 	int32_t g_textClipX1 = 0;
 
@@ -52,8 +55,47 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x00884598
 	int32_t g_fontRenderFlags = 0;
 
-	// STUB: TOY2 0x004B3AD0
-	int32_t Font::Init() { return 0; }
+	// STUB: TOY2 0x004B38E0
+	void Font::SetFontScale(float scaleX, float scaleY) {}
+
+	// FUNCTION: TOY2 0x004B3AD0
+	int32_t Font::Init()
+	{
+		if (g_fontInitialized)
+			ClearList();
+		g_currentFont = 0;
+		g_currentFontTexIndex = 0;
+		g_textCursorOffsetX = 0;
+		g_textCursorX = 0;
+		g_textCursorY = 0;
+		g_textVertices[0].position.z = 0.5f;
+		g_textVertices[0].rhw = 2.0f;
+		g_textVertices[0].diffuse.value = 0xFFFFFFFF;
+		g_textVertices[0].specular.value = 0xFFFFFFFF;
+		g_textVertices[1].position.z = 0.5f;
+		g_textVertices[1].rhw = 2.0f;
+		g_textVertices[1].diffuse.value = 0xFFFFFFFF;
+		g_textVertices[1].specular.value = 0xFFFFFFFF;
+		g_textVertices[2].position.z = 0.5f;
+		g_textVertices[2].rhw = 2.0f;
+		g_textVertices[2].diffuse.value = 0xFFFFFFFF;
+		g_textVertices[2].specular.value = 0xFFFFFFFF;
+		g_textVertices[3].position.z = 0.5f;
+		g_textVertices[3].rhw = 2.0f;
+		g_textVertices[3].diffuse.value = 0xFFFFFFFF;
+		g_textVertices[3].specular.value = 0xFFFFFFFF;
+		g_textVertices[4].position.z = 0.5f;
+		g_textVertices[4].rhw = 2.0f;
+		g_textVertices[4].diffuse.value = 0xFFFFFFFF;
+		g_textVertices[4].specular.value = 0xFFFFFFFF;
+		g_textVertices[5].position.z = 0.5f;
+		g_textVertices[5].rhw = 2.0f;
+		g_textVertices[5].diffuse.value = 0xFFFFFFFF;
+		g_textVertices[5].specular.value = 0xFFFFFFFF;
+		SetFontScale(1.0f, 1.0f);
+		SetRenderFlags(0);
+		return 1;
+	}
 
 	// STUB: TOY2 0x004B4110
 	Font* Font::Build(const char* fontName, int32_t fontSize, const char* charSet) { return 0; }

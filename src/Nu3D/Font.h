@@ -44,6 +44,7 @@ namespace Nu3D
 		static void SetTextClipRect(int32_t x1, int32_t y1, int32_t x2, int32_t y2);
 		static void BuildFontTextures();
 		static int32_t BuildTexResource(Font* font);
+		static void SetFontScale(float scaleX, float scaleY);
 		static void SetTextCursor(float x, float y);
 		static void SetRenderFlags(int32_t flags);
 		static void Destroy(Font* font);
@@ -60,6 +61,7 @@ namespace Nu3D
 	extern int32_t g_fontInitialized;
 	extern float g_textCursorX;
 	extern float g_textCursorY;
+	extern int32_t g_textCursorOffsetX;
 	extern int32_t g_textClipX1;
 	extern int32_t g_textClipY1;
 	extern int32_t g_textClipX2;
