@@ -111,6 +111,24 @@ if (-not (Test-Path $VenvPython)) {
 & $VenvPython -m pip install reccmp==0.1.6 colorama==0.4.6
 Assert-LastExit "Installing reccmp"
 
+# Apply local reccmp parser fix: the WANT_CURLY state silently gets stuck
+# on one-line function bodies (e.g. "{ return foo(); }"). See
+# tools/patches/reccmp-0.1.6-want-curly-fix.patch for details.
+$ReccmpSite = Join-Path $Venv "Lib\site-packages"
+$PatchFile = Join-Path $Root "tools\patches\reccmp-0.1.6-want-curly-fix.patch"
+Push-Location $ReccmpSite
+try {
+    & git apply --check -p1 $PatchFile 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        & git apply -p1 $PatchFile
+        Write-Host "Applied reccmp parser fix."
+    } else {
+        Write-Host "reccmp parser fix already applied or patch does not fit — skipping." -ForegroundColor Yellow
+    }
+} finally {
+    Pop-Location
+}
+
 & $VenvPython (Join-Path $Root "tools\provision-directx.py") --root $Root
 Assert-LastExit "Provisioning DirectX SDK files"
 

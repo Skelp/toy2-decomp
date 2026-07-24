@@ -99,6 +99,16 @@ if [[ ! -x "$TOOLING/venv/bin/python" ]]; then
 fi
 "$TOOLING/venv/bin/python" -m pip install reccmp==0.1.6 colorama==0.4.6
 
+# Apply local reccmp parser fix: the WANT_CURLY state silently gets stuck
+# on one-line function bodies (e.g. "{ return foo(); }"). See
+# tools/patches/reccmp-0.1.6-want-curly-fix.patch for details.
+RECCMP_SITE="$TOOLING/venv/lib/python3.11/site-packages"
+if yes n | patch --dry-run -p1 -d "$RECCMP_SITE" < "$ROOT/tools/patches/reccmp-0.1.6-want-curly-fix.patch" >/dev/null 2>&1; then
+    patch -p1 -d "$RECCMP_SITE" < "$ROOT/tools/patches/reccmp-0.1.6-want-curly-fix.patch"
+else
+    echo "reccmp parser fix already applied or patch does not fit — skipping." >&2
+fi
+
 # Recover the SDK bundle previously used by this project. The DirectDraw and
 # Direct3D 3 interfaces used by the game are ABI-compatible with these headers.
 python3.11 "$ROOT/tools/provision-directx.py" --root "$ROOT"
