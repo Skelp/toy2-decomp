@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from ghidra_sync.ghidra_client import ensure_bridge_running, get_all_functions
 from ghidra_sync.manifest import ROOT, SyncManifest, build_manifest
+from ghidra_sync.map_check import run_check as run_map_check
 
 
 MANIFEST_PATH = ROOT / "build" / "ghidra-sync-manifest.json"
@@ -182,9 +183,20 @@ def _add_selection(parser: argparse.ArgumentParser, *, required: bool = False) -
     group.add_argument("--all", action="store_true", help="consider every exact function")
 
 
+def cmd_check(args: argparse.Namespace) -> int:
+    targets = set(args.target) if args.target else None
+    return run_map_check(targets)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    check_parser = subparsers.add_parser(
+        "check", help="verify functions_map.txt against source and Ghidra"
+    )
+    _add_selection(check_parser)
+    check_parser.set_defaults(handler=cmd_check)
 
     diff_parser = subparsers.add_parser("diff", help="compare exact source/PDB state with Ghidra")
     _add_selection(diff_parser)

@@ -75,6 +75,7 @@ Commands:
   compare [args]    Run reccmp against the reference and recompiled EXEs
   report [file]     Generate the self-contained HTML decompilation dashboard
   progress [scope]  Show annotation progress, optionally for a namespace
+  check [args]      Verify functions_map.txt against source and Ghidra
   run [args]        Run the recompiled toy2.exe through Wine
   shell             Start a shell with the decompilation environment active
   sync <subcmd>     Sync exact source/PDB metadata into Ghidra
@@ -124,6 +125,9 @@ case "$command" in
         else
             python decomp_utils.py --progress
         fi
+        ;;
+    check)
+        python tools/ghidra_sync.py check "$@"
         ;;
     run)
         ensure_build
