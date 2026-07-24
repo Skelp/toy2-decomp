@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common.h"
+#include "Nu3D/Nu3D.h"
 #include <windows.h>
 
 // Looks like these methods are purely for debug methods that are never called
@@ -46,6 +47,18 @@ namespace Nu3D
 	};
 
 	extern float g_scaledFontAscent;
+
+	extern VertexTL g_textVertices[6];
+	extern Font* g_currentFont;
+	extern int32_t g_currentFontTexIndex;
+	extern float g_textCursorX;
+	extern float g_textCursorY;
+	extern int32_t g_textClipX1;
+	extern int32_t g_textClipY1;
+	extern int32_t g_textClipX2;
+	extern int32_t g_textClipY2;
+	extern float g_fontScaleY;
+	extern float g_scaledFontHeight;
 
 	STATIC_ASSERT(sizeof(Font) == 0x130);
 	STATIC_ASSERT(sizeof(GlyphInfo) == 0x14);
