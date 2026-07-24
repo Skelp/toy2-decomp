@@ -21,6 +21,16 @@ namespace Toy2
 		// (set by AnimateActors, read by Actor::FindInActorList). NULL when idle.
 		extern Actor::Toy2Actor** g_actorAnimList;
 
+		// Pointers into the currently parsed animation data blob (set by ParseHeader,
+		// read by SampleNodeTransform). g_nodeKeyframeOffsets is a per-node short
+		// table (nodeId -> keyframe base index, -1/-2/-3 = no data), g_nodeScaleFlags
+		// is a per-node bitmask (bit set = node has scale data), g_keyframeData is
+		// the base of the keyframe samples.
+		extern uint8_t* g_nodeKeyframeOffsets;
+		extern uint8_t* g_nodeScaleFlags;
+		extern uint8_t* g_keyframeData;
+
 		void ResetNodeAngles();
+		void ParseHeader(int16_t* header);
 	}
 }
