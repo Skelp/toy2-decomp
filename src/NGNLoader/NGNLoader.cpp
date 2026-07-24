@@ -262,6 +262,26 @@ namespace NGNLoader
 		return newAlloc;
 	}
 
+	// FUNCTION: TOY2 0x004BC1B0 [MATCHED]
+	void DestroyPools(NGNImage* ngnImage)
+	{
+		if (ngnImage->scalerEntryPool)
+			free(ngnImage->scalerEntryPool);
+		if (ngnImage->portalStatePool)
+			free(ngnImage->portalStatePool);
+		if (ngnImage->portalHashTable)
+			free(ngnImage->portalHashTable);
+
+		ngnImage->scalerEntryPool = 0;
+		ngnImage->portalStatePool = 0;
+		ngnImage->portalHashTable = 0;
+		ngnImage->scalerEntryCount = 0;
+		ngnImage->maxScalerEntries = 0;
+		ngnImage->portalEntryCount = 0;
+		ngnImage->areaPortalCount = 0;
+		ngnImage->bucketCount = 0;
+	}
+
 	// FUNCTION: TOY2 0x004BC2C0
 	int32_t InsertPortal(NGNImage* ngnImage, int32_t sourceAreaIdx, int32_t targetAreaIdx, Nu3D::Portal::AreaPortal* portal)
 	{

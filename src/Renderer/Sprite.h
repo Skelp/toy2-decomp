@@ -8,6 +8,7 @@ namespace Renderer
 	namespace Sprite
 	{
 		extern float g_parallaxDepthZPos;
+		extern int32_t g_spriteBuffer3DCount;
 
 		int16_t DrawScaled(int16_t xPos,
 			int16_t yPos,
@@ -29,6 +30,7 @@ namespace Renderer
 			int32_t textureIndex,
 			RGBA color,
 			int32_t flags);
+		void QueueType10(Vector3F* start, Vector3F* end, RGBA color);
 
 		void ResetQueue();
 		void DrawQueuedSprite();

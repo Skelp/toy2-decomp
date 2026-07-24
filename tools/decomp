@@ -75,8 +75,16 @@ Commands:
   compare [args]    Run reccmp against the reference and recompiled EXEs
   report [file]     Generate the self-contained HTML decompilation dashboard
   progress [scope]  Show annotation progress, optionally for a namespace
+  check [args]      Verify functions_map.txt against source and Ghidra
   run [args]        Run the recompiled toy2.exe through Wine
   shell             Start a shell with the decompilation environment active
+  sync <subcmd>     Sync exact source/PDB metadata into Ghidra
+
+Sync subcommands:
+  sync diff [--target ADDR...]          Preview exact-match differences
+  sync apply (--target ADDR...|--all)   Plan/apply one transactional update
+  sync verify [--target ADDR...|--all]  Fail on exact metadata/source-map drift
+  sync pull ADDR                        Compatibility alias for apply --target
 EOF
 }
 
@@ -118,12 +126,18 @@ case "$command" in
             python decomp_utils.py --progress
         fi
         ;;
+    check)
+        python tools/ghidra_sync.py check "$@"
+        ;;
     run)
         ensure_build
         exec wine build/toy2.exe "$@"
         ;;
     shell)
         exec "${SHELL:-/bin/bash}" -i
+        ;;
+    sync)
+        python tools/ghidra_sync.py "$@"
         ;;
     *)
         echo "Unknown command: $command" >&2

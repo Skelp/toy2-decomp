@@ -34,6 +34,13 @@ namespace Nu3D
 			int32_t frustumPlaneCount;
 		};
 
+		extern Plane g_frustumPlanes[32];
+		extern int32_t g_frustumPlaneCount;
+		extern int32_t g_reverseFrustumWinding;
+		extern int32_t g_drawPortalOutlines;
+		extern int32_t g_viewportClippingEnabled;
+		extern ViewportRectAlt g_viewClipRect;
+
 		void GetViewportRect(ViewportRectAlt* output);
 		void Init();
 		void Reset();
@@ -50,6 +57,14 @@ namespace Nu3D
 		void GetViewClipRect(ViewportRect* output);
 		void RestoreViewportCache(const ViewportCache* cache);
 	}
+
+	namespace Frustum
+	{
+		uint32_t TestSphereAllPlanesAlt(const Vector3F* center, float radius);
+		uint32_t TestSphereDepthPlanes(const Vector3F* center, float radius);
+	}
+
+	void TransformPointProjective(Vector3F* output, const Vector3F* input, int32_t count, const D3DMATRIX* transform);
 
 	STATIC_ASSERT(sizeof(Viewport::ViewportRect) == 0x10);
 	STATIC_ASSERT(sizeof(Viewport::ViewportCache) == 0x214);

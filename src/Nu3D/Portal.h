@@ -24,8 +24,7 @@ namespace Nu3D
 			Vector3F* vertices;
 
 			static void CalculateBoundingSphere(AreaPortal* portal);
-			static int32_t BuildScalerEntry(NGNLoader::NGNImage* image, int32_t areaIndex,
-				Nu3D::Link::DynamicScaler* scaler);
+			static int32_t BuildScalerEntry(NGNLoader::NGNImage* image, int32_t areaIndex, Nu3D::Link::DynamicScaler* scaler);
 			static ScalerEntry* AllocScalerEntry(NGNLoader::NGNImage* image);
 		};
 
@@ -66,5 +65,21 @@ namespace Nu3D
 		STATIC_ASSERT(sizeof(PortalBucket) == 0x8);
 		STATIC_ASSERT(sizeof(ScalerEntry) == 0x8);
 		STATIC_ASSERT(sizeof(PortalHashTable) == 0x200);
+	}
+
+	void DrawDebugPortalOutlines(Portal::AreaPortal* portal);
+
+	namespace Area
+	{
+		extern int32_t g_portalTraversalDepth;
+		extern int32_t g_excludedShapeId;
+		extern int32_t g_lastPopulatedArea;
+		extern int8_t g_portalRenderDepthThreshold;
+		extern int32_t g_renderedScalerCount;
+		extern int32_t g_specialScalerToggle;
+		extern Link::DynamicScaler* g_specialScaler;
+
+		void ResetPortalStates(NGNLoader::NGNImage* image);
+		void RenderBucketThroughPortals(NGNLoader::NGNImage* image, int32_t areaIndex, int32_t scalerType, Portal::PortalState* incomingPortal);
 	}
 }

@@ -92,6 +92,31 @@ can filter by namespace. It measures coverage, not machine-code accuracy:
 tools/decomp progress Nu3D
 ```
 
+### Exact metadata sync to Ghidra
+
+`sync` builds a fresh reccmp/PDB manifest and accepts only raw 100% function
+matches. Effective matches and stubs are reported but never applied. Preview a
+function, apply selected functions, or audit already-synced metadata with:
+
+```sh
+tools/decomp sync diff --target 0x004a1bb0
+tools/decomp sync apply --target 0x004a1bb0 --apply
+tools/decomp sync verify --target 0x004a1bb0
+```
+
+`apply --all` handles every eligible exact function. Datatypes referenced by
+the selected functions are imported recursively from the VC6 PDB; use
+`--type-scope all` to import all project PDB aggregates. Apply is dry-run by
+default and commits function metadata, datatypes, and source maps in one Ghidra
+transaction. The CLI bridge is stopped for the headless transaction and
+restarted afterward. The Ghidra project must contain the configured retail
+executable and its SHA-256 must match `reccmp-project.yml`.
+
+Function bodies remain the retail instructions in Ghidra. Exact instruction
+pairs are associated with their PDB source lines through Ghidra source maps,
+including a SHA-256 identity for each mapped source file. A targeted apply
+replaces only that function's owned ranges; other source mappings are retained.
+
 The compatibility command `python3.11 build.py --nl` also builds the game, but
 new workflows should use `tools/decomp` directly.
 

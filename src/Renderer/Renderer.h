@@ -63,17 +63,23 @@ namespace Renderer
 		Nu3D::Primitive* primitive;
 		Nu3D::InstanceData* instanceData;
 		Nu3D::Material* material;
+
+		static RenderEntry* AllocObj(Nu3D::Material* material, Nu3D::Primitive* primitive, Nu3D::InstanceData* instanceData);
+		static void InsertIntoBucket(RenderEntry* entry);
 	};
 
 	extern float g_gammaCorrection;
 	extern int32_t g_isSoftwareRendering;
-	extern uint32_t g_frameDelta;
+	extern int32_t g_frameDelta;
 	extern float g_virtualScreenWidth;
 	extern float g_virtualScreenHeight;
 	extern float g_parallaxCurHorizScroll;
 	extern int32_t g_deviceBlendShadeCapsCpy;
 	extern int32_t g_boundTextureIndices[8];
 	extern Nu3D::Material* g_boundMaterial;
+	extern int32_t g_additionalRenderFlags;
+	extern float g_primaryRenderDistanceSquared;
+	extern float g_secondaryRenderDistanceSquared;
 	extern LPDIRECT3DDEVICE3 g_drawDeviceD3DDevice;
 
 	void Cleanup();
@@ -100,6 +106,11 @@ namespace Renderer
 	void RenderParallaxBackground(int32_t forceRender);
 	void FlushRenderQueues();
 	RGBA ModulateColorByAlpha(RGBA color, int32_t flags);
+	int32_t SetAdditionalRenderFlags(int32_t flags);
+	int32_t Set508718(int32_t value);
+	void SetRenderDistance(float primaryDistance, float secondaryDistance);
+	void RenderPrimitive(Nu3D::Primitive* primitive, const D3DMATRIX* transform, int32_t renderFlags);
+	void ProcessPrimitive(Nu3D::InstanceData* instanceData, Nu3D::Primitive* primitive);
 	void BindTexture(int32_t texIndex);
 
 	STATIC_ASSERT(sizeof(RenderEntry) == 0x18);

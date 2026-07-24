@@ -105,6 +105,8 @@ namespace DrawingDevice
 	extern CD3DFramework* g_drawingDevice;
 	extern DDAppDevice::App* g_ddAppListHead;
 	extern DDAppDevice::App* g_primaryDDApp;
+	extern D3DMATRIX* g_currentViewTransform;
+	extern D3DMATRIX* g_currentProjectionTransform;
 
 	LPDIRECTDRAW4 GetDDraw4();
 	LPDIRECT3D3 GetD3D();
@@ -128,6 +130,8 @@ namespace DrawingDevice
 	HRESULT GetChosenDevice_T(DDAppDevice::App** outApp, DDAppDevice** outDevice);
 	DDAppDevice::App* GetListHead();
 	LPD3DDEVICEDESC CopySurfaceDesc(LPD3DDEVICEDESC outSurfaceDesc);
+	HRESULT SetViewTransform(D3DMATRIX* transform);
+	HRESULT SetProjectionTransform(D3DMATRIX* transform);
 	HRESULT SetRenderState(D3DRENDERSTATETYPE renderStateType, DWORD value);
 	HRESULT SetLightState(D3DLIGHTSTATETYPE lightState, DWORD value);
 	HRESULT SetTextureStageState(DWORD stage, D3DTEXTURESTAGESTATETYPE state, DWORD value);

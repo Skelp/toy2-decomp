@@ -79,6 +79,12 @@ namespace Nu3D
 		// GLOBAL: TOY2 0x009F6230
 		int32_t g_frustumPlaneCount;
 
+		// GLOBAL: TOY2 0x009F6234
+		int32_t g_reverseFrustumWinding;
+
+		// GLOBAL: TOY2 0x009F6238
+		int32_t g_drawPortalOutlines;
+
 		// GLOBAL: TOY2 0x009F623C
 		int32_t g_viewportClippingEnabled;
 
@@ -135,8 +141,7 @@ namespace Nu3D
 			float width = right - left + 1.0f;
 			float height = bottom - top + 1.0f;
 
-			if (left == g_currentViewportX && top == g_currentViewportY &&
-				width == g_currentViewportWidth && height == g_currentViewportHeight)
+			if (left == g_currentViewportX && top == g_currentViewportY && width == g_currentViewportWidth && height == g_currentViewportHeight)
 				return;
 
 			if (left < g_minViewportX)
@@ -224,8 +229,7 @@ namespace Nu3D
 			// Force SetClipRect past its unchanged-rectangle fast path so the new
 			// centre offsets are submitted to the drawing device.
 			g_currentViewportX += 1.0f;
-			SetClipRect(left, top, left + g_currentViewportWidth - 1.0f,
-				top + g_currentViewportHeight - 1.0f);
+			SetClipRect(left, top, left + g_currentViewportWidth - 1.0f, top + g_currentViewportHeight - 1.0f);
 		}
 
 		// FUNCTION: TOY2 0x004B5AA0
@@ -330,11 +334,49 @@ namespace Nu3D
 
 			if (g_viewportClippingEnabled)
 			{
-				SetClipRect(g_viewClipRect.bottom, g_viewClipRect.top,
-					g_viewClipRect.right, g_viewClipRect.left);
+				SetClipRect(g_viewClipRect.bottom, g_viewClipRect.top, g_viewClipRect.right, g_viewClipRect.left);
 			}
 
 			Camera::RebuildTransformPipeline();
+		}
+	}
+
+	namespace Frustum
+	{
+		// FUNCTION: TOY2 0x004BA270
+		uint32_t TestSphereAllPlanesAlt(const Vector3F* center, float radius)
+		{
+			uint32_t result = 0;
+			for (int32_t planeIndex = 2; planeIndex < Viewport::g_frustumPlaneCount; ++planeIndex)
+			{
+				float distance = Math::GetSignedDistanceToPlane(center, &Viewport::g_frustumPlanes[planeIndex]);
+				if (distance > radius)
+				{
+					result |= 1 << (planeIndex * 2);
+					break;
+				}
+				if (distance > -radius)
+					result |= 2 << (planeIndex * 2);
+			}
+			return result;
+		}
+
+		// FUNCTION: TOY2 0x004BA2F0
+		uint32_t TestSphereDepthPlanes(const Vector3F* center, float radius)
+		{
+			uint32_t result = 0;
+			for (int32_t planeIndex = 1; planeIndex < Viewport::g_frustumPlaneCount; ++planeIndex)
+			{
+				if (planeIndex == 2 || planeIndex == 3)
+					continue;
+
+				float distance = Math::GetSignedDistanceToPlane(center, &Viewport::g_frustumPlanes[planeIndex]);
+				if (distance > radius)
+					return result | 1 << (planeIndex * 2);
+				if (distance > -radius)
+					result |= 2 << (planeIndex * 2);
+			}
+			return result;
 		}
 	}
 
@@ -353,7 +395,7 @@ namespace Nu3D
 		D3DMATRIX g_screenViewProjectionMatrix;
 
 		// GLOBAL: TOY2 0x00A4C290
-		D3DMATRIX g_viewMatrix;
+		D3DMATRIX g_projectionMatrix;
 
 		// GLOBAL: TOY2 0x00A4C2D0
 		D3DMATRIX g_clipNormMatrix;
@@ -368,24 +410,23 @@ namespace Nu3D
 		D3DMATRIX g_viewProjectionMatrix;
 
 		// GLOBAL: TOY2 0x00A4C3D0
-		D3DMATRIX g_projectionMatrix;
+		D3DMATRIX g_viewMatrix;
 
-		// GLOBAL: TOY2 0x00E4D824
-		D3DMATRIX g_activeViewProjectionMatrix;
+		// GLOBAL: TOY2 0x00E4D7E0
+		ReflectionState g_reflectionState;
 
-		// FUNCTION: TOY2 0x004BBA10
+		// FUNCTION: TOY2 0x004BBA10 [MATCHED]
 		void RebuildTransformPipeline()
 		{
 			Viewport::GetClipNormMatrix(&g_clipNormMatrix);
 			Viewport::GetScreenSpaceMatrix(&g_screenSpaceMatrix);
-			Math::FullMatrixMultiply(&g_viewProjectionMatrix, &g_projectionMatrix, &g_viewMatrix);
+			Math::FullMatrixMultiply(&g_viewProjectionMatrix, &g_viewMatrix, &g_projectionMatrix);
 			Math::FullMatrixMultiply(&g_normalizedViewProjectionMatrix, &g_viewProjectionMatrix, &g_clipNormMatrix);
 			Math::FullMatrixMultiply(&g_screenViewProjectionMatrix, &g_normalizedViewProjectionMatrix, &g_screenSpaceMatrix);
 			Math::FullMatrixMultiply(&g_clipToScreenMatrix, &g_clipNormMatrix, &g_screenSpaceMatrix);
 			Math::InvertAffineMatrix(&g_screenToClipMatrix, &g_clipToScreenMatrix);
 			Math::InvertAffineMatrix(&g_screenToWorldMatrix, &g_screenViewProjectionMatrix);
-			memcpy(&g_activeViewProjectionMatrix, &g_normalizedViewProjectionMatrix,
-				sizeof(g_activeViewProjectionMatrix));
+			memcpy(&g_reflectionState.uvTransform, &g_normalizedViewProjectionMatrix, sizeof(g_reflectionState.uvTransform));
 		}
 	}
 }

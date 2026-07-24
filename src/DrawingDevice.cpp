@@ -10,6 +10,12 @@ namespace DrawingDevice
 	// GLOBAL: TOY2 0x00884008
 	CD3DFramework* g_drawingDevice;
 
+	// GLOBAL: TOY2 0x00884014
+	D3DMATRIX* g_currentViewTransform;
+
+	// GLOBAL: TOY2 0x00884018
+	D3DMATRIX* g_currentProjectionTransform;
+
 	// GLOBAL: TOY2 0x00884028
 	DDAppDevice::App* g_ddAppListHead;
 
@@ -571,6 +577,20 @@ namespace DrawingDevice
 
 	// FUNCTION: TOY2 0x004ABAE0
 	LPDIRECT3DVIEWPORT3 GetViewport() { return g_drawingDevice->m_pvViewport; }
+
+	// FUNCTION: TOY2 0x004ABFF0 [MATCHED]
+	HRESULT SetViewTransform(D3DMATRIX* transform)
+	{
+		g_currentViewTransform = transform;
+		return g_drawingDevice->m_pd3dDevice->SetTransform(D3DTRANSFORMSTATE_VIEW, transform);
+	}
+
+	// FUNCTION: TOY2 0x004AC010 [MATCHED]
+	HRESULT SetProjectionTransform(D3DMATRIX* transform)
+	{
+		g_currentProjectionTransform = transform;
+		return g_drawingDevice->m_pd3dDevice->SetTransform(D3DTRANSFORMSTATE_PROJECTION, transform);
+	}
 
 	// FUNCTION: TOY2 0x004ABBC0
 	int32_t GetWidth() { return g_drawingDevice->m_dwRenderWidth; }
