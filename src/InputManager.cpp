@@ -243,10 +243,10 @@ namespace InputManager
 	uint8_t IsKeyPressed(int32_t inputCode)
 	{
 		uint8_t currentState = g_inputStates[inputCode];
-		uint8_t updated = ~currentState;
-		uint8_t result = g_previousInputStates[inputCode] & currentState;
+		uint8_t previousState = g_previousInputStates[inputCode];
+		uint8_t result = currentState & previousState;
 
-		g_previousInputStates[inputCode] = updated;
+		g_previousInputStates[inputCode] = ~currentState;
 
 		return result;
 	}

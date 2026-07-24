@@ -17,33 +17,28 @@ namespace SaveManager
 	// FUNCTION: TOY2 0x00415180
 	void AddInputEntry(int32_t inputCode, int32_t controlId)
 	{
-		int32_t saveStructIndex = 0;
+		int32_t writeIndex = 0;
 
-		SaveControlMapping* saveStructs = g_save99Data.saveStructs;
-
-		do
+		for (int32_t readIndex = 0; readIndex < 38; readIndex++)
 		{
-			if (saveStructs->dInputCode != -1)
+			if (g_save99Data.saveStructs[readIndex].dInputCode != -1)
 			{
-				if (saveStructIndex != (saveStructs - g_save99Data.saveStructs))
+				if (writeIndex != readIndex)
 				{
-					g_save99Data.saveStructs[saveStructIndex] = *saveStructs;
+					g_save99Data.saveStructs[writeIndex] = g_save99Data.saveStructs[readIndex];
 
-					saveStructs->dInputCode = -1;
-					saveStructs->gameControlId = 0;
+					g_save99Data.saveStructs[readIndex].dInputCode = -1;
+					g_save99Data.saveStructs[readIndex].gameControlId = 0;
 				}
 
-				++saveStructIndex;
+				++writeIndex;
 			}
+		}
 
-			++saveStructs;
-
-		} while (saveStructs < g_save99Data.unusedStructs);
-
-		if (saveStructIndex < 38)
+		if (writeIndex < 38)
 		{
-			g_save99Data.saveStructs[saveStructIndex].dInputCode = inputCode;
-			g_save99Data.saveStructs[saveStructIndex].gameControlId = controlId;
+			g_save99Data.saveStructs[writeIndex].dInputCode = inputCode;
+			g_save99Data.saveStructs[writeIndex].gameControlId = controlId;
 		}
 	}
 
