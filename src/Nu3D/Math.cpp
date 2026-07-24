@@ -243,6 +243,18 @@ namespace Nu3D
 			return deltaX * deltaX + deltaZ * deltaZ < radius * radius;
 		}
 
+		// FUNCTION: TOY2 0x0049F400
+		int32_t IsWithinDistance(const Vector3I* left, const Vector3I* right, int32_t radius)
+		{
+			int32_t deltaX = (left->x - right->x) >> 8;
+			int32_t deltaY = (left->y - right->y) >> 8;
+			int32_t deltaZ = (left->z - right->z) >> 8;
+			int32_t distSq = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
+			if (distSq < radius * radius)
+				return distSq + 1;
+			return 0;
+		}
+
 		// FUNCTION: TOY2 0x004A8B30 [MATCHED]
 		float Abs(float value)
 		{
