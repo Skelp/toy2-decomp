@@ -607,6 +607,12 @@ namespace DrawingDevice
 	// FUNCTION: TOY2 0x004ABBF0 [MATCHED]
 	LPDIRECTDRAWSURFACE4 GetBackBuffer() { return g_drawingDevice->m_pddsBackBuffer; }
 
+	// FUNCTION: TOY2 0x004ABE30
+	int32_t GetSlotSurfaceByIndex(int32_t index, LPDIRECTDRAWSURFACE4* surfaceOut)
+	{
+		return g_drawingDevice->GetSlotSurfaceByIndex(index, surfaceOut);
+	}
+
 	// FUNCTION: TOY2 0x004ABB30 [MATCHED]
 	int32_t SetViewport(LPD3DVIEWPORT2 viewport)
 	{
