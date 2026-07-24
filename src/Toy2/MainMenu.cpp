@@ -83,7 +83,7 @@ namespace Toy2
 
 				Nu3D::Camera::FadeToTargetTint();
 
-				uint32_t frameDelta = Renderer::g_frameDelta;
+				int32_t frameDelta = Renderer::g_frameDelta;
 
 				if (g_fadeTimer > 0)
 				{

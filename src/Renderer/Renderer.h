@@ -70,7 +70,7 @@ namespace Renderer
 
 	extern float g_gammaCorrection;
 	extern int32_t g_isSoftwareRendering;
-	extern uint32_t g_frameDelta;
+	extern int32_t g_frameDelta;
 	extern float g_virtualScreenWidth;
 	extern float g_virtualScreenHeight;
 	extern float g_parallaxCurHorizScroll;

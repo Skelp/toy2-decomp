@@ -21,7 +21,7 @@ namespace Renderer
 	int32_t g_isSoftwareRendering;
 
 	// GLOBAL: TOY2 0x0052F2D4
-	uint32_t g_frameDelta;
+	int32_t g_frameDelta;
 
 	// GLOBAL: TOY2 0x00884488
 	int32_t g_rendererValid;
