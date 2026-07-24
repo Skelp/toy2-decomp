@@ -48,8 +48,9 @@ namespace AudioManager
 	// STUB: TOY2 0x0047EC20
 	void LoadSfxPackForLevel(int32_t levelId) {}
 
-	// STUB: TOY2 0x004A37E0
-	int32_t PlayOneShotSoundGlobal(int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume) { return 0; }
+	// FUNCTION: TOY2 0x004A37E0 [MATCHED]
+	int32_t PlayOneShotSoundGlobal(int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume)
+	{ return PlaySoundBuffer(soundIndex + 1, leftVolume, rightVolume, 0, volume, 0); }
 
 	// FUNCTION: TOY2 0x0047D7F0 [MATCHED]
 	void PlayMusicOneShot(int32_t trackIndex)
@@ -74,4 +75,7 @@ namespace AudioManager
 
 	// STUB: TOY2 0x00413150
 	void PlayTrackByIndex(int32_t trackIndex, int32_t fadeMode) {}
+
+	// STUB: TOY2 0x0047DE50
+	int32_t PlaySoundBuffer(int32_t soundIndex, int32_t leftVolume, int32_t rightVolume, int32_t pan, int32_t volume, int32_t flags) { return 0; }
 }
