@@ -47,6 +47,7 @@ namespace Nu3D
 		static void SetRenderFlags(int32_t flags);
 		static void Destroy(Font* font);
 		static void ClearList();
+		static Font* BuildObject(int32_t numGlyphs);
 	};
 
 	extern float g_scaledFontAscent;

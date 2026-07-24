@@ -58,6 +58,31 @@ namespace Nu3D
 	// STUB: TOY2 0x004B4110
 	Font* Font::Build(const char* fontName, int32_t fontSize, const char* charSet) { return 0; }
 
+	// GLOBAL: TOY2 0x0088456C
+	int16_t g_nextFontId = 0;
+
+	// GLOBAL: TOY2 0x004DDABC
+	int16_t g_defaultFontType = 0;
+
+	// FUNCTION: TOY2 0x004B3A20
+	Font* Font::BuildObject(int32_t numGlyphs)
+	{
+		int32_t size = sizeof(Font) + numGlyphs * sizeof(GlyphInfo);
+		Font* font = (Font*)malloc(size);
+		if (font)
+		{
+			memset(font, 0, size);
+			font->next = g_fontListHead;
+			if (g_fontListHead)
+				g_fontListHead->prev = font;
+			g_fontListHead = font;
+			font->unkInt1 = g_defaultFontType;
+			font->fontId = g_nextFontId;
+			g_nextFontId++;
+		}
+		return font;
+	}
+
 	// FUNCTION: TOY2 0x004B39D0
 	void Font::Destroy(Font* font)
 	{
