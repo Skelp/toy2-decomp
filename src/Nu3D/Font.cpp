@@ -160,8 +160,31 @@ namespace Nu3D
 		g_textClipY2 = y2;
 	}
 
-	// STUB: TOY2 0x004B3C20
-	void Font::BuildFontTextures() {}
+	// FUNCTION: TOY2 0x004B3CC0
+	int32_t Font::BuildTexResource(Font* font)
+	{
+		font->texIndex = 0;
+		if (font->bmpHandle)
+		{
+			char name[20];
+			sprintf(name, "FONT_%04d", font->fontId);
+			font->texIndex = CreateTextureResource(font->bmpHandle, name, 4);
+			if (font->texIndex)
+				return 1;
+		}
+		return 0;
+	}
+
+	// FUNCTION: TOY2 0x004B3C20
+	void Font::BuildFontTextures()
+	{
+		if (DrawingDevice::GetD3DDevice())
+		{
+			for (Font* font = g_fontListHead; font; font = font->next)
+				BuildTexResource(font);
+			SetFont(g_currentFont);
+		}
+	}
 
 	// FUNCTION: TOY2 0x004B4450 [MATCHED]
 	void Font::SetTextCursor(float x, float y)

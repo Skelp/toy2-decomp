@@ -43,6 +43,7 @@ namespace Nu3D
 		static void SetTextColor(int32_t color);
 		static void SetTextClipRect(int32_t x1, int32_t y1, int32_t x2, int32_t y2);
 		static void BuildFontTextures();
+		static int32_t BuildTexResource(Font* font);
 		static void SetTextCursor(float x, float y);
 		static void SetRenderFlags(int32_t flags);
 		static void Destroy(Font* font);

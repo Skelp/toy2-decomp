@@ -941,4 +941,10 @@ namespace Nu3D
 
 	// FUNCTION: TOY2 0x004B1180 [MATCHED]
 	void FreeAllBmpDataNodes_T() { FreeAllBmpDataNodes(); }
+
+	// STUB: TOY2 0x004BB270
+	int32_t CreateTextureResource(HBITMAP bitmapHandle, const char* textureName, int32_t flags)
+	{
+		return 0;
+	}
 }
