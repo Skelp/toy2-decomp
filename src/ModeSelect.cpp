@@ -623,9 +623,7 @@ namespace ModeSelect
 
 	// FUNCTION: TOY2 0x004ACBC0
 	BOOL WINAPI DDrawEnumCallback(GUID* lpGUID, LPSTR lpDriverDescription, LPSTR lpDriverName, LPVOID lpContext)
-	{
-		return DDrawEnumCallbackExA(lpGUID, lpDriverDescription, lpDriverName, 0, 0);
-	}
+	{ return DDrawEnumCallbackExA(lpGUID, lpDriverDescription, lpDriverName, 0, 0); }
 
 	// FUNCTION: TOY2 0x004AC4D0
 	int32_t EnumerateDrivers(DeviceFilterCallback_t callback)
@@ -1192,21 +1190,21 @@ namespace ModeSelect
 	{
 		int32_t result = 0;
 
-		DrawingDevice::DDAppDevice::DisplayMode* displayModeListHead = g_ddAppSelectedDevice->displayModeListHead;
-		g_ddAppSelectedDisplayMode = displayModeListHead;
+		DrawingDevice::DDAppDevice::DisplayMode* current = g_ddAppSelectedDevice->displayModeListHead;
+		g_ddAppSelectedDisplayMode = current;
+		DrawingDevice::DDAppDevice::DisplayMode* next = current->nextDisplayMode;
 
-		for (DrawingDevice::DDAppDevice::DisplayMode* index = displayModeListHead->nextDisplayMode; index; index = index->nextDisplayMode)
+		while (next && current->surfaceDesc.dwHeight < 480)
 		{
-			if (displayModeListHead->surfaceDesc.dwHeight >= 480)
-				break;
-
-			displayModeListHead = index;
+			current = next;
 
 			++result;
-			g_ddAppSelectedDisplayMode = index;
+			g_ddAppSelectedDisplayMode = current;
+
+			next = current->nextDisplayMode;
 		}
 
-		g_ddAppSelectedDevice->primaryDisplayMode = displayModeListHead;
+		g_ddAppSelectedDevice->primaryDisplayMode = current;
 
 		return result;
 	}
