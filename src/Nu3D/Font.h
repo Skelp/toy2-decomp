@@ -48,6 +48,7 @@ namespace Nu3D
 		static void SetTextCursor(float x, float y);
 		static void SetRenderFlags(int32_t flags);
 		static void ResetContext();
+		static HBITMAP CreateAtlasBmp(int32_t width, int32_t height);
 		static void Destroy(Font* font);
 		static void ClearList();
 		static Font* BuildObject(int32_t numGlyphs);

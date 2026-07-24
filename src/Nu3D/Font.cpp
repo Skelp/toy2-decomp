@@ -119,6 +119,32 @@ namespace Nu3D
 		g_fontDCReady = 0;
 	}
 
+	// FUNCTION: TOY2 0x004B4080
+	HBITMAP Font::CreateAtlasBmp(int32_t width, int32_t height)
+	{
+		HBITMAP h = 0;
+		if (g_fontDC)
+		{
+			BITMAPINFO bi;
+			bi.bmiHeader.biSize = 0x28;
+			bi.bmiHeader.biWidth = width;
+			bi.bmiHeader.biHeight = height;
+			bi.bmiHeader.biPlanes = 1;
+			bi.bmiHeader.biBitCount = 24;
+			bi.bmiHeader.biCompression = 0;
+			bi.bmiHeader.biSizeImage = 0;
+			bi.bmiHeader.biXPelsPerMeter = 1;
+			bi.bmiHeader.biYPelsPerMeter = 1;
+			bi.bmiHeader.biClrUsed = 0;
+			bi.bmiHeader.biClrImportant = 0;
+			void* bits;
+			h = CreateDIBSection(0, &bi, 0, &bits, 0, 0);
+			if (h)
+				g_oldBitmap = SelectObject(g_fontDC, h);
+		}
+		return h;
+	}
+
 	// STUB: TOY2 0x004B4110
 	Font* Font::Build(const char* fontName, int32_t fontSize, const char* charSet) { return 0; }
 
