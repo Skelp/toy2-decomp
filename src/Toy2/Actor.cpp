@@ -28,5 +28,17 @@ namespace Toy2
 			}
 			return -1;
 		}
+
+		// FUNCTION: TOY2 0x004CDBB0 [MATCHED]
+		void SetNodeAngle(Toy2Actor* actor, int32_t nodeIndex, float x, float y, float z)
+		{
+			int32_t actorIndex = FindInActorList(actor);
+			if (actorIndex >= 0)
+			{
+				Animation::g_nodeAngles[actorIndex][nodeIndex].x = x;
+				Animation::g_nodeAngles[actorIndex][nodeIndex].y = y;
+				Animation::g_nodeAngles[actorIndex][nodeIndex].z = z;
+			}
+		}
 	}
 }
