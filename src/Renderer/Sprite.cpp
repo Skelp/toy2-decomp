@@ -321,7 +321,7 @@ namespace Renderer
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x004B6300
+		// FUNCTION: TOY2 0x004B6300 [MATCHED]
 		void ResetQueue()
 		{
 			g_queued2DSprite = 0;

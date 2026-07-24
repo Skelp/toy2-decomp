@@ -459,7 +459,7 @@ namespace InputManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x00452180
+	// FUNCTION: TOY2 0x00452180 [MATCHED]
 	void UpdateButtonStates()
 	{
 		g_prevButtonsPressed = g_curButtonsPressed;

@@ -472,7 +472,7 @@ namespace D3DApp
 		}
 	}
 
-	// FUNCTION: TOY2 0x004A6CC0
+	// FUNCTION: TOY2 0x004A6CC0 [MATCHED]
 	int32_t ProcessWndEvents()
 	{
 		if (PeekMessageA(&g_windowData.wndEventMsg, 0, 0, 0, 1))
@@ -494,7 +494,7 @@ namespace D3DApp
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x004A6D30
+	// FUNCTION: TOY2 0x004A6D30 [MATCHED]
 	int32_t PostQuitMessage()
 	{
 		::PostQuitMessage(0);
@@ -966,6 +966,6 @@ namespace D3DApp
 		}
 	}
 
-	// FUNCTION: TOY2 0x004A6B10
+	// FUNCTION: TOY2 0x004A6B10 [MATCHED]
 	void SysParmsOnExit() { SystemParametersInfoA(SPI_SETSCREENSAVERRUNNING, g_sysParamsInfo, &g_sysParamsInfo, 0); }
 }

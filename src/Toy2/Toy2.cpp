@@ -152,7 +152,7 @@ namespace Toy2
 {
 	namespace Graphics
 	{
-		// FUNCTION: TOY2 0x004CDD90
+		// FUNCTION: TOY2 0x004CDD90 [MATCHED]
 		int32_t AddDetailLevel()
 		{
 			int32_t detail = g_toyCfgData.detail + 1;
@@ -165,7 +165,7 @@ namespace Toy2
 			return detail;
 		}
 
-		// FUNCTION: TOY2 0x004CDDB0
+		// FUNCTION: TOY2 0x004CDDB0 [MATCHED]
 		int32_t RemoveDetailLevel()
 		{
 			int32_t detail = (g_toyCfgData.detail - 1) <= 0 ? 0 : g_toyCfgData.detail - 1;
@@ -211,7 +211,7 @@ namespace Toy2
 	// STUB: TOY2 0x004A3770
 	void LoadPathBin() {}
 
-	// FUNCTION: TOY2 0x00453CF0
+	// FUNCTION: TOY2 0x00453CF0 [MATCHED]
 	int32_t ShowLevelSelect()
 	{
 		int32_t prevLevelFileIdx = Toy2::g_levelFileIndex;
@@ -489,7 +489,7 @@ namespace Toy2
 	// STUB: TOY2 0x00490730
 	void CheckForQuit() {}
 
-	// FUNCTION: TOY2 0x004CE760
+	// FUNCTION: TOY2 0x004CE760 [MATCHED]
 	void InitCfg()
 	{
 		memset(&g_toyCfgData, 0, sizeof(g_toyCfgData));
@@ -500,7 +500,7 @@ namespace Toy2
 		g_toyCfgData.gammaCorrection = 2.0;
 	}
 
-	// FUNCTION: TOY2 0x004CE810
+	// FUNCTION: TOY2 0x004CE810 [MATCHED]
 	int32_t ReadCfg()
 	{
 		InitCfg();

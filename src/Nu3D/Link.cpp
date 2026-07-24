@@ -7,7 +7,7 @@ namespace Nu3D
 {
 	namespace Spatial
 	{
-		// FUNCTION: TOY2 0x004C30D0
+		// FUNCTION: TOY2 0x004C30D0 [MATCHED]
 		int32_t ComputeCellFromXZ(CellLocation* output, float x, float z, int32_t scalerType,
 			NGNLoader::NGNImage* image)
 		{
@@ -23,7 +23,7 @@ namespace Nu3D
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x004C3130
+		// FUNCTION: TOY2 0x004C3130 [MATCHED]
 		Link::DynamicScaler** GetCellByPos(const CellLocation* location, NGNLoader::NGNImage* image)
 		{
 			if (location->x < 0 || location->x >= image->gridWidth
@@ -36,7 +36,7 @@ namespace Nu3D
 				[location->z * image->gridWidth + location->x];
 		}
 
-		// FUNCTION: TOY2 0x004C3170
+		// FUNCTION: TOY2 0x004C3170 [MATCHED]
 		void UnlinkScalerThenReinsert(Link::DynamicScaler* scaler, NGNLoader::NGNImage* image)
 		{
 			if (scaler->cellHead)
@@ -55,7 +55,7 @@ namespace Nu3D
 			InsertScalerAtComputedCell(scaler, scaler->gscaleType, image);
 		}
 
-		// FUNCTION: TOY2 0x004C31C0
+		// FUNCTION: TOY2 0x004C31C0 [MATCHED]
 		void InsertScalerAtComputedCell(Link::DynamicScaler* scaler, int32_t scalerType,
 			NGNLoader::NGNImage* image)
 		{
@@ -83,7 +83,7 @@ namespace Nu3D
 
 	namespace Link
 	{
-		// FUNCTION: TOY2 0x004CCB20
+		// FUNCTION: TOY2 0x004CCB20 [MATCHED]
 		void SetScaleFromFixedOffsets(int32_t linkId, int32_t x, int32_t y, int32_t z)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
@@ -128,7 +128,7 @@ namespace Nu3D
 			Spatial::UnlinkScalerThenReinsert(scaler, NGNLoader::g_ngnImage);
 		}
 
-		// FUNCTION: TOY2 0x004CCC70
+		// FUNCTION: TOY2 0x004CCC70 [MATCHED]
 		void SetRotationRelative8bit(int32_t linkId, int32_t x, int32_t y, int32_t z)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
@@ -145,7 +145,7 @@ namespace Nu3D
 			RebuildMatrixAndCommit(link);
 		}
 
-		// FUNCTION: TOY2 0x004CCCE0
+		// FUNCTION: TOY2 0x004CCCE0 [MATCHED]
 		void SetRotationAbsolute8bit(int32_t linkId, int32_t x, int32_t y, int32_t z)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
@@ -162,7 +162,7 @@ namespace Nu3D
 			RebuildMatrixAndCommit(link);
 		}
 
-		// FUNCTION: TOY2 0x004CCD40
+		// FUNCTION: TOY2 0x004CCD40 [MATCHED]
 		void GetRotation8Bit(int32_t linkId, Vector3I* output)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
@@ -230,7 +230,7 @@ namespace Nu3D
 			Spatial::UnlinkScalerThenReinsert(scaler, image);
 		}
 
-		// FUNCTION: TOY2 0x004CCEF0
+		// FUNCTION: TOY2 0x004CCEF0 [MATCHED]
 		void GetCurrentPosFixed(int32_t linkId, Vector3I* output)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
@@ -247,7 +247,7 @@ namespace Nu3D
 			output->z = (int32_t)link->currentPos.z << shift;
 		}
 
-		// FUNCTION: TOY2 0x004CCF70
+		// FUNCTION: TOY2 0x004CCF70 [MATCHED]
 		void GetTargetPosFixed(int32_t linkId, Vector3I* output)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
@@ -291,7 +291,7 @@ namespace Nu3D
 			Spatial::UnlinkScalerThenReinsert(scaler, image);
 		}
 
-		// FUNCTION: TOY2 0x004CD0C0
+		// FUNCTION: TOY2 0x004CD0C0 [MATCHED]
 		void CopyShapeId(int32_t destinationLinkId, int32_t sourceLinkId)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;

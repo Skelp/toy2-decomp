@@ -7,7 +7,7 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x00884480
 	Patch* g_patchListHead;
 
-	// FUNCTION: TOY2 0x004B2EB0
+	// FUNCTION: TOY2 0x004B2EB0 [MATCHED]
 	void Patch::PatchVertices::ReleaseBuffer(PatchVertices* patchVertices)
 	{
 		if (patchVertices->vertexBuffer)
@@ -134,14 +134,14 @@ namespace Nu3D
 		return result == DD_OK;
 	}
 
-	// FUNCTION: TOY2 0x004B3170
+	// FUNCTION: TOY2 0x004B3170 [MATCHED]
 	void Patch::PatchVertices::FreeVertices(PatchVertices* patchVertices)
 	{
 		if (patchVertices->data.vertices)
 			free(patchVertices->data.vertices);
 	}
 
-	// FUNCTION: TOY2 0x004B3210
+	// FUNCTION: TOY2 0x004B3210 [MATCHED]
 	void Patch::PatchVertices::Resize(PatchVertices* patchVertices, int32_t vertexCount)
 	{
 		Vertex* vertices = (Vertex*)malloc(sizeof(Vertex) * vertexCount);
@@ -154,7 +154,7 @@ namespace Nu3D
 		}
 	}
 
-	// FUNCTION: TOY2 0x004B34F0
+	// FUNCTION: TOY2 0x004B34F0 [MATCHED]
 	void Patch::Destroy(Patch* patch)
 	{
 		if (patch->listNext)
@@ -165,7 +165,7 @@ namespace Nu3D
 		Remove(patch);
 	}
 
-	// FUNCTION: TOY2 0x004B3530
+	// FUNCTION: TOY2 0x004B3530 [MATCHED]
 	void Patch::Remove(Patch* patch)
 	{
 		if (patch->next)
@@ -179,7 +179,7 @@ namespace Nu3D
 		free(patch);
 	}
 
-	// FUNCTION: TOY2 0x004B3570
+	// FUNCTION: TOY2 0x004B3570 [MATCHED]
 	Patch* Patch::AllocAndResize(int32_t vertexCount, int32_t controlPointCount)
 	{
 		Patch* patch = Alloc();
@@ -193,7 +193,7 @@ namespace Nu3D
 		return patch;
 	}
 
-	// FUNCTION: TOY2 0x004B35A0
+	// FUNCTION: TOY2 0x004B35A0 [MATCHED]
 	Patch* Patch::Alloc()
 	{
 		Patch* patch = (Patch*)malloc(sizeof(Patch));
@@ -213,14 +213,14 @@ namespace Nu3D
 		return patch;
 	}
 
-	// FUNCTION: TOY2 0x004B35E0
+	// FUNCTION: TOY2 0x004B35E0 [MATCHED]
 	void Patch::ReleaseAllVertexBuffers(Patch* patch)
 	{
 		for (; patch; patch = patch->listNext)
 			PatchVertices::ReleaseBuffer(&patch->patchVertices);
 	}
 
-	// FUNCTION: TOY2 0x004B3600
+	// FUNCTION: TOY2 0x004B3600 [MATCHED]
 	BOOL Patch::CreateAllVertexBuffers(Patch* patch)
 	{
 		BOOL allCreated = TRUE;

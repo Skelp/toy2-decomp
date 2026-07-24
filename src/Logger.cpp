@@ -23,7 +23,7 @@ namespace Logger
 
 namespace Logger
 {
-	// FUNCTION: TOY2 0x004A87C0
+	// FUNCTION: TOY2 0x004A87C0 [MATCHED]
 	ThrowErrorFunc GetErrorHandler(char* filePath, int32_t lineNumber)
 	{
 		g_errorHandlerPath = filePath;
@@ -32,7 +32,7 @@ namespace Logger
 		return ThrowError;
 	}
 
-	// FUNCTION: TOY2 0x004A8710
+	// FUNCTION: TOY2 0x004A8710 [MATCHED]
 	void ThrowError(char* format, ...)
 	{
 		char caption[256];
@@ -92,7 +92,7 @@ namespace Logger
 		}
 	}
 
-	// FUNCTION: TOY2 0x004A6730
+	// FUNCTION: TOY2 0x004A6730 [MATCHED]
 	void LogLn(char* format, ...)
 	{
 		char buffer[1024];
@@ -110,7 +110,7 @@ namespace Logger
 	// STUB: TOY2 0x004ADFD0
 	void LogD3DError(int32_t errorCode) {}
 
-	// FUNCTION: TOY2 0x00431900
+	// FUNCTION: TOY2 0x00431900 [MATCHED]
 	void LogDDError(const char* message, HRESULT error)
 	{
 		char buffer[2048];
@@ -122,7 +122,7 @@ namespace Logger
 		LogLn(buffer);
 	}
 
-	// FUNCTION: TOY2 0x004A8870
+	// FUNCTION: TOY2 0x004A8870 [MATCHED]
 	void DebugLog(char* format, ...)
 	{
 		char buffer[1024];

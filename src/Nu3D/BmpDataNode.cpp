@@ -23,7 +23,7 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x0088400C
 	BmpDataNode* g_currentBmpDataNode;
 
-	// FUNCTION: TOY2 0x004AFCB0
+	// FUNCTION: TOY2 0x004AFCB0 [MATCHED]
 	void CalculatePixelFormatShifts(PixelFormatInfo* pixelFormatInfo, DDSURFACEDESC2* surfaceDesc)
 	{
 		uint32_t mask;
@@ -132,7 +132,7 @@ namespace Nu3D
 
 		bmpDataNode->surface->Unlock(0);
 	}
-	// FUNCTION: TOY2 0x004B0400
+	// FUNCTION: TOY2 0x004B0400 [MATCHED]
 	int32_t CountAlphaBits(LPDDPIXELFORMAT pixelFormat)
 	{
 		DWORD alphaBitMask = pixelFormat->dwRGBAlphaBitMask;
@@ -148,7 +148,7 @@ namespace Nu3D
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x004B0380
+	// FUNCTION: TOY2 0x004B0380 [MATCHED]
 	LONG WINAPI FindSuitablePixelFormat(LPDDPIXELFORMAT pixelFormat, void* context)
 	{
 		if (! pixelFormat)
@@ -189,7 +189,7 @@ namespace Nu3D
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004AFBA0
+	// FUNCTION: TOY2 0x004AFBA0 [MATCHED]
 	void DestroyBmpDataNode(BmpDataNode* bmpDataNode)
 	{
 		LPDIRECT3DTEXTURE2 d3dTexture = bmpDataNode->d3dTexture;
@@ -281,7 +281,7 @@ namespace Nu3D
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x004B0760
+	// FUNCTION: TOY2 0x004B0760 [MATCHED]
 	int32_t GetBitmapWidth(HANDLE bmpHandle)
 	{
 		BITMAP bmp;
@@ -289,7 +289,7 @@ namespace Nu3D
 		return bmp.bmWidth;
 	}
 
-	// FUNCTION: TOY2 0x004B0780
+	// FUNCTION: TOY2 0x004B0780 [MATCHED]
 	int32_t GetBitmapHeight(HANDLE bmpHandle)
 	{
 		BITMAP bmp;
@@ -297,7 +297,7 @@ namespace Nu3D
 		return bmp.bmHeight;
 	}
 
-	// FUNCTION: TOY2 0x004AFC10
+	// FUNCTION: TOY2 0x004AFC10 [MATCHED]
 	BmpDataNode* AllocateBmpDataNode()
 	{
 		BmpDataNode* bmpDataStruct = (BmpDataNode*)malloc(sizeof(BmpDataNode));
@@ -449,7 +449,7 @@ namespace Nu3D
 		return hBitmap;
 	}
 
-	// FUNCTION: TOY2 0x004B06D0
+	// FUNCTION: TOY2 0x004B06D0 [MATCHED]
 	int32_t CalculateTexSize(HANDLE bmp, int32_t flags)
 	{
 		BITMAP bitmap;
@@ -523,23 +523,23 @@ namespace Nu3D
 		return buffer;
 	}
 
-	// FUNCTION: TOY2 0x004AFAF0
+	// FUNCTION: TOY2 0x004AFAF0 [MATCHED]
 	void SetMinTexSize(int32_t minTexSize) { g_minTextureSize = minTexSize; }
 
-	// FUNCTION: TOY2 0x004AD060
+	// FUNCTION: TOY2 0x004AD060 [MATCHED]
 	HRESULT BuildBmpNode(HBITMAP bitmap, const char* textureName, int32_t unused, int32_t flags)
 	{
 		return BuildRawBmpNode(bitmap, 0, textureName, flags) ? S_OK : E_OUTOFMEMORY;
 	}
 
-	// FUNCTION: TOY2 0x004AD090
+	// FUNCTION: TOY2 0x004AD090 [MATCHED]
 	HRESULT BuildBmpNodeWithAlpha(HBITMAP bitmap, const char* textureName, int32_t unused, int32_t flags,
 		HBITMAP alphaBitmap)
 	{
 		return BuildRawBmpNode(bitmap, alphaBitmap, textureName, flags) ? S_OK : E_OUTOFMEMORY;
 	}
 
-	// FUNCTION: TOY2 0x004B0620
+	// FUNCTION: TOY2 0x004B0620 [MATCHED]
 	BmpDataNode* BuildRawBmpNode(HBITMAP bitmap, HBITMAP alphaBitmap, const char* textureName,
 		int32_t flags)
 	{
@@ -627,7 +627,7 @@ namespace Nu3D
 		return bmpDataNode;
 	}
 
-	// FUNCTION: TOY2 0x004AFC70
+	// FUNCTION: TOY2 0x004AFC70 [MATCHED]
 	BmpDataNode* GetBmpDataNodeByName(const char* texName)
 	{
 		BmpDataNode* nodeIter;
@@ -641,22 +641,22 @@ namespace Nu3D
 		return nodeIter;
 	}
 
-	// FUNCTION: TOY2 0x004AD0C0
+	// FUNCTION: TOY2 0x004AD0C0 [MATCHED]
 	BmpDataNode* GetBmpDataNodeByName_T(const char* textureName)
 	{
 		return GetBmpDataNodeByName(textureName);
 	}
 
-	// FUNCTION: TOY2 0x004B0CF0
+	// FUNCTION: TOY2 0x004B0CF0 [MATCHED]
 	void AddRef(BmpDataNode* bmpDataNode) { ++bmpDataNode->refCount; }
 
-	// FUNCTION: TOY2 0x004AD130
+	// FUNCTION: TOY2 0x004AD130 [MATCHED]
 	LPDIRECT3DTEXTURE2 GetTexture(BmpDataNode* bmpDataNode)
 	{
 		return bmpDataNode ? bmpDataNode->d3dTexture : 0;
 	}
 
-	// FUNCTION: TOY2 0x004AD1C0
+	// FUNCTION: TOY2 0x004AD1C0 [MATCHED]
 	int32_t InitBmpNodeSurface(BmpDataNode* bmpDataNode, int32_t unused)
 	{
 		if (bmpDataNode)
@@ -668,7 +668,7 @@ namespace Nu3D
 		return -1;
 	}
 
-	// FUNCTION: TOY2 0x004B0C90
+	// FUNCTION: TOY2 0x004B0C90 [MATCHED]
 	BmpDataNode* LoadLocalBmpTexture(const char* rawTexStr, int32_t flags)
 	{
 		BmpDataNode* dataNode = GetBmpDataNodeByName(rawTexStr);
@@ -880,7 +880,7 @@ namespace Nu3D
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x004AFBE0
+	// FUNCTION: TOY2 0x004AFBE0 [MATCHED]
 	void FreeTexData(BmpDataNode* bmpDataNode)
 	{
 		if (bmpDataNode->texData)
@@ -889,7 +889,7 @@ namespace Nu3D
 		bmpDataNode->texData = 0;
 	}
 
-	// FUNCTION: TOY2 0x004AFB20
+	// FUNCTION: TOY2 0x004AFB20 [MATCHED]
 	void ReleaseBmpDataNode(BmpDataNode* bmpDataNode)
 	{
 		int32_t refCount = bmpDataNode->refCount;
@@ -922,14 +922,14 @@ namespace Nu3D
 		}
 	}
 
-	// FUNCTION: TOY2 0x004AC260
+	// FUNCTION: TOY2 0x004AC260 [MATCHED]
 	int32_t ReleaseBmpDataNode_T(BmpDataNode* bmpDataNode)
 	{
 		ReleaseBmpDataNode(bmpDataNode);
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004B1150
+	// FUNCTION: TOY2 0x004B1150 [MATCHED]
 	void FreeAllBmpDataNodes()
 	{
 		for (BmpDataNode* curNode = g_bmpDataHead; g_bmpDataHead; curNode = g_bmpDataHead)
@@ -939,6 +939,6 @@ namespace Nu3D
 		}
 	}
 
-	// FUNCTION: TOY2 0x004B1180
+	// FUNCTION: TOY2 0x004B1180 [MATCHED]
 	void FreeAllBmpDataNodes_T() { FreeAllBmpDataNodes(); }
 }

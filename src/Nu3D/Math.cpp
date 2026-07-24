@@ -243,7 +243,7 @@ namespace Nu3D
 			return deltaX * deltaX + deltaZ * deltaZ < radius * radius;
 		}
 
-		// FUNCTION: TOY2 0x004A8B30
+		// FUNCTION: TOY2 0x004A8B30 [MATCHED]
 		float Abs(float value)
 		{
 			uint32_t bits = *(uint32_t*)&value;

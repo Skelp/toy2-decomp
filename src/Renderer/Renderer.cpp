@@ -272,7 +272,7 @@ namespace DrawingAPI
 	// GLOBAL: TOY2 0x00508510
 	Device_ProcessVerticesOnBuffer* ProcessVerticesOnBuffer;
 
-	// FUNCTION: TOY2 0x004B2BF0
+	// FUNCTION: TOY2 0x004B2BF0 [MATCHED]
 	void SetVertexAPIs(int32_t isSoftwareRendering)
 	{
 		if (isSoftwareRendering)
@@ -298,7 +298,7 @@ namespace DrawingAPI
 
 namespace Renderer
 {
-	// FUNCTION: TOY2 0x004B2CE0
+	// FUNCTION: TOY2 0x004B2CE0 [MATCHED]
 	void DisableFog() { g_fogEnabled = 0; }
 
 	// FUNCTION: TOY2 0x004B6320
@@ -496,7 +496,7 @@ namespace Renderer
 		g_renderStateCache[textureStage + 1] = newState;
 	}
 
-	// FUNCTION: TOY2 0x004B6850
+	// FUNCTION: TOY2 0x004B6850 [MATCHED]
 	void InitRenderState(int32_t newStage)
 	{
 		SetRenderState(newStage | RENDER_COLOR_MODULATE);
@@ -664,10 +664,10 @@ namespace Renderer
 			g_deviceBlendShadeCaps |= 8;
 	}
 
-	// FUNCTION: TOY2 0x004B3860
+	// FUNCTION: TOY2 0x004B3860 [MATCHED]
 	void SetIsSoftwareRendering(int32_t value) { g_isSoftwareRendering = value; }
 
-	// FUNCTION: TOY2 0x00453CD0
+	// FUNCTION: TOY2 0x00453CD0 [MATCHED]
 	void SetVirtualRatioTo54()
 	{
 		g_virtualScreenWidth = 320.0;
@@ -829,7 +829,7 @@ namespace Renderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004B2D50
+	// FUNCTION: TOY2 0x004B2D50 [MATCHED]
 	int32_t BeginScene()
 	{
 		if (! DrawingDevice::BeginScene())
@@ -1086,7 +1086,7 @@ namespace Renderer
 			SoftwareRenderer::UnkFunc7();
 	}
 
-	// FUNCTION: TOY2 0x0048F3E0
+	// FUNCTION: TOY2 0x0048F3E0 [MATCHED]
 	void ResetParallax()
 	{
 		g_parallaxCurHorizScroll = 0.0;
@@ -1095,7 +1095,7 @@ namespace Renderer
 		g_parallaxTexWidthRatio = 1.0;
 	}
 
-	// FUNCTION: TOY2 0x004B3870
+	// FUNCTION: TOY2 0x004B3870 [MATCHED]
 	int32_t GetIsSoftwareRendering() { return g_isSoftwareRendering; }
 
 	// FUNCTION: TOY2 0x004B3740 [MATCHED]
@@ -1127,7 +1127,7 @@ namespace Renderer
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x004B2CC0
+	// FUNCTION: TOY2 0x004B2CC0 [MATCHED]
 	void GetBlendShadeCaps(int32_t* capsOut)
 	{
 		if (capsOut)
@@ -1432,7 +1432,7 @@ namespace Renderer
 		return color;
 	}
 
-	// FUNCTION: TOY2 0x004C2870
+	// FUNCTION: TOY2 0x004C2870 [MATCHED]
 	void BindTexture(int32_t texIndex)
 	{
 		g_boundMaterial = 0;

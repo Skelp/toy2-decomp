@@ -39,10 +39,10 @@ namespace NGNLoader
 	// GLOBAL: TOY2 0x009F5FE4
 	Nu3D::Material* g_tex14Materials[3];
 
-	// FUNCTION: TOY2 0x004B1190
+	// FUNCTION: TOY2 0x004B1190 [MATCHED]
 	void FreeAllBmpDataNodes() { Nu3D::FreeAllBmpDataNodes_T(); }
 
-	// FUNCTION: TOY2 0x004CB300
+	// FUNCTION: TOY2 0x004CB300 [MATCHED]
 	void GetScaleVector(Vector3F* output) { *output = g_vertexScaleVector; }
 
 	// FUNCTION: TOY2 0x004BB320
@@ -81,7 +81,7 @@ namespace NGNLoader
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x004BB4C0
+	// FUNCTION: TOY2 0x004BB4C0 [MATCHED]
 	NGNTextureCache* AllocateTextureCache()
 	{
 		NGNTextureCache* result = g_textureCache.freeList;
@@ -101,7 +101,7 @@ namespace NGNLoader
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x004BB1B0
+	// FUNCTION: TOY2 0x004BB1B0 [MATCHED]
 	NGNTextureData* AllocateTextureData()
 	{
 		NGNTextureData* result = g_textureData.freeList;
@@ -121,7 +121,7 @@ namespace NGNLoader
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x004BB150
+	// FUNCTION: TOY2 0x004BB150 [MATCHED]
 	void ReleaseTextureData(NGNTextureData* textureData)
 	{
 		if (textureData->bmpDataNode)
@@ -145,7 +145,7 @@ namespace NGNLoader
 		g_textureData.freeList = textureData;
 	}
 
-	// FUNCTION: TOY2 0x004BB2F0
+	// FUNCTION: TOY2 0x004BB2F0 [MATCHED]
 	uint32_t GetTextureDataIndexByName(char* textureName)
 	{
 		NGNTextureParams texParams;
@@ -155,7 +155,7 @@ namespace NGNLoader
 		return textureData ? textureData->textureIndex : 0;
 	}
 
-	// FUNCTION: TOY2 0x004BB810
+	// FUNCTION: TOY2 0x004BB810 [MATCHED]
 	void ReleaseTextureCache(NGNTextureCache* textureCache)
 	{
 		if (textureCache->next)
@@ -174,7 +174,7 @@ namespace NGNLoader
 		g_textureCache.freeList = textureCache;
 	}
 
-	// FUNCTION: TOY2 0x004BB7D0
+	// FUNCTION: TOY2 0x004BB7D0 [MATCHED]
 	void ReleaseAllTextures()
 	{
 		while (g_textureData.activeList)
@@ -186,7 +186,7 @@ namespace NGNLoader
 		Nu3D::FreeAllBmpDataNodes_T();
 	}
 
-	// FUNCTION: TOY2 0x004AC240
+	// FUNCTION: TOY2 0x004AC240 [MATCHED]
 	Nu3D::BmpDataNode* LoadLocalBmpTexture(const char* rawTexStr, int32_t flags) { return Nu3D::LoadLocalBmpTexture(rawTexStr, flags); }
 
 	// FUNCTION: TOY2 0x004BB3C0
@@ -240,7 +240,7 @@ namespace NGNLoader
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004AC220
+	// FUNCTION: TOY2 0x004AC220 [MATCHED]
 	Nu3D::BmpDataNode* LoadTextureContents(FILE* stream, const char* rawTexStr, int32_t flags) { return Nu3D::LoadTextureByStream(stream, rawTexStr, flags); }
 
 	// FUNCTION: TOY2 0x004BC320
@@ -282,7 +282,7 @@ namespace NGNLoader
 		ngnImage->bucketCount = 0;
 	}
 
-	// FUNCTION: TOY2 0x004BC2C0
+	// FUNCTION: TOY2 0x004BC2C0 [MATCHED]
 	int32_t InsertPortal(NGNImage* ngnImage, int32_t sourceAreaIdx, int32_t targetAreaIdx, Nu3D::Portal::AreaPortal* portal)
 	{
 		if (Toy2::g_isElevatorHopLevel && targetAreaIdx == 15)
@@ -305,7 +305,7 @@ namespace NGNLoader
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004BC230
+	// FUNCTION: TOY2 0x004BC230 [MATCHED]
 	void AllocPools(NGNImage* ngnImage, int32_t portalCount, int32_t maxScalerEntries)
 	{
 		ngnImage->portalEntryCount = 0;
@@ -327,7 +327,7 @@ namespace NGNLoader
 		memset(rotLookup, 0, sizeof(Nu3D::Portal::PortalHashTable));
 	}
 
-	// FUNCTION: TOY2 0x004B3350
+	// FUNCTION: TOY2 0x004B3350 [MATCHED]
 	Nu3D::Portal::AreaPortal* AllocPortalVertices(int32_t vertexCount)
 	{
 		Nu3D::Portal::AreaPortal* portal = (Nu3D::Portal::AreaPortal*)malloc(sizeof(Vector3F) * vertexCount + sizeof(Nu3D::Portal::AreaPortal));
@@ -1177,7 +1177,7 @@ namespace NGNLoader
 		return patchCount;
 	}
 
-	// FUNCTION: TOY2 0x004C33F0
+	// FUNCTION: TOY2 0x004C33F0 [MATCHED]
 	NGNImage* BuildImage(char* fileName)
 	{
 		int32_t terminate = 0;
@@ -1275,7 +1275,7 @@ namespace NGNLoader
 		return ngnImage;
 	}
 
-	// FUNCTION: TOY2 0x004CEAE0
+	// FUNCTION: TOY2 0x004CEAE0 [MATCHED]
 	void SetNewImage(char* fileName)
 	{
 		DECOMP_PRINT(("[NGNLoader]: Loading file %s\n", fileName));

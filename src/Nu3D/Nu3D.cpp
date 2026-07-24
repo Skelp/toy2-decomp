@@ -20,7 +20,7 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x00B1C3B8
 	int32_t g_defaultPrimitiveFlags;
 
-	// FUNCTION: TOY2 0x004B1880
+	// FUNCTION: TOY2 0x004B1880 [MATCHED]
 	void SetIsSoftwareRendering(int32_t value) { g_isSoftwareRendering = value; }
 
 	// FUNCTION: TOY2 0x004AB7D0 [MATCHED]

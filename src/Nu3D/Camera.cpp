@@ -107,7 +107,7 @@ namespace Nu3D
 		// GLOBAL: TOY2 0x00A4C410
 		int32_t g_effectMode;
 
-		// FUNCTION: TOY2 0x004A1BB0
+		// FUNCTION: TOY2 0x004A1BB0 [MATCHED]
 		void SetTint(uint8_t blue, uint8_t green, uint8_t red, uint8_t fadeSpeed)
 		{
 			g_targetTintBlue = blue;

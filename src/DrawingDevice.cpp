@@ -39,7 +39,7 @@ namespace DrawingDevice
 
 	/* ------ CD3DFramework ------- */
 
-	// FUNCTION: TOY2 0x004AEC80
+	// FUNCTION: TOY2 0x004AEC80 [MATCHED]
 	CD3DFramework::CD3DFramework()
 	{
 		m_hWnd = 0;
@@ -60,10 +60,10 @@ namespace DrawingDevice
 		memset(m_slots, 0, sizeof(m_slots));
 	}
 
-	// FUNCTION: TOY2 0x004AECD0
+	// FUNCTION: TOY2 0x004AECD0 [MATCHED]
 	void CD3DFramework::Release() { Cleanup(); }
 
-	// FUNCTION: TOY2 0x004AECE0
+	// FUNCTION: TOY2 0x004AECE0 [MATCHED]
 	int32_t CD3DFramework::Cleanup()
 	{
 		ULONG drawReleaseResult = 0;
@@ -468,7 +468,7 @@ namespace DrawingDevice
 		return 0x82000006;
 	}
 
-	// FUNCTION: TOY2 0x004AF640
+	// FUNCTION: TOY2 0x004AF640 [MATCHED]
 	int32_t CD3DFramework::RestoreToGDISurface(int32_t refreshWindow)
 	{
 		if (m_pDD)
@@ -514,7 +514,7 @@ namespace DrawingDevice
 		return g_drawingDevice->InitalizeForWindow(hWnd, guid, device, displayMode, flags);
 	}
 
-	// FUNCTION: TOY2 0x004AD610
+	// FUNCTION: TOY2 0x004AD610 [MATCHED]
 	void CD3DFramework::InitSurfaceDesc(LPDDSURFACEDESC2 ddSurfaceDesc, DWORD flags, DWORD caps)
 	{
 		memset(ddSurfaceDesc, 0, sizeof(DDSURFACEDESC2));
@@ -525,7 +525,7 @@ namespace DrawingDevice
 		ddSurfaceDesc->ddpfPixelFormat.dwSize = sizeof(DDPIXELFORMAT);
 	}
 
-	// FUNCTION: TOY2 0x004AD640
+	// FUNCTION: TOY2 0x004AD640 [MATCHED]
 	void CD3DFramework::BuildViewport(D3DVIEWPORT2* viewport, DWORD width, DWORD height)
 	{
 		memset(viewport, 0, sizeof(D3DVIEWPORT2));
@@ -566,16 +566,16 @@ namespace DrawingDevice
 
 	/* ------ DrawingDevice ------- */
 
-	// FUNCTION: TOY2 0x004ABA40
+	// FUNCTION: TOY2 0x004ABA40 [MATCHED]
 	LPDIRECTDRAW4 GetDDraw4() { return g_drawingDevice->m_pDD; }
 
-	// FUNCTION: TOY2 0x004ABA70
+	// FUNCTION: TOY2 0x004ABA70 [MATCHED]
 	LPDIRECT3D3 GetD3D() { return g_drawingDevice->m_pD3D; }
 
-	// FUNCTION: TOY2 0x004ABA80
+	// FUNCTION: TOY2 0x004ABA80 [MATCHED]
 	LPDIRECT3DDEVICE3 GetD3DDevice() { return g_drawingDevice->m_pd3dDevice; }
 
-	// FUNCTION: TOY2 0x004ABAE0
+	// FUNCTION: TOY2 0x004ABAE0 [MATCHED]
 	LPDIRECT3DVIEWPORT3 GetViewport() { return g_drawingDevice->m_pvViewport; }
 
 	// FUNCTION: TOY2 0x004ABFF0 [MATCHED]
@@ -592,22 +592,22 @@ namespace DrawingDevice
 		return g_drawingDevice->m_pd3dDevice->SetTransform(D3DTRANSFORMSTATE_PROJECTION, transform);
 	}
 
-	// FUNCTION: TOY2 0x004ABBC0
+	// FUNCTION: TOY2 0x004ABBC0 [MATCHED]
 	int32_t GetWidth() { return g_drawingDevice->m_dwRenderWidth; }
 
-	// FUNCTION: TOY2 0x004ABBD0
+	// FUNCTION: TOY2 0x004ABBD0 [MATCHED]
 	int32_t GetHeight() { return g_drawingDevice->m_dwRenderHeight; }
 
-	// FUNCTION: TOY2 0x004ABD90
+	// FUNCTION: TOY2 0x004ABD90 [MATCHED]
 	int32_t GetDestWidth() { return g_drawingDevice->m_rcViewportRect.right - g_drawingDevice->m_rcViewportRect.left; }
 
-	// FUNCTION: TOY2 0x004ABDA0
+	// FUNCTION: TOY2 0x004ABDA0 [MATCHED]
 	int32_t GetDestHeight() { return g_drawingDevice->m_rcViewportRect.bottom - g_drawingDevice->m_rcViewportRect.top; }
 
-	// FUNCTION: TOY2 0x004ABBF0
+	// FUNCTION: TOY2 0x004ABBF0 [MATCHED]
 	LPDIRECTDRAWSURFACE4 GetBackBuffer() { return g_drawingDevice->m_pddsBackBuffer; }
 
-	// FUNCTION: TOY2 0x004ABB30
+	// FUNCTION: TOY2 0x004ABB30 [MATCHED]
 	int32_t SetViewport(LPD3DVIEWPORT2 viewport)
 	{
 		if (g_drawingDevice->m_pvViewport)
@@ -616,7 +616,7 @@ namespace DrawingDevice
 		return -1;
 	}
 
-	// FUNCTION: TOY2 0x004ABB80
+	// FUNCTION: TOY2 0x004ABB80 [MATCHED]
 	int32_t BuildFreshViewport(LPD3DVIEWPORT2 viewport)
 	{
 		D3DVIEWPORT2 freshViewport;
@@ -627,10 +627,10 @@ namespace DrawingDevice
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004AC100
+	// FUNCTION: TOY2 0x004AC100 [MATCHED]
 	HRESULT CreateMaterial(LPDIRECT3DMATERIAL3* outMaterial) { return g_drawingDevice->m_pD3D->CreateMaterial(outMaterial, 0); }
 
-	// FUNCTION: TOY2 0x004ABD80
+	// FUNCTION: TOY2 0x004ABD80 [MATCHED]
 	RECT* GetDestRect() { return &g_drawingDevice->m_rcViewportRect; }
 
 	// FUNCTION: TOY2 0x004ABF00
@@ -645,25 +645,25 @@ namespace DrawingDevice
 		g_drawingDevice = 0;
 	}
 
-	// FUNCTION: TOY2 0x004ABF30
+	// FUNCTION: TOY2 0x004ABF30 [MATCHED]
 	HRESULT CreateLight(LPDIRECT3DLIGHT* outLight) { return GetD3D()->CreateLight(outLight, 0); }
 
-	// FUNCTION: TOY2 0x004ABF50
+	// FUNCTION: TOY2 0x004ABF50 [MATCHED]
 	HRESULT SetLight(LPDIRECT3DLIGHT light, LPD3DLIGHT2 description)
 	{
 		return light->SetLight((LPD3DLIGHT)description);
 	}
 
-	// FUNCTION: TOY2 0x004ABF60
+	// FUNCTION: TOY2 0x004ABF60 [MATCHED]
 	HRESULT AddLight(LPDIRECT3DLIGHT light) { return GetViewport()->AddLight(light); }
 
-	// FUNCTION: TOY2 0x004ABF80
+	// FUNCTION: TOY2 0x004ABF80 [MATCHED]
 	HRESULT DeleteLight(LPDIRECT3DLIGHT light) { return GetViewport()->DeleteLight(light); }
 
-	// FUNCTION: TOY2 0x004ABFC0
+	// FUNCTION: TOY2 0x004ABFC0 [MATCHED]
 	ULONG ReleaseLight(LPDIRECT3DLIGHT light) { return light->Release(); }
 
-	// FUNCTION: TOY2 0x00412B10
+	// FUNCTION: TOY2 0x00412B10 [MATCHED]
 	void Quit()
 	{
 		if (g_validDrawDevice)
@@ -700,13 +700,13 @@ namespace DrawingDevice
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004AC420
+	// FUNCTION: TOY2 0x004AC420 [MATCHED]
 	HRESULT GetChosenDevice_T(DDAppDevice::App** outApp, DDAppDevice** outDevice) { return GetChosenDevice(outApp, outDevice); }
 
-	// FUNCTION: TOY2 0x004AD000
+	// FUNCTION: TOY2 0x004AD000 [MATCHED]
 	DDAppDevice::App* GetListHead() { return g_ddAppListHead; }
 
-	// FUNCTION: TOY2 0x004ABCA0
+	// FUNCTION: TOY2 0x004ABCA0 [MATCHED]
 	LPD3DDEVICEDESC CopySurfaceDesc(LPD3DDEVICEDESC outSurfaceDesc)
 	{
 		D3DDEVICEDESC tempDesc;
@@ -717,19 +717,19 @@ namespace DrawingDevice
 		return outSurfaceDesc;
 	}
 
-	// FUNCTION: TOY2 0x004AC370
+	// FUNCTION: TOY2 0x004AC370 [MATCHED]
 	HRESULT SetRenderState(D3DRENDERSTATETYPE renderStateType, DWORD value) { return g_drawingDevice->m_pd3dDevice->SetRenderState(renderStateType, value); }
 
-	// FUNCTION: TOY2 0x004ABFA0
+	// FUNCTION: TOY2 0x004ABFA0 [MATCHED]
 	HRESULT SetLightState(D3DLIGHTSTATETYPE lightState, DWORD value) { return g_drawingDevice->m_pd3dDevice->SetLightState(lightState, value); }
 
-	// FUNCTION: TOY2 0x004AC150
+	// FUNCTION: TOY2 0x004AC150 [MATCHED]
 	HRESULT SetTextureStageState(DWORD stage, D3DTEXTURESTAGESTATETYPE state, DWORD value)
 	{
 		return g_drawingDevice->m_pd3dDevice->SetTextureStageState(stage, state, value);
 	}
 
-	// FUNCTION: TOY2 0x004ABAF0
+	// FUNCTION: TOY2 0x004ABAF0 [MATCHED]
 	HRESULT ClearScreen(DWORD clearFlags, D3DCOLOR clearColor)
 	{
 		LPDIRECT3DVIEWPORT3 viewport = g_drawingDevice->m_pvViewport;
@@ -744,7 +744,7 @@ namespace DrawingDevice
 		return -1;
 	}
 
-	// FUNCTION: TOY2 0x004ABA90
+	// FUNCTION: TOY2 0x004ABA90 [MATCHED]
 	HRESULT BeginScene()
 	{
 		LPDIRECT3DDEVICE3 device = GetD3DDevice();
@@ -774,7 +774,7 @@ namespace DrawingDevice
 		return frontBuffer->Blt(&g_drawingDevice->m_rcScreenRect, backBuffer, &g_drawingDevice->m_rcViewportRect, 0x1000000, 0);
 	}
 
-	// FUNCTION: TOY2 0x004ABAD0
+	// FUNCTION: TOY2 0x004ABAD0 [MATCHED]
 	void EndScene()
 	{
 		LPDIRECT3DDEVICE3 device = GetD3DDevice();
@@ -812,13 +812,13 @@ namespace DrawingDevice
 
 namespace HardwareDevice
 {
-	// FUNCTION: TOY2 0x004AC340
+	// FUNCTION: TOY2 0x004AC340 [MATCHED]
 	HRESULT DrawIndexedPrimitiveVB(D3DPRIMITIVETYPE primitiveType, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices, DWORD indexCount, DWORD flags)
 	{
 		return DrawingDevice::g_drawingDevice->m_pd3dDevice->DrawIndexedPrimitiveVB(primitiveType, vertexBuffer, indices, indexCount, flags);
 	}
 
-	// FUNCTION: TOY2 0x004AC300
+	// FUNCTION: TOY2 0x004AC300 [MATCHED]
 	HRESULT DrawIndexedPrimitive(D3DPRIMITIVETYPE d3dptPrimitiveType,
 		DWORD dwVertexTypeDesc,
 		LPVOID lpvVertices,
@@ -833,25 +833,25 @@ namespace HardwareDevice
 
 	// Vertex Methods
 
-	// FUNCTION: TOY2 0x004AC070
+	// FUNCTION: TOY2 0x004AC070 [MATCHED]
 	HRESULT ReleaseVertexBuffer(LPDIRECT3DVERTEXBUFFER buffer) { return buffer->Release(); }
 
-	// FUNCTION: TOY2 0x004AC080
+	// FUNCTION: TOY2 0x004AC080 [MATCHED]
 	HRESULT CreateVertexBuffer(D3DVERTEXBUFFERDESC* desc, LPDIRECT3DVERTEXBUFFER* outBuffer, DWORD flags)
 	{
 		return DrawingDevice::g_drawingDevice->m_pD3D->CreateVertexBuffer(desc, outBuffer, flags, 0);
 	}
 
-	// FUNCTION: TOY2 0x004AC0A0
+	// FUNCTION: TOY2 0x004AC0A0 [MATCHED]
 	HRESULT LockVertexBuffer(LPDIRECT3DVERTEXBUFFER vertexBuffer, DWORD dwFlags, LPVOID* lplpData, DWORD* lpStride)
 	{
 		return vertexBuffer->Lock(dwFlags, lplpData, lpStride);
 	}
 
-	// FUNCTION: TOY2 0x004AC0C0
+	// FUNCTION: TOY2 0x004AC0C0 [MATCHED]
 	HRESULT UnlockVertexBuffer(LPDIRECT3DVERTEXBUFFER buffer) { return buffer->Unlock(); }
 
-	// FUNCTION: TOY2 0x004AC0D0
+	// FUNCTION: TOY2 0x004AC0D0 [MATCHED]
 	HRESULT OptimizeVertexBuffer(LPDIRECT3DVERTEXBUFFER buffer, LPDIRECT3DDEVICE3 device, DWORD flags) { return buffer->Optimize(device, flags); }
 
 	// FUNCTION: TOY2 0x004AC030

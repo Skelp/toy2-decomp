@@ -57,7 +57,7 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x00452130
 	void SwapRenderBuffer() {}
 
-	// FUNCTION: TOY2 0x004C20E0
+	// FUNCTION: TOY2 0x004C20E0 [MATCHED]
 	void SetLevelFileIndex(int32_t index) { g_levelFileIndex = index; }
 
 	// STUB: TOY2 0x004BCE00
@@ -133,10 +133,10 @@ namespace SoftwareDevice
 	// STUB: TOY2 0x004B2BB0
 	HRESULT LockVertexBuffer(LPDIRECT3DVERTEXBUFFER vertexBuffer, DWORD dwFlags, LPVOID* lplpData, DWORD* lpStride) { return DDERR_UNSUPPORTED; }
 
-	// FUNCTION: TOY2 0x004B2BD0
+	// FUNCTION: TOY2 0x004B2BD0 [MATCHED]
 	HRESULT UnlockVertexBuffer(LPDIRECT3DVERTEXBUFFER buffer) { return 0; }
 
-	// FUNCTION: TOY2 0x004B2BE0
+	// FUNCTION: TOY2 0x004B2BE0 [MATCHED]
 	HRESULT OptimizeVertexBuffer(LPDIRECT3DVERTEXBUFFER buffer, LPDIRECT3DDEVICE3 device, DWORD flags) { return 0; }
 
 	// STUB: TOY2 0x004C19E0
