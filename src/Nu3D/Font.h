@@ -45,6 +45,8 @@ namespace Nu3D
 		static void BuildFontTextures();
 		static void SetTextCursor(float x, float y);
 		static void SetRenderFlags(int32_t flags);
+		static void Destroy(Font* font);
+		static void ClearList();
 	};
 
 	extern float g_scaledFontAscent;
@@ -52,6 +54,8 @@ namespace Nu3D
 	extern VertexTL g_textVertices[6];
 	extern Font* g_currentFont;
 	extern int32_t g_currentFontTexIndex;
+	extern Font* g_fontListHead;
+	extern int32_t g_fontInitialized;
 	extern float g_textCursorX;
 	extern float g_textCursorY;
 	extern int32_t g_textClipX1;

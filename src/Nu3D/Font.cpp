@@ -1,6 +1,7 @@
 #include "Nu3D/Font.h"
 
 #include "DrawingDevice.h"
+#include "Nu3D/BmpDataNode.h"
 
 namespace Nu3D
 {
@@ -20,6 +21,12 @@ namespace Nu3D
 
 	// GLOBAL: TOY2 0x00508674
 	float g_scaledFontAscent = 1.0;
+
+	// GLOBAL: TOY2 0x00884570
+	Font* g_fontListHead = 0;
+
+	// GLOBAL: TOY2 0x00884568
+	int32_t g_fontInitialized = 0;
 
 	// GLOBAL: TOY2 0x00884490
 	VertexTL g_textVertices[6];
@@ -50,6 +57,37 @@ namespace Nu3D
 
 	// STUB: TOY2 0x004B4110
 	Font* Font::Build(const char* fontName, int32_t fontSize, const char* charSet) { return 0; }
+
+	// FUNCTION: TOY2 0x004B39D0
+	void Font::Destroy(Font* font)
+	{
+		if (font->texIndex)
+			ReleaseBmpDataNode_T((BmpDataNode*)font->texIndex);
+		if (font->next)
+			font->next->prev = font->prev;
+		if (font->prev)
+		{
+			font->prev->next = font->next;
+			free(font);
+			return;
+		}
+		g_fontListHead = font->next;
+		free(font);
+	}
+
+	// FUNCTION: TOY2 0x004B3A90
+	void Font::ClearList()
+	{
+		if (! g_fontInitialized)
+			return;
+		g_fontInitialized = 0;
+		while (g_fontListHead)
+		{
+			Destroy(g_fontListHead);
+			g_currentFontTexIndex = 0;
+			g_currentFont = 0;
+		}
+	}
 
 	// FUNCTION: TOY2 0x004B3C60 [MATCHED]
 	void Font::SetFont(Font* font)
