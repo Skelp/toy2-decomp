@@ -164,6 +164,10 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x00731F18
 	int32_t g_saveMenuState;
+
+	int32_t TickSaveMenuMachine(int32_t param);
+	int32_t MovieViewerTick(int32_t movieIdx);
+	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId);
 }
 
 namespace Toy2
@@ -208,14 +212,49 @@ namespace Toy2
 		void Tick() {}
 	}
 
+	namespace PostGameSaveMenu
+	{
+		// STUB: TOY2 0x0043A130
+		int32_t Tick() { return 0; }
+	}
+
 	namespace GameOver
 	{
 		// STUB: TOY2 0x00437B20
 		void Tick() {}
 	}
 
-	// STUB: TOY2 0x00454020
-	void ShowPostGameSaveMenu() {}
+	// FUNCTION: TOY2 0x00454020 [MATCHED]
+	void ShowPostGameSaveMenu()
+	{
+		int32_t prevLevelFileIdx = g_levelFileIndex;
+
+		g_levelFileIndex = 16;
+
+		if (g_saveMenuState)
+		{
+			Levels::g_levelLoadConfig = 0xf8;
+			g_hasStaticBackdrop = 0;
+			Renderer::g_virtualScreenWidth = 512.0;
+			Renderer::g_virtualScreenHeight = 256.0;
+			g_nextBackdropId = 36;
+			Levels::InitLevelPlay(16);
+
+			int32_t result = PostGameSaveMenu::Tick();
+			g_saveMenuState = result;
+
+			if (result)
+			{
+				g_saveMenuState = 1;
+				SaveManager::TransferProgressData(&SaveManager::g_save0Data);
+				TickSaveMenuMachine(1);
+				SaveManager::LoadProgressData(&SaveManager::g_save0Data);
+				g_saveMenuState = 0;
+			}
+		}
+
+		g_levelFileIndex = prevLevelFileIdx;
+	}
 
 	// STUB: TOY2 0x00453D90
 	void ShowActClearScreen() {}
@@ -285,9 +324,6 @@ namespace Toy2
 		return newState;
 	}
 
-	int32_t MovieViewerTick(int32_t movieIdx);
-	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId);
-
 	// STUB: TOY2 0x0043A600
 	int32_t MovieViewerTick(int32_t movieIdx) { return -1; }
 
@@ -319,8 +355,6 @@ namespace Toy2
 
 		g_levelFileIndex = prevLevelFileIdx;
 	}
-
-	int32_t TickSaveMenuMachine(int32_t param);
 
 	// STUB: TOY2 0x0049B9E0
 	int32_t TickSaveMenuMachine(int32_t param) { return 0; }
