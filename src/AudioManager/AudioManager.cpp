@@ -31,4 +31,7 @@ namespace AudioManager
 
 	// STUB: TOY2 0x0047D7F0
 	void PlayMusicOneShot(int32_t trackIndex) {}
+
+	// STUB: TOY2 0x004A3BE0
+	void UpdateChannels() {}
 }

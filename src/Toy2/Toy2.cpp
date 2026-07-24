@@ -1080,8 +1080,8 @@ namespace Toy2
 		return 1;
 	}
 
-	// STUB: TOY2 0x0047D7C0
-	void UpdateAudioChannels() {}
+	// FUNCTION: TOY2 0x0047D7C0 [MATCHED]
+	void UpdateAudioChannels() { AudioManager::UpdateChannels(); }
 
 	// STUB: TOY2 0x00490BF0
 	int16_t UpdateD3DState() { return 0; }

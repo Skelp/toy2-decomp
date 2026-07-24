@@ -15,4 +15,5 @@ namespace AudioManager
 	void LoadSfxPackForLevel(int32_t levelId);
 	int32_t PlayOneShotSoundGlobal(int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume);
 	void PlayMusicOneShot(int32_t trackIndex);
+	void UpdateChannels();
 }
