@@ -285,8 +285,40 @@ namespace Toy2
 		return newState;
 	}
 
-	// STUB: TOY2 0x00453FA0
-	void ShowMovieViewer() {}
+	int32_t MovieViewerTick(int32_t movieIdx);
+	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId);
+
+	// STUB: TOY2 0x0043A600
+	int32_t MovieViewerTick(int32_t movieIdx) { return -1; }
+
+	// FUNCTION: TOY2 0x00453FA0 [MATCHED]
+	void ShowMovieViewer()
+	{
+		int32_t prevLevelFileIdx = g_levelFileIndex;
+
+		g_levelFileIndex = 16;
+
+		int32_t movieIdx = 0;
+		while (true)
+		{
+			Levels::g_levelLoadConfig = 0xb8;
+			Renderer::g_virtualScreenWidth = 320.0;
+			Renderer::g_virtualScreenHeight = 256.0;
+			Levels::InitLevelPlay(g_levelFileIndex);
+
+			MainMenu::g_menuClearColor.b = 0;
+			MainMenu::g_menuClearColor.g = 0;
+			MainMenu::g_menuClearColor.r = 0;
+			movieIdx = MovieViewerTick(movieIdx);
+
+			if (movieIdx < 0)
+				break;
+
+			PlayMovieWithTransition(movieIdx + 10, 0);
+		}
+
+		g_levelFileIndex = prevLevelFileIdx;
+	}
 
 	int32_t TickSaveMenuMachine(int32_t param);
 
@@ -314,8 +346,6 @@ namespace Toy2
 		g_levelFileIndex = prevLevelFileIdx;
 		return result;
 	}
-
-	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId);
 
 	// FUNCTION: TOY2 0x0049EB20
 	void UnlockAndPlayMovie(int32_t movieId, int32_t backgroundId, int32_t forcePlay)
