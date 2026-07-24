@@ -7,6 +7,7 @@ namespace AudioManager
 	extern int32_t g_curTrackIndex;
 
 	void StopAndFlush();
+	int32_t IsStreamActive();
 	void ReleaseBuffers();
 	void Init();
 	void SetVolumesProcessed(int32_t musicVolume, int32_t sfxVolume);

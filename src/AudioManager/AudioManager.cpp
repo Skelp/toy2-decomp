@@ -1,12 +1,30 @@
 #include "AudioManager/AudioManager.h"
+#include "Logger.h"
 
 namespace AudioManager
 {
 	// GLOBAL: TOY2 005282CC
 	int32_t g_curTrackIndex;
 
-	// STUB: TOY2 0x0047D840
-	void StopAndFlush() {}
+	// GLOBAL: TOY2 0x00724E80
+	int32_t g_audioInitialized;
+
+	// GLOBAL: TOY2 0x00726F3C
+	int32_t g_streamPending;
+
+	// FUNCTION: TOY2 0x0047D840 [MATCHED]
+	void StopAndFlush()
+	{
+		if (g_audioInitialized)
+		{
+			if (IsStreamActive())
+			{
+				StopAndWait();
+				while (IsStreamActive()) {}
+			}
+			g_streamPending = 0;
+		}
+	}
 
 	// STUB: TOY2 0x0047E850
 	void ReleaseBuffers() {}
@@ -17,8 +35,12 @@ namespace AudioManager
 	// STUB: TOY2 0x0049E8D0
 	void SetVolumesProcessed(int32_t musicVolume, int32_t sfxVolume) {}
 
-	// STUB: TOY2 0x004A3EF0
-	void FlushSoundVoices() {}
+	// FUNCTION: TOY2 0x004A3EF0 [MATCHED]
+	void FlushSoundVoices()
+	{
+		Logger::Log("FlushSoundVoices : Start.\n");
+		Logger::Log("FlushSoundVoices : End.\n");
+	}
 
 	// STUB: TOY2 0x00436D40
 	int32_t StopAndWait() { return 1; }
@@ -34,4 +56,7 @@ namespace AudioManager
 
 	// STUB: TOY2 0x004A3BE0
 	void UpdateChannels() {}
+
+	// STUB: TOY2 0x00413300
+	int32_t IsStreamActive() { return 0; }
 }
