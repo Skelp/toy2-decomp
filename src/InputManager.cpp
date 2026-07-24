@@ -54,6 +54,9 @@ namespace InputManager
 	// GLOBAL: TOY2 0x005298D0
 	LPDIRECTINPUTDEVICE2A g_directInputDevices[4];
 
+	// GLOBAL: TOY2 0x00529CB4
+	LPDIRECTINPUTDEVICE2A g_dInputDeviceCleanupList[4];
+
 	// GLOBAL: TOY2 0x005297D0
 	GUID g_dInputGuids[16];
 
@@ -467,6 +470,25 @@ namespace InputManager
 		g_curButtonsPressed = g_buttonsPressed;
 	}
 
-	// STUB: TOY2 0x00415460
-	void Cleanup() {}
+	// FUNCTION: TOY2 0x00415460
+	void Cleanup()
+	{
+		if (g_directInput)
+		{
+			if (g_directInputDevice)
+			{
+				g_directInputDevice->Unacquire();
+				g_directInputDevice->Release();
+			}
+			for (int32_t i = 0; i < 4; i++)
+			{
+				if (g_dInputDeviceCleanupList[i])
+				{
+					g_dInputDeviceCleanupList[i]->Unacquire();
+					g_dInputDeviceCleanupList[i]->Release();
+				}
+			}
+			g_directInput->Release();
+		}
+	}
 }
