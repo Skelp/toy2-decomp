@@ -161,6 +161,9 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x00534550
 	int32_t g_unused0;
+
+	// GLOBAL: TOY2 0x00731F18
+	int32_t g_saveMenuState;
 }
 
 namespace Toy2
@@ -285,8 +288,32 @@ namespace Toy2
 	// STUB: TOY2 0x00453FA0
 	void ShowMovieViewer() {}
 
-	// STUB: TOY2 0x00453F20
-	int32_t ShowSaveScreen() { return 0; }
+	int32_t TickSaveMenuMachine(int32_t param);
+
+	// STUB: TOY2 0x0049B9E0
+	int32_t TickSaveMenuMachine(int32_t param) { return 0; }
+
+	// FUNCTION: TOY2 0x00453F20 [MATCHED]
+	int32_t ShowSaveScreen()
+	{
+		int32_t prevLevelFileIdx = g_levelFileIndex;
+
+		g_levelFileIndex = 16;
+		Levels::g_levelLoadConfig = 0xf8;
+		g_hasStaticBackdrop = 0;
+		Renderer::g_virtualScreenWidth = 512.0;
+		Renderer::g_virtualScreenHeight = 256.0;
+		g_nextBackdropId = 36;
+		Levels::InitLevelPlay(16);
+
+		g_saveMenuState = 0;
+		SaveManager::TransferProgressData(&SaveManager::g_save0Data);
+		int32_t result = TickSaveMenuMachine(0);
+		SaveManager::LoadProgressData(&SaveManager::g_save0Data);
+
+		g_levelFileIndex = prevLevelFileIdx;
+		return result;
+	}
 
 	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId);
 

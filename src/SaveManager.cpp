@@ -105,6 +105,9 @@ namespace SaveManager
 	// STUB: TOY2 0x004A2CC0
 	void LoadProgressData(Save0Data* save) {}
 
+	// STUB: TOY2 0x004A2C80
+	void TransferProgressData(Save0Data* save) {}
+
 	// STUB: TOY2 0x0049B830
 	void SaveToFile(int32_t saveNum, const char* saveName) {}
 }

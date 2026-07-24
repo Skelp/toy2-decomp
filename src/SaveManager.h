@@ -54,6 +54,7 @@ namespace SaveManager
 	void Init();
 	void InitProgressData(Save0Data* save);
 	void LoadProgressData(Save0Data* save);
+	void TransferProgressData(Save0Data* save);
 	void SaveToFile(int32_t saveNum, const char* saveName);
 
 	extern Save0Data g_save0Data;
