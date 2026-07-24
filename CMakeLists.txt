@@ -99,6 +99,8 @@ set(TOY2_SOURCES
     src/Toy2/Collision.cpp
     src/Toy2/Collectables.cpp
     src/Toy2/Collectables.h
+    src/Toy2/KiteTail.cpp
+    src/Toy2/KiteTail.h
     src/Toy2/MainMenu.cpp
     src/Toy2/MainMenu.h
     src/Toy2/Animation.h
