@@ -114,6 +114,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x00529E48
 	int16_t g_pauseMenuBlinkTimer;
 
+	// GLOBAL: TOY2 0x0052F0E7
+	uint8_t g_movieUnlocked[19];
+
 	// GLOBAL: TOY2 0x0052F2DC
 	int16_t g_levelTransitionTimer;
 
@@ -248,8 +251,17 @@ namespace Toy2
 	// STUB: TOY2 0x00453F20
 	int32_t ShowSaveScreen() { return 0; }
 
-	// STUB: TOY2 0x0049EB20
-	void UnlockAndPlayMovie(int32_t movieId, int32_t backgroundId, int32_t forcePlay) {}
+	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId);
+
+	// FUNCTION: TOY2 0x0049EB20
+	void UnlockAndPlayMovie(int32_t movieId, int32_t backgroundId, int32_t forcePlay)
+	{
+		if (! g_movieUnlocked[movieId] || forcePlay)
+		{
+			g_movieUnlocked[movieId] = 1;
+			PlayMovieWithTransition(movieId + 10, backgroundId);
+		}
+	}
 
 	// STUB: TOY2 0x0049AB90
 	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId) { return 1; }
