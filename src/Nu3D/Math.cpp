@@ -292,51 +292,47 @@ namespace Nu3D
 		// FUNCTION: TOY2 0x004A9400 [MATCHED]
 		void BuildIdentityMatrix(D3DMATRIX* matrix) { memcpy(matrix, &g_identityMatrix, sizeof(D3DMATRIX)); }
 
-		// FUNCTION: TOY2 0x004A94C0
+		// FUNCTION: TOY2 0x004A94C0 [MATCHED]
 		void ApplyRotateXFromLut(D3DMATRIX* matrix, int32_t trigOffset)
 		{
-			float sine = Numerics::g_trigLUT[trigOffset & 0xFFFF];
 			float cosine = Numerics::g_trigLUT[(trigOffset + 0x4000) & 0xFFFF];
-
-			matrix->_11 = 1.0f;
-			matrix->_12 = 0.0f;
-			matrix->_13 = 0.0f;
-			matrix->_14 = 0.0f;
-			matrix->_21 = 0.0f;
+			matrix->_33 = cosine;
 			matrix->_22 = cosine;
+			float sine = Numerics::g_trigLUT[trigOffset & 0xFFFF];
+			matrix->_11 = 1.0f;
 			matrix->_23 = sine;
+			matrix->_32 = -sine;
+			matrix->_43 = 0.0f;
+			matrix->_42 = 0.0f;
+			matrix->_41 = 0.0f;
 			matrix->_24 = 0.0f;
 			matrix->_31 = 0.0f;
-			matrix->_32 = -sine;
-			matrix->_33 = cosine;
-			matrix->_34 = 0.0f;
-			matrix->_41 = 0.0f;
-			matrix->_42 = 0.0f;
-			matrix->_43 = 0.0f;
+			matrix->_21 = 0.0f;
+			matrix->_14 = 0.0f;
+			matrix->_13 = 0.0f;
+			matrix->_12 = 0.0f;
 			matrix->_44 = 1.0f;
 		}
 
-		// FUNCTION: TOY2 0x004A9530
+		// FUNCTION: TOY2 0x004A9530 [MATCHED]
 		void SetRotationYFromU16AngleLUT(D3DMATRIX* matrix, int32_t trigOffset)
 		{
 			float cosine = Numerics::g_trigLUT[(trigOffset + 0x4000) & 0xFFFF];
-			float sine = Numerics::g_trigLUT[trigOffset & 0xFFFF];
-
+			matrix->_33 = cosine;
 			matrix->_11 = cosine;
-			matrix->_12 = 0.0f;
+			float sine = Numerics::g_trigLUT[trigOffset & 0xFFFF];
+			matrix->_31 = sine;
 			matrix->_13 = -sine;
+			matrix->_22 = 1.0f;
+			matrix->_43 = 0.0f;
+			matrix->_42 = 0.0f;
+			matrix->_41 = 0.0f;
+			matrix->_24 = 0.0f;
+			matrix->_32 = 0.0f;
+			matrix->_23 = 0.0f;
 			matrix->_14 = 0.0f;
 			matrix->_21 = 0.0f;
-			matrix->_22 = 1.0f;
-			matrix->_23 = 0.0f;
-			matrix->_24 = 0.0f;
-			matrix->_31 = sine;
-			matrix->_32 = 0.0f;
-			matrix->_33 = cosine;
-			matrix->_34 = 0.0f;
-			matrix->_41 = 0.0f;
-			matrix->_42 = 0.0f;
-			matrix->_43 = 0.0f;
+			matrix->_12 = 0.0f;
 			matrix->_44 = 1.0f;
 		}
 
@@ -509,7 +505,7 @@ namespace Nu3D
 			matrix->_43 = offset->z + matrix->_43;
 		}
 
-		// FUNCTION: TOY2 0x004A97E0
+		// FUNCTION: TOY2 0x004A97E0 [MATCHED]
 		void GetPositionVector(D3DMATRIX* matrix, Vector3F* output)
 		{
 			output->x = matrix->_41;
@@ -533,7 +529,7 @@ namespace Nu3D
 			output->z = matrix->_23;
 		}
 
-		// FUNCTION: TOY2 0x004A9840
+		// FUNCTION: TOY2 0x004A9840 [MATCHED]
 		void GetForwardVector(D3DMATRIX* matrix, Vector3F* output)
 		{
 			output->x = matrix->_31;
@@ -555,7 +551,7 @@ namespace Nu3D
 			result->z = tempZ;
 		}
 
-		// FUNCTION: TOY2 0x004A91B0
+		// FUNCTION: TOY2 0x004A91B0 [MATCHED]
 		void VertexAdd(Vector3F* result, Vector3F* v1, Vector3F* v2)
 		{
 			result->x = v1->x + v2->x;
@@ -571,7 +567,7 @@ namespace Nu3D
 			result->z = v1->z - v2->z;
 		}
 
-		// FUNCTION: TOY2 0x004A9210
+		// FUNCTION: TOY2 0x004A9210 [MATCHED]
 		void ScaleVector(Vector3F* result, Vector3F* vector, float scale)
 		{
 			result->x = scale * vector->x;
@@ -590,7 +586,7 @@ namespace Nu3D
 			result->z = z;
 		}
 
-		// FUNCTION: TOY2 0x004A9340
+		// FUNCTION: TOY2 0x004A9340 [MATCHED]
 		float VectorNormalize(Vector3F* output, Vector3F* vector)
 		{
 			float lengthSquared = vector->x * vector->x + vector->y * vector->y + vector->z * vector->z;
