@@ -63,7 +63,7 @@ namespace Nu3D
 		int32_t flags);
 	BmpDataNode* GetBmpDataNodeByName_T(const char* textureName);
 	LPDIRECT3DTEXTURE2 GetTexture(BmpDataNode* bmpDataNode);
-	int32_t InitBmpNodeSurface(BmpDataNode* bmpDataNode, int32_t unused);
+	int32_t InitBmpNodeSurface(BmpDataNode* bmpDataNode, LPDIRECT3DDEVICE3 d3dDevice);
 	BmpDataNode* LoadTextureByStream(FILE* handle, const char* rawTexStr, int32_t flags);
 	Nu3D::BmpDataNode* LoadLocalBmpTexture(const char* rawTexStr, int32_t flags);
 	HRESULT SetTexture(int32_t stageIndex, BmpDataNode* bmpDataNode);

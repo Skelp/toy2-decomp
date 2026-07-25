@@ -1,5 +1,6 @@
 #include "Nu3D/BmpDataNode.h"
 #include "DrawingDevice.h"
+#include "NGNLoader/NGNLoader.h"
 #include "Renderer/Renderer.h"
 #include "Logger.h"
 
@@ -657,7 +658,7 @@ namespace Nu3D
 	}
 
 	// FUNCTION: TOY2 0x004AD1C0 [MATCHED]
-	int32_t InitBmpNodeSurface(BmpDataNode* bmpDataNode, int32_t unused)
+	int32_t InitBmpNodeSurface(BmpDataNode* bmpDataNode, LPDIRECT3DDEVICE3 d3dDevice)
 	{
 		if (bmpDataNode)
 		{
@@ -942,9 +943,33 @@ namespace Nu3D
 	// FUNCTION: TOY2 0x004B1180 [MATCHED]
 	void FreeAllBmpDataNodes_T() { FreeAllBmpDataNodes(); }
 
-	// STUB: TOY2 0x004BB270
+	// FUNCTION: TOY2 0x004BB270
 	int32_t CreateTextureResource(HBITMAP bitmapHandle, const char* textureName, int32_t flags)
 	{
+		NGNLoader::NGNTextureData* textureData = NGNLoader::AllocateTextureData();
+		if (textureData)
+		{
+			textureData->isTex14 = 0;
+			textureData->color.b = 0;
+			textureData->color.g = 0;
+			textureData->color.r = 0;
+			textureData->bmpDataNode = 0;
+			LPDIRECT3DDEVICE3 d3dDevice = DrawingDevice::GetD3DDevice();
+			if (d3dDevice)
+			{
+				if (BuildBmpNode(bitmapHandle, textureName, 0, flags) == 0)
+				{
+					BmpDataNode* bmpDataNode = GetBmpDataNodeByName_T(textureName);
+					textureData->bmpDataNode = bmpDataNode;
+					if (bmpDataNode)
+					{
+						InitBmpNodeSurface(bmpDataNode, d3dDevice);
+						return textureData->textureIndex;
+					}
+				}
+			}
+			NGNLoader::ReleaseTextureData(textureData);
+		}
 		return 0;
 	}
 }
