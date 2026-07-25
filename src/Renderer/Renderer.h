@@ -93,6 +93,8 @@ namespace Renderer
 	void SetVirtualRatioTo54();
 	void DoFrameDelay(int32_t isGameplayFrame);
 	RGBA ApplyGammaCorrection(RGBA color);
+	void ConfigureFog(float start, float end, RGBA color);
+	void SetFogEnable(int32_t enable);
 	int32_t GetIsSoftwareRendering();
 	float BuildGammaCorrectionLUT(float gammaCorrection);
 	void GetBlendShadeCaps(int32_t* capsOut);

@@ -317,6 +317,27 @@ namespace Renderer
 	// FUNCTION: TOY2 0x004B2CE0 [MATCHED]
 	void DisableFog() { g_fogEnabled = 0; }
 
+	// FUNCTION: TOY2 0x004B2CF0
+	void ConfigureFog(float start, float end, RGBA color)
+	{
+		g_fogEnabled = 1;
+		g_fogStart = start;
+		g_fogEnd = end;
+		g_fogColor = ApplyGammaCorrection(color).value;
+	}
+
+	// FUNCTION: TOY2 0x004B2D20
+	void SetFogEnable(int32_t enable)
+	{
+		if (g_fogEnabled)
+		{
+			if (enable)
+				DrawingDevice::SetRenderState(D3DRENDERSTATE_FOGENABLE, 1);
+			else
+				DrawingDevice::SetRenderState(D3DRENDERSTATE_FOGENABLE, 0);
+		}
+	}
+
 	// FUNCTION: TOY2 0x004B6320
 	void SetRenderState(int32_t newStateFlags)
 	{
