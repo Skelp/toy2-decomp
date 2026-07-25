@@ -56,6 +56,18 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x005282C8
 	int32_t g_musicVolumeLevel;
 
+	// GLOBAL: TOY2 0x005282C0
+	HANDLE g_streamCommandEvent;
+
+	// GLOBAL: TOY2 0x005282C4
+	HANDLE g_streamAckEvent;
+
+	// GLOBAL: TOY2 0x005282FC
+	int32_t g_streamActive;
+
+	// GLOBAL: TOY2 0x0053C848
+	int32_t g_streamCommand;
+
 	// GLOBAL: TOY2 0x005282F0
 	void* g_dsPrimaryBuffer;
 
@@ -316,8 +328,17 @@ namespace AudioManager
 		Logger::Log("FlushSoundVoices : End.\n");
 	}
 
-	// STUB: TOY2 0x00436D40
-	int32_t StopAndWait() { return 1; }
+	// FUNCTION: TOY2 0x00436D40 [MATCHED]
+	int32_t StopAndWait()
+	{
+		if (g_dsPrimaryBuffer != NULL && g_streamCommandEvent != NULL)
+		{
+			g_streamCommand = 1;
+			SetEvent(g_streamCommandEvent);
+			WaitForSingleObject(g_streamAckEvent, INFINITE);
+		}
+		return 1;
+	}
 
 	// STUB: TOY2 0x0047EC20
 	void LoadSfxPackForLevel(int32_t levelId) {}
@@ -370,8 +391,8 @@ namespace AudioManager
 		SetSfxVolume(sfxVolume);
 	}
 
-	// STUB: TOY2 0x00413300
-	int32_t IsStreamActive() { return 0; }
+	// FUNCTION: TOY2 0x00413300 [MATCHED]
+	int32_t IsStreamActive() { return g_streamActive; }
 
 	// STUB: TOY2 0x00413150
 	void PlayTrackByIndex(int32_t trackIndex, int32_t fadeMode) {}

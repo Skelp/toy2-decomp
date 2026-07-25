@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common.h"
+#include <windows.h>
 
 namespace AudioManager
 {
@@ -33,4 +34,9 @@ namespace AudioManager
 	extern int32_t g_musicVolumeLevel;
 	extern void* g_dsPrimaryBuffer;
 	extern int16_t g_dsVolTable[151];
+
+	extern HANDLE g_streamCommandEvent;
+	extern HANDLE g_streamAckEvent;
+	extern int32_t g_streamActive;
+	extern int32_t g_streamCommand;
 }
