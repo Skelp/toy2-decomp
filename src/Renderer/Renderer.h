@@ -108,6 +108,8 @@ namespace Renderer
 	void FlushRenderQueues();
 	RGBA ModulateColorByAlpha(RGBA color, int32_t flags);
 	int32_t SetAdditionalRenderFlags(int32_t flags);
+	void SetVertexColorModulation(int32_t red, int32_t green, int32_t blue);
+	int32_t EnableVertexColorModulation(int32_t enable);
 	int32_t Set508718(int32_t value);
 	void SetRenderDistance(float primaryDistance, float secondaryDistance);
 	void RenderPrimitive(Nu3D::Primitive* primitive, const D3DMATRIX* transform, int32_t renderFlags);

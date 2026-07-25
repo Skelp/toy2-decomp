@@ -121,6 +121,22 @@ namespace Renderer
 	// GLOBAL: TOY2 0x009F6000
 	int32_t g_useVertexColorMod;
 
+	// FUNCTION: TOY2 0x004B92E0 [MATCHED]
+	void SetVertexColorModulation(int32_t red, int32_t green, int32_t blue)
+	{
+		g_vertexColorModRed = red;
+		g_vertexColorModGreen = green;
+		g_vertexColorModBlue = blue;
+	}
+
+	// FUNCTION: TOY2 0x004B9300 [MATCHED]
+	int32_t EnableVertexColorModulation(int32_t enable)
+	{
+		int32_t previousValue = g_useVertexColorMod;
+		g_useVertexColorMod = enable;
+		return previousValue;
+	}
+
 	// GLOBAL: TOY2 0x009F5FD8
 	float g_materialHorzOffset;
 
