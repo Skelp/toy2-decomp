@@ -164,6 +164,7 @@ set(TOY2_SOURCES
     # AudioManager
     src/AudioManager/AudioManager.cpp
     src/AudioManager/AudioManager.h
+    src/AudioManager/DsVolTable.inc
 )
 
 # Build the game
