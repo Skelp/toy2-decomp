@@ -45,6 +45,9 @@ namespace Renderer
 		// GLOBAL: TOY2 0x005087D4
 		WORD g_triangleSpriteIndices[4] = { 0, 1, 2, 3 };
 
+		// GLOBAL: TOY2 0x005087DC
+		WORD g_quadSpriteFromVertsIndices[4] = { 0, 1, 2, 3 };
+
 		// FUNCTION: TOY2 0x004B68B0
 		HRESULT Render2DSprite(Nu3D::Sprite* sprite)
 		{
@@ -305,6 +308,62 @@ namespace Renderer
 					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 1, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
 					{
 						SoftwareRenderer::SubmitQuad(sprite->renderFlags, sprite->textureIndex, destBuffer, g_triangleSpriteIndices);
+					}
+				}
+			}
+		}
+
+		// FUNCTION: TOY2 0x004B8160 [MATCHED]
+		void RenderQuadSpriteFromVerts(Nu3D::Sprite* sprite)
+		{
+			LPDIRECT3DVERTEXBUFFER destBuffer = g_FVF_14C_Buffer_1.vertexBuffer;
+			Nu3D::Vertex* lockedData;
+
+			if (DrawingAPI::LockVertexBuffer(g_FVF_152_Buffer.vertexBuffer, 0x801, (LPVOID*)&lockedData, 0) == 0)
+			{
+				lockedData[0].position = sprite->position;
+				lockedData[0].coords.x = sprite->uvBottomLeft.x;
+				lockedData[0].coords.y = sprite->uvBottomLeft.y;
+				lockedData[0].diffuse = sprite->color;
+
+				lockedData[1].position = sprite->triVerts[0];
+				lockedData[1].coords.x = sprite->uvTopLeft.x;
+				lockedData[1].coords.y = sprite->uvTopLeft.y;
+				lockedData[1].diffuse = sprite->color;
+
+				lockedData[2].position = sprite->triVerts[1];
+				lockedData[2].coords.x = sprite->uvBottomRight.x;
+				lockedData[2].coords.y = sprite->uvBottomRight.y;
+				lockedData[2].diffuse = sprite->color;
+
+				lockedData[3].position = sprite->triVerts[2];
+				lockedData[3].coords.x = sprite->uvTopRight.x;
+				lockedData[3].coords.y = sprite->uvTopRight.y;
+				lockedData[3].diffuse = sprite->color;
+
+				DrawingAPI::UnlockVertexBuffer(g_FVF_152_Buffer.vertexBuffer);
+
+				D3DMATRIX matrix;
+				Nu3D::Math::BuildIdentityMatrix(&matrix);
+				DrawingDevice::SetWorldTransform(&matrix);
+
+				SoftwareRenderer::g_unkE4D950 = 2;
+
+				if (g_unk9F5FF0 != 0)
+				{
+					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 1, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
+					{
+						SoftwareRenderer::SubmitQuad(sprite->renderFlags, sprite->textureIndex, destBuffer, g_quadSpriteFromVertsIndices);
+					}
+				}
+				else
+				{
+					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 5, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
+					{
+						Renderer::InitRenderState(sprite->renderFlags);
+						Renderer::BindTexture(sprite->textureIndex);
+						SoftwareRenderer::g_viewportRect = &sprite->viewportRect;
+						DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLESTRIP, destBuffer, g_quadSpriteFromVertsIndices, 4, 8);
 					}
 				}
 			}
@@ -723,6 +782,9 @@ namespace Renderer
 							break;
 						case RENDER_TRIANGLE_SPRITE:
 							RenderTriangleSprite(commandPointer);
+							break;
+						case RENDER_QUAD_SPRITE_FROM_VERTS:
+							RenderQuadSpriteFromVerts(commandPointer);
 							break;
 						default:
 							break;
