@@ -700,6 +700,7 @@
 0x004ACFB0 ModeSelect::SetForceFullscreen
 0x004ACFC0 DrawingDevice::GetChosenDevice
 0x004AD000 DrawingDevice::GetListHead
+0x004AD030 Nu3D::BuildBmpNodeFromSlot
 0x004AD060 Nu3D::BuildBmpNode
 0x004AD090 Nu3D::BuildBmpNodeWithAlpha
 0x004AD0C0 Nu3D::GetBmpDataNodeByName_T
@@ -735,6 +736,7 @@
 0x004B0200 Nu3D::InitialiseTextureSurface
 0x004B0380 Nu3D::FindSuitablePixelFormat
 0x004B0400 Nu3D::CountAlphaBits
+0x004B0440 Nu3D::BuildRawBmpNodeFromSlot
 0x004B0620 Nu3D::BuildRawBmpNode
 0x004B06D0 Nu3D::CalculateTexSize
 0x004B0740 Nu3D::Math::RoundUpToPowerOf2
@@ -909,6 +911,7 @@
 0x004BB0E0 NGNLoader::GetTextureDataByIndex
 0x004BB150 NGNLoader::ReleaseTextureData
 0x004BB1B0 NGNLoader::AllocateTextureData
+0x004BB1F0 Nu3D::CreateTextureResourceFromSlot
 0x004BB270 Nu3D::CreateTextureResource
 0x004BB2F0 NGNLoader::GetTextureDataIndexByName
 0x004BB320 NGNLoader::GetTextureData
