@@ -107,8 +107,13 @@ namespace Logger
 		Log(buffer);
 	}
 
-	// STUB: TOY2 0x004ADFD0
-	void LogD3DError(int32_t errorCode) {}
+	// FUNCTION: TOY2 0x004ADFD0 [MATCHED]
+	void LogD3DError(int32_t errorCode)
+	{
+		char* message = D3DAppErrorToString(errorCode);
+		OutputDebugStringA(message);
+		OutputDebugStringA("\n");
+	}
 
 	// FUNCTION: TOY2 0x00431900 [MATCHED]
 	void LogDDError(const char* message, HRESULT error)
@@ -136,3 +141,6 @@ namespace Logger
 	// STUB: TOY2 0x0040D490;
 	char* ErrorToMessage(HRESULT error) { return "Unimplemented"; }
 }
+
+// STUB: TOY2 0x004ADFF0
+char* D3DAppErrorToString(int32_t error) { return "Unimplemented"; }

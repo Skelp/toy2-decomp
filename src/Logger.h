@@ -3,6 +3,8 @@
 #include "Common.h"
 #include <windows.h>
 
+char* D3DAppErrorToString(int32_t error);
+
 namespace Logger
 {
 	extern int32_t g_showMsgBoxOnThrow;
@@ -18,6 +20,6 @@ namespace Logger
 	void LogLn(char* format, ...);
 	void LogD3DError(int32_t errorCode);
 	void LogDDError(const char* message, HRESULT error);
-	void DebugLog(char *format, ...);
+	void DebugLog(char* format, ...);
 	char* ErrorToMessage(HRESULT error);
 }
