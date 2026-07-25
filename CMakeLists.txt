@@ -147,6 +147,8 @@ set(TOY2_SOURCES
     src/Renderer/RenderType.h
     src/Renderer/Sprite.h
     src/Renderer/Sprite.cpp
+    src/Renderer/Vertices.h
+    src/Renderer/Vertices.cpp
     src/Renderer/Shadows.cpp
     src/Renderer/Shadows.h
     src/Renderer/SpriteSheets.cpp

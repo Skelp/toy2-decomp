@@ -2,6 +2,7 @@
 
 #include "Common.h"
 #include "Renderer/RenderType.h"
+#include "Nu3D/Patch.h"
 #include <directx6/ddraw.h>
 #include <directx6/d3d.h>
 
@@ -72,6 +73,7 @@ namespace Renderer
 	};
 
 	extern float g_gammaCorrection;
+	extern Nu3D::Patch::PatchVertices g_FVF_14C_Buffer_2;
 	extern int32_t g_isSoftwareRendering;
 	extern int32_t g_frameDelta;
 	extern float g_virtualScreenWidth;
