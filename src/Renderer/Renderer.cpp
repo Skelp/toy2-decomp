@@ -1409,6 +1409,74 @@ namespace Renderer
 			Nu3D::g_maxBucketDepth = depth;
 	}
 
+	// FUNCTION: TOY2 0x004B87F0
+	void RenderPatchList(Nu3D::Patch* patch, const D3DMATRIX* matrices, int32_t* flags, int32_t renderFlags)
+	{
+		renderFlags |= g_additionalRenderFlags;
+
+		while (patch != 0)
+		{
+			Nu3D::InstanceData* instanceData =
+				Nu3D::InstanceData::AllocFromNodeMatrices(matrices, patch->controlPointIndices, patch->controlPointCount, flags, renderFlags);
+
+			if (instanceData != 0)
+			{
+				ProcessPatch(instanceData, patch);
+			}
+
+			patch = patch->listNext;
+		}
+	}
+
+	// FUNCTION: TOY2 0x004B8940
+	void ProcessPatch(Nu3D::InstanceData* instanceData, Nu3D::Patch* patch)
+	{
+		Nu3D::Material* material = Nu3D::Material::GetFreeByIndex(patch->materialId);
+		RenderEntry::AllocPatch(material, (Nu3D::Primitive*)patch, instanceData);
+
+		if ((material->metadata & 4) != 0)
+		{
+			RenderEntry::AllocPatch(NGNLoader::g_tex14Materials[0], (Nu3D::Primitive*)patch, instanceData);
+		}
+
+		if ((material->metadata & 0x40) != 0)
+		{
+			RenderEntry::AllocPatch(NGNLoader::g_tex14Materials[1], (Nu3D::Primitive*)patch, instanceData);
+		}
+
+		if ((material->metadata & 0x80) != 0)
+		{
+			RenderEntry::AllocPatch(NGNLoader::g_tex14Materials[2], (Nu3D::Primitive*)patch, instanceData);
+		}
+	}
+
+	// FUNCTION: TOY2 0x004B89B0
+	RenderEntry* RenderEntry::AllocPatch(Nu3D::Material* material, Nu3D::Primitive* primitive, Nu3D::InstanceData* instanceData)
+	{
+		if (g_renderEntryFreeCount)
+		{
+			RenderEntry* entry = &g_renderEntryPool[--g_renderEntryFreeCount];
+			entry->primitive = primitive;
+			entry->instanceData = instanceData;
+			entry->material = material;
+
+			if (instanceData->lodFactor == 1.0f && (material->metadata & 0xE33) == 0)
+			{
+				entry->type = RENDER_TYPE6;
+				entry->next = material->renderEntryHead;
+				material->renderEntryHead = entry;
+				return entry;
+			}
+
+			entry->type = RENDER_TYPE8;
+			InsertIntoBucket(entry);
+			return entry;
+		}
+
+		Logger::DebugLog("rndrentryAllocPatch - out of rndrentries");
+		return 0;
+	}
+
 	// FUNCTION: TOY2 0x004B8400
 	void FlushMaterialBuckets() {}
 

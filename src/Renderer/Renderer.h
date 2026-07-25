@@ -14,6 +14,7 @@ namespace Nu3D
 	struct Material;
 	struct InstanceData;
 	struct VertexTL;
+	struct Patch;
 }
 
 namespace DrawingAPI
@@ -66,6 +67,7 @@ namespace Renderer
 		Nu3D::Material* material;
 
 		static RenderEntry* AllocObj(Nu3D::Material* material, Nu3D::Primitive* primitive, Nu3D::InstanceData* instanceData);
+		static RenderEntry* AllocPatch(Nu3D::Material* material, Nu3D::Primitive* primitive, Nu3D::InstanceData* instanceData);
 		static void InsertIntoBucket(RenderEntry* entry);
 	};
 
@@ -114,6 +116,8 @@ namespace Renderer
 	void SetRenderDistance(float primaryDistance, float secondaryDistance);
 	void RenderPrimitive(Nu3D::Primitive* primitive, const D3DMATRIX* transform, int32_t renderFlags);
 	void ProcessPrimitive(Nu3D::InstanceData* instanceData, Nu3D::Primitive* primitive);
+	void RenderPatchList(Nu3D::Patch* patch, const D3DMATRIX* matrices, int32_t* flags, int32_t renderFlags);
+	void ProcessPatch(Nu3D::InstanceData* instanceData, Nu3D::Patch* patch);
 	void BindTexture(int32_t texIndex);
 	void BindMaterial(Nu3D::Material* material, int32_t force);
 	void UnbindMaterial();
