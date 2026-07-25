@@ -121,6 +121,14 @@ namespace Renderer
 	// GLOBAL: TOY2 0x009F5FF8
 	int32_t g_unk9F5FF8;
 
+	// FUNCTION: TOY2 0x004B9A60 [MATCHED]
+	int32_t Set9F5FF8(int32_t value)
+	{
+		int32_t previousValue = g_unk9F5FF8;
+		g_unk9F5FF8 = value;
+		return previousValue;
+	}
+
 	// GLOBAL: TOY2 0x009F6000
 	int32_t g_useVertexColorMod;
 

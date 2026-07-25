@@ -120,6 +120,7 @@ namespace Renderer
 	void SetVertexColorModulation(int32_t red, int32_t green, int32_t blue);
 	int32_t EnableVertexColorModulation(int32_t enable);
 	int32_t Set508718(int32_t value);
+	int32_t Set9F5FF8(int32_t value);
 	void SetRenderDistance(float primaryDistance, float secondaryDistance);
 	void RenderPrimitive(Nu3D::Primitive* primitive, const D3DMATRIX* transform, int32_t renderFlags);
 	void ProcessPrimitive(Nu3D::InstanceData* instanceData, Nu3D::Primitive* primitive);
