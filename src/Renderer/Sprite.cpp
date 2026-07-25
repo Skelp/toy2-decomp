@@ -223,6 +223,46 @@ namespace Renderer
 			}
 		}
 
+		// FUNCTION: TOY2 0x004B8A30 [MATCHED]
+		void QueueGroundAlignedSprite(Vector3F* position,
+			int32_t trigIndex,
+			float width,
+			float height,
+			Vector2F* uvTopLeft,
+			Vector2F* uvBottomRight,
+			int32_t textureIndex,
+			RGBA color,
+			int32_t flags)
+		{
+			if (g_spriteBuffer3DCount)
+			{
+				RGBA modulatedColor = ModulateColorByAlpha(color, flags);
+
+				Nu3D::Sprite* sprite = &g_spriteBuffer3D[--g_spriteBuffer3DCount];
+				sprite->type = RENDER_GROUND_ALIGNED_SPRITE;
+				sprite->position = *position;
+				sprite->trigIndex = trigIndex;
+				sprite->width = width;
+				sprite->height = height;
+				sprite->uvTopLeft = *uvTopLeft;
+				sprite->uvBottomLeft.x = uvTopLeft->x;
+				sprite->uvBottomLeft.y = uvBottomRight->y;
+				sprite->uvTopRight.x = uvBottomRight->x;
+				sprite->uvTopRight.y = uvTopLeft->y;
+				sprite->uvBottomRight = *uvBottomRight;
+				sprite->textureIndex = textureIndex;
+				modulatedColor = ApplyGammaCorrection(modulatedColor);
+				sprite->color = modulatedColor;
+				sprite->renderFlags = flags;
+				Nu3D::Viewport::GetViewClipRect(&sprite->viewportRect);
+				Nu3D::Sprite::InsertIntoBucket(sprite);
+			}
+			else
+			{
+				Logger::DebugLog("sprite buffer underrun");
+			}
+		}
+
 		// FUNCTION: TOY2 0x004946A0
 		int16_t DrawTiledFixed(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex) { return 0; }
 
