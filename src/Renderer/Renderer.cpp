@@ -1273,6 +1273,39 @@ namespace Nu3D
 		instanceData->sprite = g_instanceSpriteTemplate;
 		return instanceData;
 	}
+
+	// FUNCTION: TOY2 0x004B8840
+	InstanceData* InstanceData::AllocFromNodeMatrices(const D3DMATRIX* matrices, int32_t* nodeIndices, int32_t count, int32_t* flags, int32_t renderFlags)
+	{
+		if (! g_instanceDataFreeCount)
+			return 0;
+
+		--g_instanceDataFreeCount;
+		D3DMATRIX* dest = g_instanceDataPool[g_instanceDataFreeCount].matrices;
+
+		while (count != 0)
+		{
+			if (flags && (flags[*nodeIndices] & 1))
+			{
+				++g_instanceDataFreeCount;
+				return 0;
+			}
+
+			memcpy(dest, &matrices[*nodeIndices], sizeof(D3DMATRIX));
+			dest++;
+			nodeIndices++;
+			count--;
+		}
+
+		g_instanceDataPool[g_instanceDataFreeCount].renderFlags = renderFlags;
+		g_instanceDataPool[g_instanceDataFreeCount].lodFactor = g_lodFactor;
+		g_instanceDataPool[g_instanceDataFreeCount].horzOffset = g_materialHorzOffset;
+		g_instanceDataPool[g_instanceDataFreeCount].vertOffset = g_materialVertOffset;
+		g_instanceDataPool[g_instanceDataFreeCount].renderModeFlags = g_unk9F5FF8 != 0;
+		Nu3D::Viewport::GetViewClipRect(&g_instanceDataPool[g_instanceDataFreeCount].clipRect);
+		g_instanceDataPool[g_instanceDataFreeCount].unkInt6 = g_primitiveRenderFlags;
+		return &g_instanceDataPool[g_instanceDataFreeCount];
+	}
 }
 
 namespace Renderer
