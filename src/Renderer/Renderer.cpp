@@ -1507,6 +1507,13 @@ namespace Renderer
 	// FUNCTION: TOY2 0x004B5CF0
 	void FlushPrimitives() {}
 
+	// FUNCTION: TOY2 0x004B5E20
+	void DrawPrimitive(void* vertices, DWORD vertexCount)
+	{
+		if (vertexCount != 0)
+			DrawingDevice::DrawPrimitive(D3DPT_TRIANGLELIST, D3DFVF_0x1C4, vertices, vertexCount, 0x10);
+	}
+
 	// FUNCTION: TOY2 0x004B6A50
 	void FlushRenderQueues()
 	{
