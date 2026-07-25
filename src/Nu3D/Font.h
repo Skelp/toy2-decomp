@@ -7,6 +7,9 @@
 // Looks like these methods are purely for debug methods that are never called
 namespace Nu3D
 {
+	typedef void (*DrawTextStringFunc)(const char* text);
+	typedef int32_t (*CalculateTextSizeFunc)(const char* text);
+
 	struct GlyphInfo
 	{
 		float uvMinX;
@@ -48,6 +51,10 @@ namespace Nu3D
 		static void SetTextCursor(float x, float y);
 		static void SetRenderFlags(int32_t flags);
 		static void ResetContext();
+		static void DrawTextString(const char* text);
+		static void DrawScaledTextString(const char* text);
+		static int32_t CalculateUnscaledTextSize(const char* text);
+		static int32_t CalculateScaledTextSize(const char* text);
 		static HBITMAP CreateAtlasBmp(int32_t width, int32_t height);
 		static void Destroy(Font* font);
 		static void ClearList();
@@ -73,6 +80,9 @@ namespace Nu3D
 	extern int32_t g_textClipX2;
 	extern int32_t g_textClipY2;
 	extern float g_fontScaleY;
+	extern float g_fontScaleX;
+	extern DrawTextStringFunc g_drawTextStringFunc;
+	extern CalculateTextSizeFunc g_calculateTextSizeFunc;
 	extern float g_scaledFontHeight;
 	extern int32_t g_fontRenderFlags;
 

@@ -16,6 +16,15 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x0050866C
 	float g_fontScaleY = 0.0;
 
+	// GLOBAL: TOY2 0x00508668
+	float g_fontScaleX = 0.0;
+
+	// GLOBAL: TOY2 0x005086DC
+	DrawTextStringFunc g_drawTextStringFunc = Font::DrawTextString;
+
+	// GLOBAL: TOY2 0x005086E0
+	CalculateTextSizeFunc g_calculateTextSizeFunc = Font::CalculateUnscaledTextSize;
+
 	// GLOBAL: TOY2 0x00508670
 	float g_scaledFontHeight = 0.0;
 
@@ -64,8 +73,27 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x00884598
 	int32_t g_fontRenderFlags = 0;
 
-	// STUB: TOY2 0x004B38E0
-	void Font::SetFontScale(float scaleX, float scaleY) {}
+	// FUNCTION: TOY2 0x004B38E0
+	void Font::SetFontScale(float scaleX, float scaleY)
+	{
+		g_fontScaleX = scaleX;
+		g_fontScaleY = scaleY;
+		if (scaleX == 1.0f && scaleY == 1.0f)
+		{
+			g_drawTextStringFunc = DrawTextString;
+			g_calculateTextSizeFunc = CalculateUnscaledTextSize;
+		}
+		else
+		{
+			g_drawTextStringFunc = DrawScaledTextString;
+			g_calculateTextSizeFunc = CalculateScaledTextSize;
+		}
+		if (g_currentFont)
+		{
+			g_scaledFontHeight = (float)g_currentFont->fontHeight * scaleY;
+			g_scaledFontAscent = (float)g_currentFont->fontAscent * scaleY;
+		}
+	}
 
 	// FUNCTION: TOY2 0x004B3AD0
 	int32_t Font::Init()
@@ -285,4 +313,16 @@ namespace Nu3D
 
 	// FUNCTION: TOY2 0x004B38C0 [MATCHED]
 	void Font::SetRenderFlags(int32_t flags) { g_fontRenderFlags = flags ? 0x200 : 0; }
+
+	// STUB: TOY2 0x004B4CD0
+	void Font::DrawTextString(const char* text) {}
+
+	// STUB: TOY2 0x004B45A0
+	void Font::DrawScaledTextString(const char* text) {}
+
+	// STUB: TOY2 0x004B5480
+	int32_t Font::CalculateUnscaledTextSize(const char* text) { return 0; }
+
+	// STUB: TOY2 0x004B53D0
+	int32_t Font::CalculateScaledTextSize(const char* text) { return 0; }
 }
