@@ -22,6 +22,8 @@ namespace Toy2
 
 	void SetBackdropByIndex(int32_t index);
 	void ProcessMiscEventsEx();
+	void RenderGame(int32_t fullRender);
+	int32_t ComputeTokenProgress();
 
 	extern ToyCfg g_toyCfgData;
 	extern int32_t g_levelFileIndex;

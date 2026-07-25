@@ -77,19 +77,19 @@ namespace Nu3D
 		// FUNCTION: TOY2 0x00450C70
 		Matrix3x3I16* EulerToRotationMatrix(const Vector3I16* angles, Matrix3x3I16* output)
 		{
-			int32_t sineX = Numerics::g_fixedTrigLUT[angles->x & 0xFFF];
+			int32_t sineX = Numerics::g_sinCosLUT[angles->x & 0xFFF];
 			sineX += (sineX >> 31) & 3;
-			int32_t cosineX = Numerics::g_fixedTrigLUT[(angles->x + 0x400) & 0xFFF];
+			int32_t cosineX = Numerics::g_sinCosLUT[(angles->x + 0x400) & 0xFFF];
 			cosineX = ShiftFixedTowardZero(cosineX, 2);
 
-			int32_t sineY = Numerics::g_fixedTrigLUT[angles->y & 0xFFF];
+			int32_t sineY = Numerics::g_sinCosLUT[angles->y & 0xFFF];
 			sineY = ShiftFixedTowardZero(sineY, 2);
-			int32_t cosineY = Numerics::g_fixedTrigLUT[(angles->y + 0x400) & 0xFFF];
+			int32_t cosineY = Numerics::g_sinCosLUT[(angles->y + 0x400) & 0xFFF];
 			cosineY += (cosineY >> 31) & 3;
 
-			int32_t sineZ = Numerics::g_fixedTrigLUT[angles->z & 0xFFF];
+			int32_t sineZ = Numerics::g_sinCosLUT[angles->z & 0xFFF];
 			sineZ += (sineZ >> 31) & 3;
-			int32_t cosineZ = Numerics::g_fixedTrigLUT[(angles->z + 0x400) & 0xFFF];
+			int32_t cosineZ = Numerics::g_sinCosLUT[(angles->z + 0x400) & 0xFFF];
 			cosineZ = ShiftFixedTowardZero(cosineZ, 2);
 
 			cosineY >>= 2;

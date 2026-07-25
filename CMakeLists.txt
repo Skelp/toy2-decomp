@@ -41,6 +41,7 @@ set(CMAKE_SHARED_LINKER_FLAGS_MINSIZEREL "/incremental:no")
 
 # Toy2 Sources
 set(TOY2_SOURCES
+    src/SinCosLUT.inc
     src/LibraryMSVC.h
 
     src/Logger.cpp
@@ -105,6 +106,8 @@ set(TOY2_SOURCES
     src/Toy2/MainMenu.h
     src/Toy2/Animation.h
     src/Toy2/Animation.cpp
+    src/Toy2/Weather.cpp
+    src/Toy2/Weather.h
 
     # Nu3D
     src/Nu3D/Creature.h

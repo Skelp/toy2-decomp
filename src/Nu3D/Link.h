@@ -52,6 +52,7 @@ namespace Nu3D
 		void GetTargetPosFixed(int32_t linkId, Vector3I* output);
 		void SnapToOtherLinkUsingScale(int32_t linkId, int32_t targetLinkId);
 		void CopyShapeId(int32_t destinationLinkId, int32_t sourceLinkId);
+		void FollowWaypointPath(int32_t linkId, int32_t pathTableIdx, int32_t* progress);
 
 		STATIC_ASSERT(sizeof(DynamicScaler) == 0x94);
 		STATIC_ASSERT(sizeof(Linker) == 0x74);
@@ -66,12 +67,10 @@ namespace Nu3D
 			int32_t scalerType;
 		};
 
-		int32_t ComputeCellFromXZ(CellLocation* output, float x, float z, int32_t scalerType,
-			NGNLoader::NGNImage* image);
+		int32_t ComputeCellFromXZ(CellLocation* output, float x, float z, int32_t scalerType, NGNLoader::NGNImage* image);
 		Link::DynamicScaler** GetCellByPos(const CellLocation* location, NGNLoader::NGNImage* image);
 		void UnlinkScalerThenReinsert(Link::DynamicScaler* scaler, NGNLoader::NGNImage* image);
-		void InsertScalerAtComputedCell(Link::DynamicScaler* scaler, int32_t scalerType,
-			NGNLoader::NGNImage* image);
+		void InsertScalerAtComputedCell(Link::DynamicScaler* scaler, int32_t scalerType, NGNLoader::NGNImage* image);
 
 		STATIC_ASSERT(sizeof(CellLocation) == 0xC);
 	}
