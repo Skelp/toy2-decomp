@@ -10,6 +10,9 @@ namespace DrawingDevice
 	// GLOBAL: TOY2 0x00884008
 	CD3DFramework* g_drawingDevice;
 
+	// GLOBAL: TOY2 0x00884010
+	D3DMATRIX* g_currentWorldTransform;
+
 	// GLOBAL: TOY2 0x00884014
 	D3DMATRIX* g_currentViewTransform;
 
@@ -578,8 +581,12 @@ namespace DrawingDevice
 	// FUNCTION: TOY2 0x004ABAE0 [MATCHED]
 	LPDIRECT3DVIEWPORT3 GetViewport() { return g_drawingDevice->m_pvViewport; }
 
-	// STUB: TOY2 0x004ABFD0
-	void SetWorldTransform(D3DMATRIX* transform) {}
+	// FUNCTION: TOY2 0x004ABFD0 [MATCHED]
+	HRESULT SetWorldTransform(D3DMATRIX* transform)
+	{
+		g_currentWorldTransform = transform;
+		return g_drawingDevice->m_pd3dDevice->SetTransform(D3DTRANSFORMSTATE_WORLD, transform);
+	}
 
 	// FUNCTION: TOY2 0x004ABFF0 [MATCHED]
 	HRESULT SetViewTransform(D3DMATRIX* transform)
