@@ -1,242 +1,263 @@
 #!/usr/bin/env python3
-"""Synchronize exact Toy Story 2 reconstruction metadata into Ghidra."""
+"""Ghidra synchronization and map consistency for Toy Story 2.
+
+The Ghidra sync is driven by upstream reccmp's headless importer
+(`reccmp-ghidra-import`), which imports every matched function, global,
+vftable, and PDB type into the local Ghidra project in a single transaction.
+This wrapper resolves the project's Ghidra project location from the `ghidra`
+CLI configuration, stops the interactive Ghidra bridge so the local project can
+be opened exclusively, runs the importer, then restarts the bridge.
+
+`check` validates `functions_map.txt` structurally: sorted ascending, free of
+duplicate addresses, every entry named, and every address inside the retail
+executable's `.text` section. It does not depend on Ghidra or a current build.
+"""
 
 from __future__ import annotations
 
-import argparse
-import json
 import os
+import struct
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from types import SimpleNamespace
+from typing import Optional
 
-sys.path.insert(0, str(Path(__file__).parent))
+ROOT = Path(__file__).resolve().parents[1]
+MAP_PATH = ROOT / "tools" / "Resources" / "functions_map.txt"
+EXE_PATH = ROOT / "original" / "toy2.exe"
+BUILD_DIR = ROOT / "build"
 
-from ghidra_sync.ghidra_client import ensure_bridge_running, get_all_functions
-from ghidra_sync.manifest import ROOT, SyncManifest, build_manifest
-from ghidra_sync.map_check import run_check as run_map_check
-
-
-MANIFEST_PATH = ROOT / "build" / "ghidra-sync-manifest.json"
-
-
-def _eligible(manifest: SyncManifest) -> list[Any]:
-    return [record for record in manifest.functions if record.reason is None]
+# Matches the address/name format produced by decomp_utils.parse_functions_map.
+_MAP_LINE_RE = __import__("re").compile(r"^(?:0x)?([0-9A-Fa-f]{6,8})(?:\s+(.+))?$")
 
 
-def _ghidra_by_address() -> dict[str, Any]:
-    return {function.address.lower(): function for function in get_all_functions()}
+# --------------------------------------------------------------------------- #
+# sync: reccmp-ghidra-import orchestration
+# --------------------------------------------------------------------------- #
 
-
-def _record_status(record: Any, current: dict[str, Any]) -> tuple[str, str]:
-    if record.reason is not None:
-        return "SKIP", record.reason
-    ghidra_function = current.get(record.address.lower())
-    if ghidra_function is None:
-        return "CREATE", "create a function at this exact-matched entry point"
-    expected_name = record.name.rsplit("::", 1)[-1]
-    if ghidra_function.name != expected_name:
-        return "UPDATE", f"rename {ghidra_function.name} -> {record.name}"
-    return "READY", "exact PDB signature/types and source maps are eligible"
-
-
-def _render(manifest: SyncManifest, *, json_output: bool = False) -> tuple[str, bool]:
-    if not ensure_bridge_running():
-        raise RuntimeError("could not start the Ghidra CLI bridge")
-    current = _ghidra_by_address()
-    rows = []
-    drift = False
-    for record in manifest.functions:
-        status, detail = _record_status(record, current)
-        drift |= status in {"CREATE", "UPDATE", "CONFLICT"}
-        rows.append(
-            {
-                "address": record.address,
-                "name": record.name,
-                "status": status,
-                "detail": detail,
-                "match": record.matching,
-                "effective": record.effective,
-                "signature_available": record.signature_available,
-                "source_ranges": len(record.source_ranges),
-            }
-        )
-    if json_output:
-        return json.dumps({"version": manifest.version, "functions": rows}, indent=2), drift
-
-    lines = [
-        "",
-        "GHIDRA EXACT-SYNC DIFF",
-        f"{'Address':<12} {'Status':<10} {'Name':<42} Detail",
-        "-" * 100,
-    ]
-    for row in rows:
-        lines.append(
-            f"{row['address']:<12} {row['status']:<10} {row['name']:<42} {row['detail']}"
-        )
-    counts = {
-        status: sum(row["status"] == status for row in rows)
-        for status in ("READY", "CREATE", "UPDATE", "CONFLICT", "SKIP")
-    }
-    lines.append("-" * 100)
-    lines.append("  ".join(f"{key}: {value}" for key, value in counts.items()))
-    return "\n".join(lines), drift
-
-
-def _config_value(name: str) -> str:
+def _ghidra_config(name: str) -> str:
     result = subprocess.run(
-        ["ghidra", "config", "get", name], capture_output=True, text=True, check=False
+        ["ghidra", "config", "get", name],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if result.returncode != 0 or not result.stdout.strip():
-        raise RuntimeError(f"could not read Ghidra configuration key {name}")
+        raise RuntimeError(
+            f"could not read Ghidra configuration key {name!r}; "
+            "run `ghidra config set` first"
+        )
     return result.stdout.strip()
 
 
-def _run_headless(manifest: SyncManifest, *, verify_only: bool = False) -> int:
-    manifest.write(MANIFEST_PATH)
-    install_dir = _config_value("ghidra_install_dir")
-    project_dir = _config_value("ghidra_project_dir")
-    project = _config_value("default_project")
-    program = _config_value("default_program")
+def _bridge_running() -> bool:
+    return subprocess.run(
+        ["ghidra", "status"], capture_output=True, text=True, check=False
+    ).returncode == 0
 
-    status = subprocess.run(["ghidra", "status"], capture_output=True, text=True, check=False)
-    bridge_was_running = status.returncode == 0
+
+def _build_is_current() -> None:
+    """Fail closed if Ninja would rebuild the comparison executable/PDB."""
+    required = (
+        BUILD_DIR / "toy2.exe",
+        BUILD_DIR / "toy2.pdb",
+        BUILD_DIR / "reccmp-build.yml",
+    )
+    missing = [str(p.relative_to(ROOT)) for p in required if not p.is_file()]
+    if missing:
+        raise RuntimeError(
+            f"missing build artifacts: {', '.join(missing)}; run tools/decomp build"
+        )
+    result = subprocess.run(
+        ["ninja", "-C", str(BUILD_DIR), "-n", "toy2decomp"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    output = (result.stdout + result.stderr).strip()
+    if result.returncode != 0:
+        raise RuntimeError(f"could not validate build freshness: {output}")
+    if "no work to do" not in output.lower():
+        raise RuntimeError("comparison artifacts are stale; run tools/decomp build")
+
+
+def cmd_sync(args: SimpleNamespace) -> int:
+    # `--help` (or `-h`) is forwarded to reccmp-ghidra-import without touching
+    # the build or the Ghidra bridge, so introspection stays cheap and safe.
+    if any(token in args.remainder for token in ("-h", "--help")):
+        importer = Path(sys.executable).parent / "reccmp-ghidra-import"
+        return subprocess.call([str(importer), "--help"], cwd=BUILD_DIR)
+
+    _build_is_current()
+
+    install_dir = _ghidra_config("ghidra_install_dir")
+    project_dir = _ghidra_config("ghidra_project_dir")
+    project = _ghidra_config("default_project")
+    program = _ghidra_config("default_program")
+    # reccmp expects the program path inside the Ghidra project with a leading slash.
+    file_path = program if program.startswith("/") else f"/{program}"
+
+    # A local Ghidra project can only be opened by one process at a time. Stop
+    # the interactive `ghidra` CLI bridge if it is running so the headless
+    # importer can acquire the project, then restart it afterwards.
+    bridge_was_running = _bridge_running()
     if bridge_was_running:
         stopped = subprocess.run(["ghidra", "stop"], check=False)
         if stopped.returncode != 0:
-            raise RuntimeError("could not stop the Ghidra bridge before transactional import")
+            raise RuntimeError(
+                "could not stop the Ghidra bridge before the headless import"
+            )
 
-    environment = os.environ.copy()
-    environment["GHIDRA_INSTALL_DIR"] = install_dir
+    env = os.environ.copy()
+    env["GHIDRA_INSTALL_DIR"] = install_dir
+    # Resolve the importer from the same venv as this interpreter so PATH does
+    # not matter (tools/decomp sources the venv, but be explicit and robust).
+    importer = Path(sys.executable).parent / "reccmp-ghidra-import"
     command = [
-        sys.executable,
-        str(ROOT / "tools" / "ghidra_sync" / "headless_apply.py"),
-        "--manifest",
-        str(MANIFEST_PATH),
-        "--root",
-        str(ROOT),
-        "--project-dir",
-        project_dir,
-        "--project",
+        str(importer),
+        "--target",
+        "TOY2",
+        "--local-project-name",
         project,
-        "--program",
-        program,
+        "--local-project-dir",
+        project_dir,
+        "--file",
+        file_path,
+        *args.remainder,
     ]
-    if verify_only:
-        command.append("--verify-only")
     try:
-        result = subprocess.run(command, cwd=ROOT, env=environment, check=False)
-        return result.returncode
+        return subprocess.call(command, cwd=BUILD_DIR, env=env)
     finally:
         if bridge_was_running:
             subprocess.run(["ghidra", "start"], check=False)
 
 
-def _build(args: argparse.Namespace, *, require_target: bool = False) -> SyncManifest:
-    targets = getattr(args, "target", None)
-    if require_target and not targets and not getattr(args, "all", False):
-        raise RuntimeError("select --target ADDR... or --all")
-    type_scope = getattr(args, "type_scope", "exact")
-    manifest = build_manifest(targets, type_scope=type_scope)
-    manifest.write(MANIFEST_PATH)
-    return manifest
+# --------------------------------------------------------------------------- #
+# check: functions_map.txt structural validation
+# --------------------------------------------------------------------------- #
+
+def _parse_map(path: Path = MAP_PATH) -> list[tuple[int, str, str]]:
+    """Return [(address_int, canonical_address, name)] in file order."""
+    if not path.is_file():
+        raise RuntimeError(f"functions map not found: {path}")
+    entries: list[tuple[int, str, str]] = []
+    for lineno, raw in enumerate(
+        path.read_text(encoding="utf-8", errors="ignore").splitlines(), 1
+    ):
+        line = raw.strip()
+        if not line:
+            continue
+        match = _MAP_LINE_RE.match(line)
+        if not match:
+            raise RuntimeError(f"{path}:{lineno}: unparseable line: {raw!r}")
+        value = int(match.group(1), 16)
+        name = (match.group(2) or "").strip()
+        entries.append((value, f"0x{value:08x}", name))
+    return entries
 
 
-def cmd_diff(args: argparse.Namespace) -> int:
-    manifest = _build(args)
-    output, _ = _render(manifest, json_output=args.json)
-    print(output)
+def _code_section_ranges(path: Path = EXE_PATH) -> list[tuple[int, int]]:
+    """Return [(start, end)] RVA ranges of executable sections from the PE."""
+    data = path.read_bytes()
+    e_lfanew = struct.unpack_from("<I", data, 0x3C)[0]
+    if data[e_lfanew : e_lfanew + 4] != b"PE\0\0":
+        raise RuntimeError(f"{path}: not a valid PE image")
+    image_base = struct.unpack_from("<I", data, e_lfanew + 24 + 28)[0]
+    num_sections = struct.unpack_from("<H", data, e_lfanew + 6)[0]
+    opt_header_size = struct.unpack_from("<H", data, e_lfanew + 20)[0]
+    table = e_lfanew + 24 + opt_header_size
+    ranges: list[tuple[int, int]] = []
+    for i in range(num_sections):
+        offset = table + i * 40
+        name = data[offset : offset + 8].rstrip(b"\0")
+        if name != b".text":
+            continue
+        virtual_size = struct.unpack_from("<I", data, offset + 8)[0]
+        virtual_address = struct.unpack_from("<I", data, offset + 12)[0]
+        start = image_base + virtual_address
+        ranges.append((start, start + virtual_size))
+    if not ranges:
+        raise RuntimeError(f"{path}: no .text section found")
+    return ranges
+
+
+def _check_structure(entries: list[tuple[int, str, str]]) -> list[str]:
+    problems: list[str] = []
+    try:
+        ranges = _code_section_ranges()
+    except (OSError, RuntimeError) as error:
+        ranges = None
+        print(f"warning: could not read code section: {error}", file=sys.stderr)
+
+    seen: dict[int, str] = {}
+    prev: Optional[int] = None
+    for value, addr, name in entries:
+        if not name:
+            problems.append(f"  {addr}  has no name")
+        if value in seen:
+            problems.append(f"  {addr}  duplicate of {seen[value]}")
+        else:
+            seen[value] = addr
+        if prev is not None and value < prev:
+            problems.append(f"  {addr}  out of order (follows 0x{prev:08X})")
+        prev = value
+        if ranges is not None and not any(lo <= value < hi for lo, hi in ranges):
+            problems.append(f"  {addr}  outside the .text section")
+    return problems
+
+
+def cmd_check(args: SimpleNamespace) -> int:
+    entries = _parse_map()
+    structure = _check_structure(entries)
+    print(f"\n== structure (sorted / deduplicated / named / in .text): "
+          f"{len(structure)} problem(s)")
+    for line in structure:
+        print(line)
+    print("\n" + "=" * 60)
+    if structure:
+        print(f"{len(structure)} consistency problem(s) found.")
+        print("Ensure addresses fall within .text and keep the list sorted and "
+              "deduplicated.")
+        return 1
+    print("functions_map.txt structure is consistent.")
     return 0
 
 
-def cmd_verify(args: argparse.Namespace) -> int:
-    manifest = _build(args)
-    output, _ = _render(manifest, json_output=args.json)
-    print(output)
-    if not _eligible(manifest):
-        print("No eligible exact functions.", file=sys.stderr)
-        return 1
-    return _run_headless(manifest, verify_only=True)
-
-
-def cmd_apply(args: argparse.Namespace) -> int:
-    manifest = _build(args, require_target=True)
-    output, _ = _render(manifest, json_output=args.json)
-    print(output)
-    rejected = [record for record in manifest.functions if record.reason is not None]
-    if args.target and rejected:
-        print("Refusing requested non-exact target(s).", file=sys.stderr)
-        return 1
-    if not _eligible(manifest):
-        print("No eligible exact functions.", file=sys.stderr)
-        return 1
-    if not args.apply:
-        print("\nDry run. Add --apply to commit one transactional Ghidra update.")
-        return 0
-    return _run_headless(manifest)
-
-
-def _add_selection(parser: argparse.ArgumentParser, *, required: bool = False) -> None:
-    group = parser.add_mutually_exclusive_group(required=required)
-    group.add_argument("--target", nargs="+", metavar="ADDRESS")
-    group.add_argument("--all", action="store_true", help="consider every exact function")
-
-
-def cmd_check(args: argparse.Namespace) -> int:
-    targets = set(args.target) if args.target else None
-    return run_map_check(targets)
-
+# --------------------------------------------------------------------------- #
+# CLI
+# --------------------------------------------------------------------------- #
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    argv = sys.argv[1:]
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__)
+        print("\nUsage: tools/ghidra_sync.py <command> [args]")
+        print("  sync [reccmp-ghidra-import args]  import into Ghidra via reccmp")
+        print("  check                            validate functions_map.txt structure")
+        return 0 if not argv else 0
 
-    check_parser = subparsers.add_parser(
-        "check", help="verify functions_map.txt against source and Ghidra"
-    )
-    _add_selection(check_parser)
-    check_parser.set_defaults(handler=cmd_check)
+    command, remainder = argv[0], argv[1:]
 
-    diff_parser = subparsers.add_parser("diff", help="compare exact source/PDB state with Ghidra")
-    _add_selection(diff_parser)
-    diff_parser.add_argument("--json", action="store_true")
-    diff_parser.set_defaults(handler=cmd_diff)
+    if command == "sync":
+        args = SimpleNamespace(remainder=remainder)
+        try:
+            return cmd_sync(args)
+        except (RuntimeError, ValueError) as error:
+            print(f"Error: {error}", file=sys.stderr)
+            return 1
 
-    apply_parser = subparsers.add_parser("apply", help="apply source/PDB state; dry-run by default")
-    _add_selection(apply_parser, required=True)
-    apply_parser.add_argument("--apply", action="store_true", help="commit the transaction")
-    apply_parser.add_argument("--json", action="store_true")
-    apply_parser.add_argument(
-        "--type-scope", choices=("exact", "all"), default="exact"
-    )
-    apply_parser.set_defaults(handler=cmd_apply)
+    if command == "check":
+        try:
+            return cmd_check(SimpleNamespace())
+        except (RuntimeError, ValueError) as error:
+            print(f"Error: {error}", file=sys.stderr)
+            return 1
 
-    verify_parser = subparsers.add_parser(
-        "verify", help="fail if exact signatures, datatypes, or source maps drift"
-    )
-    _add_selection(verify_parser)
-    verify_parser.add_argument("--json", action="store_true")
-    verify_parser.set_defaults(handler=cmd_verify)
-
-    # Backwards-compatible single-address spellings.
-    for name in ("pull", "reconcile"):
-        alias = subparsers.add_parser(
-            name, help="compatibility alias for apply --target"
-        )
-        alias.add_argument("address")
-        alias.add_argument("--apply", action="store_true")
-        alias.add_argument("--json", action="store_true")
-        alias.set_defaults(handler=cmd_apply, type_scope="exact", all=False)
-
-    args = parser.parse_args()
-    if args.command in {"pull", "reconcile"}:
-        args.target = [args.address]
-    try:
-        return args.handler(args)
-    except (RuntimeError, ValueError) as error:
-        print(f"Error: {error}", file=sys.stderr)
-        return 1
+    print(f"Unknown command: {command}", file=sys.stderr)
+    print("Commands: sync, check", file=sys.stderr)
+    return 2
 
 
 if __name__ == "__main__":

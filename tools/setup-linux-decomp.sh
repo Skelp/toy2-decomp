@@ -97,7 +97,39 @@ fi
 if [[ ! -x "$TOOLING/venv/bin/python" ]]; then
     python3.11 -m venv "$TOOLING/venv"
 fi
-"$TOOLING/venv/bin/python" -m pip install reccmp==0.1.6 colorama==0.4.6
+RECCMP_SUBMODULE="$ROOT/external/submodules/reccmp"
+if [[ ! -d "$RECCMP_SUBMODULE/.git" ]]; then
+    git submodule update --init --recursive "$RECCMP_SUBMODULE"
+elif [[ "$(git -C "$RECCMP_SUBMODULE" rev-parse HEAD)" != "21416ad1938f5c372a578ef7da5175e99695ed07" ]]; then
+    echo "Unexpected reccmp submodule revision in $RECCMP_SUBMODULE" >&2
+    echo "Remove that directory and rerun setup, or run:" >&2
+    echo "  git submodule update --init --recursive external/submodules/reccmp" >&2
+    exit 1
+fi
+
+# Install reccmp from the pinned submodule in editable mode so the local
+# patches below (parser + union write) take effect. The submodule is pinned to
+# upstream master (commit 21416ad1), which carries the evolved Ghidra importer
+# used by `tools/decomp sync`.
+"$TOOLING/venv/bin/python" -m pip install -e "$RECCMP_SUBMODULE" colorama==0.4.6
+
+# Apply local reccmp patches against the submodule worktree.
+# 1. WANT_CURLY parser fix: the state silently gets stuck on one-line function
+#    bodies (e.g. "{ return foo(); }"). Still required on upstream master.
+# 2. Union datatype write support: upstream only dereferences existing unions
+#    and aborts otherwise; this project needs unions created by the importer.
+apply_reccmp_patch() {
+    local patch_file="$1"
+    local name
+    name="$(basename "$patch_file" .patch)"
+    if patch --dry-run -p1 -d "$RECCMP_SUBMODULE" < "$patch_file" >/dev/null 2>&1; then
+        patch -p1 -d "$RECCMP_SUBMODULE" < "$patch_file"
+    else
+        echo "reccmp patch '$name' already applied or does not fit — skipping." >&2
+    fi
+}
+apply_reccmp_patch "$ROOT/tools/patches/reccmp-0.1.6-want-curly-fix.patch"
+apply_reccmp_patch "$ROOT/tools/patches/reccmp-union-write.patch"
 
 # Recover the SDK bundle previously used by this project. The DirectDraw and
 # Direct3D 3 interfaces used by the game are ABI-compatible with these headers.

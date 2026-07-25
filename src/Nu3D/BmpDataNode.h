@@ -70,6 +70,7 @@ namespace Nu3D
 	int32_t CopyToDDSurface(BmpDataNode* bmpDataNode, LPDIRECTDRAWSURFACE4 ddSurface);
 	int32_t ReleaseBmpDataNode_T(BmpDataNode* bmpDataNode);
 	void FreeAllBmpDataNodes_T();
+	int32_t CreateTextureResource(HBITMAP bitmapHandle, const char* textureName, int32_t flags);
 
 	STATIC_ASSERT(sizeof(BmpDataNode) == 0x110);
 }

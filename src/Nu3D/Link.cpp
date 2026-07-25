@@ -7,9 +7,8 @@ namespace Nu3D
 {
 	namespace Spatial
 	{
-		// FUNCTION: TOY2 0x004C30D0
-		int32_t ComputeCellFromXZ(CellLocation* output, float x, float z, int32_t scalerType,
-			NGNLoader::NGNImage* image)
+		// FUNCTION: TOY2 0x004C30D0 [MATCHED]
+		int32_t ComputeCellFromXZ(CellLocation* output, float x, float z, int32_t scalerType, NGNLoader::NGNImage* image)
 		{
 			int32_t cellX = (int32_t)((x - image->worldMinX) / image->cellWidthInWorldUnits);
 			int32_t cellZ = (int32_t)((z - image->worldMinZ) / image->cellHeightInWorldUnits);
@@ -23,20 +22,18 @@ namespace Nu3D
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x004C3130
+		// FUNCTION: TOY2 0x004C3130 [MATCHED]
 		Link::DynamicScaler** GetCellByPos(const CellLocation* location, NGNLoader::NGNImage* image)
 		{
-			if (location->x < 0 || location->x >= image->gridWidth
-				|| location->z < 0 || location->z >= image->gridHeight)
+			if (location->x < 0 || location->x >= image->gridWidth || location->z < 0 || location->z >= image->gridHeight)
 			{
 				return 0;
 			}
 
-			return &image->spacialGrid[location->scalerType]
-				[location->z * image->gridWidth + location->x];
+			return &image->spacialGrid[location->scalerType][location->z * image->gridWidth + location->x];
 		}
 
-		// FUNCTION: TOY2 0x004C3170
+		// FUNCTION: TOY2 0x004C3170 [MATCHED]
 		void UnlinkScalerThenReinsert(Link::DynamicScaler* scaler, NGNLoader::NGNImage* image)
 		{
 			if (scaler->cellHead)
@@ -55,9 +52,8 @@ namespace Nu3D
 			InsertScalerAtComputedCell(scaler, scaler->gscaleType, image);
 		}
 
-		// FUNCTION: TOY2 0x004C31C0
-		void InsertScalerAtComputedCell(Link::DynamicScaler* scaler, int32_t scalerType,
-			NGNLoader::NGNImage* image)
+		// FUNCTION: TOY2 0x004C31C0 [MATCHED]
+		void InsertScalerAtComputedCell(Link::DynamicScaler* scaler, int32_t scalerType, NGNLoader::NGNImage* image)
 		{
 			Vector3F center;
 			Math::VertexAdd(&center, &scaler->translation, &scaler->boundsCenterWorld);
@@ -83,16 +79,16 @@ namespace Nu3D
 
 	namespace Link
 	{
-		// FUNCTION: TOY2 0x004CCB20
+		// FUNCTION: TOY2 0x004CCB20 [MATCHED]
 		void SetScaleFromFixedOffsets(int32_t linkId, int32_t x, int32_t y, int32_t z)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
-			if (!image || !image->links || linkId >= image->maxLinkId)
+			if (! image || ! image->links || linkId >= image->maxLinkId)
 				return;
 
 			Linker* link = &image->links[linkId];
 			DynamicScaler* scaler = link->dynamicScaler;
-			if (!scaler)
+			if (! scaler)
 				return;
 
 			if (x == 0 && y == 0 && z == 0)
@@ -128,15 +124,15 @@ namespace Nu3D
 			Spatial::UnlinkScalerThenReinsert(scaler, NGNLoader::g_ngnImage);
 		}
 
-		// FUNCTION: TOY2 0x004CCC70
+		// FUNCTION: TOY2 0x004CCC70 [MATCHED]
 		void SetRotationRelative8bit(int32_t linkId, int32_t x, int32_t y, int32_t z)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
-			if (!image || !image->links || linkId >= image->maxLinkId)
+			if (! image || ! image->links || linkId >= image->maxLinkId)
 				return;
 
 			Linker* link = &image->links[linkId];
-			if (!link->dynamicScaler)
+			if (! link->dynamicScaler)
 				return;
 
 			link->currentRot.x = link->dynamicScaler->rotation.x + (x << 4);
@@ -145,15 +141,15 @@ namespace Nu3D
 			RebuildMatrixAndCommit(link);
 		}
 
-		// FUNCTION: TOY2 0x004CCCE0
+		// FUNCTION: TOY2 0x004CCCE0 [MATCHED]
 		void SetRotationAbsolute8bit(int32_t linkId, int32_t x, int32_t y, int32_t z)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
-			if (!image || !image->links || linkId >= image->maxLinkId)
+			if (! image || ! image->links || linkId >= image->maxLinkId)
 				return;
 
 			Linker* link = &image->links[linkId];
-			if (!link->dynamicScaler)
+			if (! link->dynamicScaler)
 				return;
 
 			link->currentRot.x = x << 4;
@@ -162,15 +158,15 @@ namespace Nu3D
 			RebuildMatrixAndCommit(link);
 		}
 
-		// FUNCTION: TOY2 0x004CCD40
+		// FUNCTION: TOY2 0x004CCD40 [MATCHED]
 		void GetRotation8Bit(int32_t linkId, Vector3I* output)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
-			if (!image || !image->links || linkId >= image->maxLinkId)
+			if (! image || ! image->links || linkId >= image->maxLinkId)
 				return;
 
 			Linker* link = &image->links[linkId];
-			if (!link->dynamicScaler)
+			if (! link->dynamicScaler)
 				return;
 
 			output->x = link->currentRot.x >> 4;
@@ -182,11 +178,11 @@ namespace Nu3D
 		void TransformVectorInt3x3(int32_t linkId, Vector3I* vector)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
-			if (!image || !image->links || linkId >= image->maxLinkId)
+			if (! image || ! image->links || linkId >= image->maxLinkId)
 				return;
 
 			Linker* link = &image->links[linkId];
-			if (!link->dynamicScaler)
+			if (! link->dynamicScaler)
 				return;
 
 			Vector3F input;
@@ -205,12 +201,12 @@ namespace Nu3D
 		void SetPositionRawAndCommit(int32_t linkId, int32_t x, int32_t y, int32_t z)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
-			if (!image || !image->links || linkId >= image->maxLinkId)
+			if (! image || ! image->links || linkId >= image->maxLinkId)
 				return;
 
 			Linker* link = &image->links[linkId];
 			DynamicScaler* scaler = link->dynamicScaler;
-			if (!scaler)
+			if (! scaler)
 				return;
 
 			if (scaler->gscaleType)
@@ -230,15 +226,15 @@ namespace Nu3D
 			Spatial::UnlinkScalerThenReinsert(scaler, image);
 		}
 
-		// FUNCTION: TOY2 0x004CCEF0
+		// FUNCTION: TOY2 0x004CCEF0 [MATCHED]
 		void GetCurrentPosFixed(int32_t linkId, Vector3I* output)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
-			if (!image || !image->links || linkId >= image->maxLinkId)
+			if (! image || ! image->links || linkId >= image->maxLinkId)
 				return;
 
 			Linker* link = &image->links[linkId];
-			if (!link->dynamicScaler)
+			if (! link->dynamicScaler)
 				return;
 
 			int32_t shift = link->dynamicScaler->gscaleType ? 3 : 5;
@@ -247,15 +243,15 @@ namespace Nu3D
 			output->z = (int32_t)link->currentPos.z << shift;
 		}
 
-		// FUNCTION: TOY2 0x004CCF70
+		// FUNCTION: TOY2 0x004CCF70 [MATCHED]
 		void GetTargetPosFixed(int32_t linkId, Vector3I* output)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
-			if (!image || !image->links || linkId >= image->maxLinkId)
+			if (! image || ! image->links || linkId >= image->maxLinkId)
 				return;
 
 			Linker* link = &image->links[linkId];
-			if (!link->dynamicScaler)
+			if (! link->dynamicScaler)
 				return;
 
 			int32_t shift = link->dynamicScaler->gscaleType ? 3 : 5;
@@ -268,20 +264,17 @@ namespace Nu3D
 		void SnapToOtherLinkUsingScale(int32_t linkId, int32_t targetLinkId)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
-			if (!image || !image->links || linkId >= image->maxLinkId || targetLinkId >= image->maxLinkId)
+			if (! image || ! image->links || linkId >= image->maxLinkId || targetLinkId >= image->maxLinkId)
 				return;
 
 			Linker* link = &image->links[linkId];
 			Linker* target = &image->links[targetLinkId];
-			if (!target->dynamicScaler || !link->dynamicScaler)
+			if (! target->dynamicScaler || ! link->dynamicScaler)
 				return;
 
-			link->currentPos.x = (link->currentPos.x - target->currentPos.x) * target->currentScale.x
-				+ target->currentPos.x;
-			link->currentPos.y = (link->currentPos.y - target->currentPos.y) * target->currentScale.y
-				+ target->currentPos.y;
-			link->currentPos.z = (link->currentPos.z - target->currentPos.z) * target->currentScale.z
-				+ target->currentPos.z;
+			link->currentPos.x = (link->currentPos.x - target->currentPos.x) * target->currentScale.x + target->currentPos.x;
+			link->currentPos.y = (link->currentPos.y - target->currentPos.y) * target->currentScale.y + target->currentPos.y;
+			link->currentPos.z = (link->currentPos.z - target->currentPos.z) * target->currentScale.z + target->currentPos.z;
 
 			DynamicScaler* scaler = link->dynamicScaler;
 			scaler->translation = link->currentPos;
@@ -291,18 +284,19 @@ namespace Nu3D
 			Spatial::UnlinkScalerThenReinsert(scaler, image);
 		}
 
-		// FUNCTION: TOY2 0x004CD0C0
+		// FUNCTION: TOY2 0x004CD0C0 [MATCHED]
 		void CopyShapeId(int32_t destinationLinkId, int32_t sourceLinkId)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
-			if (!image || !image->links || destinationLinkId >= image->maxLinkId
-				|| sourceLinkId >= image->maxLinkId)
+			if (! image || ! image->links || destinationLinkId >= image->maxLinkId || sourceLinkId >= image->maxLinkId)
 			{
 				return;
 			}
 
-			image->links[destinationLinkId].dynamicScaler->shapeId
-				= image->links[sourceLinkId].dynamicScaler->shapeId;
+			image->links[destinationLinkId].dynamicScaler->shapeId = image->links[sourceLinkId].dynamicScaler->shapeId;
 		}
+
+		// FUNCTION: TOY2 0x00438910
+		void FollowWaypointPath(int32_t linkId, int32_t pathTableIdx, int32_t* progress) {}
 	}
 }

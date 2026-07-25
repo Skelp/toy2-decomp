@@ -19,7 +19,7 @@ namespace FileUtils
 	// GLOBAL: TOY2 0x00882E34
 	char g_fileNameBuffer[260];
 
-	// FUNCTION: TOY2 0x004A67D0
+	// FUNCTION: TOY2 0x004A67D0 [MATCHED]
 	int32_t GetFileSize(const char* fileName)
 	{
 		if (! g_registryKeysRead)
@@ -48,7 +48,7 @@ namespace FileUtils
 		}
 	}
 
-	// FUNCTION: TOY2 0x004A65E0
+	// FUNCTION: TOY2 0x004A65E0 [MATCHED]
 	void AppendCDPath(char* path)
 	{
 		if (! g_registryKeysRead)
@@ -57,7 +57,7 @@ namespace FileUtils
 		strcpy(path, g_cdPathRegValue);
 	}
 
-	// FUNCTION: TOY2 0x004A6790
+	// FUNCTION: TOY2 0x004A6790 [MATCHED]
 	void AppendRegPathToBuffer()
 	{
 		if (! g_registryKeysRead)
@@ -66,7 +66,7 @@ namespace FileUtils
 		strcpy(g_fileNameBuffer, g_pathRegValue);
 	}
 
-	// FUNCTION: TOY2 0x004A65A0
+	// FUNCTION: TOY2 0x004A65A0 [MATCHED]
 	void GetPathValue(char* pathOut)
 	{
 		if (! g_registryKeysRead)

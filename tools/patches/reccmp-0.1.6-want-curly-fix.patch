@@ -1,0 +1,55 @@
+reccmp 0.1.6: Fix WANT_CURLY parser state to handle one-line function bodies
+
+When a function signature is on its own line and the body is a one-liner on
+the next line (e.g. "{ return foo(); }"), the parser's WANT_CURLY state only
+checked for a line that was exactly "{". Any other content was silently
+ignored, causing the parser to get permanently stuck in WANT_CURLY and
+silently reject every subsequent function annotation in the file.
+
+This fix:
+- Handles one-line bodies: "{ ... }" -> function done
+- Handles opening brace with first statement: "{ foo();" -> IN_FUNC
+- Adds a warning (UNHANDLED_CURLY_LINE) for truly unexpected lines so the
+  parser never silently gets stuck again
+
+Patch generated against reccmp 0.1.6 from PyPI.
+Apply from the venv site-packages directory (see tools/setup-linux-decomp.sh
+and tools/setup-windows-decomp.ps1 for automated application).
+
+--- a/reccmp/parser/error.py
++++ b/reccmp/parser/error.py
+@@ -57,6 +57,11 @@
+     # WARN: The alias does not point to a valid marker type and has no effect.
+     ALIAS_GOES_NOWHERE = 114
+ 
++    # WARN: We expected an opening curly brace for a function body but found
++    # something else on the line. This usually means a one-line function body
++    # or a syntax error that the parser cannot recover from.
++    UNHANDLED_CURLY_LINE = 115
++
+     # This code or higher is an error, not a warning
+     DECOMP_ERROR_START = 200
+ 
+--- a/reccmp/parser/parser.py
++++ b/reccmp/parser/parser.py
+@@ -550,6 +550,20 @@
+             if line_strip == "{":
+                 self.curly_indent_stops = line.index("{")
+                 self.state = ReaderState.IN_FUNC
++            elif line_strip.startswith("{") and (
++                line_strip.endswith("}") or line_strip.endswith("};")
++            ):
++                # One-line function body on its own line
++                # (e.g. "{ return foo(); }")
++                self._function_done()
++            elif line_strip.startswith("{"):
++                # Opening brace on same line as first statement
++                self.curly_indent_stops = line.index("{")
++                self.state = ReaderState.IN_FUNC
++            else:
++                # Expected an opening curly brace but found something else.
++                # Warn so the parser does not silently get stuck.
++                self._syntax_warning(AlertCode.UNHANDLED_CURLY_LINE)
+ 
+         elif self.state == ReaderState.IN_FUNC:
+             if line_strip.startswith("}") and line[self.curly_indent_stops] == "}":

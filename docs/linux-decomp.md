@@ -92,25 +92,26 @@ can filter by namespace. It measures coverage, not machine-code accuracy:
 tools/decomp progress Nu3D
 ```
 
-### Exact metadata sync to Ghidra
+### Ghidra sync
 
-`sync` builds a fresh reccmp/PDB manifest and accepts only raw 100% function
-matches. Effective matches and stubs are reported but never applied. Preview a
-function, apply selected functions, or audit already-synced metadata with:
+`sync` drives upstream reccmp's headless Ghidra importer
+(`reccmp-ghidra-import`) to import every matched function, global, vftable,
+and PDB type into the local Ghidra project in a single transaction. reccmp is
+vendored as a pinned submodule at `external/submodules/reccmp` (editable
+install) with local patches in `tools/patches/` for the `WANT_CURLY` parser
+state and union-datatype writing.
 
 ```sh
-tools/decomp sync diff --target 0x004a1bb0
-tools/decomp sync apply --target 0x004a1bb0 --apply
-tools/decomp sync verify --target 0x004a1bb0
+tools/decomp sync          # import all matched entities into Ghidra
+tools/decomp sync --debug   # forward extra arguments to reccmp-ghidra-import
 ```
 
-`apply --all` handles every eligible exact function. Datatypes referenced by
-the selected functions are imported recursively from the VC6 PDB; use
-`--type-scope all` to import all project PDB aggregates. Apply is dry-run by
-default and commits function metadata, datatypes, and source maps in one Ghidra
-transaction. The CLI bridge is stopped for the headless transaction and
-restarted afterward. The Ghidra project must contain the configured retail
-executable and its SHA-256 must match `reccmp-project.yml`.
+The Ghidra project location is read from the `ghidra` CLI configuration. The
+interactive `ghidra` CLI bridge is stopped for the headless transaction and
+restarted afterwards. The Ghidra project must contain the configured retail
+executable and its SHA-256 must match `reccmp-project.yml`. reccmp imports all
+matched functions (not only exact matches); a small number of upstream
+limitations (e.g. variadic functions) are reported as non-fatal failures.
 
 Function bodies remain the retail instructions in Ghidra. Exact instruction
 pairs are associated with their PDB source lines through Ghidra source maps,

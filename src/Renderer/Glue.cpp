@@ -30,7 +30,7 @@ namespace Renderer
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x004CE340
+		// FUNCTION: TOY2 0x004CE340 [MATCHED]
 		void ReleaseBackdrop()
 		{
 			if (g_sysMemBackdrop)

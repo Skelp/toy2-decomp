@@ -96,6 +96,12 @@ namespace Toy2
 	// GLOBAL: TOY2 0x00830D58
 	int32_t g_saveLoaded;
 
+	// GLOBAL: TOY2 0x00503840
+	int16_t g_levelTokenTarget[16];
+
+	// GLOBAL: TOY2 0x00503AD4
+	char g_pathBinName[16] = "PAD\\PATH00.BIN";
+
 	// GLOBAL: TOY2 0x0052AD8A
 	int16_t g_levelIndex;
 
@@ -111,8 +117,20 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0052B818
 	int16_t g_isPaused;
 
+	// GLOBAL: TOY2 0x0052B820
+	int16_t g_demoInputBuffer[2048];
+
 	// GLOBAL: TOY2 0x00529E48
 	int16_t g_pauseMenuBlinkTimer;
+
+	// GLOBAL: TOY2 0x0052F0D7
+	uint8_t g_levelTokenBits[16];
+
+	// GLOBAL: TOY2 0x0052F0E7
+	uint8_t g_movieUnlocked[19];
+
+	// GLOBAL: TOY2 0x0052F2D8
+	int16_t g_unlocks;
 
 	// GLOBAL: TOY2 0x0052F2DC
 	int16_t g_levelTransitionTimer;
@@ -146,13 +164,20 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x00534550
 	int32_t g_unused0;
+
+	// GLOBAL: TOY2 0x00731F18
+	int32_t g_saveMenuState;
+
+	int32_t TickSaveMenuMachine(int32_t param);
+	int32_t MovieViewerTick(int32_t movieIdx);
+	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId);
 }
 
 namespace Toy2
 {
 	namespace Graphics
 	{
-		// FUNCTION: TOY2 0x004CDD90
+		// FUNCTION: TOY2 0x004CDD90 [MATCHED]
 		int32_t AddDetailLevel()
 		{
 			int32_t detail = g_toyCfgData.detail + 1;
@@ -165,7 +190,7 @@ namespace Toy2
 			return detail;
 		}
 
-		// FUNCTION: TOY2 0x004CDDB0
+		// FUNCTION: TOY2 0x004CDDB0 [MATCHED]
 		int32_t RemoveDetailLevel()
 		{
 			int32_t detail = (g_toyCfgData.detail - 1) <= 0 ? 0 : g_toyCfgData.detail - 1;
@@ -190,28 +215,91 @@ namespace Toy2
 		void Tick() {}
 	}
 
+	namespace PostGameSaveMenu
+	{
+		// STUB: TOY2 0x0043A130
+		int32_t Tick() { return 0; }
+	}
+
 	namespace GameOver
 	{
 		// STUB: TOY2 0x00437B20
 		void Tick() {}
 	}
 
-	// STUB: TOY2 0x00454020
-	void ShowPostGameSaveMenu() {}
+	// STUB: TOY2 0x00440F70
+	void RenderGame(int32_t fullRender) {}
+
+	// FUNCTION: TOY2 0x00454020 [MATCHED]
+	void ShowPostGameSaveMenu()
+	{
+		int32_t prevLevelFileIdx = g_levelFileIndex;
+
+		g_levelFileIndex = 16;
+
+		if (g_saveMenuState)
+		{
+			Levels::g_levelLoadConfig = 0xf8;
+			g_hasStaticBackdrop = 0;
+			Renderer::g_virtualScreenWidth = 512.0;
+			Renderer::g_virtualScreenHeight = 256.0;
+			g_nextBackdropId = 36;
+			Levels::InitLevelPlay(16);
+
+			int32_t result = PostGameSaveMenu::Tick();
+			g_saveMenuState = result;
+
+			if (result)
+			{
+				g_saveMenuState = 1;
+				SaveManager::TransferProgressData(&SaveManager::g_save0Data);
+				TickSaveMenuMachine(1);
+				SaveManager::LoadProgressData(&SaveManager::g_save0Data);
+				g_saveMenuState = 0;
+			}
+		}
+
+		g_levelFileIndex = prevLevelFileIdx;
+	}
 
 	// STUB: TOY2 0x00453D90
 	void ShowActClearScreen() {}
 
-	// STUB: TOY2 0x0049EB50
-	int32_t ComputeTokenProgress() { return 1; }
+	// FUNCTION: TOY2 0x0049EB50
+	int32_t ComputeTokenProgress()
+	{
+		int32_t collected = 0;
+		int32_t levelCount = 0;
+		for (int32_t i = 0; i < 15; i++)
+		{
+			int32_t bits = g_levelTokenBits[g_levelFileConversion[i]];
+			if (! bits)
+				break;
+			for (int32_t j = 0; j < 5; j++)
+			{
+				if (bits & 1)
+					collected++;
+				bits >>= 1;
+			}
+			levelCount++;
+		}
+		return (g_levelTokenTarget[levelCount] + collected * 0x100) * 0x100 + levelCount;
+	}
 
 	// STUB: TOY2 0x00414720
 	int32_t EnterLevel(int32_t levelIndex) { return 0; }
 
-	// STUB: TOY2 0x004A3770
-	void LoadPathBin() {}
+	// FUNCTION: TOY2 0x004A3770 [MATCHED]
+	void LoadPathBin()
+	{
+		int32_t levelFile = g_levelFileIndex;
+		int32_t tens = levelFile / 10;
+		g_pathBinName[8] = (char)(tens + '0');
+		g_pathBinName[9] = (char)(levelFile - tens * 10 + '0');
+		FileUtils::LoadFile(g_pathBinName, g_demoInputBuffer);
+	}
 
-	// FUNCTION: TOY2 0x00453CF0
+	// FUNCTION: TOY2 0x00453CF0 [MATCHED]
 	int32_t ShowLevelSelect()
 	{
 		int32_t prevLevelFileIdx = Toy2::g_levelFileIndex;
@@ -242,14 +330,72 @@ namespace Toy2
 		return newState;
 	}
 
-	// STUB: TOY2 0x00453FA0
-	void ShowMovieViewer() {}
+	// STUB: TOY2 0x0043A600
+	int32_t MovieViewerTick(int32_t movieIdx) { return -1; }
 
-	// STUB: TOY2 0x00453F20
-	int32_t ShowSaveScreen() { return 0; }
+	// FUNCTION: TOY2 0x00453FA0 [MATCHED]
+	void ShowMovieViewer()
+	{
+		int32_t prevLevelFileIdx = g_levelFileIndex;
 
-	// STUB: TOY2 0x0049EB20
-	void UnlockAndPlayMovie(int32_t movieId, int32_t backgroundId, int32_t forcePlay) {}
+		g_levelFileIndex = 16;
+
+		int32_t movieIdx = 0;
+		while (true)
+		{
+			Levels::g_levelLoadConfig = 0xb8;
+			Renderer::g_virtualScreenWidth = 320.0;
+			Renderer::g_virtualScreenHeight = 256.0;
+			Levels::InitLevelPlay(g_levelFileIndex);
+
+			MainMenu::g_menuClearColor.b = 0;
+			MainMenu::g_menuClearColor.g = 0;
+			MainMenu::g_menuClearColor.r = 0;
+			movieIdx = MovieViewerTick(movieIdx);
+
+			if (movieIdx < 0)
+				break;
+
+			PlayMovieWithTransition(movieIdx + 10, 0);
+		}
+
+		g_levelFileIndex = prevLevelFileIdx;
+	}
+
+	// STUB: TOY2 0x0049B9E0
+	int32_t TickSaveMenuMachine(int32_t param) { return 0; }
+
+	// FUNCTION: TOY2 0x00453F20 [MATCHED]
+	int32_t ShowSaveScreen()
+	{
+		int32_t prevLevelFileIdx = g_levelFileIndex;
+
+		g_levelFileIndex = 16;
+		Levels::g_levelLoadConfig = 0xf8;
+		g_hasStaticBackdrop = 0;
+		Renderer::g_virtualScreenWidth = 512.0;
+		Renderer::g_virtualScreenHeight = 256.0;
+		g_nextBackdropId = 36;
+		Levels::InitLevelPlay(16);
+
+		g_saveMenuState = 0;
+		SaveManager::TransferProgressData(&SaveManager::g_save0Data);
+		int32_t result = TickSaveMenuMachine(0);
+		SaveManager::LoadProgressData(&SaveManager::g_save0Data);
+
+		g_levelFileIndex = prevLevelFileIdx;
+		return result;
+	}
+
+	// FUNCTION: TOY2 0x0049EB20
+	void UnlockAndPlayMovie(int32_t movieId, int32_t backgroundId, int32_t forcePlay)
+	{
+		if (! g_movieUnlocked[movieId] || forcePlay)
+		{
+			g_movieUnlocked[movieId] = 1;
+			PlayMovieWithTransition(movieId + 10, backgroundId);
+		}
+	}
 
 	// STUB: TOY2 0x0049AB90
 	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId) { return 1; }
@@ -489,7 +635,7 @@ namespace Toy2
 	// STUB: TOY2 0x00490730
 	void CheckForQuit() {}
 
-	// FUNCTION: TOY2 0x004CE760
+	// FUNCTION: TOY2 0x004CE760 [MATCHED]
 	void InitCfg()
 	{
 		memset(&g_toyCfgData, 0, sizeof(g_toyCfgData));
@@ -500,7 +646,7 @@ namespace Toy2
 		g_toyCfgData.gammaCorrection = 2.0;
 	}
 
-	// FUNCTION: TOY2 0x004CE810
+	// FUNCTION: TOY2 0x004CE810 [MATCHED]
 	int32_t ReadCfg()
 	{
 		InitCfg();
@@ -1020,11 +1166,19 @@ namespace Toy2
 		return 0;
 	}
 
-	// STUB: TOY2 0x00412E80
-	int32_t CleanupManagers() { return 0; }
+	// FUNCTION: TOY2 0x00412E80
+	int32_t CleanupManagers()
+	{
+		InputManager::Cleanup();
+		AudioManager::StopAndFlush();
+		AudioManager::ReleaseBuffers();
+		Renderer::Cleanup();
+		DrawingDevice::Quit();
+		return 1;
+	}
 
-	// STUB: TOY2 0x0047D7C0
-	void UpdateAudioChannels() {}
+	// FUNCTION: TOY2 0x0047D7C0 [MATCHED]
+	void UpdateAudioChannels() { AudioManager::UpdateChannels(); }
 
 	// STUB: TOY2 0x00490BF0
 	int16_t UpdateD3DState() { return 0; }

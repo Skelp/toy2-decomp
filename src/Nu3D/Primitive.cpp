@@ -9,7 +9,7 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x0088447C
 	Primitive* g_primListHead;
 
-	// FUNCTION: TOY2 0x004B2E30
+	// FUNCTION: TOY2 0x004B2E30 [MATCHED]
 	void Primitive::DestroyHeader(Header* primHeader)
 	{
 		if (primHeader->indices)
@@ -21,7 +21,7 @@ namespace Nu3D
 		primHeader->indices = 0;
 	}
 
-	// FUNCTION: TOY2 0x004B2E60
+	// FUNCTION: TOY2 0x004B2E60 [MATCHED]
 	int32_t Primitive::InitHeader(Header* primHeader, int32_t drawType, int32_t indexCount)
 	{
 		primHeader->indices = (uint16_t*)malloc(sizeof(uint16_t) * indexCount);
@@ -36,7 +36,7 @@ namespace Nu3D
 		return indices && triMeta;
 	}
 
-	// FUNCTION: TOY2 0x004B3110
+	// FUNCTION: TOY2 0x004B3110 [MATCHED]
 	void Primitive::Destroy(Primitive* primitive)
 	{
 		if (primitive->listNext)
@@ -53,7 +53,7 @@ namespace Nu3D
 		Remove(primitive);
 	}
 
-	// FUNCTION: TOY2 0x004B3190
+	// FUNCTION: TOY2 0x004B3190 [MATCHED]
 	void Primitive::Remove(Primitive* primitive)
 	{
 		if (primitive->next)
@@ -67,7 +67,7 @@ namespace Nu3D
 		free(primitive);
 	}
 
-	// FUNCTION: TOY2 0x004B3280
+	// FUNCTION: TOY2 0x004B3280 [MATCHED]
 	Primitive* Primitive::Alloc()
 	{
 		Primitive* next;
@@ -91,7 +91,7 @@ namespace Nu3D
 		return prim;
 	}
 
-	// FUNCTION: TOY2 0x004B3240
+	// FUNCTION: TOY2 0x004B3240 [MATCHED]
 	Primitive::Header* Primitive::BuildHeader(int32_t headerCount)
 	{
 		Primitive::Header* headerList = (Primitive::Header*)malloc(sizeof(Primitive::Header) * headerCount);
@@ -102,7 +102,7 @@ namespace Nu3D
 		return headerList;
 	}
 
-	// FUNCTION: TOY2 0x004B31D0
+	// FUNCTION: TOY2 0x004B31D0 [MATCHED]
 	Primitive* Primitive::Build(int32_t verticesSize, int32_t headerCount)
 	{
 		Primitive* prim = Primitive::Alloc();
@@ -120,14 +120,14 @@ namespace Nu3D
 		return prim;
 	}
 
-	// FUNCTION: TOY2 0x004B32C0
+	// FUNCTION: TOY2 0x004B32C0 [MATCHED]
 	void Primitive::ReleaseAllVertexBuffers(Primitive* primitive)
 	{
 		for (; primitive; primitive = primitive->listNext)
 			Patch::PatchVertices::ReleaseBuffer(&primitive->patchVerts);
 	}
 
-	// FUNCTION: TOY2 0x004B32E0
+	// FUNCTION: TOY2 0x004B32E0 [MATCHED]
 	int32_t Primitive::CreateAllVertexBuffers(Primitive* primitive, int32_t flags)
 	{
 		int32_t allCreated = 1;
@@ -138,7 +138,7 @@ namespace Nu3D
 		return allCreated;
 	}
 
-	// FUNCTION: TOY2 0x004B3320
+	// FUNCTION: TOY2 0x004B3320 [MATCHED]
 	int32_t Primitive::UpdateAllVertexBuffers(Primitive* primitive)
 	{
 		int32_t allUpdated = 1;

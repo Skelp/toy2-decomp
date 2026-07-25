@@ -1,6 +1,7 @@
 #include "InputManager.h"
 #include "Toy2/D3DApp.h"
 #include "SaveManager.h"
+#include "Nu3D/Nu3D.h"
 
 #include <DINPUT.H>
 
@@ -53,6 +54,9 @@ namespace InputManager
 
 	// GLOBAL: TOY2 0x005298D0
 	LPDIRECTINPUTDEVICE2A g_directInputDevices[4];
+
+	// GLOBAL: TOY2 0x00529CB4
+	LPDIRECTINPUTDEVICE2A g_dInputDeviceCleanupList[4];
 
 	// GLOBAL: TOY2 0x005297D0
 	GUID g_dInputGuids[16];
@@ -243,24 +247,12 @@ namespace InputManager
 	uint8_t IsKeyPressed(int32_t inputCode)
 	{
 		uint8_t currentState = g_inputStates[inputCode];
-		uint8_t updated = ~currentState;
-		uint8_t result = g_previousInputStates[inputCode] & currentState;
+		uint8_t previousState = g_previousInputStates[inputCode];
+		uint8_t result = currentState & previousState;
 
-		g_previousInputStates[inputCode] = updated;
+		g_previousInputStates[inputCode] = ~currentState;
 
 		return result;
-	}
-
-	// FUNCTION: TOY2 0x0047D520
-	void MemSetUtil(void* buffer, uint32_t value, int32_t count)
-	{
-		__asm
-		{
-			mov     edi, buffer
-			mov     ecx, value
-			mov     eax, count
-			rep     stosd
-		}
 	}
 
 	// FUNCTION: TOY2 0x00414AF0
@@ -279,7 +271,7 @@ namespace InputManager
 
 		if (g_directInputSuccess)
 		{
-			MemSetUtil(g_inputStates, 64, 0);
+			Nu3D::MemSet32Util(g_inputStates, 64, 0);
 
 			g_directInputDevice->Acquire();
 			g_directInputDevice->GetDeviceState(256, g_inputStates);
@@ -459,11 +451,33 @@ namespace InputManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x00452180
+	// FUNCTION: TOY2 0x00452180 [MATCHED]
 	void UpdateButtonStates()
 	{
 		g_prevButtonsPressed = g_curButtonsPressed;
 		UpdateInputState();
 		g_curButtonsPressed = g_buttonsPressed;
+	}
+
+	// FUNCTION: TOY2 0x00415460
+	void Cleanup()
+	{
+		if (g_directInput)
+		{
+			if (g_directInputDevice)
+			{
+				g_directInputDevice->Unacquire();
+				g_directInputDevice->Release();
+			}
+			for (int32_t i = 0; i < 4; i++)
+			{
+				if (g_dInputDeviceCleanupList[i])
+				{
+					g_dInputDeviceCleanupList[i]->Unacquire();
+					g_dInputDeviceCleanupList[i]->Release();
+				}
+			}
+			g_directInput->Release();
+		}
 	}
 }

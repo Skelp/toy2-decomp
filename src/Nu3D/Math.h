@@ -56,6 +56,7 @@ namespace Nu3D
 		void TransformVectorByMatrix(Vector3F* result, Vector3F* sourceVector, D3DMATRIX* matrix);
 		void VertexAdd(Vector3F* result, Vector3F* v1, Vector3F* v2);
 		void CalculatePlaneFromTriangle(Vector3F* point1, Vector3F* point2, Vector3F* point3, Plane* plane);
+		void VertexAdd(Vector3F* result, Vector3F* v1, Vector3F* v2);
 		void VertexSubtract(Vector3F* result, Vector3F* v1, Vector3F* v2);
 		void ScaleVector(Vector3F* result, Vector3F* vector, float scale);
 		void VertexCrossProduct(Vector3F* result, Vector3F* v1, Vector3F* v2);

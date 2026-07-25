@@ -68,7 +68,7 @@ namespace NGNLoader
 		// GLOBAL: TOY2 0x00AAD8B4
 		int32_t g_groupMetadata[60000];
 
-		// FUNCTION: TOY2 0x004CC430
+		// FUNCTION: TOY2 0x004CC430 [MATCHED]
 		int32_t ExtractShapeName(FILE* stream)
 		{
 			fread(&g_curShapeNameLen, sizeof(uint8_t), 1, stream);
@@ -831,7 +831,7 @@ namespace NGNLoader
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x004CB270
+		// FUNCTION: TOY2 0x004CB270 [MATCHED]
 		void PrepareGlobals()
 		{
 			g_curVertexCount = 0;

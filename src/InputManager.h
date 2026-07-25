@@ -22,6 +22,7 @@ namespace InputManager
 	void Init();
 	uint8_t IsKeyPressed(int32_t inputCode);
 	void UpdateButtonStates();
+	void Cleanup();
 
 	STATIC_ASSERT(sizeof(InputMapping) == 0x8);
 }

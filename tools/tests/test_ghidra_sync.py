@@ -1,126 +1,92 @@
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
 
 
 TOOLS = Path(__file__).resolve().parents[1]
 if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
 
-from ghidra_sync.manifest import (
-    FunctionRecord,
-    _instruction_pairs,
-    _source_ranges,
-    canonical_address,
+spec = importlib.util.spec_from_file_location(
+    "toy2_ghidra_sync_cli", TOOLS / "ghidra_sync.py"
 )
-from ghidra_sync.headless_apply import _partition_owned_maps
+assert spec is not None and spec.loader is not None
+cli = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(cli)
 
 
-class _Lines:
-    def __init__(self, values):
-        self.values = values
-
-    def find_line_of_recomp_address(self, address):
-        return self.values.get(address)
-
-
-class ManifestTests(unittest.TestCase):
-    def test_canonical_address(self):
-        self.assertEqual(canonical_address("0x4a1bb0"), "0x004a1bb0")
-        self.assertEqual(canonical_address(0x401000), "0x00401000")
-
-    def test_instruction_pairs_only_uses_equal_blocks(self):
-        raw = SimpleNamespace(
-            codes=[("equal", 0, 2, 0, 2), ("replace", 2, 3, 2, 3)],
-            orig_inst=[("0x401000", "a"), ("0x401002", "b"), ("0x401004", "c")],
-            recomp_inst=[("0x501000", "a"), ("0x501002", "b"), ("0x501004", "x")],
-        )
-        diff = SimpleNamespace(result=SimpleNamespace(diff=raw))
-        self.assertEqual(
-            _instruction_pairs(diff), [(0x401000, 0x501000), (0x401002, 0x501002)]
-        )
-
-    def test_source_ranges_propagate_and_coalesce_pdb_lines(self):
+class ParseMapTests(unittest.TestCase):
+    def test_parse_map_handles_hex_and_decimal_addresses(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            source = root / "src" / "Example.cpp"
-            source.parent.mkdir()
-            source.write_text("one\ntwo\n", encoding="utf-8")
-            raw = SimpleNamespace(
-                codes=[("equal", 0, 3, 0, 3)],
-                orig_inst=[
-                    ("0x401000", "a"),
-                    ("0x401002", "b"),
-                    ("0x401004", "c"),
-                ],
-                recomp_inst=[
-                    ("0x501000", "a"),
-                    ("0x501002", "b"),
-                    ("0x501004", "c"),
-                ],
+            path = Path(directory) / "map.txt"
+            path.write_text(
+                "0x00401000 First\n"
+                "00402000 Second\n"
+                "  0x403000  Third  \n"
+                "\n"
+                "0x00404000\n",
+                encoding="utf-8",
             )
-            diff = SimpleNamespace(result=SimpleNamespace(diff=raw))
-            compare = SimpleNamespace(
-                _lines_db=_Lines(
-                    {
-                        0x501000: (source, 10),
-                        0x501004: (source, 11),
-                    }
-                )
-            )
-            ranges = _source_ranges(compare, diff, 0x401006, root)
-            self.assertEqual(
-                [(item.address, item.length, item.line) for item in ranges],
-                [("0x00401000", 4, 10), ("0x00401004", 2, 11)],
-            )
-            self.assertEqual(ranges[0].path, "/toy2-decomp/src/Example.cpp")
-            self.assertEqual(
-                ranges[0].sha256, hashlib.sha256(source.read_bytes()).hexdigest()
-            )
-
-
-class CliStatusTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        spec = importlib.util.spec_from_file_location(
-            "toy2_ghidra_sync_cli", TOOLS / "ghidra_sync.py"
+            entries = cli._parse_map(path)
+        self.assertEqual(
+            [(addr, name) for _value, addr, name in entries],
+            [
+                ("0x00401000", "First"),
+                ("0x00402000", "Second"),
+                ("0x00403000", "Third"),
+                ("0x00404000", ""),
+            ],
         )
-        assert spec is not None and spec.loader is not None
-        cls.cli = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(cls.cli)
 
-    def test_non_exact_record_is_always_skipped(self):
-        record = FunctionRecord(
-            address="0x00401000",
-            recomp_address="0x00501000",
-            name="Example",
-            source="Example.cpp",
-            annotation_line=1,
-            size=1,
-            matching=0.95,
-            exact=False,
-            effective=True,
-            stub=False,
-            signature_available=True,
-            reason="effective match is not exact",
+    def test_parse_map_rejects_unparseable_line(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "map.txt"
+            path.write_text("not-an-address\n", encoding="utf-8")
+            with self.assertRaises(RuntimeError):
+                cli._parse_map(path)
+
+
+class StructureTests(unittest.TestCase):
+    def setUp(self):
+        # Isolate structure checks from the host's retail executable.
+        self._real_ranges = cli._code_section_ranges
+        cli._code_section_ranges = lambda: [(0x00401000, 0x00500000)]
+
+    def tearDown(self):
+        cli._code_section_ranges = self._real_ranges
+
+    def _entries(self, *pairs):
+        return [(value, f"0x{value:08x}", name) for value, name in pairs]
+
+    def test_clean_map_has_no_problems(self):
+        self.assertEqual(
+            cli._check_structure(self._entries((0x00401000, "a"), (0x00402000, "b"))),
+            [],
         )
-        status, _ = self.cli._record_status(record, {})
-        self.assertEqual(status, "SKIP")
 
-    def test_targeted_source_map_ownership_preserves_other_functions(self):
-        owned = [
-            {"function": "0x00401000", "address": "0x00401000"},
-            {"function": "0x00402000", "address": "0x00402000"},
-        ]
-        removed, retained = _partition_owned_maps(owned, {"0x00401000"})
-        self.assertEqual(removed, owned[:1])
-        self.assertEqual(retained, owned[1:])
+    def test_unsorted_entries_are_flagged(self):
+        problems = cli._check_structure(
+            self._entries((0x00402000, "b"), (0x00401000, "a"))
+        )
+        self.assertTrue(any("out of order" in p for p in problems))
+
+    def test_duplicate_addresses_are_flagged(self):
+        problems = cli._check_structure(
+            self._entries((0x00401000, "a"), (0x00401000, "b"))
+        )
+        self.assertTrue(any("duplicate" in p for p in problems))
+
+    def test_missing_name_is_flagged(self):
+        problems = cli._check_structure(self._entries((0x00401000, "")))
+        self.assertTrue(any("has no name" in p for p in problems))
+
+    def test_address_outside_text_is_flagged(self):
+        problems = cli._check_structure(self._entries((0x00600000, "far")))
+        self.assertTrue(any("outside the .text section" in p for p in problems))
 
 
 if __name__ == "__main__":

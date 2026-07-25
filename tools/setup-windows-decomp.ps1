@@ -108,8 +108,40 @@ if (-not (Test-Path $VenvPython)) {
     & $PythonLauncher @PythonPrefix -m venv $Venv
     Assert-LastExit "Creating Python environment"
 }
-& $VenvPython -m pip install reccmp==0.1.6 colorama==0.4.6
+$ReccmpSubmodule = Join-Path $Root "external\submodules\reccmp"
+if (-not (Test-Path (Join-Path $ReccmpSubmodule ".git"))) {
+    & git submodule update --init --recursive $ReccmpSubmodule
+    Assert-LastExit "Initializing reccmp submodule"
+}
+
+# Install reccmp from the pinned submodule in editable mode so the local
+# patches below (parser + union write) take effect. The submodule is pinned to
+# upstream master (commit 21416ad1), which carries the evolved Ghidra importer
+# used by `tools/decomp sync`.
+& $VenvPython -m pip install -e $ReccmpSubmodule colorama==0.4.6
 Assert-LastExit "Installing reccmp"
+
+# Apply local reccmp patches against the submodule worktree.
+# 1. WANT_CURLY parser fix: the state silently gets stuck on one-line function
+#    bodies (e.g. "{ return foo(); }"). Still required on upstream master.
+# 2. Union datatype write support: upstream only dereferences existing unions
+#    and aborts otherwise; this project needs unions created by the importer.
+function Apply-ReccmpPatch([string] $PatchFile) {
+    Push-Location $ReccmpSubmodule
+    try {
+        & git apply --check -p1 $PatchFile 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            & git apply -p1 $PatchFile
+            Write-Host "Applied reccmp patch: $(Split-Path -Leaf $PatchFile)"
+        } else {
+            Write-Host "reccmp patch already applied or does not fit — skipping: $(Split-Path -Leaf $PatchFile)" -ForegroundColor Yellow
+        }
+    } finally {
+        Pop-Location
+    }
+}
+Apply-ReccmpPatch (Join-Path $Root "tools\patches\reccmp-0.1.6-want-curly-fix.patch")
+Apply-ReccmpPatch (Join-Path $Root "tools\patches\reccmp-union-write.patch")
 
 & $VenvPython (Join-Path $Root "tools\provision-directx.py") --root $Root
 Assert-LastExit "Provisioning DirectX SDK files"

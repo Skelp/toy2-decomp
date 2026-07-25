@@ -91,7 +91,7 @@ namespace Nu3D
 		// GLOBAL: TOY2 0x00E4D8E8
 		ViewportRectAlt g_viewClipRect;
 
-		// FUNCTION: TOY2 0x004B5590
+		// FUNCTION: TOY2 0x004B5590 [MATCHED]
 		void GetViewportRect(ViewportRectAlt* output)
 		{
 			output->left = g_currentViewportX;
@@ -100,7 +100,7 @@ namespace Nu3D
 			output->bottom = g_currentViewportY + g_currentViewportHeight - 1.0f;
 		}
 
-		// FUNCTION: TOY2 0x004B55D0
+		// FUNCTION: TOY2 0x004B55D0 [MATCHED]
 		void Init()
 		{
 			DrawingDevice::BuildFreshViewport(&g_pendingViewport);
@@ -135,7 +135,7 @@ namespace Nu3D
 			g_drawDeviceHeight = (float)g_renderHeight;
 		}
 
-		// FUNCTION: TOY2 0x004B5700
+		// FUNCTION: TOY2 0x004B5700 [MATCHED]
 		void SetClipRect(float left, float top, float right, float bottom)
 		{
 			float width = right - left + 1.0f;
@@ -144,13 +144,13 @@ namespace Nu3D
 			if (left == g_currentViewportX && top == g_currentViewportY && width == g_currentViewportWidth && height == g_currentViewportHeight)
 				return;
 
-			if (left < g_minViewportX)
+			if (left <= g_minViewportX)
 				left = g_minViewportX;
-			if (top < g_minViewportY)
+			if (top <= g_minViewportY)
 				top = g_minViewportY;
-			if (width > g_drawDeviceWidth - 1.0f)
+			if (width >= g_drawDeviceWidth - 1.0f)
 				width = g_drawDeviceWidth - 1.0f;
-			if (height > g_drawDeviceHeight - 1.0f)
+			if (height >= g_drawDeviceHeight - 1.0f)
 				height = g_drawDeviceHeight - 1.0f;
 
 			if (width < 0.0f || height < 0.0f)
@@ -207,7 +207,7 @@ namespace Nu3D
 			g_screenSpaceMatrixDirty = 1;
 		}
 
-		// FUNCTION: TOY2 0x004B5A00
+		// FUNCTION: TOY2 0x004B5A00 [MATCHED]
 		void SetZRange(float minZ, float maxZ)
 		{
 			g_pendingViewport.dvMinZ = minZ;
@@ -232,7 +232,7 @@ namespace Nu3D
 			SetClipRect(left, top, left + g_currentViewportWidth - 1.0f, top + g_currentViewportHeight - 1.0f);
 		}
 
-		// FUNCTION: TOY2 0x004B5AA0
+		// FUNCTION: TOY2 0x004B5AA0 [MATCHED]
 		void GetClipNormMatrix(D3DMATRIX* output)
 		{
 			if (g_clipNormMatrixDirty)
@@ -256,7 +256,7 @@ namespace Nu3D
 			g_clipNormMatrixDirty = 0;
 		}
 
-		// FUNCTION: TOY2 0x004B5BD0
+		// FUNCTION: TOY2 0x004B5BD0 [MATCHED]
 		void GetScreenSpaceMatrix(D3DMATRIX* output)
 		{
 			if (g_screenSpaceMatrixDirty)
@@ -280,7 +280,7 @@ namespace Nu3D
 			g_screenSpaceMatrixDirty = 0;
 		}
 
-		// FUNCTION: TOY2 0x004BA3A0
+		// FUNCTION: TOY2 0x004BA3A0 [MATCHED]
 		void SetViewClipRect()
 		{
 			ViewportRectAlt viewportRect;
@@ -313,7 +313,7 @@ namespace Nu3D
 			cache->frustumPlaneCount = g_frustumPlaneCount;
 		}
 
-		// FUNCTION: TOY2 0x004BAC40
+		// FUNCTION: TOY2 0x004BAC40 [MATCHED]
 		void GetViewClipRect(ViewportRect* output)
 		{
 			output->top = g_viewClipRect.top;

@@ -200,7 +200,7 @@ namespace Nu3D
 		Renderer::Set508718(5);
 	}
 
-	// FUNCTION: TOY2 0x004BC360
+	// FUNCTION: TOY2 0x004BC360 [MATCHED]
 	int32_t Portal::AreaPortal::BuildScalerEntry(NGNLoader::NGNImage* image, int32_t areaIndex, Nu3D::Link::DynamicScaler* scaler)
 	{
 		ScalerEntry* entry = AllocScalerEntry(image);
@@ -215,7 +215,7 @@ namespace Nu3D
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004BC3A0
+	// FUNCTION: TOY2 0x004BC3A0 [MATCHED]
 	Portal::ScalerEntry* Portal::AreaPortal::AllocScalerEntry(NGNLoader::NGNImage* image)
 	{
 		if (image->scalerEntryCount >= image->maxScalerEntries || ! image->scalerEntryPool)

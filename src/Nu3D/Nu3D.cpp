@@ -20,7 +20,7 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x00B1C3B8
 	int32_t g_defaultPrimitiveFlags;
 
-	// FUNCTION: TOY2 0x004B1880
+	// FUNCTION: TOY2 0x004B1880 [MATCHED]
 	void SetIsSoftwareRendering(int32_t value) { g_isSoftwareRendering = value; }
 
 	// FUNCTION: TOY2 0x004AB7D0 [MATCHED]
@@ -168,6 +168,18 @@ namespace Nu3D
 		else
 		{
 			Sleep(delayMs);
+		}
+	}
+
+	// FUNCTION: TOY2 0x0047D520
+	void MemSet32Util(void* buffer, int32_t count, uint32_t value)
+	{
+		__asm
+		{
+			mov     edi, buffer
+			mov     ecx, count
+			mov     eax, value
+			rep     stosd
 		}
 	}
 

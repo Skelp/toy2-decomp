@@ -492,6 +492,7 @@
 0x0049D2D0 Renderer::Sprite::QueueSegment
 0x0049D390 Renderer::DrawBitmapText
 0x0049D750 Renderer::DrawWhiteText
+0x0049D790 Nullsub6
 0x0049D7A0 Renderer::Sprite::DrawBackdropTransition
 0x0049D910 Toy2::Run
 0x0049DFE0 Toy2::Game::MainLoop

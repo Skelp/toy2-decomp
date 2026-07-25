@@ -43,8 +43,15 @@ namespace D3DApp
 
 namespace D3DApp
 {
-	// STUB: TOY2 0x004318F0
-	void LogErrorNotSet() {}
+	// FUNCTION: TOY2 0x0040D2C0 [MATCHED]
+	char* GetErrorNotSet() { return "ERROR NOT SET"; }
+
+	// FUNCTION: TOY2 0x004318F0 [MATCHED]
+	void LogErrorNotSet()
+	{
+		char* error = GetErrorNotSet();
+		Logger::LogLn(error);
+	}
 
 	// FUNCTION: TOY2 0x004093A0
 	int32_t BuildProfileMachine()
@@ -472,7 +479,7 @@ namespace D3DApp
 		}
 	}
 
-	// FUNCTION: TOY2 0x004A6CC0
+	// FUNCTION: TOY2 0x004A6CC0 [MATCHED]
 	int32_t ProcessWndEvents()
 	{
 		if (PeekMessageA(&g_windowData.wndEventMsg, 0, 0, 0, 1))
@@ -494,7 +501,7 @@ namespace D3DApp
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x004A6D30
+	// FUNCTION: TOY2 0x004A6D30 [MATCHED]
 	int32_t PostQuitMessage()
 	{
 		::PostQuitMessage(0);
@@ -966,6 +973,6 @@ namespace D3DApp
 		}
 	}
 
-	// FUNCTION: TOY2 0x004A6B10
+	// FUNCTION: TOY2 0x004A6B10 [MATCHED]
 	void SysParmsOnExit() { SystemParametersInfoA(SPI_SETSCREENSAVERRUNNING, g_sysParamsInfo, &g_sysParamsInfo, 0); }
 }

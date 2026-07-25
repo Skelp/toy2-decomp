@@ -117,6 +117,7 @@ namespace DrawingDevice
 	int32_t GetDestWidth();
 	int32_t GetDestHeight();
 	LPDIRECTDRAWSURFACE4 GetBackBuffer();
+	int32_t GetSlotSurfaceByIndex(int32_t index, LPDIRECTDRAWSURFACE4* surfaceOut);
 	int32_t SetViewport(LPD3DVIEWPORT2 viewport);
 	int32_t BuildFreshViewport(LPD3DVIEWPORT2 viewport);
 	HRESULT CreateMaterial(LPDIRECT3DMATERIAL3* outMaterial);

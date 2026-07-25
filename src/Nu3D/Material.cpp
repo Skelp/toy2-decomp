@@ -49,7 +49,7 @@ namespace Nu3D
 		DrawingDevice::BindTexToStage0(0);
 	}
 
-	// FUNCTION: TOY2 0x004C2150
+	// FUNCTION: TOY2 0x004C2150 [MATCHED]
 	Material* Material::Allocate()
 	{
 		Material* result = g_materialFreeListHead;
@@ -78,10 +78,10 @@ namespace Nu3D
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x004C28F0
+	// FUNCTION: TOY2 0x004C28F0 [MATCHED]
 	Material* Material::GetFreeByIndex(int32_t index) { return &g_materialFreeList[index]; }
 
-	// FUNCTION: TOY2 0x004C28E0
+	// FUNCTION: TOY2 0x004C28E0 [MATCHED]
 	Material* Material::GetHead() { return g_materialActiveListHead; }
 
 	// FUNCTION: TOY2 0x004C2750
@@ -139,10 +139,10 @@ namespace Nu3D
 		}
 	}
 
-	// FUNCTION: TOY2 0x004AC0F0
+	// FUNCTION: TOY2 0x004AC0F0 [MATCHED]
 	ULONG Material::Release(LPDIRECT3DMATERIAL3 matHandle) { return matHandle->Release(); }
 
-	// FUNCTION: TOY2 0x004C20F0
+	// FUNCTION: TOY2 0x004C20F0 [MATCHED]
 	void Material::ReleaseFromList(Material* material)
 	{
 		if (material->direct3DMat3)
@@ -162,7 +162,7 @@ namespace Nu3D
 		g_materialFreeListHead = material;
 	}
 
-	// FUNCTION: TOY2 0x004C23B0
+	// FUNCTION: TOY2 0x004C23B0 [MATCHED]
 	void Material::ConvertFileToMaterial(Material* material, MaterialFile* materialFile)
 	{
 		material->d3dMaterial.dwSize = sizeof(D3DMATERIAL);
@@ -223,7 +223,7 @@ namespace Nu3D
 		return material;
 	}
 
-	// FUNCTION: TOY2 0x004C2720
+	// FUNCTION: TOY2 0x004C2720 [MATCHED]
 	void Material::Unlink(Material* material)
 	{
 		if (material == g_materialActiveListHead)
@@ -238,10 +238,10 @@ namespace Nu3D
 			material->next->prev = material->prev;
 	}
 
-	// FUNCTION: TOY2 0x004AC140
+	// FUNCTION: TOY2 0x004AC140 [MATCHED]
 	HRESULT Material::SetMaterial(LPDIRECT3DMATERIAL3 direct3DMaterial3, LPD3DMATERIAL d3dMaterial) { return direct3DMaterial3->SetMaterial(d3dMaterial); }
 
-	// FUNCTION: TOY2 0x004AC120
+	// FUNCTION: TOY2 0x004AC120 [MATCHED]
 	HRESULT Material::GetHandle(LPDIRECT3DMATERIAL3 direct3DMaterial3, LPD3DMATERIALHANDLE d3dMaterialHandle)
 	{
 		LPDIRECT3DDEVICE3 device = DrawingDevice::g_drawingDevice->m_pd3dDevice;
@@ -265,7 +265,7 @@ namespace Nu3D
 		InsertSorted(material);
 	}
 
-	// FUNCTION: TOY2 0x004C22E0
+	// FUNCTION: TOY2 0x004C22E0 [MATCHED]
 	Material* Material::CreateFromColor(RGBColor* p_rgbColor)
 	{
 		Material* material = Material::Allocate();

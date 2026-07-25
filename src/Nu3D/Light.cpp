@@ -47,7 +47,7 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x00B62428
 	Light* g_ambientLight;
 
-	// FUNCTION: TOY2 0x004C29A0
+	// FUNCTION: TOY2 0x004C29A0 [MATCHED]
 	void Light::Destroy(Light* light)
 	{
 		if (!light)
@@ -62,7 +62,7 @@ namespace Nu3D
 		Free(light);
 	}
 
-	// FUNCTION: TOY2 0x004C29D0
+	// FUNCTION: TOY2 0x004C29D0 [MATCHED]
 	void Light::Free(Light* light)
 	{
 		if (light->previous)
@@ -81,7 +81,7 @@ namespace Nu3D
 		g_freeLightHead = light;
 	}
 
-	// FUNCTION: TOY2 0x004C2A20
+	// FUNCTION: TOY2 0x004C2A20 [MATCHED]
 	Light* Light::BuildAmbient(const LightColor* color, int32_t enabled)
 	{
 		Light* light = Alloc();
@@ -305,7 +305,7 @@ namespace Nu3D
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x004C3090
+	// FUNCTION: TOY2 0x004C3090 [MATCHED]
 	void Light::DestroyAllLights()
 	{
 		if (!g_lightPool)
@@ -318,7 +318,7 @@ namespace Nu3D
 		g_lightPool = 0;
 	}
 
-	// FUNCTION: TOY2 0x004CE6C0
+	// FUNCTION: TOY2 0x004CE6C0 [MATCHED]
 	void Light::SetDirectionalLight(int32_t directionX, int32_t directionY, int32_t directionZ,
 		int32_t red, int32_t green, int32_t blue)
 	{

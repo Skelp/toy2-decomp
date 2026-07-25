@@ -84,7 +84,7 @@ struct Matrix3x3I16
 namespace Numerics
 {
 	extern float* g_trigLUT;
-	extern int16_t g_fixedTrigLUT[0x1000];
+	extern int16_t g_sinCosLUT[4096];
 
 	int32_t RoundUpToPowerOf2(int32_t number);
 	void InitTrigLut();

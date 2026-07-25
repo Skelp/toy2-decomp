@@ -320,10 +320,10 @@ namespace ModeSelect
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004ACFB0
+	// FUNCTION: TOY2 0x004ACFB0 [MATCHED]
 	void SetForceFullscreen(int32_t forceFullscreen) { g_forceFullscreen = forceFullscreen; }
 
-	// FUNCTION: TOY2 0x004AC390
+	// FUNCTION: TOY2 0x004AC390 [MATCHED]
 	void SetForceFullscreen_T(int32_t forceFullscreen) { SetForceFullscreen(forceFullscreen); }
 
 	// FUNCTION: TOY2 0x004AC9C0
@@ -621,7 +621,7 @@ namespace ModeSelect
 		return reinterpret_cast<BOOL>(ddApp);
 	}
 
-	// FUNCTION: TOY2 0x004ACBC0
+	// FUNCTION: TOY2 0x004ACBC0 [MATCHED]
 	BOOL WINAPI DDrawEnumCallback(GUID* lpGUID, LPSTR lpDriverDescription, LPSTR lpDriverName, LPVOID lpContext)
 	{
 		return DDrawEnumCallbackExA(lpGUID, lpDriverDescription, lpDriverName, 0, 0);
@@ -650,13 +650,13 @@ namespace ModeSelect
 		return SelectPrimaryDevice(0);
 	}
 
-	// FUNCTION: TOY2 0x004AC3A0
+	// FUNCTION: TOY2 0x004AC3A0 [MATCHED]
 	int32_t EnumerateDrivers_T(DeviceFilterCallback_t callback) { return EnumerateDrivers(callback); }
 
-	// FUNCTION: TOY2 0x00412B00
+	// FUNCTION: TOY2 0x00412B00 [MATCHED]
 	int32_t DeviceFilterCallback(LPDDCAPS caps, void* context) { return FALSE; }
 
-	// FUNCTION: TOY2 0x00431C40
+	// FUNCTION: TOY2 0x00431C40 [MATCHED]
 	BOOL DrawTextOutA(HDC hdc, int32_t x, int32_t y, const char* format, ...)
 	{
 		char buffer[512];
@@ -1055,7 +1055,7 @@ namespace ModeSelect
 		return DefWindowProcA(hWnd, msg, wParam, lParam);
 	}
 
-	// FUNCTION: TOY2 0x00431CA0
+	// FUNCTION: TOY2 0x00431CA0 [MATCHED]
 	int32_t SelectDDAppByIndex(int32_t index)
 	{
 		int32_t result = 0;
@@ -1885,7 +1885,7 @@ namespace ModeSelect
 		g_ddAppSelectedDevice->canRenderWindowedOnPrimary = 0;
 	}
 
-	// FUNCTION: TOY2 0x004334B0
+	// FUNCTION: TOY2 0x004334B0 [MATCHED]
 	void Show()
 	{
 		ShowCursor(0);

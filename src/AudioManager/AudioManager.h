@@ -5,13 +5,32 @@
 namespace AudioManager
 {
 	extern int32_t g_curTrackIndex;
+	extern int32_t g_loopingMusicTrackIndex;
 
 	void StopAndFlush();
+	int32_t IsStreamActive();
+	void PlayTrackByIndex(int32_t trackIndex, int32_t fadeMode);
+	int32_t PlaySoundBuffer(int32_t soundIndex, int32_t leftVolume, int32_t rightVolume, int32_t pan, int32_t volume, int32_t flags);
+	void ReleaseBuffers();
 	void Init();
 	void SetVolumesProcessed(int32_t musicVolume, int32_t sfxVolume);
+	void SetMusicVolume(int32_t musicVolume);
+	void SetSfxVolume(int32_t sfxVolume);
+	void SetVolumes(int32_t musicVolume, int32_t sfxVolume);
 	void FlushSoundVoices();
 	int32_t StopAndWait();
 	void LoadSfxPackForLevel(int32_t levelId);
 	int32_t PlayOneShotSoundGlobal(int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume);
 	void PlayMusicOneShot(int32_t trackIndex);
+	void PlayMusicLooping(int16_t trackIndex);
+	int32_t PlayLoopingSound3DPositional(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, void* unused, int16_t rightVolume);
+	void UpdateChannels();
+	void SetVolumes(int32_t musicVolume, int32_t sfxVolume);
+
+	extern int16_t g_musicVolTable[12];
+	extern int16_t g_soundVolTable[12];
+	extern int32_t g_sfxVolume;
+	extern int32_t g_musicVolumeLevel;
+	extern void* g_dsPrimaryBuffer;
+	extern int16_t g_dsVolTable[151];
 }
