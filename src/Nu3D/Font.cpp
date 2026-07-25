@@ -16,6 +16,9 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x0050866C
 	float g_fontScaleY = 0.0;
 
+	// GLOBAL: TOY2 0x00508664
+	int32_t g_textTabWidth = 0;
+
 	// GLOBAL: TOY2 0x00508668
 	float g_fontScaleX = 0.0;
 
@@ -56,10 +59,10 @@ namespace Nu3D
 	int32_t g_fontDCReady = 0;
 
 	// GLOBAL: TOY2 0x00884580
-	float g_textCursorX = 0.0;
+	int32_t g_textCursorX = 0;
 
 	// GLOBAL: TOY2 0x00884584
-	float g_textCursorY = 0.0;
+	int32_t g_textCursorY = 0;
 
 	// GLOBAL: TOY2 0x00884588
 	int32_t g_textCursorOffsetX = 0;
@@ -308,7 +311,7 @@ namespace Nu3D
 	}
 
 	// FUNCTION: TOY2 0x004B4450 [MATCHED]
-	void Font::SetTextCursor(float x, float y)
+	void Font::SetTextCursor(int32_t x, int32_t y)
 	{
 		g_textCursorX = x;
 		g_textCursorY = y;
@@ -317,11 +320,141 @@ namespace Nu3D
 	// FUNCTION: TOY2 0x004B38C0 [MATCHED]
 	void Font::SetRenderFlags(int32_t flags) { g_fontRenderFlags = flags ? 0x200 : 0; }
 
-	// STUB: TOY2 0x004B4CD0
-	void Font::DrawTextString(const char* text) {}
+	// STUB: TOY2 0x004B5310
+	int32_t Font::ComputeUnscaledCharClip(char c) { return 0; }
 
-	// STUB: TOY2 0x004B45A0
-	void Font::DrawScaledTextString(const char* text) {}
+	// STUB: TOY2 0x004B4DE0
+	int32_t Font::DrawUnscaledGlyph(char c) { return 0; }
+
+	// STUB: TOY2 0x004B4FA0
+	int32_t Font::DrawClippedUnscaledGlyph(char c) { return 0; }
+
+	// STUB: TOY2 0x004B4C10
+	int32_t Font::ComputeScaledCharClip(char c) { return 0; }
+
+	// STUB: TOY2 0x004B46B0
+	int32_t Font::DrawScaledGlyph(char c) { return 0; }
+
+	// STUB: TOY2 0x004B4880
+	int32_t Font::DrawClippedScaledGlyph(char c) { return 0; }
+
+	// FUNCTION: TOY2 0x004B4CD0
+	int32_t Font::DrawTextString(const char* text)
+	{
+		Font* font = g_currentFont;
+		int32_t maxWidth;
+		int32_t width;
+		if (font)
+		{
+			int32_t startX = g_textCursorX;
+			maxWidth = 0;
+			width = 0;
+			char c = *text;
+			if (c)
+			{
+				do
+				{
+					switch (c)
+					{
+						case '\t': {
+							int32_t next = g_textCursorX + g_textTabWidth;
+							next -= next % g_textTabWidth;
+							width += next - g_textCursorX;
+							g_textCursorX = next;
+						}
+						break;
+						case '\n':
+							g_textCursorY += font->fontHeight;
+							g_textCursorX = startX;
+							goto lineReset;
+						case '\r':
+							g_textCursorY += (int32_t)g_scaledFontHeight;
+							g_textCursorX = g_textClipX1;
+						lineReset:
+							maxWidth = maxWidth > width ? maxWidth : width;
+							width = 0;
+							break;
+						default: {
+							int32_t w;
+							if (ComputeUnscaledCharClip(c))
+								w = DrawUnscaledGlyph(c);
+							else
+								w = DrawClippedUnscaledGlyph(c);
+							width += w;
+							g_textCursorX += w;
+						}
+						break;
+					}
+					c = *++text;
+				} while (c);
+			}
+		}
+		else
+		{
+			maxWidth = (int32_t)text;
+			width = (int32_t)text;
+		}
+		return maxWidth > width ? maxWidth : width;
+	}
+
+	// FUNCTION: TOY2 0x004B45A0
+	int32_t Font::DrawScaledTextString(const char* text)
+	{
+		Font* font = g_currentFont;
+		int32_t maxWidth;
+		int32_t width;
+		if (font)
+		{
+			int32_t startX = g_textCursorX;
+			maxWidth = 0;
+			width = 0;
+			char c = *text;
+			if (c)
+			{
+				do
+				{
+					switch (c)
+					{
+						case '\t': {
+							int32_t next = g_textCursorX + g_textTabWidth;
+							next -= next % g_textTabWidth;
+							width += next - g_textCursorX;
+							g_textCursorX = next;
+						}
+						break;
+						case '\n':
+							g_textCursorY += (int32_t)g_scaledFontHeight;
+							g_textCursorX = startX;
+							goto lineReset;
+						case '\r':
+							g_textCursorY += (int32_t)g_scaledFontHeight;
+							g_textCursorX = g_textClipX1;
+						lineReset:
+							maxWidth = maxWidth > width ? maxWidth : width;
+							width = 0;
+							break;
+						default: {
+							int32_t w;
+							if (ComputeScaledCharClip(c))
+								w = DrawScaledGlyph(c);
+							else
+								w = DrawClippedScaledGlyph(c);
+							width += w;
+							g_textCursorX += w;
+						}
+						break;
+					}
+					c = *++text;
+				} while (c);
+			}
+		}
+		else
+		{
+			maxWidth = (int32_t)text;
+			width = (int32_t)text;
+		}
+		return maxWidth > width ? maxWidth : width;
+	}
 
 	// FUNCTION: TOY2 0x004B5480
 	int32_t Font::CalculateUnscaledTextSize(const char* text)

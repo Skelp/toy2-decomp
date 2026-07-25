@@ -1186,7 +1186,7 @@ namespace Toy2
 	// FUNCTION: TOY2 0x004909E0
 	void ProcessMiscEventsEx()
 	{
-		Nu3D::Font::SetTextCursor(0, Nu3D::g_scaledFontAscent);
+		Nu3D::Font::SetTextCursor(0, (int32_t)Nu3D::g_scaledFontAscent);
 		DevDraw::g_vertexCount = 0;
 
 		D3DApp::g_windowData.wndIsExiting = g_wndIsExitingUnused;
