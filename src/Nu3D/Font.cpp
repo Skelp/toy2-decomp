@@ -2,6 +2,7 @@
 
 #include "DrawingDevice.h"
 #include "Nu3D/BmpDataNode.h"
+#include "Renderer/Renderer.h"
 
 namespace Nu3D
 {
@@ -356,8 +357,53 @@ namespace Nu3D
 		return (clipDY2 & clipDY1 & clipDX2 & clipDX1) & 0x80000000;
 	}
 
-	// STUB: TOY2 0x004B4DE0
-	int32_t Font::DrawUnscaledGlyph(char c) { return 0; }
+	// Draws a single unscaled glyph as a two-triangle quad (vertices 0..2 and
+	// 3..5). The fast path selected by ComputeUnscaledCharClip when the glyph is
+	// fully inside the clip rect. The cursor Y is offset by the font ascent to
+	// get the glyph's top edge; the bottom edge additionally subtracts 1.0 to
+	// keep the quad within the glyph's texel bounds. Note g_textCursorOffsetX is
+	// applied to the top edge only -- the bottom edge uses the raw cursor X,
+	// matching the retail vertex setup.
+	// FUNCTION: TOY2 0x004B4DE0 [MATCHED]
+	int32_t Font::DrawUnscaledGlyph(char c)
+	{
+		LPDIRECT3DDEVICE3 device = DrawingDevice::GetD3DDevice();
+		if (g_currentFont && g_currentFontTexIndex && device)
+		{
+			Font* font = g_currentFont;
+			GlyphInfo* glyph = &font->glyphs[font->charToGlyphIndex[(uint8_t)c]];
+
+			float yTop = (float)(g_textCursorY - font->fontAscent);
+
+			g_textVertices[0].position.x = (float)(g_textCursorOffsetX + g_textCursorX);
+			g_textVertices[0].position.y = yTop;
+			g_textVertices[0].uv.x = glyph->uvMinX;
+			g_textVertices[0].uv.y = glyph->uvMinY;
+
+			g_textVertices[1].position.x = (float)(glyph->width + g_textCursorOffsetX + g_textCursorX - 1);
+			g_textVertices[1].position.y = yTop;
+			g_textVertices[1].uv.x = glyph->uvMaxX;
+			g_textVertices[1].uv.y = glyph->uvMinY;
+
+			g_textVertices[2].position.x = (float)(glyph->width + g_textCursorX - 1);
+			g_textVertices[2].position.y = (float)glyph->height + yTop - 1.0f;
+			g_textVertices[2].uv.x = glyph->uvMaxX;
+			g_textVertices[2].uv.y = glyph->uvMaxY;
+
+			g_textVertices[3].position = g_textVertices[0].position;
+			g_textVertices[3].uv = g_textVertices[0].uv;
+			g_textVertices[4] = g_textVertices[2];
+			g_textVertices[5].position.x = (float)g_textCursorX;
+			g_textVertices[5].position.y = g_textVertices[2].position.y;
+			g_textVertices[5].uv.x = glyph->uvMinX;
+			g_textVertices[5].uv.y = glyph->uvMaxY;
+
+			Renderer::DrawSingleTexturedTriangle(g_textVertices, g_currentFontTexIndex, g_fontRenderFlags | 0x444);
+			Renderer::DrawSingleTexturedTriangle(&g_textVertices[3], g_currentFontTexIndex, g_fontRenderFlags | 0x444);
+			return glyph->width;
+		}
+		return 0;
+	}
 
 	// STUB: TOY2 0x004B4FA0
 	int32_t Font::DrawClippedUnscaledGlyph(char c) { return 0; }

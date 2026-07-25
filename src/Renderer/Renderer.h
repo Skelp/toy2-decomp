@@ -13,6 +13,7 @@ namespace Nu3D
 	struct Primitive;
 	struct Material;
 	struct InstanceData;
+	struct VertexTL;
 }
 
 namespace DrawingAPI
@@ -112,6 +113,7 @@ namespace Renderer
 	void RenderPrimitive(Nu3D::Primitive* primitive, const D3DMATRIX* transform, int32_t renderFlags);
 	void ProcessPrimitive(Nu3D::InstanceData* instanceData, Nu3D::Primitive* primitive);
 	void BindTexture(int32_t texIndex);
+	void DrawSingleTexturedTriangle(Nu3D::VertexTL* vertices, int32_t texIndex, int32_t renderFlags);
 
 	STATIC_ASSERT(sizeof(RenderEntry) == 0x18);
 }

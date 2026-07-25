@@ -1452,6 +1452,9 @@ namespace Renderer
 			}
 		}
 	}
+
+	// STUB: TOY2 0x004B9600
+	void DrawSingleTexturedTriangle(Nu3D::VertexTL* vertices, int32_t texIndex, int32_t renderFlags) {}
 }
 
 namespace DevDraw
