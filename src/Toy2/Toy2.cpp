@@ -129,6 +129,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0052F0E7
 	uint8_t g_movieUnlocked[19];
 
+	// GLOBAL: TOY2 0x0052F2D8
+	int16_t g_unlocks;
+
 	// GLOBAL: TOY2 0x0052F2DC
 	int16_t g_levelTransitionTimer;
 

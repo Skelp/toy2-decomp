@@ -1,5 +1,7 @@
 #include "SaveManager.h"
 #include "InputManager.h"
+#include "Toy2/Buzz.h"
+#include "Toy2/Toy2.h"
 
 #include <MEMORY.H>
 
@@ -105,8 +107,14 @@ namespace SaveManager
 	// STUB: TOY2 0x004A2CC0
 	void LoadProgressData(Save0Data* save) {}
 
-	// STUB: TOY2 0x004A2C80
-	void TransferProgressData(Save0Data* save) {}
+	// FUNCTION: TOY2 0x004A2C80 [MATCHED]
+	void TransferProgressData(Save0Data* save)
+	{
+		save->lives = (uint8_t)Toy2::g_buzzActor.lives;
+		save->lastLevel = (uint8_t)Toy2::g_levelIndex;
+		save->unlocks = (uint8_t)Toy2::g_unlocks;
+		save->health = (uint16_t)Toy2::g_buzzActor.health;
+	}
 
 	// STUB: TOY2 0x0049B830
 	void SaveToFile(int32_t saveNum, const char* saveName) {}

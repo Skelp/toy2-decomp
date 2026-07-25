@@ -60,4 +60,6 @@ namespace Toy2
 
 		STATIC_ASSERT(sizeof(Toy2BuzzActor) == 0xA0);
 	}
+
+	extern Buzz::Toy2BuzzActor g_buzzActor;
 }
