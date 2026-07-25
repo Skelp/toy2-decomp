@@ -1,0 +1,62 @@
+reccmp master: Write union datatypes instead of aborting
+
+Upstream's `_import_union` only dereferences an existing union and raises
+`TypeNotImplementedError` ("Writing union types is not supported. Please add
+by hand") when the union does not yet exist in Ghidra. This project relies on
+several PDB unions (e.g. variant/overlay types) that must be created by the
+importer, so writing them by hand on every fresh project is not practical.
+
+This patch implements the write path: when the union is absent, create a
+`UnionDataType`, clear any placeholder components, populate it from the PDB
+field list, and assert the resulting size matches the PDB. Subsequent runs
+find the union via the existing `get_ghidra_type` dereference path, so the
+import stays idempotent.
+
+Generated against reccmp master (commit 21416ad1).
+Apply from the reccmp submodule root with `patch -p1`.
+
+diff --git a/reccmp/ghidra/importer/type_importer.py b/reccmp/ghidra/importer/type_importer.py
+index d1a4d0a5..e72640e1 100644
+--- a/reccmp/ghidra/importer/type_importer.py
++++ b/reccmp/ghidra/importer/type_importer.py
+@@ -18,6 +18,7 @@
+     StructureDataType,
+     StructureInternal,
+     TypedefDataType,
++    UnionDataType,
+     ComponentOffsetSettingsDefinition,
+ )
+ 
+@@ -194,11 +195,27 @@ def _import_union(self, type_pdb: CvdumpParsedType) -> DataType:
+                 union_type.getLength() == expected_size
+             ), f"Wrong size of existing union type '{raw_name}': expected {expected_size}, got {union_type.getLength()}"
+             return union_type
+-        except TypeNotFoundInGhidraError as e:
+-            # We have so few instances, it is not worth implementing this
+-            raise TypeNotImplementedError(
+-                f"Writing union types is not supported. Please add by hand: {type_pdb}"
+-            ) from e
++        except TypeNotFoundInGhidraError:
++            logger.info("Creating new union data type %s", type_name_with_namespace)
++            union_type = add_data_type_or_reuse_existing(
++                self.api,
++                UnionDataType(
++                    category_path_of(type_name_with_namespace.namespace_path),
++                    type_name_with_namespace.base_name,
++                ),
++            )
++            while union_type.getNumComponents() > 0:
++                union_type.delete(0)
++            field_list = self.extraction.compare.types.from_key(
++                type_pdb["field_list_type"]
++            )
++            for member in field_list.get("members", []):
++                member_type = self.import_pdb_type_into_ghidra(member.type)
++                union_type.add(member_type, -1, member.name, None)
++            assert (
++                union_type.getLength() == expected_size
++            ), f"Wrong size of created union type '{raw_name}': expected {expected_size}, got {union_type.getLength()}"
++            return union_type
+ 
+     def _import_enum(self, type_pdb: CvdumpParsedType) -> DataType:
+         underlying_type = self.import_pdb_type_into_ghidra(type_pdb["underlying_type"])

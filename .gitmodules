@@ -1,3 +1,6 @@
 [submodule "external/submodules/imgui"]
 	path = external/submodules/imgui
 	url = https://github.com/ocornut/imgui
+[submodule "external/submodules/reccmp"]
+	path = external/submodules/reccmp
+	url = https://github.com/isledecomp/reccmp.git
