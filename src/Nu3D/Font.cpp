@@ -362,8 +362,27 @@ namespace Nu3D
 	// STUB: TOY2 0x004B4FA0
 	int32_t Font::DrawClippedUnscaledGlyph(char c) { return 0; }
 
-	// STUB: TOY2 0x004B4C10
-	int32_t Font::ComputeScaledCharClip(char c) { return 0; }
+	// Scaled twin of ComputeUnscaledCharClip: the glyph width and the font
+	// ascent/descent are taken from the precomputed scaled float globals
+	// (g_fontScaleX * glyph->width, g_scaledFontAscent, g_scaledFontHeight) and
+	// truncated back to int via __ftol before the same four clip-delta tests.
+	// FUNCTION: TOY2 0x004B4C10
+	int32_t Font::ComputeScaledCharClip(char c)
+	{
+		Font* font = g_currentFont;
+		GlyphInfo* glyph = &font->glyphs[font->charToGlyphIndex[(uint8_t)c]];
+
+		int32_t clipDX1 = g_textClipX1 - g_textCursorX;
+		g_charClipDX1 = clipDX1;
+		int32_t clipDX2 = (int32_t)(glyph->width * g_fontScaleX) - g_textClipX2 + g_textCursorX;
+		g_charClipDX2 = clipDX2;
+		int32_t clipDY1 = g_textClipY1 - (int32_t)(g_textCursorY - g_scaledFontAscent);
+		g_charClipDY1 = clipDY1;
+		int32_t clipDY2 = (int32_t)(g_scaledFontHeight - g_scaledFontAscent) - g_textClipY2 + g_textCursorY;
+		g_charClipDY2 = clipDY2;
+
+		return (clipDY2 & clipDY1 & clipDX2 & clipDX1) & 0x80000000;
+	}
 
 	// STUB: TOY2 0x004B46B0
 	int32_t Font::DrawScaledGlyph(char c) { return 0; }
