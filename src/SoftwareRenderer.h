@@ -2,6 +2,7 @@
 
 #include "Common.h"
 #include "Numerics.h"
+#include "Nu3D/Nu3D.h"
 #include "Nu3D/Viewport.h"
 #include <directx6/ddraw.h>
 #include <directx6/d3d.h>
@@ -34,6 +35,11 @@ namespace SoftwareRenderer
 	void SetCameraNearFarZ(float nearZ, float farZ);
 
 	void SubmitQuad(int32_t renderFlags, int32_t textureIndex, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices);
+	// SubmitSortedTriangle (0x004B5E40) bucket-sorts a transformed triangle into g_renderBuckets
+	// by depth. param field10/fieldC map to sorted-record +0x10/+0xc; SubmitQuad populates
+	// fieldC=textureIndex/field10=0 while the indexed-strip submitters swap them — refine the
+	// names when SubmitSortedTriangle and its record struct are reconstructed.
+	void SubmitSortedTriangle(int32_t renderFlags, int32_t field10, int32_t fieldC, Nu3D::VertexTL* v0, Nu3D::VertexTL* v1, Nu3D::VertexTL* v2);
 
 	void UnkFunc67(int32_t param1, int32_t param2);
 	void UnkFunc2();

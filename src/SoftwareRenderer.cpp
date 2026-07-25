@@ -1,4 +1,5 @@
 #include "SoftwareRenderer.h"
+#include "Renderer/Renderer.h"
 
 namespace SoftwareRenderer
 {
@@ -99,8 +100,20 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x00470C70
 	void UnkFunc7() {}
 
-	// STUB: TOY2 0x004B6220
-	void SubmitQuad(int32_t renderFlags, int32_t textureIndex, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices) {}
+	// STUB: TOY2 0x004B5E40
+	void SubmitSortedTriangle(int32_t renderFlags, int32_t field10, int32_t fieldC, Nu3D::VertexTL* v0, Nu3D::VertexTL* v1, Nu3D::VertexTL* v2) {}
+
+	// FUNCTION: TOY2 0x004B6220 [MATCHED]
+	void SubmitQuad(int32_t renderFlags, int32_t textureIndex, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices)
+	{
+		Nu3D::VertexTL* lockedVertices;
+		if (DrawingAPI::LockVertexBuffer(vertexBuffer, 0x801, (LPVOID*)&lockedVertices, 0) == 0)
+		{
+			SubmitSortedTriangle(renderFlags, 0, textureIndex, &lockedVertices[indices[0]], &lockedVertices[indices[1]], &lockedVertices[indices[2]]);
+			SubmitSortedTriangle(renderFlags, 0, textureIndex, &lockedVertices[2], &lockedVertices[indices[1]], &lockedVertices[indices[3]]);
+			DrawingAPI::UnlockVertexBuffer(vertexBuffer);
+		}
+	}
 }
 
 namespace SoftwareDevice
