@@ -735,6 +735,12 @@ namespace DrawingDevice
 		return g_drawingDevice->m_pd3dDevice->SetTextureStageState(stage, state, value);
 	}
 
+	// FUNCTION: TOY2 0x004AC2A0 [MATCHED]
+	HRESULT DrawPrimitive(D3DPRIMITIVETYPE d3dptPrimitiveType, DWORD dwVertexTypeDesc, LPVOID lpvVertices, DWORD dwVertexCount, DWORD dwFlags)
+	{
+		return g_drawingDevice->m_pd3dDevice->DrawPrimitive(d3dptPrimitiveType, dwVertexTypeDesc, lpvVertices, dwVertexCount, dwFlags);
+	}
+
 	// FUNCTION: TOY2 0x004ABAF0 [MATCHED]
 	HRESULT ClearScreen(DWORD clearFlags, D3DCOLOR clearColor)
 	{
