@@ -84,6 +84,7 @@ namespace Nu3D
 	extern DrawTextStringFunc g_drawTextStringFunc;
 	extern CalculateTextSizeFunc g_calculateTextSizeFunc;
 	extern float g_scaledFontHeight;
+	extern int32_t g_textHeight;
 	extern int32_t g_fontRenderFlags;
 
 	STATIC_ASSERT(sizeof(Font) == 0x130);

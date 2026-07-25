@@ -70,6 +70,9 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x00884590
 	int32_t g_textClipY1 = 0;
 
+	// GLOBAL: TOY2 0x00884594
+	int32_t g_textHeight = 0;
+
 	// GLOBAL: TOY2 0x00884598
 	int32_t g_fontRenderFlags = 0;
 
@@ -320,9 +323,87 @@ namespace Nu3D
 	// STUB: TOY2 0x004B45A0
 	void Font::DrawScaledTextString(const char* text) {}
 
-	// STUB: TOY2 0x004B5480
-	int32_t Font::CalculateUnscaledTextSize(const char* text) { return 0; }
+	// FUNCTION: TOY2 0x004B5480
+	int32_t Font::CalculateUnscaledTextSize(const char* text)
+	{
+		Font* font = g_currentFont;
+		int32_t maxWidth;
+		int32_t width;
+		if (font)
+		{
+			maxWidth = 0;
+			width = 0;
+			g_textHeight = (int32_t)g_scaledFontHeight;
+			char c = *text;
+			if (c)
+			{
+				do
+				{
+					switch (c)
+					{
+						case '\t':
+							break;
+						case '\n':
+						case '\r':
+							maxWidth = maxWidth > width ? maxWidth : width;
+							g_textHeight = (int32_t)((float)g_textHeight + g_scaledFontHeight);
+							width = 0;
+							break;
+						default:
+							width += font->glyphs[font->charToGlyphIndex[(uint8_t)c]].width;
+							break;
+					}
+					c = *++text;
+				} while (c);
+			}
+		}
+		else
+		{
+			maxWidth = (int32_t)text;
+			width = (int32_t)text;
+		}
+		return maxWidth > width ? maxWidth : width;
+	}
 
-	// STUB: TOY2 0x004B53D0
-	int32_t Font::CalculateScaledTextSize(const char* text) { return 0; }
+	// FUNCTION: TOY2 0x004B53D0
+	int32_t Font::CalculateScaledTextSize(const char* text)
+	{
+		Font* font = g_currentFont;
+		int32_t maxWidth;
+		int32_t width;
+		if (font)
+		{
+			maxWidth = 0;
+			width = 0;
+			g_textHeight = (int32_t)g_scaledFontHeight;
+			char c = *text;
+			if (c)
+			{
+				do
+				{
+					switch (c)
+					{
+						case '\t':
+							break;
+						case '\n':
+						case '\r':
+							maxWidth = maxWidth > width ? maxWidth : width;
+							g_textHeight = (int32_t)((float)g_textHeight + g_scaledFontHeight);
+							width = 0;
+							break;
+						default:
+							width += (int32_t)((float)font->glyphs[font->charToGlyphIndex[(uint8_t)c]].width * g_fontScaleX);
+							break;
+					}
+					c = *++text;
+				} while (c);
+			}
+		}
+		else
+		{
+			maxWidth = (int32_t)text;
+			width = (int32_t)text;
+		}
+		return maxWidth > width ? maxWidth : width;
+	}
 }
