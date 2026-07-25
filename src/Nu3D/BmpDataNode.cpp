@@ -546,10 +546,67 @@ namespace Nu3D
 		return BuildRawBmpNode(bitmap, alphaBitmap, textureName, flags) ? S_OK : E_OUTOFMEMORY;
 	}
 
-	// STUB: TOY2 0x004B0440
+	// FUNCTION: TOY2 0x004B0440
 	BmpDataNode* BuildRawBmpNodeFromSlot(int32_t slotIndex, const char* textureName, int32_t alphaFlag)
 	{
-		return 0;
+		BmpDataNode* bmpDataNode = AllocateBmpDataNode();
+		if (! bmpDataNode)
+			return bmpDataNode;
+
+		int32_t textureWidth;
+		int32_t textureHeight;
+		uint32_t surfaceCaps;
+		LPDIRECTDRAWSURFACE4 slotSurface;
+
+		DrawingDevice::GetSlotTexSize(slotIndex, &textureWidth, &textureHeight);
+		DrawingDevice::GetSlotSurfaceCaps(slotIndex, &surfaceCaps);
+		DrawingDevice::GetSlotSurfaceByIndex(slotIndex, &slotSurface);
+
+		bmpDataNode->unkVar2 = slotIndex;
+		bmpDataNode->unkVar3 = (int32_t)slotSurface;
+		bmpDataNode->unkVar4 = 0;
+
+		if ((surfaceCaps & DDSCAPS_TEXTURE) == 0)
+			bmpDataNode->unkVar1 = 1;
+		else
+			bmpDataNode->unkVar1 = 0;
+
+		bmpDataNode->texData = 0;
+		bmpDataNode->textureWidth = textureWidth;
+		bmpDataNode->textureHeight = textureHeight;
+		bmpDataNode->flags = alphaFlag;
+		strcpy(bmpDataNode->texName, textureName);
+
+		if (bmpDataNode->unkVar1 == 0)
+		{
+			bmpDataNode->flags |= 0x40;
+			bmpDataNode->surface = slotSurface;
+			slotSurface->QueryInterface(IID_IDirect3DTexture2, (LPVOID*)&bmpDataNode->d3dTexture);
+			bmpDataNode->surfaceDesc.dwSize = sizeof(DDSURFACEDESC2);
+			slotSurface->GetSurfaceDesc(&bmpDataNode->surfaceDesc);
+			return bmpDataNode;
+		}
+
+		InitialiseTextureSurface(bmpDataNode);
+
+		DDBLTFX bltfx;
+		bltfx.dwSize = sizeof(DDBLTFX);
+		bltfx.dwROP = SRCCOPY;
+		if (bmpDataNode->surface->Blt(NULL, (LPDIRECTDRAWSURFACE4)bmpDataNode->unkVar3, NULL, DDBLT_ROP | DDBLT_ASYNC, &bltfx) < 0)
+		{
+			DDSURFACEDESC2 surfaceDesc;
+			memset(&surfaceDesc, 0, sizeof(surfaceDesc));
+			surfaceDesc.dwSize = sizeof(DDSURFACEDESC2);
+			surfaceDesc.dwFlags = DDSD_CAPS | DDSD_WIDTH | DDSD_HEIGHT;
+			surfaceDesc.ddsCaps.dwCaps = DDSCAPS_SYSTEMMEMORY;
+			surfaceDesc.dwWidth = bmpDataNode->textureWidth;
+			surfaceDesc.dwHeight = bmpDataNode->textureHeight;
+			LPDIRECTDRAW4 ddraw4 = DrawingDevice::GetDDraw4();
+			HRESULT result = ddraw4->CreateSurface(&surfaceDesc, (LPDIRECTDRAWSURFACE4*)&bmpDataNode->unkVar4, NULL);
+			bmpDataNode->unkVar1 = (result >= 0) ? 2 : 0;
+		}
+
+		return bmpDataNode;
 	}
 
 	// FUNCTION: TOY2 0x004B0620 [MATCHED]

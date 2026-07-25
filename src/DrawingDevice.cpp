@@ -620,6 +620,12 @@ namespace DrawingDevice
 	// FUNCTION: TOY2 0x004ABE30
 	int32_t GetSlotSurfaceByIndex(int32_t index, LPDIRECTDRAWSURFACE4* surfaceOut) { return g_drawingDevice->GetSlotSurfaceByIndex(index, surfaceOut); }
 
+	// STUB: TOY2 0x004ABE50
+	int32_t GetSlotSurfaceCaps(int32_t index, uint32_t* capsOut) { return 0; }
+
+	// STUB: TOY2 0x004ABE70
+	int32_t GetSlotTexSize(int32_t index, int32_t* widthOut, int32_t* heightOut) { return 0; }
+
 	// FUNCTION: TOY2 0x004ABB30 [MATCHED]
 	int32_t SetViewport(LPD3DVIEWPORT2 viewport)
 	{

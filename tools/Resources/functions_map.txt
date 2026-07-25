@@ -653,6 +653,8 @@
 0x004ABD90 DrawingDevice::GetDestWidth
 0x004ABDA0 DrawingDevice::GetDestHeight
 0x004ABE30 DrawingDevice::GetSlotSurfaceByIndex
+0x004ABE50 DrawingDevice::GetSlotSurfaceCaps
+0x004ABE70 DrawingDevice::GetSlotTexSize
 0x004ABE90 Nu3D::DrawSurface::GetDC
 0x004ABEA0 Nu3D::DrawSurface::ReleaseDC
 0x004ABEB0 CD3DFramework::Build
