@@ -533,6 +533,54 @@ namespace Renderer
 		g_renderStateCache[textureStage + 1] = newState;
 	}
 
+	// FUNCTION: TOY2 0x004B6760
+	int32_t SetupMaterialRenderState(Nu3D::Material* material, int32_t stateFlags)
+	{
+		int32_t textureStage = 0;
+		while (textureStage < g_maxSimultaneousTextures)
+		{
+			int32_t newStateFlags = stateFlags;
+			if (material != 0)
+			{
+				int32_t metadata = material->metadata;
+				if (metadata & 0x2)
+					newStateFlags |= RENDER_ALPHA_DEFAULT | RENDER_ZWRITE;
+				if (metadata & 0x10)
+					newStateFlags |= RENDER_ZWRITE | RENDER_ALPHA_CUSTOM;
+				if (metadata & 0x20)
+					newStateFlags |= RENDER_ZWRITE | RENDER_ALPHA_ALT;
+				if (metadata & 0x200)
+					newStateFlags |= RENDER_ZWRITE | RENDER_ALPHA_TEX_MODULATE;
+				if (metadata & 0x400)
+					newStateFlags |= RENDER_ZWRITE | RENDER_ALPHA_TEX_MOD_CUSTOM;
+				if (metadata & 0x800)
+					newStateFlags |= RENDER_ZWRITE | RENDER_ALPHA_TEX_MOD_ALT;
+				if (metadata & 0x8)
+					newStateFlags = (newStateFlags & ~(RENDER_CULL_FRONT | RENDER_CULL_BACK)) | RENDER_CULL_NONE;
+				if (material == NGNLoader::g_tex14Materials[0] || material == NGNLoader::g_tex14Materials[1] || material == NGNLoader::g_tex14Materials[2])
+					newStateFlags &= ~(RENDER_TEXTURE_WRAP_UV | RENDER_TEXTURE_CLAMP_U);
+				if (textureStage != 0)
+				{
+					if (metadata & 0x40000)
+						newStateFlags |= RENDER_COLOR_MODULATE;
+					if (metadata & 0x80000)
+						newStateFlags |= RENDER_COLOR_BLEND_FACTOR;
+				}
+			}
+			if (textureStage == 0)
+			{
+				newStateFlags |= RENDER_COLOR_MODULATE;
+				SetRenderState(newStateFlags);
+			}
+			SetTextureStageState(newStateFlags, textureStage);
+			if (material != 0)
+				material = material->nextPass;
+			textureStage++;
+		}
+
+		return textureStage;
+	}
+
 	// FUNCTION: TOY2 0x004B6850 [MATCHED]
 	void InitRenderState(int32_t newStage)
 	{
