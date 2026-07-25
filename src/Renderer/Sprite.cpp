@@ -36,6 +36,9 @@ namespace Renderer
 		// GLOBAL: TOY2 0x005087EC
 		WORD g_2DSpriteIndices[4] = { 0, 1, 2, 3 };
 
+		// GLOBAL: TOY2 0x005087C4
+		WORD g_quadSpriteIndices[4] = { 0, 1, 2, 3 };
+
 		// FUNCTION: TOY2 0x004B68B0
 		HRESULT Render2DSprite(Nu3D::Sprite* sprite)
 		{
@@ -102,6 +105,75 @@ namespace Renderer
 			SoftwareRenderer::g_unk9F6008 = 1;
 
 			return DrawingAPI::DrawIndexedPrimitive(D3DPT_TRIANGLESTRIP, D3DFVF_0x1C4, vertexData, 4, g_2DSpriteIndices, 4, 24);
+		}
+
+		// FUNCTION: TOY2 0x004B7B30
+		void RenderQuadSprite(Nu3D::Sprite* sprite)
+		{
+			LPDIRECT3DVERTEXBUFFER destBuffer = g_FVF_14C_Buffer_2.vertexBuffer;
+			Nu3D::Vertex* lockedData;
+
+			if (DrawingAPI::LockVertexBuffer(g_FVF_152_Buffer.vertexBuffer, 0x801, (LPVOID*)&lockedData, 0) == 0)
+			{
+				lockedData[0].position.x = -sprite->width;
+				lockedData[0].position.y = -sprite->height;
+				lockedData[0].position.z = 0.0f;
+				lockedData[0].coords.x = sprite->uvBottomLeft.x;
+				lockedData[0].coords.y = sprite->uvBottomLeft.y;
+				lockedData[0].diffuse = sprite->color;
+
+				lockedData[1].position.x = -sprite->width;
+				lockedData[1].position.y = sprite->height;
+				lockedData[1].position.z = 0.0f;
+				lockedData[1].coords.x = sprite->uvTopLeft.x;
+				lockedData[1].coords.y = sprite->uvTopLeft.y;
+				lockedData[1].diffuse = sprite->color;
+
+				lockedData[2].position.x = sprite->width;
+				lockedData[2].position.y = -sprite->height;
+				lockedData[2].position.z = 0.0f;
+				lockedData[2].coords.x = sprite->uvBottomRight.x;
+				lockedData[2].coords.y = sprite->uvBottomRight.y;
+				lockedData[2].diffuse = sprite->color;
+
+				lockedData[3].position.x = sprite->width;
+				lockedData[3].position.y = sprite->height;
+				lockedData[3].position.z = 0.0f;
+				lockedData[3].coords.x = sprite->uvTopRight.x;
+				lockedData[3].coords.y = sprite->uvTopRight.y;
+				lockedData[3].diffuse = sprite->color;
+
+				DrawingAPI::UnlockVertexBuffer(g_FVF_152_Buffer.vertexBuffer);
+
+				D3DMATRIX matrix = Nu3D::Camera::g_activeCamera.transform;
+				matrix._43 = 0.0f;
+				matrix._42 = 0.0f;
+				matrix._41 = 0.0f;
+				if (sprite->trigIndex != 0)
+					Nu3D::Math::MatrixRotateRoll(&matrix, sprite->trigIndex);
+				Nu3D::Math::AddWorldSpaceTransform(&matrix, &sprite->position);
+				DrawingDevice::SetWorldTransform(&matrix);
+
+				SoftwareRenderer::g_unkE4D950 = 5;
+
+				if (g_unk9F5FF0 == 0)
+				{
+					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 5, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
+					{
+						Renderer::InitRenderState(sprite->renderFlags);
+						Renderer::BindTexture(sprite->textureIndex);
+						SoftwareRenderer::g_viewportRect = &sprite->viewportRect;
+						DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLESTRIP, destBuffer, g_quadSpriteIndices, 4, 8);
+					}
+				}
+				else
+				{
+					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 1, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
+					{
+						SoftwareRenderer::SubmitQuad(sprite->renderFlags, sprite->textureIndex, destBuffer, g_quadSpriteIndices);
+					}
+				}
+			}
 		}
 
 		// FUNCTION: TOY2 0x004B8DD0
@@ -506,6 +578,8 @@ namespace Renderer
 				{
 					switch (commandPointer->type)
 					{
+						case RENDER_QUADSPRITE:
+							RenderQuadSprite(commandPointer);
 						case RENDER_2D_SPRITE:
 							Sprite::Render2DSprite(commandPointer);
 						default:

@@ -74,6 +74,8 @@ namespace Renderer
 
 	extern float g_gammaCorrection;
 	extern Nu3D::Patch::PatchVertices g_FVF_14C_Buffer_2;
+	extern Nu3D::Patch::PatchVertices g_FVF_152_Buffer;
+	extern int32_t g_unk9F5FF0;
 	extern int32_t g_isSoftwareRendering;
 	extern int32_t g_frameDelta;
 	extern float g_virtualScreenWidth;

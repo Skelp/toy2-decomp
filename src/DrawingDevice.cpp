@@ -578,6 +578,9 @@ namespace DrawingDevice
 	// FUNCTION: TOY2 0x004ABAE0 [MATCHED]
 	LPDIRECT3DVIEWPORT3 GetViewport() { return g_drawingDevice->m_pvViewport; }
 
+	// STUB: TOY2 0x004ABFD0
+	void SetWorldTransform(D3DMATRIX* transform) {}
+
 	// FUNCTION: TOY2 0x004ABFF0 [MATCHED]
 	HRESULT SetViewTransform(D3DMATRIX* transform)
 	{
@@ -608,10 +611,7 @@ namespace DrawingDevice
 	LPDIRECTDRAWSURFACE4 GetBackBuffer() { return g_drawingDevice->m_pddsBackBuffer; }
 
 	// FUNCTION: TOY2 0x004ABE30
-	int32_t GetSlotSurfaceByIndex(int32_t index, LPDIRECTDRAWSURFACE4* surfaceOut)
-	{
-		return g_drawingDevice->GetSlotSurfaceByIndex(index, surfaceOut);
-	}
+	int32_t GetSlotSurfaceByIndex(int32_t index, LPDIRECTDRAWSURFACE4* surfaceOut) { return g_drawingDevice->GetSlotSurfaceByIndex(index, surfaceOut); }
 
 	// FUNCTION: TOY2 0x004ABB30 [MATCHED]
 	int32_t SetViewport(LPD3DVIEWPORT2 viewport)
@@ -655,10 +655,7 @@ namespace DrawingDevice
 	HRESULT CreateLight(LPDIRECT3DLIGHT* outLight) { return GetD3D()->CreateLight(outLight, 0); }
 
 	// FUNCTION: TOY2 0x004ABF50 [MATCHED]
-	HRESULT SetLight(LPDIRECT3DLIGHT light, LPD3DLIGHT2 description)
-	{
-		return light->SetLight((LPD3DLIGHT)description);
-	}
+	HRESULT SetLight(LPDIRECT3DLIGHT light, LPD3DLIGHT2 description) { return light->SetLight((LPD3DLIGHT)description); }
 
 	// FUNCTION: TOY2 0x004ABF60 [MATCHED]
 	HRESULT AddLight(LPDIRECT3DLIGHT light) { return GetViewport()->AddLight(light); }
@@ -731,15 +728,11 @@ namespace DrawingDevice
 
 	// FUNCTION: TOY2 0x004AC150 [MATCHED]
 	HRESULT SetTextureStageState(DWORD stage, D3DTEXTURESTAGESTATETYPE state, DWORD value)
-	{
-		return g_drawingDevice->m_pd3dDevice->SetTextureStageState(stage, state, value);
-	}
+	{ return g_drawingDevice->m_pd3dDevice->SetTextureStageState(stage, state, value); }
 
 	// FUNCTION: TOY2 0x004AC2A0 [MATCHED]
 	HRESULT DrawPrimitive(D3DPRIMITIVETYPE d3dptPrimitiveType, DWORD dwVertexTypeDesc, LPVOID lpvVertices, DWORD dwVertexCount, DWORD dwFlags)
-	{
-		return g_drawingDevice->m_pd3dDevice->DrawPrimitive(d3dptPrimitiveType, dwVertexTypeDesc, lpvVertices, dwVertexCount, dwFlags);
-	}
+	{ return g_drawingDevice->m_pd3dDevice->DrawPrimitive(d3dptPrimitiveType, dwVertexTypeDesc, lpvVertices, dwVertexCount, dwFlags); }
 
 	// FUNCTION: TOY2 0x004ABAF0 [MATCHED]
 	HRESULT ClearScreen(DWORD clearFlags, D3DCOLOR clearColor)
@@ -826,9 +819,7 @@ namespace HardwareDevice
 {
 	// FUNCTION: TOY2 0x004AC340 [MATCHED]
 	HRESULT DrawIndexedPrimitiveVB(D3DPRIMITIVETYPE primitiveType, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices, DWORD indexCount, DWORD flags)
-	{
-		return DrawingDevice::g_drawingDevice->m_pd3dDevice->DrawIndexedPrimitiveVB(primitiveType, vertexBuffer, indices, indexCount, flags);
-	}
+	{ return DrawingDevice::g_drawingDevice->m_pd3dDevice->DrawIndexedPrimitiveVB(primitiveType, vertexBuffer, indices, indexCount, flags); }
 
 	// FUNCTION: TOY2 0x004AC300 [MATCHED]
 	HRESULT DrawIndexedPrimitive(D3DPRIMITIVETYPE d3dptPrimitiveType,
@@ -850,15 +841,11 @@ namespace HardwareDevice
 
 	// FUNCTION: TOY2 0x004AC080 [MATCHED]
 	HRESULT CreateVertexBuffer(D3DVERTEXBUFFERDESC* desc, LPDIRECT3DVERTEXBUFFER* outBuffer, DWORD flags)
-	{
-		return DrawingDevice::g_drawingDevice->m_pD3D->CreateVertexBuffer(desc, outBuffer, flags, 0);
-	}
+	{ return DrawingDevice::g_drawingDevice->m_pD3D->CreateVertexBuffer(desc, outBuffer, flags, 0); }
 
 	// FUNCTION: TOY2 0x004AC0A0 [MATCHED]
 	HRESULT LockVertexBuffer(LPDIRECT3DVERTEXBUFFER vertexBuffer, DWORD dwFlags, LPVOID* lplpData, DWORD* lpStride)
-	{
-		return vertexBuffer->Lock(dwFlags, lplpData, lpStride);
-	}
+	{ return vertexBuffer->Lock(dwFlags, lplpData, lpStride); }
 
 	// FUNCTION: TOY2 0x004AC0C0 [MATCHED]
 	HRESULT UnlockVertexBuffer(LPDIRECT3DVERTEXBUFFER buffer) { return buffer->Unlock(); }
@@ -874,7 +861,5 @@ namespace HardwareDevice
 		LPDIRECT3DVERTEXBUFFER srcBuffer,
 		DWORD dwSrcIndex,
 		DWORD dwFlags)
-	{
-		return destBuffer->ProcessVertices(dwVertexOp, dwDestIndex, dwCount, srcBuffer, dwSrcIndex, DrawingDevice::g_drawingDevice->m_pd3dDevice, dwFlags);
-	}
+	{ return destBuffer->ProcessVertices(dwVertexOp, dwDestIndex, dwCount, srcBuffer, dwSrcIndex, DrawingDevice::g_drawingDevice->m_pd3dDevice, dwFlags); }
 }

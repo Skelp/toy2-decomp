@@ -98,6 +98,9 @@ namespace SoftwareRenderer
 
 	// STUB: TOY2 0x00470C70
 	void UnkFunc7() {}
+
+	// STUB: TOY2 0x004B6220
+	void SubmitQuad(int32_t renderFlags, int32_t textureIndex, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices) {}
 }
 
 namespace SoftwareDevice
@@ -106,9 +109,7 @@ namespace SoftwareDevice
 
 	// STUB: TOY2 0x004B9950
 	HRESULT DrawIndexedPrimitiveVB(D3DPRIMITIVETYPE primitiveType, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices, DWORD indexCount, DWORD flags)
-	{
-		return DDERR_UNSUPPORTED;
-	}
+	{ return DDERR_UNSUPPORTED; }
 
 	// STUB: TOY2 0x004B99F0
 	HRESULT DrawIndexedPrimitive(D3DPRIMITIVETYPE d3dptPrimitiveType,
@@ -118,9 +119,7 @@ namespace SoftwareDevice
 		LPWORD lpwIndices,
 		DWORD dwIndexCount,
 		DWORD dwFlags)
-	{
-		return DDERR_UNSUPPORTED;
-	}
+	{ return DDERR_UNSUPPORTED; }
 
 	// Vertex Methods
 
@@ -147,7 +146,5 @@ namespace SoftwareDevice
 		LPDIRECT3DVERTEXBUFFER srcBuffer,
 		DWORD dwSrcIndex,
 		DWORD dwFlags)
-	{
-		return DDERR_UNSUPPORTED;
-	}
+	{ return DDERR_UNSUPPORTED; }
 }

@@ -33,6 +33,8 @@ namespace SoftwareRenderer
 	void PresentFrame();
 	void SetCameraNearFarZ(float nearZ, float farZ);
 
+	void SubmitQuad(int32_t renderFlags, int32_t textureIndex, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices);
+
 	void UnkFunc67(int32_t param1, int32_t param2);
 	void UnkFunc2();
 	int16_t UnkFunc3();

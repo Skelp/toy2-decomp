@@ -131,6 +131,7 @@ namespace DrawingDevice
 	HRESULT GetChosenDevice_T(DDAppDevice::App** outApp, DDAppDevice** outDevice);
 	DDAppDevice::App* GetListHead();
 	LPD3DDEVICEDESC CopySurfaceDesc(LPD3DDEVICEDESC outSurfaceDesc);
+	void SetWorldTransform(D3DMATRIX* transform);
 	HRESULT SetViewTransform(D3DMATRIX* transform);
 	HRESULT SetProjectionTransform(D3DMATRIX* transform);
 	HRESULT SetRenderState(D3DRENDERSTATETYPE renderStateType, DWORD value);
