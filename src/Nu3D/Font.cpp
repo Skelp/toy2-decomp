@@ -43,6 +43,24 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x00884490
 	VertexTL g_textVertices[6];
 
+	// Per-character clip deltas, written by Compute*CharClip and read by the
+	// DrawClipped*Glyph primitives. Each delta is a signed distance from a glyph
+	// edge to the corresponding clip bound: negative means the edge is inside
+	// (visible), non-negative means it is clipped. The combined sign bit is set
+	// only when all four edges are inside (fully visible), which selects the
+	// fast unclipped Draw*Glyph path over the clipped one.
+	// GLOBAL: TOY2 0x00884550
+	int32_t g_charClipDX1 = 0;
+
+	// GLOBAL: TOY2 0x00884554
+	int32_t g_charClipDX2 = 0;
+
+	// GLOBAL: TOY2 0x0088455C
+	int32_t g_charClipDY1 = 0;
+
+	// GLOBAL: TOY2 0x00884564
+	int32_t g_charClipDY2 = 0;
+
 	// GLOBAL: TOY2 0x00884558
 	HGDIOBJ g_oldBitmap = 0;
 
@@ -320,8 +338,23 @@ namespace Nu3D
 	// FUNCTION: TOY2 0x004B38C0 [MATCHED]
 	void Font::SetRenderFlags(int32_t flags) { g_fontRenderFlags = flags ? 0x200 : 0; }
 
-	// STUB: TOY2 0x004B5310
-	int32_t Font::ComputeUnscaledCharClip(char c) { return 0; }
+	// FUNCTION: TOY2 0x004B5310
+	int32_t Font::ComputeUnscaledCharClip(char c)
+	{
+		Font* font = g_currentFont;
+		GlyphInfo* glyph = &font->glyphs[font->charToGlyphIndex[(uint8_t)c]];
+
+		int32_t clipDX1 = g_textClipX1 - g_textCursorX;
+		g_charClipDX1 = clipDX1;
+		int32_t clipDX2 = glyph->width - g_textClipX2 + g_textCursorX;
+		g_charClipDX2 = clipDX2;
+		int32_t clipDY1 = font->fontAscent - g_textCursorY + g_textClipY1;
+		g_charClipDY1 = clipDY1;
+		int32_t clipDY2 = font->fontHeight - font->fontAscent - g_textClipY2 + g_textCursorY;
+		g_charClipDY2 = clipDY2;
+
+		return (clipDY2 & clipDY1 & clipDX2 & clipDX1) & 0x80000000;
+	}
 
 	// STUB: TOY2 0x004B4DE0
 	int32_t Font::DrawUnscaledGlyph(char c) { return 0; }

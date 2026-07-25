@@ -87,6 +87,10 @@ namespace Nu3D
 	extern int32_t g_textClipY1;
 	extern int32_t g_textClipX2;
 	extern int32_t g_textClipY2;
+	extern int32_t g_charClipDX1;
+	extern int32_t g_charClipDX2;
+	extern int32_t g_charClipDY1;
+	extern int32_t g_charClipDY2;
 	extern float g_fontScaleY;
 	extern float g_fontScaleX;
 	extern DrawTextStringFunc g_drawTextStringFunc;
