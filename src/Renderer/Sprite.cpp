@@ -48,6 +48,9 @@ namespace Renderer
 		// GLOBAL: TOY2 0x005087DC
 		WORD g_quadSpriteFromVertsIndices[4] = { 0, 1, 2, 3 };
 
+		// GLOBAL: TOY2 0x005087E4
+		WORD g_lineSpriteIndices[2] = { 0, 1 };
+
 		// FUNCTION: TOY2 0x004B68B0
 		HRESULT Render2DSprite(Nu3D::Sprite* sprite)
 		{
@@ -367,6 +370,32 @@ namespace Renderer
 					}
 				}
 			}
+		}
+
+		// FUNCTION: TOY2 0x004B8330
+		void RenderType10(Nu3D::Sprite* sprite)
+		{
+			Nu3D::Vertex lineVerts[2];
+
+			lineVerts[0].coords.x = 0.0f;
+			lineVerts[0].coords.y = 0.0f;
+			lineVerts[1].coords.x = 0.0f;
+			lineVerts[1].coords.y = 0.0f;
+			lineVerts[0].position = sprite->position;
+			lineVerts[1].position = sprite->triVerts[0];
+			lineVerts[0].diffuse = sprite->color;
+			lineVerts[1].diffuse = sprite->color;
+
+			D3DMATRIX matrix;
+			Nu3D::Math::BuildIdentityMatrix(&matrix);
+			DrawingDevice::SetWorldTransform(&matrix);
+
+			Renderer::InitRenderState(sprite->renderFlags | RENDER_CULL_NONE);
+			SoftwareRenderer::g_unkE4D950 = 5;
+			Renderer::BindTexture(0);
+			SoftwareRenderer::g_viewportRect = &sprite->viewportRect;
+
+			DrawingAPI::DrawIndexedPrimitive(D3DPT_LINESTRIP, D3DFVF_0x152, lineVerts, 2, g_lineSpriteIndices, 2, 24);
 		}
 
 		// FUNCTION: TOY2 0x004B8DD0
@@ -785,6 +814,9 @@ namespace Renderer
 							break;
 						case RENDER_QUAD_SPRITE_FROM_VERTS:
 							RenderQuadSpriteFromVerts(commandPointer);
+							break;
+						case RENDER_TYPE10:
+							RenderType10(commandPointer);
 							break;
 						default:
 							break;
