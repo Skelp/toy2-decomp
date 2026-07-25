@@ -37,4 +37,7 @@ namespace D3DApp
 	LRESULT WINAPI NormalWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 	void SysParmsOnExit();
+
+	char* GetErrorNotSet();
+	void LogErrorNotSet();
 }

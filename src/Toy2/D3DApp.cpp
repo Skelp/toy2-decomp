@@ -43,8 +43,15 @@ namespace D3DApp
 
 namespace D3DApp
 {
-	// STUB: TOY2 0x004318F0
-	void LogErrorNotSet() {}
+	// FUNCTION: TOY2 0x0040D2C0 [MATCHED]
+	char* GetErrorNotSet() { return "ERROR NOT SET"; }
+
+	// FUNCTION: TOY2 0x004318F0 [MATCHED]
+	void LogErrorNotSet()
+	{
+		char* error = GetErrorNotSet();
+		Logger::LogLn(error);
+	}
 
 	// FUNCTION: TOY2 0x004093A0
 	int32_t BuildProfileMachine()
