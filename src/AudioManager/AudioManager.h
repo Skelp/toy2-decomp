@@ -13,6 +13,9 @@ namespace AudioManager
 	void ReleaseBuffers();
 	void Init();
 	void SetVolumesProcessed(int32_t musicVolume, int32_t sfxVolume);
+	void SetMusicVolume(int32_t musicVolume);
+	void SetSfxVolume(int32_t sfxVolume);
+	void SetVolumes(int32_t musicVolume, int32_t sfxVolume);
 	void FlushSoundVoices();
 	int32_t StopAndWait();
 	void LoadSfxPackForLevel(int32_t levelId);
@@ -23,4 +26,8 @@ namespace AudioManager
 
 	extern int16_t g_musicVolTable[12];
 	extern int16_t g_soundVolTable[12];
+	extern int32_t g_sfxVolume;
+	extern int32_t g_musicVolumeLevel;
+	extern void* g_dsPrimaryBuffer;
+	extern int16_t g_dsVolTable[151];
 }
