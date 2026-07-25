@@ -382,7 +382,7 @@
 0x0047D880 AudioManager::PlayMusicLooping
 0x0047D8D0 Toy2::UnusedInit
 0x0047D8E0 AudioManager::IsEffectPlaying
-0x0047D930 AudioManager::ReassertChannelPlaying
+0x0047D930 AudioManager::RestartLoopingSound
 0x0047DE50 AudioManager::PlaySoundBuffer
 0x0047E3C0 AudioManager::Enumerate
 0x0047E420 AudioManager::CreateDirectSoundBuffer

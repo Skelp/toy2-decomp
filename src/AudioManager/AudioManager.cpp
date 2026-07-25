@@ -68,6 +68,15 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x0053C848
 	int32_t g_streamCommand;
 
+	// GLOBAL: TOY2 0x00725E94
+	int32_t g_pendingStreamTrack;
+
+	// GLOBAL: TOY2 0x00725E98
+	int32_t g_pendingStreamNoFade;
+
+	// GLOBAL: TOY2 0x00830E58
+	int16_t g_loopingSoundChannels[32][5];
+
 	// GLOBAL: TOY2 0x005282F0
 	void* g_dsPrimaryBuffer;
 
@@ -381,8 +390,46 @@ namespace AudioManager
 	// STUB: TOY2 0x004A3B90
 	int32_t PlayLoopingSound3DPositional(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, void* unused, int16_t rightVolume) { return 0; }
 
-	// STUB: TOY2 0x004A3BE0
-	void UpdateChannels() {}
+	// STUB: TOY2 0x0047D930
+	int32_t RestartLoopingSound(int32_t soundId) { return 0; }
+
+	// FUNCTION: TOY2 0x004A3BE0 [MATCHED]
+	void UpdateChannels()
+	{
+		if (g_streamPending != 0 && --g_streamPending == 0)
+		{
+			if (g_pendingStreamNoFade != 0)
+			{
+				PlayTrackByIndex(g_pendingStreamTrack, 0);
+			}
+			else
+			{
+				PlayTrackByIndex(g_pendingStreamTrack, 1);
+			}
+		}
+		int16_t* p = &g_loopingSoundChannels[0][1];
+		do
+		{
+			if (p[-1] != -1 && *p != -1)
+			{
+				if (--*p <= 0)
+				{
+					if (RestartLoopingSound(p[-1]) == 1)
+					{
+						*p = 1;
+					}
+					else
+					{
+						p[-1] = -1;
+					}
+				}
+			}
+			p += 5;
+			// Loop bound is one past the 32nd channel's countdown field
+			// (g_loopingSoundChannels base 0x00830E58 + 32*10 + 2). Expressed as a
+			// raw address because the symbol form resolves ambiguously in reccmp.
+		} while ((int)p < 0x830f9a);
+	}
 
 	// FUNCTION: TOY2 0x004A3ED0 [MATCHED]
 	void SetVolumes(int32_t musicVolume, int32_t sfxVolume)
