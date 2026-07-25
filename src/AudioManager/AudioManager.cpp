@@ -35,6 +35,9 @@ namespace AudioManager
 	// GLOBAL: TOY2 005282CC
 	int32_t g_curTrackIndex;
 
+	// GLOBAL: TOY2 0x00559C68
+	int32_t g_loopingMusicTrackIndex;
+
 	// GLOBAL: TOY2 0x00724E80
 	int32_t g_audioInitialized;
 
@@ -338,8 +341,21 @@ namespace AudioManager
 		}
 	}
 
-	// STUB: TOY2 0x0047D880
-	void PlayMusicLooping(int16_t trackIndex) {}
+	// FUNCTION: TOY2 0x0047D880
+	void PlayMusicLooping(int16_t trackIndex)
+	{
+		if (g_audioInitialized)
+		{
+			if (IsStreamActive())
+			{
+				StopAndWait();
+				while (IsStreamActive()) {}
+			}
+			g_streamPending = 0;
+			PlayTrackByIndex(trackIndex, 1);
+			g_loopingMusicTrackIndex = trackIndex;
+		}
+	}
 
 	// STUB: TOY2 0x004A3B90
 	int32_t PlayLoopingSound3DPositional(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, void* unused, int16_t rightVolume) { return 0; }

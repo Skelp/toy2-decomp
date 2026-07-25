@@ -5,6 +5,7 @@
 namespace AudioManager
 {
 	extern int32_t g_curTrackIndex;
+	extern int32_t g_loopingMusicTrackIndex;
 
 	void StopAndFlush();
 	int32_t IsStreamActive();
