@@ -113,6 +113,8 @@ namespace Renderer
 	void RenderPrimitive(Nu3D::Primitive* primitive, const D3DMATRIX* transform, int32_t renderFlags);
 	void ProcessPrimitive(Nu3D::InstanceData* instanceData, Nu3D::Primitive* primitive);
 	void BindTexture(int32_t texIndex);
+	void BindMaterial(Nu3D::Material* material, int32_t force);
+	void UnbindMaterial();
 	void DrawSingleTexturedTriangle(Nu3D::VertexTL* vertices, int32_t texIndex, int32_t renderFlags);
 
 	STATIC_ASSERT(sizeof(RenderEntry) == 0x18);

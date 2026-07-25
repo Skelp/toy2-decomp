@@ -1432,6 +1432,43 @@ namespace Renderer
 		return color;
 	}
 
+	// FUNCTION: TOY2 0x004C27D0
+	void BindMaterial(Nu3D::Material* material, int32_t force)
+	{
+		if (g_boundMaterial != material || force != 0)
+		{
+			g_boundMaterial = material;
+
+			if (material != 0)
+			{
+				if (g_isSoftwareRendering == 0)
+					DrawingDevice::SetLightState(D3DLIGHTSTATE_MATERIAL, material->d3dMaterialHandle);
+
+				for (int32_t stage = 0; stage < g_maxSimultaneousTextures; ++stage)
+				{
+					if (g_boundTextureIndices[stage] != material->texDataIndex)
+					{
+						g_boundTextureIndices[stage] = material->texDataIndex;
+						DrawingDevice::BindTexWithStage(material->texDataIndex, stage);
+					}
+
+					material = material->nextPass;
+
+					if (material == 0)
+						return;
+				}
+			}
+			else
+			{
+				for (int32_t stage = 0; stage < g_maxSimultaneousTextures; ++stage)
+					g_boundTextureIndices[stage] = -1;
+			}
+		}
+	}
+
+	// FUNCTION: TOY2 0x004B8450
+	void UnbindMaterial() { BindMaterial(0, 0); }
+
 	// FUNCTION: TOY2 0x004C2870 [MATCHED]
 	void BindTexture(int32_t texIndex)
 	{
