@@ -37,6 +37,7 @@ namespace Toy2
 	extern int32_t g_nextBackdropId;
 	extern int16_t g_levelIndex;
 	extern int16_t g_unlocks;
+	extern int32_t g_levelFileConversion[15];
 
 	STATIC_ASSERT(sizeof(ToyCfg) == 0x18);
 }

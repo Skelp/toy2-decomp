@@ -19,4 +19,8 @@ namespace AudioManager
 	int32_t PlayOneShotSoundGlobal(int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume);
 	void PlayMusicOneShot(int32_t trackIndex);
 	void UpdateChannels();
+	void SetVolumes(int32_t musicVolume, int32_t sfxVolume);
+
+	extern int16_t g_musicVolTable[12];
+	extern int16_t g_soundVolTable[12];
 }
