@@ -63,6 +63,7 @@ namespace Nu3D
 		static int32_t CalculateUnscaledTextSize(const char* text);
 		static int32_t CalculateScaledTextSize(const char* text);
 		static HBITMAP CreateAtlasBmp(int32_t width, int32_t height);
+		static HDC CreateDC();
 		static void Destroy(Font* font);
 		static void ClearList();
 		static Font* BuildObject(int32_t numGlyphs);
