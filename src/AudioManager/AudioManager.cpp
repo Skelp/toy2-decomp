@@ -2,6 +2,7 @@
 #include "FileUtils.h"
 #include "Logger.h"
 #include <cstring>
+#include <stdio.h>
 #include <directx6/dsound.h>
 
 namespace AudioManager
@@ -788,8 +789,103 @@ namespace AudioManager
 			return 0;
 		}
 
-		// STUB: TOY2 0x004A3F10
-		MMRESULT OpenFile(LPSTR path, HMMIO* outHmmio, HGLOBAL* outFormatHandle, MMCKINFO* parentChunk) { return 0; }
+		// FUNCTION: TOY2 0x004A3F10
+		MMRESULT OpenFile(LPSTR path, HMMIO* outHmmio, HGLOBAL* outFormatHandle, MMCKINFO* parentChunk)
+		{
+			*outFormatHandle = NULL;
+			HMMIO hmmio = NULL;
+			MMRESULT result;
+			FILE* file = fopen(path, "rb");
+			if (file != NULL)
+			{
+				fclose(file);
+				hmmio = mmioOpen(path, NULL, MMIO_ALLOCBUF);
+				if (hmmio != NULL)
+				{
+					result = mmioDescend(hmmio, parentChunk, NULL, 0);
+					if (result != 0)
+					{
+						goto cleanup;
+					}
+					if (parentChunk->ckid != mmioFOURCC('R', 'I', 'F', 'F') || parentChunk->fccType != mmioFOURCC('W', 'A', 'V', 'E'))
+					{
+						goto badFormat;
+					}
+					MMCKINFO fmtChunk;
+					fmtChunk.ckid = mmioFOURCC('f', 'm', 't', ' ');
+					result = mmioDescend(hmmio, &fmtChunk, parentChunk, MMIO_FINDCHUNK);
+					if (result != 0)
+					{
+						goto cleanup;
+					}
+					if (fmtChunk.cksize < 0x10)
+					{
+					badFormat:
+						result = 0xe101;
+						goto cleanup;
+					}
+					PCMWAVEFORMAT format;
+					if (mmioRead(hmmio, (HPSTR)&format, 0x10) != 0x10)
+					{
+						result = 0xe102;
+						goto cleanup;
+					}
+					uint32_t cbSize;
+					if (format.wf.wFormatTag == WAVE_FORMAT_PCM)
+					{
+						cbSize = 0;
+					}
+					else
+					{
+						if (mmioRead(hmmio, (HPSTR)&cbSize, 2) != 2)
+						{
+							result = 0xe102;
+							goto cleanup;
+						}
+					}
+					HGLOBAL h;
+					h = GlobalAlloc(GMEM_FIXED, (cbSize & 0xffff) + sizeof(WAVEFORMATEX));
+					*outFormatHandle = h;
+					if (h == NULL)
+					{
+						result = 0xe000;
+						goto cleanup;
+					}
+					*(PCMWAVEFORMAT*)h = format;
+					((WAVEFORMATEX*)*outFormatHandle)->cbSize = (uint16_t)cbSize;
+					if (cbSize != 0)
+					{
+						if (mmioRead(hmmio, (HPSTR)((char*)h + sizeof(WAVEFORMATEX)), cbSize & 0xffff) != (cbSize & 0xffff))
+						{
+							result = 0xe101;
+							goto cleanup;
+						}
+					}
+					result = mmioAscend(hmmio, &fmtChunk, 0);
+					if (result != 0)
+					{
+						goto cleanup;
+					}
+					*outHmmio = hmmio;
+					return result;
+				}
+			}
+			result = 0xe100;
+		cleanup:
+			if (*outFormatHandle != NULL)
+			{
+				GlobalFree(*outFormatHandle);
+				*outFormatHandle = NULL;
+			}
+			if (hmmio == NULL)
+			{
+				*outHmmio = NULL;
+				return result;
+			}
+			mmioClose(hmmio, 0);
+			*outHmmio = NULL;
+			return result;
+		}
 	}
 
 	namespace Stream
