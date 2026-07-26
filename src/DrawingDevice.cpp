@@ -509,6 +509,39 @@ namespace DrawingDevice
 		return result;
 	}
 
+	// FUNCTION: TOY2 0x004AFA60
+	int32_t CD3DFramework::GetSlotSurfaceCaps(int32_t index, uint32_t* capsOut)
+	{
+		if (index > 8)
+			return 0x8200000F;
+
+		DrawingDeviceSlot* slot = &m_slots[index];
+
+		if (! slot->valid)
+			return 0x8200000F;
+
+		slot->surface1->GetCaps((LPDDSCAPS2)capsOut);
+
+		return 0;
+	}
+
+	// FUNCTION: TOY2 0x004AFAA0
+	int32_t CD3DFramework::GetSlotTexSize(int32_t index, int32_t* widthOut, int32_t* heightOut)
+	{
+		if (index > 8)
+			return 0x8200000F;
+
+		DrawingDeviceSlot* slot = &m_slots[index];
+
+		if (! slot->valid)
+			return 0x8200000F;
+
+		*widthOut = slot->width;
+		*heightOut = slot->height;
+
+		return 0;
+	}
+
 	// FUNCTION: TOY2 0x004ABEB0
 	HRESULT CD3DFramework::Build(HWND hWnd, GUID* guid, DDAppDevice* device, DDAppDevice::DisplayMode* displayMode, uint8_t flags)
 	{
@@ -620,11 +653,11 @@ namespace DrawingDevice
 	// FUNCTION: TOY2 0x004ABE30
 	int32_t GetSlotSurfaceByIndex(int32_t index, LPDIRECTDRAWSURFACE4* surfaceOut) { return g_drawingDevice->GetSlotSurfaceByIndex(index, surfaceOut); }
 
-	// STUB: TOY2 0x004ABE50
-	int32_t GetSlotSurfaceCaps(int32_t index, uint32_t* capsOut) { return 0; }
+	// FUNCTION: TOY2 0x004ABE50
+	int32_t GetSlotSurfaceCaps(int32_t index, uint32_t* capsOut) { return g_drawingDevice->GetSlotSurfaceCaps(index, capsOut); }
 
-	// STUB: TOY2 0x004ABE70
-	int32_t GetSlotTexSize(int32_t index, int32_t* widthOut, int32_t* heightOut) { return 0; }
+	// FUNCTION: TOY2 0x004ABE70
+	int32_t GetSlotTexSize(int32_t index, int32_t* widthOut, int32_t* heightOut) { return g_drawingDevice->GetSlotTexSize(index, widthOut, heightOut); }
 
 	// FUNCTION: TOY2 0x004ABB30 [MATCHED]
 	int32_t SetViewport(LPD3DVIEWPORT2 viewport)

@@ -726,6 +726,8 @@
 0x004AF550 CD3DFramework::CreateAndSetViewport
 0x004AF640 DrawingDevice::CD3DFramework::RestoreToGDISurface
 0x004AFA20 CD3DFramework::GetSlotSurfaceByIndex
+0x004AFA60 CD3DFramework::GetSlotSurfaceCaps
+0x004AFAA0 CD3DFramework::GetSlotTexSize
 0x004AFAF0 Nu3D::SetMinTexSize
 0x004AFB20 Nu3D::ReleaseBmpDataNode
 0x004AFBA0 Nu3D::DestroyBmpDataNode
