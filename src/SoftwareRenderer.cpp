@@ -124,6 +124,18 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00DBB088
 	int32_t g_clipBottom;
 
+	// GLOBAL: TOY2 0x00508964
+	int32_t g_cachedViewportTop = 0;
+
+	// GLOBAL: TOY2 0x00508968
+	int32_t g_cachedViewportBottom = 0;
+
+	// GLOBAL: TOY2 0x0050896C
+	int32_t g_cachedViewportLeft = 0;
+
+	// GLOBAL: TOY2 0x00508970
+	int32_t g_cachedViewportRight = 0;
+
 	// GLOBAL: TOY2 0x00A4CC6C
 	int32_t g_zoomLevel;
 
@@ -176,6 +188,12 @@ namespace SoftwareRenderer
 
 	// GLOBAL: TOY2 0x004DDB40
 	extern const double k_hSpanScale = 1.0 / 220.0;
+
+	// GLOBAL: TOY2 0x004DDAE0
+	extern const double k_viewportScaleV = 1.7;
+
+	// GLOBAL: TOY2 0x004DDAD8
+	extern const double k_viewportScaleH = 1.9;
 
 	// Heap buffer allocated by InitSoftwareRenderer (malloc'd, ~1.25MB) and
 	// released by Destroy on shutdown.
@@ -597,8 +615,84 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// STUB: TOY2 0x004BCC70
-	void UnkFunc17(int32_t top, int32_t bottom, int32_t left, int32_t right) {}
+	// Converts the viewport rect (passed as top/bottom/left/right matching the
+	// ViewportRect field order; GetViewClipRect stores the left value in the
+	// bottom field and the bottom value in the left field) into the integer
+	// clip rect g_clipTop/Bottom/Left/Right. Each edge is recomputed only when
+	// its source field changes since the last call. The vertical pair (top,
+	// left-field) scales through g_screenDimV; the horizontal pair (bottom-field,
+	// right) scales through g_screenDimH.
+	//
+	// Residual diff is CAP-15: the build CSEs the right param load into ECX
+	// where retail re-reads [esp+0x20] at each use, which reorders the V/H
+	// conditional blocks. The scale and clamp blocks all match.
+	// FUNCTION: TOY2 0x004BCC70
+	void UnkFunc17(int32_t top, int32_t bottom, int32_t left, int32_t right)
+	{
+		int32_t vCenter;
+		int32_t hCenter;
+		float scaleV;
+		float scaleH;
+
+		if (top != g_cachedViewportTop || left != g_cachedViewportLeft)
+		{
+			vCenter = g_screenDimV >> 1;
+			scaleV = (float)((g_bottomOffset - g_topOffset + 1) * k_viewportScaleV / g_screenDimV);
+		}
+		else
+		{
+			vCenter = right;
+		}
+		if (bottom != g_cachedViewportBottom || right != g_cachedViewportRight)
+		{
+			hCenter = g_screenDimH >> 1;
+			scaleH = (float)((g_rightOffset - g_leftOffset + 1) * k_viewportScaleH / g_screenDimH);
+		}
+		else
+		{
+			hCenter = right;
+		}
+		if (top != g_cachedViewportTop)
+		{
+			g_cachedViewportTop = top;
+			int32_t clipTop = (int32_t)((top - vCenter) * scaleV) + vCenter - 4;
+			if (clipTop < g_topOffset)
+			{
+				clipTop = g_topOffset;
+			}
+			g_clipTop = clipTop;
+		}
+		if (left != g_cachedViewportLeft)
+		{
+			g_cachedViewportLeft = left;
+			int32_t clipBottom = (int32_t)((left - vCenter) * scaleV) + vCenter + 4;
+			if (clipBottom > g_bottomOffset)
+			{
+				clipBottom = g_bottomOffset;
+			}
+			g_clipBottom = clipBottom;
+		}
+		if (bottom != g_cachedViewportBottom)
+		{
+			g_cachedViewportBottom = bottom;
+			int32_t clipLeft = (int32_t)((bottom - hCenter) * scaleH) + hCenter - 6;
+			if (clipLeft < g_leftOffset)
+			{
+				clipLeft = g_leftOffset;
+			}
+			g_clipLeft = clipLeft;
+		}
+		if (right != g_cachedViewportRight)
+		{
+			g_cachedViewportRight = right;
+			int32_t clipRight = (int32_t)((right - hCenter) * scaleH) + hCenter + 0x20;
+			if (clipRight > g_rightOffset)
+			{
+				clipRight = g_rightOffset;
+			}
+			g_clipRight = clipRight;
+		}
+	}
 
 	// STUB: TOY2 0x004C14A0
 	void UnkFunc19(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags) {}

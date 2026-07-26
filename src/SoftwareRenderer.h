@@ -33,6 +33,14 @@ namespace SoftwareRenderer
 	extern int32_t g_clipRight;
 	extern int32_t g_clipTop;
 	extern int32_t g_clipBottom;
+	// Last viewport-rect values seen by UnkFunc17. Each clip edge is recomputed
+	// only when its source rect field changes, so repeated draws with the same
+	// viewport skip the float scaling work. Named for the ViewportRect field each
+	// caches (see GetViewClipRect: the bottom field holds the left value).
+	extern int32_t g_cachedViewportTop;
+	extern int32_t g_cachedViewportBottom;
+	extern int32_t g_cachedViewportLeft;
+	extern int32_t g_cachedViewportRight;
 	// Zoom step counter clamped to [0,10]; the zoomed source extents below are
 	// adjusted by ZoomIn/ZoomOut and CommitZoom derives the render scale from
 	// extent / screen dimension.
@@ -55,6 +63,11 @@ namespace SoftwareRenderer
 	extern float g_secondaryRenderDistance;
 	extern const double k_vSpanScale;
 	extern const double k_hSpanScale;
+	// Viewport-to-clip-rect scale factors used by UnkFunc17. The vertical scale
+	// maps the rect's top/bottom edges through the screen height, and the
+	// horizontal scale maps left/right through the screen width.
+	extern const double k_viewportScaleV;
+	extern const double k_viewportScaleH;
 	extern void* g_softwareRendererBuffer;
 	extern LPVOID g_primarySurfacePtr;
 	extern int32_t g_primarySurfacePitch;
