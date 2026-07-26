@@ -1,5 +1,7 @@
 #include "AudioManager/AudioManager.h"
+#include "FileUtils.h"
 #include "Logger.h"
+#include <cstring>
 
 struct IDirectSoundBuffer;
 
@@ -32,7 +34,7 @@ struct IDirectSoundBuffer
 
 namespace AudioManager
 {
-	// GLOBAL: TOY2 005282CC
+	// GLOBAL: TOY2 0x005282CC
 	int32_t g_curTrackIndex;
 
 	// GLOBAL: TOY2 0x00559C68
@@ -296,8 +298,50 @@ namespace AudioManager
 	// FUNCTION: TOY2 0x00413300 [MATCHED]
 	int32_t IsStreamActive() { return g_streamActive; }
 
-	// STUB: TOY2 0x00413150
-	void PlayTrackByIndex(int32_t trackIndex, int32_t fadeMode) {}
+	// GLOBAL: TOY2 0x004ECCD8
+	const char* g_trackNames[22] = { "house",
+		"neighbou",
+		"buzvred",
+		"constr",
+		"alley",
+		"slime",
+		"als_toyb",
+		"spacelnd",
+		"buzvbuz",
+		"elev",
+		"als_pent",
+		"buzvzurg",
+		"convey",
+		"tarmac",
+		"buzvpros",
+		"miniboss",
+		"minirace",
+		"over",
+		"complete",
+		"ygafim",
+		"titlescr",
+		"levcomp" };
+
+	// STUB: TOY2 0x00436CE0
+	void QueuePlay(char* path, int32_t fadeMode) {}
+
+	// FUNCTION: TOY2 0x00413150
+	int32_t PlayTrackByIndex(int32_t trackIndex, int32_t fadeMode)
+	{
+		char buffer[512];
+
+		StopAndWait();
+		if (trackIndex >= 0x16 || trackIndex < 0)
+			return 0;
+
+		FileUtils::AppendCDPath(buffer);
+		strcat(buffer, "audio\\");
+		strcat(buffer, g_trackNames[trackIndex]);
+		strcat(buffer, ".wav");
+		QueuePlay(buffer, fadeMode);
+		g_curTrackIndex = trackIndex;
+		return 1;
+	}
 
 	// STUB: TOY2 0x0047DE50
 	int32_t PlaySoundBuffer(int32_t soundIndex, int32_t leftVolume, int32_t rightVolume, int32_t pan, int32_t volume, int32_t flags) { return 0; }

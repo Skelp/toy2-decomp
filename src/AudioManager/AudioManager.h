@@ -10,7 +10,8 @@ namespace AudioManager
 
 	void StopAndFlush();
 	int32_t IsStreamActive();
-	void PlayTrackByIndex(int32_t trackIndex, int32_t fadeMode);
+	int32_t PlayTrackByIndex(int32_t trackIndex, int32_t fadeMode);
+	void QueuePlay(char* path, int32_t fadeMode);
 	int32_t PlaySoundBuffer(int32_t soundIndex, int32_t leftVolume, int32_t rightVolume, int32_t pan, int32_t volume, int32_t flags);
 	void ReleaseBuffers();
 	void Init();
