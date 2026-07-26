@@ -476,6 +476,28 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x00490290
 	int16_t UnkFunc3() { return 0; }
 
+	// FUNCTION: TOY2 0x004BCAD0
+	void UnkFunc29(Nu3D::VertexTL* vertices[4], int32_t vertexCount, int32_t field80, int32_t field88)
+	{
+		if (g_unkDE20A8 < 0x400)
+		{
+			RenderCommand* command = &g_renderQueue[g_unkDE20A8];
+			g_unkDE20A8++;
+			Nu3D::VertexTL* dst = command->vertices;
+			for (int i = 0; i < 3; i++)
+			{
+				dst[i] = *vertices[i];
+			}
+			if (vertexCount == 4)
+			{
+				dst[3] = *vertices[3];
+			}
+			command->vertexCount = vertexCount;
+			command->field80 = field80;
+			command->field88 = field88;
+		}
+	}
+
 	// FUNCTION: TOY2 0x004BCBE0 [MATCHED]
 	void UnkFunc31()
 	{

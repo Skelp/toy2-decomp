@@ -104,6 +104,7 @@ namespace SoftwareRenderer
 	// The metadata at +0x80 is only partially understood; refine the names when
 	// UnkFunc29 and UnkFunc35 are reconstructed.
 	struct RenderCommand;
+	void UnkFunc29(Nu3D::VertexTL* vertices[4], int32_t vertexCount, int32_t field80, int32_t field88);
 	void UnkFunc35(RenderCommand* command, int32_t vertexCount, int32_t field88, int32_t field80, int32_t field94);
 }
 
