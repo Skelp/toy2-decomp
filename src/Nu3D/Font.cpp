@@ -2,6 +2,7 @@
 
 #include "DrawingDevice.h"
 #include "Nu3D/BmpDataNode.h"
+#include "Nu3D/DrawSurface.h"
 #include "Renderer/Renderer.h"
 
 namespace Nu3D
@@ -204,8 +205,26 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x005086F8
 	int16_t g_defaultGlyphChar = 0x3F;
 
-	// STUB: TOY2 0x004B4010
-	HDC Font::CreateDC() { return 0; }
+	// FUNCTION: TOY2 0x004B4010
+	HDC Font::CreateDC()
+	{
+		if (g_fontDC || g_fontDCReady)
+		{
+			ResetContext();
+		}
+
+		LPDIRECTDRAWSURFACE4 surface;
+		DrawingDevice::GetSlotSurfaceByIndex(0, &surface);
+
+		HDC hdc;
+		if (DrawSurface::GetDC(surface, &hdc) == 0)
+		{
+			g_fontDC = CreateCompatibleDC(hdc);
+			DrawSurface::ReleaseDC(surface, hdc);
+		}
+
+		return g_fontDC;
+	}
 
 	// FUNCTION: TOY2 0x004B4110
 	Font* Font::Build(const char* fontName, int32_t fontSize, const char* charSet)
