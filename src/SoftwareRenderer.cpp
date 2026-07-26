@@ -6,6 +6,7 @@
 #include "Nu3D/BmpDataNode.h"
 #include "Logger.h"
 #include <stdlib.h>
+#include <math.h>
 
 namespace SoftwareRenderer
 {
@@ -162,6 +163,12 @@ namespace SoftwareRenderer
 
 	// GLOBAL: TOY2 0x00E4D7B0
 	int32_t g_screenDimH;
+
+	// GLOBAL: TOY2 0x00B7FBA8
+	float g_primaryRenderDistance = 0.0f;
+
+	// GLOBAL: TOY2 0x00DE20A0
+	float g_secondaryRenderDistance = 0.0f;
 
 	// .rdata span-scale constants: 1/320 and 1/220.
 	// GLOBAL: TOY2 0x004DDB48
@@ -577,11 +584,43 @@ namespace SoftwareRenderer
 		return 1;
 	}
 
+	// FUNCTION: TOY2 0x004BC430 [MATCHED]
+	void UnkFunc18(float* primaryDistance, float* secondaryDistance)
+	{
+		if (primaryDistance != NULL)
+		{
+			*primaryDistance = sqrt(Renderer::g_primaryRenderDistanceSquared);
+		}
+		if (secondaryDistance != NULL)
+		{
+			*secondaryDistance = sqrt(Renderer::g_secondaryRenderDistanceSquared);
+		}
+	}
+
 	// STUB: TOY2 0x004BCC70
 	void UnkFunc17(int32_t top, int32_t bottom, int32_t left, int32_t right) {}
 
-	// STUB: TOY2 0x004C1720
-	void UnkFunc16(D3DPRIMITIVETYPE d3dptPrimitiveType, LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags) {}
+	// STUB: TOY2 0x004C14A0
+	void UnkFunc19(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags) {}
+
+	// STUB: TOY2 0x004C1540
+	void UnkFunc21(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags) {}
+
+	// FUNCTION: TOY2 0x004C1720 [MATCHED]
+	void UnkFunc16(D3DPRIMITIVETYPE d3dptPrimitiveType, LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags)
+	{
+		UnkFunc18(&g_primaryRenderDistance, &g_secondaryRenderDistance);
+		switch (d3dptPrimitiveType)
+		{
+			case D3DPT_TRIANGLELIST:
+				UnkFunc19(lpvVertices, lpwIndices, dwIndexCount, dwFlags);
+				break;
+			case D3DPT_TRIANGLESTRIP:
+				UnkFunc21(lpvVertices, lpwIndices, dwIndexCount, dwFlags);
+				break;
+		}
+		g_unk9F6008 = 0;
+	}
 
 	// STUB: TOY2 0x0047D210
 	void UnkFunc8(void* param1, int32_t param2) {}

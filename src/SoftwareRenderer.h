@@ -48,6 +48,11 @@ namespace SoftwareRenderer
 	extern float g_zoomScaleH;
 	extern int32_t g_screenDimV;
 	extern int32_t g_screenDimH;
+	// Square roots of Renderer::g_primaryRenderDistanceSquared and
+	// g_secondaryRenderDistanceSquared, refreshed by UnkFunc18 before each draw
+	// dispatch. The software rasterizer culls vertices against these distances.
+	extern float g_primaryRenderDistance;
+	extern float g_secondaryRenderDistance;
 	extern const double k_vSpanScale;
 	extern const double k_hSpanScale;
 	extern void* g_softwareRendererBuffer;
@@ -119,6 +124,9 @@ namespace SoftwareRenderer
 		DDSURFACEDESC2* surfaceDesc;
 	};
 	int32_t UnkFunc20(TextureData* out);
+	void UnkFunc18(float* primaryDistance, float* secondaryDistance);
+	void UnkFunc19(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags);
+	void UnkFunc21(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags);
 	void UnkFunc17(int32_t top, int32_t bottom, int32_t left, int32_t right);
 	void UnkFunc16(D3DPRIMITIVETYPE d3dptPrimitiveType, LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags);
 }
