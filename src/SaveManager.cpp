@@ -106,7 +106,8 @@ namespace SaveManager
 		save->unlocks = 0;
 		save->health = 0xe;
 		save->lives = 5;
-		memset(&save->tokens[1], 0, sizeof(save->tokens) - 1);
+		for (int32_t i = 1; i < 16; i++)
+			save->tokens[i] = 0;
 		memset(&save->moviesUnlocked, 0, sizeof(save->moviesUnlocked) + sizeof(save->padInt) + sizeof(save->padBytes));
 	}
 
