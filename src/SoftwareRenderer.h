@@ -44,6 +44,7 @@ namespace SoftwareRenderer
 	extern int32_t g_screenDimH;
 	extern const double k_vSpanScale;
 	extern const double k_hSpanScale;
+	extern void* g_softwareRendererBuffer;
 	extern uint8_t* g_currentRenderBuffer;
 	extern uint8_t* g_renderBufferPixels;
 	extern uint8_t g_renderBufferA[];

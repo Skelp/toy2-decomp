@@ -1,6 +1,8 @@
 #include "SoftwareRenderer.h"
 #include "Renderer/Renderer.h"
 #include "Toy2/MainMenu.h"
+#include "Logger.h"
+#include <stdlib.h>
 
 namespace SoftwareRenderer
 {
@@ -99,6 +101,11 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x004DDB40
 	extern const double k_hSpanScale = 1.0 / 220.0;
 
+	// Heap buffer allocated by InitSoftwareRenderer (malloc'd, ~1.25MB) and
+	// released by Destroy on shutdown.
+	// GLOBAL: TOY2 0x0084CBE0
+	void* g_softwareRendererBuffer;
+
 	// GLOBAL: TOY2 0x00882910
 	int32_t g_bitsPerPixel;
 
@@ -163,11 +170,18 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x004BCE00
 	void InitialisePrimarySurface() {}
 
-	// STUB: TOY2 0x004C1E60
-	void InitialisePrimarySurface_T() {}
+	// FUNCTION: TOY2 0x004C1E60
+	void InitialisePrimarySurface_T() { InitialisePrimarySurface(); }
 
-	// STUB: TOY2 0x0047D0F0
-	void Destroy() {}
+	// FUNCTION: TOY2 0x0047D0F0
+	void Destroy()
+	{
+		Logger::Log("QUIT : Destroying software renderer.\n");
+		if (g_softwareRendererBuffer)
+		{
+			free(g_softwareRendererBuffer);
+		}
+	}
 
 	// FUNCTION: TOY2 0x004C1E70
 	void CommitZoom()
