@@ -32,6 +32,7 @@ namespace AudioManager
 	void PlayMusicLooping(int16_t trackIndex);
 	int32_t PlayLoopingSound3D(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, int16_t rightVolume);
 	int32_t PlayLoopingSound3DPositional(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, void* unused, int32_t rightVolume);
+	void ResetChannelsTable();
 	void UpdateChannels();
 	int32_t RestartLoopingSound(int32_t soundId);
 	void SetVolumes(int32_t musicVolume, int32_t sfxVolume);

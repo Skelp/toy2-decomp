@@ -359,6 +359,17 @@ namespace AudioManager
 	// STUB: TOY2 0x0047D930
 	int32_t RestartLoopingSound(int32_t soundId) { return 0; }
 
+	// FUNCTION: TOY2 0x004A3BC0
+	void ResetChannelsTable()
+	{
+		int16_t* p = &g_loopingSoundChannels[0][0];
+		do
+		{
+			*p = -1;
+			p += 5;
+		} while (p < &g_loopingSoundChannels[32][0]);
+	}
+
 	// FUNCTION: TOY2 0x004A3BE0
 	void UpdateChannels()
 	{
