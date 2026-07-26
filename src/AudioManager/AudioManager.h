@@ -21,6 +21,7 @@ namespace AudioManager
 	void SetVolumes(int32_t musicVolume, int32_t sfxVolume);
 	void FlushSoundVoices();
 	int32_t StopAndWait();
+	void SignalThreadExit();
 	void LoadSfxPackForLevel(int32_t levelId);
 	int32_t PlayOneShotSoundGlobal(int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume);
 	void PlayMusicOneShot(int32_t trackIndex);
@@ -44,6 +45,7 @@ namespace AudioManager
 	extern int32_t g_streamFadeMode;
 	extern int32_t g_streamCommand;
 	extern char g_streamPath[512];
+	extern int32_t g_streamThreadReady;
 
 	extern int32_t g_pendingStreamTrack;
 	extern int32_t g_pendingStreamNoFade;

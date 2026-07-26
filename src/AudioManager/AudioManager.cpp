@@ -76,6 +76,9 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x0053C84C
 	char g_streamPath[512];
 
+	// GLOBAL: TOY2 0x0053CA50
+	int32_t g_streamThreadReady;
+
 	// GLOBAL: TOY2 0x00725E94
 	int32_t g_pendingStreamTrack;
 
@@ -197,6 +200,17 @@ namespace AudioManager
 	{
 		Logger::Log("FlushSoundVoices : Start.\n");
 		Logger::Log("FlushSoundVoices : End.\n");
+	}
+
+	// FUNCTION: TOY2 0x00436C90
+	void SignalThreadExit()
+	{
+		if (g_streamCommandEvent != NULL)
+		{
+			g_streamCommand = 3;
+			g_streamThreadReady = 0;
+			SetEvent(g_streamCommandEvent);
+		}
 	}
 
 	// FUNCTION: TOY2 0x00436D40 [MATCHED]
