@@ -585,6 +585,42 @@ namespace AudioManager
 	int32_t PlayOneShotSoundGlobal(int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume)
 	{ return PlaySoundBuffer(soundIndex + 1, leftVolume, rightVolume, 0, volume, 0); }
 
+	// STUB: TOY2 0x004A3C80
+	int32_t PlayOneShotSound3DActor(void* actor, int32_t soundIndex, int32_t frequency, int32_t volume, void* position, int32_t flag) { return 0; }
+
+	// A 16-byte preset table entry. The first three int16 fields are the only
+	// ones the Preset thunks read; the remaining bytes hold further preset data
+	// whose roles await reconstruction of PlayOneShotSound3DActor.
+	struct OneShotSoundPreset
+	{
+		int16_t soundIndex;
+		int16_t frequency;
+		int16_t volume;
+		int16_t reserved0;
+		int32_t reserved1;
+		int32_t reserved2;
+	};
+
+	// GLOBAL: TOY2 0x00502950
+	OneShotSoundPreset g_oneShotPresets[218];
+
+	namespace Preset
+	{
+		// FUNCTION: TOY2 0x0049EA60 [MATCHED]
+		void PlayOneShotSound2(int32_t index, void* actor)
+		{
+			OneShotSoundPreset& preset = g_oneShotPresets[index];
+			PlayOneShotSound3DActor(actor, preset.soundIndex - 1, preset.frequency, preset.volume, actor, 0);
+		}
+
+		// FUNCTION: TOY2 0x0049EA90 [MATCHED]
+		void PlayOneShotSound(int32_t index, void* actor)
+		{
+			OneShotSoundPreset& preset = g_oneShotPresets[index];
+			PlayOneShotSound3DActor(actor, preset.soundIndex - 1, preset.frequency, preset.volume, actor, 1);
+		}
+	}
+
 	// FUNCTION: TOY2 0x0047D7F0 [MATCHED]
 	void PlayMusicOneShot(int32_t trackIndex)
 	{
