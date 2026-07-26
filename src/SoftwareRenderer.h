@@ -34,6 +34,10 @@ namespace SoftwareRenderer
 	extern int32_t g_zoomExtentV;
 	extern int32_t g_zoomExtentH;
 	extern int32_t g_bitsPerPixel;
+	extern uint8_t* g_currentRenderBuffer;
+	extern uint8_t* g_renderBufferPixels;
+	extern uint8_t g_renderBufferA[];
+	extern uint8_t g_renderBufferB[];
 	extern float g_cameraNearZ;
 	extern float g_cameraFarZ;
 

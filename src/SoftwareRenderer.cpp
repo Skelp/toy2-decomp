@@ -1,5 +1,6 @@
 #include "SoftwareRenderer.h"
 #include "Renderer/Renderer.h"
+#include "Toy2/MainMenu.h"
 
 namespace SoftwareRenderer
 {
@@ -63,6 +64,22 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00882910
 	int32_t g_bitsPerPixel;
 
+	// Render-buffer double-buffering state. SwapRenderBuffer toggles
+	// g_currentRenderBuffer between the two contiguous render buffers
+	// (g_renderBufferB follows g_renderBufferA at +0x3C420) and derives
+	// g_renderBufferPixels at a fixed +0x4020 offset into the active buffer.
+	// GLOBAL: TOY2 0x00559DF8
+	uint8_t* g_currentRenderBuffer;
+
+	// GLOBAL: TOY2 0x0055A118
+	uint8_t* g_renderBufferPixels;
+
+	// GLOBAL: TOY2 0x0055A148
+	uint8_t g_renderBufferA[0x3C420];
+
+	// GLOBAL: TOY2 0x00596568
+	uint8_t g_renderBufferB[0x3C420];
+
 	// GLOBAL: TOY2 0x00DBB080
 	float g_cameraNearZ;
 
@@ -92,8 +109,15 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// STUB: TOY2 0x00452130
-	void SwapRenderBuffer() {}
+	// FUNCTION: TOY2 0x00452130
+	void SwapRenderBuffer()
+	{
+		Toy2::MainMenu::g_menuClearColor.b = 0;
+		Toy2::MainMenu::g_menuClearColor.g = 0;
+		Toy2::MainMenu::g_menuClearColor.r = 0;
+		g_currentRenderBuffer = (g_currentRenderBuffer == g_renderBufferA) ? g_renderBufferB : g_renderBufferA;
+		g_renderBufferPixels = g_currentRenderBuffer + 0x4020;
+	}
 
 	// FUNCTION: TOY2 0x004C20E0 [MATCHED]
 	void SetLevelFileIndex(int32_t index) { g_levelFileIndex = index; }
