@@ -299,6 +299,37 @@ namespace AudioManager
 		return result;
 	}
 
+	struct SfxPackEntry
+	{
+		char** filenames;
+		int32_t baseIndex;
+	};
+
+	void LoadSoundEffect(char* name, int32_t index, int32_t flag);
+
+	// FUNCTION: TOY2 0x0047D670 [MATCHED]
+	void LoadSoundPack(SfxPackEntry* table, int32_t index)
+	{
+		if (index >= 0 && index <= 0x10)
+		{
+			char** filenames = table[index].filenames;
+			int32_t baseIndex = table[index].baseIndex;
+			char* filename = *filenames;
+			while (filename != NULL)
+			{
+				if (*filename != '\0')
+				{
+					char path[256];
+					sprintf(path, "%s.wav", filename);
+					LoadSoundEffect(path, baseIndex, 0);
+				}
+				filenames++;
+				baseIndex++;
+				filename = *filenames;
+			}
+		}
+	}
+
 	// FUNCTION: TOY2 0x0047E5B0 [MATCHED]
 	void LoadSoundEffect(char* name, int32_t index, int32_t flag)
 	{
