@@ -3,6 +3,7 @@
 #include "Renderer/Renderer.h"
 #include "Toy2/MainMenu.h"
 #include "Toy2/Toy2.h"
+#include "Nu3D/BmpDataNode.h"
 #include "Logger.h"
 #include <stdlib.h>
 
@@ -563,8 +564,18 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x00470C70
 	void UnkFunc7() {}
 
-	// STUB: TOY2 0x004AC1F0
-	void UnkFunc20(void* scratch) {}
+	// FUNCTION: TOY2 0x004AC1F0 [MATCHED]
+	int32_t UnkFunc20(TextureData* out)
+	{
+		Nu3D::BmpDataNode* node = Nu3D::g_currentBmpDataNode;
+		if (node != NULL)
+		{
+			out->texData = node->texData;
+			out->surfaceDesc = &node->surfaceDesc;
+			return 0;
+		}
+		return 1;
+	}
 
 	// STUB: TOY2 0x004BCC70
 	void UnkFunc17(int32_t top, int32_t bottom, int32_t left, int32_t right) {}
@@ -618,8 +629,8 @@ namespace SoftwareDevice
 		DWORD dwIndexCount,
 		DWORD dwFlags)
 	{
-		int32_t scratch[2];
-		SoftwareRenderer::UnkFunc20(scratch);
+		SoftwareRenderer::TextureData scratch;
+		SoftwareRenderer::UnkFunc20(&scratch);
 		if (SoftwareRenderer::g_viewportRect != NULL)
 		{
 			Nu3D::Viewport::ViewportRect* rect = SoftwareRenderer::g_viewportRect;

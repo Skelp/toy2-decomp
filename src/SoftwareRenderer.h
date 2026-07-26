@@ -107,7 +107,18 @@ namespace SoftwareRenderer
 	void UnkFunc29(Nu3D::VertexTL* vertices[4], int32_t vertexCount, int32_t field80, int32_t field88);
 	void UnkFunc35(RenderCommand* command, int32_t vertexCount, int32_t field88, int32_t field80, int32_t field94);
 	void UnkFunc34(RenderCommand* command, int32_t vertexCount, int32_t field88, int32_t field80, int32_t field94);
-	void UnkFunc20(void* scratch);
+
+	// Snapshot of the current texture's writable data: the pixel buffer and the
+	// surface descriptor that holds its dimensions and pitch. UnkFunc20 fills
+	// this from Nu3D::g_currentBmpDataNode; it returns 0 on success and 1 when
+	// no texture is bound. Callers mask the texData pointer with the return so a
+	// NULL texture becomes a NULL rasterizer source.
+	struct TextureData
+	{
+		uint32_t* texData;
+		DDSURFACEDESC2* surfaceDesc;
+	};
+	int32_t UnkFunc20(TextureData* out);
 	void UnkFunc17(int32_t top, int32_t bottom, int32_t left, int32_t right);
 	void UnkFunc16(D3DPRIMITIVETYPE d3dptPrimitiveType, LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags);
 }
