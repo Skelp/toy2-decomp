@@ -18,6 +18,9 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x00724E80
 	int32_t g_audioInitialized;
 
+	// GLOBAL: TOY2 0x00724E84
+	int32_t g_streamState;
+
 	// GLOBAL: TOY2 0x00726F3C
 	int32_t g_streamPending;
 
@@ -64,7 +67,10 @@ namespace AudioManager
 	int16_t g_loopingSoundChannels[32][5];
 
 	// GLOBAL: TOY2 0x00725294
-	void* g_loopingSoundOwners[32];
+	void* g_loopingSoundOwners[768];
+
+	// GLOBAL: TOY2 0x00726230
+	int32_t g_loadedBufferCount;
 
 	// GLOBAL: TOY2 0x00726338
 	LPDIRECTSOUNDBUFFER g_dsBuffers[768];
@@ -105,8 +111,60 @@ namespace AudioManager
 		}
 	}
 
-	// STUB: TOY2 0x0047E850
-	void ReleaseBuffers() {}
+	// FUNCTION: TOY2 0x0047E850 [MATCHED]
+	void ReleaseBuffers()
+	{
+		if (g_audioInitialized != 0)
+		{
+			int32_t i;
+			StopAndWait();
+			if (g_audioInitialized != 0)
+			{
+				for (i = 767; i >= 0; i--)
+				{
+					LPDIRECTSOUNDBUFFER buf = g_dsBuffers[i];
+					if (buf != NULL)
+					{
+						DWORD status;
+						DWORD playing;
+						if (g_audioInitialized == 0)
+						{
+							playing = 0;
+						}
+						else
+						{
+							g_dsResult = buf->GetStatus(&status);
+							playing = status;
+						}
+						if ((playing & 1) == 1)
+						{
+							g_dsBuffers[i]->Stop();
+						}
+						g_dsBuffers[i]->Release();
+						g_dsBuffers[i] = NULL;
+						g_loopingSoundOwners[i] = NULL;
+					}
+				}
+			}
+			if (g_directSound != NULL)
+			{
+				g_directSound->Release();
+			}
+			g_directSound = NULL;
+			ResetChannelsTable();
+			g_loadedBufferCount = 0;
+			for (i = 0; i < 768; i++)
+			{
+				g_dsBuffers[i] = NULL;
+			}
+			for (i = 0; i < 768; i++)
+			{
+				g_loopingSoundOwners[i] = NULL;
+			}
+			g_streamState = 0;
+			g_audioInitialized = 0;
+		}
+	}
 
 	// STUB: TOY2 0x0047EDE0
 	void Init() {}

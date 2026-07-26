@@ -61,7 +61,7 @@ namespace AudioManager
 	extern int32_t g_pendingStreamTrack;
 	extern int32_t g_pendingStreamNoFade;
 	extern int16_t g_loopingSoundChannels[32][5];
-	extern void* g_loopingSoundOwners[32];
+	extern void* g_loopingSoundOwners[768];
 
 	extern HGLOBAL g_waveFormatHandle;
 	extern HMMIO g_waveMmioHandle;
