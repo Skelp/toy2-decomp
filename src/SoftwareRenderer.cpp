@@ -2,6 +2,7 @@
 #include "DrawingDevice.h"
 #include "Renderer/Renderer.h"
 #include "Toy2/MainMenu.h"
+#include "Toy2/Toy2.h"
 #include "Logger.h"
 #include <stdlib.h>
 
@@ -9,6 +10,12 @@ namespace SoftwareRenderer
 {
 	// GLOBAL: TOY2 0x004F7400
 	PointI g_unk4F7400 = { -32768, -32768 };
+
+	// GLOBAL: TOY2 0x004F73A8
+	int32_t g_backdropWidth = 0;
+
+	// GLOBAL: TOY2 0x004F73D4
+	int32_t g_staticBackdropWidth = 0;
 
 	// GLOBAL: TOY2 0x00500A1C
 	int32_t g_unk500A1C = 0xFFFFFFFF;
@@ -425,8 +432,22 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x004C17B0
 	void PresentFrame() {}
 
-	// STUB: TOY2 0x00490410
-	void UnkFunc67(int32_t param1, int32_t param2) {}
+	// FUNCTION: TOY2 0x00490410
+	void UnkFunc67(int32_t param1, int32_t param2)
+	{
+		int32_t* piPitch = Toy2::g_hasStaticBackdrop ? &g_staticBackdropWidth : &g_backdropWidth;
+		int32_t pitch = *piPitch;
+		int32_t quotient = param1 / pitch;
+		int32_t remainder = param1 - quotient * pitch;
+		if (remainder < 0)
+		{
+			g_unk4F7400.x = (1 - quotient) * pitch + param1;
+			g_unk4F7400.y = param2;
+			return;
+		}
+		g_unk4F7400.x = remainder;
+		g_unk4F7400.y = param2;
+	}
 
 	// STUB: TOY2 0x0048FB70
 	void UnkFunc2() {}

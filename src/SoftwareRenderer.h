@@ -10,6 +10,8 @@
 namespace SoftwareRenderer
 {
 	extern PointI g_unk4F7400;
+	extern int32_t g_backdropWidth;
+	extern int32_t g_staticBackdropWidth;
 	extern int32_t g_unk500A1C;
 	extern int32_t g_unk830C60;
 	extern int32_t g_unk559C40;
