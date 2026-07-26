@@ -171,6 +171,7 @@ namespace Toy2
 	int32_t TickSaveMenuMachine(int32_t param);
 	int32_t MovieViewerTick(int32_t movieIdx);
 	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId);
+	int32_t CleanupManagers();
 }
 
 namespace Toy2
@@ -632,8 +633,46 @@ namespace Toy2
 		SaveManager::Init();
 	}
 
-	// STUB: TOY2 0x00490730
-	void CheckForQuit() {}
+	// FUNCTION: TOY2 0x00490730
+	void CheckForQuit()
+	{
+		if (D3DApp::g_windowData.wndIsExiting != 0)
+		{
+			Logger::Log("CheckForQuit : Starting shutdown now...\n");
+			DestroyWindow(D3DApp::g_windowData.mainHwnd);
+
+			switch (D3DApp::g_renderMode)
+			{
+				case RENDERMODE_SOFTWARE:
+					SoftwareRenderer::Destroy();
+					break;
+				case RENDERMODE_D3D:
+					Logger::Log("QUIT : Destroying Direct3D renderer.\n");
+					break;
+			}
+
+			CleanupManagers();
+			D3DApp::PostQuitMessage();
+			CoUninitialize();
+
+			D3DApp::g_windowData.mainHwnd = 0;
+
+			Logger::Log("CheckForQuit : Code shutdown.\n");
+
+			g_clearScreenSaveResult = SystemParametersInfoA(SPI_SCREENSAVERRUNNING, 0, &g_setScreenSaveRunning, 0);
+
+			if (g_clearScreenSaveResult == 0)
+			{
+				Logger::Log("Failed to clear SCREENSAVERRUNNING\n");
+			}
+			else
+			{
+				Logger::Log("Managed to clear SCREENSAVERRUNNING\n");
+			}
+
+			exit(D3DApp::g_windowData.wndEventMsg.wParam);
+		}
+	}
 
 	// FUNCTION: TOY2 0x004CE760 [MATCHED]
 	void InitCfg()
