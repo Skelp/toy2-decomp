@@ -189,8 +189,65 @@ namespace AudioManager
 		return 0;
 	}
 
-	// STUB: TOY2 0x004A4680
-	int32_t WaveLoadFile(char* path, int32_t* outBytes, int32_t* outFormatSize, HGLOBAL* outFormatHandle, void** outData) { return 0; }
+	// STUB: TOY2 0x004A4130
+	MMRESULT WaveReadFile(HMMIO hmmio, uint32_t size, void* buffer, MMCKINFO* chunk, uint32_t* outRead) { return 0; }
+
+	// FUNCTION: TOY2 0x004A4680
+	int32_t WaveLoadFile(char* path, int32_t* outBytes, int32_t* outFormatSize, HGLOBAL* outFormatHandle, void** outData)
+	{
+		HMMIO hmmio;
+		MMCKINFO parentChunk;
+		MMCKINFO dataChunk;
+		HGLOBAL data;
+		uint32_t bytesRead;
+		*outData = NULL;
+		*outFormatHandle = NULL;
+		*outBytes = 0;
+		MMRESULT result = Wave::OpenFile(path, &hmmio, outFormatHandle, &parentChunk);
+		if (result != 0)
+		{
+			Logger::DebugLog("Unable to open %s\r\n", path);
+			goto cleanup;
+		}
+		mmioSeek(hmmio, parentChunk.dwDataOffset + 4, SEEK_SET);
+		dataChunk.ckid = mmioFOURCC('d', 'a', 't', 'a');
+		result = mmioDescend(hmmio, &dataChunk, &parentChunk, MMIO_FINDCHUNK);
+		if (result != 0)
+		{
+			goto cleanup;
+		}
+		data = GlobalAlloc(GMEM_FIXED, dataChunk.cksize);
+		*outData = data;
+		if (data == NULL)
+		{
+			result = 0xe000;
+			goto cleanup;
+		}
+		result = WaveReadFile(hmmio, dataChunk.cksize, data, &dataChunk, &bytesRead);
+		if (result != 0)
+		{
+		cleanup:
+			if (*outData != NULL)
+			{
+				GlobalFree(*outData);
+				*outData = NULL;
+			}
+			if (*outFormatHandle != NULL)
+			{
+				GlobalFree(*outFormatHandle);
+				*outFormatHandle = NULL;
+			}
+		}
+		else
+		{
+			*outBytes = bytesRead;
+		}
+		if (hmmio != NULL)
+		{
+			mmioClose(hmmio, 0);
+		}
+		return result;
+	}
 
 	// FUNCTION: TOY2 0x0047E5B0 [MATCHED]
 	void LoadSoundEffect(char* name, int32_t index, int32_t flag)
@@ -730,6 +787,9 @@ namespace AudioManager
 			}
 			return 0;
 		}
+
+		// STUB: TOY2 0x004A3F10
+		MMRESULT OpenFile(LPSTR path, HMMIO* outHmmio, HGLOBAL* outFormatHandle, MMCKINFO* parentChunk) { return 0; }
 	}
 
 	namespace Stream
