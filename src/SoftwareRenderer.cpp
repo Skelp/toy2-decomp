@@ -57,6 +57,27 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00DE20A8
 	int32_t g_unkDE20A8;
 
+	// A queued render command for the software rasterizer. UnkFunc29 enqueues
+	// transformed vertices (3 for a triangle, 4 for a quad when vertexCount is
+	// 4) and UnkFunc35 dequeues and rasterizes one. Stride 0x9C, capacity 1024
+	// (g_unkDE20A8 is the live count). The metadata at +0x80 is only partially
+	// understood; refine the names when UnkFunc29 and UnkFunc35 are
+	// reconstructed.
+	struct RenderCommand
+	{
+		Nu3D::VertexTL vertices[4]; // +0x00
+		int32_t field80; // +0x80 (mode/flags read by UnkFunc35)
+		int32_t vertexCount; // +0x84 (3 = triangle, 4 = quad)
+		int32_t field88; // +0x88
+		int32_t field8C; // +0x8C
+		int32_t field90; // +0x90
+		int32_t field94; // +0x94 (passed to UnkFunc35)
+		int32_t field98; // +0x98
+	};
+
+	// GLOBAL: TOY2 0x00DBB0A0
+	RenderCommand g_renderQueue[1024];
+
 	// GLOBAL: TOY2 0x00A4CC74
 	int32_t g_levelFileIndex;
 
@@ -455,8 +476,19 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x00490290
 	int16_t UnkFunc3() { return 0; }
 
-	// STUB: TOY2 0x004BCBE0
-	void UnkFunc31() {}
+	// FUNCTION: TOY2 0x004BCBE0 [MATCHED]
+	void UnkFunc31()
+	{
+		for (int i = 0; i < g_unkDE20A8; i++)
+		{
+			RenderCommand& command = g_renderQueue[i];
+			UnkFunc35(&command, command.vertexCount, command.field88, command.field80, command.field94);
+		}
+		g_unkA4CC80 = 0;
+	}
+
+	// STUB: TOY2 0x004C9D00
+	void UnkFunc35(RenderCommand* command, int32_t vertexCount, int32_t field88, int32_t field80, int32_t field94) {}
 
 	// FUNCTION: TOY2 0x004BCC40
 	void UnkFunc32()

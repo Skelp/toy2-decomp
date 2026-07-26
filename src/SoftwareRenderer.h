@@ -97,6 +97,14 @@ namespace SoftwareRenderer
 	void UnkFunc7();
 
 	void UnkFunc8(void* param1, int32_t param2);
+
+	// A queued render command for the software rasterizer. UnkFunc29 enqueues
+	// transformed vertices (3 for a triangle, 4 for a quad when vertexCount is
+	// 4) and UnkFunc35 dequeues and rasterizes one. Stride 0x9C, capacity 1024.
+	// The metadata at +0x80 is only partially understood; refine the names when
+	// UnkFunc29 and UnkFunc35 are reconstructed.
+	struct RenderCommand;
+	void UnkFunc35(RenderCommand* command, int32_t vertexCount, int32_t field88, int32_t field80, int32_t field94);
 }
 
 namespace SoftwareDevice
