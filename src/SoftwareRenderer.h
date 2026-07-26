@@ -20,6 +20,19 @@ namespace SoftwareRenderer
 	extern int32_t g_rightOffset;
 	extern int32_t g_topOffset;
 	extern int32_t g_bottomOffset;
+	// Integer clip rect, kept in sync with the viewport offsets above by
+	// ZoomIn/ZoomOut/InitialisePrimarySurface. The polygon clipper clips
+	// against these bounds.
+	extern int32_t g_clipLeft;
+	extern int32_t g_clipRight;
+	extern int32_t g_clipTop;
+	extern int32_t g_clipBottom;
+	// Zoom step counter clamped to [0,10]; the zoomed source extents below are
+	// adjusted by ZoomIn/ZoomOut and CommitZoom derives the render scale from
+	// extent / screen dimension.
+	extern int32_t g_zoomLevel;
+	extern int32_t g_zoomExtentV;
+	extern int32_t g_zoomExtentH;
 	extern int32_t g_bitsPerPixel;
 	extern float g_cameraNearZ;
 	extern float g_cameraFarZ;
@@ -29,6 +42,7 @@ namespace SoftwareRenderer
 	void InitialisePrimarySurface();
 	void InitialisePrimarySurface_T();
 	void Destroy();
+	void CommitZoom();
 	void ZoomOut();
 	void ZoomIn();
 	void PresentFrame();

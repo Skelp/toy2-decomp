@@ -39,6 +39,27 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x005088E0
 	int32_t g_bottomOffset = -1;
 
+	// GLOBAL: TOY2 0x00B7FBBC
+	int32_t g_clipLeft;
+
+	// GLOBAL: TOY2 0x00DE20B8
+	int32_t g_clipRight;
+
+	// GLOBAL: TOY2 0x00DE20A4
+	int32_t g_clipTop;
+
+	// GLOBAL: TOY2 0x00DBB088
+	int32_t g_clipBottom;
+
+	// GLOBAL: TOY2 0x00A4CC6C
+	int32_t g_zoomLevel;
+
+	// GLOBAL: TOY2 0x00E4D7BC
+	int32_t g_zoomExtentV;
+
+	// GLOBAL: TOY2 0x00B7FBB4
+	int32_t g_zoomExtentH;
+
 	// GLOBAL: TOY2 0x00882910
 	int32_t g_bitsPerPixel;
 
@@ -86,11 +107,52 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x0047D0F0
 	void Destroy() {}
 
-	// STUB: TOY2 0x004C1FC0
-	void ZoomOut() {}
+	// STUB: TOY2 0x004C1E70
+	void CommitZoom() {}
 
-	// STUB: TOY2 0x004C1F00
-	void ZoomIn() {}
+	// FUNCTION: TOY2 0x004C1FC0
+	void ZoomOut()
+	{
+		if (g_zoomLevel >= 10)
+		{
+			g_zoomLevel = 10;
+			return;
+		}
+		g_zoomLevel++;
+		g_zoomExtentV -= 0x10;
+		g_zoomExtentH -= 0xc;
+		g_topOffset += 8;
+		g_bottomOffset -= 8;
+		g_leftOffset += 6;
+		g_rightOffset -= 6;
+		g_clipTop += 8;
+		g_clipBottom -= 8;
+		g_clipLeft += 6;
+		g_clipRight -= 6;
+		CommitZoom();
+	}
+
+	// FUNCTION: TOY2 0x004C1F00
+	void ZoomIn()
+	{
+		if (g_zoomLevel <= 0)
+		{
+			g_zoomLevel = 0;
+			return;
+		}
+		g_zoomLevel--;
+		g_zoomExtentV += 0x10;
+		g_zoomExtentH += 0xc;
+		g_topOffset -= 8;
+		g_bottomOffset += 8;
+		g_leftOffset -= 6;
+		g_rightOffset += 6;
+		g_clipTop -= 8;
+		g_clipBottom += 8;
+		g_clipLeft -= 6;
+		g_clipRight += 6;
+		CommitZoom();
+	}
 
 	// STUB: TOY2 0x004C17B0
 	void PresentFrame() {}
