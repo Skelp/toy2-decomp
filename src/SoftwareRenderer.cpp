@@ -1,4 +1,5 @@
 #include "SoftwareRenderer.h"
+#include "DrawingDevice.h"
 #include "Renderer/Renderer.h"
 #include "Toy2/MainMenu.h"
 #include "Logger.h"
@@ -106,6 +107,30 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x0084CBE0
 	void* g_softwareRendererBuffer;
 
+	// Locked primary surface pointer and pitch, captured by
+	// InitialisePrimarySurface and read by PresentFrame when blitting.
+	// GLOBAL: TOY2 0x00E4D7B4
+	LPVOID g_primarySurfacePtr;
+
+	// GLOBAL: TOY2 0x00E4D7A0
+	int32_t g_primarySurfacePitch;
+
+	// Pixel format mode detected from the primary surface:
+	// 0 = 16-bit 555, 1 = 16-bit 565, 2 = 24/32-bit BGR, 3 = 24/32-bit RGB.
+	// Read by InitialiseColourScaleTables and the colour-conversion helpers.
+	// GLOBAL: TOY2 0x00DE20AC
+	int32_t g_pixelFormatMode;
+
+	// Surface-sized working buffer (malloc'd as height*pitch) reallocated by
+	// InitialisePrimarySurface when the surface changes; read by PresentFrame.
+	// GLOBAL: TOY2 0x00A4CC84
+	void* g_backBuffer;
+
+	// Colour-scale lookup tables, allocated by InitialiseColourScaleTables and
+	// freed (then rebuilt) by InitialisePrimarySurface on surface change.
+	// GLOBAL: TOY2 0x00A4CC78
+	void* g_colourScaleTables;
+
 	// GLOBAL: TOY2 0x00882910
 	int32_t g_bitsPerPixel;
 
@@ -167,8 +192,75 @@ namespace SoftwareRenderer
 	// FUNCTION: TOY2 0x004C20E0 [MATCHED]
 	void SetLevelFileIndex(int32_t index) { g_levelFileIndex = index; }
 
-	// STUB: TOY2 0x004BCE00
-	void InitialisePrimarySurface() {}
+	// STUB: TOY2 0x004C1C40
+	void InitialiseColourScaleTables() {}
+
+	// FUNCTION: TOY2 0x004BCE00
+	void InitialisePrimarySurface()
+	{
+		DDSURFACEDESC2 surfaceDesc;
+		surfaceDesc.dwSize = sizeof(surfaceDesc);
+		DrawingDevice::LockPrimarySurface(&surfaceDesc);
+
+		g_primarySurfacePtr = surfaceDesc.lpSurface;
+		int32_t clipRight = surfaceDesc.dwHeight - 1;
+		int32_t clipBottom = surfaceDesc.dwWidth - 1;
+		int32_t clipTop = 0;
+		g_primarySurfacePitch = surfaceDesc.lPitch;
+		g_screenDimV = surfaceDesc.dwWidth;
+		g_screenDimH = surfaceDesc.dwHeight;
+
+		// 320x200 mode: height==200 (clipRight = height-1 == 0xc7). Override the
+		// width-axis clip to a centered 14..306 window. (g_zoomExtentV store is
+		// overwritten below; reproduced faithfully from retail.)
+		if (clipRight == 0xc7)
+		{
+			clipTop = 0xe;
+			clipBottom = 0x132;
+			g_zoomExtentV = 0x124;
+		}
+
+		if (surfaceDesc.ddpfPixelFormat.dwRGBBitCount == 0x10)
+		{
+			g_pixelFormatMode = (surfaceDesc.ddpfPixelFormat.dwGBitMask != 0x3e0);
+		}
+		else if (surfaceDesc.ddpfPixelFormat.dwBBitMask == 0xff)
+		{
+			g_pixelFormatMode = 2;
+		}
+		else if (surfaceDesc.ddpfPixelFormat.dwRBitMask == 0xff)
+		{
+			g_pixelFormatMode = 3;
+		}
+
+		DrawingDevice::UnlockPrimarySurface();
+
+		g_clipLeft = 0;
+		g_clipRight = clipRight;
+		g_clipTop = clipTop;
+		g_clipBottom = clipBottom;
+		g_leftOffset = 0;
+		g_topOffset = clipTop;
+		g_rightOffset = clipRight;
+		g_bottomOffset = clipBottom;
+		g_zoomExtentV = surfaceDesc.dwWidth;
+		g_zoomExtentH = surfaceDesc.dwHeight;
+
+		CommitZoom();
+
+		g_zoomLevel = 0;
+		if (g_backBuffer)
+		{
+			free(g_backBuffer);
+			g_backBuffer = 0;
+		}
+		if (g_colourScaleTables)
+		{
+			free(g_colourScaleTables);
+		}
+		g_backBuffer = malloc(surfaceDesc.dwHeight * surfaceDesc.lPitch);
+		InitialiseColourScaleTables();
+	}
 
 	// FUNCTION: TOY2 0x004C1E60
 	void InitialisePrimarySurface_T() { InitialisePrimarySurface(); }

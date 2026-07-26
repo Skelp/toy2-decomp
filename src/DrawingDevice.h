@@ -146,6 +146,8 @@ namespace DrawingDevice
 	HRESULT BeginScene();
 	HRESULT PresentFrame();
 	void EndScene();
+	void LockPrimarySurface(LPDDSURFACEDESC2 surfaceDesc);
+	void UnlockPrimarySurface();
 	HRESULT BindTexWithStage(int32_t textureIndex, int32_t stageIndex);
 	HRESULT BindTexToStage0(int32_t textureIndex);
 	HRESULT DrawPrimitive(D3DPRIMITIVETYPE d3dptPrimitiveType, DWORD dwVertexTypeDesc, LPVOID lpvVertices, DWORD dwVertexCount, DWORD dwFlags);

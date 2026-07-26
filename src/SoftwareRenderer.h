@@ -45,6 +45,11 @@ namespace SoftwareRenderer
 	extern const double k_vSpanScale;
 	extern const double k_hSpanScale;
 	extern void* g_softwareRendererBuffer;
+	extern LPVOID g_primarySurfacePtr;
+	extern int32_t g_primarySurfacePitch;
+	extern int32_t g_pixelFormatMode;
+	extern void* g_backBuffer;
+	extern void* g_colourScaleTables;
 	extern uint8_t* g_currentRenderBuffer;
 	extern uint8_t* g_renderBufferPixels;
 	extern uint8_t g_renderBufferA[];
@@ -58,6 +63,7 @@ namespace SoftwareRenderer
 	void InitialisePrimarySurface_T();
 	void Destroy();
 	void CommitZoom();
+	void InitialiseColourScaleTables();
 	void ZoomOut();
 	void ZoomIn();
 	void PresentFrame();
