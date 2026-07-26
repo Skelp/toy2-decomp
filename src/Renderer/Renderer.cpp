@@ -1006,6 +1006,16 @@ namespace Renderer
 		}
 	}
 
+	// FUNCTION: TOY2 0x00401B60
+	void DrawBlackBorderBox(int32_t xPos, int32_t yPos, int32_t width, int32_t height, uint32_t red, uint32_t green, uint32_t blue)
+	{
+		Sprite::DrawScaled(xPos, yPos, 6, 1, 0, 0, 0, 0x60, 0x2000, height);
+		Sprite::DrawScaled((width >> 12) + xPos - 2, yPos, 6, 1, 0, 0, 0, 0x60, 0x2000, height);
+		Sprite::DrawScaled(xPos, yPos, 6, 1, 0, 0, 0, 0x60, width, 0x1000);
+		Sprite::DrawScaled(xPos, (height >> 12) + yPos - 1, 6, 1, 0, 0, 0, 0x60, width, 0x1000);
+		Sprite::DrawScaled(xPos + 2, yPos + 1, 6, 1, red, green, blue, 0, width - 0x4000, height - 0x2000);
+	}
+
 	// FUNCTION: TOY2 0x0049B580
 	void DrawMainMenuText(int16_t yPos, char* text, int32_t fadeAlpha)
 	{
