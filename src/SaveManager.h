@@ -60,6 +60,7 @@ namespace SaveManager
 	extern Save0Data g_save0Data;
 	extern Save99Data g_save99Data;
 	extern uint32_t g_curLevelTokenData;
+	extern char g_emptyString;
 
 	STATIC_ASSERT(sizeof(Save0Data) == 0x188);
 	STATIC_ASSERT(sizeof(Save99Data) == 0x188);

@@ -5,6 +5,8 @@
 #include "Toy2/Toy2.h"
 
 #include <MEMORY.H>
+#include <STDIO.H>
+#include <STRING.H>
 
 namespace SaveManager
 {
@@ -16,6 +18,9 @@ namespace SaveManager
 
 	// GLOBAL: TOY2 0x00830CA8
 	uint32_t g_curLevelTokenData;
+
+	// GLOBAL: TOY2 0x00528160
+	char g_emptyString;
 
 	// FUNCTION: TOY2 0x00415180
 	void AddInputEntry(int32_t inputCode, int32_t controlId)
@@ -129,6 +134,30 @@ namespace SaveManager
 		save->health = (uint16_t)Toy2::g_buzzActor.health;
 	}
 
-	// STUB: TOY2 0x0049B830
-	void SaveToFile(int32_t saveNum, const char* saveName) {}
+	// FUNCTION: TOY2 0x0049B830
+	void SaveToFile(int32_t saveNum, const char* saveName)
+	{
+		char nameChar = g_emptyString;
+		if (saveName == NULL)
+			saveName = &nameChar;
+
+		char fileName[256];
+		sprintf(fileName, "Toy2%02d.sav", saveNum);
+
+		FILE* file = fopen(fileName, "wb");
+		if (file)
+		{
+			int32_t nameLen = strlen(saveName);
+			fwrite(&nameLen, 1, 4, file);
+			if (nameLen != 0)
+				fwrite(saveName, 1, nameLen, file);
+
+			if (saveNum == 99)
+				fwrite(&g_save99Data, 1, 0x188, file);
+			else
+				fwrite(&g_save0Data, 1, 0x188, file);
+
+			fclose(file);
+		}
+	}
 }
