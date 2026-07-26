@@ -655,9 +655,24 @@ namespace SoftwareDevice
 
 	// Drawing Methods
 
-	// STUB: TOY2 0x004B9950
+	// FUNCTION: TOY2 0x004B9950 [MATCHED]
 	HRESULT DrawIndexedPrimitiveVB(D3DPRIMITIVETYPE primitiveType, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices, DWORD indexCount, DWORD flags)
-	{ return DDERR_UNSUPPORTED; }
+	{
+		LPVOID lockedVertices;
+		if (DrawingAPI::LockVertexBuffer(vertexBuffer, 0x801, &lockedVertices, 0) == 0)
+		{
+			SoftwareRenderer::TextureData scratch;
+			SoftwareRenderer::UnkFunc20(&scratch);
+			if (SoftwareRenderer::g_viewportRect != NULL)
+			{
+				Nu3D::Viewport::ViewportRect* rect = SoftwareRenderer::g_viewportRect;
+				SoftwareRenderer::UnkFunc17((int32_t)rect->top, (int32_t)rect->bottom, (int32_t)rect->left, (int32_t)rect->right);
+			}
+			SoftwareRenderer::UnkFunc16(primitiveType, lockedVertices, indices, indexCount, flags);
+			DrawingAPI::UnlockVertexBuffer(vertexBuffer);
+		}
+		return 0;
+	}
 
 	// FUNCTION: TOY2 0x004B99F0 [MATCHED]
 	HRESULT DrawIndexedPrimitive(D3DPRIMITIVETYPE d3dptPrimitiveType,
