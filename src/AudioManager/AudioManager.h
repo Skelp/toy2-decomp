@@ -3,6 +3,7 @@
 #include "Common.h"
 #include <windows.h>
 #include <mmsystem.h>
+#include <directx6/dsound.h>
 
 namespace AudioManager
 {
@@ -29,7 +30,7 @@ namespace AudioManager
 	int32_t PlayOneShotSoundGlobal(int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume);
 	void PlayMusicOneShot(int32_t trackIndex);
 	void PlayMusicLooping(int16_t trackIndex);
-	int32_t PlayLoopingSound3D(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume);
+	int32_t PlayLoopingSound3D(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, int16_t rightVolume);
 	int32_t PlayLoopingSound3DPositional(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, void* unused, int32_t rightVolume);
 	void UpdateChannels();
 	int32_t RestartLoopingSound(int32_t soundId);
@@ -39,9 +40,9 @@ namespace AudioManager
 	extern int16_t g_soundVolTable[12];
 	extern int32_t g_sfxVolume;
 	extern int32_t g_musicVolumeLevel;
-	extern void* g_dsPrimaryBuffer;
-	extern void* g_dsSecondaryBuffer;
-	extern void* g_directSound;
+	extern LPDIRECTSOUND g_directSound;
+	extern LPDIRECTSOUNDBUFFER g_dsPrimaryBuffer;
+	extern LPDIRECTSOUNDBUFFER g_dsSecondaryBuffer;
 	extern int16_t g_dsVolTable[151];
 
 	extern HANDLE g_streamCommandEvent;
@@ -55,6 +56,7 @@ namespace AudioManager
 	extern int32_t g_pendingStreamTrack;
 	extern int32_t g_pendingStreamNoFade;
 	extern int16_t g_loopingSoundChannels[32][5];
+	extern void* g_loopingSoundOwners[32];
 
 	extern HGLOBAL g_waveFormatHandle;
 	extern HMMIO g_waveMmioHandle;

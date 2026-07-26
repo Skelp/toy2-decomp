@@ -60,11 +60,14 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x00830E58
 	int16_t g_loopingSoundChannels[32][5];
 
+	// GLOBAL: TOY2 0x00725294
+	void* g_loopingSoundOwners[32];
+
 	// GLOBAL: TOY2 0x005282F0
-	void* g_dsPrimaryBuffer;
+	LPDIRECTSOUNDBUFFER g_dsPrimaryBuffer;
 
 	// GLOBAL: TOY2 0x005282F4
-	void* g_dsSecondaryBuffer;
+	LPDIRECTSOUNDBUFFER g_dsSecondaryBuffer;
 
 	// GLOBAL: TOY2 0x005281D8
 	HGLOBAL g_waveFormatHandle;
@@ -73,7 +76,7 @@ namespace AudioManager
 	HMMIO g_waveMmioHandle;
 
 	// GLOBAL: TOY2 0x00725F24
-	void* g_directSound;
+	LPDIRECTSOUND g_directSound;
 
 	// GLOBAL: TOY2 0x004FD668
 	// clang-format off
@@ -113,7 +116,7 @@ namespace AudioManager
 		Logger::Log("SETMUSICVOL : Vol %d \n", scaledVol);
 		if (g_dsPrimaryBuffer != NULL)
 		{
-			int32_t result = ((IDirectSoundBuffer*)g_dsPrimaryBuffer)->SetVolume(scaledVol);
+			int32_t result = g_dsPrimaryBuffer->SetVolume(scaledVol);
 			if (result)
 			{
 				char* msg;
@@ -250,8 +253,104 @@ namespace AudioManager
 		}
 	}
 
-	// STUB: TOY2 0x004A3980
-	int32_t PlayLoopingSound3D(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume) { return 0; }
+	// FUNCTION: TOY2 0x004A3980
+	int32_t PlayLoopingSound3D(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, int16_t rightVolume)
+	{
+		int32_t leftVol = leftVolume;
+		if (leftVol < 0)
+		{
+			leftVol = 0;
+		}
+		else if (leftVol > 0x96)
+		{
+			leftVol = 0x96;
+		}
+		int32_t rightVol = leftVolume;
+		if (rightVol < 0)
+		{
+			rightVol = 0;
+		}
+		else if (rightVol > 0x96)
+		{
+			rightVol = 0x96;
+		}
+
+		int32_t foundIndex = -1;
+		int16_t* chan = &g_loopingSoundChannels[0][0];
+		void** ownerp = g_loopingSoundOwners;
+		int32_t i = 0;
+		do
+		{
+			if (chan[0] != -1 && *ownerp == owner)
+			{
+				foundIndex = i;
+			}
+			chan += 5;
+			ownerp++;
+			i++;
+		} while (chan < &g_loopingSoundChannels[32][0]);
+
+		if (foundIndex != -1)
+		{
+			g_loopingSoundChannels[foundIndex][3] = (int16_t)volume;
+			if (g_loopingSoundChannels[foundIndex][4] <= 0)
+			{
+				g_loopingSoundChannels[foundIndex][4] = rightVolume;
+				g_loopingSoundChannels[foundIndex][3] = (int16_t)volume;
+			}
+			else
+			{
+				g_loopingSoundChannels[foundIndex][4] = g_loopingSoundChannels[foundIndex][4] - 1;
+			}
+			if (g_loopingSoundChannels[foundIndex][3] > g_loopingSoundChannels[foundIndex][2])
+			{
+				g_loopingSoundChannels[foundIndex][2] = g_loopingSoundChannels[foundIndex][2] + 0x40;
+			}
+			if (g_loopingSoundChannels[foundIndex][3] < g_loopingSoundChannels[foundIndex][2])
+			{
+				g_loopingSoundChannels[foundIndex][2] = g_loopingSoundChannels[foundIndex][2] - 0x40;
+			}
+			int32_t soundId = PlaySoundBuffer(soundIndex + 1, leftVol, rightVol, (int32_t)owner, g_loopingSoundChannels[foundIndex][2], 1);
+			g_loopingSoundChannels[foundIndex][0] = (int16_t)soundId;
+			g_loopingSoundChannels[foundIndex][1] = 0x10;
+			return (leftVol + rightVol) / 2;
+		}
+
+		int32_t soundId = PlaySoundBuffer(soundIndex + 1, leftVol, rightVol, (int32_t)owner, volume, 1);
+		if (soundId != -1)
+		{
+			int32_t freeIndex = -1;
+			int16_t* p = &g_loopingSoundChannels[0][0];
+			int32_t j = 0;
+			do
+			{
+				if (p[0] == (int16_t)soundId)
+				{
+					g_loopingSoundChannels[j][1] = 0x10;
+					g_loopingSoundChannels[j][2] = (int16_t)volume;
+					g_loopingSoundChannels[j][3] = (int16_t)volume;
+					g_loopingSoundChannels[j][4] = rightVolume;
+					return (leftVol + rightVol) / 2;
+				}
+				if (p[0] == -1)
+				{
+					freeIndex = j;
+				}
+				p += 5;
+				j++;
+			} while (p < &g_loopingSoundChannels[32][0]);
+
+			if (freeIndex != -1)
+			{
+				g_loopingSoundChannels[freeIndex][0] = (int16_t)soundId;
+				g_loopingSoundChannels[freeIndex][1] = 0x10;
+				g_loopingSoundChannels[freeIndex][2] = (int16_t)volume;
+				g_loopingSoundChannels[freeIndex][3] = (int16_t)volume;
+				g_loopingSoundChannels[freeIndex][4] = rightVolume;
+			}
+		}
+		return (leftVol + rightVol) / 2;
+	}
 
 	// FUNCTION: TOY2 0x004A3B90
 	int32_t PlayLoopingSound3DPositional(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, void* unused, int32_t rightVolume)
@@ -392,11 +491,11 @@ namespace AudioManager
 		{
 			if (g_directSound != NULL && g_dsPrimaryBuffer != NULL)
 			{
-				((IDirectSoundBuffer*)g_dsPrimaryBuffer)->Stop();
+				g_dsPrimaryBuffer->Stop();
 				Wave::CloseFile(&g_waveMmioHandle, &g_waveFormatHandle);
-				((IDirectSoundBuffer*)g_dsSecondaryBuffer)->Release();
+				g_dsSecondaryBuffer->Release();
 				g_dsSecondaryBuffer = NULL;
-				((IDirectSoundBuffer*)g_dsPrimaryBuffer)->Release();
+				g_dsPrimaryBuffer->Release();
 				g_dsPrimaryBuffer = NULL;
 			}
 		}
