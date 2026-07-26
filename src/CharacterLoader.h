@@ -39,10 +39,11 @@ namespace CharacterLoader
 	extern int16_t g_unk54717C;
 	extern int16_t g_unk546D78;
 	extern int16_t g_unk547CD0;
+	extern void* g_unk547CD4[128];
 	extern int32_t g_alternateAllParse[128];
 	extern uint8_t* g_charFileDataCache[128];
 
-	void Start(int32_t *value, uint8_t **buffer, uint8_t *creatureList);
+	void Start(int32_t* value, uint8_t** buffer, uint8_t* creatureList);
 
 	STATIC_ASSERT(sizeof(BoneTransform) == 0x6C);
 }

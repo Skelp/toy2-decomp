@@ -43,5 +43,8 @@ namespace Toy2
 			g_nodeScaleFlags = (uint8_t*)header + headerSize + (uint16_t)header[5] * 2;
 			g_keyframeData = g_nodeScaleFlags + (uint16_t)header[6];
 		}
+
+		// STUB: TOY2 0x0043BA80
+		void EvaluateClip(void* clipData, int32_t arg2, uint16_t arg3, int32_t arg4) {}
 	}
 }

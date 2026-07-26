@@ -1,5 +1,6 @@
 #include "Toy2/Actor.h"
 #include "Toy2/Animation.h"
+#include "CharacterLoader.h"
 
 namespace Toy2
 {
@@ -13,6 +14,13 @@ namespace Toy2
 
 		// STUB: TOY2 0x00407150
 		void InitCreatureRam() {}
+
+		// FUNCTION: TOY2 0x004019D0
+		void UpdatePrimaryAnimation(Toy2Actor* actor)
+		{
+			void* entry = CharacterLoader::g_unk547CD4[actor->creatureId];
+			Animation::EvaluateClip(*(void**)((uint8_t*)entry + 8 + actor->primaryAnimIdx * 4), actor->unkVar7, *(uint16_t*)((uint8_t*)entry + 4), 0);
+		}
 
 		// FUNCTION: TOY2 0x00414A80
 		void GetCreatureList(uint8_t* creatureIdList)

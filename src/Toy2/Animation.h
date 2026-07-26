@@ -32,5 +32,9 @@ namespace Toy2
 
 		void ResetNodeAngles();
 		void ParseHeader(int16_t* header);
+
+		// Evaluate one animation clip. arg1 is the clip data pointer; the
+		// remaining arguments are not yet reconstructed.
+		void EvaluateClip(void* clipData, int32_t arg2, uint16_t arg3, int32_t arg4);
 	}
 }
