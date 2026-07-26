@@ -23,6 +23,7 @@ namespace AudioManager
 	void QueuePlay(char* path, int32_t fadeMode);
 	int32_t PlaySoundBuffer(int32_t soundIndex, int32_t leftVolume, int32_t rightVolume, int32_t pan, int32_t volume, int32_t flags);
 	int32_t IsEffectPlaying(int32_t index);
+	int32_t IsActorSoundPlaying(void* owner);
 	void ReleaseAllBuffers();
 	int32_t CreateDirectSoundBuffer(LPDIRECTSOUND ds, LPDIRECTSOUNDBUFFER* outBuf, DWORD bufferBytes);
 	int32_t WriteToBuffer(LPDIRECTSOUNDBUFFER buf, DWORD offset, const void* src, DWORD bytes);

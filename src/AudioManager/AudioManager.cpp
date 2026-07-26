@@ -768,6 +768,33 @@ namespace AudioManager
 		} while (p < &g_loopingSoundChannels[32][1]);
 	}
 
+	// FUNCTION: TOY2 0x004A3E60
+	int32_t IsActorSoundPlaying(void* owner)
+	{
+		if (g_audioInitialized != 0)
+		{
+			int16_t* chan = &g_loopingSoundChannels[0][0];
+			int32_t i = 0;
+			do
+			{
+				if (chan[0] != -1 && chan[1] == -1 && g_loopingSoundOwners[chan[0]] == owner)
+				{
+					goto found;
+				}
+				chan += 5;
+				i++;
+			} while (chan < &g_loopingSoundChannels[32][0]);
+			return 0;
+		found:
+			if ((IsEffectPlaying(g_loopingSoundChannels[i][0]) & 1) != 0)
+			{
+				return 1;
+			}
+			g_loopingSoundChannels[i][0] = -1;
+		}
+		return 0;
+	}
+
 	// FUNCTION: TOY2 0x004A3ED0 [MATCHED]
 	void SetVolumes(int32_t musicVolume, int32_t sfxVolume)
 	{
