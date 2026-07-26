@@ -26,6 +26,7 @@ namespace AudioManager
 	void ReleaseAllBuffers();
 	int32_t CreateDirectSoundBuffer(LPDIRECTSOUND ds, LPDIRECTSOUNDBUFFER* outBuf, DWORD bufferBytes);
 	int32_t WriteToBuffer(LPDIRECTSOUNDBUFFER buf, DWORD offset, const void* src, DWORD bytes);
+	int32_t WaveLoadFile(char* path, int32_t* outBytes, int32_t* outFormatSize, HGLOBAL* outFormatHandle, void** outData);
 	void ReleaseBuffers();
 	void Init();
 	void SetVolumesProcessed(int32_t musicVolume, int32_t sfxVolume);
@@ -68,6 +69,13 @@ namespace AudioManager
 	extern int32_t g_pendingStreamNoFade;
 	extern int16_t g_loopingSoundChannels[32][5];
 	extern void* g_loopingSoundOwners[768];
+
+	extern int32_t g_loadedSfxPackIndex;
+	extern int32_t g_loadedWaveBytes;
+	extern int32_t g_loadedWaveFormatSize;
+	extern void* g_loadedWaveData;
+	extern uint16_t g_soundFreqTable[128];
+	extern char g_sfxSubPath[8];
 
 	extern HGLOBAL g_waveFormatHandle;
 	extern HGLOBAL g_sfxWaveFormatHandle;

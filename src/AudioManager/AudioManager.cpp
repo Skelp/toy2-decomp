@@ -93,6 +93,24 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x00725F24
 	LPDIRECTSOUND g_directSound;
 
+	// GLOBAL: TOY2 0x004FCDBC
+	int32_t g_loadedSfxPackIndex;
+
+	// GLOBAL: TOY2 0x00724E88
+	void* g_loadedWaveData;
+
+	// GLOBAL: TOY2 0x00725F28
+	int32_t g_loadedWaveFormatSize;
+
+	// GLOBAL: TOY2 0x00725F2C
+	int32_t g_loadedWaveBytes;
+
+	// GLOBAL: TOY2 0x00726234
+	uint16_t g_soundFreqTable[128];
+
+	// GLOBAL: TOY2 0x00534074
+	char g_sfxSubPath[8];
+
 	// GLOBAL: TOY2 0x004FD668
 	// clang-format off
 	int16_t g_dsVolTable[151] = {
@@ -169,6 +187,56 @@ namespace AudioManager
 			}
 		}
 		return 0;
+	}
+
+	// STUB: TOY2 0x004A4680
+	int32_t WaveLoadFile(char* path, int32_t* outBytes, int32_t* outFormatSize, HGLOBAL* outFormatHandle, void** outData) { return 0; }
+
+	// FUNCTION: TOY2 0x0047E5B0 [MATCHED]
+	void LoadSoundEffect(char* name, int32_t index, int32_t flag)
+	{
+		char path[1024];
+		if (g_loadedSfxPackIndex == -1 || index == g_loadedSfxPackIndex)
+		{
+			FileUtils::GetPathValue(path);
+			strcat(path, "sfx\\");
+			if (flag != 0)
+			{
+				strcat(path, g_sfxSubPath);
+			}
+			strcat(path, name);
+			Logger::Log("LoadSoundEffect : Loading %s, effect %d.\n", path, index, 1);
+			if (WaveLoadFile(path, &g_loadedWaveBytes, &g_loadedWaveFormatSize, &g_sfxWaveFormatHandle, &g_loadedWaveData) == 0)
+			{
+				LPDIRECTSOUNDBUFFER* outBuf = &g_dsBuffers[index * 6];
+				if (CreateDirectSoundBuffer(g_directSound, outBuf, g_loadedWaveBytes) == 1)
+				{
+					WriteToBuffer(*outBuf, 0, g_loadedWaveData, g_loadedWaveBytes);
+					uint16_t freq = ((PCMWAVEFORMAT*)g_sfxWaveFormatHandle)->wf.nSamplesPerSec;
+					g_soundFreqTable[index] = freq;
+					(*outBuf)->SetFrequency(freq);
+					(*outBuf)->SetPan(0);
+					(*outBuf)->SetVolume(0);
+					g_loopingSoundOwners[index * 6] = (void*)1;
+					for (int32_t i = 1; i <= 5; i++)
+					{
+						g_dsResult = g_directSound->DuplicateSoundBuffer(*outBuf, &g_dsBuffers[index * 6 + i]);
+						if (g_dsResult == DS_OK)
+						{
+							g_dsBuffers[index * 6 + i]->SetFrequency(g_soundFreqTable[index]);
+							g_dsBuffers[index * 6 + i]->SetPan(0);
+							g_dsBuffers[index * 6 + i]->SetVolume(0);
+							g_loopingSoundOwners[index * 6 + i] = (void*)1;
+						}
+					}
+					return;
+				}
+			}
+			else
+			{
+				Logger::Log("LoadSoundEffect : Calling WaveLoadFile failed - no sound effect %s, effect %d.\n", path, index);
+			}
+		}
 	}
 
 	// FUNCTION: TOY2 0x0047E7D0 [MATCHED]
