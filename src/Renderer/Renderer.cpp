@@ -9,11 +9,22 @@
 #include "Nu3D/Math.h"
 #include "NGNLoader/NGNLoader.h"
 #include "Nu3D/Patch.h"
+#include "Nu3D/Primitive.h"
 #include "Renderer/Sprite.h"
 #include "Toy2/Toy2.h"
 #include "Renderer/Glue.h"
 #include "Toy2/D3DApp.h"
 #include "Logger.h"
+
+// Unidentified empty no-op (single RET) called once from Renderer::Cleanup
+// between the primitive-list teardown and the texture/light release. Its
+// address sits between Nu3D::Material::Init and Nu3D::Light::Destroy; the
+// retail body is empty, so it is a stubbed/placeholder cleanup step.
+// STUB: TOY2 0x004C2990
+namespace Nu3D
+{
+	void UnkFunc0() {}
+} // namespace Nu3D
 
 namespace Renderer
 {
@@ -714,8 +725,24 @@ namespace Renderer
 		DECOMP_PRINT(("Finished Renderer::InitResources\n"));
 	}
 
-	// STUB: TOY2 0x004B37F0
-	void Cleanup() {}
+	// FUNCTION: TOY2 0x004B37F0
+	void Cleanup()
+	{
+		while (Nu3D::g_patchListHead != NULL)
+		{
+			Nu3D::g_patchListHead->listNext = NULL;
+			Nu3D::Patch::Destroy(Nu3D::g_patchListHead);
+		}
+		while (Nu3D::g_primListHead != NULL)
+		{
+			Nu3D::g_primListHead->listNext = NULL;
+			Nu3D::Primitive::Destroy(Nu3D::g_primListHead);
+		}
+		Nu3D::UnkFunc0();
+		NGNLoader::ReleaseAllTextures();
+		Nu3D::Light::DestroyAllLights();
+		g_rendererValid = 0;
+	}
 
 	// FUNCTION: TOY2 0x004B3630
 	void Init()
