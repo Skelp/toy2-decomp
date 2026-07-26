@@ -86,6 +86,7 @@ namespace AudioManager
 	{
 		int32_t CloseFile(HMMIO* hmmio, HGLOBAL* dataHandle);
 		MMRESULT OpenFile(LPSTR path, HMMIO* outHmmio, HGLOBAL* outFormatHandle, MMCKINFO* parentChunk);
+		MMRESULT SeekToChunk(HMMIO* hmmio, MMCKINFO* dataChunk, MMCKINFO* parentChunk);
 	}
 
 	namespace Stream

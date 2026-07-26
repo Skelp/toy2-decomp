@@ -935,6 +935,14 @@ namespace AudioManager
 			*outHmmio = NULL;
 			return result;
 		}
+
+		// FUNCTION: TOY2 0x004A40F0 [MATCHED]
+		MMRESULT SeekToChunk(HMMIO* hmmio, MMCKINFO* dataChunk, MMCKINFO* parentChunk)
+		{
+			mmioSeek(*hmmio, parentChunk->dwDataOffset + 4, 0);
+			dataChunk->ckid = mmioFOURCC('d', 'a', 't', 'a');
+			return mmioDescend(*hmmio, dataChunk, parentChunk, MMIO_FINDCHUNK);
+		}
 	}
 
 	namespace Stream
