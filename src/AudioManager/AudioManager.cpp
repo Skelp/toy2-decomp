@@ -21,7 +21,7 @@ namespace AudioManager
 	int32_t g_audioInitialized;
 
 	// GLOBAL: TOY2 0x00724E84
-	int32_t g_streamState;
+	int32_t g_deviceCount;
 
 	// GLOBAL: TOY2 0x00726F3C
 	int32_t g_streamPending;
@@ -63,7 +63,7 @@ namespace AudioManager
 	int32_t g_pendingStreamTrack;
 
 	// GLOBAL: TOY2 0x00725E98
-	int32_t g_pendingStreamNoFade;
+	LPGUID g_deviceGuids[16];
 
 	// GLOBAL: TOY2 0x00830E58
 	int16_t g_loopingSoundChannels[32][5];
@@ -100,6 +100,9 @@ namespace AudioManager
 
 	// GLOBAL: TOY2 0x00724E88
 	void* g_loadedWaveData;
+
+	// GLOBAL: TOY2 0x00724E8C
+	char g_deviceNames[16][32];
 
 	// GLOBAL: TOY2 0x00725F28
 	int32_t g_loadedWaveFormatSize;
@@ -461,9 +464,19 @@ namespace AudioManager
 			{
 				g_loopingSoundOwners[i] = NULL;
 			}
-			g_streamState = 0;
+			g_deviceCount = 0;
 			g_audioInitialized = 0;
 		}
+	}
+
+	// FUNCTION: TOY2 0x0047E3C0
+	BOOL CALLBACK Enumerate(LPGUID lpGuid, LPCSTR lpcstrDescription, LPCSTR lpcstrModule, LPVOID lpContext)
+	{
+		int32_t index = g_deviceCount;
+		strcpy(g_deviceNames[index], lpcstrDescription);
+		g_deviceGuids[index] = lpGuid;
+		g_deviceCount = index + 1;
+		return TRUE;
 	}
 
 	// STUB: TOY2 0x0047EDE0
@@ -852,7 +865,7 @@ namespace AudioManager
 	{
 		if (g_streamPending != 0 && --g_streamPending == 0)
 		{
-			if (g_pendingStreamNoFade != 0)
+			if (g_deviceGuids[0] != NULL)
 			{
 				PlayTrackByIndex(g_pendingStreamTrack, 0);
 			}

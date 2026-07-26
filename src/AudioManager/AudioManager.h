@@ -45,6 +45,7 @@ namespace AudioManager
 	int32_t PlayOneShotSound3DActor(void* actor, int32_t soundIndex, int32_t frequency, int32_t volume, void* position, int32_t flag);
 	void ClearSequence7Cursor();
 	void StartSoundSequenceOnActor(int32_t sequenceId, Vector3I* position);
+	BOOL CALLBACK Enumerate(LPGUID lpGuid, LPCSTR lpcstrDescription, LPCSTR lpcstrModule, LPVOID lpContext);
 	void PlayMusicOneShot(int32_t trackIndex);
 	void PlayMusicLooping(int16_t trackIndex);
 	int32_t PlayLoopingSound3D(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, int16_t rightVolume);
@@ -72,7 +73,6 @@ namespace AudioManager
 	extern int32_t g_streamThreadReady;
 
 	extern int32_t g_pendingStreamTrack;
-	extern int32_t g_pendingStreamNoFade;
 	extern int16_t g_loopingSoundChannels[32][5];
 	extern void* g_loopingSoundOwners[768];
 
