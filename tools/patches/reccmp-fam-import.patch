@@ -1,0 +1,73 @@
+reccmp master: Import structs with flexible array members (FAM)
+
+Upstream's `_overwrite_struct` places every PDB field with
+`replaceAtOffset`.  C flexible array members (`Type name[];`) are encoded
+in the PDB as a zero-length `LF_ARRAY` whose offset equals the struct's
+fixed size (i.e. just past the last fixed field).  For such a component
+`Structure.getComponentAt(offset)` returns `None` (nothing starts at
+`offset == length`), so the importer's
+`assert existing_type is not None` raises `AssertionError`, which the
+broad `except` surfaces as `StructModificationError`.  Even without the
+assertion, `replaceAtOffset` would throw
+`IllegalArgumentException: Offset N is beyond end of structure`.
+
+This affects any type with a trailing `name[]`, e.g. Toy Story 2's
+`Toy2::Levels::RecordData` (`data[]`), `Toy2::Levels::ObjectList`
+(`entries[]`), `Nu3D::Font` (`glyphs[]`), and
+`Renderer::...TileSheet` (`tiles[]`).  Because types are imported lazily
+on demand, one missing FAM type fans out to many logged failures.
+
+This patch detects zero-length array components and appends them via
+`Structure.add(type, 0, name, comment)` instead of `replaceAtOffset`.
+Ghidra treats a zero-length trailing component as a flexible array, and
+the struct's reported size stays equal to the PDB size (so the existing
+size assertions still hold).  The component must already be the last
+entry (components are sorted by offset and a FAM sits at `offset ==
+class_size`); a warning is logged if that invariant is violated.
+
+Generated against reccmp master (commit 21416ad1) with the
+reccmp-union-write patch already applied.
+Apply from the reccmp submodule root with `patch -p1`.
+
+diff --git a/reccmp/ghidra/importer/type_importer.py b/reccmp/ghidra/importer/type_importer.py
+index e72640e1..3a562277 100644
+--- a/reccmp/ghidra/importer/type_importer.py
++++ b/reccmp/ghidra/importer/type_importer.py
+@@ -474,6 +474,37 @@ def _overwrite_struct(
+             logger.debug("Adding component %s to class: %s", component, sanitized_name)
+ 
+             try:
++                # Flexible array members (C trailing `Type name[];`) are encoded
++                # in the PDB as a zero-length LF_ARRAY whose offset equals the
++                # struct's fixed size (i.e. just past the last fixed field).
++                # Ghidra cannot place such a component with replaceAtOffset --
++                # getComponentAt(offset) returns None and replaceAtOffset raises
++                # "Offset N is beyond end of structure" -- so append it as a
++                # zero-length trailing component, which Ghidra treats as a
++                # flexible array without changing the struct's reported size.
++                if (
++                    isinstance(component.type, ArrayDataType)
++                    and component.type.getNumElements() == 0
++                ):
++                    expected_offset = new_ghidra_struct.getLength()
++                    if offset != expected_offset:
++                        logger.warning(
++                            "Flexible array member %s at offset %d of %s is not at "
++                            "the end of the struct (expected %d); placing it at %d",
++                            component.name,
++                            offset,
++                            sanitized_name,
++                            expected_offset,
++                            expected_offset,
++                        )
++                    new_ghidra_struct.add(
++                        component.type,
++                        0,  # zero-length: do not grow the struct
++                        component.name,
++                        cast(str, None),  # comment
++                    )
++                    continue
++
+                 # Make sure there is room for the new structure and that we have no collision.
+                 existing_type = new_ghidra_struct.getComponentAt(offset)
+                 assert (
