@@ -22,6 +22,22 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x009F6008
 	int32_t g_unk9F6008;
 
+	// Render-queue clear/reset state shared by the UnkFunc31/32/33 cluster
+	// and the FUN_004bc980 / FUN_004bcad0 helpers: g_unkA4CC80 is an active
+	// flag, g_unkB626E0 a 30000-dword buffer, g_unkDBB094 and g_unkDE20A8 are
+	// counts. UnkFunc32 clears the buffer and resets the counts when inactive.
+	// GLOBAL: TOY2 0x00A4CC80
+	int32_t g_unkA4CC80;
+
+	// GLOBAL: TOY2 0x00B626E0
+	int32_t g_unkB626E0[30000];
+
+	// GLOBAL: TOY2 0x00DBB094
+	int32_t g_unkDBB094;
+
+	// GLOBAL: TOY2 0x00DE20A8
+	int32_t g_unkDE20A8;
+
 	// GLOBAL: TOY2 0x00A4CC74
 	int32_t g_levelFileIndex;
 
@@ -409,8 +425,19 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x004BCBE0
 	void UnkFunc31() {}
 
-	// STUB: TOY2 0x004BCC40
-	void UnkFunc32() {}
+	// FUNCTION: TOY2 0x004BCC40
+	void UnkFunc32()
+	{
+		if (g_unkA4CC80 == 0)
+		{
+			for (int i = 0; i < 30000; i++)
+			{
+				g_unkB626E0[i] = 0;
+			}
+			g_unkDBB094 = 0;
+			g_unkDE20A8 = 0;
+		}
+	}
 
 	// STUB: TOY2 0x004BCB60
 	void UnkFunc33() {}
