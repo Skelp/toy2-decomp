@@ -22,11 +22,41 @@ build() {
     if [[ ! -f build/build.ninja ]]; then
         configure
     fi
-    cmake --build build -- -j1
+    # Wine-hosted VC6 must stay serialized. Every object shares one vc60.pdb
+    # per target, so a parallel build dies with "fatal error C1033: cannot open
+    # program database". This was measured; /Z7 does not fix it either. See
+    # docs/linux-decomp.md, "Build parallelism". Keep the default of 1.
+    cmake --build build -- "-j${TOY2_BUILD_JOBS:-1}"
     (
         cd build
         reccmp-project detect --what recompiled
     )
+}
+
+# Print only the per-function similarity verdict for each given address. One
+# PDB parse serves every address, and no assembly diff reaches the caller.
+score() {
+    if [[ $# -eq 0 ]]; then
+        echo "Usage: tools/decomp score <address> [address...]" >&2
+        return 2
+    fi
+    ensure_build
+    local address verdict
+    for address in "$@"; do
+        # reccmp prints "<name> is only N% similar ..." for a partial match,
+        # a bare "OK!" banner for an exact match, and an ERROR line when the
+        # address is not paired. Normalize all three to one line per address.
+        # `grep` exits non-zero when nothing matches, so tolerate that here
+        # rather than let `set -e` abort the whole loop.
+        verdict=$(
+            cd build \
+                && { reccmp-reccmp --target TOY2 --no-color --verbose "$address" 2>/dev/null || true; } \
+                | { grep -E "is only|OK!|Failed to find" || true; } \
+                | sed -e 's/, diff above$//' -e 's/^.*OK!.*$/100.00% (exact match)/' \
+                | tail -1
+        )
+        printf '%s  %s\n' "$address" "${verdict:-no verdict line (is the address a function start?)}"
+    done
 }
 
 ensure_build() {
@@ -73,6 +103,10 @@ Commands:
   configure         Configure the VC6 SP3 build through Wine
   build             Build toy2.exe/patcher.dll and register the output
   compare [args]    Run reccmp against the reference and recompiled EXEs
+  score <addr>...   Print only the similarity verdict for one or more addresses
+  bc <addr>         Build, then show the verbose comparison for one address
+  candidates [ns]   Rank reconstruction candidates (no Ghidra, no reccmp run)
+  evidence <addr>   Collect bounded evidence for one target in a single call
   report [file]     Generate the self-contained HTML decompilation dashboard
   progress [scope]  Show annotation progress, optionally for a namespace
   check             Verify functions_map.txt is sorted, deduplicated, named, in-range
@@ -80,10 +114,23 @@ Commands:
   shell             Start a shell with the decompilation environment active
   sync [args]       Import matched functions/types/globals into Ghidra via reccmp
 
+`candidates` and `evidence` read only committed files plus the build report, so
+they are fast and safe to run first:
+  tools/decomp candidates --stubs --limit 10
+  tools/decomp candidates Nu3D --leaves --why
+  tools/decomp evidence 0x00403640
+  tools/decomp evidence 0x00403640 --disasm
+
+`score` avoids the assembly diff when you only need the percentage:
+  tools/decomp score 0x00403640 0x004B99F0
+
 `sync` runs reccmp's headless Ghidra importer (`reccmp-ghidra-import`) against
 the local Ghidra project. Extra arguments are forwarded to the importer, e.g.
   tools/decomp sync --debug
 The Ghidra project location is read from the `ghidra` CLI configuration.
+
+TOY2_BUILD_JOBS sets the build parallelism. Keep the default of 1: VC6 shares
+one vc60.pdb per target, so a parallel build fails. See docs/linux-decomp.md.
 EOF
 }
 
@@ -102,6 +149,12 @@ esac
 source tools/linux-decomp-env.sh
 
 case "$command" in
+    candidates)
+        exec python tools/decomp_candidates.py "$@"
+        ;;
+    evidence)
+        exec python tools/decomp_evidence.py "$@"
+        ;;
     configure)
         configure "$@"
         ;;
@@ -111,6 +164,17 @@ case "$command" in
     compare)
         ensure_build
         (cd build && reccmp-reccmp --target TOY2 "$@")
+        ;;
+    score)
+        score "$@"
+        ;;
+    bc)
+        if [[ $# -ne 1 ]]; then
+            echo "Usage: tools/decomp bc <address>" >&2
+            exit 2
+        fi
+        build
+        (cd build && reccmp-reccmp --target TOY2 --verbose "$1")
         ;;
     report)
         report "$@"

@@ -30,6 +30,13 @@ done
 export WINEPREFIX="$TOY2_TOOLING/wineprefix"
 export WINEDEBUG="${WINEDEBUG:--all}"
 
+# reccmp loads a Qt/EGL-backed dependency that prints "libEGL warning" and
+# "pci id for fd" lines to stderr on some GPU drivers. The warnings are
+# harmless, but they force every caller to add a grep filter, which can also
+# hide real errors. Software rendering removes them and does not change any
+# comparison output.
+export LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
+
 # Wait for each Wine-hosted tool itself instead of the wrapper package's
 # optional FIFO forwarding helper. The helper can return before VC6 closes its
 # object files, leaving Ninja with stale dependency timestamps and causing
@@ -38,7 +45,10 @@ export WINE_MSVC_RAW_STDOUT=1
 
 # The 8168 package supplies CL.EXE 12.00.8168, LINK.EXE 6.00.8168, and
 # Linux/Wine wrappers. This is the compiler generation recorded in toy2.exe.
-source "$TOY2_MSVC_BASE/activate_x86"
+# The activation script announces itself on stdout. That banner appears in
+# every tool's output and gets filtered by hand at each call site, so drop it
+# here instead.
+source "$TOY2_MSVC_BASE/activate_x86" >/dev/null
 
 # Visual Studio 6 SP3 kept compiler build 8168 but updated the product CRT,
 # headers, and libraries to build 8447. Both build numbers occur in the

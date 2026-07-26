@@ -70,6 +70,24 @@ tools/decomp progress
 reccmp. Compilation is serialized because concurrent Wine-hosted VC6 processes
 are unreliable. Incremental Ninja builds remain enabled.
 
+### Build parallelism
+
+Do not spend time on this again. `TOY2_BUILD_JOBS` sets the Ninja job count,
+and the default of 1 is the only value that works.
+
+VC6 writes debug information for every object in one shared `vc60.pdb` per
+target directory. Two concurrent `CL.EXE` processes therefore fight for the
+same file, and the build fails:
+
+```text
+fatal error C1033: cannot open program database '...\vc60.pdb'
+```
+
+This was measured at `-j4`. `/Z7`, which writes debug information into each
+object file instead of a shared database, also failed to make a parallel build
+work. The serial build is the supported configuration. Keep `TOY2_BUILD_JOBS`
+at its default.
+
 `compare` calculates per-function machine-code similarity. Inspect an
 individual function with its original address:
 
