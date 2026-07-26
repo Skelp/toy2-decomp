@@ -213,6 +213,9 @@ namespace AudioManager
 		}
 	}
 
+	// FUNCTION: TOY2 0x00436CC0
+	int32_t IsThreadReady() { return g_streamThreadReady; }
+
 	// FUNCTION: TOY2 0x00436D40 [MATCHED]
 	int32_t StopAndWait()
 	{
@@ -354,6 +357,9 @@ namespace AudioManager
 			WaitForSingleObject(g_streamAckEvent, INFINITE);
 		}
 	}
+
+	// FUNCTION: TOY2 0x00413140
+	void OnExit() { SignalThreadExit(); }
 
 	// FUNCTION: TOY2 0x00413150
 	int32_t PlayTrackByIndex(int32_t trackIndex, int32_t fadeMode)
