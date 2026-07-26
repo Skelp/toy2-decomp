@@ -74,6 +74,8 @@ namespace NGNLoader
 		Nu3D::Creature** creatureData;
 		int32_t creatureCount;
 		TextureEntry textureEntries[64];
+
+		static void Destroy(NGNImage* ngnImage);
 	};
 
 	struct NGNTextureData

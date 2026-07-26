@@ -2,6 +2,7 @@
 
 #include "Common.h"
 #include "Numerics.h"
+#include "Nu3D/Nu3D.h"
 #include "Nu3D/Viewport.h"
 #include <directx6/ddraw.h>
 #include <directx6/d3d.h>
@@ -11,6 +12,10 @@ namespace SoftwareRenderer
 	extern PointI g_unk4F7400;
 	extern int32_t g_unk500A1C;
 	extern int32_t g_unk830C60;
+	extern int32_t g_unk559C40;
+	extern void* g_unk839278;
+	extern void* g_unk504D34;
+	extern int32_t g_unk839280;
 	extern int32_t g_unkE4D950;
 	extern int32_t g_unk9F6008;
 	extern Nu3D::Viewport::ViewportRect* g_viewportRect;
@@ -19,7 +24,44 @@ namespace SoftwareRenderer
 	extern int32_t g_rightOffset;
 	extern int32_t g_topOffset;
 	extern int32_t g_bottomOffset;
+	// Integer clip rect, kept in sync with the viewport offsets above by
+	// ZoomIn/ZoomOut/InitialisePrimarySurface. The polygon clipper clips
+	// against these bounds.
+	extern int32_t g_clipLeft;
+	extern int32_t g_clipRight;
+	extern int32_t g_clipTop;
+	extern int32_t g_clipBottom;
+	// Zoom step counter clamped to [0,10]; the zoomed source extents below are
+	// adjusted by ZoomIn/ZoomOut and CommitZoom derives the render scale from
+	// extent / screen dimension.
+	extern int32_t g_zoomLevel;
+	extern int32_t g_zoomExtentV;
+	extern int32_t g_zoomExtentH;
 	extern int32_t g_bitsPerPixel;
+	extern float g_topOffsetF;
+	extern float g_leftOffsetF;
+	extern float g_spanScaleV;
+	extern float g_spanScaleH;
+	extern float g_zoomScaleV;
+	extern float g_zoomScaleH;
+	extern int32_t g_screenDimV;
+	extern int32_t g_screenDimH;
+	extern const double k_vSpanScale;
+	extern const double k_hSpanScale;
+	extern void* g_softwareRendererBuffer;
+	extern LPVOID g_primarySurfacePtr;
+	extern int32_t g_primarySurfacePitch;
+	extern int32_t g_pixelFormatMode;
+	extern void* g_backBuffer;
+	extern void* g_colourScaleTables;
+	extern uint16_t* g_colourScaleTable0;
+	extern uint16_t* g_colourScaleTable1;
+	extern uint16_t* g_colourScaleTable2;
+	extern uint16_t* g_colourScaleTable3;
+	extern uint8_t* g_currentRenderBuffer;
+	extern uint8_t* g_renderBufferPixels;
+	extern uint8_t g_renderBufferA[];
+	extern uint8_t g_renderBufferB[];
 	extern float g_cameraNearZ;
 	extern float g_cameraFarZ;
 
@@ -28,10 +70,21 @@ namespace SoftwareRenderer
 	void InitialisePrimarySurface();
 	void InitialisePrimarySurface_T();
 	void Destroy();
+	void CommitZoom();
+	void InitialiseColourScaleTables();
 	void ZoomOut();
 	void ZoomIn();
 	void PresentFrame();
 	void SetCameraNearFarZ(float nearZ, float farZ);
+
+	int32_t GetStrideFromFVF(int32_t fvf);
+
+	void SubmitQuad(int32_t renderFlags, int32_t textureIndex, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices);
+	// SubmitSortedTriangle (0x004B5E40) bucket-sorts a transformed triangle into g_renderBuckets
+	// by depth. param field10/fieldC map to sorted-record +0x10/+0xc; SubmitQuad populates
+	// fieldC=textureIndex/field10=0 while the indexed-strip submitters swap them — refine the
+	// names when SubmitSortedTriangle and its record struct are reconstructed.
+	void SubmitSortedTriangle(int32_t renderFlags, int32_t field10, int32_t fieldC, Nu3D::VertexTL* v0, Nu3D::VertexTL* v1, Nu3D::VertexTL* v2);
 
 	void UnkFunc67(int32_t param1, int32_t param2);
 	void UnkFunc2();
@@ -40,6 +93,8 @@ namespace SoftwareRenderer
 	void UnkFunc32();
 	void UnkFunc33();
 	void UnkFunc7();
+
+	void UnkFunc8(void* param1, int32_t param2);
 }
 
 namespace SoftwareDevice

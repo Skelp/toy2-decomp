@@ -171,6 +171,7 @@ namespace Toy2
 	int32_t TickSaveMenuMachine(int32_t param);
 	int32_t MovieViewerTick(int32_t movieIdx);
 	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId);
+	int32_t CleanupManagers();
 }
 
 namespace Toy2
@@ -223,8 +224,68 @@ namespace Toy2
 
 	namespace GameOver
 	{
-		// STUB: TOY2 0x00437B20
-		void Tick() {}
+		// FUNCTION: TOY2 0x00437B20
+		void Tick()
+		{
+			InputManager::g_curButtonsPressed = 0;
+			InputManager::g_prevButtonsPressed = 0;
+			MainMenu::g_fadeTimer = 0;
+			MainMenu::g_nextScreen = 0;
+			Nu3D::Camera::g_cameraTintBlue = 0;
+			Nu3D::Camera::g_cameraTintGreen = 0;
+			Nu3D::Camera::g_cameraTintRed = 0;
+			Nu3D::Camera::SetTint(128, 128, 128, 12);
+			SoftwareRenderer::UnkFunc67(0, 0);
+			Renderer::g_frameDelta = 1;
+			SetBackdropByIndex(1);
+
+			int32_t iVar2 = 0x4b0;
+			AudioManager::PlayMusicOneShot(0x11);
+
+			while (true)
+			{
+				Nu3D::Camera::FadeToTargetTint();
+				MainMenu::RenderMenu();
+
+				if (iVar2 > 0)
+				{
+					iVar2 -= Renderer::g_frameDelta;
+					if (iVar2 <= 0)
+						iVar2 = 0;
+				}
+
+				if (AudioManager::IsStreamActive() == 0)
+				{
+					if (iVar2 > 0x17)
+						iVar2 = 0x17;
+				}
+				else if (iVar2 > 0x17)
+				{
+					goto skip_tint;
+				}
+				if (Renderer::g_frameDelta + iVar2 > 0x17)
+				{
+					Nu3D::Camera::SetTint(0, 0, 0, 12);
+				}
+			skip_tint:
+				if (g_attractModeTimer >= 0 && (InputManager::g_curButtonsPressed & 1))
+				{
+					InputManager::g_curButtonsPressed |= 0x4000;
+				}
+				if ((InputManager::g_curButtonsPressed & 0xf000) == 0 || (InputManager::g_prevButtonsPressed & 0xf000) != 0 || iVar2 >= 0x474 || iVar2 <= 0x17)
+				{
+					if (iVar2 == 0)
+					{
+						AudioManager::StopAndWait();
+						return;
+					}
+				}
+				else
+				{
+					iVar2 = 0x18;
+				}
+			}
+		}
 	}
 
 	// STUB: TOY2 0x00440F70
@@ -632,8 +693,46 @@ namespace Toy2
 		SaveManager::Init();
 	}
 
-	// STUB: TOY2 0x00490730
-	void CheckForQuit() {}
+	// FUNCTION: TOY2 0x00490730
+	void CheckForQuit()
+	{
+		if (D3DApp::g_windowData.wndIsExiting != 0)
+		{
+			Logger::Log("CheckForQuit : Starting shutdown now...\n");
+			DestroyWindow(D3DApp::g_windowData.mainHwnd);
+
+			switch (D3DApp::g_renderMode)
+			{
+				case RENDERMODE_SOFTWARE:
+					SoftwareRenderer::Destroy();
+					break;
+				case RENDERMODE_D3D:
+					Logger::Log("QUIT : Destroying Direct3D renderer.\n");
+					break;
+			}
+
+			CleanupManagers();
+			D3DApp::PostQuitMessage();
+			CoUninitialize();
+
+			D3DApp::g_windowData.mainHwnd = 0;
+
+			Logger::Log("CheckForQuit : Code shutdown.\n");
+
+			g_clearScreenSaveResult = SystemParametersInfoA(SPI_SCREENSAVERRUNNING, 0, &g_setScreenSaveRunning, 0);
+
+			if (g_clearScreenSaveResult == 0)
+			{
+				Logger::Log("Failed to clear SCREENSAVERRUNNING\n");
+			}
+			else
+			{
+				Logger::Log("Managed to clear SCREENSAVERRUNNING\n");
+			}
+
+			exit(D3DApp::g_windowData.wndEventMsg.wParam);
+		}
+	}
 
 	// FUNCTION: TOY2 0x004CE760 [MATCHED]
 	void InitCfg()
@@ -1186,7 +1285,7 @@ namespace Toy2
 	// FUNCTION: TOY2 0x004909E0
 	void ProcessMiscEventsEx()
 	{
-		Nu3D::Font::SetTextCursor(0, Nu3D::g_scaledFontAscent);
+		Nu3D::Font::SetTextCursor(0, (int32_t)Nu3D::g_scaledFontAscent);
 		DevDraw::g_vertexCount = 0;
 
 		D3DApp::g_windowData.wndIsExiting = g_wndIsExitingUnused;

@@ -9,11 +9,22 @@
 #include "Nu3D/Math.h"
 #include "NGNLoader/NGNLoader.h"
 #include "Nu3D/Patch.h"
+#include "Nu3D/Primitive.h"
 #include "Renderer/Sprite.h"
 #include "Toy2/Toy2.h"
 #include "Renderer/Glue.h"
 #include "Toy2/D3DApp.h"
 #include "Logger.h"
+
+// Unidentified empty no-op (single RET) called once from Renderer::Cleanup
+// between the primitive-list teardown and the texture/light release. Its
+// address sits between Nu3D::Material::Init and Nu3D::Light::Destroy; the
+// retail body is empty, so it is a stubbed/placeholder cleanup step.
+// STUB: TOY2 0x004C2990
+namespace Nu3D
+{
+	void UnkFunc0() {}
+} // namespace Nu3D
 
 namespace Renderer
 {
@@ -115,11 +126,38 @@ namespace Renderer
 	// GLOBAL: TOY2 0x009F5FE0
 	Nu3D::Material* g_whiteMaterial;
 
+	// GLOBAL: TOY2 0x009F5FF0
+	int32_t g_unk9F5FF0;
+
 	// GLOBAL: TOY2 0x009F5FF8
 	int32_t g_unk9F5FF8;
 
+	// FUNCTION: TOY2 0x004B9A60 [MATCHED]
+	int32_t Set9F5FF8(int32_t value)
+	{
+		int32_t previousValue = g_unk9F5FF8;
+		g_unk9F5FF8 = value;
+		return previousValue;
+	}
+
 	// GLOBAL: TOY2 0x009F6000
 	int32_t g_useVertexColorMod;
+
+	// FUNCTION: TOY2 0x004B92E0 [MATCHED]
+	void SetVertexColorModulation(int32_t red, int32_t green, int32_t blue)
+	{
+		g_vertexColorModRed = red;
+		g_vertexColorModGreen = green;
+		g_vertexColorModBlue = blue;
+	}
+
+	// FUNCTION: TOY2 0x004B9300 [MATCHED]
+	int32_t EnableVertexColorModulation(int32_t enable)
+	{
+		int32_t previousValue = g_useVertexColorMod;
+		g_useVertexColorMod = enable;
+		return previousValue;
+	}
 
 	// GLOBAL: TOY2 0x009F5FD8
 	float g_materialHorzOffset;
@@ -300,6 +338,27 @@ namespace Renderer
 {
 	// FUNCTION: TOY2 0x004B2CE0 [MATCHED]
 	void DisableFog() { g_fogEnabled = 0; }
+
+	// FUNCTION: TOY2 0x004B2CF0
+	void ConfigureFog(float start, float end, RGBA color)
+	{
+		g_fogEnabled = 1;
+		g_fogStart = start;
+		g_fogEnd = end;
+		g_fogColor = ApplyGammaCorrection(color).value;
+	}
+
+	// FUNCTION: TOY2 0x004B2D20
+	void SetFogEnable(int32_t enable)
+	{
+		if (g_fogEnabled)
+		{
+			if (enable)
+				DrawingDevice::SetRenderState(D3DRENDERSTATE_FOGENABLE, 1);
+			else
+				DrawingDevice::SetRenderState(D3DRENDERSTATE_FOGENABLE, 0);
+		}
+	}
 
 	// FUNCTION: TOY2 0x004B6320
 	void SetRenderState(int32_t newStateFlags)
@@ -496,6 +555,54 @@ namespace Renderer
 		g_renderStateCache[textureStage + 1] = newState;
 	}
 
+	// FUNCTION: TOY2 0x004B6760
+	int32_t SetupMaterialRenderState(Nu3D::Material* material, int32_t stateFlags)
+	{
+		int32_t textureStage = 0;
+		while (textureStage < g_maxSimultaneousTextures)
+		{
+			int32_t newStateFlags = stateFlags;
+			if (material != 0)
+			{
+				int32_t metadata = material->metadata;
+				if (metadata & 0x2)
+					newStateFlags |= RENDER_ALPHA_DEFAULT | RENDER_ZWRITE;
+				if (metadata & 0x10)
+					newStateFlags |= RENDER_ZWRITE | RENDER_ALPHA_CUSTOM;
+				if (metadata & 0x20)
+					newStateFlags |= RENDER_ZWRITE | RENDER_ALPHA_ALT;
+				if (metadata & 0x200)
+					newStateFlags |= RENDER_ZWRITE | RENDER_ALPHA_TEX_MODULATE;
+				if (metadata & 0x400)
+					newStateFlags |= RENDER_ZWRITE | RENDER_ALPHA_TEX_MOD_CUSTOM;
+				if (metadata & 0x800)
+					newStateFlags |= RENDER_ZWRITE | RENDER_ALPHA_TEX_MOD_ALT;
+				if (metadata & 0x8)
+					newStateFlags = (newStateFlags & ~(RENDER_CULL_FRONT | RENDER_CULL_BACK)) | RENDER_CULL_NONE;
+				if (material == NGNLoader::g_tex14Materials[0] || material == NGNLoader::g_tex14Materials[1] || material == NGNLoader::g_tex14Materials[2])
+					newStateFlags &= ~(RENDER_TEXTURE_WRAP_UV | RENDER_TEXTURE_CLAMP_U);
+				if (textureStage != 0)
+				{
+					if (metadata & 0x40000)
+						newStateFlags |= RENDER_COLOR_MODULATE;
+					if (metadata & 0x80000)
+						newStateFlags |= RENDER_COLOR_BLEND_FACTOR;
+				}
+			}
+			if (textureStage == 0)
+			{
+				newStateFlags |= RENDER_COLOR_MODULATE;
+				SetRenderState(newStateFlags);
+			}
+			SetTextureStageState(newStateFlags, textureStage);
+			if (material != 0)
+				material = material->nextPass;
+			textureStage++;
+		}
+
+		return textureStage;
+	}
+
 	// FUNCTION: TOY2 0x004B6850 [MATCHED]
 	void InitRenderState(int32_t newStage)
 	{
@@ -618,8 +725,24 @@ namespace Renderer
 		DECOMP_PRINT(("Finished Renderer::InitResources\n"));
 	}
 
-	// STUB: TOY2 0x004B37F0
-	void Cleanup() {}
+	// FUNCTION: TOY2 0x004B37F0
+	void Cleanup()
+	{
+		while (Nu3D::g_patchListHead != NULL)
+		{
+			Nu3D::g_patchListHead->listNext = NULL;
+			Nu3D::Patch::Destroy(Nu3D::g_patchListHead);
+		}
+		while (Nu3D::g_primListHead != NULL)
+		{
+			Nu3D::g_primListHead->listNext = NULL;
+			Nu3D::Primitive::Destroy(Nu3D::g_primListHead);
+		}
+		Nu3D::UnkFunc0();
+		NGNLoader::ReleaseAllTextures();
+		Nu3D::Light::DestroyAllLights();
+		g_rendererValid = 0;
+	}
 
 	// FUNCTION: TOY2 0x004B3630
 	void Init()
@@ -1257,6 +1380,39 @@ namespace Nu3D
 		instanceData->sprite = g_instanceSpriteTemplate;
 		return instanceData;
 	}
+
+	// FUNCTION: TOY2 0x004B8840
+	InstanceData* InstanceData::AllocFromNodeMatrices(const D3DMATRIX* matrices, int32_t* nodeIndices, int32_t count, int32_t* flags, int32_t renderFlags)
+	{
+		if (! g_instanceDataFreeCount)
+			return 0;
+
+		--g_instanceDataFreeCount;
+		D3DMATRIX* dest = g_instanceDataPool[g_instanceDataFreeCount].matrices;
+
+		while (count != 0)
+		{
+			if (flags && (flags[*nodeIndices] & 1))
+			{
+				++g_instanceDataFreeCount;
+				return 0;
+			}
+
+			memcpy(dest, &matrices[*nodeIndices], sizeof(D3DMATRIX));
+			dest++;
+			nodeIndices++;
+			count--;
+		}
+
+		g_instanceDataPool[g_instanceDataFreeCount].renderFlags = renderFlags;
+		g_instanceDataPool[g_instanceDataFreeCount].lodFactor = g_lodFactor;
+		g_instanceDataPool[g_instanceDataFreeCount].horzOffset = g_materialHorzOffset;
+		g_instanceDataPool[g_instanceDataFreeCount].vertOffset = g_materialVertOffset;
+		g_instanceDataPool[g_instanceDataFreeCount].renderModeFlags = g_unk9F5FF8 != 0;
+		Nu3D::Viewport::GetViewClipRect(&g_instanceDataPool[g_instanceDataFreeCount].clipRect);
+		g_instanceDataPool[g_instanceDataFreeCount].unkInt6 = g_primitiveRenderFlags;
+		return &g_instanceDataPool[g_instanceDataFreeCount];
+	}
 }
 
 namespace Renderer
@@ -1360,6 +1516,74 @@ namespace Renderer
 			Nu3D::g_maxBucketDepth = depth;
 	}
 
+	// FUNCTION: TOY2 0x004B87F0
+	void RenderPatchList(Nu3D::Patch* patch, const D3DMATRIX* matrices, int32_t* flags, int32_t renderFlags)
+	{
+		renderFlags |= g_additionalRenderFlags;
+
+		while (patch != 0)
+		{
+			Nu3D::InstanceData* instanceData =
+				Nu3D::InstanceData::AllocFromNodeMatrices(matrices, patch->controlPointIndices, patch->controlPointCount, flags, renderFlags);
+
+			if (instanceData != 0)
+			{
+				ProcessPatch(instanceData, patch);
+			}
+
+			patch = patch->listNext;
+		}
+	}
+
+	// FUNCTION: TOY2 0x004B8940
+	void ProcessPatch(Nu3D::InstanceData* instanceData, Nu3D::Patch* patch)
+	{
+		Nu3D::Material* material = Nu3D::Material::GetFreeByIndex(patch->materialId);
+		RenderEntry::AllocPatch(material, (Nu3D::Primitive*)patch, instanceData);
+
+		if ((material->metadata & 4) != 0)
+		{
+			RenderEntry::AllocPatch(NGNLoader::g_tex14Materials[0], (Nu3D::Primitive*)patch, instanceData);
+		}
+
+		if ((material->metadata & 0x40) != 0)
+		{
+			RenderEntry::AllocPatch(NGNLoader::g_tex14Materials[1], (Nu3D::Primitive*)patch, instanceData);
+		}
+
+		if ((material->metadata & 0x80) != 0)
+		{
+			RenderEntry::AllocPatch(NGNLoader::g_tex14Materials[2], (Nu3D::Primitive*)patch, instanceData);
+		}
+	}
+
+	// FUNCTION: TOY2 0x004B89B0
+	RenderEntry* RenderEntry::AllocPatch(Nu3D::Material* material, Nu3D::Primitive* primitive, Nu3D::InstanceData* instanceData)
+	{
+		if (g_renderEntryFreeCount)
+		{
+			RenderEntry* entry = &g_renderEntryPool[--g_renderEntryFreeCount];
+			entry->primitive = primitive;
+			entry->instanceData = instanceData;
+			entry->material = material;
+
+			if (instanceData->lodFactor == 1.0f && (material->metadata & 0xE33) == 0)
+			{
+				entry->type = RENDER_TYPE6;
+				entry->next = material->renderEntryHead;
+				material->renderEntryHead = entry;
+				return entry;
+			}
+
+			entry->type = RENDER_TYPE8;
+			InsertIntoBucket(entry);
+			return entry;
+		}
+
+		Logger::DebugLog("rndrentryAllocPatch - out of rndrentries");
+		return 0;
+	}
+
 	// FUNCTION: TOY2 0x004B8400
 	void FlushMaterialBuckets() {}
 
@@ -1368,6 +1592,13 @@ namespace Renderer
 
 	// FUNCTION: TOY2 0x004B5CF0
 	void FlushPrimitives() {}
+
+	// FUNCTION: TOY2 0x004B5E20
+	void DrawPrimitive(void* vertices, DWORD vertexCount)
+	{
+		if (vertexCount != 0)
+			DrawingDevice::DrawPrimitive(D3DPT_TRIANGLELIST, D3DFVF_0x1C4, vertices, vertexCount, 0x10);
+	}
 
 	// FUNCTION: TOY2 0x004B6A50
 	void FlushRenderQueues()
@@ -1432,6 +1663,43 @@ namespace Renderer
 		return color;
 	}
 
+	// FUNCTION: TOY2 0x004C27D0
+	void BindMaterial(Nu3D::Material* material, int32_t force)
+	{
+		if (g_boundMaterial != material || force != 0)
+		{
+			g_boundMaterial = material;
+
+			if (material != 0)
+			{
+				if (g_isSoftwareRendering == 0)
+					DrawingDevice::SetLightState(D3DLIGHTSTATE_MATERIAL, material->d3dMaterialHandle);
+
+				for (int32_t stage = 0; stage < g_maxSimultaneousTextures; ++stage)
+				{
+					if (g_boundTextureIndices[stage] != material->texDataIndex)
+					{
+						g_boundTextureIndices[stage] = material->texDataIndex;
+						DrawingDevice::BindTexWithStage(material->texDataIndex, stage);
+					}
+
+					material = material->nextPass;
+
+					if (material == 0)
+						return;
+				}
+			}
+			else
+			{
+				for (int32_t stage = 0; stage < g_maxSimultaneousTextures; ++stage)
+					g_boundTextureIndices[stage] = -1;
+			}
+		}
+	}
+
+	// FUNCTION: TOY2 0x004B8450
+	void UnbindMaterial() { BindMaterial(0, 0); }
+
 	// FUNCTION: TOY2 0x004C2870 [MATCHED]
 	void BindTexture(int32_t texIndex)
 	{
@@ -1452,6 +1720,14 @@ namespace Renderer
 			}
 		}
 	}
+
+	// FUNCTION: TOY2 0x004B9600 [MATCHED]
+	void DrawSingleTexturedTriangle(Nu3D::VertexTL* vertices, int32_t texIndex, int32_t renderFlags)
+	{
+		InitRenderState(renderFlags);
+		BindTexture(texIndex);
+		DrawingDevice::DrawPrimitive(D3DPT_TRIANGLELIST, D3DFVF_0x1C4, vertices, 3, 0x10);
+	}
 }
 
 namespace DevDraw
@@ -1459,6 +1735,40 @@ namespace DevDraw
 	// GLOBAL: TOY2 0x00732FBC
 	int32_t g_vertexCount;
 
-	// STUB: TOY2 0x004907E0
-	int16_t DrawSlots() { return 0; }
+	// FUNCTION: TOY2 0x004907E0
+	int16_t DrawSlots()
+	{
+		switch (D3DApp::g_renderMode)
+		{
+			case 1:
+				if (SoftwareRenderer::g_unk559C40 != 1 || (Renderer::g_frameDelta & 1) == 0)
+				{
+					SoftwareRenderer::UnkFunc8(SoftwareRenderer::g_unk839278, 0);
+				}
+				SoftwareRenderer::g_unk839280 = 0;
+				Nu3D::MemSet32Util(SoftwareRenderer::g_unk504D34, 0x1000, 0);
+				break;
+			case 2: {
+				int16_t i;
+				for (i = 0; i < 0x40; i++)
+				{
+					FlushDrawBufferSlot(i);
+				}
+				for (i = 0; i < 0x40; i++)
+				{
+					FlushTransparentDrawBufferSlot(i);
+				}
+				return 1;
+			}
+			default:
+				break;
+		}
+		return 1;
+	}
+
+	// STUB: TOY2 0x00490470
+	void FlushDrawBufferSlot(int16_t slot) {}
+
+	// STUB: TOY2 0x004905C0
+	void FlushTransparentDrawBufferSlot(int16_t slot) {}
 }

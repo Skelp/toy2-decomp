@@ -95,6 +95,8 @@ namespace DrawingDevice
 		HRESULT CreateAndSetViewport();
 		int32_t RestoreToGDISurface(int32_t refreshWindow);
 		int32_t GetSlotSurfaceByIndex(int32_t index, LPDIRECTDRAWSURFACE4* surfaceOut);
+		int32_t GetSlotSurfaceCaps(int32_t index, uint32_t* capsOut);
+		int32_t GetSlotTexSize(int32_t index, int32_t* widthOut, int32_t* heightOut);
 
 		static HRESULT Build(HWND hWnd, GUID* guid, DDAppDevice* device, DDAppDevice::DisplayMode* displayMode, uint8_t flags);
 		static void InitSurfaceDesc(LPDDSURFACEDESC2 ddSurfaceDesc, DWORD flags, DWORD caps);
@@ -105,6 +107,7 @@ namespace DrawingDevice
 	extern CD3DFramework* g_drawingDevice;
 	extern DDAppDevice::App* g_ddAppListHead;
 	extern DDAppDevice::App* g_primaryDDApp;
+	extern D3DMATRIX* g_currentWorldTransform;
 	extern D3DMATRIX* g_currentViewTransform;
 	extern D3DMATRIX* g_currentProjectionTransform;
 
@@ -118,6 +121,8 @@ namespace DrawingDevice
 	int32_t GetDestHeight();
 	LPDIRECTDRAWSURFACE4 GetBackBuffer();
 	int32_t GetSlotSurfaceByIndex(int32_t index, LPDIRECTDRAWSURFACE4* surfaceOut);
+	int32_t GetSlotTexSize(int32_t index, int32_t* widthOut, int32_t* heightOut);
+	int32_t GetSlotSurfaceCaps(int32_t index, uint32_t* capsOut);
 	int32_t SetViewport(LPD3DVIEWPORT2 viewport);
 	int32_t BuildFreshViewport(LPD3DVIEWPORT2 viewport);
 	HRESULT CreateMaterial(LPDIRECT3DMATERIAL3* outMaterial);
@@ -131,6 +136,7 @@ namespace DrawingDevice
 	HRESULT GetChosenDevice_T(DDAppDevice::App** outApp, DDAppDevice** outDevice);
 	DDAppDevice::App* GetListHead();
 	LPD3DDEVICEDESC CopySurfaceDesc(LPD3DDEVICEDESC outSurfaceDesc);
+	HRESULT SetWorldTransform(D3DMATRIX* transform);
 	HRESULT SetViewTransform(D3DMATRIX* transform);
 	HRESULT SetProjectionTransform(D3DMATRIX* transform);
 	HRESULT SetRenderState(D3DRENDERSTATETYPE renderStateType, DWORD value);
@@ -140,8 +146,11 @@ namespace DrawingDevice
 	HRESULT BeginScene();
 	HRESULT PresentFrame();
 	void EndScene();
+	void LockPrimarySurface(LPDDSURFACEDESC2 surfaceDesc);
+	void UnlockPrimarySurface();
 	HRESULT BindTexWithStage(int32_t textureIndex, int32_t stageIndex);
 	HRESULT BindTexToStage0(int32_t textureIndex);
+	HRESULT DrawPrimitive(D3DPRIMITIVETYPE d3dptPrimitiveType, DWORD dwVertexTypeDesc, LPVOID lpvVertices, DWORD dwVertexCount, DWORD dwFlags);
 
 	STATIC_ASSERT(sizeof(DrawingDeviceSlot) == 0x18);
 	STATIC_ASSERT(sizeof(CD3DFramework) == 0x234);

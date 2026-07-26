@@ -9,6 +9,7 @@ namespace Toy2
 	{
         int32_t Tick();
         void ShowSettings();
+        void RenderMenu();
 
 		extern int32_t g_fadeTimer;
 		extern int32_t g_nextScreen;

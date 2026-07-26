@@ -132,6 +132,8 @@ set(TOY2_SOURCES
     src/Nu3D/Viewport.cpp
     src/Nu3D/Font.h
     src/Nu3D/Font.cpp
+    src/Nu3D/DrawSurface.h
+    src/Nu3D/DrawSurface.cpp
     src/Nu3D/Light.cpp
     src/Nu3D/Light.h
     src/Nu3D/Camera.cpp
@@ -147,6 +149,8 @@ set(TOY2_SOURCES
     src/Renderer/RenderType.h
     src/Renderer/Sprite.h
     src/Renderer/Sprite.cpp
+    src/Renderer/Vertices.h
+    src/Renderer/Vertices.cpp
     src/Renderer/Shadows.cpp
     src/Renderer/Shadows.h
     src/Renderer/SpriteSheets.cpp
@@ -164,6 +168,7 @@ set(TOY2_SOURCES
     # AudioManager
     src/AudioManager/AudioManager.cpp
     src/AudioManager/AudioManager.h
+    src/AudioManager/DsVolTable.inc
 )
 
 # Build the game

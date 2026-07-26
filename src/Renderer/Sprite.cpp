@@ -36,6 +36,21 @@ namespace Renderer
 		// GLOBAL: TOY2 0x005087EC
 		WORD g_2DSpriteIndices[4] = { 0, 1, 2, 3 };
 
+		// GLOBAL: TOY2 0x005087C4
+		WORD g_quadSpriteIndices[4] = { 0, 1, 2, 3 };
+
+		// GLOBAL: TOY2 0x005087CC
+		WORD g_billboardSpriteIndices[4] = { 0, 1, 2, 3 };
+
+		// GLOBAL: TOY2 0x005087D4
+		WORD g_triangleSpriteIndices[4] = { 0, 1, 2, 3 };
+
+		// GLOBAL: TOY2 0x005087DC
+		WORD g_quadSpriteFromVertsIndices[4] = { 0, 1, 2, 3 };
+
+		// GLOBAL: TOY2 0x005087E4
+		WORD g_lineSpriteIndices[2] = { 0, 1 };
+
 		// FUNCTION: TOY2 0x004B68B0
 		HRESULT Render2DSprite(Nu3D::Sprite* sprite)
 		{
@@ -102,6 +117,285 @@ namespace Renderer
 			SoftwareRenderer::g_unk9F6008 = 1;
 
 			return DrawingAPI::DrawIndexedPrimitive(D3DPT_TRIANGLESTRIP, D3DFVF_0x1C4, vertexData, 4, g_2DSpriteIndices, 4, 24);
+		}
+
+		// FUNCTION: TOY2 0x004B7B30
+		void RenderQuadSprite(Nu3D::Sprite* sprite)
+		{
+			LPDIRECT3DVERTEXBUFFER destBuffer = g_FVF_14C_Buffer_2.vertexBuffer;
+			Nu3D::Vertex* lockedData;
+
+			if (DrawingAPI::LockVertexBuffer(g_FVF_152_Buffer.vertexBuffer, 0x801, (LPVOID*)&lockedData, 0) == 0)
+			{
+				lockedData[0].position.x = -sprite->width;
+				lockedData[0].position.y = -sprite->height;
+				lockedData[0].position.z = 0.0f;
+				lockedData[0].coords.x = sprite->uvBottomLeft.x;
+				lockedData[0].coords.y = sprite->uvBottomLeft.y;
+				lockedData[0].diffuse = sprite->color;
+
+				lockedData[1].position.x = -sprite->width;
+				lockedData[1].position.y = sprite->height;
+				lockedData[1].position.z = 0.0f;
+				lockedData[1].coords.x = sprite->uvTopLeft.x;
+				lockedData[1].coords.y = sprite->uvTopLeft.y;
+				lockedData[1].diffuse = sprite->color;
+
+				lockedData[2].position.x = sprite->width;
+				lockedData[2].position.y = -sprite->height;
+				lockedData[2].position.z = 0.0f;
+				lockedData[2].coords.x = sprite->uvBottomRight.x;
+				lockedData[2].coords.y = sprite->uvBottomRight.y;
+				lockedData[2].diffuse = sprite->color;
+
+				lockedData[3].position.x = sprite->width;
+				lockedData[3].position.y = sprite->height;
+				lockedData[3].position.z = 0.0f;
+				lockedData[3].coords.x = sprite->uvTopRight.x;
+				lockedData[3].coords.y = sprite->uvTopRight.y;
+				lockedData[3].diffuse = sprite->color;
+
+				DrawingAPI::UnlockVertexBuffer(g_FVF_152_Buffer.vertexBuffer);
+
+				D3DMATRIX matrix = Nu3D::Camera::g_activeCamera.transform;
+				matrix._43 = 0.0f;
+				matrix._42 = 0.0f;
+				matrix._41 = 0.0f;
+				if (sprite->trigIndex != 0)
+					Nu3D::Math::MatrixRotateRoll(&matrix, sprite->trigIndex);
+				Nu3D::Math::AddWorldSpaceTransform(&matrix, &sprite->position);
+				DrawingDevice::SetWorldTransform(&matrix);
+
+				SoftwareRenderer::g_unkE4D950 = 5;
+
+				if (g_unk9F5FF0 == 0)
+				{
+					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 5, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
+					{
+						Renderer::InitRenderState(sprite->renderFlags);
+						Renderer::BindTexture(sprite->textureIndex);
+						SoftwareRenderer::g_viewportRect = &sprite->viewportRect;
+						DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLESTRIP, destBuffer, g_quadSpriteIndices, 4, 8);
+					}
+				}
+				else
+				{
+					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 1, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
+					{
+						SoftwareRenderer::SubmitQuad(sprite->renderFlags, sprite->textureIndex, destBuffer, g_quadSpriteIndices);
+					}
+				}
+			}
+		}
+
+		// FUNCTION: TOY2 0x004B7D60
+		void RenderBillboardSprite(Nu3D::Sprite* sprite)
+		{
+			LPDIRECT3DVERTEXBUFFER destBuffer = g_FVF_14C_Buffer_2.vertexBuffer;
+			Nu3D::Vertex* lockedData;
+
+			if (DrawingAPI::LockVertexBuffer(g_FVF_152_Buffer.vertexBuffer, 0x801, (LPVOID*)&lockedData, 0) == 0)
+			{
+				lockedData[0].position.x = -sprite->width;
+				lockedData[0].position.y = -sprite->height;
+				lockedData[0].position.z = 0.0f;
+				lockedData[0].coords.x = sprite->uvBottomLeft.x;
+				lockedData[0].coords.y = sprite->uvBottomLeft.y;
+				lockedData[0].diffuse = sprite->color;
+
+				lockedData[1].position.x = -sprite->width;
+				lockedData[1].position.y = sprite->height;
+				lockedData[1].position.z = 0.0f;
+				lockedData[1].coords.x = sprite->uvTopLeft.x;
+				lockedData[1].coords.y = sprite->uvTopLeft.y;
+				lockedData[1].diffuse = sprite->color;
+
+				lockedData[2].position.x = sprite->width;
+				lockedData[2].position.y = -sprite->height;
+				lockedData[2].position.z = 0.0f;
+				lockedData[2].coords.x = sprite->uvBottomRight.x;
+				lockedData[2].coords.y = sprite->uvBottomRight.y;
+				lockedData[2].diffuse = sprite->color;
+
+				lockedData[3].position.x = sprite->width;
+				lockedData[3].position.y = sprite->height;
+				lockedData[3].position.z = 0.0f;
+				lockedData[3].coords.x = sprite->uvTopRight.x;
+				lockedData[3].coords.y = sprite->uvTopRight.y;
+				lockedData[3].diffuse = sprite->color;
+
+				DrawingAPI::UnlockVertexBuffer(g_FVF_152_Buffer.vertexBuffer);
+
+				D3DMATRIX matrix;
+				Nu3D::Math::BuildIdentityMatrix(&matrix);
+				Vector3F direction;
+				Nu3D::Math::GetPositionVector(&Nu3D::Camera::g_activeCamera.transform, &direction);
+				Nu3D::Math::VertexSubtract(&direction, &direction, &sprite->position);
+				direction.y = 0.0f;
+				Nu3D::Math::VectorNormalize(&direction, &direction);
+				matrix._31 = direction.x;
+				matrix._33 = direction.z;
+				matrix._32 = direction.y;
+				matrix._12 = direction.y;
+				matrix._11 = -direction.z;
+				matrix._13 = direction.x;
+				Nu3D::Math::ScaleMatrix(&matrix);
+				Nu3D::Math::AddWorldSpaceTransform(&matrix, &sprite->position);
+				DrawingDevice::SetWorldTransform(&matrix);
+
+				SoftwareRenderer::g_unkE4D950 = 5;
+
+				if (g_unk9F5FF0 == 0)
+				{
+					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 5, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
+					{
+						Renderer::InitRenderState(sprite->renderFlags);
+						Renderer::BindTexture(sprite->textureIndex);
+						SoftwareRenderer::g_viewportRect = &sprite->viewportRect;
+						DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLESTRIP, destBuffer, g_billboardSpriteIndices, 4, 8);
+					}
+				}
+				else
+				{
+					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 1, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
+					{
+						SoftwareRenderer::SubmitQuad(sprite->renderFlags, sprite->textureIndex, destBuffer, g_billboardSpriteIndices);
+					}
+				}
+			}
+		}
+
+		// FUNCTION: TOY2 0x004B7FC0 [MATCHED]
+		void RenderTriangleSprite(Nu3D::Sprite* sprite)
+		{
+			LPDIRECT3DVERTEXBUFFER destBuffer = g_FVF_14C_Buffer_1.vertexBuffer;
+			Nu3D::Vertex* lockedData;
+
+			if (DrawingAPI::LockVertexBuffer(g_FVF_152_Buffer.vertexBuffer, 0x801, (LPVOID*)&lockedData, 0) == 0)
+			{
+				lockedData[0].position = sprite->position;
+				lockedData[0].coords.x = sprite->uvBottomLeft.x;
+				lockedData[0].coords.y = sprite->uvBottomLeft.y;
+				lockedData[0].diffuse = sprite->color;
+
+				lockedData[1].position = sprite->triVerts[0];
+				lockedData[1].coords.x = sprite->uvTopLeft.x;
+				lockedData[1].coords.y = sprite->uvTopLeft.y;
+				lockedData[1].diffuse = sprite->color;
+
+				lockedData[2].position = sprite->triVerts[1];
+				lockedData[2].coords.x = sprite->uvBottomRight.x;
+				lockedData[2].coords.y = sprite->uvBottomRight.y;
+				lockedData[2].diffuse = sprite->color;
+
+				DrawingAPI::UnlockVertexBuffer(g_FVF_152_Buffer.vertexBuffer);
+
+				D3DMATRIX matrix;
+				Nu3D::Math::BuildIdentityMatrix(&matrix);
+				DrawingDevice::SetWorldTransform(&matrix);
+
+				SoftwareRenderer::g_unkE4D950 = 5;
+
+				if (g_unk9F5FF0 == 0)
+				{
+					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 5, 0, 3, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
+					{
+						Renderer::InitRenderState(sprite->renderFlags);
+						Renderer::BindTexture(sprite->textureIndex);
+						SoftwareRenderer::g_viewportRect = &sprite->viewportRect;
+						DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLESTRIP, destBuffer, g_triangleSpriteIndices, 3, 8);
+					}
+				}
+				else
+				{
+					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 1, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
+					{
+						SoftwareRenderer::SubmitQuad(sprite->renderFlags, sprite->textureIndex, destBuffer, g_triangleSpriteIndices);
+					}
+				}
+			}
+		}
+
+		// FUNCTION: TOY2 0x004B8160 [MATCHED]
+		void RenderQuadSpriteFromVerts(Nu3D::Sprite* sprite)
+		{
+			LPDIRECT3DVERTEXBUFFER destBuffer = g_FVF_14C_Buffer_1.vertexBuffer;
+			Nu3D::Vertex* lockedData;
+
+			if (DrawingAPI::LockVertexBuffer(g_FVF_152_Buffer.vertexBuffer, 0x801, (LPVOID*)&lockedData, 0) == 0)
+			{
+				lockedData[0].position = sprite->position;
+				lockedData[0].coords.x = sprite->uvBottomLeft.x;
+				lockedData[0].coords.y = sprite->uvBottomLeft.y;
+				lockedData[0].diffuse = sprite->color;
+
+				lockedData[1].position = sprite->triVerts[0];
+				lockedData[1].coords.x = sprite->uvTopLeft.x;
+				lockedData[1].coords.y = sprite->uvTopLeft.y;
+				lockedData[1].diffuse = sprite->color;
+
+				lockedData[2].position = sprite->triVerts[1];
+				lockedData[2].coords.x = sprite->uvBottomRight.x;
+				lockedData[2].coords.y = sprite->uvBottomRight.y;
+				lockedData[2].diffuse = sprite->color;
+
+				lockedData[3].position = sprite->triVerts[2];
+				lockedData[3].coords.x = sprite->uvTopRight.x;
+				lockedData[3].coords.y = sprite->uvTopRight.y;
+				lockedData[3].diffuse = sprite->color;
+
+				DrawingAPI::UnlockVertexBuffer(g_FVF_152_Buffer.vertexBuffer);
+
+				D3DMATRIX matrix;
+				Nu3D::Math::BuildIdentityMatrix(&matrix);
+				DrawingDevice::SetWorldTransform(&matrix);
+
+				SoftwareRenderer::g_unkE4D950 = 2;
+
+				if (g_unk9F5FF0 != 0)
+				{
+					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 1, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
+					{
+						SoftwareRenderer::SubmitQuad(sprite->renderFlags, sprite->textureIndex, destBuffer, g_quadSpriteFromVertsIndices);
+					}
+				}
+				else
+				{
+					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 5, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
+					{
+						Renderer::InitRenderState(sprite->renderFlags);
+						Renderer::BindTexture(sprite->textureIndex);
+						SoftwareRenderer::g_viewportRect = &sprite->viewportRect;
+						DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLESTRIP, destBuffer, g_quadSpriteFromVertsIndices, 4, 8);
+					}
+				}
+			}
+		}
+
+		// FUNCTION: TOY2 0x004B8330
+		void RenderType10(Nu3D::Sprite* sprite)
+		{
+			Nu3D::Vertex lineVerts[2];
+
+			lineVerts[0].coords.x = 0.0f;
+			lineVerts[0].coords.y = 0.0f;
+			lineVerts[1].coords.x = 0.0f;
+			lineVerts[1].coords.y = 0.0f;
+			lineVerts[0].position = sprite->position;
+			lineVerts[1].position = sprite->triVerts[0];
+			lineVerts[0].diffuse = sprite->color;
+			lineVerts[1].diffuse = sprite->color;
+
+			D3DMATRIX matrix;
+			Nu3D::Math::BuildIdentityMatrix(&matrix);
+			DrawingDevice::SetWorldTransform(&matrix);
+
+			Renderer::InitRenderState(sprite->renderFlags | RENDER_CULL_NONE);
+			SoftwareRenderer::g_unkE4D950 = 5;
+			Renderer::BindTexture(0);
+			SoftwareRenderer::g_viewportRect = &sprite->viewportRect;
+
+			DrawingAPI::DrawIndexedPrimitive(D3DPT_LINESTRIP, D3DFVF_0x152, lineVerts, 2, g_lineSpriteIndices, 2, 24);
 		}
 
 		// FUNCTION: TOY2 0x004B8DD0
@@ -214,6 +508,158 @@ namespace Renderer
 				sprite->triVerts[0] = *end;
 				sprite->color = Renderer::ApplyGammaCorrection(color);
 				sprite->renderFlags = Renderer::g_additionalRenderFlags;
+				Nu3D::Viewport::GetViewClipRect(&sprite->viewportRect);
+				Nu3D::Sprite::InsertIntoBucket(sprite);
+			}
+			else
+			{
+				Logger::DebugLog("sprite buffer underrun");
+			}
+		}
+
+		// FUNCTION: TOY2 0x004B8A30 [MATCHED]
+		void QueueGroundAlignedSprite(Vector3F* position,
+			int32_t trigIndex,
+			float width,
+			float height,
+			Vector2F* uvTopLeft,
+			Vector2F* uvBottomRight,
+			int32_t textureIndex,
+			RGBA color,
+			int32_t flags)
+		{
+			if (g_spriteBuffer3DCount)
+			{
+				RGBA modulatedColor = ModulateColorByAlpha(color, flags);
+
+				Nu3D::Sprite* sprite = &g_spriteBuffer3D[--g_spriteBuffer3DCount];
+				sprite->type = RENDER_GROUND_ALIGNED_SPRITE;
+				sprite->position = *position;
+				sprite->trigIndex = trigIndex;
+				sprite->width = width;
+				sprite->height = height;
+				sprite->uvTopLeft = *uvTopLeft;
+				sprite->uvBottomLeft.x = uvTopLeft->x;
+				sprite->uvBottomLeft.y = uvBottomRight->y;
+				sprite->uvTopRight.x = uvBottomRight->x;
+				sprite->uvTopRight.y = uvTopLeft->y;
+				sprite->uvBottomRight = *uvBottomRight;
+				sprite->textureIndex = textureIndex;
+				modulatedColor = ApplyGammaCorrection(modulatedColor);
+				sprite->color = modulatedColor;
+				sprite->renderFlags = flags;
+				Nu3D::Viewport::GetViewClipRect(&sprite->viewportRect);
+				Nu3D::Sprite::InsertIntoBucket(sprite);
+			}
+			else
+			{
+				Logger::DebugLog("sprite buffer underrun");
+			}
+		}
+
+		// FUNCTION: TOY2 0x004B8E60 [MATCHED]
+		void QueueQuadSprite(Vector3F* position,
+			int32_t trigIndex,
+			float width,
+			float height,
+			Vector2F* uvTopLeft,
+			Vector2F* uvBottomRight,
+			int32_t textureIndex,
+			RGBA color,
+			int32_t flags)
+		{
+			if (g_spriteBuffer3DCount)
+			{
+				RGBA modulatedColor = ModulateColorByAlpha(color, flags);
+
+				Nu3D::Sprite* sprite = &g_spriteBuffer3D[--g_spriteBuffer3DCount];
+				sprite->type = RENDER_QUADSPRITE;
+				sprite->position = *position;
+				sprite->trigIndex = trigIndex;
+				sprite->width = width;
+				sprite->height = height;
+				sprite->uvTopLeft = *uvTopLeft;
+				sprite->uvBottomLeft.x = uvTopLeft->x;
+				sprite->uvBottomLeft.y = uvBottomRight->y;
+				sprite->uvTopRight.x = uvBottomRight->x;
+				sprite->uvTopRight.y = uvTopLeft->y;
+				sprite->uvBottomRight = *uvBottomRight;
+				sprite->textureIndex = textureIndex;
+				modulatedColor = ApplyGammaCorrection(modulatedColor);
+				sprite->color = modulatedColor;
+				sprite->renderFlags = flags;
+				Nu3D::Viewport::GetViewClipRect(&sprite->viewportRect);
+				Nu3D::Sprite::InsertIntoBucket(sprite);
+			}
+			else
+			{
+				Logger::DebugLog("sprite buffer underrun");
+			}
+		}
+
+		// FUNCTION: TOY2 0x004B8F40 [MATCHED]
+		void QueueBillboardSprite(Vector3F* position,
+			int32_t trigIndex,
+			float width,
+			float height,
+			Vector2F* uvTopLeft,
+			Vector2F* uvBottomRight,
+			int32_t textureIndex,
+			RGBA color,
+			int32_t flags)
+		{
+			if (g_spriteBuffer3DCount)
+			{
+				RGBA modulatedColor = ModulateColorByAlpha(color, flags);
+
+				Nu3D::Sprite* sprite = &g_spriteBuffer3D[--g_spriteBuffer3DCount];
+				sprite->type = RENDER_BILLBOARD_SPRITE;
+				sprite->position = *position;
+				sprite->trigIndex = trigIndex;
+				sprite->width = width;
+				sprite->height = height;
+				sprite->uvTopLeft = *uvTopLeft;
+				sprite->uvBottomLeft.x = uvTopLeft->x;
+				sprite->uvBottomLeft.y = uvBottomRight->y;
+				sprite->uvTopRight.x = uvBottomRight->x;
+				sprite->uvTopRight.y = uvTopLeft->y;
+				sprite->uvBottomRight = *uvBottomRight;
+				sprite->textureIndex = textureIndex;
+				modulatedColor = ApplyGammaCorrection(modulatedColor);
+				sprite->color = modulatedColor;
+				sprite->renderFlags = flags;
+				Nu3D::Viewport::GetViewClipRect(&sprite->viewportRect);
+				Nu3D::Sprite::InsertIntoBucket(sprite);
+			}
+			else
+			{
+				Logger::DebugLog("sprite buffer underrun");
+			}
+		}
+
+		// FUNCTION: TOY2 0x004B9100 [MATCHED]
+		void QueueQuadSpriteFromVerts(Vector3F* verts, Vector2F* uvTopLeft, Vector2F* uvBottomRight, int32_t textureIndex, RGBA color, int32_t flags)
+		{
+			if (g_spriteBuffer3DCount)
+			{
+				RGBA modulatedColor = ModulateColorByAlpha(color, flags);
+
+				Nu3D::Sprite* sprite = &g_spriteBuffer3D[--g_spriteBuffer3DCount];
+				sprite->type = RENDER_QUAD_SPRITE_FROM_VERTS;
+				sprite->position = verts[0];
+				sprite->triVerts[0] = verts[1];
+				sprite->triVerts[1] = verts[2];
+				sprite->triVerts[2] = verts[3];
+				sprite->uvBottomLeft.x = uvTopLeft->x;
+				sprite->uvBottomLeft.y = uvBottomRight->y;
+				sprite->uvTopLeft = *uvTopLeft;
+				sprite->uvBottomRight = *uvBottomRight;
+				sprite->uvTopRight.x = uvBottomRight->x;
+				sprite->uvTopRight.y = uvTopLeft->y;
+				sprite->textureIndex = textureIndex;
+				modulatedColor = ApplyGammaCorrection(modulatedColor);
+				sprite->color = modulatedColor;
+				sprite->renderFlags = flags;
 				Nu3D::Viewport::GetViewClipRect(&sprite->viewportRect);
 				Nu3D::Sprite::InsertIntoBucket(sprite);
 			}
@@ -354,8 +800,24 @@ namespace Renderer
 				{
 					switch (commandPointer->type)
 					{
+						case RENDER_QUADSPRITE:
+							RenderQuadSprite(commandPointer);
+							break;
+						case RENDER_BILLBOARD_SPRITE:
+							RenderBillboardSprite(commandPointer);
+							break;
 						case RENDER_2D_SPRITE:
 							Sprite::Render2DSprite(commandPointer);
+							break;
+						case RENDER_TRIANGLE_SPRITE:
+							RenderTriangleSprite(commandPointer);
+							break;
+						case RENDER_QUAD_SPRITE_FROM_VERTS:
+							RenderQuadSpriteFromVerts(commandPointer);
+							break;
+						case RENDER_TYPE10:
+							RenderType10(commandPointer);
+							break;
 						default:
 							break;
 					}

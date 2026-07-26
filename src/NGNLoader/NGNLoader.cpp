@@ -15,6 +15,9 @@ namespace NGNLoader
 	// GLOBAL: TOY2 0x00B62410
 	NGNImage* g_ngnImage;
 
+	// STUB: TOY2 0x004C32B0
+	void NGNImage::Destroy(NGNImage* ngnImage) {}
+
 	// GLOBAL: TOY2 0x009F6240
 	NGNTextureData g_textureDataFreeList[2000];
 

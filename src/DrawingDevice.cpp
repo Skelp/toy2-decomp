@@ -10,6 +10,9 @@ namespace DrawingDevice
 	// GLOBAL: TOY2 0x00884008
 	CD3DFramework* g_drawingDevice;
 
+	// GLOBAL: TOY2 0x00884010
+	D3DMATRIX* g_currentWorldTransform;
+
 	// GLOBAL: TOY2 0x00884014
 	D3DMATRIX* g_currentViewTransform;
 
@@ -506,6 +509,39 @@ namespace DrawingDevice
 		return result;
 	}
 
+	// FUNCTION: TOY2 0x004AFA60
+	int32_t CD3DFramework::GetSlotSurfaceCaps(int32_t index, uint32_t* capsOut)
+	{
+		if (index > 8)
+			return 0x8200000F;
+
+		DrawingDeviceSlot* slot = &m_slots[index];
+
+		if (! slot->valid)
+			return 0x8200000F;
+
+		slot->surface1->GetCaps((LPDDSCAPS2)capsOut);
+
+		return 0;
+	}
+
+	// FUNCTION: TOY2 0x004AFAA0
+	int32_t CD3DFramework::GetSlotTexSize(int32_t index, int32_t* widthOut, int32_t* heightOut)
+	{
+		if (index > 8)
+			return 0x8200000F;
+
+		DrawingDeviceSlot* slot = &m_slots[index];
+
+		if (! slot->valid)
+			return 0x8200000F;
+
+		*widthOut = slot->width;
+		*heightOut = slot->height;
+
+		return 0;
+	}
+
 	// FUNCTION: TOY2 0x004ABEB0
 	HRESULT CD3DFramework::Build(HWND hWnd, GUID* guid, DDAppDevice* device, DDAppDevice::DisplayMode* displayMode, uint8_t flags)
 	{
@@ -578,6 +614,13 @@ namespace DrawingDevice
 	// FUNCTION: TOY2 0x004ABAE0 [MATCHED]
 	LPDIRECT3DVIEWPORT3 GetViewport() { return g_drawingDevice->m_pvViewport; }
 
+	// FUNCTION: TOY2 0x004ABFD0 [MATCHED]
+	HRESULT SetWorldTransform(D3DMATRIX* transform)
+	{
+		g_currentWorldTransform = transform;
+		return g_drawingDevice->m_pd3dDevice->SetTransform(D3DTRANSFORMSTATE_WORLD, transform);
+	}
+
 	// FUNCTION: TOY2 0x004ABFF0 [MATCHED]
 	HRESULT SetViewTransform(D3DMATRIX* transform)
 	{
@@ -608,10 +651,13 @@ namespace DrawingDevice
 	LPDIRECTDRAWSURFACE4 GetBackBuffer() { return g_drawingDevice->m_pddsBackBuffer; }
 
 	// FUNCTION: TOY2 0x004ABE30
-	int32_t GetSlotSurfaceByIndex(int32_t index, LPDIRECTDRAWSURFACE4* surfaceOut)
-	{
-		return g_drawingDevice->GetSlotSurfaceByIndex(index, surfaceOut);
-	}
+	int32_t GetSlotSurfaceByIndex(int32_t index, LPDIRECTDRAWSURFACE4* surfaceOut) { return g_drawingDevice->GetSlotSurfaceByIndex(index, surfaceOut); }
+
+	// FUNCTION: TOY2 0x004ABE50
+	int32_t GetSlotSurfaceCaps(int32_t index, uint32_t* capsOut) { return g_drawingDevice->GetSlotSurfaceCaps(index, capsOut); }
+
+	// FUNCTION: TOY2 0x004ABE70
+	int32_t GetSlotTexSize(int32_t index, int32_t* widthOut, int32_t* heightOut) { return g_drawingDevice->GetSlotTexSize(index, widthOut, heightOut); }
 
 	// FUNCTION: TOY2 0x004ABB30 [MATCHED]
 	int32_t SetViewport(LPD3DVIEWPORT2 viewport)
@@ -655,10 +701,7 @@ namespace DrawingDevice
 	HRESULT CreateLight(LPDIRECT3DLIGHT* outLight) { return GetD3D()->CreateLight(outLight, 0); }
 
 	// FUNCTION: TOY2 0x004ABF50 [MATCHED]
-	HRESULT SetLight(LPDIRECT3DLIGHT light, LPD3DLIGHT2 description)
-	{
-		return light->SetLight((LPD3DLIGHT)description);
-	}
+	HRESULT SetLight(LPDIRECT3DLIGHT light, LPD3DLIGHT2 description) { return light->SetLight((LPD3DLIGHT)description); }
 
 	// FUNCTION: TOY2 0x004ABF60 [MATCHED]
 	HRESULT AddLight(LPDIRECT3DLIGHT light) { return GetViewport()->AddLight(light); }
@@ -731,9 +774,11 @@ namespace DrawingDevice
 
 	// FUNCTION: TOY2 0x004AC150 [MATCHED]
 	HRESULT SetTextureStageState(DWORD stage, D3DTEXTURESTAGESTATETYPE state, DWORD value)
-	{
-		return g_drawingDevice->m_pd3dDevice->SetTextureStageState(stage, state, value);
-	}
+	{ return g_drawingDevice->m_pd3dDevice->SetTextureStageState(stage, state, value); }
+
+	// FUNCTION: TOY2 0x004AC2A0 [MATCHED]
+	HRESULT DrawPrimitive(D3DPRIMITIVETYPE d3dptPrimitiveType, DWORD dwVertexTypeDesc, LPVOID lpvVertices, DWORD dwVertexCount, DWORD dwFlags)
+	{ return g_drawingDevice->m_pd3dDevice->DrawPrimitive(d3dptPrimitiveType, dwVertexTypeDesc, lpvVertices, dwVertexCount, dwFlags); }
 
 	// FUNCTION: TOY2 0x004ABAF0 [MATCHED]
 	HRESULT ClearScreen(DWORD clearFlags, D3DCOLOR clearColor)
@@ -814,15 +859,19 @@ namespace DrawingDevice
 		else
 			return Nu3D::SetTexture(0, 0);
 	}
+	// FUNCTION: TOY2 0x004ABC40
+	void LockPrimarySurface(LPDDSURFACEDESC2 surfaceDesc)
+	{ g_drawingDevice->m_pddsFrontBuffer->Lock(0, surfaceDesc, DDLOCK_WAIT | DDLOCK_WRITEONLY | DDLOCK_NOSYSLOCK, 0); }
+
+	// FUNCTION: TOY2 0x004ABC60
+	void UnlockPrimarySurface() { g_drawingDevice->m_pddsFrontBuffer->Unlock(0); }
 }
 
 namespace HardwareDevice
 {
 	// FUNCTION: TOY2 0x004AC340 [MATCHED]
 	HRESULT DrawIndexedPrimitiveVB(D3DPRIMITIVETYPE primitiveType, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices, DWORD indexCount, DWORD flags)
-	{
-		return DrawingDevice::g_drawingDevice->m_pd3dDevice->DrawIndexedPrimitiveVB(primitiveType, vertexBuffer, indices, indexCount, flags);
-	}
+	{ return DrawingDevice::g_drawingDevice->m_pd3dDevice->DrawIndexedPrimitiveVB(primitiveType, vertexBuffer, indices, indexCount, flags); }
 
 	// FUNCTION: TOY2 0x004AC300 [MATCHED]
 	HRESULT DrawIndexedPrimitive(D3DPRIMITIVETYPE d3dptPrimitiveType,
@@ -844,15 +893,11 @@ namespace HardwareDevice
 
 	// FUNCTION: TOY2 0x004AC080 [MATCHED]
 	HRESULT CreateVertexBuffer(D3DVERTEXBUFFERDESC* desc, LPDIRECT3DVERTEXBUFFER* outBuffer, DWORD flags)
-	{
-		return DrawingDevice::g_drawingDevice->m_pD3D->CreateVertexBuffer(desc, outBuffer, flags, 0);
-	}
+	{ return DrawingDevice::g_drawingDevice->m_pD3D->CreateVertexBuffer(desc, outBuffer, flags, 0); }
 
 	// FUNCTION: TOY2 0x004AC0A0 [MATCHED]
 	HRESULT LockVertexBuffer(LPDIRECT3DVERTEXBUFFER vertexBuffer, DWORD dwFlags, LPVOID* lplpData, DWORD* lpStride)
-	{
-		return vertexBuffer->Lock(dwFlags, lplpData, lpStride);
-	}
+	{ return vertexBuffer->Lock(dwFlags, lplpData, lpStride); }
 
 	// FUNCTION: TOY2 0x004AC0C0 [MATCHED]
 	HRESULT UnlockVertexBuffer(LPDIRECT3DVERTEXBUFFER buffer) { return buffer->Unlock(); }
@@ -868,7 +913,5 @@ namespace HardwareDevice
 		LPDIRECT3DVERTEXBUFFER srcBuffer,
 		DWORD dwSrcIndex,
 		DWORD dwFlags)
-	{
-		return destBuffer->ProcessVertices(dwVertexOp, dwDestIndex, dwCount, srcBuffer, dwSrcIndex, DrawingDevice::g_drawingDevice->m_pd3dDevice, dwFlags);
-	}
+	{ return destBuffer->ProcessVertices(dwVertexOp, dwDestIndex, dwCount, srcBuffer, dwSrcIndex, DrawingDevice::g_drawingDevice->m_pd3dDevice, dwFlags); }
 }

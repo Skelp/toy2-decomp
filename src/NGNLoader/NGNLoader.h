@@ -22,6 +22,7 @@ namespace NGNLoader
 	int32_t ExtractShapePatch(FILE* stream, Nu3D::Creature* creature);
 	int32_t GetTextureDataIndex(uint32_t textureIndex);
 	uint32_t GetTextureDataIndexByName(char* textureName);
+	NGNTextureData* AllocateTextureData();
 	NGNTextureData* GetTextureDataByIndex(uint32_t texDataIndex);
 	void ReleaseTextureData(NGNTextureData* textureData);
 	void ReleaseAllTextures();

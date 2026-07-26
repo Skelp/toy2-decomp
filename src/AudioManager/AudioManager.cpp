@@ -56,161 +56,36 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x005282C8
 	int32_t g_musicVolumeLevel;
 
+	// GLOBAL: TOY2 0x005282C0
+	HANDLE g_streamCommandEvent;
+
+	// GLOBAL: TOY2 0x005282C4
+	HANDLE g_streamAckEvent;
+
+	// GLOBAL: TOY2 0x005282FC
+	int32_t g_streamActive;
+
+	// GLOBAL: TOY2 0x0053C848
+	int32_t g_streamCommand;
+
+	// GLOBAL: TOY2 0x00725E94
+	int32_t g_pendingStreamTrack;
+
+	// GLOBAL: TOY2 0x00725E98
+	int32_t g_pendingStreamNoFade;
+
+	// GLOBAL: TOY2 0x00830E58
+	int16_t g_loopingSoundChannels[32][5];
+
 	// GLOBAL: TOY2 0x005282F0
 	void* g_dsPrimaryBuffer;
 
 	// GLOBAL: TOY2 0x004FD668
-	int16_t g_dsVolTable[151] = { -10000,
-		-9800,
-		-9600,
-		-9300,
-		-9000,
-		-8700,
-		-8300,
-		-8000,
-		-7250,
-		-6500,
-		-5750,
-		-5500,
-		-5250,
-		-5000,
-		-4500,
-		-4000,
-		-3900,
-		-3800,
-		-3700,
-		-3600,
-		-3500,
-		-3400,
-		-3300,
-		-3200,
-		-3100,
-		-3000,
-		-2920,
-		-2840,
-		-2770,
-		-2700,
-		-2630,
-		-2560,
-		-2490,
-		-2420,
-		-2350,
-		-2280,
-		-2210,
-		-2140,
-		-2070,
-		-2000,
-		-1960,
-		-1912,
-		-1864,
-		-1830,
-		-1790,
-		-1750,
-		-1710,
-		-1670,
-		-1630,
-		-1590,
-		-1550,
-		-1510,
-		-1470,
-		-1430,
-		-1390,
-		-1340,
-		-1290,
-		-1250,
-		-1210,
-		-1168,
-		-1126,
-		-1084,
-		-1042,
-		-1000,
-		-985,
-		-970,
-		-955,
-		-940,
-		-925,
-		-910,
-		-895,
-		-880,
-		-865,
-		-850,
-		-835,
-		-820,
-		-805,
-		-790,
-		-775,
-		-759,
-		-743,
-		-727,
-		-711,
-		-695,
-		-679,
-		-663,
-		-647,
-		-631,
-		-615,
-		-599,
-		-583,
-		-567,
-		-551,
-		-535,
-		-519,
-		-503,
-		-487,
-		-471,
-		-455,
-		-439,
-		-423,
-		-407,
-		-391,
-		-375,
-		-359,
-		-343,
-		-327,
-		-311,
-		-295,
-		-279,
-		-263,
-		-247,
-		-231,
-		-215,
-		-199,
-		-183,
-		-167,
-		-151,
-		-135,
-		-119,
-		-103,
-		-87,
-		-71,
-		-55,
-		-39,
-		-23,
-		-7,
-		-6,
-		-5,
-		-4,
-		-3,
-		-2,
-		-1,
-		0,
-		0,
-		0,
-		0,
-		0,
-		0,
-		0,
-		0,
-		0,
-		0,
-		0,
-		0,
-		0,
-		0,
-		0,
-		0,
-		0,
-		0 };
+	// clang-format off
+	int16_t g_dsVolTable[151] = {
+#include "DsVolTable.inc"
+	};
+	// clang-format on
 
 	// FUNCTION: TOY2 0x0047D840 [MATCHED]
 	void StopAndFlush()
@@ -316,8 +191,17 @@ namespace AudioManager
 		Logger::Log("FlushSoundVoices : End.\n");
 	}
 
-	// STUB: TOY2 0x00436D40
-	int32_t StopAndWait() { return 1; }
+	// FUNCTION: TOY2 0x00436D40 [MATCHED]
+	int32_t StopAndWait()
+	{
+		if (g_dsPrimaryBuffer != NULL && g_streamCommandEvent != NULL)
+		{
+			g_streamCommand = 1;
+			SetEvent(g_streamCommandEvent);
+			WaitForSingleObject(g_streamAckEvent, INFINITE);
+		}
+		return 1;
+	}
 
 	// STUB: TOY2 0x0047EC20
 	void LoadSfxPackForLevel(int32_t levelId) {}
@@ -357,11 +241,50 @@ namespace AudioManager
 		}
 	}
 
-	// STUB: TOY2 0x004A3B90
-	int32_t PlayLoopingSound3DPositional(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, void* unused, int16_t rightVolume) { return 0; }
+	// STUB: TOY2 0x004A3980
+	int32_t PlayLoopingSound3D(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume) { return 0; }
 
-	// STUB: TOY2 0x004A3BE0
-	void UpdateChannels() {}
+	// FUNCTION: TOY2 0x004A3B90
+	int32_t PlayLoopingSound3DPositional(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, void* unused, int32_t rightVolume)
+	{ return PlayLoopingSound3D(owner, soundIndex, volume, leftVolume, rightVolume); }
+
+	// STUB: TOY2 0x0047D930
+	int32_t RestartLoopingSound(int32_t soundId) { return 0; }
+
+	// FUNCTION: TOY2 0x004A3BE0
+	void UpdateChannels()
+	{
+		if (g_streamPending != 0 && --g_streamPending == 0)
+		{
+			if (g_pendingStreamNoFade != 0)
+			{
+				PlayTrackByIndex(g_pendingStreamTrack, 0);
+			}
+			else
+			{
+				PlayTrackByIndex(g_pendingStreamTrack, 1);
+			}
+		}
+		int16_t* p = &g_loopingSoundChannels[0][1];
+		do
+		{
+			if (p[-1] != -1 && *p != -1)
+			{
+				if (--*p <= 0)
+				{
+					if (RestartLoopingSound(p[-1]) == 1)
+					{
+						*p = 1;
+					}
+					else
+					{
+						p[-1] = -1;
+					}
+				}
+			}
+			p += 5;
+		} while (p < &g_loopingSoundChannels[32][1]);
+	}
 
 	// FUNCTION: TOY2 0x004A3ED0 [MATCHED]
 	void SetVolumes(int32_t musicVolume, int32_t sfxVolume)
@@ -370,8 +293,8 @@ namespace AudioManager
 		SetSfxVolume(sfxVolume);
 	}
 
-	// STUB: TOY2 0x00413300
-	int32_t IsStreamActive() { return 0; }
+	// FUNCTION: TOY2 0x00413300 [MATCHED]
+	int32_t IsStreamActive() { return g_streamActive; }
 
 	// STUB: TOY2 0x00413150
 	void PlayTrackByIndex(int32_t trackIndex, int32_t fadeMode) {}

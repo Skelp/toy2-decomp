@@ -45,6 +45,7 @@ namespace Nu3D
 		Sprite sprite;
 
 		static InstanceData* AllocFromMatrix(const D3DMATRIX* matrix, int32_t renderFlags);
+		static InstanceData* AllocFromNodeMatrices(const D3DMATRIX* matrices, int32_t* nodeIndices, int32_t count, int32_t* flags, int32_t renderFlags);
 	};
 
 	extern Sprite* g_spriteBuckets[256];

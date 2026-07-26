@@ -382,7 +382,7 @@
 0x0047D880 AudioManager::PlayMusicLooping
 0x0047D8D0 Toy2::UnusedInit
 0x0047D8E0 AudioManager::IsEffectPlaying
-0x0047D930 AudioManager::ReassertChannelPlaying
+0x0047D930 AudioManager::RestartLoopingSound
 0x0047DE50 AudioManager::PlaySoundBuffer
 0x0047E3C0 AudioManager::Enumerate
 0x0047E420 AudioManager::CreateDirectSoundBuffer
@@ -653,6 +653,8 @@
 0x004ABD90 DrawingDevice::GetDestWidth
 0x004ABDA0 DrawingDevice::GetDestHeight
 0x004ABE30 DrawingDevice::GetSlotSurfaceByIndex
+0x004ABE50 DrawingDevice::GetSlotSurfaceCaps
+0x004ABE70 DrawingDevice::GetSlotTexSize
 0x004ABE90 Nu3D::DrawSurface::GetDC
 0x004ABEA0 Nu3D::DrawSurface::ReleaseDC
 0x004ABEB0 CD3DFramework::Build
@@ -700,6 +702,7 @@
 0x004ACFB0 ModeSelect::SetForceFullscreen
 0x004ACFC0 DrawingDevice::GetChosenDevice
 0x004AD000 DrawingDevice::GetListHead
+0x004AD030 Nu3D::BuildBmpNodeFromSlot
 0x004AD060 Nu3D::BuildBmpNode
 0x004AD090 Nu3D::BuildBmpNodeWithAlpha
 0x004AD0C0 Nu3D::GetBmpDataNodeByName_T
@@ -723,6 +726,8 @@
 0x004AF550 CD3DFramework::CreateAndSetViewport
 0x004AF640 DrawingDevice::CD3DFramework::RestoreToGDISurface
 0x004AFA20 CD3DFramework::GetSlotSurfaceByIndex
+0x004AFA60 CD3DFramework::GetSlotSurfaceCaps
+0x004AFAA0 CD3DFramework::GetSlotTexSize
 0x004AFAF0 Nu3D::SetMinTexSize
 0x004AFB20 Nu3D::ReleaseBmpDataNode
 0x004AFBA0 Nu3D::DestroyBmpDataNode
@@ -735,6 +740,7 @@
 0x004B0200 Nu3D::InitialiseTextureSurface
 0x004B0380 Nu3D::FindSuitablePixelFormat
 0x004B0400 Nu3D::CountAlphaBits
+0x004B0440 Nu3D::BuildRawBmpNodeFromSlot
 0x004B0620 Nu3D::BuildRawBmpNode
 0x004B06D0 Nu3D::CalculateTexSize
 0x004B0740 Nu3D::Math::RoundUpToPowerOf2
@@ -909,6 +915,7 @@
 0x004BB0E0 NGNLoader::GetTextureDataByIndex
 0x004BB150 NGNLoader::ReleaseTextureData
 0x004BB1B0 NGNLoader::AllocateTextureData
+0x004BB1F0 Nu3D::CreateTextureResourceFromSlot
 0x004BB270 Nu3D::CreateTextureResource
 0x004BB2F0 NGNLoader::GetTextureDataIndexByName
 0x004BB320 NGNLoader::GetTextureData
@@ -996,6 +1003,7 @@
 0x004C28E0 Nu3D::Material::GetHead
 0x004C28F0 Nu3D::Material::GetFreeByIndex
 0x004C2910 Nu3D::Material::Init
+0x004C2990 Nu3D::UnkFunc0
 0x004C29A0 Nu3D::Light::Destroy
 0x004C29D0 Nu3D::Light::Free
 0x004C2A20 Nu3D::Light::BuildAmbient

@@ -9,6 +9,7 @@
 #include "Collision.h"
 
 #include "NGNLoader/NGNLoader.h"
+#include "Renderer/Glue.h"
 #include "Toy2/Toy2.h"
 #include "Toy2/Collectables.h"
 #include "Toy2/Actor.h"
@@ -119,8 +120,18 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00559C4C
 		ObjectDescCache* g_objectDescCache;
 
-		// STUB: TOY2 0x004CEA20
-		void FlushRenderer() {}
+		// FUNCTION: TOY2 0x004CEA20
+		void FlushRenderer()
+		{
+			Renderer::Glue::ReleaseBackdrop();
+			Nu3D::Light::Cleanup();
+			if (NGNLoader::g_ngnImage)
+			{
+				NGNLoader::NGNImage::Destroy(NGNLoader::g_ngnImage);
+			}
+			NGNLoader::g_ngnImage = 0;
+			Renderer::Cleanup();
+		}
 
 		// FUNCTION: TOY2 0x004CE8B0
 		int32_t InitLevelDefaults()

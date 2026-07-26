@@ -7,6 +7,9 @@
 // Looks like these methods are purely for debug methods that are never called
 namespace Nu3D
 {
+	typedef int32_t (*DrawTextStringFunc)(const char* text);
+	typedef int32_t (*CalculateTextSizeFunc)(const char* text);
+
 	struct GlyphInfo
 	{
 		float uvMinX;
@@ -45,10 +48,22 @@ namespace Nu3D
 		static void BuildFontTextures();
 		static int32_t BuildTexResource(Font* font);
 		static void SetFontScale(float scaleX, float scaleY);
-		static void SetTextCursor(float x, float y);
+		static void SetTextCursor(int32_t x, int32_t y);
 		static void SetRenderFlags(int32_t flags);
 		static void ResetContext();
+		static int32_t DrawTextString(const char* text);
+		static int32_t DrawScaledTextString(const char* text);
+
+		static int32_t ComputeUnscaledCharClip(char c);
+		static int32_t DrawUnscaledGlyph(char c);
+		static int32_t DrawClippedUnscaledGlyph(char c);
+		static int32_t ComputeScaledCharClip(char c);
+		static int32_t DrawScaledGlyph(char c);
+		static int32_t DrawClippedScaledGlyph(char c);
+		static int32_t CalculateUnscaledTextSize(const char* text);
+		static int32_t CalculateScaledTextSize(const char* text);
 		static HBITMAP CreateAtlasBmp(int32_t width, int32_t height);
+		static HDC CreateDC();
 		static void Destroy(Font* font);
 		static void ClearList();
 		static Font* BuildObject(int32_t numGlyphs);
@@ -65,15 +80,24 @@ namespace Nu3D
 	extern int32_t g_currentFontTexIndex;
 	extern Font* g_fontListHead;
 	extern int32_t g_fontInitialized;
-	extern float g_textCursorX;
-	extern float g_textCursorY;
+	extern int32_t g_textCursorX;
+	extern int32_t g_textCursorY;
+	extern int32_t g_textTabWidth;
 	extern int32_t g_textCursorOffsetX;
 	extern int32_t g_textClipX1;
 	extern int32_t g_textClipY1;
 	extern int32_t g_textClipX2;
 	extern int32_t g_textClipY2;
+	extern int32_t g_charClipDX1;
+	extern int32_t g_charClipDX2;
+	extern int32_t g_charClipDY1;
+	extern int32_t g_charClipDY2;
 	extern float g_fontScaleY;
+	extern float g_fontScaleX;
+	extern DrawTextStringFunc g_drawTextStringFunc;
+	extern CalculateTextSizeFunc g_calculateTextSizeFunc;
 	extern float g_scaledFontHeight;
+	extern int32_t g_textHeight;
 	extern int32_t g_fontRenderFlags;
 
 	STATIC_ASSERT(sizeof(Font) == 0x130);

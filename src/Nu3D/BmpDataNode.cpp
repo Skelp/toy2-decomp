@@ -1,5 +1,6 @@
 #include "Nu3D/BmpDataNode.h"
 #include "DrawingDevice.h"
+#include "NGNLoader/NGNLoader.h"
 #include "Renderer/Renderer.h"
 #include "Logger.h"
 
@@ -526,6 +527,12 @@ namespace Nu3D
 	// FUNCTION: TOY2 0x004AFAF0 [MATCHED]
 	void SetMinTexSize(int32_t minTexSize) { g_minTextureSize = minTexSize; }
 
+	// FUNCTION: TOY2 0x004AD030
+	HRESULT BuildBmpNodeFromSlot(int32_t slotIndex, const char* textureName, int32_t alphaFlag)
+	{
+		return BuildRawBmpNodeFromSlot(slotIndex, textureName, alphaFlag) ? S_OK : E_OUTOFMEMORY;
+	}
+
 	// FUNCTION: TOY2 0x004AD060 [MATCHED]
 	HRESULT BuildBmpNode(HBITMAP bitmap, const char* textureName, int32_t unused, int32_t flags)
 	{
@@ -537,6 +544,69 @@ namespace Nu3D
 		HBITMAP alphaBitmap)
 	{
 		return BuildRawBmpNode(bitmap, alphaBitmap, textureName, flags) ? S_OK : E_OUTOFMEMORY;
+	}
+
+	// FUNCTION: TOY2 0x004B0440
+	BmpDataNode* BuildRawBmpNodeFromSlot(int32_t slotIndex, const char* textureName, int32_t alphaFlag)
+	{
+		BmpDataNode* bmpDataNode = AllocateBmpDataNode();
+		if (! bmpDataNode)
+			return bmpDataNode;
+
+		int32_t textureWidth;
+		int32_t textureHeight;
+		uint32_t surfaceCaps;
+		LPDIRECTDRAWSURFACE4 slotSurface;
+
+		DrawingDevice::GetSlotTexSize(slotIndex, &textureWidth, &textureHeight);
+		DrawingDevice::GetSlotSurfaceCaps(slotIndex, &surfaceCaps);
+		DrawingDevice::GetSlotSurfaceByIndex(slotIndex, &slotSurface);
+
+		bmpDataNode->unkVar2 = slotIndex;
+		bmpDataNode->unkVar3 = (int32_t)slotSurface;
+		bmpDataNode->unkVar4 = 0;
+
+		if ((surfaceCaps & DDSCAPS_TEXTURE) == 0)
+			bmpDataNode->unkVar1 = 1;
+		else
+			bmpDataNode->unkVar1 = 0;
+
+		bmpDataNode->texData = 0;
+		bmpDataNode->textureWidth = textureWidth;
+		bmpDataNode->textureHeight = textureHeight;
+		bmpDataNode->flags = alphaFlag;
+		strcpy(bmpDataNode->texName, textureName);
+
+		if (bmpDataNode->unkVar1 == 0)
+		{
+			bmpDataNode->flags |= 0x40;
+			bmpDataNode->surface = slotSurface;
+			slotSurface->QueryInterface(IID_IDirect3DTexture2, (LPVOID*)&bmpDataNode->d3dTexture);
+			bmpDataNode->surfaceDesc.dwSize = sizeof(DDSURFACEDESC2);
+			slotSurface->GetSurfaceDesc(&bmpDataNode->surfaceDesc);
+			return bmpDataNode;
+		}
+
+		InitialiseTextureSurface(bmpDataNode);
+
+		DDBLTFX bltfx;
+		bltfx.dwSize = sizeof(DDBLTFX);
+		bltfx.dwROP = SRCCOPY;
+		if (bmpDataNode->surface->Blt(NULL, (LPDIRECTDRAWSURFACE4)bmpDataNode->unkVar3, NULL, DDBLT_ROP | DDBLT_ASYNC, &bltfx) < 0)
+		{
+			DDSURFACEDESC2 surfaceDesc;
+			memset(&surfaceDesc, 0, sizeof(surfaceDesc));
+			surfaceDesc.dwSize = sizeof(DDSURFACEDESC2);
+			surfaceDesc.dwFlags = DDSD_CAPS | DDSD_WIDTH | DDSD_HEIGHT;
+			surfaceDesc.ddsCaps.dwCaps = DDSCAPS_SYSTEMMEMORY;
+			surfaceDesc.dwWidth = bmpDataNode->textureWidth;
+			surfaceDesc.dwHeight = bmpDataNode->textureHeight;
+			LPDIRECTDRAW4 ddraw4 = DrawingDevice::GetDDraw4();
+			HRESULT result = ddraw4->CreateSurface(&surfaceDesc, (LPDIRECTDRAWSURFACE4*)&bmpDataNode->unkVar4, NULL);
+			bmpDataNode->unkVar1 = (result >= 0) ? 2 : 0;
+		}
+
+		return bmpDataNode;
 	}
 
 	// FUNCTION: TOY2 0x004B0620 [MATCHED]
@@ -657,7 +727,7 @@ namespace Nu3D
 	}
 
 	// FUNCTION: TOY2 0x004AD1C0 [MATCHED]
-	int32_t InitBmpNodeSurface(BmpDataNode* bmpDataNode, int32_t unused)
+	int32_t InitBmpNodeSurface(BmpDataNode* bmpDataNode, LPDIRECT3DDEVICE3 d3dDevice)
 	{
 		if (bmpDataNode)
 		{
@@ -942,9 +1012,63 @@ namespace Nu3D
 	// FUNCTION: TOY2 0x004B1180 [MATCHED]
 	void FreeAllBmpDataNodes_T() { FreeAllBmpDataNodes(); }
 
-	// STUB: TOY2 0x004BB270
+	// FUNCTION: TOY2 0x004BB1F0
+	int32_t CreateTextureResourceFromSlot(int32_t slotIndex, const char* textureName, uint32_t flags)
+	{
+		NGNLoader::NGNTextureData* textureData = NGNLoader::AllocateTextureData();
+		if (textureData)
+		{
+			textureData->isTex14 = 0;
+			textureData->color.b = 0;
+			textureData->color.g = 0;
+			textureData->color.r = 0;
+			textureData->bmpDataNode = 0;
+			LPDIRECT3DDEVICE3 d3dDevice = DrawingDevice::GetD3DDevice();
+			if (d3dDevice)
+			{
+				if (BuildBmpNodeFromSlot(slotIndex, textureName, (flags >> 1) & 1) == 0)
+				{
+					BmpDataNode* bmpDataNode = GetBmpDataNodeByName_T(textureName);
+					textureData->bmpDataNode = bmpDataNode;
+					if (bmpDataNode)
+					{
+						InitBmpNodeSurface(bmpDataNode, d3dDevice);
+						return textureData->textureIndex;
+					}
+				}
+			}
+			NGNLoader::ReleaseTextureData(textureData);
+		}
+		return 0;
+	}
+
+	// FUNCTION: TOY2 0x004BB270
 	int32_t CreateTextureResource(HBITMAP bitmapHandle, const char* textureName, int32_t flags)
 	{
+		NGNLoader::NGNTextureData* textureData = NGNLoader::AllocateTextureData();
+		if (textureData)
+		{
+			textureData->isTex14 = 0;
+			textureData->color.b = 0;
+			textureData->color.g = 0;
+			textureData->color.r = 0;
+			textureData->bmpDataNode = 0;
+			LPDIRECT3DDEVICE3 d3dDevice = DrawingDevice::GetD3DDevice();
+			if (d3dDevice)
+			{
+				if (BuildBmpNode(bitmapHandle, textureName, 0, flags) == 0)
+				{
+					BmpDataNode* bmpDataNode = GetBmpDataNodeByName_T(textureName);
+					textureData->bmpDataNode = bmpDataNode;
+					if (bmpDataNode)
+					{
+						InitBmpNodeSurface(bmpDataNode, d3dDevice);
+						return textureData->textureIndex;
+					}
+				}
+			}
+			NGNLoader::ReleaseTextureData(textureData);
+		}
 		return 0;
 	}
 }

@@ -2,6 +2,8 @@
 
 #include "DrawingDevice.h"
 #include "Nu3D/BmpDataNode.h"
+#include "Nu3D/DrawSurface.h"
+#include "Renderer/Renderer.h"
 
 namespace Nu3D
 {
@@ -15,6 +17,18 @@ namespace Nu3D
 
 	// GLOBAL: TOY2 0x0050866C
 	float g_fontScaleY = 0.0;
+
+	// GLOBAL: TOY2 0x00508664
+	int32_t g_textTabWidth = 0;
+
+	// GLOBAL: TOY2 0x00508668
+	float g_fontScaleX = 0.0;
+
+	// GLOBAL: TOY2 0x005086DC
+	DrawTextStringFunc g_drawTextStringFunc = Font::DrawTextString;
+
+	// GLOBAL: TOY2 0x005086E0
+	CalculateTextSizeFunc g_calculateTextSizeFunc = Font::CalculateUnscaledTextSize;
 
 	// GLOBAL: TOY2 0x00508670
 	float g_scaledFontHeight = 0.0;
@@ -30,6 +44,24 @@ namespace Nu3D
 
 	// GLOBAL: TOY2 0x00884490
 	VertexTL g_textVertices[6];
+
+	// Per-character clip deltas, written by Compute*CharClip and read by the
+	// DrawClipped*Glyph primitives. Each delta is a signed distance from a glyph
+	// edge to the corresponding clip bound: negative means the edge is inside
+	// (visible), non-negative means it is clipped. The combined sign bit is set
+	// only when all four edges are inside (fully visible), which selects the
+	// fast unclipped Draw*Glyph path over the clipped one.
+	// GLOBAL: TOY2 0x00884550
+	int32_t g_charClipDX1 = 0;
+
+	// GLOBAL: TOY2 0x00884554
+	int32_t g_charClipDX2 = 0;
+
+	// GLOBAL: TOY2 0x0088455C
+	int32_t g_charClipDY1 = 0;
+
+	// GLOBAL: TOY2 0x00884564
+	int32_t g_charClipDY2 = 0;
 
 	// GLOBAL: TOY2 0x00884558
 	HGDIOBJ g_oldBitmap = 0;
@@ -47,10 +79,10 @@ namespace Nu3D
 	int32_t g_fontDCReady = 0;
 
 	// GLOBAL: TOY2 0x00884580
-	float g_textCursorX = 0.0;
+	int32_t g_textCursorX = 0;
 
 	// GLOBAL: TOY2 0x00884584
-	float g_textCursorY = 0.0;
+	int32_t g_textCursorY = 0;
 
 	// GLOBAL: TOY2 0x00884588
 	int32_t g_textCursorOffsetX = 0;
@@ -61,11 +93,33 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x00884590
 	int32_t g_textClipY1 = 0;
 
+	// GLOBAL: TOY2 0x00884594
+	int32_t g_textHeight = 0;
+
 	// GLOBAL: TOY2 0x00884598
 	int32_t g_fontRenderFlags = 0;
 
-	// STUB: TOY2 0x004B38E0
-	void Font::SetFontScale(float scaleX, float scaleY) {}
+	// FUNCTION: TOY2 0x004B38E0
+	void Font::SetFontScale(float scaleX, float scaleY)
+	{
+		g_fontScaleX = scaleX;
+		g_fontScaleY = scaleY;
+		if (scaleX == 1.0f && scaleY == 1.0f)
+		{
+			g_drawTextStringFunc = DrawTextString;
+			g_calculateTextSizeFunc = CalculateUnscaledTextSize;
+		}
+		else
+		{
+			g_drawTextStringFunc = DrawScaledTextString;
+			g_calculateTextSizeFunc = CalculateScaledTextSize;
+		}
+		if (g_currentFont)
+		{
+			g_scaledFontHeight = (float)g_currentFont->fontHeight * scaleY;
+			g_scaledFontAscent = (float)g_currentFont->fontAscent * scaleY;
+		}
+	}
 
 	// FUNCTION: TOY2 0x004B3AD0
 	int32_t Font::Init()
@@ -145,8 +199,125 @@ namespace Nu3D
 		return h;
 	}
 
-	// STUB: TOY2 0x004B4110
-	Font* Font::Build(const char* fontName, int32_t fontSize, const char* charSet) { return 0; }
+	// GLOBAL: TOY2 0x00508678
+	const char g_defaultCharSet[] = " 01234567890-=!\"\xa3$%^&*()_+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz[]{};'#:@~,./<>?\\|";
+
+	// GLOBAL: TOY2 0x005086F8
+	int16_t g_defaultGlyphChar = 0x3F;
+
+	// FUNCTION: TOY2 0x004B4010
+	HDC Font::CreateDC()
+	{
+		if (g_fontDC || g_fontDCReady)
+		{
+			ResetContext();
+		}
+
+		LPDIRECTDRAWSURFACE4 surface;
+		DrawingDevice::GetSlotSurfaceByIndex(0, &surface);
+
+		HDC hdc;
+		if (DrawSurface::GetDC(surface, &hdc) == 0)
+		{
+			g_fontDC = CreateCompatibleDC(hdc);
+			DrawSurface::ReleaseDC(surface, hdc);
+		}
+
+		return g_fontDC;
+	}
+
+	// FUNCTION: TOY2 0x004B4110
+	Font* Font::Build(const char* fontName, int32_t fontSize, const char* charSet)
+	{
+		char glyphChar[2];
+		*(int16_t*)glyphChar = g_defaultGlyphChar;
+		Font* font = 0;
+		if (! charSet)
+			charSet = g_defaultCharSet;
+		int32_t numGlyphs = strlen(charSet);
+		HFONT hfont = CreateFontA(fontSize, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, fontName);
+		if (! hfont)
+			return font;
+		HDC hdc = CreateDC();
+		if (hdc)
+		{
+			font = BuildObject(numGlyphs);
+			if (font)
+			{
+				HGDIOBJ oldBmp = SelectObject(hdc, hfont);
+				COLORREF oldFg = ::SetTextColor(hdc, 0xffffff);
+				COLORREF oldBg = SetBkColor(hdc, 0);
+				TEXTMETRICA tm;
+				GetTextMetricsA(hdc, &tm);
+				strcpy(font->fontName, fontName);
+				font->fontHeight = (int16_t)tm.tmHeight;
+				font->fontAscent = (int16_t)tm.tmAscent;
+				int32_t atlasSize = 0x200;
+				int32_t pow2;
+				do
+				{
+					atlasSize >>= 1;
+					int32_t penX = 1;
+					int32_t rowY = 1;
+					for (int32_t i = 0; i < numGlyphs; i++)
+					{
+						glyphChar[0] = charSet[i];
+						SIZE size;
+						GetTextExtentPoint32A(hdc, glyphChar, 1, &size);
+						if (size.cx + penX + 1 >= atlasSize)
+						{
+							penX = 1;
+							rowY = rowY + font->fontHeight + 1;
+						}
+						penX = penX + size.cx + 1;
+					}
+					rowY = rowY + font->fontHeight + 1;
+					pow2 = 1;
+					while (pow2 < rowY)
+						pow2 <<= 1;
+				} while (pow2 < atlasSize);
+				g_fontDCReady = (int32_t)CreateAtlasBmp(pow2, pow2);
+				font->bmpHandle = (HBITMAP)g_fontDCReady;
+				font->atlasWidth = (int16_t)pow2;
+				font->atlasHeight = (int16_t)pow2;
+				font->numGlyphs = (int16_t)numGlyphs;
+				{
+					int32_t penX = 1;
+					int32_t penY = 1;
+					float invAtlas = (float)(pow2 - 1);
+					GlyphInfo* glyph = font->glyphs;
+					for (int32_t i = 0; i < numGlyphs; i++)
+					{
+						glyphChar[0] = charSet[i];
+						SIZE size;
+						GetTextExtentPoint32A(hdc, glyphChar, 1, &size);
+						if (size.cx + penX + 1 >= pow2)
+						{
+							penX = 1;
+							penY = penY + font->fontHeight + 1;
+						}
+						TextOutA(hdc, penX, penY, glyphChar, 1);
+						glyph[i].uvMinX = (float)penX / invAtlas;
+						glyph[i].uvMaxX = (float)(size.cx + penX - 1) / invAtlas;
+						glyph[i].uvMinY = (float)penY / invAtlas;
+						glyph[i].uvMaxY = (float)(size.cy + penY - 1) / invAtlas;
+						glyph[i].width = (int16_t)size.cx;
+						glyph[i].height = (int16_t)size.cy;
+						penX = penX + size.cx + 1;
+					}
+				}
+				for (int32_t i = 0; i < numGlyphs; i++)
+					font->charToGlyphIndex[(uint8_t)charSet[i]] = (uint8_t)i;
+				SelectObject(hdc, oldBmp);
+				::SetTextColor(hdc, oldFg);
+				SetBkColor(hdc, oldBg);
+			}
+			ResetContext();
+			BuildTexResource(font);
+		}
+		DeleteObject(hfont);
+		return font;
+	}
 
 	// GLOBAL: TOY2 0x0088456C
 	int16_t g_nextFontId = 0;
@@ -277,7 +448,7 @@ namespace Nu3D
 	}
 
 	// FUNCTION: TOY2 0x004B4450 [MATCHED]
-	void Font::SetTextCursor(float x, float y)
+	void Font::SetTextCursor(int32_t x, int32_t y)
 	{
 		g_textCursorX = x;
 		g_textCursorY = y;
@@ -285,4 +456,421 @@ namespace Nu3D
 
 	// FUNCTION: TOY2 0x004B38C0 [MATCHED]
 	void Font::SetRenderFlags(int32_t flags) { g_fontRenderFlags = flags ? 0x200 : 0; }
+
+	// FUNCTION: TOY2 0x004B5310
+	int32_t Font::ComputeUnscaledCharClip(char c)
+	{
+		Font* font = g_currentFont;
+		GlyphInfo* glyph = &font->glyphs[font->charToGlyphIndex[(uint8_t)c]];
+
+		int32_t clipDX1 = g_textClipX1 - g_textCursorX;
+		g_charClipDX1 = clipDX1;
+		int32_t clipDX2 = glyph->width - g_textClipX2 + g_textCursorX;
+		g_charClipDX2 = clipDX2;
+		int32_t clipDY1 = font->fontAscent - g_textCursorY + g_textClipY1;
+		g_charClipDY1 = clipDY1;
+		int32_t clipDY2 = font->fontHeight - font->fontAscent - g_textClipY2 + g_textCursorY;
+		g_charClipDY2 = clipDY2;
+
+		return (clipDY2 & clipDY1 & clipDX2 & clipDX1) & 0x80000000;
+	}
+
+	// Draws a single unscaled glyph as a two-triangle quad (vertices 0..2 and
+	// 3..5). The fast path selected by ComputeUnscaledCharClip when the glyph is
+	// fully inside the clip rect. The cursor Y is offset by the font ascent to
+	// get the glyph's top edge; the bottom edge additionally subtracts 1.0 to
+	// keep the quad within the glyph's texel bounds. Note g_textCursorOffsetX is
+	// applied to the top edge only -- the bottom edge uses the raw cursor X,
+	// matching the retail vertex setup.
+	// FUNCTION: TOY2 0x004B4DE0 [MATCHED]
+	int32_t Font::DrawUnscaledGlyph(char c)
+	{
+		LPDIRECT3DDEVICE3 device = DrawingDevice::GetD3DDevice();
+		if (g_currentFont && g_currentFontTexIndex && device)
+		{
+			Font* font = g_currentFont;
+			GlyphInfo* glyph = &font->glyphs[font->charToGlyphIndex[(uint8_t)c]];
+
+			float yTop = (float)(g_textCursorY - font->fontAscent);
+
+			g_textVertices[0].position.x = (float)(g_textCursorOffsetX + g_textCursorX);
+			g_textVertices[0].position.y = yTop;
+			g_textVertices[0].uv.x = glyph->uvMinX;
+			g_textVertices[0].uv.y = glyph->uvMinY;
+
+			g_textVertices[1].position.x = (float)(glyph->width + g_textCursorOffsetX + g_textCursorX - 1);
+			g_textVertices[1].position.y = yTop;
+			g_textVertices[1].uv.x = glyph->uvMaxX;
+			g_textVertices[1].uv.y = glyph->uvMinY;
+
+			g_textVertices[2].position.x = (float)(glyph->width + g_textCursorX - 1);
+			g_textVertices[2].position.y = (float)glyph->height + yTop - 1.0f;
+			g_textVertices[2].uv.x = glyph->uvMaxX;
+			g_textVertices[2].uv.y = glyph->uvMaxY;
+
+			g_textVertices[3].position = g_textVertices[0].position;
+			g_textVertices[3].uv = g_textVertices[0].uv;
+			g_textVertices[4] = g_textVertices[2];
+			g_textVertices[5].position.x = (float)g_textCursorX;
+			g_textVertices[5].position.y = g_textVertices[2].position.y;
+			g_textVertices[5].uv.x = glyph->uvMinX;
+			g_textVertices[5].uv.y = glyph->uvMaxY;
+
+			Renderer::DrawSingleTexturedTriangle(g_textVertices, g_currentFontTexIndex, g_fontRenderFlags | 0x444);
+			Renderer::DrawSingleTexturedTriangle(&g_textVertices[3], g_currentFontTexIndex, g_fontRenderFlags | 0x444);
+			return glyph->width;
+		}
+		return 0;
+	}
+
+	// Draws a single unscaled glyph as a two-triangle quad, clipping each edge
+	// against the per-character clip deltas written by ComputeUnscaledCharClip.
+	// Each of the four edges is handled independently: when the delta is positive
+	// the edge is outside the clip rect and is moved inwards, interpolating the
+	// glyph UV so the visible slice still maps to the correct atlas region. The
+	// vertex layout and the g_textCursorOffsetX top-edge-only asymmetry match
+	// DrawUnscaledGlyph; only the per-edge position/UV differ. Note the render
+	// flags are a fixed 0x444 here -- unlike the unscaled sibling the clipped
+	// path does not OR in g_fontRenderFlags, matching the retail code.
+	//
+	// The generated code differs from retail in register allocation: MSVC keeps
+	// g_currentFont in EDI (callee-saved) for this function rather than in ECX
+	// (caller-saved) as the shorter DrawUnscaledGlyph does, which shifts the
+	// callee-saved-register saves earlier and offsets the scratch stack slots
+	// (esp+0xc/0x14 vs retail's esp+0x10/0x18). The per-edge vertex logic is
+	// otherwise identical (confirmed against the not-clipped-left block).
+	// FUNCTION: TOY2 0x004B4FA0
+	int32_t Font::DrawClippedUnscaledGlyph(char c)
+	{
+		LPDIRECT3DDEVICE3 device = DrawingDevice::GetD3DDevice();
+		if (g_currentFont && g_currentFontTexIndex && device)
+		{
+			Font* font = g_currentFont;
+			GlyphInfo* glyph = &font->glyphs[font->charToGlyphIndex[(uint8_t)c]];
+
+			// If either horizontal edge removes at least the full width, or either
+			// vertical edge removes at least the full height, the glyph is fully
+			// outside the clip rect: advance the cursor without drawing.
+			if ((g_charClipDX1 > g_charClipDX2 ? g_charClipDX1 : g_charClipDX2) >= glyph->width
+				|| (g_charClipDY1 > g_charClipDY2 ? g_charClipDY1 : g_charClipDY2) >= glyph->height)
+				return glyph->width;
+
+			float yTop = (float)(g_textCursorY - font->fontAscent);
+
+			// Left edge (v0 TL, v3 TL copy, v5 BL).
+			if (g_charClipDX1 <= 0)
+			{
+				g_textVertices[0].position.x = (float)(g_textCursorOffsetX + g_textCursorX);
+				g_textVertices[3].position.x = g_textVertices[0].position.x;
+				g_textVertices[5].position.x = (float)g_textCursorX;
+				g_textVertices[0].uv.x = glyph->uvMinX;
+				g_textVertices[3].uv.x = glyph->uvMinX;
+				g_textVertices[5].uv.x = glyph->uvMinX;
+			}
+			else
+			{
+				g_textVertices[0].position.x = (float)(g_textCursorOffsetX + g_textCursorX + g_charClipDX1);
+				g_textVertices[0].uv.x = glyph->uvMinX + (glyph->uvMaxX - glyph->uvMinX) * (float)g_charClipDX1 / (float)glyph->width;
+				g_textVertices[3].position.x = g_textVertices[0].position.x;
+				g_textVertices[3].uv.x = g_textVertices[0].uv.x;
+				g_textVertices[5].position.x = (float)(g_charClipDX1 + g_textCursorX);
+				g_textVertices[5].uv.x = g_textVertices[0].uv.x;
+			}
+
+			// Right edge (v1 TR, v2 BR, v4 BR copy).
+			if (g_charClipDX2 <= 0)
+			{
+				g_textVertices[1].position.x = (float)(glyph->width + g_textCursorOffsetX + g_textCursorX - 1);
+				g_textVertices[1].uv.x = glyph->uvMaxX;
+				g_textVertices[2].position.x = (float)(glyph->width + g_textCursorX - 1);
+				g_textVertices[2].uv.x = glyph->uvMaxX;
+				g_textVertices[4].position.x = g_textVertices[2].position.x;
+				g_textVertices[4].uv.x = glyph->uvMaxX;
+			}
+			else
+			{
+				g_textVertices[1].position.x = (float)(glyph->width - g_charClipDX2 + g_textCursorOffsetX + g_textCursorX - 1);
+				g_textVertices[1].uv.x = glyph->uvMaxX - (glyph->uvMaxX - glyph->uvMinX) * (float)g_charClipDX2 / (float)glyph->width;
+				g_textVertices[2].position.x = (float)(glyph->width - g_charClipDX2 + g_textCursorX - 1);
+				g_textVertices[2].uv.x = g_textVertices[1].uv.x;
+				g_textVertices[4].position.x = g_textVertices[2].position.x;
+				g_textVertices[4].uv.x = g_textVertices[1].uv.x;
+			}
+
+			// Top edge (v0 TL, v1 TR, v3 TL copy).
+			if (g_charClipDY1 <= 0)
+			{
+				g_textVertices[0].position.y = yTop;
+				g_textVertices[0].uv.y = glyph->uvMinY;
+				g_textVertices[1].position.y = yTop;
+				g_textVertices[1].uv.y = glyph->uvMinY;
+				g_textVertices[3].position.y = yTop;
+				g_textVertices[3].uv.y = glyph->uvMinY;
+			}
+			else
+			{
+				g_textVertices[0].position.y = (float)g_charClipDY1 + yTop;
+				g_textVertices[0].uv.y = glyph->uvMinY + (glyph->uvMaxY - glyph->uvMinY) * (float)g_charClipDY1 / (float)glyph->height;
+				g_textVertices[1].position.y = g_textVertices[0].position.y;
+				g_textVertices[1].uv.y = g_textVertices[0].uv.y;
+				g_textVertices[3].position.y = g_textVertices[0].position.y;
+				g_textVertices[3].uv.y = g_textVertices[0].uv.y;
+			}
+
+			// Bottom edge (v2 BR, v4 BR copy, v5 BL).
+			if (g_charClipDY2 <= 0)
+			{
+				g_textVertices[2].position.y = (float)glyph->height + yTop - 1.0f;
+				g_textVertices[2].uv.y = glyph->uvMaxY;
+				g_textVertices[4].position.y = g_textVertices[2].position.y;
+				g_textVertices[4].uv.y = glyph->uvMaxY;
+				g_textVertices[5].position.y = g_textVertices[2].position.y;
+				g_textVertices[5].uv.y = glyph->uvMaxY;
+			}
+			else
+			{
+				g_textVertices[2].position.y = (float)glyph->height + yTop - 1.0f - (float)g_charClipDY2;
+				g_textVertices[2].uv.y = glyph->uvMaxY - (glyph->uvMaxY - glyph->uvMinY) * (float)g_charClipDY2 / (float)glyph->height;
+				g_textVertices[4].position.y = g_textVertices[2].position.y;
+				g_textVertices[4].uv.y = g_textVertices[2].uv.y;
+				g_textVertices[5].position.y = g_textVertices[2].position.y;
+				g_textVertices[5].uv.y = g_textVertices[2].uv.y;
+			}
+
+			Renderer::DrawSingleTexturedTriangle(g_textVertices, g_currentFontTexIndex, 0x444);
+			Renderer::DrawSingleTexturedTriangle(&g_textVertices[3], g_currentFontTexIndex, 0x444);
+			return glyph->width;
+		}
+		return 0;
+	}
+
+	// Scaled twin of ComputeUnscaledCharClip: the glyph width and the font
+	// ascent/descent are taken from the precomputed scaled float globals
+	// (g_fontScaleX * glyph->width, g_scaledFontAscent, g_scaledFontHeight) and
+	// truncated back to int via __ftol before the same four clip-delta tests.
+	// FUNCTION: TOY2 0x004B4C10
+	int32_t Font::ComputeScaledCharClip(char c)
+	{
+		Font* font = g_currentFont;
+		GlyphInfo* glyph = &font->glyphs[font->charToGlyphIndex[(uint8_t)c]];
+
+		int32_t clipDX1 = g_textClipX1 - g_textCursorX;
+		g_charClipDX1 = clipDX1;
+		int32_t clipDX2 = (int32_t)(glyph->width * g_fontScaleX) - g_textClipX2 + g_textCursorX;
+		g_charClipDX2 = clipDX2;
+		int32_t clipDY1 = g_textClipY1 - (int32_t)(g_textCursorY - g_scaledFontAscent);
+		g_charClipDY1 = clipDY1;
+		int32_t clipDY2 = (int32_t)(g_scaledFontHeight - g_scaledFontAscent) - g_textClipY2 + g_textCursorY;
+		g_charClipDY2 = clipDY2;
+
+		return (clipDY2 & clipDY1 & clipDX2 & clipDX1) & 0x80000000;
+	}
+
+	// STUB: TOY2 0x004B46B0
+	int32_t Font::DrawScaledGlyph(char c) { return 0; }
+
+	// STUB: TOY2 0x004B4880
+	int32_t Font::DrawClippedScaledGlyph(char c) { return 0; }
+
+	// FUNCTION: TOY2 0x004B4CD0
+	int32_t Font::DrawTextString(const char* text)
+	{
+		Font* font = g_currentFont;
+		int32_t maxWidth;
+		int32_t width;
+		if (font)
+		{
+			int32_t startX = g_textCursorX;
+			maxWidth = 0;
+			width = 0;
+			char c = *text;
+			if (c)
+			{
+				do
+				{
+					switch (c)
+					{
+						case '\t': {
+							int32_t next = g_textCursorX + g_textTabWidth;
+							next -= next % g_textTabWidth;
+							width += next - g_textCursorX;
+							g_textCursorX = next;
+						}
+						break;
+						case '\n':
+							g_textCursorY += font->fontHeight;
+							g_textCursorX = startX;
+							goto lineReset;
+						case '\r':
+							g_textCursorY += (int32_t)g_scaledFontHeight;
+							g_textCursorX = g_textClipX1;
+						lineReset:
+							maxWidth = maxWidth > width ? maxWidth : width;
+							width = 0;
+							break;
+						default: {
+							int32_t w;
+							if (ComputeUnscaledCharClip(c))
+								w = DrawUnscaledGlyph(c);
+							else
+								w = DrawClippedUnscaledGlyph(c);
+							width += w;
+							g_textCursorX += w;
+						}
+						break;
+					}
+					c = *++text;
+				} while (c);
+			}
+		}
+		else
+		{
+			maxWidth = (int32_t)text;
+			width = (int32_t)text;
+		}
+		return maxWidth > width ? maxWidth : width;
+	}
+
+	// FUNCTION: TOY2 0x004B45A0
+	int32_t Font::DrawScaledTextString(const char* text)
+	{
+		Font* font = g_currentFont;
+		int32_t maxWidth;
+		int32_t width;
+		if (font)
+		{
+			int32_t startX = g_textCursorX;
+			maxWidth = 0;
+			width = 0;
+			char c = *text;
+			if (c)
+			{
+				do
+				{
+					switch (c)
+					{
+						case '\t': {
+							int32_t next = g_textCursorX + g_textTabWidth;
+							next -= next % g_textTabWidth;
+							width += next - g_textCursorX;
+							g_textCursorX = next;
+						}
+						break;
+						case '\n':
+							g_textCursorY += (int32_t)g_scaledFontHeight;
+							g_textCursorX = startX;
+							goto lineReset;
+						case '\r':
+							g_textCursorY += (int32_t)g_scaledFontHeight;
+							g_textCursorX = g_textClipX1;
+						lineReset:
+							maxWidth = maxWidth > width ? maxWidth : width;
+							width = 0;
+							break;
+						default: {
+							int32_t w;
+							if (ComputeScaledCharClip(c))
+								w = DrawScaledGlyph(c);
+							else
+								w = DrawClippedScaledGlyph(c);
+							width += w;
+							g_textCursorX += w;
+						}
+						break;
+					}
+					c = *++text;
+				} while (c);
+			}
+		}
+		else
+		{
+			maxWidth = (int32_t)text;
+			width = (int32_t)text;
+		}
+		return maxWidth > width ? maxWidth : width;
+	}
+
+	// FUNCTION: TOY2 0x004B5480
+	int32_t Font::CalculateUnscaledTextSize(const char* text)
+	{
+		Font* font = g_currentFont;
+		int32_t maxWidth;
+		int32_t width;
+		if (font)
+		{
+			maxWidth = 0;
+			width = 0;
+			g_textHeight = (int32_t)g_scaledFontHeight;
+			char c = *text;
+			if (c)
+			{
+				do
+				{
+					switch (c)
+					{
+						case '\t':
+							break;
+						case '\n':
+						case '\r':
+							maxWidth = maxWidth > width ? maxWidth : width;
+							g_textHeight = (int32_t)((float)g_textHeight + g_scaledFontHeight);
+							width = 0;
+							break;
+						default:
+							width += font->glyphs[font->charToGlyphIndex[(uint8_t)c]].width;
+							break;
+					}
+					c = *++text;
+				} while (c);
+			}
+		}
+		else
+		{
+			maxWidth = (int32_t)text;
+			width = (int32_t)text;
+		}
+		return maxWidth > width ? maxWidth : width;
+	}
+
+	// FUNCTION: TOY2 0x004B53D0
+	int32_t Font::CalculateScaledTextSize(const char* text)
+	{
+		Font* font = g_currentFont;
+		int32_t maxWidth;
+		int32_t width;
+		if (font)
+		{
+			maxWidth = 0;
+			width = 0;
+			g_textHeight = (int32_t)g_scaledFontHeight;
+			char c = *text;
+			if (c)
+			{
+				do
+				{
+					switch (c)
+					{
+						case '\t':
+							break;
+						case '\n':
+						case '\r':
+							maxWidth = maxWidth > width ? maxWidth : width;
+							g_textHeight = (int32_t)((float)g_textHeight + g_scaledFontHeight);
+							width = 0;
+							break;
+						default:
+							width += (int32_t)((float)font->glyphs[font->charToGlyphIndex[(uint8_t)c]].width * g_fontScaleX);
+							break;
+					}
+					c = *++text;
+				} while (c);
+			}
+		}
+		else
+		{
+			maxWidth = (int32_t)text;
+			width = (int32_t)text;
+		}
+		return maxWidth > width ? maxWidth : width;
+	}
 }

@@ -56,20 +56,23 @@ namespace Nu3D
 	extern BmpDataNode* g_currentBmpDataNode;
 
 	void SetMinTexSize(int32_t minTexSize);
+	HRESULT BuildBmpNodeFromSlot(int32_t slotIndex, const char* textureName, int32_t alphaFlag);
 	HRESULT BuildBmpNode(HBITMAP bitmap, const char* textureName, int32_t unused, int32_t flags);
 	HRESULT BuildBmpNodeWithAlpha(HBITMAP bitmap, const char* textureName, int32_t unused,
 		int32_t flags, HBITMAP alphaBitmap);
+	BmpDataNode* BuildRawBmpNodeFromSlot(int32_t slotIndex, const char* textureName, int32_t alphaFlag);
 	BmpDataNode* BuildRawBmpNode(HBITMAP bitmap, HBITMAP alphaBitmap, const char* textureName,
 		int32_t flags);
 	BmpDataNode* GetBmpDataNodeByName_T(const char* textureName);
 	LPDIRECT3DTEXTURE2 GetTexture(BmpDataNode* bmpDataNode);
-	int32_t InitBmpNodeSurface(BmpDataNode* bmpDataNode, int32_t unused);
+	int32_t InitBmpNodeSurface(BmpDataNode* bmpDataNode, LPDIRECT3DDEVICE3 d3dDevice);
 	BmpDataNode* LoadTextureByStream(FILE* handle, const char* rawTexStr, int32_t flags);
 	Nu3D::BmpDataNode* LoadLocalBmpTexture(const char* rawTexStr, int32_t flags);
 	HRESULT SetTexture(int32_t stageIndex, BmpDataNode* bmpDataNode);
 	int32_t CopyToDDSurface(BmpDataNode* bmpDataNode, LPDIRECTDRAWSURFACE4 ddSurface);
 	int32_t ReleaseBmpDataNode_T(BmpDataNode* bmpDataNode);
 	void FreeAllBmpDataNodes_T();
+	int32_t CreateTextureResourceFromSlot(int32_t slotIndex, const char* textureName, uint32_t flags);
 	int32_t CreateTextureResource(HBITMAP bitmapHandle, const char* textureName, int32_t flags);
 
 	STATIC_ASSERT(sizeof(BmpDataNode) == 0x110);

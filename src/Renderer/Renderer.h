@@ -2,6 +2,7 @@
 
 #include "Common.h"
 #include "Renderer/RenderType.h"
+#include "Nu3D/Patch.h"
 #include <directx6/ddraw.h>
 #include <directx6/d3d.h>
 
@@ -13,6 +14,8 @@ namespace Nu3D
 	struct Primitive;
 	struct Material;
 	struct InstanceData;
+	struct VertexTL;
+	struct Patch;
 }
 
 namespace DrawingAPI
@@ -65,10 +68,15 @@ namespace Renderer
 		Nu3D::Material* material;
 
 		static RenderEntry* AllocObj(Nu3D::Material* material, Nu3D::Primitive* primitive, Nu3D::InstanceData* instanceData);
+		static RenderEntry* AllocPatch(Nu3D::Material* material, Nu3D::Primitive* primitive, Nu3D::InstanceData* instanceData);
 		static void InsertIntoBucket(RenderEntry* entry);
 	};
 
 	extern float g_gammaCorrection;
+	extern Nu3D::Patch::PatchVertices g_FVF_14C_Buffer_2;
+	extern Nu3D::Patch::PatchVertices g_FVF_14C_Buffer_1;
+	extern Nu3D::Patch::PatchVertices g_FVF_152_Buffer;
+	extern int32_t g_unk9F5FF0;
 	extern int32_t g_isSoftwareRendering;
 	extern int32_t g_frameDelta;
 	extern float g_virtualScreenWidth;
@@ -88,6 +96,8 @@ namespace Renderer
 	void SetVirtualRatioTo54();
 	void DoFrameDelay(int32_t isGameplayFrame);
 	RGBA ApplyGammaCorrection(RGBA color);
+	void ConfigureFog(float start, float end, RGBA color);
+	void SetFogEnable(int32_t enable);
 	int32_t GetIsSoftwareRendering();
 	float BuildGammaCorrectionLUT(float gammaCorrection);
 	void GetBlendShadeCaps(int32_t* capsOut);
@@ -107,11 +117,19 @@ namespace Renderer
 	void FlushRenderQueues();
 	RGBA ModulateColorByAlpha(RGBA color, int32_t flags);
 	int32_t SetAdditionalRenderFlags(int32_t flags);
+	void SetVertexColorModulation(int32_t red, int32_t green, int32_t blue);
+	int32_t EnableVertexColorModulation(int32_t enable);
 	int32_t Set508718(int32_t value);
+	int32_t Set9F5FF8(int32_t value);
 	void SetRenderDistance(float primaryDistance, float secondaryDistance);
 	void RenderPrimitive(Nu3D::Primitive* primitive, const D3DMATRIX* transform, int32_t renderFlags);
 	void ProcessPrimitive(Nu3D::InstanceData* instanceData, Nu3D::Primitive* primitive);
+	void RenderPatchList(Nu3D::Patch* patch, const D3DMATRIX* matrices, int32_t* flags, int32_t renderFlags);
+	void ProcessPatch(Nu3D::InstanceData* instanceData, Nu3D::Patch* patch);
 	void BindTexture(int32_t texIndex);
+	void BindMaterial(Nu3D::Material* material, int32_t force);
+	void UnbindMaterial();
+	void DrawSingleTexturedTriangle(Nu3D::VertexTL* vertices, int32_t texIndex, int32_t renderFlags);
 
 	STATIC_ASSERT(sizeof(RenderEntry) == 0x18);
 }
@@ -121,4 +139,7 @@ namespace DevDraw
 	extern int32_t g_vertexCount;
 
 	int16_t DrawSlots();
+
+	void FlushDrawBufferSlot(int16_t slot);
+	void FlushTransparentDrawBufferSlot(int16_t slot);
 }

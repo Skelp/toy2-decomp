@@ -9,5 +9,6 @@ namespace Renderer
 	{
 		int32_t BackdropBltFast();
 		HBITMAP SetBackdrop(int32_t textureIndex);
+		void ReleaseBackdrop();
 	}
 }
