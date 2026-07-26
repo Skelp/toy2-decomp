@@ -10,12 +10,16 @@ namespace AudioManager
 	extern int32_t g_curTrackIndex;
 	extern int32_t g_loopingMusicTrackIndex;
 
+	extern int32_t g_dsResult;
+	extern LPDIRECTSOUNDBUFFER g_dsBuffers[768];
+
 	void StopAndFlush();
 	void OnExit();
 	int32_t IsStreamActive();
 	int32_t PlayTrackByIndex(int32_t trackIndex, int32_t fadeMode);
 	void QueuePlay(char* path, int32_t fadeMode);
 	int32_t PlaySoundBuffer(int32_t soundIndex, int32_t leftVolume, int32_t rightVolume, int32_t pan, int32_t volume, int32_t flags);
+	int32_t IsEffectPlaying(int32_t index);
 	void ReleaseBuffers();
 	void Init();
 	void SetVolumesProcessed(int32_t musicVolume, int32_t sfxVolume);

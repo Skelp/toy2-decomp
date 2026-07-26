@@ -12,6 +12,9 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x00559C68
 	int32_t g_loopingMusicTrackIndex;
 
+	// GLOBAL: TOY2 0x00724E7C
+	int32_t g_dsResult;
+
 	// GLOBAL: TOY2 0x00724E80
 	int32_t g_audioInitialized;
 
@@ -62,6 +65,9 @@ namespace AudioManager
 
 	// GLOBAL: TOY2 0x00725294
 	void* g_loopingSoundOwners[32];
+
+	// GLOBAL: TOY2 0x00726338
+	LPDIRECTSOUNDBUFFER g_dsBuffers[768];
 
 	// GLOBAL: TOY2 0x005282F0
 	LPDIRECTSOUNDBUFFER g_dsPrimaryBuffer;
@@ -471,6 +477,18 @@ namespace AudioManager
 		QueuePlay(buffer, fadeMode);
 		g_curTrackIndex = trackIndex;
 		return 1;
+	}
+
+	// FUNCTION: TOY2 0x0047D8E0 [MATCHED]
+	int32_t IsEffectPlaying(int32_t index)
+	{
+		if (g_audioInitialized == 0)
+		{
+			return 0;
+		}
+		DWORD status;
+		g_dsResult = g_dsBuffers[index]->GetStatus(&status);
+		return status;
 	}
 
 	// STUB: TOY2 0x0047DE50
