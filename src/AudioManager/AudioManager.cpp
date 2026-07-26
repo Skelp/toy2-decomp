@@ -2,42 +2,7 @@
 #include "FileUtils.h"
 #include "Logger.h"
 #include <cstring>
-
-struct IDirectSoundBuffer;
-
-typedef int32_t(__stdcall* DSBSetVolumeFunc)(IDirectSoundBuffer*, int32_t);
-typedef int32_t(__stdcall* DSBReleaseFunc)(IDirectSoundBuffer*);
-typedef int32_t(__stdcall* DSBStopFunc)(IDirectSoundBuffer*);
-
-struct IDirectSoundBufferVtbl
-{
-	void* QueryInterface;
-	void* AddRef;
-	DSBReleaseFunc Release;
-	void* GetCaps;
-	void* GetCurrentPosition;
-	void* GetFormat;
-	void* GetVolume;
-	void* GetPan;
-	void* GetFrequency;
-	void* GetStatus;
-	void* Initialize;
-	void* Lock;
-	void* Play;
-	void* SetCurrentPosition;
-	void* SetFormat;
-	DSBSetVolumeFunc SetVolume;
-	void* SetPan;
-	void* SetFrequency;
-	DSBStopFunc Stop;
-	void* Unlock;
-	void* Restore;
-};
-
-struct IDirectSoundBuffer
-{
-	IDirectSoundBufferVtbl* lpVtbl;
-};
+#include <directx6/dsound.h>
 
 namespace AudioManager
 {
@@ -148,7 +113,7 @@ namespace AudioManager
 		Logger::Log("SETMUSICVOL : Vol %d \n", scaledVol);
 		if (g_dsPrimaryBuffer != NULL)
 		{
-			int32_t result = ((IDirectSoundBuffer*)g_dsPrimaryBuffer)->lpVtbl->SetVolume((IDirectSoundBuffer*)g_dsPrimaryBuffer, scaledVol);
+			int32_t result = ((IDirectSoundBuffer*)g_dsPrimaryBuffer)->SetVolume(scaledVol);
 			if (result)
 			{
 				char* msg;
@@ -427,11 +392,11 @@ namespace AudioManager
 		{
 			if (g_directSound != NULL && g_dsPrimaryBuffer != NULL)
 			{
-				((IDirectSoundBuffer*)g_dsPrimaryBuffer)->lpVtbl->Stop((IDirectSoundBuffer*)g_dsPrimaryBuffer);
+				((IDirectSoundBuffer*)g_dsPrimaryBuffer)->Stop();
 				Wave::CloseFile(&g_waveMmioHandle, &g_waveFormatHandle);
-				((IDirectSoundBuffer*)g_dsSecondaryBuffer)->lpVtbl->Release((IDirectSoundBuffer*)g_dsSecondaryBuffer);
+				((IDirectSoundBuffer*)g_dsSecondaryBuffer)->Release();
 				g_dsSecondaryBuffer = NULL;
-				((IDirectSoundBuffer*)g_dsPrimaryBuffer)->lpVtbl->Release((IDirectSoundBuffer*)g_dsPrimaryBuffer);
+				((IDirectSoundBuffer*)g_dsPrimaryBuffer)->Release();
 				g_dsPrimaryBuffer = NULL;
 			}
 		}
