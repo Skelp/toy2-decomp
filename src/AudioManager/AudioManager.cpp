@@ -111,6 +111,39 @@ namespace AudioManager
 		}
 	}
 
+	// FUNCTION: TOY2 0x0047E7D0 [MATCHED]
+	void ReleaseAllBuffers()
+	{
+		if (g_audioInitialized != 0)
+		{
+			for (int32_t i = 767; i >= 0; i--)
+			{
+				LPDIRECTSOUNDBUFFER buf = g_dsBuffers[i];
+				if (buf != NULL)
+				{
+					DWORD status;
+					DWORD playing;
+					if (g_audioInitialized == 0)
+					{
+						playing = 0;
+					}
+					else
+					{
+						g_dsResult = buf->GetStatus(&status);
+						playing = status;
+					}
+					if ((playing & 1) == 1)
+					{
+						g_dsBuffers[i]->Stop();
+					}
+					g_dsBuffers[i]->Release();
+					g_dsBuffers[i] = NULL;
+					g_loopingSoundOwners[i] = NULL;
+				}
+			}
+		}
+	}
+
 	// FUNCTION: TOY2 0x0047E850 [MATCHED]
 	void ReleaseBuffers()
 	{

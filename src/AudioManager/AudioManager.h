@@ -20,6 +20,7 @@ namespace AudioManager
 	void QueuePlay(char* path, int32_t fadeMode);
 	int32_t PlaySoundBuffer(int32_t soundIndex, int32_t leftVolume, int32_t rightVolume, int32_t pan, int32_t volume, int32_t flags);
 	int32_t IsEffectPlaying(int32_t index);
+	void ReleaseAllBuffers();
 	void ReleaseBuffers();
 	void Init();
 	void SetVolumesProcessed(int32_t musicVolume, int32_t sfxVolume);
