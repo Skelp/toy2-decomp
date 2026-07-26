@@ -487,8 +487,62 @@ namespace Toy2
 		}
 	}
 
-	// STUB: TOY2 0x00438520
-	int32_t ShowStaticScreen(int32_t backdropIndex) { return 0; }
+	// FUNCTION: TOY2 0x00438520
+	int32_t ShowStaticScreen(int32_t backdropIndex)
+	{
+		InputManager::g_curButtonsPressed = 0;
+		InputManager::g_prevButtonsPressed = 0;
+		MainMenu::g_fadeTimer = 0;
+		MainMenu::g_nextScreen = 0;
+		Nu3D::Camera::g_cameraTintBlue = 0;
+		Nu3D::Camera::g_cameraTintGreen = 0;
+		Nu3D::Camera::g_cameraTintRed = 0;
+		Nu3D::Camera::SetTint(128, 128, 128, 12);
+		SoftwareRenderer::UnkFunc67(0, 0);
+		Renderer::g_frameDelta = 1;
+		SetBackdropByIndex(backdropIndex);
+
+		int32_t result = 0;
+		int32_t fadeFrames = 600;
+		int32_t threshold = ((int16_t)g_pastInitialBoot != 0) ? 600 : 300;
+
+		while (true)
+		{
+			Nu3D::Camera::FadeToTargetTint();
+			SoftwareRenderer::UnkFunc67(0, 0);
+			Nullsub3();
+			MainMenu::RenderMenu();
+
+			if (fadeFrames > 0)
+			{
+				fadeFrames -= Renderer::g_frameDelta;
+				if (fadeFrames <= 0)
+					fadeFrames = 0;
+			}
+
+			if (fadeFrames <= 0x17)
+			{
+				if (Renderer::g_frameDelta + fadeFrames > 0x17)
+					Nu3D::Camera::SetTint(0, 0, 0, 12);
+			}
+
+			if (g_attractModeTimer >= 0 && (InputManager::g_curButtonsPressed & 1) && fadeFrames > 0x17)
+			{
+				fadeFrames = 0x18;
+				result = 1;
+			}
+
+			if ((InputManager::g_curButtonsPressed & 0xf000) != 0 && (InputManager::g_prevButtonsPressed & 0xf000) == 0 && fadeFrames < threshold
+				&& fadeFrames > 0x17)
+			{
+				fadeFrames = 0x18;
+			}
+			else if (fadeFrames <= 0)
+			{
+				return result;
+			}
+		}
+	}
 
 	// STUB: TOY2 0x0043A380
 	int32_t ShowCredits() { return 0; }
