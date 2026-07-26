@@ -190,8 +190,57 @@ namespace AudioManager
 		return 0;
 	}
 
-	// STUB: TOY2 0x004A4130
-	MMRESULT WaveReadFile(HMMIO hmmio, uint32_t size, void* buffer, MMCKINFO* chunk, uint32_t* outRead) { return 0; }
+	// FUNCTION: TOY2 0x004A4130
+	MMRESULT WaveReadFile(HMMIO hmmio, uint32_t size, void* buffer, MMCKINFO* chunk, uint32_t* outRead)
+	{
+		MMIOINFO info;
+		MMRESULT result = mmioGetInfo(hmmio, &info, 0);
+		if (result == 0)
+		{
+			uint32_t cksize = chunk->cksize;
+			if (size > cksize)
+			{
+				size = cksize;
+			}
+			chunk->cksize = cksize - size;
+			uint32_t count = 0;
+			if (size > 0)
+			{
+				HPSTR pchEndRead = info.pchEndRead;
+				do
+				{
+					if (info.pchNext == pchEndRead)
+					{
+						result = mmioAdvance(hmmio, &info, 0);
+						if (result != 0)
+						{
+							goto fail;
+						}
+						pchEndRead = info.pchEndRead;
+						if (info.pchNext == pchEndRead)
+						{
+							goto emptyBuffer;
+						}
+					}
+					((char*)buffer)[count++] = *info.pchNext++;
+				} while (count < size);
+			}
+			result = mmioSetInfo(hmmio, &info, 0);
+			if (result == 0)
+			{
+				goto success;
+			}
+		}
+	fail:
+		*outRead = 0;
+		return result;
+	emptyBuffer:
+		*outRead = 0;
+		return 0xe103;
+	success:
+		*outRead = size;
+		return result;
+	}
 
 	// FUNCTION: TOY2 0x004A4680
 	int32_t WaveLoadFile(char* path, int32_t* outBytes, int32_t* outFormatSize, HGLOBAL* outFormatHandle, void** outData)
