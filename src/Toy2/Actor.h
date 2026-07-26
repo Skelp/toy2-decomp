@@ -68,6 +68,9 @@ namespace Toy2
 
 		extern Toy2Actor* g_activeActors[65];
 
+		extern Toy2Actor g_creatureActors[64];
+
+		void InitCreatureRam();
 		void GetCreatureList(uint8_t* creatureIdList);
 		int32_t FindInActorList(Toy2Actor* actor);
 		void SetNodeAngle(Toy2Actor* actor, int32_t nodeIndex, float x, float y, float z);

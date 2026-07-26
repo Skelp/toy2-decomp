@@ -8,8 +8,30 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0052F1D0
 		Toy2Actor* g_activeActors[65];
 
-		// STUB: TOY2 0x00414A80
-		void GetCreatureList(uint8_t* creatureIdList) {}
+		// GLOBAL: TOY2 0x0052c840
+		Toy2Actor g_creatureActors[64];
+
+		// STUB: TOY2 0x00407150
+		void InitCreatureRam() {}
+
+		// FUNCTION: TOY2 0x00414A80
+		void GetCreatureList(uint8_t* creatureIdList)
+		{
+			InitCreatureRam();
+			int32_t index = 1;
+			int16_t* creatureId = &g_creatureActors[0].creatureId;
+			creatureIdList[0] = 0;
+			do
+			{
+				if (*creatureId != 0)
+				{
+					creatureIdList[index] = (uint8_t)*creatureId;
+					index++;
+				}
+				creatureId += sizeof(Toy2Actor) / sizeof(int16_t);
+			} while (creatureId < &g_creatureActors[64].creatureId);
+			creatureIdList[index] = 0xff;
+		}
 
 		// FUNCTION: TOY2 0x004CDBF0 [MATCHED]
 		int32_t FindInActorList(Toy2Actor* actor)
