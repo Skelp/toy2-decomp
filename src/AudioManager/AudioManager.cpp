@@ -241,8 +241,12 @@ namespace AudioManager
 		}
 	}
 
-	// STUB: TOY2 0x004A3B90
-	int32_t PlayLoopingSound3DPositional(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, void* unused, int16_t rightVolume) { return 0; }
+	// STUB: TOY2 0x004A3980
+	int32_t PlayLoopingSound3D(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume) { return 0; }
+
+	// FUNCTION: TOY2 0x004A3B90
+	int32_t PlayLoopingSound3DPositional(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, void* unused, int32_t rightVolume)
+	{ return PlayLoopingSound3D(owner, soundIndex, volume, leftVolume, rightVolume); }
 
 	// STUB: TOY2 0x0047D930
 	int32_t RestartLoopingSound(int32_t soundId) { return 0; }
