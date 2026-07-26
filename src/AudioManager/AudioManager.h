@@ -3,6 +3,9 @@
 #include "Common.h"
 #include <windows.h>
 #include <mmsystem.h>
+#ifndef DIRECTSOUND_VERSION
+#define DIRECTSOUND_VERSION 0x0600
+#endif
 #include <directx6/dsound.h>
 
 namespace AudioManager
@@ -21,6 +24,7 @@ namespace AudioManager
 	int32_t PlaySoundBuffer(int32_t soundIndex, int32_t leftVolume, int32_t rightVolume, int32_t pan, int32_t volume, int32_t flags);
 	int32_t IsEffectPlaying(int32_t index);
 	void ReleaseAllBuffers();
+	int32_t CreateDirectSoundBuffer(LPDIRECTSOUND ds, LPDIRECTSOUNDBUFFER* outBuf, DWORD bufferBytes);
 	void ReleaseBuffers();
 	void Init();
 	void SetVolumesProcessed(int32_t musicVolume, int32_t sfxVolume);
@@ -65,6 +69,7 @@ namespace AudioManager
 	extern void* g_loopingSoundOwners[768];
 
 	extern HGLOBAL g_waveFormatHandle;
+	extern HGLOBAL g_sfxWaveFormatHandle;
 	extern HMMIO g_waveMmioHandle;
 
 	namespace Wave

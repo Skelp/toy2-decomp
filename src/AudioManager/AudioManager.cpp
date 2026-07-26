@@ -84,6 +84,9 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x005281D8
 	HGLOBAL g_waveFormatHandle;
 
+	// GLOBAL: TOY2 0x00725290
+	HGLOBAL g_sfxWaveFormatHandle;
+
 	// GLOBAL: TOY2 0x005281DC
 	HMMIO g_waveMmioHandle;
 
@@ -109,6 +112,34 @@ namespace AudioManager
 			}
 			g_streamPending = 0;
 		}
+	}
+
+	// FUNCTION: TOY2 0x0047E420 [MATCHED]
+	int32_t CreateDirectSoundBuffer(LPDIRECTSOUND ds, LPDIRECTSOUNDBUFFER* outBuf, DWORD bufferBytes)
+	{
+		PCMWAVEFORMAT wfx;
+		memset(&wfx, 0, sizeof(wfx));
+		PCMWAVEFORMAT* src = (PCMWAVEFORMAT*)g_sfxWaveFormatHandle;
+		wfx.wf.wFormatTag = src->wf.wFormatTag;
+		wfx.wf.nChannels = src->wf.nChannels;
+		wfx.wf.nSamplesPerSec = src->wf.nSamplesPerSec;
+		wfx.wf.nBlockAlign = src->wf.nBlockAlign;
+		wfx.wf.nAvgBytesPerSec = src->wf.nAvgBytesPerSec;
+		wfx.wBitsPerSample = src->wBitsPerSample;
+
+		DSBUFFERDESC desc;
+		memset(&desc, 0, sizeof(desc));
+		desc.dwSize = sizeof(desc);
+		desc.dwFlags = 0x80e0;
+		desc.dwBufferBytes = bufferBytes;
+		desc.lpwfxFormat = (WAVEFORMATEX*)&wfx;
+
+		if (ds->CreateSoundBuffer(&desc, outBuf, NULL) == 0)
+		{
+			return 1;
+		}
+		*outBuf = NULL;
+		return 0;
 	}
 
 	// FUNCTION: TOY2 0x0047E7D0 [MATCHED]
