@@ -6,12 +6,14 @@
 struct IDirectSoundBuffer;
 
 typedef int32_t(__stdcall* DSBSetVolumeFunc)(IDirectSoundBuffer*, int32_t);
+typedef int32_t(__stdcall* DSBReleaseFunc)(IDirectSoundBuffer*);
+typedef int32_t(__stdcall* DSBStopFunc)(IDirectSoundBuffer*);
 
 struct IDirectSoundBufferVtbl
 {
 	void* QueryInterface;
 	void* AddRef;
-	void* Release;
+	DSBReleaseFunc Release;
 	void* GetCaps;
 	void* GetCurrentPosition;
 	void* GetFormat;
@@ -25,6 +27,11 @@ struct IDirectSoundBufferVtbl
 	void* SetCurrentPosition;
 	void* SetFormat;
 	DSBSetVolumeFunc SetVolume;
+	void* SetPan;
+	void* SetFrequency;
+	DSBStopFunc Stop;
+	void* Unlock;
+	void* Restore;
 };
 
 struct IDirectSoundBuffer
@@ -91,11 +98,17 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x005282F0
 	void* g_dsPrimaryBuffer;
 
+	// GLOBAL: TOY2 0x005282F4
+	void* g_dsSecondaryBuffer;
+
 	// GLOBAL: TOY2 0x005281D8
 	HGLOBAL g_waveFormatHandle;
 
 	// GLOBAL: TOY2 0x005281DC
 	HMMIO g_waveMmioHandle;
+
+	// GLOBAL: TOY2 0x00725F24
+	void* g_directSound;
 
 	// GLOBAL: TOY2 0x004FD668
 	// clang-format off
@@ -404,6 +417,23 @@ namespace AudioManager
 				*hmmio = NULL;
 			}
 			return 0;
+		}
+	}
+
+	namespace Stream
+	{
+		// FUNCTION: TOY2 0x004132A0
+		void Stop()
+		{
+			if (g_directSound != NULL && g_dsPrimaryBuffer != NULL)
+			{
+				((IDirectSoundBuffer*)g_dsPrimaryBuffer)->lpVtbl->Stop((IDirectSoundBuffer*)g_dsPrimaryBuffer);
+				Wave::CloseFile(&g_waveMmioHandle, &g_waveFormatHandle);
+				((IDirectSoundBuffer*)g_dsSecondaryBuffer)->lpVtbl->Release((IDirectSoundBuffer*)g_dsSecondaryBuffer);
+				g_dsSecondaryBuffer = NULL;
+				((IDirectSoundBuffer*)g_dsPrimaryBuffer)->lpVtbl->Release((IDirectSoundBuffer*)g_dsPrimaryBuffer);
+				g_dsPrimaryBuffer = NULL;
+			}
 		}
 	}
 }

@@ -40,6 +40,8 @@ namespace AudioManager
 	extern int32_t g_sfxVolume;
 	extern int32_t g_musicVolumeLevel;
 	extern void* g_dsPrimaryBuffer;
+	extern void* g_dsSecondaryBuffer;
+	extern void* g_directSound;
 	extern int16_t g_dsVolTable[151];
 
 	extern HANDLE g_streamCommandEvent;
@@ -60,5 +62,10 @@ namespace AudioManager
 	namespace Wave
 	{
 		int32_t CloseFile(HMMIO* hmmio, HGLOBAL* dataHandle);
+	}
+
+	namespace Stream
+	{
+		void Stop();
 	}
 }
