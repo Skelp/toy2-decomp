@@ -126,6 +126,23 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00A4CC84
 	void* g_backBuffer;
 
+	// Colour-scale sub-table pointers. Each table is a 256x256 uint16 LUT
+	// laid out as table[scale*256 + colour], mapping a scaled colour component
+	// (min(colour*scale, 0xffff)) into its 16-bit position for the active pixel
+	// format. Built by InitialiseColourScaleTables from g_pixelFormatMode and
+	// read by the colour-conversion render helpers.
+	// GLOBAL: TOY2 0x00E4D7AC
+	uint16_t* g_colourScaleTable0;
+
+	// GLOBAL: TOY2 0x00DBB08C
+	uint16_t* g_colourScaleTable1;
+
+	// GLOBAL: TOY2 0x00B7FBC0
+	uint16_t* g_colourScaleTable2;
+
+	// GLOBAL: TOY2 0x00E4D7B8
+	uint16_t* g_colourScaleTable3;
+
 	// Colour-scale lookup tables, allocated by InitialiseColourScaleTables and
 	// freed (then rebuilt) by InitialisePrimarySurface on surface change.
 	// GLOBAL: TOY2 0x00A4CC78
@@ -192,8 +209,55 @@ namespace SoftwareRenderer
 	// FUNCTION: TOY2 0x004C20E0 [MATCHED]
 	void SetLevelFileIndex(int32_t index) { g_levelFileIndex = index; }
 
-	// STUB: TOY2 0x004C1C40
-	void InitialiseColourScaleTables() {}
+	// Builds one 256x256 colour-scale LUT into `tableGlobal`. The LUT maps
+	// table[scale*256 + colour] = (min(colour*scale, 0xffff) >> shift) & mask,
+	// placing a single colour component into its 16-bit channel position. The
+	// table global is referenced directly (not cached) so MSVC6 reloads it each
+	// inner iteration, matching retail's conservative-aliasing codegen.
+#define TOY2_BUILD_COLOUR_SCALE_TABLE(tableGlobal, shift, mask)           \
+	do                                                                    \
+	{                                                                     \
+		int idx = 0;                                                      \
+		for (int s = 0; s < 256; s++)                                     \
+		{                                                                 \
+			uint32_t acc = 0;                                             \
+			for (int c = 0; c < 256; c++)                                 \
+			{                                                             \
+				uint32_t v = acc;                                         \
+				if (acc > 0xffff)                                         \
+					v = 0xffff;                                           \
+				tableGlobal[idx++] = (uint16_t)((v >> (shift)) & (mask)); \
+				acc += s;                                                 \
+			}                                                             \
+		}                                                                 \
+	} while (0)
+
+	// FUNCTION: TOY2 0x004C1C40
+	void InitialiseColourScaleTables()
+	{
+		g_colourScaleTables = malloc(0x80000);
+		g_colourScaleTable0 = (uint16_t*)g_colourScaleTables;
+		g_colourScaleTable1 = g_colourScaleTable0 + 0x10000;
+		g_colourScaleTable2 = g_colourScaleTable1 + 0x10000;
+		g_colourScaleTable3 = g_colourScaleTable2 + 0x10000;
+
+		if (g_pixelFormatMode == 0) // 16-bit 555
+		{
+			TOY2_BUILD_COLOUR_SCALE_TABLE(g_colourScaleTable0, 11, 0x1f);
+			TOY2_BUILD_COLOUR_SCALE_TABLE(g_colourScaleTable1, 6, 0x3e0);
+			TOY2_BUILD_COLOUR_SCALE_TABLE(g_colourScaleTable2, 1, 0x7c00);
+			TOY2_BUILD_COLOUR_SCALE_TABLE(g_colourScaleTable3, 11, 0x1f);
+			return;
+		}
+
+		// 16-bit 565 (24/32-bit BGR/RGB modes reuse these tables).
+		TOY2_BUILD_COLOUR_SCALE_TABLE(g_colourScaleTable0, 11, 0x1f);
+		TOY2_BUILD_COLOUR_SCALE_TABLE(g_colourScaleTable1, 5, 0x7c0);
+		TOY2_BUILD_COLOUR_SCALE_TABLE(g_colourScaleTable2, 0, 0xf800);
+		TOY2_BUILD_COLOUR_SCALE_TABLE(g_colourScaleTable3, 11, 0x1f);
+	}
+
+#undef TOY2_BUILD_COLOUR_SCALE_TABLE
 
 	// FUNCTION: TOY2 0x004BCE00
 	void InitialisePrimarySurface()

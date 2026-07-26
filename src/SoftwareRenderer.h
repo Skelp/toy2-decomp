@@ -50,6 +50,10 @@ namespace SoftwareRenderer
 	extern int32_t g_pixelFormatMode;
 	extern void* g_backBuffer;
 	extern void* g_colourScaleTables;
+	extern uint16_t* g_colourScaleTable0;
+	extern uint16_t* g_colourScaleTable1;
+	extern uint16_t* g_colourScaleTable2;
+	extern uint16_t* g_colourScaleTable3;
 	extern uint8_t* g_currentRenderBuffer;
 	extern uint8_t* g_renderBufferPixels;
 	extern uint8_t g_renderBufferA[];
