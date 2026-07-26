@@ -640,6 +640,65 @@ namespace AudioManager
 	// FUNCTION: TOY2 0x0049E9C0 [MATCHED]
 	void ClearSequence7Cursor() { g_soundSequenceSlots[7].cursor = 0; }
 
+	// Pointer table for the six sequence-data blobs. Callers pass a negative
+	// identifier (-1..-6); the access is g_sequenceDataPtrs[-sequenceId - 1].
+	// A NULL sentinel follows the six valid entries. The build leaves the
+	// table zero-initialized; reccmp compares only .text, so the referencing
+	// code resolves by symbol name.
+	// GLOBAL: TOY2 0x00503828
+	int16_t* g_sequenceDataPtrs[7];
+
+	// Header at the start of each sequence-data blob: three peak-volume
+	// fields that the engine doubles into the 8-bit DirectSound range.
+	struct SequenceHeader
+	{
+		int16_t leftVolume; // +0x00
+		int16_t rightVolume; // +0x02
+		int16_t volume; // +0x04
+	};
+
+	// Peak sound volumes for the current level. Respawn and EnterLevel reset
+	// these to zero. PlaySoundEffect and StartSoundSequenceOnActor raise them
+	// when a sequence or one-shot exceeds the current peak. The left/right pair
+	// is stored doubled (the source field is a 7-bit value; the engine doubles
+	// it to the 8-bit DirectSound range). PlaySoundEffect clamps g_maxVolume to
+	// 0xff, which confirms it is a volume.
+	// GLOBAL: TOY2 0x0052ef44
+	int16_t g_maxLeftVolume;
+	// GLOBAL: TOY2 0x0052ef46
+	int16_t g_maxRightVolume;
+	// GLOBAL: TOY2 0x0052f2da
+	int16_t g_maxVolume;
+
+	// FUNCTION: TOY2 0x0049E910
+	void StartSoundSequenceOnActor(int32_t sequenceId, Vector3I* position)
+	{
+		SoundSequenceSlot& slot = g_soundSequenceSlots[7];
+		slot.position.x = position->x;
+		slot.position.y = position->y;
+		slot.position.z = position->z;
+		slot.timer = 0;
+
+		SequenceHeader* header = (SequenceHeader*)g_sequenceDataPtrs[-sequenceId - 1];
+		slot.cursor = (uint8_t*)(header + 1);
+
+		if (header->leftVolume != 0 || header->rightVolume != 0)
+		{
+			if (g_maxLeftVolume < header->leftVolume * 2)
+			{
+				g_maxLeftVolume = header->leftVolume * 2;
+			}
+			if (g_maxRightVolume < header->rightVolume * 2)
+			{
+				g_maxRightVolume = header->rightVolume * 2;
+			}
+			if (g_maxVolume < header->volume * 2)
+			{
+				g_maxVolume = header->volume * 2;
+			}
+		}
+	}
+
 	// FUNCTION: TOY2 0x0047D7F0 [MATCHED]
 	void PlayMusicOneShot(int32_t trackIndex)
 	{
