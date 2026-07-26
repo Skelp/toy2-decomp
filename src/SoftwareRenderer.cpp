@@ -48,6 +48,12 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00A4CC80
 	int32_t g_unkA4CC80;
 
+	// Reset by UnkFunc33 after the sorted bucket walk. g_unkB626C0 sits just
+	// below the bucket array; g_unkB7FBB8 sits just below g_clipLeft. Roles
+	// not yet fully understood.
+	// GLOBAL: TOY2 0x00B626C0
+	int32_t g_unkB626C0;
+
 	// GLOBAL: TOY2 0x00B626E0
 	int32_t g_unkB626E0[30000];
 
@@ -60,16 +66,18 @@ namespace SoftwareRenderer
 	// A queued render command for the software rasterizer. UnkFunc29 enqueues
 	// transformed vertices (3 for a triangle, 4 for a quad when vertexCount is
 	// 4) and UnkFunc35 dequeues and rasterizes one. Stride 0x9C, capacity 1024
-	// (g_unkDE20A8 is the live count). The metadata at +0x80 is only partially
-	// understood; refine the names when UnkFunc29 and UnkFunc35 are
-	// reconstructed.
+	// (g_unkDE20A8 is the live count). The same struct is reused by the sorted
+	// path: UnkFunc33 walks the g_unkB626E0 depth buckets and threads nodes
+	// through the next pointer (+0x8C), calling UnkFunc34 per node. The
+	// metadata at +0x80 is only partially understood; refine the names when
+	// UnkFunc29 and UnkFunc35 are reconstructed.
 	struct RenderCommand
 	{
 		Nu3D::VertexTL vertices[4]; // +0x00
 		int32_t field80; // +0x80 (mode/flags read by UnkFunc35)
 		int32_t vertexCount; // +0x84 (3 = triangle, 4 = quad)
 		int32_t field88; // +0x88
-		int32_t field8C; // +0x8C
+		RenderCommand* next; // +0x8C (sorted-path list link, read by UnkFunc33)
 		int32_t field90; // +0x90
 		int32_t field94; // +0x94 (passed to UnkFunc35)
 		int32_t field98; // +0x98
@@ -77,6 +85,9 @@ namespace SoftwareRenderer
 
 	// GLOBAL: TOY2 0x00DBB0A0
 	RenderCommand g_renderQueue[1024];
+
+	// GLOBAL: TOY2 0x00B7FBB8
+	int32_t g_unkB7FBB8;
 
 	// GLOBAL: TOY2 0x00A4CC74
 	int32_t g_levelFileIndex;
@@ -526,8 +537,28 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// STUB: TOY2 0x004BCB60
-	void UnkFunc33() {}
+	// STUB: TOY2 0x004C9A50
+	void UnkFunc34(RenderCommand* command, int32_t vertexCount, int32_t field88, int32_t field80, int32_t field94) {}
+
+	// FUNCTION: TOY2 0x004BCB60 [MATCHED]
+	void UnkFunc33()
+	{
+		if (g_unkA4CC80 == 1)
+		{
+			for (int i = 29999; i >= 0; i--)
+			{
+				RenderCommand* command = (RenderCommand*)g_unkB626E0[i];
+				while (command != NULL)
+				{
+					UnkFunc34(command, command->vertexCount, command->field88, command->field80, command->field94);
+					command = command->next;
+				}
+			}
+		}
+		g_unkB7FBB8 = 0;
+		g_unkB626C0 = 0;
+		g_unkA4CC80++;
+	}
 
 	// STUB: TOY2 0x00470C70
 	void UnkFunc7() {}

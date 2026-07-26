@@ -106,6 +106,7 @@ namespace SoftwareRenderer
 	struct RenderCommand;
 	void UnkFunc29(Nu3D::VertexTL* vertices[4], int32_t vertexCount, int32_t field80, int32_t field88);
 	void UnkFunc35(RenderCommand* command, int32_t vertexCount, int32_t field88, int32_t field80, int32_t field94);
+	void UnkFunc34(RenderCommand* command, int32_t vertexCount, int32_t field88, int32_t field80, int32_t field94);
 }
 
 namespace SoftwareDevice
