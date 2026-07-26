@@ -107,6 +107,9 @@ namespace SoftwareRenderer
 	void UnkFunc29(Nu3D::VertexTL* vertices[4], int32_t vertexCount, int32_t field80, int32_t field88);
 	void UnkFunc35(RenderCommand* command, int32_t vertexCount, int32_t field88, int32_t field80, int32_t field94);
 	void UnkFunc34(RenderCommand* command, int32_t vertexCount, int32_t field88, int32_t field80, int32_t field94);
+	void UnkFunc20(void* scratch);
+	void UnkFunc17(int32_t top, int32_t bottom, int32_t left, int32_t right);
+	void UnkFunc16(D3DPRIMITIVETYPE d3dptPrimitiveType, LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags);
 }
 
 namespace SoftwareDevice

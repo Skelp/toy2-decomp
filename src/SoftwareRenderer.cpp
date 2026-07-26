@@ -563,6 +563,15 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x00470C70
 	void UnkFunc7() {}
 
+	// STUB: TOY2 0x004AC1F0
+	void UnkFunc20(void* scratch) {}
+
+	// STUB: TOY2 0x004BCC70
+	void UnkFunc17(int32_t top, int32_t bottom, int32_t left, int32_t right) {}
+
+	// STUB: TOY2 0x004C1720
+	void UnkFunc16(D3DPRIMITIVETYPE d3dptPrimitiveType, LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags) {}
+
 	// STUB: TOY2 0x0047D210
 	void UnkFunc8(void* param1, int32_t param2) {}
 
@@ -600,7 +609,7 @@ namespace SoftwareDevice
 	HRESULT DrawIndexedPrimitiveVB(D3DPRIMITIVETYPE primitiveType, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices, DWORD indexCount, DWORD flags)
 	{ return DDERR_UNSUPPORTED; }
 
-	// STUB: TOY2 0x004B99F0
+	// FUNCTION: TOY2 0x004B99F0 [MATCHED]
 	HRESULT DrawIndexedPrimitive(D3DPRIMITIVETYPE d3dptPrimitiveType,
 		DWORD dwVertexTypeDesc,
 		LPVOID lpvVertices,
@@ -608,7 +617,17 @@ namespace SoftwareDevice
 		LPWORD lpwIndices,
 		DWORD dwIndexCount,
 		DWORD dwFlags)
-	{ return DDERR_UNSUPPORTED; }
+	{
+		int32_t scratch[2];
+		SoftwareRenderer::UnkFunc20(scratch);
+		if (SoftwareRenderer::g_viewportRect != NULL)
+		{
+			Nu3D::Viewport::ViewportRect* rect = SoftwareRenderer::g_viewportRect;
+			SoftwareRenderer::UnkFunc17((int32_t)rect->top, (int32_t)rect->bottom, (int32_t)rect->left, (int32_t)rect->right);
+		}
+		SoftwareRenderer::UnkFunc16(d3dptPrimitiveType, lpvVertices, lpwIndices, dwIndexCount, dwFlags);
+		return 0;
+	}
 
 	// Vertex Methods
 
