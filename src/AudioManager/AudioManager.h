@@ -2,6 +2,7 @@
 
 #include "Common.h"
 #include <windows.h>
+#include <mmsystem.h>
 
 namespace AudioManager
 {
@@ -52,4 +53,12 @@ namespace AudioManager
 	extern int32_t g_pendingStreamTrack;
 	extern int32_t g_pendingStreamNoFade;
 	extern int16_t g_loopingSoundChannels[32][5];
+
+	extern HGLOBAL g_waveFormatHandle;
+	extern HMMIO g_waveMmioHandle;
+
+	namespace Wave
+	{
+		int32_t CloseFile(HMMIO* hmmio, HGLOBAL* dataHandle);
+	}
 }

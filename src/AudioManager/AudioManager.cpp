@@ -91,6 +91,12 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x005282F0
 	void* g_dsPrimaryBuffer;
 
+	// GLOBAL: TOY2 0x005281D8
+	HGLOBAL g_waveFormatHandle;
+
+	// GLOBAL: TOY2 0x005281DC
+	HMMIO g_waveMmioHandle;
+
 	// GLOBAL: TOY2 0x004FD668
 	// clang-format off
 	int16_t g_dsVolTable[151] = {
@@ -381,4 +387,23 @@ namespace AudioManager
 
 	// STUB: TOY2 0x0047DE50
 	int32_t PlaySoundBuffer(int32_t soundIndex, int32_t leftVolume, int32_t rightVolume, int32_t pan, int32_t volume, int32_t flags) { return 0; }
+
+	namespace Wave
+	{
+		// FUNCTION: TOY2 0x004A4200
+		int32_t CloseFile(HMMIO* hmmio, HGLOBAL* dataHandle)
+		{
+			if (*dataHandle != NULL)
+			{
+				GlobalFree(*dataHandle);
+				*dataHandle = NULL;
+			}
+			if (*hmmio != NULL)
+			{
+				mmioClose(*hmmio, 0);
+				*hmmio = NULL;
+			}
+			return 0;
+		}
+	}
 }
