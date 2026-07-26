@@ -61,6 +61,44 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00B7FBB4
 	int32_t g_zoomExtentH;
 
+	// Float render-transform globals derived from the integer zoom/offset state
+	// by CommitZoom. The polygon pipeline applies them as a screen-space
+	// mapping (x' = spanScaleV*x + topOffsetF, y' = spanScaleH*y + leftOffsetF)
+	// with extent/dimension ratios as projection scales. The engine cross-wires
+	// the axes (the vertical span feeds the x scale); reproduced faithfully.
+	// GLOBAL: TOY2 0x00DBB084
+	float g_topOffsetF;
+
+	// GLOBAL: TOY2 0x00DE20B0
+	float g_leftOffsetF;
+
+	// GLOBAL: TOY2 0x00DFF580
+	float g_spanScaleV;
+
+	// GLOBAL: TOY2 0x00B626BC
+	float g_spanScaleH;
+
+	// GLOBAL: TOY2 0x00E4D7A8
+	float g_zoomScaleV;
+
+	// GLOBAL: TOY2 0x00B7FBA4
+	float g_zoomScaleH;
+
+	// Screen dimensions (set at boot by InitialisePrimarySurface). Used as the
+	// integer divisors for the zoom scales and as clipBottom+1 / clipRight+1.
+	// GLOBAL: TOY2 0x00DE20B4
+	int32_t g_screenDimV;
+
+	// GLOBAL: TOY2 0x00E4D7B0
+	int32_t g_screenDimH;
+
+	// .rdata span-scale constants: 1/320 and 1/220.
+	// GLOBAL: TOY2 0x004DDB48
+	extern const double k_vSpanScale = 1.0 / 320.0;
+
+	// GLOBAL: TOY2 0x004DDB40
+	extern const double k_hSpanScale = 1.0 / 220.0;
+
 	// GLOBAL: TOY2 0x00882910
 	int32_t g_bitsPerPixel;
 
@@ -131,8 +169,16 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x0047D0F0
 	void Destroy() {}
 
-	// STUB: TOY2 0x004C1E70
-	void CommitZoom() {}
+	// FUNCTION: TOY2 0x004C1E70
+	void CommitZoom()
+	{
+		g_topOffsetF = (float)g_topOffset;
+		g_leftOffsetF = (float)g_leftOffset;
+		g_spanScaleV = (float)((g_bottomOffset - g_topOffset) + 1) * k_vSpanScale;
+		g_spanScaleH = (float)((g_rightOffset - g_leftOffset) + 1) * k_hSpanScale;
+		g_zoomScaleV = (float)g_zoomExtentV / g_screenDimV;
+		g_zoomScaleH = (float)g_zoomExtentH / g_screenDimH;
+	}
 
 	// FUNCTION: TOY2 0x004C1FC0
 	void ZoomOut()

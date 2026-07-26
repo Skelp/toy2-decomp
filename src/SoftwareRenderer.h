@@ -34,6 +34,16 @@ namespace SoftwareRenderer
 	extern int32_t g_zoomExtentV;
 	extern int32_t g_zoomExtentH;
 	extern int32_t g_bitsPerPixel;
+	extern float g_topOffsetF;
+	extern float g_leftOffsetF;
+	extern float g_spanScaleV;
+	extern float g_spanScaleH;
+	extern float g_zoomScaleV;
+	extern float g_zoomScaleH;
+	extern int32_t g_screenDimV;
+	extern int32_t g_screenDimH;
+	extern const double k_vSpanScale;
+	extern const double k_hSpanScale;
 	extern uint8_t* g_currentRenderBuffer;
 	extern uint8_t* g_renderBufferPixels;
 	extern uint8_t g_renderBufferA[];
