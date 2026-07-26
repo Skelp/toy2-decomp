@@ -34,6 +34,8 @@ namespace SoftwareRenderer
 	void PresentFrame();
 	void SetCameraNearFarZ(float nearZ, float farZ);
 
+	int32_t GetStrideFromFVF(int32_t fvf);
+
 	void SubmitQuad(int32_t renderFlags, int32_t textureIndex, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices);
 	// SubmitSortedTriangle (0x004B5E40) bucket-sorts a transformed triangle into g_renderBuckets
 	// by depth. param field10/fieldC map to sorted-record +0x10/+0xc; SubmitQuad populates

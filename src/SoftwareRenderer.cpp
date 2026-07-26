@@ -55,6 +55,22 @@ namespace SoftwareRenderer
 		g_cameraFarZ = farZ;
 	}
 
+	// FUNCTION: TOY2 0x004B2B80
+	int32_t GetStrideFromFVF(int32_t fvf)
+	{
+		switch (fvf)
+		{
+			case 0x112:
+				return 0x20;
+			case 0x152:
+				return 0x24;
+			case 0x1c4:
+				return 0x20;
+			default:
+				return 0;
+		}
+	}
+
 	// STUB: TOY2 0x00452130
 	void SwapRenderBuffer() {}
 
@@ -118,6 +134,16 @@ namespace SoftwareRenderer
 
 namespace SoftwareDevice
 {
+	// A software vertex buffer is a malloc'd block: a 2-dword header (per-vertex
+	// stride and vertex count) followed by the vertex data. The public handle
+	// type is LPDIRECT3DVERTEXBUFFER; the software device casts it to this
+	// header to access the payload.
+	struct SoftwareVertexBuffer
+	{
+		int32_t stride;
+		int32_t count;
+	};
+
 	// Drawing Methods
 
 	// STUB: TOY2 0x004B9950
@@ -139,11 +165,35 @@ namespace SoftwareDevice
 	// STUB: TOY2 0x004B2B20
 	HRESULT ReleaseVertexBuffer(LPDIRECT3DVERTEXBUFFER buffer) { return DDERR_UNSUPPORTED; }
 
-	// STUB: TOY2 0x004B2B30
-	HRESULT CreateVertexBuffer(D3DVERTEXBUFFERDESC* desc, LPDIRECT3DVERTEXBUFFER* outBuffer, DWORD flags) { return DDERR_UNSUPPORTED; }
+	// FUNCTION: TOY2 0x004B2B30
+	HRESULT CreateVertexBuffer(D3DVERTEXBUFFERDESC* desc, LPDIRECT3DVERTEXBUFFER* outBuffer, DWORD flags)
+	{
+		int32_t count = (int32_t)desc->dwNumVertices;
+		int32_t stride = SoftwareRenderer::GetStrideFromFVF((int32_t)desc->dwFVF);
+		if (stride != 0)
+		{
+			SoftwareVertexBuffer* vb = (SoftwareVertexBuffer*)malloc(sizeof(SoftwareVertexBuffer) + stride * count);
+			if (vb != NULL)
+			{
+				vb->stride = stride;
+				vb->count = count;
+				*outBuffer = (LPDIRECT3DVERTEXBUFFER)vb;
+				return 0;
+			}
+			return E_OUTOFMEMORY;
+		}
+		return E_INVALIDARG;
+	}
 
-	// STUB: TOY2 0x004B2BB0
-	HRESULT LockVertexBuffer(LPDIRECT3DVERTEXBUFFER vertexBuffer, DWORD dwFlags, LPVOID* lplpData, DWORD* lpStride) { return DDERR_UNSUPPORTED; }
+	// FUNCTION: TOY2 0x004B2BB0
+	HRESULT LockVertexBuffer(LPDIRECT3DVERTEXBUFFER vertexBuffer, DWORD dwFlags, LPVOID* lplpData, DWORD* lpStride)
+	{
+		SoftwareVertexBuffer* vb = (SoftwareVertexBuffer*)vertexBuffer;
+		*lplpData = vb + 1;
+		if (lpStride != NULL)
+			*lpStride = vb->count * vb->stride;
+		return 0;
+	}
 
 	// FUNCTION: TOY2 0x004B2BD0 [MATCHED]
 	HRESULT UnlockVertexBuffer(LPDIRECT3DVERTEXBUFFER buffer) { return 0; }
