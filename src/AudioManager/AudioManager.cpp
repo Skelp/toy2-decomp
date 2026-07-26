@@ -142,6 +142,35 @@ namespace AudioManager
 		return 0;
 	}
 
+	// FUNCTION: TOY2 0x0047E4E0
+	int32_t WriteToBuffer(LPDIRECTSOUNDBUFFER buf, DWORD offset, const void* src, DWORD bytes)
+	{
+		void* audioPtr1;
+		DWORD audioBytes1;
+		void* audioPtr2;
+		DWORD audioBytes2;
+
+		HRESULT result = buf->Lock(offset, bytes, &audioPtr1, &audioBytes1, &audioPtr2, &audioBytes2, 0);
+		if (result == DSERR_BUFFERLOST)
+		{
+			buf->Restore();
+			result = buf->Lock(offset, bytes, &audioPtr1, &audioBytes1, &audioPtr2, &audioBytes2, 0);
+		}
+		if (result == DS_OK)
+		{
+			memcpy(audioPtr1, src, audioBytes1);
+			if (audioPtr2 != NULL)
+			{
+				memcpy(audioPtr2, (const BYTE*)src + audioBytes1, audioBytes2);
+			}
+			if (buf->Unlock(audioPtr1, audioBytes1, audioPtr2, audioBytes2) == DS_OK)
+			{
+				return 1;
+			}
+		}
+		return 0;
+	}
+
 	// FUNCTION: TOY2 0x0047E7D0 [MATCHED]
 	void ReleaseAllBuffers()
 	{

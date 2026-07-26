@@ -4,7 +4,7 @@
 #include <windows.h>
 #include <mmsystem.h>
 #ifndef DIRECTSOUND_VERSION
-#define DIRECTSOUND_VERSION 0x0600
+	#define DIRECTSOUND_VERSION 0x0600
 #endif
 #include <directx6/dsound.h>
 
@@ -25,6 +25,7 @@ namespace AudioManager
 	int32_t IsEffectPlaying(int32_t index);
 	void ReleaseAllBuffers();
 	int32_t CreateDirectSoundBuffer(LPDIRECTSOUND ds, LPDIRECTSOUNDBUFFER* outBuf, DWORD bufferBytes);
+	int32_t WriteToBuffer(LPDIRECTSOUNDBUFFER buf, DWORD offset, const void* src, DWORD bytes);
 	void ReleaseBuffers();
 	void Init();
 	void SetVolumesProcessed(int32_t musicVolume, int32_t sfxVolume);
