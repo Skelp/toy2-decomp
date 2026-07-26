@@ -139,4 +139,7 @@ namespace DevDraw
 	extern int32_t g_vertexCount;
 
 	int16_t DrawSlots();
+
+	void FlushDrawBufferSlot(int16_t slot);
+	void FlushTransparentDrawBufferSlot(int16_t slot);
 }

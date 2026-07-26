@@ -1735,6 +1735,40 @@ namespace DevDraw
 	// GLOBAL: TOY2 0x00732FBC
 	int32_t g_vertexCount;
 
-	// STUB: TOY2 0x004907E0
-	int16_t DrawSlots() { return 0; }
+	// FUNCTION: TOY2 0x004907E0
+	int16_t DrawSlots()
+	{
+		switch (D3DApp::g_renderMode)
+		{
+			case 1:
+				if (SoftwareRenderer::g_unk559C40 != 1 || (Renderer::g_frameDelta & 1) == 0)
+				{
+					SoftwareRenderer::UnkFunc8(SoftwareRenderer::g_unk839278, 0);
+				}
+				SoftwareRenderer::g_unk839280 = 0;
+				Nu3D::MemSet32Util(SoftwareRenderer::g_unk504D34, 0x1000, 0);
+				break;
+			case 2: {
+				int16_t i;
+				for (i = 0; i < 0x40; i++)
+				{
+					FlushDrawBufferSlot(i);
+				}
+				for (i = 0; i < 0x40; i++)
+				{
+					FlushTransparentDrawBufferSlot(i);
+				}
+				return 1;
+			}
+			default:
+				break;
+		}
+		return 1;
+	}
+
+	// STUB: TOY2 0x00490470
+	void FlushDrawBufferSlot(int16_t slot) {}
+
+	// STUB: TOY2 0x004905C0
+	void FlushTransparentDrawBufferSlot(int16_t slot) {}
 }

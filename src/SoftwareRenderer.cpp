@@ -16,6 +16,18 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00830C60
 	int32_t g_unk830C60;
 
+	// GLOBAL: TOY2 0x00559C40
+	int32_t g_unk559C40;
+
+	// GLOBAL: TOY2 0x00839278
+	void* g_unk839278;
+
+	// GLOBAL: TOY2 0x00504D34
+	void* g_unk504D34;
+
+	// GLOBAL: TOY2 0x00839280
+	int32_t g_unk839280;
+
 	// GLOBAL: TOY2 0x00E4D950
 	int32_t g_unkE4D950;
 
@@ -444,6 +456,9 @@ namespace SoftwareRenderer
 
 	// STUB: TOY2 0x00470C70
 	void UnkFunc7() {}
+
+	// STUB: TOY2 0x0047D210
+	void UnkFunc8(void* param1, int32_t param2) {}
 
 	// STUB: TOY2 0x004B5E40
 	void SubmitSortedTriangle(int32_t renderFlags, int32_t field10, int32_t fieldC, Nu3D::VertexTL* v0, Nu3D::VertexTL* v1, Nu3D::VertexTL* v2) {}
