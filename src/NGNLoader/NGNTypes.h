@@ -20,7 +20,7 @@ namespace NGNLoader
 	{
 		int32_t isBGR;
 		int32_t textureDataIndex;
-		int32_t unused1;
+		void* unused1;
 		int32_t unused2;
 	};
 
@@ -76,6 +76,7 @@ namespace NGNLoader
 		TextureEntry textureEntries[64];
 
 		static void Destroy(NGNImage* ngnImage);
+		static void DestroyPortal(Nu3D::Portal::AreaPortal* portal);
 	};
 
 	struct NGNTextureData

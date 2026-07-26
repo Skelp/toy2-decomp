@@ -15,8 +15,63 @@ namespace NGNLoader
 	// GLOBAL: TOY2 0x00B62410
 	NGNImage* g_ngnImage;
 
-	// STUB: TOY2 0x004C32B0
-	void NGNImage::Destroy(NGNImage* ngnImage) {}
+	// FUNCTION: TOY2 0x004B33A0
+	void NGNImage::DestroyPortal(Nu3D::Portal::AreaPortal* portal) { free(portal); }
+
+	// FUNCTION: TOY2 0x004C32B0
+	void NGNImage::Destroy(NGNImage* ngnImage)
+	{
+		if (ngnImage)
+		{
+			int32_t i;
+
+			for (i = 0; i < 64; i++)
+			{
+				if (ngnImage->textureEntries[i].unused1)
+					free(ngnImage->textureEntries[i].unused1);
+			}
+
+			if (ngnImage->creatureData)
+			{
+				for (i = 0; i < ngnImage->creatureCount; i++)
+				{
+					if (ngnImage->creatureData[i])
+						Nu3D::Creature::Destroy(ngnImage->creatureData[i]);
+				}
+				free(ngnImage->creatureData);
+			}
+
+			if (ngnImage->primitives)
+			{
+				for (i = 0; i < ngnImage->primCount; i++)
+					Nu3D::Primitive::Destroy(ngnImage->primitives[i]);
+				free(ngnImage->primitives);
+			}
+
+			for (i = 0; i < ngnImage->gscaleType; i++)
+			{
+				if (ngnImage->dynamicScalers[i])
+					free(ngnImage->dynamicScalers[i]);
+				if (ngnImage->spacialGrid[i])
+					free(ngnImage->spacialGrid[i]);
+			}
+
+			if (ngnImage->areaPortals)
+			{
+				for (i = 0; i < ngnImage->actualPortalCount; i++)
+					DestroyPortal(ngnImage->areaPortals[i]);
+				free(ngnImage->areaPortals);
+			}
+
+			if (ngnImage->links)
+				free(ngnImage->links);
+
+			if (ngnImage->portalHashTable)
+				DestroyPools(ngnImage);
+
+			free(ngnImage);
+		}
+	}
 
 	// GLOBAL: TOY2 0x009F6240
 	NGNTextureData g_textureDataFreeList[2000];
@@ -1446,6 +1501,9 @@ namespace NGNLoader
 
 namespace Nu3D
 {
+	// STUB: TOY2 0x004C9F50
+	void Creature::Destroy(Creature* creature) {}
+
 	// FUNCTION: TOY2 0x004CA0C0
 	void CopyNormalsFromNearestVertex(Creature* creature, int32_t nodeIndex, Vertex* vertex)
 	{

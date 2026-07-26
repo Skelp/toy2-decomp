@@ -22,6 +22,8 @@ namespace Nu3D
 		int32_t* nodeMetadata;
 		void** animData;
 		int32_t animCount;
+
+		static void Destroy(Creature* creature);
 	};
 
 	STATIC_ASSERT(sizeof(Creature) == 0x30);
