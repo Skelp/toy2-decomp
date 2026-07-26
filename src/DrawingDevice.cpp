@@ -859,11 +859,12 @@ namespace DrawingDevice
 		else
 			return Nu3D::SetTexture(0, 0);
 	}
-	// STUB: TOY2 0x004ABC40
-	void LockPrimarySurface(LPDDSURFACEDESC2 surfaceDesc) {}
+	// FUNCTION: TOY2 0x004ABC40
+	void LockPrimarySurface(LPDDSURFACEDESC2 surfaceDesc)
+	{ g_drawingDevice->m_pddsFrontBuffer->Lock(0, surfaceDesc, DDLOCK_WAIT | DDLOCK_WRITEONLY | DDLOCK_NOSYSLOCK, 0); }
 
-	// STUB: TOY2 0x004ABC60
-	void UnlockPrimarySurface() {}
+	// FUNCTION: TOY2 0x004ABC60
+	void UnlockPrimarySurface() { g_drawingDevice->m_pddsFrontBuffer->Unlock(0); }
 }
 
 namespace HardwareDevice
