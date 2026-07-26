@@ -1501,8 +1501,49 @@ namespace NGNLoader
 
 namespace Nu3D
 {
-	// STUB: TOY2 0x004C9F50
-	void Creature::Destroy(Creature* creature) {}
+	// FUNCTION: TOY2 0x004C9F50
+	void Creature::Destroy(Creature* creature)
+	{
+		if (creature->matrixList1)
+			free(creature->matrixList1);
+		if (creature->matrixList2)
+			free(creature->matrixList2);
+		if (creature->matrixList3)
+			free(creature->matrixList3);
+
+		int32_t i;
+
+		if (creature->nodeNames)
+		{
+			for (i = 0; i < creature->nodeCount; i++)
+				free(creature->nodeNames[i]);
+			free(creature->nodeNames);
+		}
+
+		if (creature->primitives)
+		{
+			for (i = 0; i < creature->nodeCount; i++)
+			{
+				if (creature->primitives[i])
+					Primitive::Destroy(creature->primitives[i]);
+			}
+		}
+
+		if (creature->animCount)
+		{
+			for (i = 0; i < creature->animCount; i++)
+				free(creature->animData[i]);
+			free(creature->animData);
+		}
+
+		if (creature->patch)
+			Patch::Destroy(creature->patch);
+
+		if (creature->flagsList)
+			free(creature->flagsList);
+
+		free(creature);
+	}
 
 	// FUNCTION: TOY2 0x004CA0C0
 	void CopyNormalsFromNearestVertex(Creature* creature, int32_t nodeIndex, Vertex* vertex)
