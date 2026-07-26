@@ -42,6 +42,7 @@ namespace AudioManager
 	void LoadSfxPackForLevel(int32_t levelId);
 	int32_t PlayOneShotSoundGlobal(int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume);
 	int32_t PlayOneShotSound3DActor(void* actor, int32_t soundIndex, int32_t frequency, int32_t volume, void* position, int32_t flag);
+	void ClearSequence7Cursor();
 	void PlayMusicOneShot(int32_t trackIndex);
 	void PlayMusicLooping(int16_t trackIndex);
 	int32_t PlayLoopingSound3D(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, int16_t rightVolume);

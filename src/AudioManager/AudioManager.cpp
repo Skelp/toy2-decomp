@@ -1,6 +1,7 @@
 #include "AudioManager/AudioManager.h"
 #include "FileUtils.h"
 #include "Logger.h"
+#include "Numerics.h"
 #include <cstring>
 #include <stdio.h>
 #include <directx6/dsound.h>
@@ -620,6 +621,24 @@ namespace AudioManager
 			PlayOneShotSound3DActor(actor, preset.soundIndex - 1, preset.frequency, preset.volume, actor, 1);
 		}
 	}
+
+	// A sound-sequence slot. The engine runs up to eight concurrent
+	// sequences. Each slot holds the listener position, a cursor into the
+	// sequence event data, and a countdown timer. ClearSequence7Cursor resets
+	// slot 7, the slot that StartSoundSequenceOnActor initializes.
+	struct SoundSequenceSlot
+	{
+		Vector3I position; // +0x00
+		uint8_t* cursor; // +0x0c
+		int16_t timer; // +0x10
+		int16_t reserved; // +0x12
+	};
+
+	// GLOBAL: TOY2 0x0052f120
+	SoundSequenceSlot g_soundSequenceSlots[8];
+
+	// FUNCTION: TOY2 0x0049E9C0 [MATCHED]
+	void ClearSequence7Cursor() { g_soundSequenceSlots[7].cursor = 0; }
 
 	// FUNCTION: TOY2 0x0047D7F0 [MATCHED]
 	void PlayMusicOneShot(int32_t trackIndex)
