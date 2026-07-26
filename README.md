@@ -1,27 +1,27 @@
 # Toy Story 2 PC decompilation
 
 This project reconstructs the Windows release of *Toy Story 2: Buzz Lightyear
-to the Rescue* as readable C++ and measures the result against the original
-executable. It is an incomplete research project, not a replacement for the
-game.
+to the Rescue* as readable C++. It measures the result against the original
+executable. It is an incomplete research project. It is not a replacement for
+the game.
 
-The repository does not contain the game or any extracted game assets. To run
-the comparison workflow, contributors must provide their own genuine copy of
-the supported `toy2.exe`:
+The repository does not contain the game or extracted game assets. To run the
+comparison workflow, contributors must provide their own genuine copy of the
+supported `toy2.exe`:
 
 ```text
 SHA-256  023eb6a9459443b34d24cf685591bfeb3b95e1acf579405f6d8fa4407ccbdaf0
 ```
 
-No disc image is needed to compile or compare the program. Running the
-recompiled game requires the files and registry configuration from a complete,
-legitimately owned installation; see the platform guides for safe runtime
-testing that does not replace the retail executable.
+A disc image is not needed to compile or compare the program. To run the
+recompiled game, you need the files and registry configuration from a
+complete, legitimately owned installation. See the platform guides for safe
+runtime testing that does not replace the retail executable.
 
 ## Quick start
 
-Clone the repository normally rather than downloading a source ZIP. The setup
-uses a historical SDK snapshot already present in the Git history.
+Clone the repository normally. Do not download a source ZIP. The setup uses a
+historical SDK snapshot already present in the Git history.
 
 ### Windows
 
@@ -62,7 +62,7 @@ See [the complete Linux guide](docs/linux-decomp.md).
 
 ## Daily commands
 
-Windows commands use `tools/decomp.ps1`; Linux commands use `tools/decomp`.
+Windows commands use `tools/decomp.ps1`. Linux commands use `tools/decomp`.
 Both expose the same workflow:
 
 | Command | Purpose |
@@ -71,27 +71,28 @@ Both expose the same workflow:
 | `compare` | Run detailed reccmp machine-code comparison |
 | `report` | Generate `build/decomp-report.html` |
 | `progress [namespace]` | Count source annotations against the function map |
-| `run` | Launch `build/toy2.exe`; requires an already configured runtime environment |
+| `run` | Launch `build/toy2.exe`. Requires an already configured runtime environment |
 | `shell` | Open a shell with the local compiler environment active |
 
-The report is a single offline HTML file with project/source treemaps,
-function filtering, accuracy distributions, and instruction-level diffs.
+The report is a single offline HTML file. It contains project and source
+treemaps, function filtering, accuracy distributions, and instruction-level
+diffs.
 
-On Linux, a reproducible bounded startup test against an owned installation is
-available separately:
+On Linux, you can run a separate reproducible bounded startup test against an
+owned installation:
 
 ```sh
 tools/smoke-test-linux.sh /path/to/installed-game
 ```
 
-It uses a temporary copy and restores the project-local Wine registry when it
-finishes. Game files and generated runtime output remain outside Git.
+The helper uses a temporary copy. It restores the project-local Wine registry
+when it finishes. Game files and generated runtime output stay outside Git.
 
 ## Toolchain identity
 
 The reference executable records Visual C++ 6 compiler build 8168 and Visual
-Studio 6 SP3 product build 8447 in its Rich header. Both platform setup scripts
-therefore use:
+Studio 6 SP3 product build 8447 in its Rich header. Both platform setup
+scripts use:
 
 - `CL.EXE` 12.00.8168 and `LINK.EXE` 6.00.8168
 - Visual Studio 6 SP3 build 8447 headers and libraries
@@ -100,10 +101,10 @@ therefore use:
 - reccmp 0.1.6 in a repository-local Python environment
 
 All downloaded or reconstructed dependencies live in ignored directories.
-Ghidra is useful for analysis but is not installed or configured by setup.
+Ghidra is useful for analysis. Setup does not install or configure it.
 
 ## Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before sending changes. In particular,
-never commit game executables, disc images, extracted installations, SDK output,
-PDB files, or generated comparison reports.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before you send changes. Do not commit
+game executables, disc images, extracted installations, SDK output, PDB files,
+or generated comparison reports.
