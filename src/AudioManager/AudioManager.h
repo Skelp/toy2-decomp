@@ -41,7 +41,9 @@ namespace AudioManager
 	extern HANDLE g_streamCommandEvent;
 	extern HANDLE g_streamAckEvent;
 	extern int32_t g_streamActive;
+	extern int32_t g_streamFadeMode;
 	extern int32_t g_streamCommand;
+	extern char g_streamPath[512];
 
 	extern int32_t g_pendingStreamTrack;
 	extern int32_t g_pendingStreamNoFade;

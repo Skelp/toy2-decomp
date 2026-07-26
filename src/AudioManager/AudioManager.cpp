@@ -67,8 +67,14 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x005282FC
 	int32_t g_streamActive;
 
+	// GLOBAL: TOY2 0x0053C844
+	int32_t g_streamFadeMode;
+
 	// GLOBAL: TOY2 0x0053C848
 	int32_t g_streamCommand;
+
+	// GLOBAL: TOY2 0x0053C84C
+	char g_streamPath[512];
 
 	// GLOBAL: TOY2 0x00725E94
 	int32_t g_pendingStreamTrack;
@@ -322,8 +328,18 @@ namespace AudioManager
 		"titlescr",
 		"levcomp" };
 
-	// STUB: TOY2 0x00436CE0
-	void QueuePlay(char* path, int32_t fadeMode) {}
+	// FUNCTION: TOY2 0x00436CE0
+	void QueuePlay(char* path, int32_t fadeMode)
+	{
+		if (g_streamCommandEvent != NULL)
+		{
+			strcpy(g_streamPath, path);
+			g_streamCommand = 2;
+			g_streamFadeMode = fadeMode;
+			SetEvent(g_streamCommandEvent);
+			WaitForSingleObject(g_streamAckEvent, INFINITE);
+		}
+	}
 
 	// FUNCTION: TOY2 0x00413150
 	int32_t PlayTrackByIndex(int32_t trackIndex, int32_t fadeMode)
