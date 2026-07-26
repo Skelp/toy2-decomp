@@ -68,6 +68,13 @@ namespace SoftwareRenderer
 	// horizontal scale maps left/right through the screen width.
 	extern const double k_viewportScaleV;
 	extern const double k_viewportScaleH;
+	// Scales the per-triangle minimum vertex z into the 1024-entry depth bucket
+	// range used by SubmitSortedTriangle: depthKey = minZ * k_depthSortScale,
+	// bucket = (int32_t) depthKey & 0x3ff.
+	extern const float k_depthSortScale;
+	// Gate read by SubmitSortedTriangle; when nonzero, triangle submission is
+	// skipped. No writer has been located yet (likely zero for the retail path).
+	extern int32_t g_unk9F6010;
 	extern void* g_softwareRendererBuffer;
 	extern LPVOID g_primarySurfacePtr;
 	extern int32_t g_primarySurfacePitch;

@@ -195,6 +195,14 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x004DDAD8
 	extern const double k_viewportScaleH = 1.9;
 
+	// .rdata depth-sort scale: 1023.0 (= 1024 - 1). SubmitSortedTriangle maps
+	// the triangle's minimum vertex z into the 1024-entry bucket range.
+	// GLOBAL: TOY2 0x004DDAC4
+	extern const float k_depthSortScale = 1023.0f;
+
+	// GLOBAL: TOY2 0x009F6010
+	int32_t g_unk9F6010;
+
 	// Heap buffer allocated by InitSoftwareRenderer (malloc'd, ~1.25MB) and
 	// released by Destroy on shutdown.
 	// GLOBAL: TOY2 0x0084CBE0
@@ -719,8 +727,73 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x0047D210
 	void UnkFunc8(void* param1, int32_t param2) {}
 
-	// STUB: TOY2 0x004B5E40
-	void SubmitSortedTriangle(int32_t renderFlags, int32_t field10, int32_t fieldC, Nu3D::VertexTL* v0, Nu3D::VertexTL* v1, Nu3D::VertexTL* v2) {}
+	// Queues a transformed triangle for sorted (back-to-front) transparency
+	// rasterization. Claims a slot from Renderer::g_primitiveBuffer, copies the
+	// three transformed vertices and the per-call flags, derives the depth key
+	// as the minimum vertex z scaled into the 1024-entry bucket range, and
+	// inserts the slot into the Renderer::g_renderBuckets[depthKey & 0x3ff]
+	// singly-linked list kept in descending depthKey order so the drain pass
+	// renders farthest triangles first.
+	//
+	// The two early-out guards are written as separate sequential returns
+	// (not a single &&) so the callee-saved register pushes are deferred past
+	// them, matching retail (FIX-14). The depth key uses a MIN macro with no
+	// intermediate local so MSVC keeps the candidate on the FPU stack and
+	// recomputes the inner min in the else branch (FIX-14); the inline nested
+	// ternary lowers to FCOMP-from-memory instead of retail's FLD/FCOMPP. The
+	// for(;;) walk lowers to retail's single-body rotated loop, and the
+	// splice/set-head if/else shares the record->next store rather than an
+	// early return (an early return forces eager callee-saved pushes).
+#define NU_FMIN(a, b) ((a) < (b) ? (a) : (b))
+	// FUNCTION: TOY2 0x004B5E40 [MATCHED]
+	void SubmitSortedTriangle(int32_t renderFlags, int32_t field10, int32_t fieldC, Nu3D::VertexTL* v0, Nu3D::VertexTL* v1, Nu3D::VertexTL* v2)
+	{
+		if (g_unk9F6010 != 0)
+		{
+			return;
+		}
+		if (Renderer::g_primitiveBufferFreeCount == 0)
+		{
+			return;
+		}
+
+		Renderer::g_primitiveBufferFreeCount--;
+		Renderer::SortedPrimitive* record = &Renderer::g_primitiveBuffer[Renderer::g_primitiveBufferFreeCount];
+		record->renderFlags = renderFlags;
+		record->field10 = field10;
+		record->fieldC = fieldC;
+		record->v0 = *v0;
+		record->v1 = *v1;
+		record->v2 = *v2;
+		float depthKey = NU_FMIN(record->v0.position.z, NU_FMIN(record->v1.position.z, record->v2.position.z)) * k_depthSortScale;
+		record->depthKey = depthKey;
+		int32_t bucket = (int32_t)depthKey & 0x3ff;
+		Renderer::SortedPrimitive* node = (Renderer::SortedPrimitive*)Renderer::g_renderBuckets[bucket];
+		Renderer::SortedPrimitive* prev = NULL;
+		for (;;)
+		{
+			if (node == NULL)
+			{
+				break;
+			}
+			if (node->depthKey <= depthKey)
+			{
+				break;
+			}
+			prev = node;
+			node = node->next;
+		}
+		if (prev != NULL)
+		{
+			prev->next = record;
+		}
+		else
+		{
+			Renderer::g_renderBuckets[bucket] = record;
+		}
+		record->next = node;
+	}
+#undef NU_FMIN
 
 	// FUNCTION: TOY2 0x004B6220 [MATCHED]
 	void SubmitQuad(int32_t renderFlags, int32_t textureIndex, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices)

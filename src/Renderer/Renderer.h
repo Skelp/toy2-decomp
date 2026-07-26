@@ -133,6 +133,32 @@ namespace Renderer
 	void DrawSingleTexturedTriangle(Nu3D::VertexTL* vertices, int32_t texIndex, int32_t renderFlags);
 
 	STATIC_ASSERT(sizeof(RenderEntry) == 0x18);
+
+	// A transformed triangle queued for sorted (back-to-front) transparency
+	// rasterization. SubmitSortedTriangle fills a slot from g_primitiveBuffer,
+	// computes depthKey = min(v0.z, v1.z, v2.z) * k_depthSortScale, and inserts
+	// the slot into the g_renderBuckets[depthKey & 0x3ff] linked list kept in
+	// descending depthKey order. The +0x04 field is not written by
+	// SubmitSortedTriangle; its role is pending reconstruction of the bucket
+	// drain path.
+	struct SortedPrimitive
+	{
+		SortedPrimitive* next;
+		int32_t unk04;
+		int32_t renderFlags;
+		int32_t fieldC;
+		int32_t field10;
+		Nu3D::VertexTL v0;
+		Nu3D::VertexTL v1;
+		Nu3D::VertexTL v2;
+		float depthKey;
+	};
+
+	extern int32_t g_primitiveBufferFreeCount;
+	extern void* g_renderBuckets[1024];
+	extern SortedPrimitive g_primitiveBuffer[3000];
+
+	STATIC_ASSERT(sizeof(SortedPrimitive) == 0x78);
 }
 
 namespace DevDraw

@@ -97,6 +97,9 @@ namespace Renderer
 	// GLOBAL: TOY2 0x0095B860
 	void* g_renderBuckets[1024];
 
+	// GLOBAL: TOY2 0x008F7E90
+	SortedPrimitive g_primitiveBuffer[3000];
+
 	// FUNCTION: TOY2 0x004B92B0 [MATCHED]
 	int32_t SetAdditionalRenderFlags(int32_t flags)
 	{
