@@ -616,8 +616,146 @@ namespace SoftwareRenderer
 		CommitZoom();
 	}
 
-	// STUB: TOY2 0x004C17B0
-	void PresentFrame() {}
+	// FUNCTION: TOY2 0x004C17B0
+	void PresentFrame()
+	{
+		DDSURFACEDESC2 surfaceDesc;
+		surfaceDesc.dwSize = sizeof(surfaceDesc);
+		if (g_backBuffer == NULL)
+		{
+			return;
+		}
+
+		DrawingDevice::LockPrimarySurface(&surfaceDesc);
+
+		uint8_t* primarySurface = (uint8_t*)g_primarySurfacePtr;
+		uint8_t* backBuffer = (uint8_t*)g_backBuffer;
+		uint32_t* backRow = (uint32_t*)backBuffer;
+		uint32_t rowDwordCount = (uint32_t)g_screenDimV >> 1;
+		uint32_t topDwords = rowDwordCount;
+		do
+		{
+			*backRow++ = 0;
+			topDwords--;
+		} while (topDwords != 0);
+
+		uint8_t* backBorderRow = backBuffer;
+		int32_t middleRows = g_screenDimH - 1;
+		do
+		{
+			uint16_t* backPixel = (uint16_t*)backBorderRow;
+			backPixel[0] = 0;
+			backPixel[g_screenDimV - 1] = 0;
+			backBorderRow += g_primarySurfacePitch;
+			middleRows--;
+		} while (middleRows != 0);
+
+		backRow = (uint32_t*)backBorderRow;
+		uint32_t bottomDwords = rowDwordCount;
+		do
+		{
+			*backRow++ = 0;
+			bottomDwords--;
+		} while (bottomDwords != 0);
+
+		int32_t bufferOffset = g_primarySurfacePitch * g_leftOffset + g_topOffset * sizeof(uint16_t);
+		uint8_t* primaryRow = primarySurface + bufferOffset;
+		uint8_t* backBufferRow = backBuffer + bufferOffset;
+		uint32_t visibleDwordCount = (uint32_t)(g_bottomOffset - g_topOffset + 1) >> 1;
+		int32_t visibleRows = g_rightOffset - g_leftOffset + 1;
+		do
+		{
+			uint32_t* primaryPixel = (uint32_t*)primaryRow;
+			uint32_t* backPixelPair = (uint32_t*)backBufferRow;
+			uint32_t visibleDwords = visibleDwordCount;
+			do
+			{
+				*primaryPixel++ = *backPixelPair;
+				*backPixelPair++ = (uint32_t)g_softwareClearColor;
+				visibleDwords--;
+			} while (visibleDwords != 0);
+			primaryRow += g_primarySurfacePitch;
+			backBufferRow += g_primarySurfacePitch;
+			visibleRows--;
+		} while (visibleRows != 0);
+
+		primaryRow = primarySurface;
+		backBufferRow = backBuffer;
+		int32_t topMarginRows = g_leftOffset;
+		if (topMarginRows != 0)
+		{
+			do
+			{
+				uint32_t* primaryPixel = (uint32_t*)primaryRow;
+				uint32_t* backPixelPair = (uint32_t*)backBufferRow;
+				uint32_t topMarginDwords = rowDwordCount;
+				do
+				{
+					*primaryPixel++ = *backPixelPair;
+					*backPixelPair++ = 0x00100010;
+					topMarginDwords--;
+				} while (topMarginDwords != 0);
+				primaryRow += g_primarySurfacePitch;
+				backBufferRow += g_primarySurfacePitch;
+				topMarginRows--;
+			} while (topMarginRows != 0);
+		}
+
+		bufferOffset = (g_rightOffset + 1) * g_primarySurfacePitch;
+		primaryRow = primarySurface + bufferOffset;
+		backBufferRow = backBuffer + bufferOffset;
+		int32_t bottomMarginRows = g_leftOffset;
+		if (bottomMarginRows != 0)
+		{
+			do
+			{
+				uint32_t* primaryPixel = (uint32_t*)primaryRow;
+				uint32_t* backPixelPair = (uint32_t*)backBufferRow;
+				uint32_t bottomMarginDwords = rowDwordCount;
+				do
+				{
+					*primaryPixel++ = *backPixelPair;
+					*backPixelPair++ = 0x00100010;
+					bottomMarginDwords--;
+				} while (bottomMarginDwords != 0);
+				primaryRow += g_primarySurfacePitch;
+				backBufferRow += g_primarySurfacePitch;
+				bottomMarginRows--;
+			} while (bottomMarginRows != 0);
+		}
+
+		primaryRow = primarySurface + g_primarySurfacePitch * g_leftOffset;
+		backBufferRow = backBuffer + g_primarySurfacePitch * g_leftOffset;
+		if (g_topOffset != 0)
+		{
+			uint32_t marginDwordCount = (uint32_t)g_topOffset >> 1;
+			int32_t rightMarginOffset = g_bottomOffset * sizeof(uint16_t);
+			int32_t marginRows = g_rightOffset - g_leftOffset + 1;
+			do
+			{
+				uint32_t* primaryPixel = (uint32_t*)primaryRow;
+				uint32_t* backPixelPair = (uint32_t*)backBufferRow;
+				uint32_t* primaryRightPixel = (uint32_t*)(primaryRow + rightMarginOffset);
+				uint32_t* backRightPixel = (uint32_t*)(backBufferRow + rightMarginOffset);
+				uint32_t marginDwords = marginDwordCount;
+				do
+				{
+					*primaryPixel = *backPixelPair;
+					*backPixelPair = 0x00100010;
+					*primaryRightPixel++ = *backRightPixel;
+					*backRightPixel++ = 0x00100010;
+					primaryPixel++;
+					backPixelPair++;
+					marginDwords--;
+				} while (marginDwords != 0);
+				primaryRow += g_primarySurfacePitch;
+				backBufferRow += g_primarySurfacePitch;
+				marginRows--;
+			} while (marginRows != 0);
+		}
+
+		DrawingDevice::UnlockPrimarySurface();
+	}
 
 	// FUNCTION: TOY2 0x00490410
 	void UnkFunc67(int32_t x, int32_t y)
