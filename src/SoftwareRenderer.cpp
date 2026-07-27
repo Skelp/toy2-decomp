@@ -827,6 +827,46 @@ namespace SoftwareRenderer
 		}
 	}
 
+	// Submits a triangle strip (indexCount-2 triangles) for sorted transparency
+	// rasterization. Locks the vertex buffer, emits the first triangle from
+	// indices[0..2], then walks the remaining indices keeping a rolling triple of
+	// the last three indices (a,b,c) and flipping the vertex order on odd
+	// iterations to preserve strip winding. Forwards fieldC=0/field10 to
+	// SubmitSortedTriangle (same slot assignment as SubmitTriangleList, opposite
+	// to SubmitQuad). Residual ~3% is CAP-17: MSVC hoists the loop-invariant
+	// `remaining = indexCount - 3` init as `LEA EBX,[edx-3]` with an early count
+	// load, where retail loads count into EBX late and SUBtracts in place.
+	// FUNCTION: TOY2 0x004B6040
+	void SubmitTriangleStrip(int32_t renderFlags, LPDIRECT3DVERTEXBUFFER vertexBuffer, int32_t field10, WORD* indices, int32_t indexCount)
+	{
+		Nu3D::VertexTL* lockedVertices;
+		if (DrawingAPI::LockVertexBuffer(vertexBuffer, 0x801, (LPVOID*)&lockedVertices, 0) == 0)
+		{
+			WORD* p = indices;
+			uint32_t a = *p++;
+			uint32_t b = *p++;
+			uint32_t c = *p++;
+			int32_t remaining = indexCount - 3;
+			SubmitSortedTriangle(renderFlags, field10, 0, &lockedVertices[a], &lockedVertices[b], &lockedVertices[c]);
+			while (remaining != 0)
+			{
+				a = b;
+				b = c;
+				remaining--;
+				c = *p++;
+				if (remaining & 1)
+				{
+					SubmitSortedTriangle(renderFlags, field10, 0, &lockedVertices[a], &lockedVertices[b], &lockedVertices[c]);
+				}
+				else
+				{
+					SubmitSortedTriangle(renderFlags, field10, 0, &lockedVertices[c], &lockedVertices[b], &lockedVertices[a]);
+				}
+			}
+			DrawingAPI::UnlockVertexBuffer(vertexBuffer);
+		}
+	}
+
 	// FUNCTION: TOY2 0x004B6220 [MATCHED]
 	void SubmitQuad(int32_t renderFlags, int32_t textureIndex, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices)
 	{
