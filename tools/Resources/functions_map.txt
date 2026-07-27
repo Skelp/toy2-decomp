@@ -983,7 +983,7 @@
 0x004C1540 SoftwareRenderer::UnkFunc21
 0x004C1720 SoftwareRenderer::UnkFunc16
 0x004C17B0 SoftwareRenderer::PresentFrame
-0x004C19E0 SoftwareRenderer::ProcessVerticesOnBuffer
+0x004C19E0 SoftwareDevice::ProcessVerticesOnBuffer
 0x004C1C20 SoftwareRenderer::SetCameraNearFarZ
 0x004C1C40 SoftwareRenderer::InitialiseColourScaleTables
 0x004C1E60 SoftwareRenderer::InitialisePrimarySurface_T

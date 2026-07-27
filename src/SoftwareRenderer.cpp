@@ -6,6 +6,7 @@
 #include "Toy2/D3DApp.h"
 #include "Nu3D/BmpDataNode.h"
 #include "Nu3D/Camera.h"
+#include "Nu3D/Math.h"
 #include "Logger.h"
 #include <stdlib.h>
 #include <math.h>
@@ -199,6 +200,9 @@ namespace SoftwareRenderer
 
 	// GLOBAL: TOY2 0x00DFF580
 	float g_spanScaleV;
+
+	// GLOBAL: TOY2 0x00DFF5A0
+	Nu3D::VertexTL g_processedVertices[10000];
 
 	// GLOBAL: TOY2 0x00B626BC
 	float g_spanScaleH;
@@ -3159,7 +3163,7 @@ namespace SoftwareDevice
 	// FUNCTION: TOY2 0x004B2BE0 [MATCHED]
 	HRESULT OptimizeVertexBuffer(LPDIRECT3DVERTEXBUFFER buffer, LPDIRECT3DDEVICE3 device, DWORD flags) { return 0; }
 
-	// STUB: TOY2 0x004C19E0
+	// FUNCTION: TOY2 0x004C19E0
 	HRESULT ProcessVerticesOnBuffer(LPDIRECT3DVERTEXBUFFER destBuffer,
 		DWORD dwVertexOp,
 		DWORD dwDestIndex,
@@ -3167,5 +3171,62 @@ namespace SoftwareDevice
 		LPDIRECT3DVERTEXBUFFER srcBuffer,
 		DWORD dwSrcIndex,
 		DWORD dwFlags)
-	{ return DDERR_UNSUPPORTED; }
+	{
+		float halfScreenV = (float)(SoftwareRenderer::g_screenDimV * 0.5);
+		float halfScreenH = (float)(SoftwareRenderer::g_screenDimH * 0.5);
+		SoftwareRenderer::UnkFunc18(&SoftwareRenderer::g_primaryRenderDistance, &SoftwareRenderer::g_secondaryRenderDistance);
+
+		Nu3D::Vertex* sourceVertices;
+		DWORD bufferSize;
+		DrawingAPI::LockVertexBuffer(srcBuffer, 0x11, (LPVOID*)&sourceVertices, &bufferSize);
+		sourceVertices += dwSrcIndex;
+
+		D3DMATRIX worldViewMatrix;
+		Nu3D::Math::MultiplyMatrix3x4(&worldViewMatrix, DrawingDevice::g_currentWorldTransform, DrawingDevice::g_currentViewTransform);
+
+		Nu3D::VertexTL* processedVertex = SoftwareRenderer::g_processedVertices;
+		if (dwCount > 0)
+		{
+			DWORD remaining = dwCount;
+			do
+			{
+				Vector3F sourcePosition = sourceVertices->position;
+				Vector3F transformedPosition;
+				Nu3D::Math::TransformPointByMatrix(&transformedPosition, &sourcePosition, &worldViewMatrix);
+
+				if (transformedPosition.z > 0.0)
+				{
+					processedVertex->position.x = (float)(SoftwareRenderer::g_screenDimV / 2)
+						+ transformedPosition.x * halfScreenV / (transformedPosition.z + 1.0f) * SoftwareRenderer::g_zoomScaleV
+							* (float)SoftwareRenderer::k_viewportScaleV;
+					processedVertex->position.y = (float)(SoftwareRenderer::g_screenDimH / 2)
+						- transformedPosition.y * halfScreenH / (transformedPosition.z + 1.0f) * SoftwareRenderer::g_zoomScaleH
+							* (float)SoftwareRenderer::k_viewportScaleH;
+				}
+				else
+				{
+					processedVertex->position.x = transformedPosition.x;
+					processedVertex->position.y = transformedPosition.y;
+				}
+
+				processedVertex->position.z = transformedPosition.z;
+				processedVertex->specular.value = (uint32_t)(int32_t)halfScreenH;
+				processedVertex->rhw = -transformedPosition.y;
+				processedVertex->diffuse = sourceVertices->diffuse;
+				processedVertex->uv = sourceVertices->coords;
+
+				sourceVertices++;
+				processedVertex++;
+				remaining--;
+			} while (remaining != 0);
+		}
+
+		DrawingAPI::UnlockVertexBuffer(srcBuffer);
+
+		DrawingAPI::LockVertexBuffer(destBuffer, 0x21, (LPVOID*)&processedVertex, &bufferSize);
+		processedVertex += dwDestIndex;
+		memcpy(processedVertex, SoftwareRenderer::g_processedVertices, dwCount * sizeof(Nu3D::VertexTL));
+		DrawingAPI::UnlockVertexBuffer(destBuffer);
+		return 0;
+	}
 }
