@@ -20,6 +20,15 @@ namespace SoftwareRenderer
 	extern int32_t g_unk839280;
 	extern int32_t g_unkE4D950;
 	extern int32_t g_unk9F6008;
+
+	// The software renderer's DirectDraw palette and backing entry buffers.
+	// SetPaletteOnAPI (0x00470BF0) creates the palette from g_paletteEntries and
+	// attaches it to the front/back buffers; UnkFunc7 (0x00470C70) rebuilds the
+	// live entries by tinting g_paletteSource by the camera tint, then SetEntries.
+	// The palette is stored B,G,R,X per entry (byte 0 = blue, 1 = green, 2 = red).
+	extern LPDIRECTDRAWPALETTE g_lpPalette;
+	extern uint8_t g_paletteEntries[0x400];
+	extern uint8_t g_paletteSource[0x400];
 	extern Nu3D::Viewport::ViewportRect* g_viewportRect;
 	extern int32_t g_softwareClearColor;
 	extern int32_t g_leftOffset;
