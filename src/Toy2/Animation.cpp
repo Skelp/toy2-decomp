@@ -10,6 +10,22 @@ namespace Toy2
 {
 	namespace Animation
 	{
+		struct CharacterAnimationData
+		{
+			uint8_t reserved[4];
+			int16_t baseBoneIndex;
+		};
+
+		struct AnimationActor
+		{
+			Vector3I position;
+			int16_t pitchAngle;
+			int16_t yawAngle;
+			int16_t rollAngle;
+			int16_t primaryAnimIndex;
+			int16_t creatureId;
+		};
+
 		// GLOBAL: TOY2 0x00B1C3C0
 		Vector3F g_nodeAngles[64][32];
 
@@ -230,7 +246,22 @@ namespace Toy2
 			g_singleNodeIndex = -1;
 		}
 
-		// STUB: TOY2 0x0043C0E0
-		void TransformByBone(Vector3I* position, void* actor, int32_t boneIndex) {}
+		// FUNCTION: TOY2 0x0043C0E0
+		void TransformByBone(Vector3I* position, void* actor, int32_t boneIndex)
+		{
+			AnimationActor* animationActor = (AnimationActor*)actor;
+			CharacterAnimationData* animationData = (CharacterAnimationData*)CharacterLoader::g_unk547CD4[animationActor->creatureId];
+			CharacterLoader::BoneTransform* transform = &CharacterLoader::g_boneTransforms[animationData->baseBoneIndex + boneIndex];
+			int32_t x = position->x;
+			int32_t y = position->y;
+			int32_t z = position->z;
+			Vector3I transformed;
+			transformed.x = (transform->rotation.m00 * x + transform->rotation.m01 * y + transform->rotation.m02 * z) / 4096;
+			transformed.y = (transform->rotation.m10 * x + transform->rotation.m11 * y + transform->rotation.m12 * z) / 4096;
+			transformed.z = (transform->rotation.m20 * x + transform->rotation.m21 * y + transform->rotation.m22 * z) / 4096;
+			position->x = transform->translation.x + transformed.x;
+			position->y = transform->translation.y + transformed.y;
+			position->z = transform->translation.z + transformed.z;
+		}
 	}
 }
