@@ -1779,16 +1779,11 @@ namespace DevDraw
 		return 1;
 	}
 
-	// Flushes one slot of the indexed draw buffer: binds the slot's texture,
-	// issues an indexed triangle-list DrawIndexedPrimitive, accumulates the
-	// vertex count, and resets the slot's vertex and index counts. The texture
-	// name is built as "LOADTEXT_texXX" where XX is the zero-padded slot index.
-	//
-	// g_unk500A10 holds parallel per-slot arrays: a vertex-data pointer array
-	// (stride 4 at +0x0), a vertex-count array (stride 2 at +0x104), an index
-	// buffer block (stride 2000 at +0x186), and an index-count array (stride
-	// 2 at +0x1fd56). The full object layout is not yet reconstructed, so the
-	// accesses use byte offsets on the pointer.
+	// Flushes one slot of the opaque indexed draw buffer: binds the slot's
+	// texture, issues an indexed triangle-list DrawIndexedPrimitive,
+	// accumulates the vertex count, and resets the slot's vertex and index
+	// counts. The texture name is built as "LOADTEXT_texXX" where XX is the
+	// zero-padded slot index.
 	//
 	// The slot parameter stays in a 16-bit register (for the current-slot word
 	// store) while a sign-extended copy drives the array indexing. The draw
@@ -1803,7 +1798,7 @@ namespace DevDraw
 		LPDIRECT3DDEVICE3 d3dDevice = DrawingDevice::GetD3DDevice();
 		int32_t slotIndex = slot;
 
-		if (((int16_t*)((char*)Toy2::g_unk500A10 + 0x104))[slotIndex] != 0)
+		if (Toy2::g_drawBuffer->VerticeCount[slotIndex] != 0)
 		{
 			char textureName[15] = "LOADTEXT_tex00";
 			textureName[12] = (char)('0' + slotIndex / 10);
@@ -1814,10 +1809,10 @@ namespace DevDraw
 
 			HRESULT error = d3dDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST,
 				D3DFVF_0x1C4,
-				((void**)Toy2::g_unk500A10)[slotIndex],
-				((int16_t*)((char*)Toy2::g_unk500A10 + 0x104))[slotIndex],
-				(LPWORD)((char*)Toy2::g_unk500A10 + slotIndex * 2000 + 0x186),
-				((int16_t*)((char*)Toy2::g_unk500A10 + 0x1fd56))[slotIndex],
+				Toy2::g_drawBuffer->Vertice[slotIndex],
+				Toy2::g_drawBuffer->VerticeCount[slotIndex],
+				Toy2::g_drawBuffer->Index[slotIndex],
+				Toy2::g_drawBuffer->IndexCount[slotIndex],
 				8);
 
 			if (error < 0)
@@ -1829,11 +1824,11 @@ namespace DevDraw
 			}
 
 			Toy2::g_currentDrawSlot = slot;
-			g_vertexCount += ((int16_t*)((char*)Toy2::g_unk500A10 + 0x104))[slotIndex];
+			g_vertexCount += Toy2::g_drawBuffer->VerticeCount[slotIndex];
 		}
 
-		((int16_t*)((char*)Toy2::g_unk500A10 + 0x1fd56))[slotIndex] = 0;
-		((int16_t*)((char*)Toy2::g_unk500A10 + 0x104))[slotIndex] = 0;
+		Toy2::g_drawBuffer->IndexCount[slotIndex] = 0;
+		Toy2::g_drawBuffer->VerticeCount[slotIndex] = 0;
 
 		return 1;
 	}
@@ -1844,14 +1839,8 @@ namespace DevDraw
 	// slot's vertex and index counts. The texture name is built as
 	// "LOADTEXT_texXX" where XX is the zero-padded slot index.
 	//
-	// g_unk500A14 holds the transparent draw buffer, a parallel per-slot
-	// array layout matching the opaque buffer (g_unk500A10) but with larger
-	// per-slot index storage: vertex-data pointer (stride 4 at +0x0), vertex
-	// count (stride 2 at +0x104), index buffer (stride 12000 at +0x186), and
-	// index count (stride 2 at +0x5dd86). Only slots 0..31 are valid (the
-	// transparent pool is half the opaque pool's 64 slots). The full object
-	// layout is not yet reconstructed, so the accesses use byte offsets on the
-	// pointer.
+	// Only slots 0..31 are valid (the transparent pool is half the opaque
+	// pool's 64 slots).
 	//
 	// The slot parameter stays in a 16-bit register (BX) while a sign-extended
 	// copy (slotIndex) drives the array indexing. The draw buffer pointer is
@@ -1868,7 +1857,7 @@ namespace DevDraw
 		{
 			int32_t slotIndex = slot;
 
-			if (((int16_t*)((char*)Toy2::g_unk500A14 + 0x104))[slotIndex] != 0)
+			if (Toy2::g_transparentDrawBuffer->VerticeCount[slotIndex] != 0)
 			{
 				char textureName[15] = "LOADTEXT_tex00";
 				textureName[12] = (char)('0' + slotIndex / 10);
@@ -1879,10 +1868,10 @@ namespace DevDraw
 
 				HRESULT error = d3dDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST,
 					D3DFVF_0x1C4,
-					((void**)Toy2::g_unk500A14)[slotIndex],
-					((int16_t*)((char*)Toy2::g_unk500A14 + 0x104))[slotIndex],
-					(LPWORD)((char*)Toy2::g_unk500A14 + slotIndex * 12000 + 0x186),
-					((int16_t*)((char*)Toy2::g_unk500A14 + 0x5dd86))[slotIndex],
+					Toy2::g_transparentDrawBuffer->Vertice[slotIndex],
+					Toy2::g_transparentDrawBuffer->VerticeCount[slotIndex],
+					Toy2::g_transparentDrawBuffer->Index[slotIndex],
+					Toy2::g_transparentDrawBuffer->IndexCount[slotIndex],
 					8);
 
 				if (error < 0)
@@ -1894,15 +1883,16 @@ namespace DevDraw
 				}
 
 				Toy2::g_currentDrawSlot = slot;
-				g_vertexCount += ((int16_t*)((char*)Toy2::g_unk500A14 + 0x104))[slotIndex];
+				g_vertexCount += Toy2::g_transparentDrawBuffer->VerticeCount[slotIndex];
 			}
 		}
 
 		Renderer::InitRenderState(0);
 
-		((int16_t*)((char*)Toy2::g_unk500A14 + 0x5dd86))[slot] = 0;
-		((int16_t*)((char*)Toy2::g_unk500A14 + 0x104))[slot] = 0;
+		Toy2::g_transparentDrawBuffer->IndexCount[slot] = 0;
+		Toy2::g_transparentDrawBuffer->VerticeCount[slot] = 0;
 
 		return 1;
 	}
+
 }

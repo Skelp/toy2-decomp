@@ -7,6 +7,7 @@
 #include "ModeSelect.h"
 #include "Nullsub.h"
 #include "SoftwareRenderer.h"
+#include "Renderer/Renderer.h"
 #include "SaveManager.h"
 #include "Random.h"
 #include "Toy2/LevelSelect.h"
@@ -83,10 +84,10 @@ namespace Toy2
 	int32_t g_destRectHeightCopy;
 
 	// GLOBAL: TOY2 0x00500A10
-	void* g_unk500A10;
+	DevDraw::DrawBuffer* g_drawBuffer;
 
 	// GLOBAL: TOY2 0x00500A14
-	void* g_unk500A14;
+	DevDraw::TransparentDrawBuffer* g_transparentDrawBuffer;
 
 	// GLOBAL: TOY2 0x00500A28
 	int16_t g_currentDrawSlot;
@@ -1398,12 +1399,14 @@ namespace Toy2
 	// rectangle. Computes the dest width and height, derives several scaled
 	// half-width / fixed-point variants used by the rasterizer, resets a few
 	// frame-local flags, points SoftwareRenderer::g_unk504D34 at the shared
-	// draw buffer, zeros a word field in the object at g_unk500A10, and
-	// stamps the frame start time. Called on the hardware (D3D) render path
-	// (g_renderMode == 2); the software path uses InitSoftwareRenderer.
+	// draw buffer, zeros a word field in the DevDraw::DrawBuffer allocation
+	// at +0x9fdd8, and stamps the frame start time. Called on the hardware
+	// (D3D) render path (g_renderMode == 2); the software path uses
+	// InitSoftwareRenderer.
 	//
-	// g_unk500A10 points to a large object whose field at +0x9fdd8 (a word)
-	// is reset each frame; its full layout is not yet reconstructed.
+	// The field at +0x9fdd8 is beyond the DrawBuffer slot arrays (which end
+	// at +0x1FDD8); it is a separate field in the same allocation, not yet
+	// modeled.
 	//
 	// The halfWidth/halfHeight locals and the store interleaving (width store
 	// before the height field-loads; width-1 before height-1) reproduce
@@ -1439,7 +1442,9 @@ namespace Toy2
 		SoftwareRenderer::g_unk504D34 = (void*)&SoftwareRenderer::g_unk87E50C;
 		SoftwareRenderer::g_unk839278 = (void*)0x3ff;
 
-		*(int16_t*)((char*)g_unk500A10 + 0x9fdd8) = 0;
+		// The field at +0x9fdd8 is beyond the DrawBuffer slot array region.
+		// It is a separate field in the same allocation.
+		*(int16_t*)((char*)g_drawBuffer + 0x9fdd8) = 0;
 
 		g_unk731CBC = timeGetTime();
 

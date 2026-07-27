@@ -166,6 +166,38 @@ namespace DevDraw
 {
 	extern int32_t g_vertexCount;
 
+	// Opaque indexed draw buffer. Stores per-slot vertex-pointer, vertex-count,
+	// index, and index-count arrays for the main (opaque) geometry pass. The
+	// retail binary names the instance `drawb`.
+	//
+	// Layout confirmed by the arithmetic in FlushDrawBufferSlot:
+	//   Vertice[65] at +0x000, VerticeCount[65] at +0x104,
+	//   Index[65][1000] at +0x186, IndexCount[65] at +0x1FD56.
+	//   Total size 0x1FDD8.
+	struct DrawBuffer
+	{
+		void* Vertice[65];
+		int16_t VerticeCount[65];
+		WORD Index[65][1000];
+		int16_t IndexCount[65];
+	};
+
+	// Transparent indexed draw buffer. Same layout as DrawBuffer for the vertex
+	// arrays but with a larger index block (6000 WORD per slot) and only 32
+	// index slots. The retail binary names the instance `drawtranb`.
+	//
+	// Layout confirmed by the arithmetic in FlushTransparentDrawBufferSlot:
+	//   Vertice[65] at +0x000, VerticeCount[65] at +0x104,
+	//   Index[32][6000] at +0x186, IndexCount[32] at +0x5DD86.
+	//   Total size 0x5DDC6.
+	struct TransparentDrawBuffer
+	{
+		void* Vertice[65];
+		int16_t VerticeCount[65];
+		WORD Index[32][6000];
+		int16_t IndexCount[32];
+	};
+
 	int16_t DrawSlots();
 
 	int16_t FlushDrawBufferSlot(int16_t slot);
