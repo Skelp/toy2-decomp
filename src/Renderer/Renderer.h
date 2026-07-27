@@ -64,7 +64,11 @@ namespace Renderer
 		RenderEntry* next;
 		Renderer::RenderType type;
 		float distanceSquared;
-		Nu3D::Primitive* primitive;
+		union
+		{
+			Nu3D::Primitive* primitive;
+			Nu3D::Patch* patch;
+		};
 		Nu3D::InstanceData* instanceData;
 		Nu3D::Material* material;
 
@@ -88,6 +92,8 @@ namespace Renderer
 	extern int32_t g_boundTextureIndices[8];
 	extern Nu3D::Material* g_boundMaterial;
 	extern int32_t g_additionalRenderFlags;
+	extern float g_materialHorzOffset;
+	extern float g_materialVertOffset;
 	extern float g_primaryRenderDistanceSquared;
 	extern float g_secondaryRenderDistanceSquared;
 	extern LPDIRECT3DDEVICE3 g_drawDeviceD3DDevice;
@@ -151,7 +157,7 @@ namespace Renderer
 		int32_t reserved;
 		int32_t renderFlags;
 		int32_t textureIndex;
-		int32_t primitiveGroup;
+		RenderEntry* renderEntry;
 		Nu3D::VertexTL v0;
 		Nu3D::VertexTL v1;
 		Nu3D::VertexTL v2;

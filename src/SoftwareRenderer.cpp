@@ -2897,7 +2897,8 @@ namespace SoftwareRenderer
 	// early return (an early return forces eager callee-saved pushes).
 #define NU_FMIN(a, b) ((a) < (b) ? (a) : (b))
 	// FUNCTION: TOY2 0x004B5E40 [MATCHED]
-	void SubmitSortedTriangle(int32_t renderFlags, int32_t primitiveGroup, int32_t textureIndex, Nu3D::VertexTL* v0, Nu3D::VertexTL* v1, Nu3D::VertexTL* v2)
+	void SubmitSortedTriangle(
+		int32_t renderFlags, Renderer::RenderEntry* renderEntry, int32_t textureIndex, Nu3D::VertexTL* v0, Nu3D::VertexTL* v1, Nu3D::VertexTL* v2)
 	{
 		if (g_unk9F6010 != 0)
 		{
@@ -2911,7 +2912,7 @@ namespace SoftwareRenderer
 		Renderer::g_primitiveBufferFreeCount--;
 		Renderer::SortedPrimitive* record = &Renderer::g_primitiveBuffer[Renderer::g_primitiveBufferFreeCount];
 		record->renderFlags = renderFlags;
-		record->primitiveGroup = primitiveGroup;
+		record->renderEntry = renderEntry;
 		record->textureIndex = textureIndex;
 		record->v0 = *v0;
 		record->v1 = *v1;
@@ -2950,8 +2951,8 @@ namespace SoftwareRenderer
 	// transparency rasterization. Locks the vertex buffer, walks the index list
 	// back-to-front in groups of three, and forwards each triangle to
 	// SubmitSortedTriangle with textureIndex=0 (SubmitQuad instead passes textureIndex=
-	// textureIndex/primitiveGroup=0; the two submitter families populate the sorted
-	// record's primitiveGroup/textureIndex pair in opposite slots). The index buffer is read
+	// texture index and no render entry. The indexed submitters retain the render entry
+	// and use texture index zero. The index buffer is read
 	// via a pointer centered on the middle index of each triple so the three
 	// vertex pointers come from p[-1], p[0], p[1] as p walks backward. The
 	// count guard is written as an explicit if around a do-while so the pointer
@@ -2959,7 +2960,7 @@ namespace SoftwareRenderer
 	// retail's callee-saved register scheduling; a plain while hoists the
 	// pointer init before the guard.
 	// FUNCTION: TOY2 0x004B5FB0 [MATCHED]
-	void SubmitTriangleList(int32_t renderFlags, LPDIRECT3DVERTEXBUFFER vertexBuffer, int32_t primitiveGroup, WORD* indices, int32_t indexCount)
+	void SubmitTriangleList(int32_t renderFlags, LPDIRECT3DVERTEXBUFFER vertexBuffer, Renderer::RenderEntry* renderEntry, WORD* indices, int32_t indexCount)
 	{
 		Nu3D::VertexTL* lockedVertices;
 		if (DrawingAPI::LockVertexBuffer(vertexBuffer, 0x801, (LPVOID*)&lockedVertices, 0) == 0)
@@ -2971,7 +2972,7 @@ namespace SoftwareRenderer
 				{
 					p -= 3;
 					indexCount -= 3;
-					SubmitSortedTriangle(renderFlags, primitiveGroup, 0, &lockedVertices[p[-1]], &lockedVertices[p[0]], &lockedVertices[p[1]]);
+					SubmitSortedTriangle(renderFlags, renderEntry, 0, &lockedVertices[p[-1]], &lockedVertices[p[0]], &lockedVertices[p[1]]);
 				} while (indexCount != 0);
 			}
 			DrawingAPI::UnlockVertexBuffer(vertexBuffer);
@@ -2982,13 +2983,13 @@ namespace SoftwareRenderer
 	// rasterization. Locks the vertex buffer, emits the first triangle from
 	// indices[0..2], then walks the remaining indices keeping a rolling triple of
 	// the last three indices (a,b,c) and flipping the vertex order on odd
-	// iterations to preserve strip winding. Forwards textureIndex=0/primitiveGroup to
+	// iterations to preserve strip winding. It forwards texture index zero and the render entry to
 	// SubmitSortedTriangle (same slot assignment as SubmitTriangleList, opposite
 	// to SubmitQuad). Residual ~3% is CAP-17: MSVC hoists the loop-invariant
 	// `remaining = indexCount - 3` init as `LEA EBX,[edx-3]` with an early count
 	// load, where retail loads count into EBX late and SUBtracts in place.
 	// FUNCTION: TOY2 0x004B6040
-	void SubmitTriangleStrip(int32_t renderFlags, LPDIRECT3DVERTEXBUFFER vertexBuffer, int32_t primitiveGroup, WORD* indices, int32_t indexCount)
+	void SubmitTriangleStrip(int32_t renderFlags, LPDIRECT3DVERTEXBUFFER vertexBuffer, Renderer::RenderEntry* renderEntry, WORD* indices, int32_t indexCount)
 	{
 		Nu3D::VertexTL* lockedVertices;
 		if (DrawingAPI::LockVertexBuffer(vertexBuffer, 0x801, (LPVOID*)&lockedVertices, 0) == 0)
@@ -2998,7 +2999,7 @@ namespace SoftwareRenderer
 			uint32_t b = *p++;
 			uint32_t c = *p++;
 			int32_t remaining = indexCount - 3;
-			SubmitSortedTriangle(renderFlags, primitiveGroup, 0, &lockedVertices[a], &lockedVertices[b], &lockedVertices[c]);
+			SubmitSortedTriangle(renderFlags, renderEntry, 0, &lockedVertices[a], &lockedVertices[b], &lockedVertices[c]);
 			while (remaining != 0)
 			{
 				a = b;
@@ -3007,11 +3008,11 @@ namespace SoftwareRenderer
 				c = *p++;
 				if (remaining & 1)
 				{
-					SubmitSortedTriangle(renderFlags, primitiveGroup, 0, &lockedVertices[a], &lockedVertices[b], &lockedVertices[c]);
+					SubmitSortedTriangle(renderFlags, renderEntry, 0, &lockedVertices[a], &lockedVertices[b], &lockedVertices[c]);
 				}
 				else
 				{
-					SubmitSortedTriangle(renderFlags, primitiveGroup, 0, &lockedVertices[c], &lockedVertices[b], &lockedVertices[a]);
+					SubmitSortedTriangle(renderFlags, renderEntry, 0, &lockedVertices[c], &lockedVertices[b], &lockedVertices[a]);
 				}
 			}
 			DrawingAPI::UnlockVertexBuffer(vertexBuffer);
@@ -3021,20 +3022,20 @@ namespace SoftwareRenderer
 	// Submits a triangle strip (indexCount-2 triangles) for sorted transparency
 	// rasterization using an already-locked vertex buffer. The caller (RenderType8)
 	// locks the vertex buffer and passes the locked base pointer directly, so this
-	// variant performs no Lock/Unlock. Same strip logic and textureIndex=0/primitiveGroup slot
+	// variant performs no Lock/Unlock. It uses the same strip logic, render entry, and zero texture-index
 	// assignment as SubmitTriangleStrip: emit the first triangle from
 	// indices[0..2], then walk the remaining indices keeping a rolling triple
 	// (a,b,c) and flipping the vertex order on odd iterations to preserve strip
 	// winding.
 	// FUNCTION: TOY2 0x004B6140 [MATCHED]
-	void SubmitTriangleStripRaw(int32_t renderFlags, Nu3D::VertexTL* lockedVertices, int32_t primitiveGroup, WORD* indices, int32_t indexCount)
+	void SubmitTriangleStripRaw(int32_t renderFlags, Nu3D::VertexTL* lockedVertices, Renderer::RenderEntry* renderEntry, WORD* indices, int32_t indexCount)
 	{
 		WORD* p = indices;
 		uint32_t a = *p++;
 		uint32_t b = *p++;
 		uint32_t c = *p++;
 		indexCount -= 3;
-		SubmitSortedTriangle(renderFlags, primitiveGroup, 0, &lockedVertices[a], &lockedVertices[b], &lockedVertices[c]);
+		SubmitSortedTriangle(renderFlags, renderEntry, 0, &lockedVertices[a], &lockedVertices[b], &lockedVertices[c]);
 		while (indexCount != 0)
 		{
 			a = b;
@@ -3043,11 +3044,11 @@ namespace SoftwareRenderer
 			c = *p++;
 			if (indexCount & 1)
 			{
-				SubmitSortedTriangle(renderFlags, primitiveGroup, 0, &lockedVertices[a], &lockedVertices[b], &lockedVertices[c]);
+				SubmitSortedTriangle(renderFlags, renderEntry, 0, &lockedVertices[a], &lockedVertices[b], &lockedVertices[c]);
 			}
 			else
 			{
-				SubmitSortedTriangle(renderFlags, primitiveGroup, 0, &lockedVertices[c], &lockedVertices[b], &lockedVertices[a]);
+				SubmitSortedTriangle(renderFlags, renderEntry, 0, &lockedVertices[c], &lockedVertices[b], &lockedVertices[a]);
 			}
 		}
 	}
@@ -3058,8 +3059,8 @@ namespace SoftwareRenderer
 		Nu3D::VertexTL* lockedVertices;
 		if (DrawingAPI::LockVertexBuffer(vertexBuffer, 0x801, (LPVOID*)&lockedVertices, 0) == 0)
 		{
-			SubmitSortedTriangle(renderFlags, 0, textureIndex, &lockedVertices[indices[0]], &lockedVertices[indices[1]], &lockedVertices[indices[2]]);
-			SubmitSortedTriangle(renderFlags, 0, textureIndex, &lockedVertices[2], &lockedVertices[indices[1]], &lockedVertices[indices[3]]);
+			SubmitSortedTriangle(renderFlags, NULL, textureIndex, &lockedVertices[indices[0]], &lockedVertices[indices[1]], &lockedVertices[indices[2]]);
+			SubmitSortedTriangle(renderFlags, NULL, textureIndex, &lockedVertices[2], &lockedVertices[indices[1]], &lockedVertices[indices[3]]);
 			DrawingAPI::UnlockVertexBuffer(vertexBuffer);
 		}
 	}

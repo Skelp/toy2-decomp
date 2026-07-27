@@ -1,6 +1,7 @@
 #include "Renderer/Sprite.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/SpriteSheets.h"
+#include "Renderer/Vertices.h"
 #include "Nu3D/Sprite.h"
 #include "Nu3D/Camera.h"
 #include "Nu3D/Math.h"
@@ -53,6 +54,19 @@ namespace Renderer
 
 		// GLOBAL: TOY2 0x005087E4
 		WORD g_lineSpriteIndices[2] = { 0, 1 };
+
+		// GLOBAL: TOY2 0x00508734
+		WORD g_patchQuadIndices[4] = { 0, 1, 2, 3 };
+
+		// GLOBAL: TOY2 0x0050873C
+		// clang-format off
+		WORD g_patchStripIndices[64] = {
+			0, 32, 1, 33, 2, 34, 3, 35, 4, 36, 5, 37, 6, 38, 7, 39,
+			8, 40, 9, 41, 10, 42, 11, 43, 12, 44, 13, 45, 14, 46, 15, 47,
+			16, 48, 17, 49, 18, 50, 19, 51, 20, 52, 21, 53, 22, 54, 23, 55,
+			24, 56, 25, 57, 26, 58, 27, 59, 28, 60, 29, 61, 30, 62, 31, 63
+		};
+		// clang-format on
 
 		// FUNCTION: TOY2 0x004B68B0
 		HRESULT Render2DSprite(Nu3D::Sprite* sprite)
@@ -792,8 +806,99 @@ namespace Renderer
 			g_spriteBuffer2DCount = 2000;
 		}
 
-		// STUB: TOY2 0x004B6C10
-		void RenderType8(Nu3D::Material* material, Renderer::RenderEntry* entry) {}
+		// FUNCTION: TOY2 0x004B6C10
+		void RenderType8(Nu3D::Material* material, Renderer::RenderEntry* entry)
+		{
+			D3DMATRIX* transforms = entry->instanceData->matrices;
+			Nu3D::InstanceData* instanceData = entry->instanceData;
+
+			SoftwareRenderer::g_softwarePrimitiveType = instanceData->unkInt6;
+
+			int32_t renderFlags = instanceData->renderFlags;
+			int32_t metadata = material->metadata;
+			if (metadata & 1)
+				renderFlags |= 0xC00;
+			if (metadata & 0x10)
+				renderFlags |= 0x4800;
+			if (metadata & 0x20)
+				renderFlags |= 0x20800;
+			if (metadata & 0x200)
+				renderFlags |= 0x100800;
+			if (metadata & 0x400)
+				renderFlags |= 0x200800;
+			if (metadata & 0x800)
+				renderFlags |= 0x400800;
+
+			Nu3D::Patch* patch = entry->patch;
+			renderFlags |= patch->renderFlags;
+			if (metadata & 8)
+				renderFlags = (renderFlags & ~0x30) | RENDER_CULL_NONE;
+
+			int32_t projectTexture = material == NGNLoader::g_tex14Materials[0] || material == NGNLoader::g_tex14Materials[1]
+				|| material == NGNLoader::g_tex14Materials[2];
+			if (projectTexture)
+				renderFlags &= ~0x180;
+
+			Renderer::InitRenderState(renderFlags);
+
+			LPDIRECT3DVERTEXBUFFER sourceBuffer = patch->patchVertices.vertexBuffer;
+			LPDIRECT3DVERTEXBUFFER destBuffer = g_FVF_14C_Buffer_2.vertexBuffer;
+			if (sourceBuffer != 0 && destBuffer != 0)
+			{
+				DWORD vertexOp = 1;
+				if ((instanceData->renderModeFlags & 1) != 0)
+					vertexOp = 0x401;
+				HRESULT result;
+				WORD* indices;
+
+				if (patch->controlPointCount != 4)
+				{
+					int32_t halfVertexCount = patch->patchVertices.vertexCount / 2;
+					DrawingDevice::SetWorldTransform(&transforms[0]);
+					DrawingAPI::ProcessVerticesOnBuffer(destBuffer, vertexOp, 0, halfVertexCount, sourceBuffer, 0, 0);
+					DrawingDevice::SetWorldTransform(&transforms[1]);
+					result = DrawingAPI::ProcessVerticesOnBuffer(destBuffer, vertexOp, 32, halfVertexCount, sourceBuffer, halfVertexCount, 0);
+					indices = g_patchStripIndices;
+				}
+				else
+				{
+					DrawingDevice::SetWorldTransform(&transforms[0]);
+					result = DrawingAPI::ProcessVerticesOnBuffer(destBuffer, vertexOp, 0, 1, sourceBuffer, 0, 0);
+					DrawingDevice::SetWorldTransform(&transforms[1]);
+					result |= DrawingAPI::ProcessVerticesOnBuffer(destBuffer, vertexOp, 1, 1, sourceBuffer, 1, 0);
+					DrawingDevice::SetWorldTransform(&transforms[2]);
+					result |= DrawingAPI::ProcessVerticesOnBuffer(destBuffer, vertexOp, 2, 1, sourceBuffer, 2, 0);
+					DrawingDevice::SetWorldTransform(&transforms[3]);
+					result |= DrawingAPI::ProcessVerticesOnBuffer(destBuffer, vertexOp, 3, 1, sourceBuffer, 3, 0);
+					indices = g_patchQuadIndices;
+				}
+
+				if (result == 0)
+				{
+					if (projectTexture)
+						Renderer::Vertices::ProjectToScreen(&patch->patchVertices, transforms, patch->controlPointCount);
+
+					if (g_materialHorzOffset != 0.0f || g_materialVertOffset != 0.0f)
+						Renderer::Vertices::ApplyOffset(&patch->patchVertices, g_materialHorzOffset, g_materialVertOffset);
+
+					SoftwareRenderer::g_viewportRect = &instanceData->clipRect;
+					Nu3D::VertexTL* lockedVertices;
+					if (DrawingAPI::LockVertexBuffer(destBuffer, 0x801, (LPVOID*)&lockedVertices, 0) == 0)
+					{
+						if (g_drawingTransparentBuckets != 0)
+						{
+							SoftwareRenderer::SubmitTriangleStripRaw(renderFlags, lockedVertices, entry, indices, patch->patchVertices.vertexCount);
+						}
+						else
+						{
+							DrawingAPI::DrawIndexedPrimitive(
+								D3DPT_TRIANGLESTRIP, D3DFVF_0x1C4, lockedVertices, 64, indices, patch->patchVertices.vertexCount, 8);
+						}
+						DrawingAPI::UnlockVertexBuffer(destBuffer);
+					}
+				}
+			}
+		}
 
 		// STUB: TOY2 0x004B70E0
 		void RenderType9(Nu3D::Material* material, Renderer::RenderEntry* entry) {}
