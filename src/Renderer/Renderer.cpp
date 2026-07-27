@@ -1069,6 +1069,38 @@ namespace Renderer
 		}
 	}
 
+	// STUB: TOY2 0x004AFD30
+	void BlitBitmapWithWrapping(
+		Nu3D::BmpDataNode* bitmap, int32_t sourceX, int32_t sourceY, int32_t width, int32_t height, int32_t wrapX, int32_t wrapY, int32_t destX, int32_t destY)
+	{}
+
+	// FUNCTION: TOY2 0x004CE510
+	void BlitTextureByIndex(
+		uint32_t textureIndex, int32_t destX, int32_t destY, int32_t width, int32_t height, int32_t wrapX, int32_t wrapY, int32_t sourceX, int32_t sourceY)
+	{
+		if ((Toy2::g_toyCfgData.flags & 4) != 0)
+		{
+			uint32_t textureDataIndex = NGNLoader::GetTextureDataIndex(textureIndex);
+			if (textureDataIndex != 0)
+			{
+				NGNLoader::NGNTextureData* textureData = NGNLoader::GetTextureDataByIndex(textureDataIndex);
+				BlitBitmapWithWrapping(textureData->bmpDataNode, sourceX, sourceY, width, height, wrapX, wrapY, destX, destY);
+			}
+		}
+	}
+
+	// FUNCTION: TOY2 0x0049B260
+	void BlitTextureByIndexOffset(uint32_t textureIndex,
+		int32_t destX,
+		int32_t destY,
+		int32_t width,
+		int32_t height,
+		int32_t wrapX,
+		int32_t wrapY,
+		int32_t sourceOffsetX,
+		int32_t sourceOffsetY)
+	{ BlitTextureByIndex(textureIndex, destX, destY, width, height, wrapX, wrapY, destX + sourceOffsetX, destY + sourceOffsetY); }
+
 	// FUNCTION: TOY2 0x00401B60
 	void DrawBlackBorderBox(int32_t xPos, int32_t yPos, int32_t width, int32_t height, uint32_t red, uint32_t green, uint32_t blue)
 	{

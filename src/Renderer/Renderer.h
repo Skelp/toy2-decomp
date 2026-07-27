@@ -12,6 +12,7 @@
 
 namespace Nu3D
 {
+	struct BmpDataNode;
 	struct Primitive;
 	struct Material;
 	struct InstanceData;
@@ -129,6 +130,19 @@ namespace Renderer
 	int32_t BeginScene();
 	void EndScene(int32_t presentFrame);
 	void ShowBlackFrames();
+	void BlitBitmapWithWrapping(
+		Nu3D::BmpDataNode* bitmap, int32_t sourceX, int32_t sourceY, int32_t width, int32_t height, int32_t wrapX, int32_t wrapY, int32_t destX, int32_t destY);
+	void BlitTextureByIndex(
+		uint32_t textureIndex, int32_t destX, int32_t destY, int32_t width, int32_t height, int32_t wrapX, int32_t wrapY, int32_t sourceX, int32_t sourceY);
+	void BlitTextureByIndexOffset(uint32_t textureIndex,
+		int32_t destX,
+		int32_t destY,
+		int32_t width,
+		int32_t height,
+		int32_t wrapX,
+		int32_t wrapY,
+		int32_t sourceOffsetX,
+		int32_t sourceOffsetY);
 
 	// Render Methods
 	void DrawMainMenuText(int16_t yPos, char* text, int32_t fadeAlpha);
