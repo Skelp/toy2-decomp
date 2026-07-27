@@ -8,6 +8,7 @@
 #include "Nullsub.h"
 #include "SoftwareRenderer.h"
 #include "Renderer/Renderer.h"
+#include "Renderer/Sprite.h"
 #include "SaveManager.h"
 #include "Random.h"
 #include "Toy2/LevelSelect.h"
@@ -403,8 +404,70 @@ namespace Toy2
 		g_levelFileIndex = prevLevelFileIdx;
 	}
 
-	// STUB: TOY2 0x00453D90
-	void ShowActClearScreen() {}
+	// STUB: TOY2 0x004500A0
+	void LoadLevelGraphics(int32_t levelFileIndex) {}
+
+	// FUNCTION: TOY2 0x00453D90 [MATCHED]
+	void ShowActClearScreen()
+	{
+		int32_t previousLevelFileIndex = g_levelFileIndex;
+		g_levelFileIndex += 32;
+		Renderer::g_virtualScreenWidth = 320.0f;
+		Renderer::g_virtualScreenHeight = 256.0f;
+		LoadLevelGraphics(g_levelFileIndex);
+		SoftwareRenderer::g_unk4F7400.x = 0;
+		SoftwareRenderer::g_unk4F7400.y = 0;
+		Nu3D::Camera::SetTint(128, 128, 128, 12);
+		int32_t fadeTimer = 28;
+		AudioManager::PlayMusicOneShot(21);
+
+		do
+		{
+			fadeTimer -= Renderer::g_frameDelta;
+			if (fadeTimer <= 0)
+				fadeTimer = 0;
+			Nu3D::Camera::FadeToTargetTint();
+			MainMenu::RenderMenu();
+		} while (fadeTimer != 0);
+
+		int32_t isFadingOut = 0;
+		int32_t blinkTimer = 0;
+		SoftwareRenderer::g_unk4F7400.x = 0;
+		SoftwareRenderer::g_unk4F7400.y = 0;
+		fadeTimer = 28;
+		do
+		{
+			Nu3D::Camera::FadeToTargetTint();
+			if (isFadingOut)
+			{
+				fadeTimer -= Renderer::g_frameDelta;
+				if (fadeTimer <= 0)
+					fadeTimer = 0;
+			}
+
+			if ((InputManager::g_curButtonsPressed & INPUT_JUMP) != 0 && (InputManager::g_prevButtonsPressed & INPUT_JUMP) == 0 && ! isFadingOut)
+			{
+				Nu3D::Camera::SetTint(0, 0, 0, 12);
+				isFadingOut = 1;
+				AudioManager::PlaySoundEffect(7, 0);
+			}
+
+			blinkTimer = (blinkTimer + Renderer::g_frameDelta) & 0x3f;
+			if (blinkTimer > 30)
+				Renderer::Sprite::DrawScaled(96, 200, 128, 0, 255, 255, 255, 255, 2048, 2048);
+			MainMenu::RenderMenu();
+		} while (fadeTimer != 0);
+
+		AudioManager::StopAndWait();
+		g_hasStaticBackdrop = 0;
+		SoftwareRenderer::g_unk4F7400.x = -32768;
+		SoftwareRenderer::g_unk4F7400.y = -32768;
+		Renderer::g_virtualScreenWidth = 512.0f;
+		Renderer::g_virtualScreenHeight = 256.0f;
+		g_nextBackdropId = 36;
+		g_saveMenuState = 1;
+		g_levelFileIndex = previousLevelFileIndex;
+	}
 
 	// FUNCTION: TOY2 0x0049EB50
 	int32_t ComputeTokenProgress()

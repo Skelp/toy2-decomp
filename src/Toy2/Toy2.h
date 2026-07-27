@@ -5,6 +5,7 @@
 
 namespace Toy2
 {
+	void LoadLevelGraphics(int32_t levelFileIndex);
 	struct ToyCfg
 	{
 		uint32_t flags;

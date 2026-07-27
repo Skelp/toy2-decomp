@@ -47,6 +47,7 @@ namespace AudioManager
 	void StartSoundSequenceOnActor(int32_t sequenceId, Vector3I* position);
 	BOOL CALLBACK Enumerate(LPGUID lpGuid, LPCSTR lpcstrDescription, LPCSTR lpcstrModule, LPVOID lpContext);
 	void PlayMusicOneShot(int32_t trackIndex);
+	void PlaySoundEffect(int32_t soundIndex, int32_t flags);
 	void PlayMusicLooping(int16_t trackIndex);
 	int32_t PlayLoopingSound3D(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, int16_t rightVolume);
 	int32_t PlayLoopingSound3DPositional(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, void* unused, int32_t rightVolume);
