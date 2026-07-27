@@ -666,8 +666,48 @@ namespace Nu3D
 		return (clipDY2 & clipDY1 & clipDX2 & clipDX1) & 0x80000000;
 	}
 
-	// STUB: TOY2 0x004B46B0
-	int32_t Font::DrawScaledGlyph(char c) { return 0; }
+	// FUNCTION: TOY2 0x004B46B0 [MATCHED]
+	int32_t Font::DrawScaledGlyph(char c)
+	{
+		LPDIRECT3DDEVICE3 device = DrawingDevice::GetD3DDevice();
+		if (g_currentFont && g_currentFontTexIndex && device)
+		{
+			Font* font = g_currentFont;
+			GlyphInfo* glyph = &font->glyphs[font->charToGlyphIndex[(uint8_t)c]];
+
+			float scaledWidth = (float)glyph->width * g_fontScaleX;
+			float scaledHeight = (float)glyph->height * g_fontScaleY;
+			float yTop = (float)g_textCursorY - g_scaledFontAscent;
+
+			g_textVertices[0].position.x = (float)(g_textCursorOffsetX + g_textCursorX);
+			g_textVertices[0].position.y = yTop;
+			g_textVertices[0].uv.x = glyph->uvMinX;
+			g_textVertices[0].uv.y = glyph->uvMinY;
+
+			g_textVertices[1].position.x = (float)(g_textCursorOffsetX + g_textCursorX - 1) + scaledWidth;
+			g_textVertices[1].position.y = yTop;
+			g_textVertices[1].uv.x = glyph->uvMaxX;
+			g_textVertices[1].uv.y = glyph->uvMinY;
+
+			g_textVertices[2].position.x = (float)(g_textCursorX - 1) + scaledWidth;
+			g_textVertices[2].position.y = yTop - 1.0f + scaledHeight;
+			g_textVertices[2].uv.x = glyph->uvMaxX;
+			g_textVertices[2].uv.y = glyph->uvMaxY;
+
+			g_textVertices[3].position = g_textVertices[0].position;
+			g_textVertices[3].uv = g_textVertices[0].uv;
+			g_textVertices[4] = g_textVertices[2];
+			g_textVertices[5].position.x = (float)g_textCursorX;
+			g_textVertices[5].position.y = g_textVertices[2].position.y;
+			g_textVertices[5].uv.x = glyph->uvMinX;
+			g_textVertices[5].uv.y = glyph->uvMaxY;
+
+			Renderer::DrawSingleTexturedTriangle(g_textVertices, g_currentFontTexIndex, g_fontRenderFlags | 0x444);
+			Renderer::DrawSingleTexturedTriangle(&g_textVertices[3], g_currentFontTexIndex, g_fontRenderFlags | 0x444);
+			return (int32_t)scaledWidth;
+		}
+		return 0;
+	}
 
 	// STUB: TOY2 0x004B4880
 	int32_t Font::DrawClippedScaledGlyph(char c) { return 0; }
