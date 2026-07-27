@@ -36,6 +36,9 @@ namespace Renderer
 		// GLOBAL: TOY2 0x005087EC
 		WORD g_2DSpriteIndices[4] = { 0, 1, 2, 3 };
 
+		// GLOBAL: TOY2 0x005087BC
+		WORD g_groundAlignedSpriteIndices[4] = { 0, 1, 2, 3 };
+
 		// GLOBAL: TOY2 0x005087C4
 		WORD g_quadSpriteIndices[4] = { 0, 1, 2, 3 };
 
@@ -795,8 +798,71 @@ namespace Renderer
 		// STUB: TOY2 0x004B70E0
 		void RenderType9(Nu3D::Material* material, Renderer::RenderEntry* entry) {}
 
-		// STUB: TOY2 0x004B7920
-		void RenderGroundAlignedSprite(Nu3D::Sprite* sprite) {}
+		// FUNCTION: TOY2 0x004B7920
+		void RenderGroundAlignedSprite(Nu3D::Sprite* sprite)
+		{
+			LPDIRECT3DVERTEXBUFFER destBuffer = g_FVF_14C_Buffer_2.vertexBuffer;
+			Nu3D::Vertex* lockedData;
+
+			if (DrawingAPI::LockVertexBuffer(g_FVF_152_Buffer.vertexBuffer, 0x801, (LPVOID*)&lockedData, 0) == 0)
+			{
+				lockedData[0].position.x = -sprite->width;
+				lockedData[0].position.y = 0.0f;
+				lockedData[0].position.z = -sprite->height;
+				lockedData[0].coords.x = sprite->uvBottomLeft.x;
+				lockedData[0].coords.y = sprite->uvBottomLeft.y;
+				lockedData[0].diffuse = sprite->color;
+
+				lockedData[1].position.x = -sprite->width;
+				lockedData[1].position.y = 0.0f;
+				lockedData[1].position.z = sprite->height;
+				lockedData[1].coords.x = sprite->uvTopLeft.x;
+				lockedData[1].coords.y = sprite->uvTopLeft.y;
+				lockedData[1].diffuse = sprite->color;
+
+				lockedData[2].position.x = sprite->width;
+				lockedData[2].position.y = 0.0f;
+				lockedData[2].position.z = -sprite->height;
+				lockedData[2].coords.x = sprite->uvBottomRight.x;
+				lockedData[2].coords.y = sprite->uvBottomRight.y;
+				lockedData[2].diffuse = sprite->color;
+
+				lockedData[3].position.x = sprite->width;
+				lockedData[3].position.y = 0.0f;
+				lockedData[3].position.z = sprite->height;
+				lockedData[3].coords.x = sprite->uvTopRight.x;
+				lockedData[3].coords.y = sprite->uvTopRight.y;
+				lockedData[3].diffuse = sprite->color;
+
+				DrawingAPI::UnlockVertexBuffer(g_FVF_152_Buffer.vertexBuffer);
+
+				D3DMATRIX matrix;
+				Nu3D::Math::BuildIdentityMatrix(&matrix);
+				if (sprite->trigIndex != 0)
+					Nu3D::Math::RotateYFromLut(&matrix, sprite->trigIndex);
+				Nu3D::Math::AddWorldSpaceTransform(&matrix, &sprite->position);
+				DrawingDevice::SetWorldTransform(&matrix);
+
+				if (g_drawingTransparentBuckets == 0)
+				{
+					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 5, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
+					{
+						Renderer::InitRenderState(sprite->renderFlags | RENDER_ZBIAS_1);
+						Renderer::BindTexture(sprite->textureIndex);
+						SoftwareRenderer::g_softwarePrimitiveType = 0;
+						SoftwareRenderer::g_viewportRect = &sprite->viewportRect;
+						DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLESTRIP, destBuffer, g_groundAlignedSpriteIndices, 4, 8);
+					}
+				}
+				else
+				{
+					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 1, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
+					{
+						SoftwareRenderer::SubmitQuad(sprite->renderFlags | RENDER_ZBIAS_1, sprite->textureIndex, destBuffer, g_groundAlignedSpriteIndices);
+					}
+				}
+			}
+		}
 
 		// Dispatches the shared render-list header. Sprite items use the full
 		// Nu3D::Sprite payload. Geometry and patch entries use Renderer::RenderEntry.
