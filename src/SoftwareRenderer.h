@@ -112,6 +112,8 @@ namespace SoftwareRenderer
 	// (the opposite slot assignment from SubmitQuad).
 	// SubmitTriangleStrip (0x004B6040) emits a triangle strip (indexCount-2 triangles)
 	// with alternating winding; same fieldC=0/field10=field10 slot assignment.
+	// SubmitTriangleStripRaw (0x004B6140) is the same strip logic but operates on an
+	// already-locked vertex buffer (caller pre-locks and passes the base pointer).
 	// SubmitSortedTriangle (0x004B5E40) bucket-sorts a transformed triangle into g_renderBuckets
 	// by depth. param field10/fieldC map to sorted-record +0x10/+0xc; SubmitQuad populates
 	// fieldC=textureIndex/field10=0 while the indexed-strip submitters swap them — refine the

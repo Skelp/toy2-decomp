@@ -867,6 +867,40 @@ namespace SoftwareRenderer
 		}
 	}
 
+	// Submits a triangle strip (indexCount-2 triangles) for sorted transparency
+	// rasterization using an already-locked vertex buffer. The caller (RenderType8)
+	// locks the vertex buffer and passes the locked base pointer directly, so this
+	// variant performs no Lock/Unlock. Same strip logic and fieldC=0/field10 slot
+	// assignment as SubmitTriangleStrip: emit the first triangle from
+	// indices[0..2], then walk the remaining indices keeping a rolling triple
+	// (a,b,c) and flipping the vertex order on odd iterations to preserve strip
+	// winding.
+	// FUNCTION: TOY2 0x004B6140 [MATCHED]
+	void SubmitTriangleStripRaw(int32_t renderFlags, Nu3D::VertexTL* lockedVertices, int32_t field10, WORD* indices, int32_t indexCount)
+	{
+		WORD* p = indices;
+		uint32_t a = *p++;
+		uint32_t b = *p++;
+		uint32_t c = *p++;
+		indexCount -= 3;
+		SubmitSortedTriangle(renderFlags, field10, 0, &lockedVertices[a], &lockedVertices[b], &lockedVertices[c]);
+		while (indexCount != 0)
+		{
+			a = b;
+			b = c;
+			indexCount--;
+			c = *p++;
+			if (indexCount & 1)
+			{
+				SubmitSortedTriangle(renderFlags, field10, 0, &lockedVertices[a], &lockedVertices[b], &lockedVertices[c]);
+			}
+			else
+			{
+				SubmitSortedTriangle(renderFlags, field10, 0, &lockedVertices[c], &lockedVertices[b], &lockedVertices[a]);
+			}
+		}
+	}
+
 	// FUNCTION: TOY2 0x004B6220 [MATCHED]
 	void SubmitQuad(int32_t renderFlags, int32_t textureIndex, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices)
 	{
