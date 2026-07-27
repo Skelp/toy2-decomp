@@ -15,7 +15,7 @@ namespace SoftwareRenderer
 	extern int32_t g_unk500A1C;
 	extern int32_t g_unk830C60;
 	extern int32_t g_unk559C40;
-	extern void* g_unk839278;
+	extern int32_t g_unk839278;
 	extern void* g_unk504D34;
 	extern int32_t g_unk87E50C;
 	extern int32_t g_unk839280;
@@ -138,7 +138,7 @@ namespace SoftwareRenderer
 	void SetPaletteOnAPI();
 	void UnkFunc7();
 
-	void UnkFunc8(void* param1, int32_t param2);
+	void UnkFunc8(int32_t param1, int32_t param2);
 
 	// A queued render command for the software rasterizer. UnkFunc29 enqueues
 	// transformed vertices (3 for a triangle, 4 for a quad when vertexCount is

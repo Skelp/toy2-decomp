@@ -31,7 +31,7 @@ namespace SoftwareRenderer
 	int32_t g_unk559C40;
 
 	// GLOBAL: TOY2 0x00839278
-	void* g_unk839278;
+	int32_t g_unk839278;
 
 	// GLOBAL: TOY2 0x00504D34
 	void* g_unk504D34;
@@ -824,7 +824,7 @@ namespace SoftwareRenderer
 	}
 
 	// STUB: TOY2 0x0047D210
-	void UnkFunc8(void* param1, int32_t param2) {}
+	void UnkFunc8(int32_t param1, int32_t param2) {}
 
 	// Queues a transformed triangle for sorted (back-to-front) transparency
 	// rasterization. Claims a slot from Renderer::g_primitiveBuffer, copies the

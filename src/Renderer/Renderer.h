@@ -3,6 +3,7 @@
 #include "Common.h"
 #include "Renderer/RenderType.h"
 #include "Nu3D/Patch.h"
+#include <stddef.h>
 #include <directx6/ddraw.h>
 #include <directx6/d3d.h>
 
@@ -173,13 +174,22 @@ namespace DevDraw
 	// Layout confirmed by the arithmetic in FlushDrawBufferSlot:
 	//   Vertice[65] at +0x000, VerticeCount[65] at +0x104,
 	//   Index[65][1000] at +0x186, IndexCount[65] at +0x1FD56.
-	//   Total size 0x1FDD8.
+	//
+	// The shared vertex pool follows the slot arrays at +0x1FDD8, and its count
+	// is at +0x9FDD8. The function at 0x00490D10 confirms both: it appends two
+	// vertices per call with `LEA edi,[edx + esi*1 + 0x1FDD8]` after `esi =
+	// count << 5`, so the element stride is 0x20 = sizeof(VertexTL). Its guard
+	// `cmp cx, 0x3FFE` keeps room for that pair, which makes the highest index
+	// 0x3FFF and the capacity 16384. (0x9FDD8 - 0x1FDD8) / 0x20 = 16384 closes
+	// the arithmetic exactly.
 	struct DrawBuffer
 	{
 		void* Vertice[65];
 		int16_t VerticeCount[65];
 		WORD Index[65][1000];
 		int16_t IndexCount[65];
+		Nu3D::VertexTL VerticePool[16384];
+		int16_t VerticePoolCount;
 	};
 
 	// Transparent indexed draw buffer. Same layout as DrawBuffer for the vertex
@@ -197,6 +207,16 @@ namespace DevDraw
 		WORD Index[32][6000];
 		int16_t IndexCount[32];
 	};
+
+	STATIC_ASSERT(offsetof(DrawBuffer, VerticeCount) == 0x104);
+	STATIC_ASSERT(offsetof(DrawBuffer, Index) == 0x186);
+	STATIC_ASSERT(offsetof(DrawBuffer, IndexCount) == 0x1FD56);
+	STATIC_ASSERT(offsetof(DrawBuffer, VerticePool) == 0x1FDD8);
+	STATIC_ASSERT(offsetof(DrawBuffer, VerticePoolCount) == 0x9FDD8);
+
+	STATIC_ASSERT(offsetof(TransparentDrawBuffer, VerticeCount) == 0x104);
+	STATIC_ASSERT(offsetof(TransparentDrawBuffer, Index) == 0x186);
+	STATIC_ASSERT(offsetof(TransparentDrawBuffer, IndexCount) == 0x5DD86);
 
 	int16_t DrawSlots();
 

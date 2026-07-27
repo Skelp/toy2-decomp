@@ -47,11 +47,29 @@ namespace Toy2
 	// GLOBAL: TOY2 0x00882768
 	int32_t g_destRectWidth;
 
+	// The rasterizer's screen-space clip rectangle. InitSoftWindow (0x0047CBA0,
+	// named by its own "InitSoftWindow(%i,%i)" log string) centers a window of
+	// the requested size in the destination rectangle and writes these bounds:
+	// left = (destWidth - windowWidth) / 2, right = left + windowWidth - 1, and
+	// the same for top and bottom. UpdateD3DState writes the full-window case,
+	// where left and top are 0.
+	//
+	// The helper at 0x00490D10 proves the roles: it clamps a point's x field up
+	// to g_screenClipLeft and down to g_screenClipRight, and its y field up to
+	// g_screenClipTop and down to g_screenClipBottom.
+	//
+	// The *Fixed pair holds the same left and right edges in 1/1024 units.
+	// InitSoftWindow computes right * 1024 + 1023, which for a zero left edge
+	// equals the width * 1024 - 1 that UpdateD3DState stores.
+
 	// GLOBAL: TOY2 0x00882784
-	int32_t g_destRectWidthTimes1024Minus1;
+	int32_t g_screenClipRightFixed;
+
+	// The size InitSoftWindow was last asked for, retained for the callers that
+	// re-derive the window without repeating the centering arithmetic.
 
 	// GLOBAL: TOY2 0x00882798
-	int32_t g_destRectWidthCopy;
+	int32_t g_softWindowWidth;
 
 	// GLOBAL: TOY2 0x008828A0
 	int32_t g_destRectWidthScaled;
@@ -60,28 +78,28 @@ namespace Toy2
 	int32_t g_destRectHeight;
 
 	// GLOBAL: TOY2 0x008828BC
-	int32_t g_unk8828BC;
+	int32_t g_screenClipLeftFixed;
 
 	// GLOBAL: TOY2 0x008828C4
-	int32_t g_destRectWidthMinus1;
+	int32_t g_screenClipRight;
 
 	// GLOBAL: TOY2 0x008828CC
-	int32_t g_destRectHeightMinus1;
+	int32_t g_screenClipBottom;
 
 	// GLOBAL: TOY2 0x008828D8
-	int32_t g_destRectHalfWidthCopy;
+	int32_t g_softWindowHalfWidth;
 
 	// GLOBAL: TOY2 0x008828DC
 	int32_t g_destRectHalfHeight;
 
 	// GLOBAL: TOY2 0x008828E0
-	int32_t g_unk8828E0;
+	int32_t g_screenClipLeft;
 
 	// GLOBAL: TOY2 0x008828E4
-	int32_t g_unk8828E4;
+	int32_t g_screenClipTop;
 
 	// GLOBAL: TOY2 0x008828E8
-	int32_t g_destRectHeightCopy;
+	int32_t g_softWindowHeight;
 
 	// GLOBAL: TOY2 0x00500A10
 	DevDraw::DrawBuffer* g_drawBuffer;
@@ -1399,14 +1417,9 @@ namespace Toy2
 	// rectangle. Computes the dest width and height, derives several scaled
 	// half-width / fixed-point variants used by the rasterizer, resets a few
 	// frame-local flags, points SoftwareRenderer::g_unk504D34 at the shared
-	// draw buffer, zeros a word field in the DevDraw::DrawBuffer allocation
-	// at +0x9fdd8, and stamps the frame start time. Called on the hardware
-	// (D3D) render path (g_renderMode == 2); the software path uses
-	// InitSoftwareRenderer.
-	//
-	// The field at +0x9fdd8 is beyond the DrawBuffer slot arrays (which end
-	// at +0x1FDD8); it is a separate field in the same allocation, not yet
-	// modeled.
+	// draw buffer, empties the shared vertex pool, and stamps the frame start
+	// time. Called on the hardware (D3D) render path (g_renderMode == 2); the
+	// software path uses InitSoftwareRenderer.
 	//
 	// The halfWidth/halfHeight locals and the store interleaving (width store
 	// before the height field-loads; width-1 before height-1) reproduce
@@ -1425,26 +1438,24 @@ namespace Toy2
 		int32_t height = destRect->bottom - destRect->top;
 		int32_t halfWidth = width / 2;
 		int32_t halfHeight = height / 2;
-		g_destRectWidthCopy = width;
-		g_destRectWidthMinus1 = width - 1;
-		g_destRectHeightMinus1 = height - 1;
+		g_softWindowWidth = width;
+		g_screenClipRight = width - 1;
+		g_screenClipBottom = height - 1;
 		g_destRectHeight = height;
 		g_destRectWidthScaled = (width * 256) / 320;
-		g_unk8828E0 = 0;
-		g_unk8828E4 = 0;
+		g_screenClipLeft = 0;
+		g_screenClipTop = 0;
 		g_destRectHalfWidth = halfWidth;
-		g_destRectWidthTimes1024Minus1 = width * 1024 - 1;
-		g_destRectHalfWidthCopy = halfWidth;
+		g_screenClipRightFixed = width * 1024 - 1;
+		g_softWindowHalfWidth = halfWidth;
 		g_destRectHalfHeight = halfHeight;
-		g_destRectHeightCopy = height;
-		g_unk8828BC = 0;
+		g_softWindowHeight = height;
+		g_screenClipLeftFixed = 0;
 
 		SoftwareRenderer::g_unk504D34 = (void*)&SoftwareRenderer::g_unk87E50C;
-		SoftwareRenderer::g_unk839278 = (void*)0x3ff;
+		SoftwareRenderer::g_unk839278 = 0x3ff;
 
-		// The field at +0x9fdd8 is beyond the DrawBuffer slot array region.
-		// It is a separate field in the same allocation.
-		*(int16_t*)((char*)g_drawBuffer + 0x9fdd8) = 0;
+		g_drawBuffer->VerticePoolCount = 0;
 
 		g_unk731CBC = timeGetTime();
 
