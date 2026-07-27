@@ -85,6 +85,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x00500A10
 	void* g_unk500A10;
 
+	// GLOBAL: TOY2 0x00500A28
+	int16_t g_currentDrawSlot;
+
 	// GLOBAL: TOY2 0x00500A24
 	int32_t g_destRectHalfWidth;
 

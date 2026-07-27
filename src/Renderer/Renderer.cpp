@@ -1779,8 +1779,64 @@ namespace DevDraw
 		return 1;
 	}
 
-	// STUB: TOY2 0x00490470
-	void FlushDrawBufferSlot(int16_t slot) {}
+	// Flushes one slot of the indexed draw buffer: binds the slot's texture,
+	// issues an indexed triangle-list DrawIndexedPrimitive, accumulates the
+	// vertex count, and resets the slot's vertex and index counts. The texture
+	// name is built as "LOADTEXT_texXX" where XX is the zero-padded slot index.
+	//
+	// g_unk500A10 holds parallel per-slot arrays: a vertex-data pointer array
+	// (stride 4 at +0x0), a vertex-count array (stride 2 at +0x104), an index
+	// buffer block (stride 2000 at +0x186), and an index-count array (stride
+	// 2 at +0x1fd56). The full object layout is not yet reconstructed, so the
+	// accesses use byte offsets on the pointer.
+	//
+	// The slot parameter stays in a 16-bit register (for the current-slot word
+	// store) while a sign-extended copy drives the array indexing. The draw
+	// buffer pointer is re-read from the global before each use (the string
+	// building and the COM calls clobber the holding register), so no local
+	// caches it.
+	// FUNCTION: TOY2 0x00490470
+	int16_t FlushDrawBufferSlot(int16_t slot)
+	{
+		Renderer::InitRenderState(0);
+
+		LPDIRECT3DDEVICE3 d3dDevice = DrawingDevice::GetD3DDevice();
+		int32_t slotIndex = slot;
+
+		if (((int16_t*)((char*)Toy2::g_unk500A10 + 0x104))[slotIndex] != 0)
+		{
+			char textureName[15] = "LOADTEXT_tex00";
+			textureName[12] = (char)('0' + slotIndex / 10);
+			textureName[13] = (char)('0' + slotIndex % 10);
+
+			Nu3D::BmpDataNode* bmpDataNode = Nu3D::GetBmpDataNodeByName_T(textureName);
+			d3dDevice->SetTexture(0, Nu3D::GetTexture(bmpDataNode));
+
+			HRESULT error = d3dDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST,
+				D3DFVF_0x1C4,
+				((void**)Toy2::g_unk500A10)[slotIndex],
+				((int16_t*)((char*)Toy2::g_unk500A10 + 0x104))[slotIndex],
+				(LPWORD)((char*)Toy2::g_unk500A10 + slotIndex * 2000 + 0x186),
+				((int16_t*)((char*)Toy2::g_unk500A10 + 0x1fd56))[slotIndex],
+				8);
+
+			if (error < 0)
+			{
+				Logger::LogDDError(
+					"dev->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, ( 0x004 | 0x040 | 0x080 | 0x100 ), (LPVOID) (drawb->Vertice[i]), "
+					"drawb->VerticeCount[i], (LPWORD) & (drawb->Index[i]), drawb->IndexCount[i], 0x00000008l)",
+					error);
+			}
+
+			Toy2::g_currentDrawSlot = slot;
+			g_vertexCount += ((int16_t*)((char*)Toy2::g_unk500A10 + 0x104))[slotIndex];
+		}
+
+		((int16_t*)((char*)Toy2::g_unk500A10 + 0x1fd56))[slotIndex] = 0;
+		((int16_t*)((char*)Toy2::g_unk500A10 + 0x104))[slotIndex] = 0;
+
+		return 1;
+	}
 
 	// STUB: TOY2 0x004905C0
 	void FlushTransparentDrawBufferSlot(int16_t slot) {}
