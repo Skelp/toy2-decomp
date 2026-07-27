@@ -285,6 +285,39 @@ namespace InputManager
 		return result;
 	}
 
+	// FUNCTION: TOY2 0x00415800
+	int32_t FindKeyPressed()
+	{
+		for (int32_t inputCode = 1; inputCode < 256; inputCode++)
+		{
+			uint8_t currentState = g_inputStates[inputCode];
+			uint8_t previousState = g_previousInputStates[inputCode];
+			uint8_t result = currentState;
+			result &= previousState;
+			g_previousInputStates[inputCode] = ~currentState;
+			if (result)
+				return inputCode;
+		}
+
+		return 0;
+	}
+
+	// FUNCTION: TOY2 0x00415860
+	int32_t FindKeyReleased()
+	{
+		for (int32_t inputCode = 1; inputCode < 256; inputCode++)
+		{
+			uint8_t currentState = g_inputStates[inputCode];
+			uint8_t previousState = g_previousInputStates[inputCode];
+			previousState &= currentState;
+			g_previousInputStates[inputCode] = ~currentState;
+			if (previousState)
+				return inputCode;
+		}
+
+		return 0;
+	}
+
 	// FUNCTION: TOY2 0x00414AF0
 	void UpdateInputState()
 	{

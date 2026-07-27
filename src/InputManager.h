@@ -23,6 +23,8 @@ namespace InputManager
 	int32_t GetPressedInput();
 	char* GetGameControlName(int32_t inputCode);
 	uint8_t IsKeyPressed(int32_t inputCode);
+	int32_t FindKeyPressed();
+	int32_t FindKeyReleased();
 	void UpdateButtonStates();
 	void Cleanup();
 
