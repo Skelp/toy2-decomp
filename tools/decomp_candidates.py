@@ -12,6 +12,9 @@ no Ghidra call and no reccmp run:
   comparison is available.
 - `.notes/caps-registry.tsv` supplies the known non-source-fixable caps, so a
   capped function is not offered again as if it were fresh work.
+- `tools/decomp_lint.py` supplies the source-plausibility errors, so a function
+  that matches the machine code but still states byte offsets is still offered
+  as work. A 100% match is not the finish line.
 
 The ranking follows the candidate rubric in `AGENTS.md`: a marked `STUB`
 first, then a small unannotated function in a namespace that already has
@@ -24,6 +27,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -56,6 +60,7 @@ class Candidate:
     cap: str = ""
     siblings: int = 0
     namespace: str = ""
+    lint_errors: int = 0
     reasons: list[str] = field(default_factory=list)
     rank: float = 0.0
 
@@ -134,11 +139,57 @@ def namespace_of(name: str) -> str:
     return name.rsplit("::", 1)[0] if "::" in name else ""
 
 
+_ANNOTATION_LINE_RE = re.compile(r"//\s*(?:FUNCTION|STUB):\s*TOY2\s+(0x[0-9A-Fa-f]+)")
+
+
+def read_lint_errors() -> dict[int, int]:
+    """Count source-plausibility errors per retail address.
+
+    A finding is attributed to the nearest `// FUNCTION:` or `// STUB:`
+    annotation above it, which is the function that contains the line.
+    """
+
+    try:
+        from tools import decomp_lint
+    except ImportError:
+        return {}
+
+    counts: dict[int, int] = {}
+    for path in sorted(SOURCE_ROOT.rglob("*")):
+        if path.suffix not in (".c", ".cpp"):
+            continue
+        try:
+            findings = decomp_lint.check_file(path)
+        except OSError:
+            continue
+        errors = [item for item in findings if item.severity == "error"]
+        if not errors:
+            continue
+        owners: list[tuple[int, int]] = []
+        for number, line in enumerate(
+            path.read_text(encoding="utf-8", errors="ignore").splitlines(), 1
+        ):
+            found = _ANNOTATION_LINE_RE.search(line)
+            if found:
+                owners.append((number, int(found.group(1), 16)))
+        for finding in errors:
+            owner = None
+            for number, address in owners:
+                if number <= finding.line:
+                    owner = address
+                else:
+                    break
+            if owner is not None:
+                counts[owner] = counts.get(owner, 0) + 1
+    return counts
+
+
 def build_candidates() -> list[Candidate]:
     entries = parse_map()
     states = read_annotation_states()
     matches = read_match_percentages()
     caps = read_caps()
+    lint_errors = read_lint_errors()
 
     reconstructed_per_namespace: dict[str, int] = {}
     for address, name in entries:
@@ -162,6 +213,7 @@ def build_candidates() -> list[Candidate]:
                 cap=caps.get(address, ""),
                 siblings=reconstructed_per_namespace.get(namespace, 0),
                 namespace=namespace,
+                lint_errors=lint_errors.get(address, 0),
             )
         )
     return candidates
@@ -194,6 +246,12 @@ def score(candidate: Candidate) -> None:
         rank += 10.0
         if candidate.match is not None and candidate.match < 0.999:
             reasons.append("implemented below a match")
+
+    # A function that matches the machine code but still states byte offsets is
+    # unfinished work, whatever its percentage says. Rank it as real work.
+    if candidate.lint_errors:
+        rank += 45.0 + min(candidate.lint_errors, 10)
+        reasons.append(f"{candidate.lint_errors} lint error(s): states offsets, not names")
 
     if candidate.size and candidate.size <= LEAF_MAX_SIZE:
         rank += 30.0
@@ -236,6 +294,7 @@ def select(
     near_only: bool,
     max_size: int | None,
     exclude_capped: bool,
+    debt_only: bool = False,
 ) -> list[Candidate]:
     chosen: list[Candidate] = []
     for candidate in candidates:
@@ -255,9 +314,12 @@ def select(
             continue
         if exclude_capped and candidate.cap:
             continue
-        if not (stubs_only or leaves_only or near_only) and candidate.state == "FUNCTION":
-            # A fully matched function is finished work, not a candidate.
-            if candidate.match is None or candidate.match >= 0.999:
+        if debt_only and not candidate.lint_errors:
+            continue
+        if not (stubs_only or leaves_only or near_only or debt_only) and candidate.state == "FUNCTION":
+            # A fully matched function is finished work only when its source also
+            # reads like source. Lint errors keep it in the list.
+            if (candidate.match is None or candidate.match >= 0.999) and not candidate.lint_errors:
                 continue
         chosen.append(candidate)
 
@@ -302,6 +364,11 @@ def main() -> int:
         action="store_true",
         help="only implemented functions that are still below a match",
     )
+    parser.add_argument(
+        "--debt",
+        action="store_true",
+        help="only functions with source-plausibility errors (see .notes/refactor-debt.md)",
+    )
     parser.add_argument("--max-size", type=int, help="drop candidates larger than this many bytes")
     parser.add_argument(
         "--include-capped",
@@ -325,6 +392,7 @@ def main() -> int:
         near_only=args.near,
         max_size=args.max_size,
         exclude_capped=not args.include_capped,
+        debt_only=args.debt,
     )
 
     if args.json:
@@ -339,6 +407,7 @@ def main() -> int:
                     "source": item.source,
                     "cap": item.cap,
                     "siblings": item.siblings,
+                    "lint_errors": item.lint_errors,
                     "rank": item.rank,
                     "reasons": item.reasons,
                 }

@@ -28,6 +28,7 @@ SOURCE_ROOT = ROOT / "src"
 MAP_PATH = ROOT / "tools" / "Resources" / "functions_map.txt"
 
 sys.path.insert(0, str(ROOT))
+from tools import decomp_binary  # noqa: E402
 from tools.decomp_annotations import read_source_annotations  # noqa: E402
 from tools.decomp_candidates import (  # noqa: E402
     parse_map,
@@ -37,6 +38,10 @@ from tools.decomp_candidates import (  # noqa: E402
 
 NEIGHBOR_COUNT = 3
 DATA_ADDRESS_RE = re.compile(r"0x(00[0-9a-fA-F]{6})")
+# A string pointer often appears as a bare `PUSH 0x5014f4` immediate, without
+# the leading zeroes the memory-operand form carries. Accept both widths and let
+# the section lookup reject anything unmapped.
+IMMEDIATE_ADDRESS_RE = re.compile(r"0x([0-9a-fA-F]{5,8})")
 
 
 def run_ghidra(arguments: list[str]) -> object | None:
@@ -211,11 +216,41 @@ def main() -> int:
     else:
         print("unavailable; is the Ghidra bridge running? try `ghidra status`")
 
-    section("referenced data addresses")
+    # The retail build kept its assert and log text. Those literals carry the
+    # developers' own field names, so they outrank any invented name. Report
+    # them before the plain data addresses.
     operand_text = " ".join(
         " ".join(str(operand) for operand in instruction.get("operands", []))
         for instruction in rows
     )
+
+    if decomp_binary.available():
+        candidate_addresses = sorted(
+            {int(value, 16) for value in IMMEDIATE_ADDRESS_RE.findall(operand_text)}
+        )
+        literals = decomp_binary.strings_referenced_by(candidate_addresses)
+        # MSVC6 reads a short literal in dword pieces, so the interior offsets
+        # look like separate strings. Drop a literal that is only the tail of a
+        # longer one reported here.
+        literals = [
+            literal
+            for literal in literals
+            if not any(
+                other is not literal and other.text.endswith(literal.text)
+                for other in literals
+            )
+        ]
+        section("referenced strings (original names outrank invented ones)")
+        if not literals:
+            print("none")
+        for literal in literals:
+            print(f"  0x{literal.address:08X}  {literal.text!r}")
+            for expression in literal.field_expressions:
+                print(f"{'':>14}^ original field name: {expression}")
+            if literal.source_file:
+                print(f"{'':>14}^ original translation unit: {literal.source_file}")
+
+    section("referenced data addresses")
     referenced = sorted(
         {
             int(value, 16)

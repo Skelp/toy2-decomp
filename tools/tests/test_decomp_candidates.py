@@ -99,6 +99,14 @@ class ScoreTests(unittest.TestCase):
         candidates.score(large)
         self.assertGreater(leaf.rank, large.rank)
 
+    def test_lint_errors_make_a_matched_function_rank_as_work(self):
+        # A 100% match that still states byte offsets is unfinished.
+        clean = make(0x401000, "N::Clean", size=300, state="FUNCTION", match=1.0)
+        debt = make(0x402000, "N::Debt", size=300, state="FUNCTION", match=1.0, lint_errors=6)
+        candidates.score(clean)
+        candidates.score(debt)
+        self.assertGreater(debt.rank, clean.rank)
+
     def test_a_capped_function_sinks_below_every_uncapped_one(self):
         capped = make(0x401000, "N::A", size=64, state="STUB", cap="CAP-14")
         plain = make(0x402000, "N::B", size=5000, state="FUNCTION", match=0.5)
@@ -131,6 +139,9 @@ class SelectTests(unittest.TestCase):
             make(0x405000, "N::Near", size=64, state="FUNCTION", match=0.7),
             make(0x406000, "N::Capped", size=64, state="STUB", cap="CAP-01"),
             make(0x407000, "Other::Stub", size=64, state="STUB"),
+            make(
+                0x408000, "N::Debt", size=300, state="FUNCTION", match=1.0, lint_errors=6
+            ),
         ]
 
     def choose(self, **kwargs):
@@ -141,12 +152,20 @@ class SelectTests(unittest.TestCase):
             "near_only": False,
             "max_size": None,
             "exclude_capped": True,
+            "debt_only": False,
         }
         arguments.update(kwargs)
         return [item.name for item in candidates.select(list(self.pool), **arguments)]
 
     def test_a_fully_matched_function_is_not_a_candidate(self):
         self.assertNotIn("N::Done", self.choose())
+
+    def test_a_fully_matched_function_with_lint_errors_stays_a_candidate(self):
+        # Otherwise the worst debt is invisible: it already matches at 100%.
+        self.assertIn("N::Debt", self.choose())
+
+    def test_debt_only_keeps_just_the_lint_failures(self):
+        self.assertEqual(self.choose(debt_only=True), ["N::Debt"])
 
     def test_a_capped_function_is_hidden_by_default(self):
         self.assertNotIn("N::Capped", self.choose())

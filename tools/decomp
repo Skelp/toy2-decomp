@@ -107,6 +107,8 @@ Commands:
   bc <addr>         Build, then show the verbose comparison for one address
   candidates [ns]   Rank reconstruction candidates (no Ghidra, no reccmp run)
   evidence <addr>   Collect bounded evidence for one target in a single call
+  lint [files]      Check reconstructed source for decompiler residue
+  names             Re-extract .notes/original-names.md from the retail binary
   report [file]     Generate the self-contained HTML decompilation dashboard
   progress [scope]  Show annotation progress, optionally for a namespace
   check             Verify functions_map.txt is sorted, deduplicated, named, in-range
@@ -116,6 +118,7 @@ Commands:
 
 `candidates` and `evidence` read only committed files plus the build report, so
 they are fast and safe to run first:
+  tools/decomp candidates --debt --why        # matched but still states offsets
   tools/decomp candidates --stubs --limit 10
   tools/decomp candidates Nu3D --leaves --why
   tools/decomp evidence 0x00403640
@@ -123,6 +126,16 @@ they are fast and safe to run first:
 
 `score` avoids the assembly diff when you only need the percentage:
   tools/decomp score 0x00403640 0x004B99F0
+
+`lint` measures source plausibility, which the comparison cannot see. An exact
+match that still states byte offsets is a transliteration, not a
+reconstruction:
+  tools/decomp lint                 # all of src/
+  tools/decomp lint --staged        # only what you are about to commit
+
+`names` regenerates .notes/original-names.md, the developers' own structure and
+field names recovered from the retail assert strings. Those names outrank any
+name you would invent.
 
 `sync` runs reccmp's headless Ghidra importer (`reccmp-ghidra-import`) against
 the local Ghidra project. Extra arguments are forwarded to the importer, e.g.
@@ -154,6 +167,12 @@ case "$command" in
         ;;
     evidence)
         exec python tools/decomp_evidence.py "$@"
+        ;;
+    lint)
+        exec python tools/decomp_lint.py "$@"
+        ;;
+    names)
+        exec python tools/decomp_original_names.py "$@"
         ;;
     configure)
         configure "$@"
