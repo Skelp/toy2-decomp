@@ -24,9 +24,7 @@ namespace Toy2
 			int16_t scaleY;
 			int16_t scaleZ;
 			int8_t flags;
-			int8_t unk19;
-			int8_t unk1A;
-			int8_t unk1B;
+			uint8_t padding[3];
 			int32_t meshPtr;
 			int32_t animPtr;
 		};
@@ -41,11 +39,11 @@ namespace Toy2
 			int16_t mat_23;
 			Vector3I16 rotation;
 			uint8_t flags;
-			uint8_t unk;
+			uint8_t reservedFlags;
 			void* modelPtr;
-			int32_t unk11;
+			int32_t animPtr;
 			int16_t polyCount;
-			int16_t unk13;
+			int16_t reservedTail;
 		};
 
 		struct InstanceSection
@@ -85,8 +83,7 @@ namespace Toy2
 			int32_t unk6;
 			int32_t z_or_coord;
 			int16_t type;
-			uint8_t unk14;
-			uint8_t unk15;
+			uint8_t paddingTail[2];
 			ObjectDesc* desc;
 		};
 

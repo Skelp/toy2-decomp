@@ -143,13 +143,12 @@ namespace Renderer
 	// rasterization. SubmitSortedTriangle fills a slot from g_primitiveBuffer,
 	// computes depthKey = min(v0.z, v1.z, v2.z) * k_depthSortScale, and inserts
 	// the slot into the g_renderBuckets[depthKey & 0x3ff] linked list kept in
-	// descending depthKey order. The +0x04 field is not written by
-	// SubmitSortedTriangle; its role is pending reconstruction of the bucket
-	// drain path.
+	// descending depthKey order. SubmitSortedTriangle does not write the
+	// reserved field at +0x04.
 	struct SortedPrimitive
 	{
 		SortedPrimitive* next;
-		int32_t unk04;
+		int32_t reserved;
 		int32_t renderFlags;
 		int32_t textureIndex;
 		int32_t primitiveGroup;

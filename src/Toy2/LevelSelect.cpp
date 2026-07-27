@@ -577,7 +577,7 @@ namespace Toy2
 						19 * (2 * tokenIconIdx - tokenIconCount) + 256, 50, 54, ((animTimer / 2) + 4 * tokenIconIdx + 4) & 31, 128, 128, 128, 96, 3276, 2048);
 
 				int32_t warnTimercopy = needTokensTimer;
-				int32_t tokensHeldCopy;
+				int32_t displayedTokenCount;
 
 				if (needTokensTimer <= 0)
 					goto LBL_DRAW_TOKEN_COUNTER;
@@ -590,7 +590,7 @@ namespace Toy2
 
 					Renderer::Sprite::DrawTiledFixed(14, 192, 54, (animTimer / 2) & 31);
 
-					tokensHeldCopy = tokensHeld;
+					displayedTokenCount = tokensHeld;
 
 					Renderer::Sprite::DrawTile(102, 208, 58, tokensHeld / 10 % 10);
 					Renderer::Sprite::DrawTile(115, 208, 58, tokensHeld % 10);
@@ -599,7 +599,7 @@ namespace Toy2
 
 				Renderer::Sprite::DrawColouredFixed(14, 192, 54, (animTimer / 2) & 31, 128, 32, 32);
 
-				tokensHeldCopy = tokensHeld;
+				displayedTokenCount = tokensHeld;
 
 				Renderer::Sprite::DrawColoured(102, 208, 58, tokensHeld / 10 % 10, 128, 32, 32);
 				Renderer::Sprite::DrawColoured(115, 208, 58, tokensHeld % 10, 128, 32, 32);
@@ -609,9 +609,9 @@ namespace Toy2
 			LBL_DRAW_LEVEL_GATE:
 
 				uint8_t blinkTimer;
-				int32_t tokensNeededCopy;
+				int32_t requiredTokenCount;
 
-				if (curLevel == maxLevelCursor && (tokensNeededCopy = tokensNeeded, tokensHeldCopy < tokensNeeded))
+				if (curLevel == maxLevelCursor && (requiredTokenCount = tokensNeeded, displayedTokenCount < tokensNeeded))
 				{
 					blinkTimer = sceneTimer;
 
@@ -620,7 +620,7 @@ namespace Toy2
 						if (tokensNeeded >= 10)
 						{
 							Renderer::Sprite::DrawScaled(232, 109, 58, tokensNeeded / 10 % 10, 128, 128, 128, 96, 6000, 5500);
-							Renderer::Sprite::DrawScaled(256, 109, 58, tokensNeededCopy % 10, 128, 128, 128, 96, 6000, 5500);
+							Renderer::Sprite::DrawScaled(256, 109, 58, requiredTokenCount % 10, 128, 128, 128, 96, 6000, 5500);
 						}
 						else
 						{

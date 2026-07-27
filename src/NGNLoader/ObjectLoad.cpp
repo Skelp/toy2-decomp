@@ -562,11 +562,11 @@ namespace NGNLoader
 				if (! primObject)
 					Logger::GetErrorHandler("C:\\projects\\nu3d\\objload.c", 634)("unable to alloc OBJ3D with %d vrts", verticesSize);
 
-				int32_t flagsTemp = Nu3D::g_defaultPrimitiveFlags | primObject->renderFlags;
-				primObject->renderFlags = flagsTemp;
+				int32_t effectiveRenderFlags = Nu3D::g_defaultPrimitiveFlags | primObject->renderFlags;
+				primObject->renderFlags = effectiveRenderFlags;
 
 				if ((g_curVertexFlags & 4) != 0)
-					primObject->renderFlags = flagsTemp | 0x40001000;
+					primObject->renderFlags = effectiveRenderFlags | 0x40001000;
 
 				if (materialIndex >= g_curMaterialCount)
 				{

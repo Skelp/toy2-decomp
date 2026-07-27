@@ -37,7 +37,7 @@ namespace Toy2
 		int32_t g_levelLoadConfig;
 
 		// GLOBAL: TOY2 0x0055A12C
-		int32_t g_levelLoadConfigCopy;
+		int32_t g_initialLevelLoadConfig;
 
 		// GLOBAL: TOY2 0x00729128
 		void* g_cachedAllBuffer;
@@ -466,7 +466,7 @@ namespace Toy2
 						l_secRotZValue = l_secRotZ * l_typeData->scaleZ;
 
 						l_sectionStorage->modelPtr = l_typeData;
-						l_sectionStorage->unk11 = 0;
+						l_sectionStorage->animPtr = 0;
 						l_sectionStorage->rotation.z = l_secRotZValue / 4096;
 
 						l_secondSection_->unk6 = l_sectionStorage;
@@ -482,13 +482,13 @@ namespace Toy2
 						if ((*l_secondSection14 & 0x20) != 0)
 						{
 							*l_secondSection14 |= 0x40u;
-							l_typeData2->unk11 += g_levelDataBase;
+							l_typeData2->animPtr += g_levelDataBase;
 						}
 
 						Nu3D::Math::EulerToRotationMatrix(&l_typeData2->rotation, l_sectionStorage);
 
 						l_sectionStorage->modelPtr = l_typeData2;
-						l_sectionStorage->unk11 = 0;
+						l_sectionStorage->animPtr = 0;
 						l_secondSection_->unk6 = l_sectionStorage;
 
 						l_sectionStorage->polyCount = Toy2::Level::CalculatePolyCount(l_secondSection_);
@@ -555,7 +555,7 @@ namespace Toy2
 						l_sectionStorage->mat_23 = l_modelA2->scaleZ * l_sectionStorage->mat_23 / 4096;
 						l_secRotZ2Value = l_secRotZ2 * l_modelA2->scaleZ;
 						l_sectionStorage->modelPtr = l_modelA2;
-						l_sectionStorage->unk11 = 0;
+						l_sectionStorage->animPtr = 0;
 						l_sectionStorage->rotation.z = l_secRotZ2Value / 4096;
 
 						*(l_secondInstance + 2) = l_sectionStorage;
@@ -571,12 +571,12 @@ namespace Toy2
 						if ((*l_secondInstance & 0x20) != 0)
 						{
 							*l_secondInstance |= 0x40u;
-							l_modelB2->unk11 += g_levelDataBase;
+							l_modelB2->animPtr += g_levelDataBase;
 						}
 
 						Nu3D::Math::EulerToRotationMatrix(&l_modelB2->rotation, l_sectionStorage);
 						l_sectionStorage->modelPtr = l_modelB2;
-						l_sectionStorage->unk11 = 0;
+						l_sectionStorage->animPtr = 0;
 						*(l_secondInstance + 2) = l_sectionStorage;
 						l_sectionStorage->polyCount = Toy2::Level::CalculatePolyCount((l_secondInstance - 14));
 
@@ -803,7 +803,7 @@ namespace Toy2
 			}
 
 			int32_t loadConfigCpy = g_levelLoadConfig;
-			g_levelLoadConfigCopy = g_levelLoadConfig;
+			g_initialLevelLoadConfig = g_levelLoadConfig;
 
 			uint8_t* dataBuffer = g_levelDataHeapBase;
 

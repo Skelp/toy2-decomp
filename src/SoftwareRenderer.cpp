@@ -119,11 +119,11 @@ namespace SoftwareRenderer
 		int32_t vertexCount; // +0x84 (3 = triangle, 4 = quad)
 		int32_t renderState; // +0x88 (Renderer::RENDER_* alpha flags)
 		RenderCommand* next; // +0x8C (sorted-path list link, read by UnkFunc33)
-		int32_t field90; // +0x90
+		int32_t reserved90; // +0x90
 		// +0x94: nonzero selects alternate span rasterizers. UnkFunc35 ignores it;
 		// UnkFunc34 branches on it, which is what gives it this role.
 		int32_t useAlternateSpans;
-		int32_t field98; // +0x98
+		int32_t reserved98; // +0x98
 	};
 
 	// GLOBAL: TOY2 0x00DBB0A0
@@ -2539,7 +2539,7 @@ namespace SoftwareRenderer
 	}
 
 	// STUB: TOY2 0x004C0320
-	void UnkFunc22(Nu3D::VertexTL* vertices[3], int32_t vertexCount, uint32_t* texData, int32_t renderState, int32_t param5, int32_t param6) {}
+	void UnkFunc22(Nu3D::VertexTL* vertices[3], int32_t vertexCount, uint32_t* texData, int32_t renderState, int32_t primitiveType, DWORD drawFlags) {}
 
 	// STUB: TOY2 0x004C1540
 	void UnkFunc21(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags) {}
