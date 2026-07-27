@@ -1242,31 +1242,163 @@ namespace SoftwareRenderer
 		int32_t rightBlue)
 	{}
 
-	// STUB: TOY2 0x004C5D80
-	void UnkFunc56(Nu3D::VertexTL* leftEdge,
-		Nu3D::VertexTL* rightEdge,
+	// Blends an untextured span with a 555 destination. The source and
+	// destination factors are in g_spanAlpha and g_spanInvAlpha.
+	// FUNCTION: TOY2 0x004C5D80
+	void UnkFunc56(Nu3D::VertexTL* edgeA,
+		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
-		int32_t leftRed,
-		int32_t leftGreen,
-		int32_t leftBlue,
-		int32_t rightRed,
-		int32_t rightGreen,
-		int32_t rightBlue)
-	{}
+		int32_t edgeARed,
+		int32_t edgeAGreen,
+		int32_t edgeABlue,
+		int32_t edgeBRed,
+		int32_t edgeBGreen,
+		int32_t edgeBBlue)
+	{
+		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
+		int32_t farRed;
+		int32_t farGreen;
+		int32_t farBlue;
+		if (width < 0)
+		{
+			farRed = edgeBRed;
+			farGreen = edgeBGreen;
+			farBlue = edgeBBlue;
+			edgeBRed = edgeARed;
+			edgeBGreen = edgeAGreen;
+			edgeBBlue = edgeABlue;
+			edgeB = edgeA;
+			width = -width;
+		}
+		else
+		{
+			if (width == 0)
+			{
+				return;
+			}
+			farRed = edgeARed;
+			farGreen = edgeAGreen;
+			farBlue = edgeABlue;
+		}
 
-	// STUB: TOY2 0x004C5F00
-	void UnkFunc38(Nu3D::VertexTL* leftEdge,
-		Nu3D::VertexTL* rightEdge,
+		destRow += (int32_t)edgeB->position.x;
+		int32_t stepRed = (farRed - edgeBRed) / width;
+		int32_t stepGreen = (farGreen - edgeBGreen) / width;
+		int32_t stepBlue = (farBlue - edgeBBlue) / width;
+
+		while (width > 0)
+		{
+			int32_t alpha = g_spanAlpha;
+			uint16_t pixel = *destRow;
+			int32_t invAlpha = g_spanInvAlpha;
+
+			int32_t blue = ((pixel & 0x1f) << 3) * invAlpha + ((uint32_t)(alpha * edgeBBlue) >> 8);
+			if (blue > 0xf800)
+			{
+				blue = 0xf800;
+			}
+
+			int32_t green = ((pixel >> 2) & 0xf8) * invAlpha + ((uint32_t)(alpha * edgeBGreen) >> 8);
+			if (green > 0xf800)
+			{
+				green = 0xf800;
+			}
+
+			int32_t red = ((pixel >> 7) & 0xf8) * invAlpha + ((uint32_t)(alpha * edgeBRed) >> 8);
+			if (red > 0xf800)
+			{
+				red = 0xf800;
+			}
+
+			*destRow = (uint16_t)(((red >> 1) & 0x7c00) + ((green >> 6) & 0x3e0) + (blue >> 11));
+			destRow++;
+
+			edgeBRed += stepRed;
+			edgeBGreen += stepGreen;
+			edgeBBlue += stepBlue;
+			width--;
+		}
+	}
+
+	// The alternate-format twin of UnkFunc56. It uses the same blend and
+	// interpolation, but extracts and packs channels for the other surface mode.
+	// FUNCTION: TOY2 0x004C5F00
+	void UnkFunc38(Nu3D::VertexTL* edgeA,
+		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
-		int32_t leftRed,
-		int32_t leftGreen,
-		int32_t leftBlue,
-		int32_t rightRed,
-		int32_t rightGreen,
-		int32_t rightBlue)
-	{}
+		int32_t edgeARed,
+		int32_t edgeAGreen,
+		int32_t edgeABlue,
+		int32_t edgeBRed,
+		int32_t edgeBGreen,
+		int32_t edgeBBlue)
+	{
+		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
+		int32_t farRed;
+		int32_t farGreen;
+		int32_t farBlue;
+		if (width < 0)
+		{
+			farRed = edgeBRed;
+			farGreen = edgeBGreen;
+			farBlue = edgeBBlue;
+			edgeBRed = edgeARed;
+			edgeBGreen = edgeAGreen;
+			edgeBBlue = edgeABlue;
+			edgeB = edgeA;
+			width = -width;
+		}
+		else
+		{
+			if (width == 0)
+			{
+				return;
+			}
+			farRed = edgeARed;
+			farGreen = edgeAGreen;
+			farBlue = edgeABlue;
+		}
+
+		destRow += (int32_t)edgeB->position.x;
+		int32_t stepRed = (farRed - edgeBRed) / width;
+		int32_t stepGreen = (farGreen - edgeBGreen) / width;
+		int32_t stepBlue = (farBlue - edgeBBlue) / width;
+
+		while (width > 0)
+		{
+			int32_t alpha = g_spanAlpha;
+			uint16_t pixel = *destRow;
+			int32_t invAlpha = g_spanInvAlpha;
+
+			int32_t blue = ((pixel & 0x1f) << 3) * invAlpha + ((uint32_t)(alpha * edgeBBlue) >> 8);
+			if (blue > 0xf800)
+			{
+				blue = 0xf800;
+			}
+
+			int32_t green = ((pixel >> 3) & 0xf8) * invAlpha + ((uint32_t)(alpha * edgeBGreen) >> 8);
+			if (green > 0xf800)
+			{
+				green = 0xf800;
+			}
+
+			int32_t red = ((pixel >> 8) & 0xf8) * invAlpha + ((uint32_t)(alpha * edgeBRed) >> 8);
+			if (red > 0xf800)
+			{
+				red = 0xf800;
+			}
+
+			*destRow = (uint16_t)((red & 0xf800) + ((green >> 5) & 0x7c0) + (blue >> 11));
+			destRow++;
+
+			edgeBRed += stepRed;
+			edgeBGreen += stepGreen;
+			edgeBBlue += stepBlue;
+			width--;
+		}
+	}
 
 	// STUB: TOY2 0x004C6080
 	void UnkFunc44(Nu3D::VertexTL* leftEdge,
