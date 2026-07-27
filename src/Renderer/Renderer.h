@@ -169,5 +169,5 @@ namespace DevDraw
 	int16_t DrawSlots();
 
 	int16_t FlushDrawBufferSlot(int16_t slot);
-	void FlushTransparentDrawBufferSlot(int16_t slot);
+	int16_t FlushTransparentDrawBufferSlot(int16_t slot);
 }

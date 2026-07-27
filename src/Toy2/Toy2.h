@@ -41,6 +41,7 @@ namespace Toy2
 	extern int32_t g_unk8828E4;
 	extern int32_t g_destRectHeightCopy;
 	extern void* g_unk500A10;
+	extern void* g_unk500A14;
 	extern int16_t g_currentDrawSlot;
 	extern int32_t g_destRectHalfWidth;
 	extern int32_t g_unk72E340;
