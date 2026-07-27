@@ -1,5 +1,6 @@
 #include "Toy2/Actor.h"
 #include "Toy2/Animation.h"
+#include "Toy2/Buzz.h"
 #include "CharacterLoader.h"
 
 #include <string.h>
@@ -21,6 +22,9 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x004E0588
 		uint8_t* g_animationFrameSequences[26];
+
+		// GLOBAL: TOY2 0x00529D48
+		Toy2Actor* g_renderActors[66];
 
 		// GLOBAL: TOY2 0x0050A54C
 		int32_t g_unk50A54C;
@@ -111,6 +115,23 @@ namespace Toy2
 			actor->primaryAnimIdx = animationIndex;
 			actor->animationFrameSequence = g_animationFrameSequences[frameSequenceIndex];
 			actor->animationFramePosition = (uint32_t)*actor->animationFrameSequence << 16;
+		}
+
+		// FUNCTION: TOY2 0x0049F460
+		int32_t IsInsideBounds(const Vector3I* position, int32_t minX, int32_t maxX, int32_t minZ, int32_t maxZ)
+		{ return position->x > minX && position->x < maxX && position->z > minZ && position->z < maxZ; }
+
+		// FUNCTION: TOY2 0x004A28B0
+		void PopulateActiveActors()
+		{
+			int32_t actorIndex = 0;
+			while (g_activeActors[actorIndex] != 0)
+			{
+				g_renderActors[actorIndex] = g_activeActors[actorIndex];
+				actorIndex++;
+			}
+			g_renderActors[actorIndex++] = (Toy2Actor*)&Toy2::g_buzzActor;
+			g_renderActors[actorIndex] = 0;
 		}
 
 		// FUNCTION: TOY2 0x00414A80

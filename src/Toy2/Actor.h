@@ -72,6 +72,7 @@ namespace Toy2
 
 		extern Toy2Actor g_creatureActors[64];
 		extern uint8_t* g_animationFrameSequences[26];
+		extern Toy2Actor* g_renderActors[66];
 
 		// Actor-system state reset by InitCreatureRam. Roles are not yet confirmed;
 		// the consuming functions (Game::UpdateActors et al.) are unreconstructed.
@@ -83,6 +84,8 @@ namespace Toy2
 		void InitCreatureRam();
 		void StepCreatureAnimFrame(Toy2Actor* actor);
 		void SetAnimation(Toy2Actor* actor, int16_t animationIndex, int32_t frameSequenceIndex);
+		int32_t IsInsideBounds(const Vector3I* position, int32_t minX, int32_t maxX, int32_t minZ, int32_t maxZ);
+		void PopulateActiveActors();
 		void GetCreatureList(uint8_t* creatureIdList);
 		int32_t FindInActorList(Toy2Actor* actor);
 		void SetNodeAngle(Toy2Actor* actor, int32_t nodeIndex, float x, float y, float z);
