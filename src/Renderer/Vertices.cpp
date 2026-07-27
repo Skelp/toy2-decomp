@@ -80,6 +80,67 @@ namespace Renderer
 			}
 		}
 
+		// FUNCTION: TOY2 0x004B75E0
+		void ProjectCustomTextureCoordinates(
+			Nu3D::Patch::PatchVertices* vertices, D3DMATRIX* transform, const Nu3D::InstanceData::TextureProjectionData* projection)
+		{
+			if (g_FVF_14C_Buffer_2.vertexBuffer != 0)
+			{
+				Nu3D::VertexTL* destVertices;
+				if (DrawingAPI::LockVertexBuffer(g_FVF_14C_Buffer_2.vertexBuffer, DDLOCK_WAIT | DDLOCK_NOSYSLOCK, (LPVOID*)&destVertices, 0) == DD_OK)
+				{
+					D3DMATRIX combined;
+					Nu3D::Math::FullMatrixMultiply(&combined, transform, &projection->matrix);
+
+					Vector3F projectedReference;
+					Nu3D::Math::TransformPointPerspective(&projectedReference, &projection->referencePoint, &combined);
+
+					Nu3D::Vertex* sourceVertex = vertices->data.vertices;
+					for (int32_t vertexIndex = 0; vertexIndex < vertices->vertexCount; ++vertexIndex)
+					{
+						Vector3F projectedPosition;
+						Nu3D::Math::ProjectPoint(&projectedPosition, &sourceVertex->position, &combined);
+						destVertices[vertexIndex].uv.x = (projectedPosition.x + 1.0f) * 0.5f;
+						destVertices[vertexIndex].uv.y = 1.0f - (projectedPosition.y + 1.0f) * 0.5f;
+
+						Nu3D::Math::TransformPointPerspective(&projectedPosition, &sourceVertex->normals, &combined);
+						destVertices[vertexIndex].uv.x += (projectedReference.x - projectedPosition.x) * projection->scale;
+						destVertices[vertexIndex].uv.y -= (projectedReference.y - projectedPosition.y) * projection->scale;
+						++sourceVertex;
+					}
+
+					DrawingAPI::UnlockVertexBuffer(g_FVF_14C_Buffer_2.vertexBuffer);
+				}
+			}
+		}
+
+		// FUNCTION: TOY2 0x004B7710
+		void ProjectTex14Coordinates(Nu3D::Patch::PatchVertices* vertices, D3DMATRIX* transform)
+		{
+			if (g_FVF_14C_Buffer_2.vertexBuffer != 0)
+			{
+				Nu3D::VertexTL* destVertex;
+				if (DrawingAPI::LockVertexBuffer(g_FVF_14C_Buffer_2.vertexBuffer, DDLOCK_WAIT | DDLOCK_NOSYSLOCK, (LPVOID*)&destVertex, 0) == DD_OK)
+				{
+					D3DMATRIX combined;
+					Nu3D::Math::MultiplyMatrix3x4(&combined, transform, Nu3D::Camera::GetViewMatrix());
+
+					Nu3D::Vertex* sourceVertex = vertices->data.vertices;
+					for (int32_t vertexIndex = 0; vertexIndex < vertices->vertexCount; ++vertexIndex)
+					{
+						Vector3F& normal = sourceVertex->normals;
+						destVertex->uv.x = (normal.x * combined._11 + normal.y * combined._21 + normal.z * combined._31 + 1.0f) * 0.5f;
+						destVertex->uv.y = (1.0f - (normal.x * combined._12 + normal.y * combined._22 + normal.z * combined._32)) * 0.5f;
+						destVertex->diffuse.a = 0x60;
+						++sourceVertex;
+						++destVertex;
+					}
+
+					DrawingAPI::UnlockVertexBuffer(g_FVF_14C_Buffer_2.vertexBuffer);
+				}
+			}
+		}
+
 		// FUNCTION: TOY2 0x004B7830
 		void ModuleColor(Nu3D::Patch::PatchVertices* vertices, int32_t red, int32_t green, int32_t blue)
 		{

@@ -124,6 +124,8 @@ namespace SoftwareRenderer
 	int32_t GetStrideFromFVF(int32_t fvf);
 
 	void SubmitQuad(int32_t renderFlags, int32_t textureIndex, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices);
+	void SubmitTriangleList(int32_t renderFlags, LPDIRECT3DVERTEXBUFFER vertexBuffer, Renderer::RenderEntry* renderEntry, WORD* indices, int32_t indexCount);
+	void SubmitTriangleStrip(int32_t renderFlags, LPDIRECT3DVERTEXBUFFER vertexBuffer, Renderer::RenderEntry* renderEntry, WORD* indices, int32_t indexCount);
 	void SubmitTriangleStripRaw(int32_t renderFlags, Nu3D::VertexTL* lockedVertices, Renderer::RenderEntry* renderEntry, WORD* indices, int32_t indexCount);
 	// SubmitTriangleList (0x004B5FB0) walks a triangle-list index buffer back-to-front
 	// and forwards each triangle to SubmitSortedTriangle with textureIndex=0 and the same render entry.

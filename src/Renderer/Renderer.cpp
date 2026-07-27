@@ -180,6 +180,18 @@ namespace Renderer
 	// GLOBAL: TOY2 0x009F2F28
 	Nu3D::Patch::PatchVertices g_FVF_152_Buffer;
 
+	// GLOBAL: TOY2 0x009F5FFC
+	int32_t g_drawTriangleWireframes;
+
+	// GLOBAL: TOY2 0x00E4D8FC
+	int32_t g_submittedVertexCount;
+
+	// GLOBAL: TOY2 0x00E4D944
+	int32_t g_submittedTriangleCount;
+
+	// GLOBAL: TOY2 0x00E4D94C
+	int32_t g_submittedPrimitiveCount;
+
 	// GLOBAL: TOY2 0x00E4D920
 	int32_t g_renderStateCache[8];
 

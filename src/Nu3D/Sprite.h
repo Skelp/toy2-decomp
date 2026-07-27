@@ -4,6 +4,7 @@
 #include "Numerics.h"
 #include "Nu3D/Viewport.h"
 #include "Renderer/RenderType.h"
+#include <stddef.h>
 #include <directx6/ddraw.h>
 #include <directx6/d3d.h>
 
@@ -33,6 +34,15 @@ namespace Nu3D
 
 	struct InstanceData
 	{
+		struct TextureProjectionData
+		{
+			float scale;
+			int32_t reserved0[4];
+			Vector3F referencePoint;
+			int32_t reserved1[9];
+			D3DMATRIX matrix;
+		};
+
 		D3DMATRIX matrices[4];
 		int32_t renderFlags;
 		float lodFactor;
@@ -42,7 +52,11 @@ namespace Nu3D
 		int32_t unkInt6;
 		RGB32 vertexModColor;
 		Viewport::ViewportRect clipRect;
-		Sprite sprite;
+		union
+		{
+			Sprite sprite;
+			TextureProjectionData textureProjection;
+		};
 
 		static InstanceData* AllocFromMatrix(const D3DMATRIX* matrix, int32_t renderFlags);
 		static InstanceData* AllocFromNodeMatrices(const D3DMATRIX* matrices, int32_t* nodeIndices, int32_t count, int32_t* flags, int32_t renderFlags);
@@ -52,5 +66,9 @@ namespace Nu3D
 	extern int32_t g_maxBucketDepth;
 
 	STATIC_ASSERT(sizeof(InstanceData) == 0x1B8);
+	STATIC_ASSERT(sizeof(InstanceData::TextureProjectionData) == 0x84);
+	STATIC_ASSERT(offsetof(InstanceData::TextureProjectionData, referencePoint) == 0x14);
+	STATIC_ASSERT(offsetof(InstanceData::TextureProjectionData, matrix) == 0x44);
+	STATIC_ASSERT(offsetof(InstanceData, textureProjection) == 0x134);
 	STATIC_ASSERT(sizeof(Sprite) == 0x84);
 }

@@ -900,8 +900,162 @@ namespace Renderer
 			}
 		}
 
-		// STUB: TOY2 0x004B70E0
-		void RenderType9(Nu3D::Material* material, Renderer::RenderEntry* entry) {}
+		// FUNCTION: TOY2 0x004B70E0
+		void RenderType9(Nu3D::Material* material, Renderer::RenderEntry* entry)
+		{
+			Nu3D::InstanceData* instanceData = entry->instanceData;
+			Nu3D::Primitive* primitive = entry->primitive;
+			SoftwareRenderer::g_softwarePrimitiveType = instanceData->unkInt6;
+
+			int32_t renderFlags = instanceData->renderFlags | primitive->renderFlags;
+			if (primitive->header[0].drawType == 4 || primitive->header[0].drawType == 5)
+				renderFlags |= RENDER_CULL_NONE;
+
+			int32_t projectTexture = material == NGNLoader::g_tex14Materials[0] || material == NGNLoader::g_tex14Materials[1]
+				|| material == NGNLoader::g_tex14Materials[2];
+
+			if (g_drawingTransparentBuckets == 0 || (instanceData->renderModeFlags & 1) != 0)
+				Renderer::SetupMaterialRenderState(material, renderFlags);
+
+			LPDIRECT3DVERTEXBUFFER sourceBuffer = primitive->patchVerts.vertexBuffer;
+			LPDIRECT3DVERTEXBUFFER destBuffer = g_FVF_14C_Buffer_1.vertexBuffer;
+			if (instanceData->horzOffset != 0.0f || instanceData->vertOffset != 0.0f || (instanceData->renderModeFlags & 3) != 0
+				|| (material->metadata & 0x100) != 0 || projectTexture || primitive->header[0].drawType == 4 || primitive->header[0].drawType == 5
+				|| g_drawingTransparentBuckets != 0)
+			{
+				destBuffer = g_FVF_14C_Buffer_2.vertexBuffer;
+			}
+
+			++g_submittedPrimitiveCount;
+			g_submittedVertexCount += primitive->patchVerts.vertexCount;
+			if (sourceBuffer == 0 || destBuffer == 0)
+				return;
+
+			DWORD vertexOp = 1;
+			if ((instanceData->renderModeFlags & 1) != 0)
+				vertexOp = 0x401;
+			if ((renderFlags & 0x2000) == 0 && g_drawingTransparentBuckets == 0)
+				vertexOp |= 4;
+
+			HRESULT result;
+			if (primitive->header[0].drawType < 4 || primitive->header[0].drawType > 5)
+			{
+				DrawingDevice::SetWorldTransform(&instanceData->matrices[0]);
+				result = DrawingAPI::ProcessVerticesOnBuffer(destBuffer, vertexOp, 0, primitive->patchVerts.vertexCount, sourceBuffer, 0, 0);
+			}
+			else
+			{
+				result = DD_OK;
+			}
+
+			if ((material->metadata & 0x100) != 0)
+			{
+				Renderer::Vertices::ProjectCustomTextureCoordinates(&primitive->patchVerts, &instanceData->matrices[0], &instanceData->textureProjection);
+			}
+			if (projectTexture)
+				Renderer::Vertices::ProjectTex14Coordinates(&primitive->patchVerts, &instanceData->matrices[0]);
+			if ((instanceData->renderModeFlags & 2) != 0)
+			{
+				Renderer::Vertices::ModuleColor(
+					&primitive->patchVerts, instanceData->vertexModColor.r, instanceData->vertexModColor.g, instanceData->vertexModColor.b);
+			}
+			if (g_materialHorzOffset != 0.0f || g_materialVertOffset != 0.0f)
+				Renderer::Vertices::ApplyOffset(&primitive->patchVerts, g_materialHorzOffset, g_materialVertOffset);
+
+			if (result != DD_OK)
+				return;
+
+			DWORD drawFlags = 8;
+			if ((renderFlags & 0x2000) != 0 || g_drawingTransparentBuckets != 0)
+				drawFlags = 12;
+			SoftwareRenderer::g_viewportRect = &instanceData->clipRect;
+
+			for (int32_t headerIndex = 0; headerIndex < primitive->headerCount; ++headerIndex)
+			{
+				Nu3D::Primitive::Header& header = primitive->header[headerIndex];
+				if (g_drawTriangleWireframes != 0)
+				{
+					for (int32_t indexOffset = 0; indexOffset < header.indexCount; indexOffset += 3)
+					{
+						DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_LINESTRIP, destBuffer, header.indices + indexOffset, 3, drawFlags);
+					}
+					continue;
+				}
+
+				switch (header.drawType)
+				{
+					case 0:
+						g_submittedTriangleCount += header.indexCount / 3;
+						if (g_drawingTransparentBuckets == 0)
+						{
+							DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLELIST, destBuffer, header.indices, header.indexCount, drawFlags);
+						}
+						else
+						{
+							SoftwareRenderer::SubmitTriangleList(renderFlags, destBuffer, entry, header.indices, header.indexCount);
+						}
+						break;
+
+					case 2:
+						g_submittedTriangleCount += header.indexCount >> 1;
+						if (g_drawingTransparentBuckets == 0)
+						{
+							DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLESTRIP, destBuffer, header.indices, header.indexCount, drawFlags);
+						}
+						else
+						{
+							SoftwareRenderer::SubmitTriangleStrip(renderFlags, destBuffer, entry, header.indices, header.indexCount);
+						}
+						break;
+
+					case 3: {
+						g_submittedTriangleCount += header.indexCount >> 1;
+						WORD* indices = header.indices;
+						for (int32_t indexCount = header.indexCount; indexCount != 0; indexCount -= 4)
+						{
+							DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLESTRIP, destBuffer, indices, 4, drawFlags);
+							indices += 4;
+						}
+						break;
+					}
+
+					case 4:
+					case 5: {
+						WORD* indices = header.indices;
+						Vector3F billboardPosition;
+						Nu3D::Math::TransformPointByMatrix(
+							&billboardPosition, &primitive->patchVerts.data.vertices[*indices].position, &instanceData->matrices[0]);
+
+						D3DMATRIX billboardMatrix;
+						if (header.drawType == 4)
+						{
+							Nu3D::Math::BuildIdentityMatrix(&billboardMatrix);
+							Nu3D::Math::RotateYFromLut(&billboardMatrix, Nu3D::Camera::g_billboardYaw);
+						}
+						else
+						{
+							billboardMatrix = Nu3D::Camera::g_activeCamera.transform;
+						}
+						billboardMatrix._41 = billboardPosition.x;
+						billboardMatrix._42 = billboardPosition.y;
+						billboardMatrix._43 = billboardPosition.z;
+						DrawingDevice::SetWorldTransform(&billboardMatrix);
+
+						++indices;
+						DrawingAPI::ProcessVerticesOnBuffer(destBuffer, vertexOp, *indices, 4, sourceBuffer, *indices, 0);
+						if (g_drawingTransparentBuckets == 0)
+						{
+							DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLESTRIP, destBuffer, indices, 4, drawFlags);
+						}
+						else
+						{
+							SoftwareRenderer::SubmitTriangleStrip(renderFlags, destBuffer, entry, indices, 4);
+						}
+						break;
+					}
+				}
+			}
+		}
 
 		// FUNCTION: TOY2 0x004B7920
 		void RenderGroundAlignedSprite(Nu3D::Sprite* sprite)

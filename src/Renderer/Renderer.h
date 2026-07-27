@@ -97,6 +97,10 @@ namespace Renderer
 	extern float g_primaryRenderDistanceSquared;
 	extern float g_secondaryRenderDistanceSquared;
 	extern LPDIRECT3DDEVICE3 g_drawDeviceD3DDevice;
+	extern int32_t g_drawTriangleWireframes;
+	extern int32_t g_submittedVertexCount;
+	extern int32_t g_submittedTriangleCount;
+	extern int32_t g_submittedPrimitiveCount;
 
 	void Cleanup();
 	void Init();
@@ -121,6 +125,7 @@ namespace Renderer
 	void DrawTintOverlay();
 
 	void InitRenderState(int32_t newStage);
+	int32_t SetupMaterialRenderState(Nu3D::Material* material, int32_t stateFlags);
 	void ResetParallax();
 	void RenderParallaxBackground(int32_t forceRender);
 	void FlushRenderQueues();

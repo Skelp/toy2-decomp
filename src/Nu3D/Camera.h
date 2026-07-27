@@ -65,6 +65,7 @@ namespace Nu3D
 		extern FixedViewTransform g_fixedViewTransform;
 		extern ReflectionState g_reflectionState;
 		extern int32_t g_effectMode;
+		extern int32_t g_billboardYaw;
 		extern int32_t g_cameraSkewEnabled;
 		extern int32_t g_cameraSkewPhase;
 

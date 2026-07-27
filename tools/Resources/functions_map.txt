@@ -867,8 +867,8 @@
 0x004B6ED0 Renderer::Vertices::ApplyOffset
 0x004B6F50 Renderer::Vertices::ProjectToScreen
 0x004B70E0 Renderer::Sprite::RenderType9
-0x004B75E0 Renderer::Vertices::ApplyMetadata100
-0x004B7710 Renderer::Vertices::ProjectForTex14
+0x004B75E0 Renderer::Vertices::ProjectCustomTextureCoordinates
+0x004B7710 Renderer::Vertices::ProjectTex14Coordinates
 0x004B7830 Renderer::Vertices::ModuleColor
 0x004B7920 Renderer::Sprite::RenderGroundAlignedSprite
 0x004B7B30 Renderer::Sprite::RenderQuadSprite
