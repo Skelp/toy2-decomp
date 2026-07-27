@@ -462,6 +462,10 @@
 0x00490B90 Nu3D::Math::CrossProduct3D
 0x00490BF0 Toy2::UpdateD3DState
 0x00490D00 Nullsub5
+0x00490D10 DevDraw::AppendClippedVertexPair
+0x00490EE0 DevDraw::SubmitQuadFlushing
+0x00491F20 DevDraw::UnkFunc1
+0x00492F70 DevDraw::UnkFunc2
 0x00493A60 Renderer::Sprite::DrawTinted
 0x00493C30 Renderer::Sprite::DrawColoured
 0x00493DC0 Renderer::Sprite::DrawColouredFixed
