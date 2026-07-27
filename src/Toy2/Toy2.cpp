@@ -32,6 +32,12 @@
 
 namespace Toy2
 {
+	// FUNCTION: TOY2 0x0044F840
+	void ShowModelNode(int32_t creatureIndex, int32_t nodeIndex) { Nu3D::Creature::SetNodeVisibleByIndex(creatureIndex, nodeIndex, 1); }
+
+	// FUNCTION: TOY2 0x0044F860
+	void HideModelNode(int32_t creatureIndex, int32_t nodeIndex) { Nu3D::Creature::SetNodeVisibleByIndex(creatureIndex, nodeIndex, 0); }
+
 	// GLOBAL: TOY2 0x00508D70
 	ToyCfg g_toyCfgData = {
 		7, /* flags */

@@ -1501,6 +1501,37 @@ namespace NGNLoader
 
 namespace Nu3D
 {
+	// FUNCTION: TOY2 0x004CAB80
+	int32_t Creature::SetNodeVisible(Creature* creature, int32_t nodeIndex, int32_t visible)
+	{
+		int32_t wasVisible = -1;
+		int32_t* nodeFlags = creature->flagsList;
+		if (nodeIndex >= 0 && nodeIndex < creature->nodeCount && nodeFlags != 0)
+		{
+			int32_t flags = nodeFlags[nodeIndex];
+			nodeFlags[nodeIndex] = flags & ~1;
+			wasVisible = ~flags & 1;
+			if (visible == 0)
+			{
+				creature->flagsList[nodeIndex] |= 1;
+			}
+		}
+		return wasVisible;
+	}
+
+	// FUNCTION: TOY2 0x004CE570
+	void Creature::SetNodeVisibleByIndex(int32_t creatureIndex, int32_t nodeIndex, int32_t visible)
+	{
+		if (creatureIndex >= 0 && creatureIndex < NGNLoader::g_ngnImage->creatureCount)
+		{
+			Creature* creature = NGNLoader::g_ngnImage->creatureData[creatureIndex];
+			if (creature != 0)
+			{
+				SetNodeVisible(creature, nodeIndex, visible);
+			}
+		}
+	}
+
 	// FUNCTION: TOY2 0x004C9F50
 	void Creature::Destroy(Creature* creature)
 	{
