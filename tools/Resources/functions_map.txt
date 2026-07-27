@@ -1091,7 +1091,7 @@
 0x004CCF70 Nu3D::Link::GetTargetPosFixed
 0x004CCFF0 Nu3D::Link::SnapToOtherLinkUsingScale
 0x004CD0C0 Nu3D::Link::CopyShapeId
-0x004CD110 Toy2::ShowTokenSparkle
+0x004CD110 Toy2::Collectables::ShowTokenSparkle
 0x004CD120 Toy2::Animation::ResetNodeAngles
 0x004CD140 Nu3D::Bones::GetRootWorldPos
 0x004CD170 Toy2::Animation::ParseHeader
