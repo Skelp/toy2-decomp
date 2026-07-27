@@ -165,6 +165,18 @@ namespace InputManager
 	};
 	// clang-format on
 
+	// GLOBAL: TOY2 0x00503860
+	DirectionInputMapping g_directionInputMappings[] = {
+		{ INPUT_FIRE, INPUT_JUMP, INPUT_SPIN },
+		{ INPUT_JUMP, INPUT_FIRE, INPUT_CANCEL },
+		{ INPUT_JUMP, INPUT_SPIN, INPUT_CANCEL },
+		{ INPUT_FIRE, INPUT_JUMP, INPUT_CANCEL },
+		{ INPUT_SPIN, INPUT_JUMP, INPUT_CANCEL },
+		{ INPUT_JUMP, INPUT_FIRE, INPUT_SPIN },
+		{ INPUT_JUMP, INPUT_SPIN, INPUT_FIRE },
+		{ INPUT_SPIN, INPUT_JUMP, INPUT_FIRE },
+	};
+
 	// FUNCTION: TOY2 0x00415120
 	int32_t GetPressedInput()
 	{
@@ -316,6 +328,21 @@ namespace InputManager
 		}
 
 		return 0;
+	}
+
+	// FUNCTION: TOY2 0x0049EBA0
+	void UpdateDirectionInputState()
+	{
+		uint32_t cameraType = SaveManager::g_save0Data.cameraType & SaveManager::CAMERA_MASK;
+		DirectionInputMapping& mapping = g_directionInputMappings[cameraType];
+
+		g_directionInputState = g_curButtonsPressed & 0xFFF;
+		if (mapping.fireMask & g_curButtonsPressed)
+			g_directionInputState |= INPUT_FIRE;
+		if (mapping.jumpMask & g_curButtonsPressed)
+			g_directionInputState |= INPUT_JUMP;
+		if (mapping.spinMask & g_curButtonsPressed)
+			g_directionInputState |= INPUT_SPIN;
 	}
 
 	// FUNCTION: TOY2 0x00414AF0
