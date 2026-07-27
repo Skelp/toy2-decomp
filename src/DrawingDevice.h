@@ -145,7 +145,9 @@ namespace DrawingDevice
 	HRESULT ClearScreen(DWORD clearFlags, D3DCOLOR clearColor);
 	HRESULT BeginScene();
 	HRESULT PresentFrame();
+	void RestoreToGDISurface(int32_t refreshWindow);
 	void EndScene();
+	HRESULT SetTexture(DWORD stage, LPDIRECT3DTEXTURE2 texture);
 	void LockPrimarySurface(LPDDSURFACEDESC2 surfaceDesc);
 	void UnlockPrimarySurface();
 	HRESULT BindTexWithStage(int32_t textureIndex, int32_t stageIndex);

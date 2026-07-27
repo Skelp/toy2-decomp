@@ -825,6 +825,12 @@ namespace DrawingDevice
 		return frontBuffer->Blt(&g_drawingDevice->m_rcScreenRect, backBuffer, &g_drawingDevice->m_rcViewportRect, 0x1000000, 0);
 	}
 
+	// FUNCTION: TOY2 0x004ABD50
+	void RestoreToGDISurface(int32_t refreshWindow) { g_drawingDevice->RestoreToGDISurface(refreshWindow); }
+
+	// FUNCTION: TOY2 0x004AC180
+	HRESULT SetTexture(DWORD stage, LPDIRECT3DTEXTURE2 texture) { return g_drawingDevice->m_pd3dDevice->SetTexture(stage, texture); }
+
 	// FUNCTION: TOY2 0x004ABAD0 [MATCHED]
 	void EndScene()
 	{
