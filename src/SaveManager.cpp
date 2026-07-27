@@ -50,6 +50,56 @@ namespace SaveManager
 		}
 	}
 
+	// FUNCTION: TOY2 0x004151E0
+	void ClearBindByControlId(int32_t controlId)
+	{
+		for (int32_t i = 0; i < 38; i++)
+		{
+			if (g_save99Data.saveStructs[i].gameControlId == controlId)
+			{
+				g_save99Data.saveStructs[i].dInputCode = TOY_INPUT_UNKNOWN;
+				g_save99Data.saveStructs[i].gameControlId = 0;
+			}
+		}
+	}
+
+	// FUNCTION: TOY2 0x00415210
+	void ClearBindByInputCode(int32_t inputCode)
+	{
+		for (int32_t i = 0; i < 38; i++)
+		{
+			if (g_save99Data.saveStructs[i].dInputCode == inputCode)
+			{
+				g_save99Data.saveStructs[i].dInputCode = TOY_INPUT_UNKNOWN;
+				g_save99Data.saveStructs[i].gameControlId = 0;
+			}
+		}
+	}
+
+	// FUNCTION: TOY2 0x00415240
+	int32_t GetInputCodeByControlId(int32_t controlId)
+	{
+		for (int32_t i = 0; i < 38; i++)
+		{
+			if (g_save99Data.saveStructs[i].gameControlId == controlId)
+				return g_save99Data.saveStructs[i].dInputCode;
+		}
+
+		return TOY_INPUT_UNKNOWN;
+	}
+
+	// FUNCTION: TOY2 0x00415270
+	int32_t GetControlSettingId(int32_t inputCode)
+	{
+		for (int32_t i = 0; i < 38; i++)
+		{
+			if (g_save99Data.saveStructs[i].dInputCode == inputCode)
+				return g_save99Data.saveStructs[i].gameControlId;
+		}
+
+		return TOY_INPUT_UNKNOWN;
+	}
+
 	// FUNCTION: TOY2 0x00414F20
 	void Init()
 	{

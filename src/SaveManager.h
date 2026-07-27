@@ -52,6 +52,10 @@ namespace SaveManager
 #pragma pack(pop)
 
 	void Init();
+	void ClearBindByControlId(int32_t controlId);
+	void ClearBindByInputCode(int32_t inputCode);
+	int32_t GetInputCodeByControlId(int32_t controlId);
+	int32_t GetControlSettingId(int32_t inputCode);
 	void InitProgressData(Save0Data* save);
 	void LoadProgressData(Save0Data* save);
 	void TransferProgressData(Save0Data* save);
