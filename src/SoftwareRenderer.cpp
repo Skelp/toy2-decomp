@@ -649,31 +649,196 @@ namespace SoftwareRenderer
 		int32_t rightBlue)
 	{}
 
-	// STUB: TOY2 0x004C4E00
-	void UnkFunc52(Nu3D::VertexTL* leftEdge,
-		Nu3D::VertexTL* rightEdge,
+	// Untextured additive span for a 16-bit 555 surface.
+	//
+	// The span brightens what is already on the surface: for every pixel it reads
+	// the destination, adds the interpolated span colour to each five-bit channel,
+	// saturates each result at 0x1f, and writes the pixel back. This is the
+	// RENDER_ALPHA_CUSTOM path with no texture bound, which the selector reaches
+	// for glow, muzzle-flash, and light-bloom primitives. texData is unused here;
+	// the walker passes it because every span variant shares one signature.
+	//
+	// The accumulators carry a five-bit channel in the high half of a 16-bit
+	// fixed-point value, so each read shifts down by 11. Unlike the subtractive
+	// siblings this one keeps them in full 32-bit registers, so retail uses a
+	// dword load and a logical shift rather than a word load.
+	// FUNCTION: TOY2 0x004C4E00
+	void UnkFunc52(Nu3D::VertexTL* edgeA,
+		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
-		int32_t leftRed,
-		int32_t leftGreen,
-		int32_t leftBlue,
-		int32_t rightRed,
-		int32_t rightGreen,
-		int32_t rightBlue)
-	{}
+		int32_t edgeARed,
+		int32_t edgeAGreen,
+		int32_t edgeABlue,
+		int32_t edgeBRed,
+		int32_t edgeBGreen,
+		int32_t edgeBBlue)
+	{
+		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
+		if (width == 0)
+		{
+			return;
+		}
 
-	// STUB: TOY2 0x004C4F30
-	void UnkFunc36(Nu3D::VertexTL* leftEdge,
-		Nu3D::VertexTL* rightEdge,
+		// The caller does not order the endpoints. Keep the one with the smaller x
+		// in edgeB and its colours in the edgeB accumulators, so the walk below
+		// always runs to increasing columns. farRed/Green/Blue hold the other end.
+		int32_t farRed;
+		int32_t farGreen;
+		int32_t farBlue;
+		if (width < 0)
+		{
+			farRed = edgeBRed;
+			farGreen = edgeBGreen;
+			farBlue = edgeBBlue;
+			edgeBRed = edgeARed;
+			edgeBGreen = edgeAGreen;
+			edgeBBlue = edgeABlue;
+			edgeB = edgeA;
+			width = -width;
+		}
+		else
+		{
+			farRed = edgeARed;
+			farGreen = edgeAGreen;
+			farBlue = edgeABlue;
+		}
+
+		if (width > 0)
+		{
+			int32_t stepRed = (farRed - edgeBRed) / width;
+			int32_t stepGreen = (farGreen - edgeBGreen) / width;
+			int32_t stepBlue = (farBlue - edgeBBlue) / width;
+
+			destRow += (int32_t)edgeB->position.x;
+
+			do
+			{
+				// Retail reads a full dword through the 16-bit cursor and keeps only
+				// the low pixel. The upper half is discarded by the channel masks.
+				uint32_t pixel = *(const uint32_t*)destRow;
+
+				int32_t channel = (int32_t)(pixel & 0x1f) + (int32_t)((uint32_t)edgeBBlue >> 11);
+				if (channel >= 0x20)
+				{
+					channel = 0x1f;
+				}
+				int32_t out = channel;
+
+				channel = (int32_t)((pixel >> 5) & 0x1f) + (int32_t)((uint32_t)edgeBGreen >> 11);
+				if (channel >= 0x20)
+				{
+					channel = 0x1f;
+				}
+				out += channel << 5;
+
+				channel = (int32_t)((pixel >> 10) & 0x1f) + (int32_t)((uint32_t)edgeBRed >> 11);
+				if (channel >= 0x20)
+				{
+					channel = 0x1f;
+				}
+
+				*destRow = (uint16_t)((channel << 10) + out);
+				destRow++;
+
+				edgeBRed += stepRed;
+				edgeBGreen += stepGreen;
+				edgeBBlue += stepBlue;
+				width--;
+			} while (width != 0);
+		}
+	}
+
+	// The 16-bit 565 twin of UnkFunc52. Identical additive span; only the channel
+	// positions move. Green starts at bit 6 and red at bit 11, and the rasterizer
+	// still takes five bits per channel, so it uses the high five bits of the
+	// six-bit green field.
+	// FUNCTION: TOY2 0x004C4F30
+	void UnkFunc36(Nu3D::VertexTL* edgeA,
+		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
-		int32_t leftRed,
-		int32_t leftGreen,
-		int32_t leftBlue,
-		int32_t rightRed,
-		int32_t rightGreen,
-		int32_t rightBlue)
-	{}
+		int32_t edgeARed,
+		int32_t edgeAGreen,
+		int32_t edgeABlue,
+		int32_t edgeBRed,
+		int32_t edgeBGreen,
+		int32_t edgeBBlue)
+	{
+		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
+		if (width == 0)
+		{
+			return;
+		}
+
+		// The caller does not order the endpoints. Keep the one with the smaller x
+		// in edgeB and its colours in the edgeB accumulators, so the walk below
+		// always runs to increasing columns. farRed/Green/Blue hold the other end.
+		int32_t farRed;
+		int32_t farGreen;
+		int32_t farBlue;
+		if (width < 0)
+		{
+			farRed = edgeBRed;
+			farGreen = edgeBGreen;
+			farBlue = edgeBBlue;
+			edgeBRed = edgeARed;
+			edgeBGreen = edgeAGreen;
+			edgeBBlue = edgeABlue;
+			edgeB = edgeA;
+			width = -width;
+		}
+		else
+		{
+			farRed = edgeARed;
+			farGreen = edgeAGreen;
+			farBlue = edgeABlue;
+		}
+
+		if (width > 0)
+		{
+			int32_t stepRed = (farRed - edgeBRed) / width;
+			int32_t stepGreen = (farGreen - edgeBGreen) / width;
+			int32_t stepBlue = (farBlue - edgeBBlue) / width;
+
+			destRow += (int32_t)edgeB->position.x;
+
+			do
+			{
+				// Retail reads a full dword through the 16-bit cursor and keeps only
+				// the low pixel. The upper half is discarded by the channel masks.
+				uint32_t pixel = *(const uint32_t*)destRow;
+
+				int32_t channel = (int32_t)(pixel & 0x1f) + (int32_t)((uint32_t)edgeBBlue >> 11);
+				if (channel >= 0x20)
+				{
+					channel = 0x1f;
+				}
+				int32_t out = channel;
+
+				channel = (int32_t)((pixel >> 6) & 0x1f) + (int32_t)((uint32_t)edgeBGreen >> 11);
+				if (channel >= 0x20)
+				{
+					channel = 0x1f;
+				}
+				out += channel << 6;
+
+				channel = (int32_t)((pixel >> 11) & 0x1f) + (int32_t)((uint32_t)edgeBRed >> 11);
+				if (channel >= 0x20)
+				{
+					channel = 0x1f;
+				}
+
+				*destRow = (uint16_t)((channel << 11) + out);
+				destRow++;
+
+				edgeBRed += stepRed;
+				edgeBGreen += stepGreen;
+				edgeBBlue += stepBlue;
+				width--;
+			} while (width != 0);
+		}
+	}
 
 	// STUB: TOY2 0x004C5060
 	void UnkFunc41(Nu3D::VertexTL* leftEdge,
