@@ -150,7 +150,34 @@ namespace SoftwareRenderer
 	// variant from the render state and publish it in g_spanRasterizer; UnkFunc57
 	// and UnkFunc58 then call it per scanline. There are 21 variants, one per
 	// combination of pixel format, texturing, and blend mode.
-	typedef void (*SpanRasterizer)();
+	//
+	// Every variant shares one ten-argument __cdecl signature. The walkers push
+	// ten dwords and clean up with a single `add esp, 0x28`, and each variant
+	// reads the same [ebp+8..ebp+0x2c] slots, so the shared parameter list is:
+	//
+	//   edgeA, edgeB      the two span endpoints, in no particular order. Each is
+	//                     a VertexTL, read for position.x (truncated by __ftol to
+	//                     a pixel column) and, on the textured and modulated
+	//                     paths, for uv. Each variant compares the two and works
+	//                     from the one with the smaller x.
+	//   destRow           the 16-bit destination pixel cursor for this row.
+	//   texData           the texture pixel buffer, NULL on untextured paths.
+	//   edgeA/edgeB RGB   the two endpoint colours in 16-bit fixed point, one
+	//                     five-bit channel per component in the high half. The
+	//                     rasterizer interpolates between them across the span.
+	//
+	// A variant that ignores a slot still receives it, because the walker calls
+	// every variant through the same pointer.
+	typedef void (*SpanRasterizer)(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
 	extern SpanRasterizer g_spanRasterizer;
 	extern int32_t g_spanAlpha;
 	extern int32_t g_spanInvAlpha;
@@ -158,22 +185,168 @@ namespace SoftwareRenderer
 	// The span variants themselves. Naming each one needs its body, so they keep
 	// their map names for now; the selector below documents which state picks
 	// which.
-	void UnkFunc36();
-	void UnkFunc37();
-	void UnkFunc38();
-	void UnkFunc40();
-	void UnkFunc41();
-	void UnkFunc42();
-	void UnkFunc43();
-	void UnkFunc44();
-	void UnkFunc48();
-	void UnkFunc49();
-	void UnkFunc50();
-	void UnkFunc51();
-	void UnkFunc52();
-	void UnkFunc53();
-	void UnkFunc55();
-	void UnkFunc56();
+	void UnkFunc36(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
+	void UnkFunc37(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
+	void UnkFunc38(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
+	void UnkFunc40(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
+	void UnkFunc41(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
+	void UnkFunc42(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
+	void UnkFunc43(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
+	void UnkFunc44(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
+	void UnkFunc48(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
+	void UnkFunc49(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
+	void UnkFunc50(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
+	void UnkFunc51(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
+	void UnkFunc52(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
+
+	// Subtractive span for a 16-bit 555 surface. See the definition.
+	void UnkFunc53(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
+	void UnkFunc55(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
+	void UnkFunc56(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
 
 	// The whole-primitive paths. The two quad rasterizers take only the command;
 	// the two triangle walkers also take the texture.

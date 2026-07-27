@@ -598,52 +598,372 @@ namespace SoftwareRenderer
 	// scanline using the globals the selector published.
 
 	// STUB: TOY2 0x004C4370
-	void UnkFunc48() {}
+	void UnkFunc48(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue)
+	{}
 
 	// STUB: TOY2 0x004C48E0
-	void UnkFunc55() {}
+	void UnkFunc55(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue)
+	{}
 
 	// STUB: TOY2 0x004C4A60
-	void UnkFunc40() {}
+	void UnkFunc40(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue)
+	{}
 
 	// STUB: TOY2 0x004C4BE0
-	void UnkFunc49() {}
+	void UnkFunc49(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue)
+	{}
 
 	// STUB: TOY2 0x004C4E00
-	void UnkFunc52() {}
+	void UnkFunc52(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue)
+	{}
 
 	// STUB: TOY2 0x004C4F30
-	void UnkFunc36() {}
+	void UnkFunc36(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue)
+	{}
 
 	// STUB: TOY2 0x004C5060
-	void UnkFunc41() {}
+	void UnkFunc41(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue)
+	{}
 
 	// STUB: TOY2 0x004C5280
-	void UnkFunc50() {}
+	void UnkFunc50(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue)
+	{}
 
-	// STUB: TOY2 0x004C5490
-	void UnkFunc53() {}
+	// Untextured subtractive span for a 16-bit 555 surface.
+	//
+	// The span darkens what is already on the surface: for every pixel it reads
+	// the destination, subtracts the interpolated span colour from each five-bit
+	// channel, clamps each result at zero, and writes the pixel back. This is the
+	// RENDER_ALPHA_ALT path with no texture bound, which the selector reaches for
+	// shadow and darkening primitives. texData is unused here; the walker passes
+	// it because every span variant shares one signature.
+	//
+	// The accumulators carry a five-bit channel in the high half of a 16-bit
+	// fixed-point value, so each read truncates to 16 bits and shifts down by 11.
+	// That is why retail uses a word load and needs no mask.
+	// FUNCTION: TOY2 0x004C5490
+	void UnkFunc53(Nu3D::VertexTL* edgeA,
+		Nu3D::VertexTL* edgeB,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t edgeARed,
+		int32_t edgeAGreen,
+		int32_t edgeABlue,
+		int32_t edgeBRed,
+		int32_t edgeBGreen,
+		int32_t edgeBBlue)
+	{
+		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
+		if (width == 0)
+		{
+			return;
+		}
 
-	// STUB: TOY2 0x004C55B0
-	void UnkFunc37() {}
+		// The caller does not order the endpoints. Keep the one with the smaller x
+		// in edgeB and its colours in the edgeB accumulators, so the walk below
+		// always runs to increasing columns. farRed/Green/Blue hold the other end.
+		int32_t farRed;
+		int32_t farGreen;
+		int32_t farBlue;
+		if (width < 0)
+		{
+			farRed = edgeBRed;
+			farGreen = edgeBGreen;
+			farBlue = edgeBBlue;
+			edgeBRed = edgeARed;
+			edgeBGreen = edgeAGreen;
+			edgeBBlue = edgeABlue;
+			edgeB = edgeA;
+			width = -width;
+		}
+		else
+		{
+			farRed = edgeARed;
+			farGreen = edgeAGreen;
+			farBlue = edgeABlue;
+		}
+
+		if (width > 0)
+		{
+			int32_t stepRed = (farRed - edgeBRed) / width;
+			int32_t stepGreen = (farGreen - edgeBGreen) / width;
+			int32_t stepBlue = (farBlue - edgeBBlue) / width;
+
+			destRow += (int32_t)edgeB->position.x;
+
+			do
+			{
+				uint16_t pixel = *destRow;
+
+				int32_t channel = (pixel & 0x1f) - ((uint16_t)edgeBBlue >> 11);
+				if (channel < 0)
+				{
+					channel = 0;
+				}
+				int32_t out = channel;
+
+				channel = ((pixel >> 5) & 0x1f) - ((uint16_t)edgeBGreen >> 11);
+				if (channel < 0)
+				{
+					channel = 0;
+				}
+				out += channel << 5;
+
+				channel = ((pixel >> 10) & 0x1f) - ((uint16_t)edgeBRed >> 11);
+				if (channel < 0)
+				{
+					channel = 0;
+				}
+
+				*destRow = (uint16_t)((channel << 10) + out);
+				destRow++;
+
+				edgeBRed += stepRed;
+				edgeBGreen += stepGreen;
+				edgeBBlue += stepBlue;
+				width--;
+			} while (width != 0);
+		}
+	}
+
+	// The 16-bit 565 twin of UnkFunc53. Identical subtractive span; only the
+	// channel positions move. Green starts at bit 6 and red at bit 11, and the
+	// rasterizer still takes five bits per channel, so it uses the high five bits
+	// of the six-bit green field.
+	// FUNCTION: TOY2 0x004C55B0
+	void UnkFunc37(Nu3D::VertexTL* edgeA,
+		Nu3D::VertexTL* edgeB,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t edgeARed,
+		int32_t edgeAGreen,
+		int32_t edgeABlue,
+		int32_t edgeBRed,
+		int32_t edgeBGreen,
+		int32_t edgeBBlue)
+	{
+		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
+		if (width == 0)
+		{
+			return;
+		}
+
+		// The caller does not order the endpoints. Keep the one with the smaller x
+		// in edgeB and its colours in the edgeB accumulators, so the walk below
+		// always runs to increasing columns. farRed/Green/Blue hold the other end.
+		int32_t farRed;
+		int32_t farGreen;
+		int32_t farBlue;
+		if (width < 0)
+		{
+			farRed = edgeBRed;
+			farGreen = edgeBGreen;
+			farBlue = edgeBBlue;
+			edgeBRed = edgeARed;
+			edgeBGreen = edgeAGreen;
+			edgeBBlue = edgeABlue;
+			edgeB = edgeA;
+			width = -width;
+		}
+		else
+		{
+			farRed = edgeARed;
+			farGreen = edgeAGreen;
+			farBlue = edgeABlue;
+		}
+
+		if (width > 0)
+		{
+			int32_t stepRed = (farRed - edgeBRed) / width;
+			int32_t stepGreen = (farGreen - edgeBGreen) / width;
+			int32_t stepBlue = (farBlue - edgeBBlue) / width;
+
+			destRow += (int32_t)edgeB->position.x;
+
+			do
+			{
+				uint16_t pixel = *destRow;
+
+				int32_t channel = (pixel & 0x1f) - ((uint16_t)edgeBBlue >> 11);
+				if (channel < 0)
+				{
+					channel = 0;
+				}
+				int32_t out = channel;
+
+				channel = ((pixel >> 6) & 0x1f) - ((uint16_t)edgeBGreen >> 11);
+				if (channel < 0)
+				{
+					channel = 0;
+				}
+				out += channel << 6;
+
+				channel = ((pixel >> 11) & 0x1f) - ((uint16_t)edgeBRed >> 11);
+				if (channel < 0)
+				{
+					channel = 0;
+				}
+
+				*destRow = (uint16_t)((channel << 11) + out);
+				destRow++;
+
+				edgeBRed += stepRed;
+				edgeBGreen += stepGreen;
+				edgeBBlue += stepBlue;
+				width--;
+			} while (width != 0);
+		}
+	}
 
 	// STUB: TOY2 0x004C56D0
-	void UnkFunc42() {}
+	void UnkFunc42(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue)
+	{}
 
 	// STUB: TOY2 0x004C58E0
-	void UnkFunc43() {}
+	void UnkFunc43(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue)
+	{}
 
 	// STUB: TOY2 0x004C5AC0
-	void UnkFunc51() {}
+	void UnkFunc51(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue)
+	{}
 
 	// STUB: TOY2 0x004C5D80
-	void UnkFunc56() {}
+	void UnkFunc56(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue)
+	{}
 
 	// STUB: TOY2 0x004C5F00
-	void UnkFunc38() {}
+	void UnkFunc38(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue)
+	{}
 
 	// STUB: TOY2 0x004C6080
-	void UnkFunc44() {}
+	void UnkFunc44(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue)
+	{}
 
 	// Whole-primitive rasterizers for an untextured quad.
 
