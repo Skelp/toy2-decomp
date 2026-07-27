@@ -143,12 +143,48 @@ namespace SoftwareRenderer
 	// A queued render command for the software rasterizer. UnkFunc29 enqueues
 	// transformed vertices (3 for a triangle, 4 for a quad when vertexCount is
 	// 4) and UnkFunc35 dequeues and rasterizes one. Stride 0x9C, capacity 1024.
-	// The metadata at +0x80 is only partially understood; refine the names when
-	// UnkFunc29 and UnkFunc35 are reconstructed.
 	struct RenderCommand;
-	void UnkFunc29(Nu3D::VertexTL* vertices[4], int32_t vertexCount, int32_t field80, int32_t field88);
-	void UnkFunc35(RenderCommand* command, int32_t vertexCount, int32_t field88, int32_t field80, int32_t field94);
-	void UnkFunc34(RenderCommand* command, int32_t vertexCount, int32_t field88, int32_t field80, int32_t field94);
+	void UnkFunc29(Nu3D::VertexTL* vertices[4], int32_t vertexCount, uint32_t* texData, int32_t renderState);
+
+	// One scanline of a triangle or a quad. UnkFunc34 and UnkFunc35 choose the
+	// variant from the render state and publish it in g_spanRasterizer; UnkFunc57
+	// and UnkFunc58 then call it per scanline. There are 21 variants, one per
+	// combination of pixel format, texturing, and blend mode.
+	typedef void (*SpanRasterizer)();
+	extern SpanRasterizer g_spanRasterizer;
+	extern int32_t g_spanAlpha;
+	extern int32_t g_spanInvAlpha;
+
+	// The span variants themselves. Naming each one needs its body, so they keep
+	// their map names for now; the selector below documents which state picks
+	// which.
+	void UnkFunc36();
+	void UnkFunc37();
+	void UnkFunc38();
+	void UnkFunc40();
+	void UnkFunc41();
+	void UnkFunc42();
+	void UnkFunc43();
+	void UnkFunc44();
+	void UnkFunc48();
+	void UnkFunc49();
+	void UnkFunc50();
+	void UnkFunc51();
+	void UnkFunc52();
+	void UnkFunc53();
+	void UnkFunc55();
+	void UnkFunc56();
+
+	// The whole-primitive paths. The two quad rasterizers take only the command;
+	// the two triangle walkers also take the texture.
+	void UnkFunc39(RenderCommand* command);
+	void UnkFunc54(RenderCommand* command);
+	void UnkFunc46(RenderCommand* command, uint32_t* texData);
+	void UnkFunc57(RenderCommand* command, uint32_t* texData);
+	void UnkFunc58(RenderCommand* command, uint32_t* texData);
+
+	void UnkFunc35(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans);
+	void UnkFunc34(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans);
 
 	// Snapshot of the current texture's writable data: the pixel buffer and the
 	// surface descriptor that holds its dimensions and pitch. UnkFunc20 fills

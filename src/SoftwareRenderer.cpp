@@ -97,12 +97,14 @@ namespace SoftwareRenderer
 	struct RenderCommand
 	{
 		Nu3D::VertexTL vertices[4]; // +0x00
-		int32_t field80; // +0x80 (mode/flags read by UnkFunc35)
+		uint32_t* texData; // +0x80 (NULL selects an untextured rasterizer)
 		int32_t vertexCount; // +0x84 (3 = triangle, 4 = quad)
-		int32_t field88; // +0x88
+		int32_t renderState; // +0x88 (Renderer::RENDER_* alpha flags)
 		RenderCommand* next; // +0x8C (sorted-path list link, read by UnkFunc33)
 		int32_t field90; // +0x90
-		int32_t field94; // +0x94 (passed to UnkFunc35)
+		// +0x94: nonzero selects alternate span rasterizers. UnkFunc35 ignores it;
+		// UnkFunc34 branches on it, which is what gives it this role.
+		int32_t useAlternateSpans;
 		int32_t field98; // +0x98
 	};
 
@@ -182,6 +184,23 @@ namespace SoftwareRenderer
 
 	// GLOBAL: TOY2 0x00B626BC
 	float g_spanScaleH;
+
+	// The span rasterizer that UnkFunc34 and UnkFunc35 select from the render
+	// state, and that UnkFunc57 and UnkFunc58 then call once per scanline. The
+	// selection is a plain global, so the executors take no function argument.
+
+	// GLOBAL: TOY2 0x00B626B0
+	SpanRasterizer g_spanRasterizer;
+
+	// Vertex 0's diffuse alpha, and its complement 255 - alpha. The two blending
+	// span rasterizers read them instead of re-reading the vertex, so the
+	// selector has to publish them whenever it picks a blending path.
+
+	// GLOBAL: TOY2 0x00B626AC
+	int32_t g_spanAlpha;
+
+	// GLOBAL: TOY2 0x00B626B8
+	int32_t g_spanInvAlpha;
 
 	// GLOBAL: TOY2 0x00E4D7A8
 	float g_zoomScaleV;
@@ -543,7 +562,7 @@ namespace SoftwareRenderer
 	int16_t UnkFunc3() { return 0; }
 
 	// FUNCTION: TOY2 0x004BCAD0
-	void UnkFunc29(Nu3D::VertexTL* vertices[4], int32_t vertexCount, int32_t field80, int32_t field88)
+	void UnkFunc29(Nu3D::VertexTL* vertices[4], int32_t vertexCount, uint32_t* texData, int32_t renderState)
 	{
 		if (g_unkDE20A8 < 0x400)
 		{
@@ -559,8 +578,8 @@ namespace SoftwareRenderer
 				dst[3] = *vertices[3];
 			}
 			command->vertexCount = vertexCount;
-			command->field80 = field80;
-			command->field88 = field88;
+			command->texData = texData;
+			command->renderState = renderState;
 		}
 	}
 
@@ -570,13 +589,236 @@ namespace SoftwareRenderer
 		for (int i = 0; i < g_unkDE20A8; i++)
 		{
 			RenderCommand& command = g_renderQueue[i];
-			UnkFunc35(&command, command.vertexCount, command.field88, command.field80, command.field94);
+			UnkFunc35(&command, command.vertexCount, command.renderState, command.texData, command.useAlternateSpans);
 		}
 		g_unkA4CC80 = 0;
 	}
 
-	// STUB: TOY2 0x004C9D00
-	void UnkFunc35(RenderCommand* command, int32_t vertexCount, int32_t field88, int32_t field80, int32_t field94) {}
+	// The span rasterizers that UnkFunc34 and UnkFunc35 select. Each writes one
+	// scanline using the globals the selector published.
+
+	// STUB: TOY2 0x004C4370
+	void UnkFunc48() {}
+
+	// STUB: TOY2 0x004C48E0
+	void UnkFunc55() {}
+
+	// STUB: TOY2 0x004C4A60
+	void UnkFunc40() {}
+
+	// STUB: TOY2 0x004C4BE0
+	void UnkFunc49() {}
+
+	// STUB: TOY2 0x004C4E00
+	void UnkFunc52() {}
+
+	// STUB: TOY2 0x004C4F30
+	void UnkFunc36() {}
+
+	// STUB: TOY2 0x004C5060
+	void UnkFunc41() {}
+
+	// STUB: TOY2 0x004C5280
+	void UnkFunc50() {}
+
+	// STUB: TOY2 0x004C5490
+	void UnkFunc53() {}
+
+	// STUB: TOY2 0x004C55B0
+	void UnkFunc37() {}
+
+	// STUB: TOY2 0x004C56D0
+	void UnkFunc42() {}
+
+	// STUB: TOY2 0x004C58E0
+	void UnkFunc43() {}
+
+	// STUB: TOY2 0x004C5AC0
+	void UnkFunc51() {}
+
+	// STUB: TOY2 0x004C5D80
+	void UnkFunc56() {}
+
+	// STUB: TOY2 0x004C5F00
+	void UnkFunc38() {}
+
+	// STUB: TOY2 0x004C6080
+	void UnkFunc44() {}
+
+	// Whole-primitive rasterizers for an untextured quad.
+
+	// STUB: TOY2 0x004C80D0
+	void UnkFunc54(RenderCommand* command) {}
+
+	// STUB: TOY2 0x004C8930
+	void UnkFunc39(RenderCommand* command) {}
+
+	// The primitive walkers: a textured quad, then the triangle and quad span
+	// loops that call g_spanRasterizer once per scanline.
+
+	// STUB: TOY2 0x004C6340
+	void UnkFunc57(RenderCommand* command, uint32_t* texData) {}
+
+	// STUB: TOY2 0x004C6B80
+	void UnkFunc46(RenderCommand* command, uint32_t* texData) {}
+
+	// STUB: TOY2 0x004C9190
+	void UnkFunc58(RenderCommand* command, uint32_t* texData) {}
+
+	// Chooses the span rasterizer for one queued command, then runs it.
+	//
+	// Three things select the variant: the surface pixel format, whether a
+	// texture is bound, and the alpha mode in the render state. The command
+	// already carries its own texture and render state, so the corresponding
+	// parameters are dead here; UnkFunc31 passes them because UnkFunc34 shares
+	// the signature.
+	//
+	// An untextured quad and a textured quad have dedicated whole-primitive
+	// rasterizers, so those two cases return early instead of selecting a span.
+	// Everything else falls through to the shared tail, which walks a triangle
+	// or a quad one scanline at a time.
+
+	// FUNCTION: TOY2 0x004C9D00 [MATCHED]
+	void UnkFunc35(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans)
+	{
+		int32_t pixelFormatMode = g_pixelFormatMode;
+		uint32_t* commandTexData = command->texData;
+		int32_t commandRenderState = command->renderState;
+		int32_t commandVertexCount = command->vertexCount;
+
+		if (pixelFormatMode == 0)
+		{
+			if (commandTexData == NULL)
+			{
+				if (commandRenderState & Renderer::RENDER_ALPHA_CUSTOM)
+				{
+					g_spanRasterizer = UnkFunc52;
+				}
+				else if (commandRenderState & Renderer::RENDER_ALPHA_ALT)
+				{
+					g_spanRasterizer = UnkFunc53;
+				}
+				else if (commandRenderState & Renderer::RENDER_ALPHA_DEFAULT)
+				{
+					g_spanAlpha = command->vertices[0].diffuse.value >> 24;
+					if (g_spanAlpha == 255)
+					{
+						g_spanRasterizer = UnkFunc55;
+					}
+					else
+					{
+						g_spanRasterizer = UnkFunc56;
+						g_spanInvAlpha = 255 - g_spanAlpha;
+					}
+				}
+				else if (commandVertexCount == 4)
+				{
+					UnkFunc54(command);
+					return;
+				}
+				else
+				{
+					g_spanRasterizer = UnkFunc55;
+				}
+			}
+			else if (commandRenderState & Renderer::RENDER_ALPHA_CUSTOM)
+			{
+				g_spanRasterizer = UnkFunc49;
+			}
+			else if (commandRenderState & Renderer::RENDER_ALPHA_ALT)
+			{
+				g_spanRasterizer = UnkFunc50;
+			}
+			else if (commandRenderState & Renderer::RENDER_ALPHA_DEFAULT)
+			{
+				g_spanAlpha = command->vertices[0].diffuse.value >> 24;
+				if (g_spanAlpha == 255)
+				{
+					g_spanRasterizer = UnkFunc43;
+				}
+				else
+				{
+					g_spanRasterizer = UnkFunc51;
+					g_spanInvAlpha = 255 - g_spanAlpha;
+				}
+			}
+			else
+			{
+				goto textured;
+			}
+		}
+		else if (commandTexData == NULL)
+		{
+			if (commandRenderState & Renderer::RENDER_ALPHA_CUSTOM)
+			{
+				g_spanRasterizer = UnkFunc36;
+			}
+			else if (commandRenderState & Renderer::RENDER_ALPHA_ALT)
+			{
+				g_spanRasterizer = UnkFunc37;
+			}
+			else if (commandRenderState & Renderer::RENDER_ALPHA_DEFAULT)
+			{
+				g_spanAlpha = command->vertices[0].diffuse.value >> 24;
+				if (g_spanAlpha == 255)
+				{
+					g_spanRasterizer = UnkFunc40;
+				}
+				else
+				{
+					g_spanRasterizer = UnkFunc38;
+					g_spanInvAlpha = 255 - g_spanAlpha;
+				}
+			}
+			else if (commandVertexCount == 4)
+			{
+				UnkFunc39(command);
+				return;
+			}
+			else
+			{
+				g_spanRasterizer = UnkFunc40;
+			}
+		}
+		else if (commandRenderState & Renderer::RENDER_ALPHA_CUSTOM)
+		{
+			g_spanRasterizer = UnkFunc41;
+		}
+		else if (commandRenderState & Renderer::RENDER_ALPHA_ALT)
+		{
+			g_spanRasterizer = UnkFunc42;
+		}
+		else if (commandRenderState & Renderer::RENDER_ALPHA_DEFAULT)
+		{
+			g_spanAlpha = command->vertices[0].diffuse.value >> 24;
+			if (g_spanAlpha == 255)
+			{
+				g_spanRasterizer = UnkFunc43;
+			}
+			else
+			{
+				g_spanRasterizer = UnkFunc44;
+				g_spanInvAlpha = 255 - g_spanAlpha;
+			}
+		}
+		else
+		{
+		textured:
+			if (commandVertexCount == 4)
+			{
+				UnkFunc46(command, commandTexData);
+				return;
+			}
+			g_spanRasterizer = UnkFunc48;
+		}
+
+		if (commandVertexCount == 3)
+		{
+			UnkFunc57(command, commandTexData);
+			return;
+		}
+		UnkFunc58(command, commandTexData);
+	}
 
 	// FUNCTION: TOY2 0x004BCC40
 	void UnkFunc32()
@@ -593,7 +835,7 @@ namespace SoftwareRenderer
 	}
 
 	// STUB: TOY2 0x004C9A50
-	void UnkFunc34(RenderCommand* command, int32_t vertexCount, int32_t field88, int32_t field80, int32_t field94) {}
+	void UnkFunc34(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans) {}
 
 	// FUNCTION: TOY2 0x004BCB60 [MATCHED]
 	void UnkFunc33()
@@ -605,7 +847,7 @@ namespace SoftwareRenderer
 				RenderCommand* command = (RenderCommand*)g_unkB626E0[i];
 				while (command != NULL)
 				{
-					UnkFunc34(command, command->vertexCount, command->field88, command->field80, command->field94);
+					UnkFunc34(command, command->vertexCount, command->renderState, command->texData, command->useAlternateSpans);
 					command = command->next;
 				}
 			}
