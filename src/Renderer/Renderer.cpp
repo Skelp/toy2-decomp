@@ -1052,6 +1052,23 @@ namespace Renderer
 		}
 	}
 
+	// FUNCTION: TOY2 0x004CE5B0
+	void ShowBlackFrames()
+	{
+		RGBA black;
+		black.value = 0;
+		ClearScreen(black, 3);
+		if (BeginScene())
+		{
+			EndScene(1);
+		}
+		ClearScreen(black, 3);
+		if (BeginScene())
+		{
+			EndScene(1);
+		}
+	}
+
 	// FUNCTION: TOY2 0x00401B60
 	void DrawBlackBorderBox(int32_t xPos, int32_t yPos, int32_t width, int32_t height, uint32_t red, uint32_t green, uint32_t blue)
 	{

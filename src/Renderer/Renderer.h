@@ -128,6 +128,7 @@ namespace Renderer
 	void ClearScreen(RGBA clearColor, int32_t clearFlags);
 	int32_t BeginScene();
 	void EndScene(int32_t presentFrame);
+	void ShowBlackFrames();
 
 	// Render Methods
 	void DrawMainMenuText(int16_t yPos, char* text, int32_t fadeAlpha);

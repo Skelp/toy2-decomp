@@ -378,6 +378,15 @@ namespace Toy2
 	// STUB: TOY2 0x00440F70
 	void RenderGame(int32_t fullRender) {}
 
+	// FUNCTION: TOY2 0x00453CA0
+	void ResetBackdropState()
+	{
+		g_hasStaticBackdrop = 0;
+		Renderer::g_virtualScreenWidth = 512.0f;
+		Renderer::g_virtualScreenHeight = 256.0f;
+		g_nextBackdropId = 36;
+	}
+
 	// FUNCTION: TOY2 0x00454020 [MATCHED]
 	void ShowPostGameSaveMenu()
 	{
