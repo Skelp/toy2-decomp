@@ -709,8 +709,114 @@ namespace Nu3D
 		return 0;
 	}
 
-	// STUB: TOY2 0x004B4880
-	int32_t Font::DrawClippedScaledGlyph(char c) { return 0; }
+	// FUNCTION: TOY2 0x004B4880
+	int32_t Font::DrawClippedScaledGlyph(char c)
+	{
+		LPDIRECT3DDEVICE3 device = DrawingDevice::GetD3DDevice();
+		if (g_currentFont && g_currentFontTexIndex && device)
+		{
+			Font* font = g_currentFont;
+			GlyphInfo* glyph = &font->glyphs[font->charToGlyphIndex[(uint8_t)c]];
+
+			float scaledWidth = (float)glyph->width * g_fontScaleX;
+			float scaledHeight = (float)glyph->height * g_fontScaleY;
+			int32_t horizontalClip = g_charClipDX1;
+			if (horizontalClip <= g_charClipDX2)
+				horizontalClip = g_charClipDX2;
+
+			if ((float)horizontalClip < scaledWidth)
+			{
+				int32_t verticalClip = g_charClipDY1;
+				if (verticalClip <= g_charClipDY2)
+					verticalClip = g_charClipDY2;
+
+				if ((float)verticalClip < scaledHeight)
+				{
+					float yTop = (float)g_textCursorY - g_scaledFontAscent;
+					int32_t topRightX = g_textCursorOffsetX + g_textCursorX;
+
+					if (g_charClipDX1 < 1)
+					{
+						g_textVertices[0].uv.x = glyph->uvMinX;
+						g_textVertices[3].uv.x = glyph->uvMinX;
+						g_textVertices[5].uv.x = glyph->uvMinX;
+						g_textVertices[3].position.x = (float)topRightX;
+						g_textVertices[5].position.x = (float)g_textCursorX;
+					}
+					else
+					{
+						g_textVertices[3].position.x = (float)(topRightX + g_charClipDX1);
+						g_textVertices[5].position.x = (float)(g_textCursorX + g_charClipDX1);
+						g_textVertices[0].uv.x = glyph->uvMinX + ((float)g_charClipDX1 + g_fontScaleX) * (glyph->uvMaxX - glyph->uvMinX) / scaledWidth;
+						g_textVertices[3].uv.x = g_textVertices[0].uv.x;
+						g_textVertices[5].uv.x = g_textVertices[0].uv.x;
+					}
+
+					if (g_charClipDX2 < 1)
+					{
+						g_textVertices[1].uv.x = glyph->uvMaxX;
+						g_textVertices[2].uv.x = glyph->uvMaxX;
+						g_textVertices[4].uv.x = glyph->uvMaxX;
+						g_textVertices[4].position.x = (float)(g_textCursorX - 1) + scaledWidth;
+						g_textVertices[1].position.x = (float)(topRightX - 1) + scaledWidth;
+					}
+					else
+					{
+						g_textVertices[4].position.x = (float)(g_textCursorX - g_charClipDX2 - 1) + scaledWidth;
+						g_textVertices[1].position.x = (float)(topRightX - g_charClipDX2 - 1) + scaledWidth;
+						g_textVertices[1].uv.x = glyph->uvMaxX - (glyph->uvMaxX - glyph->uvMinX) * (float)g_charClipDX2 / scaledWidth;
+						g_textVertices[2].uv.x = g_textVertices[1].uv.x;
+						g_textVertices[4].uv.x = g_textVertices[1].uv.x;
+					}
+
+					if (g_charClipDY1 < 1)
+					{
+						g_textVertices[0].uv.y = glyph->uvMinY;
+						g_textVertices[1].uv.y = glyph->uvMinY;
+						g_textVertices[3].uv.y = glyph->uvMinY;
+						g_textVertices[3].position.y = yTop;
+					}
+					else
+					{
+						g_textVertices[3].position.y = (float)g_charClipDY1 + yTop;
+						g_textVertices[0].uv.y = glyph->uvMinY + ((float)g_charClipDY1 + g_fontScaleY) * (glyph->uvMaxY - glyph->uvMinY) / scaledHeight;
+						g_textVertices[1].uv.y = g_textVertices[0].uv.y;
+						g_textVertices[3].uv.y = g_textVertices[0].uv.y;
+					}
+
+					float yBottom;
+					if (g_charClipDY2 < 1)
+					{
+						yBottom = yTop - 1.0f;
+						g_textVertices[2].uv.y = glyph->uvMaxY;
+						g_textVertices[4].uv.y = glyph->uvMaxY;
+						g_textVertices[5].uv.y = glyph->uvMaxY;
+					}
+					else
+					{
+						yBottom = yTop - 1.0f - (float)g_charClipDY2;
+						g_textVertices[2].uv.y = glyph->uvMaxY - (glyph->uvMaxY - glyph->uvMinY) * (float)g_charClipDY2 / scaledHeight;
+						g_textVertices[4].uv.y = g_textVertices[2].uv.y;
+						g_textVertices[5].uv.y = g_textVertices[2].uv.y;
+					}
+
+					g_textVertices[5].position.y = yBottom + g_scaledFontHeight;
+					g_textVertices[0].position.x = g_textVertices[3].position.x;
+					g_textVertices[0].position.y = g_textVertices[3].position.y;
+					g_textVertices[1].position.y = g_textVertices[3].position.y;
+					g_textVertices[2].position.x = g_textVertices[4].position.x;
+					g_textVertices[2].position.y = g_textVertices[5].position.y;
+					g_textVertices[4].position.y = g_textVertices[5].position.y;
+
+					Renderer::DrawSingleTexturedTriangle(g_textVertices, g_currentFontTexIndex, 0x444);
+					Renderer::DrawSingleTexturedTriangle(&g_textVertices[3], g_currentFontTexIndex, 0x444);
+				}
+			}
+
+			return (int32_t)scaledWidth;
+		}
+		return 0;
+	}
 
 	// FUNCTION: TOY2 0x004B4CD0
 	int32_t Font::DrawTextString(const char* text)
