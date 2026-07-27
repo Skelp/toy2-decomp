@@ -19,6 +19,9 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0052c840
 		Toy2Actor g_creatureActors[64];
 
+		// GLOBAL: TOY2 0x004E0588
+		uint8_t* g_animationFrameSequences[26];
+
 		// GLOBAL: TOY2 0x0050A54C
 		int32_t g_unk50A54C;
 
@@ -67,8 +70,47 @@ namespace Toy2
 		void UpdatePrimaryAnimation(Toy2Actor* actor)
 		{
 			void* entry = CharacterLoader::g_unk547CD4[actor->creatureId];
-			Animation::EvaluateClip(
-				(Animation::ClipHeader*)*(void**)((uint8_t*)entry + 8 + actor->primaryAnimIdx * 4), actor->unkVar7, *(uint16_t*)((uint8_t*)entry + 4), 0);
+			Animation::EvaluateClip((Animation::ClipHeader*)*(void**)((uint8_t*)entry + 8 + actor->primaryAnimIdx * 4),
+				actor->animationFramePosition,
+				*(uint16_t*)((uint8_t*)entry + 4),
+				0);
+		}
+
+		// FUNCTION: TOY2 0x00405C80
+		void StepCreatureAnimFrame(Toy2Actor* actor)
+		{
+			if (actor->animationFrameSequence[2] == 0xff && actor->animationFrameSequence[3] == 0)
+			{
+				uint8_t* frame = actor->animationFrameSequence;
+				actor->animationFramePosition = ((uint32_t)frame[0] << 16) + 0xffff;
+				return;
+			}
+
+			uint8_t* frame = actor->animationFrameSequence + 1;
+			actor->animationFrameSequence = frame;
+			if (*frame == 0xff)
+			{
+				if (actor->animationFrameSequence[1] != 1)
+				{
+					actor->animationFrameSequence -= actor->animationFrameSequence[1];
+				}
+				else
+				{
+					actor->animationFrameSequence--;
+					actor->animationFramePosition |= 0xffff;
+				}
+			}
+
+			actor->animationFramePosition &= 0xffff;
+			actor->animationFramePosition += (uint32_t)*actor->animationFrameSequence << 16;
+		}
+
+		// FUNCTION: TOY2 0x00405CF0
+		void SetAnimation(Toy2Actor* actor, int16_t animationIndex, int32_t frameSequenceIndex)
+		{
+			actor->primaryAnimIdx = animationIndex;
+			actor->animationFrameSequence = g_animationFrameSequences[frameSequenceIndex];
+			actor->animationFramePosition = (uint32_t)*actor->animationFrameSequence << 16;
 		}
 
 		// FUNCTION: TOY2 0x00414A80

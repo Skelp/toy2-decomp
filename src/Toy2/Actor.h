@@ -3,6 +3,8 @@
 #include "Common.h"
 #include "RawLoader.h"
 
+#include <stddef.h>
+
 namespace Toy2
 {
 	namespace Actor
@@ -27,7 +29,7 @@ namespace Toy2
 			int16_t primaryAnimIdx;
 			int16_t creatureId;
 			int16_t secondaryAnimIdx;
-			int32_t unkVar7;
+			int32_t animationFramePosition;
 			int32_t unkVar8;
 			int32_t unkVar9;
 			RGB16 actorTint;
@@ -50,7 +52,7 @@ namespace Toy2
 			int32_t areaIndex;
 			int16_t unkVar29;
 			int16_t unkVar29_;
-			int32_t unkVar30;
+			uint8_t* animationFrameSequence;
 			int16_t unkShort1;
 			int16_t unkShort2;
 			int16_t damageCooldownTimer;
@@ -69,6 +71,7 @@ namespace Toy2
 		extern Toy2Actor* g_activeActors[65];
 
 		extern Toy2Actor g_creatureActors[64];
+		extern uint8_t* g_animationFrameSequences[26];
 
 		// Actor-system state reset by InitCreatureRam. Roles are not yet confirmed;
 		// the consuming functions (Game::UpdateActors et al.) are unreconstructed.
@@ -78,11 +81,15 @@ namespace Toy2
 		extern int32_t g_unk52EF88;
 
 		void InitCreatureRam();
+		void StepCreatureAnimFrame(Toy2Actor* actor);
+		void SetAnimation(Toy2Actor* actor, int16_t animationIndex, int32_t frameSequenceIndex);
 		void GetCreatureList(uint8_t* creatureIdList);
 		int32_t FindInActorList(Toy2Actor* actor);
 		void SetNodeAngle(Toy2Actor* actor, int32_t nodeIndex, float x, float y, float z);
 
 		STATIC_ASSERT(sizeof(Toy2Actor) == 0x9C);
+		STATIC_ASSERT(offsetof(Toy2Actor, animationFramePosition) == 0x18);
+		STATIC_ASSERT(offsetof(Toy2Actor, animationFrameSequence) == 0x74);
 		STATIC_ASSERT(sizeof(Toy2Actor::ActorBehaviourContext) == 0xC);
 	}
 }
