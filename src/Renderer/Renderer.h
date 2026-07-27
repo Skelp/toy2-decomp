@@ -59,6 +59,16 @@ namespace DrawingAPI
 
 namespace Renderer
 {
+	struct ViewportPreset
+	{
+		float secondaryPortalNearClip;
+		float primaryFogFarClip;
+		float secondaryNearClip;
+		float primaryNearClip;
+		float primaryRenderDistance;
+		float secondaryRenderDistance;
+	};
+
 	struct RenderEntry
 	{
 		RenderEntry* next;
@@ -136,6 +146,8 @@ namespace Renderer
 	int32_t Set508718(int32_t value);
 	int32_t Set9F5FF8(int32_t value);
 	void SetRenderDistance(float primaryDistance, float secondaryDistance);
+	void SetViewportPresetByDetail(int32_t detail);
+	void SetViewportPreset();
 	void RenderPrimitive(Nu3D::Primitive* primitive, const D3DMATRIX* transform, int32_t renderFlags);
 	void ProcessPrimitive(Nu3D::InstanceData* instanceData, Nu3D::Primitive* primitive);
 	void RenderPatchList(Nu3D::Patch* patch, const D3DMATRIX* matrices, int32_t* flags, int32_t renderFlags);
@@ -146,6 +158,7 @@ namespace Renderer
 	void DrawSingleTexturedTriangle(Nu3D::VertexTL* vertices, int32_t texIndex, int32_t renderFlags);
 
 	STATIC_ASSERT(sizeof(RenderEntry) == 0x18);
+	STATIC_ASSERT(sizeof(ViewportPreset) == 0x18);
 	STATIC_ASSERT(offsetof(RenderEntry, primitive) == 0x0C);
 	STATIC_ASSERT(offsetof(RenderEntry, instanceData) == 0x10);
 	STATIC_ASSERT(offsetof(RenderEntry, material) == 0x14);

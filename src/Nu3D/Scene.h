@@ -13,6 +13,9 @@ namespace Nu3D
 	{
 		extern float g_primaryFarClip;
 		extern float g_primaryNearClip;
+		extern float g_secondaryNearClip;
+		extern float g_secondaryPortalNearClip;
+		extern float g_primaryFogFarClip;
 
 		void RenderCellsInRadius(int32_t cellRadius, int32_t scalerType, NGNLoader::NGNImage* image);
 		void RenderWorldGeometry(int32_t areaIndex, int32_t renderFlags);

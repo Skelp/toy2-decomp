@@ -10,6 +10,7 @@
 #include "NGNLoader/NGNLoader.h"
 #include "Nu3D/Patch.h"
 #include "Nu3D/Primitive.h"
+#include "Nu3D/Scene.h"
 #include "Renderer/Sprite.h"
 #include "Toy2/Toy2.h"
 #include "Renderer/Glue.h"
@@ -28,6 +29,13 @@ namespace Nu3D
 
 namespace Renderer
 {
+	// GLOBAL: TOY2 0x00508D28
+	ViewportPreset g_viewportPresets[] = {
+		{ 3000.0f, 3500.0f, 50.0f, 55.0f, 10000.0f, 0.0f },
+		{ 5000.0f, 6500.0f, 40.0f, 60.0f, 10000.0f, 0.0f },
+		{ 10000.0f, 12000.0f, 40.0f, 60.0f, 12000.0f, 1000.0f },
+	};
+
 	// GLOBAL: TOY2 0x00884484
 	int32_t g_isSoftwareRendering;
 
@@ -122,6 +130,29 @@ namespace Renderer
 		g_primaryRenderDistanceSquared = primaryDistance * primaryDistance;
 		g_secondaryRenderDistanceSquared = secondaryDistance * secondaryDistance;
 	}
+
+	// FUNCTION: TOY2 0x004CDD10
+	void SetViewportPresetByDetail(int32_t detail)
+	{
+		if (detail <= 2)
+		{
+			if (detail < 0)
+				detail = 0;
+		}
+		else
+		{
+			detail = 2;
+		}
+
+		SetRenderDistance(g_viewportPresets[detail].primaryRenderDistance, g_viewportPresets[detail].secondaryRenderDistance);
+		Nu3D::Scene::g_secondaryPortalNearClip = g_viewportPresets[detail].secondaryPortalNearClip;
+		Nu3D::Scene::g_primaryFogFarClip = g_viewportPresets[detail].primaryFogFarClip;
+		Nu3D::Scene::g_primaryNearClip = g_viewportPresets[detail].primaryNearClip;
+		Nu3D::Scene::g_secondaryNearClip = g_viewportPresets[detail].secondaryNearClip;
+	}
+
+	// FUNCTION: TOY2 0x004CDD80
+	void SetViewportPreset() { SetViewportPresetByDetail(Toy2::g_toyCfgData.detail); }
 
 	// GLOBAL: TOY2 0x0094FCD4
 	float g_lodFactor;
