@@ -1259,18 +1259,137 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// STUB: TOY2 0x004C5280
-	void UnkFunc50(Nu3D::VertexTL* leftEdge,
-		Nu3D::VertexTL* rightEdge,
+	// Textured subtractive span for a 16-bit 555 surface. A texel with a zero
+	// high byte is transparent. Other texels darken the destination channels.
+	// FUNCTION: TOY2 0x004C5280
+	void UnkFunc50(Nu3D::VertexTL* edgeA,
+		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
-		int32_t leftRed,
-		int32_t leftGreen,
-		int32_t leftBlue,
-		int32_t rightRed,
-		int32_t rightGreen,
-		int32_t rightBlue)
-	{}
+		int32_t edgeARed,
+		int32_t edgeAGreen,
+		int32_t edgeABlue,
+		int32_t edgeBRed,
+		int32_t edgeBGreen,
+		int32_t edgeBBlue)
+	{
+		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
+		if (width == 0)
+		{
+			return;
+		}
+
+		int32_t farRed;
+		int32_t farGreen;
+		int32_t farBlue;
+		if (width < 0)
+		{
+			farRed = edgeBRed;
+			farGreen = edgeBGreen;
+			farBlue = edgeBBlue;
+			edgeBRed = edgeARed;
+			edgeBGreen = edgeAGreen;
+			edgeBBlue = edgeABlue;
+			Nu3D::VertexTL* swap = edgeA;
+			edgeA = edgeB;
+			edgeB = swap;
+			width = -width;
+		}
+		else
+		{
+			farRed = edgeARed;
+			farGreen = edgeAGreen;
+			farBlue = edgeABlue;
+		}
+
+		if (width > 0)
+		{
+			int32_t stepRed = (farRed - edgeBRed) / width;
+			int32_t stepGreen = (farGreen - edgeBGreen) / width;
+			int32_t stepBlue = (farBlue - edgeBBlue) / width;
+
+			destRow += (int32_t)edgeB->position.x;
+
+			int32_t textureU = (int32_t)(edgeB->uv.x * k_textureCoordinateScale);
+			if (textureU > k_textureCoordinateFixedMax)
+			{
+				textureU = k_textureCoordinateFixedMax;
+			}
+			textureU <<= k_textureCoordinateShift;
+
+			int32_t textureVValue = (int32_t)(edgeB->uv.y * k_textureCoordinateScale);
+			if (textureVValue > k_textureCoordinateFixedMax)
+			{
+				textureVValue = k_textureCoordinateFixedMax;
+			}
+			int32_t textureV = (k_textureCoordinateMax - textureVValue) << k_textureCoordinateShift;
+
+			int32_t farTextureU = (int32_t)(edgeA->uv.x * k_textureCoordinateScale);
+			if (farTextureU > k_textureCoordinateMax)
+			{
+				farTextureU = k_textureCoordinateMax;
+			}
+			farTextureU <<= k_textureCoordinateShift;
+			if (farTextureU > k_textureCoordinateFixedMax)
+			{
+				farTextureU = k_textureCoordinateFixedMax;
+			}
+			int32_t stepTextureU = (farTextureU - textureU) / width;
+
+			int32_t farTextureVValue = (int32_t)(edgeA->uv.y * k_textureCoordinateScale);
+			if (farTextureVValue > k_textureCoordinateMax)
+			{
+				farTextureVValue = k_textureCoordinateMax;
+			}
+			int32_t farTextureV = (k_textureCoordinateMax - farTextureVValue) << k_textureCoordinateShift;
+			if (farTextureV > k_textureCoordinateFixedMax)
+			{
+				farTextureV = k_textureCoordinateFixedMax;
+			}
+			int32_t stepTextureV = (farTextureV - textureV) / width;
+
+			do
+			{
+				int32_t textureIndex = ((textureV >> k_textureCoordinateShift) & k_lowerByteMask) * k_textureDimension
+					+ ((textureU >> k_textureCoordinateShift) & k_lowerByteMask);
+				uint32_t texel = texData[textureIndex];
+				if (texel > k_rgbMask)
+				{
+					uint16_t pixel = *destRow;
+
+					int32_t channel = (pixel & k_fiveBitChannelMask) - g_colourScaleTable3[(edgeBBlue & k_upperByteMask) + (texel & k_lowerByteMask)];
+					if (channel < 0)
+					{
+						channel = 0;
+					}
+					int32_t out = channel;
+
+					channel = ((pixel >> 5) & k_fiveBitChannelMask) - g_colourScaleTable3[(edgeBGreen & k_upperByteMask) + ((texel >> 8) & k_lowerByteMask)];
+					if (channel < 0)
+					{
+						channel = 0;
+					}
+					out += channel << 5;
+
+					channel = ((pixel >> 10) & k_fiveBitChannelMask) - g_colourScaleTable3[(edgeBRed & k_upperByteMask) + ((texel >> 16) & k_lowerByteMask)];
+					if (channel < 0)
+					{
+						channel = 0;
+					}
+
+					*destRow = (uint16_t)((channel << 10) + out);
+				}
+
+				destRow++;
+				textureU += stepTextureU;
+				textureV += stepTextureV;
+				edgeBRed += stepRed;
+				edgeBGreen += stepGreen;
+				edgeBBlue += stepBlue;
+				width--;
+			} while (width != 0);
+		}
+	}
 
 	// Untextured subtractive span for a 16-bit 555 surface.
 	//
@@ -1458,18 +1577,137 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// STUB: TOY2 0x004C56D0
-	void UnkFunc42(Nu3D::VertexTL* leftEdge,
-		Nu3D::VertexTL* rightEdge,
+	// The 565 twin of UnkFunc50. It uses the same texture sampling and
+	// subtractive blend, but reads green at bit 6 and red at bit 11.
+	// FUNCTION: TOY2 0x004C56D0
+	void UnkFunc42(Nu3D::VertexTL* edgeA,
+		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
-		int32_t leftRed,
-		int32_t leftGreen,
-		int32_t leftBlue,
-		int32_t rightRed,
-		int32_t rightGreen,
-		int32_t rightBlue)
-	{}
+		int32_t edgeARed,
+		int32_t edgeAGreen,
+		int32_t edgeABlue,
+		int32_t edgeBRed,
+		int32_t edgeBGreen,
+		int32_t edgeBBlue)
+	{
+		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
+		if (width == 0)
+		{
+			return;
+		}
+
+		int32_t farRed;
+		int32_t farGreen;
+		int32_t farBlue;
+		if (width < 0)
+		{
+			farRed = edgeBRed;
+			farGreen = edgeBGreen;
+			farBlue = edgeBBlue;
+			edgeBRed = edgeARed;
+			edgeBGreen = edgeAGreen;
+			edgeBBlue = edgeABlue;
+			Nu3D::VertexTL* swap = edgeA;
+			edgeA = edgeB;
+			edgeB = swap;
+			width = -width;
+		}
+		else
+		{
+			farRed = edgeARed;
+			farGreen = edgeAGreen;
+			farBlue = edgeABlue;
+		}
+
+		if (width > 0)
+		{
+			int32_t stepRed = (farRed - edgeBRed) / width;
+			int32_t stepGreen = (farGreen - edgeBGreen) / width;
+			int32_t stepBlue = (farBlue - edgeBBlue) / width;
+
+			destRow += (int32_t)edgeB->position.x;
+
+			int32_t textureU = (int32_t)(edgeB->uv.x * k_textureCoordinateScale);
+			if (textureU > k_textureCoordinateFixedMax)
+			{
+				textureU = k_textureCoordinateFixedMax;
+			}
+			textureU <<= k_textureCoordinateShift;
+
+			int32_t textureVValue = (int32_t)(edgeB->uv.y * k_textureCoordinateScale);
+			if (textureVValue > k_textureCoordinateFixedMax)
+			{
+				textureVValue = k_textureCoordinateFixedMax;
+			}
+			int32_t textureV = (k_textureCoordinateMax - textureVValue) << k_textureCoordinateShift;
+
+			int32_t farTextureU = (int32_t)(edgeA->uv.x * k_textureCoordinateScale);
+			if (farTextureU > k_textureCoordinateMax)
+			{
+				farTextureU = k_textureCoordinateMax;
+			}
+			farTextureU <<= k_textureCoordinateShift;
+			if (farTextureU > k_textureCoordinateFixedMax)
+			{
+				farTextureU = k_textureCoordinateFixedMax;
+			}
+			int32_t stepTextureU = (farTextureU - textureU) / width;
+
+			int32_t farTextureVValue = (int32_t)(edgeA->uv.y * k_textureCoordinateScale);
+			if (farTextureVValue > k_textureCoordinateMax)
+			{
+				farTextureVValue = k_textureCoordinateMax;
+			}
+			int32_t farTextureV = (k_textureCoordinateMax - farTextureVValue) << k_textureCoordinateShift;
+			if (farTextureV > k_textureCoordinateFixedMax)
+			{
+				farTextureV = k_textureCoordinateFixedMax;
+			}
+			int32_t stepTextureV = (farTextureV - textureV) / width;
+
+			do
+			{
+				int32_t textureIndex = ((textureV >> k_textureCoordinateShift) & k_lowerByteMask) * k_textureDimension
+					+ ((textureU >> k_textureCoordinateShift) & k_lowerByteMask);
+				uint32_t texel = texData[textureIndex];
+				if (texel > k_rgbMask)
+				{
+					uint16_t pixel = *destRow;
+
+					int32_t channel = (pixel & k_fiveBitChannelMask) - g_colourScaleTable3[(edgeBBlue & k_upperByteMask) + (texel & k_lowerByteMask)];
+					if (channel < 0)
+					{
+						channel = 0;
+					}
+					int32_t out = channel;
+
+					channel = ((pixel >> 6) & k_fiveBitChannelMask) - g_colourScaleTable3[(edgeBGreen & k_upperByteMask) + ((texel >> 8) & k_lowerByteMask)];
+					if (channel < 0)
+					{
+						channel = 0;
+					}
+					out += channel << 6;
+
+					channel = (pixel >> 11) - g_colourScaleTable3[(edgeBRed & k_upperByteMask) + ((texel >> 16) & k_lowerByteMask)];
+					if (channel < 0)
+					{
+						channel = 0;
+					}
+
+					*destRow = (uint16_t)((channel << 11) + out);
+				}
+
+				destRow++;
+				textureU += stepTextureU;
+				textureV += stepTextureV;
+				edgeBRed += stepRed;
+				edgeBGreen += stepGreen;
+				edgeBBlue += stepBlue;
+				width--;
+			} while (width != 0);
+		}
+	}
 
 	// STUB: TOY2 0x004C58E0
 	void UnkFunc43(Nu3D::VertexTL* leftEdge,
