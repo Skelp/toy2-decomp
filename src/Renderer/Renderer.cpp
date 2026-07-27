@@ -130,7 +130,7 @@ namespace Renderer
 	Nu3D::Material* g_whiteMaterial;
 
 	// GLOBAL: TOY2 0x009F5FF0
-	int32_t g_unk9F5FF0;
+	int32_t g_drawingTransparentBuckets;
 
 	// GLOBAL: TOY2 0x009F5FF8
 	int32_t g_unk9F5FF8;

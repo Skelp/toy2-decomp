@@ -168,7 +168,7 @@ namespace Renderer
 
 				SoftwareRenderer::g_unkE4D950 = 5;
 
-				if (g_unk9F5FF0 == 0)
+				if (g_drawingTransparentBuckets == 0)
 				{
 					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 5, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
 					{
@@ -245,7 +245,7 @@ namespace Renderer
 
 				SoftwareRenderer::g_unkE4D950 = 5;
 
-				if (g_unk9F5FF0 == 0)
+				if (g_drawingTransparentBuckets == 0)
 				{
 					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 5, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
 					{
@@ -296,7 +296,7 @@ namespace Renderer
 
 				SoftwareRenderer::g_unkE4D950 = 5;
 
-				if (g_unk9F5FF0 == 0)
+				if (g_drawingTransparentBuckets == 0)
 				{
 					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 5, 0, 3, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
 					{
@@ -352,7 +352,7 @@ namespace Renderer
 
 				SoftwareRenderer::g_unkE4D950 = 2;
 
-				if (g_unk9F5FF0 != 0)
+				if (g_drawingTransparentBuckets != 0)
 				{
 					if (DrawingAPI::ProcessVerticesOnBuffer(destBuffer, 1, 0, 4, g_FVF_152_Buffer.vertexBuffer, 0, 0) == 0)
 					{
@@ -789,42 +789,81 @@ namespace Renderer
 			g_spriteBuffer2DCount = 2000;
 		}
 
-		// STUB: TOY2 0x004B6AD0
+		// STUB: TOY2 0x004B6C10
+		void RenderType8(Nu3D::Material* material, Renderer::RenderEntry* entry) {}
+
+		// STUB: TOY2 0x004B70E0
+		void RenderType9(Nu3D::Material* material, Renderer::RenderEntry* entry) {}
+
+		// STUB: TOY2 0x004B7920
+		void RenderGroundAlignedSprite(Nu3D::Sprite* sprite) {}
+
+		// Dispatches the shared render-list header. Sprite items use the full
+		// Nu3D::Sprite payload. Geometry and patch entries use Renderer::RenderEntry.
+		// FUNCTION: TOY2 0x004B6AD0 [MATCHED]
 		void DispatchCommand(Nu3D::Sprite* command)
 		{
-			Nu3D::Sprite* commandPointer = command;
+			Nu3D::Sprite* item = command;
 
-			if (commandPointer)
+			if (item)
 			{
 				do
 				{
-					switch (commandPointer->type)
+					switch (item->type)
 					{
 						case RENDER_QUADSPRITE:
-							RenderQuadSprite(commandPointer);
+							RenderQuadSprite(item);
+							break;
+						case RENDER_GROUND_ALIGNED_SPRITE:
+							RenderGroundAlignedSprite(item);
 							break;
 						case RENDER_BILLBOARD_SPRITE:
-							RenderBillboardSprite(commandPointer);
+							RenderBillboardSprite(item);
 							break;
 						case RENDER_2D_SPRITE:
-							Sprite::Render2DSprite(commandPointer);
+							Render2DSprite(item);
 							break;
 						case RENDER_TRIANGLE_SPRITE:
-							RenderTriangleSprite(commandPointer);
+							RenderTriangleSprite(item);
 							break;
 						case RENDER_QUAD_SPRITE_FROM_VERTS:
-							RenderQuadSpriteFromVerts(commandPointer);
+							RenderQuadSpriteFromVerts(item);
 							break;
+						case RENDER_TYPE6: {
+							Renderer::RenderEntry* entry = (Renderer::RenderEntry*)item;
+							RenderType8(entry->material, entry);
+							break;
+						}
+						case RENDER_TYPE7: {
+							Renderer::RenderEntry* entry = (Renderer::RenderEntry*)item;
+							RenderType9(entry->material, entry);
+							break;
+						}
+						case RENDER_TYPE8: {
+							Renderer::RenderEntry* entry = (Renderer::RenderEntry*)item;
+							if (g_drawingTransparentBuckets == 0 || (entry->instanceData->renderModeFlags & 1) != 0)
+								Renderer::BindMaterial(entry->material, 1);
+							RenderType8(entry->material, entry);
+							break;
+						}
+						case RENDER_TYPE9: {
+							Renderer::RenderEntry* entry = (Renderer::RenderEntry*)item;
+							if ((entry->instanceData->renderModeFlags & 1) != 0)
+								Renderer::BindMaterial(entry->material, 1);
+							else if (g_drawingTransparentBuckets == 0)
+								Renderer::BindMaterial(entry->material, 0);
+							RenderType9(entry->material, entry);
+							break;
+						}
 						case RENDER_TYPE10:
-							RenderType10(commandPointer);
+							RenderType10(item);
 							break;
 						default:
 							break;
 					}
 
-					commandPointer = commandPointer->next;
-
-				} while (commandPointer);
+					item = item->next;
+				} while (item);
 			}
 		}
 

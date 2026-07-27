@@ -77,7 +77,7 @@ namespace Renderer
 	extern Nu3D::Patch::PatchVertices g_FVF_14C_Buffer_2;
 	extern Nu3D::Patch::PatchVertices g_FVF_14C_Buffer_1;
 	extern Nu3D::Patch::PatchVertices g_FVF_152_Buffer;
-	extern int32_t g_unk9F5FF0;
+	extern int32_t g_drawingTransparentBuckets;
 	extern int32_t g_isSoftwareRendering;
 	extern int32_t g_frameDelta;
 	extern int32_t g_renderStateCache[8];
@@ -135,6 +135,9 @@ namespace Renderer
 	void DrawSingleTexturedTriangle(Nu3D::VertexTL* vertices, int32_t texIndex, int32_t renderFlags);
 
 	STATIC_ASSERT(sizeof(RenderEntry) == 0x18);
+	STATIC_ASSERT(offsetof(RenderEntry, primitive) == 0x0C);
+	STATIC_ASSERT(offsetof(RenderEntry, instanceData) == 0x10);
+	STATIC_ASSERT(offsetof(RenderEntry, material) == 0x14);
 
 	// A transformed triangle queued for sorted (back-to-front) transparency
 	// rasterization. SubmitSortedTriangle fills a slot from g_primitiveBuffer,
