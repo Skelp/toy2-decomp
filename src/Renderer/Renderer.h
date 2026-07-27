@@ -79,6 +79,7 @@ namespace Renderer
 	extern int32_t g_unk9F5FF0;
 	extern int32_t g_isSoftwareRendering;
 	extern int32_t g_frameDelta;
+	extern int32_t g_renderStateCache[8];
 	extern float g_virtualScreenWidth;
 	extern float g_virtualScreenHeight;
 	extern float g_parallaxCurHorizScroll;

@@ -164,6 +164,7 @@ namespace SoftwareRenderer
 	void UnkFunc18(float* primaryDistance, float* secondaryDistance);
 	void UnkFunc19(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags);
 	void UnkFunc21(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags);
+	void UnkFunc22(Nu3D::VertexTL* vertices[3], int32_t vertexCount, uint32_t* texData, int32_t renderState, int32_t param5, int32_t param6);
 	void UnkFunc17(int32_t top, int32_t bottom, int32_t left, int32_t right);
 	void UnkFunc16(D3DPRIMITIVETYPE d3dptPrimitiveType, LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags);
 }

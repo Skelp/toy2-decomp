@@ -759,8 +759,47 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// STUB: TOY2 0x004C14A0
-	void UnkFunc19(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags) {}
+	// Software triangle-list rasterizer dispatch. Resolves the current bound
+	// texture via UnkFunc20, groups the index stream into triples (one per
+	// triangle), and forwards each triple to the inner rasterizer UnkFunc22
+	// with the masked texture pointer (NULL when no texture is bound). Each
+	// index addresses a 32-byte VertexTL into lpvVertices.
+	//
+	// dwFlags is unused by the retail body.
+	//
+	// Residual is CAP-19: MSVC assigns maskedTexData to EBP and keeps the
+	// triangle count in EBX, where retail assigns maskedTexData to EBX and
+	// spills the count to EBP (pushed inside the loop guard). The loop body
+	// also takes a negative-offset early-increment index strip
+	// ([esi-4]/[esi-2]/[esi] then add esi,6) where retail reads
+	// [esi]/[esi+2] then bumps twice before [esi]. Both compute identical
+	// vertices; the divergence is register allocation plus the pointer-walk
+	// transformation. Robust across 5 source forms (34.8-36.5%).
+	// FUNCTION: TOY2 0x004C14A0
+	void UnkFunc19(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags)
+	{
+		TextureData tex;
+		int32_t noTexture = UnkFunc20(&tex);
+		LPWORD indices = lpwIndices;
+		uint32_t* maskedTexData = (noTexture != 0) ? NULL : tex.texData;
+		DWORD remaining = dwIndexCount / 3;
+		if (remaining != 0)
+		{
+			do
+			{
+				Nu3D::VertexTL* vertices[3];
+				vertices[0] = (Nu3D::VertexTL*)((uint8_t*)lpvVertices + indices[0] * 0x20);
+				vertices[1] = (Nu3D::VertexTL*)((uint8_t*)lpvVertices + indices[1] * 0x20);
+				vertices[2] = (Nu3D::VertexTL*)((uint8_t*)lpvVertices + indices[2] * 0x20);
+				UnkFunc22(vertices, 3, maskedTexData, Renderer::g_renderStateCache[0], g_unkE4D950, 0);
+				indices += 3;
+				remaining--;
+			} while (remaining != 0);
+		}
+	}
+
+	// STUB: TOY2 0x004C0320
+	void UnkFunc22(Nu3D::VertexTL* vertices[3], int32_t vertexCount, uint32_t* texData, int32_t renderState, int32_t param5, int32_t param6) {}
 
 	// STUB: TOY2 0x004C1540
 	void UnkFunc21(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags) {}
