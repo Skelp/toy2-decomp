@@ -147,8 +147,8 @@ namespace Renderer
 		SortedPrimitive* next;
 		int32_t unk04;
 		int32_t renderFlags;
-		int32_t fieldC;
-		int32_t field10;
+		int32_t textureIndex;
+		int32_t primitiveGroup;
 		Nu3D::VertexTL v0;
 		Nu3D::VertexTL v1;
 		Nu3D::VertexTL v2;
