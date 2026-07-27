@@ -520,20 +520,20 @@ namespace SoftwareRenderer
 	void PresentFrame() {}
 
 	// FUNCTION: TOY2 0x00490410
-	void UnkFunc67(int32_t param1, int32_t param2)
+	void UnkFunc67(int32_t x, int32_t y)
 	{
 		int32_t* piPitch = Toy2::g_hasStaticBackdrop ? &g_staticBackdropWidth : &g_backdropWidth;
 		int32_t pitch = *piPitch;
-		int32_t quotient = param1 / pitch;
-		int32_t remainder = param1 - quotient * pitch;
+		int32_t quotient = x / pitch;
+		int32_t remainder = x - quotient * pitch;
 		if (remainder < 0)
 		{
-			g_unk4F7400.x = (1 - quotient) * pitch + param1;
-			g_unk4F7400.y = param2;
+			g_unk4F7400.x = (1 - quotient) * pitch + x;
+			g_unk4F7400.y = y;
 			return;
 		}
 		g_unk4F7400.x = remainder;
-		g_unk4F7400.y = param2;
+		g_unk4F7400.y = y;
 	}
 
 	// STUB: TOY2 0x0048FB70

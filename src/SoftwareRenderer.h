@@ -129,7 +129,7 @@ namespace SoftwareRenderer
 	// textureIndex=textureIndex/primitiveGroup=0 while the indexed-strip submitters swap them.
 	void SubmitSortedTriangle(int32_t renderFlags, int32_t primitiveGroup, int32_t textureIndex, Nu3D::VertexTL* v0, Nu3D::VertexTL* v1, Nu3D::VertexTL* v2);
 
-	void UnkFunc67(int32_t param1, int32_t param2);
+	void UnkFunc67(int32_t x, int32_t y);
 	void UnkFunc2();
 	int16_t UnkFunc3();
 	void UnkFunc31();
