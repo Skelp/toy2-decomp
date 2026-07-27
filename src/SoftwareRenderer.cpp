@@ -22,7 +22,24 @@ namespace SoftwareRenderer
 	int32_t g_staticBackdropWidth = 0;
 
 	// GLOBAL: TOY2 0x00500A1C
-	int32_t g_unk500A1C = 0xFFFFFFFF;
+	int32_t g_backdropTextureColumn = 0xFFFFFFFF;
+
+	// The backdrop scroll state follows the camera yaw. The draw setup computes
+	// the horizon and view depth; UpdateBackdropScroll consumes and clamps them.
+	// GLOBAL: TOY2 0x0072EFC0
+	int32_t g_previousBackdropYaw;
+
+	// GLOBAL: TOY2 0x00731DF0
+	int32_t g_backdropYawAccumulator;
+
+	// GLOBAL: TOY2 0x00731D6C
+	int32_t g_backdropScrollX;
+
+	// GLOBAL: TOY2 0x00731C14
+	int32_t g_backdropHorizon;
+
+	// GLOBAL: TOY2 0x00731C18
+	int32_t g_backdropViewDepth;
 
 	// GLOBAL: TOY2 0x00830C60
 	int32_t g_unk830C60;
@@ -622,8 +639,77 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x0048FB70
 	void UnkFunc2() {}
 
-	// STUB: TOY2 0x00490290
-	int16_t UnkFunc3() { return 0; }
+	// GLOBAL: TOY2 0x00547EE2
+	int16_t g_backdropCameraYaw;
+
+	// FUNCTION: TOY2 0x00490290
+	int16_t UpdateBackdropScroll()
+	{
+		volatile int32_t clampedVisibleHeight;
+		int32_t hasStaticBackdrop = Toy2::g_hasStaticBackdrop;
+		int32_t* backdropWidth = hasStaticBackdrop ? &g_staticBackdropWidth : &g_backdropWidth;
+		int32_t cameraYaw = g_backdropCameraYaw;
+		int32_t textureColumn;
+
+		if (g_backdropTextureColumn == -1)
+		{
+			cameraYaw = -cameraYaw;
+			g_previousBackdropYaw = cameraYaw;
+			g_backdropYawAccumulator = cameraYaw;
+			textureColumn = (cameraYaw * 2240 / 8192) & 0xff;
+			g_backdropScrollX = textureColumn % *backdropWidth;
+		}
+		else
+		{
+			int32_t yawDelta = -(g_previousBackdropYaw + cameraYaw);
+			if (yawDelta < -0x800)
+				yawDelta += 0x1000;
+			else if (yawDelta > 0x800)
+				yawDelta -= 0x1000;
+
+			g_backdropYawAccumulator += yawDelta;
+			g_previousBackdropYaw = -cameraYaw;
+			textureColumn = (g_backdropYawAccumulator * 2240 / 8192) & 0xff;
+
+			int32_t scrollDelta = textureColumn - g_backdropTextureColumn;
+			if (scrollDelta < -0x80)
+				scrollDelta += 0x100;
+			else if (scrollDelta > 0x80)
+				scrollDelta -= 0x100;
+
+			g_backdropScrollX = (g_backdropScrollX + scrollDelta) % *backdropWidth;
+			while (g_backdropScrollX < 0)
+				g_backdropScrollX += *backdropWidth;
+		}
+
+		int32_t clippedTop;
+		int32_t backdropHorizon = g_backdropHorizon;
+		g_backdropTextureColumn = textureColumn;
+
+		if (backdropHorizon < 0)
+		{
+			clippedTop = -backdropHorizon;
+			backdropHorizon = 0;
+			g_backdropHorizon = backdropHorizon;
+		}
+		else
+		{
+			clippedTop = 0;
+		}
+
+		if (g_unk4F7400.x != -0x8000)
+			g_backdropScrollX = g_unk4F7400.x;
+
+		int32_t backdropHeight = backdropWidth[1];
+		if (clippedTop <= backdropHeight && clippedTop >= 0 && g_backdropViewDepth > 0x800)
+		{
+			backdropHeight -= clippedTop;
+			if (Toy2::g_levelFileIndex != 0 && ! hasStaticBackdrop && backdropHorizon + backdropHeight > 0xf0)
+				clampedVisibleHeight = 0xf0 - backdropHorizon;
+		}
+
+		return 1;
+	}
 
 	// FUNCTION: TOY2 0x004BCAD0
 	void UnkFunc29(Nu3D::VertexTL* vertices[4], int32_t vertexCount, uint32_t* texData, int32_t renderState)

@@ -777,7 +777,7 @@ namespace Toy2
 			CharacterLoader::g_unk546D78 = 0;
 			CharacterLoader::g_unk547CD0 = 0;
 
-			SoftwareRenderer::g_unk500A1C = -1;
+			SoftwareRenderer::g_backdropTextureColumn = -1;
 
 			Renderer::Shadows::g_shadowCount = 0;
 			Renderer::Shadows::g_unusedShadowVar = 0;

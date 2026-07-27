@@ -12,7 +12,7 @@ namespace SoftwareRenderer
 	extern PointI g_unk4F7400;
 	extern int32_t g_backdropWidth;
 	extern int32_t g_staticBackdropWidth;
-	extern int32_t g_unk500A1C;
+	extern int32_t g_backdropTextureColumn;
 	extern int32_t g_unk830C60;
 	extern int32_t g_unk559C40;
 	extern int32_t g_unk839278;
@@ -133,7 +133,7 @@ namespace SoftwareRenderer
 
 	void UnkFunc67(int32_t x, int32_t y);
 	void UnkFunc2();
-	int16_t UnkFunc3();
+	int16_t UpdateBackdropScroll();
 	void UnkFunc31();
 	void UnkFunc32();
 	void UnkFunc33();
