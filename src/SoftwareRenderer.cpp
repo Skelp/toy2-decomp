@@ -244,6 +244,7 @@ namespace SoftwareRenderer
 		k_rgbMask = 0x00ffffff,
 		k_fiveBitChannelMask = 0x1f,
 		k_fiveBitChannelLimit = k_fiveBitChannelMask + 1,
+		k_colourScaleSubtableSize = 0x10000,
 	};
 
 	// GLOBAL: TOY2 0x004DDAE0
@@ -1709,18 +1710,119 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// STUB: TOY2 0x004C58E0
-	void UnkFunc43(Nu3D::VertexTL* leftEdge,
-		Nu3D::VertexTL* rightEdge,
+	// Converts a textured span to the active 16-bit surface format. A texel
+	// with a zero high byte is transparent. The colour table entries already
+	// contain their packed destination-channel bits.
+	// FUNCTION: TOY2 0x004C58E0
+	void UnkFunc43(Nu3D::VertexTL* edgeA,
+		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
-		int32_t leftRed,
-		int32_t leftGreen,
-		int32_t leftBlue,
-		int32_t rightRed,
-		int32_t rightGreen,
-		int32_t rightBlue)
-	{}
+		int32_t edgeARed,
+		int32_t edgeAGreen,
+		int32_t edgeABlue,
+		int32_t edgeBRed,
+		int32_t edgeBGreen,
+		int32_t edgeBBlue)
+	{
+		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
+		if (width == 0)
+		{
+			return;
+		}
+
+		int32_t farRed;
+		int32_t farGreen;
+		int32_t farBlue;
+		if (width < 0)
+		{
+			farRed = edgeBRed;
+			farGreen = edgeBGreen;
+			farBlue = edgeBBlue;
+			edgeBRed = edgeARed;
+			edgeBGreen = edgeAGreen;
+			edgeBBlue = edgeABlue;
+			Nu3D::VertexTL* swap = edgeA;
+			edgeA = edgeB;
+			edgeB = swap;
+			width = -width;
+		}
+		else
+		{
+			farRed = edgeARed;
+			farGreen = edgeAGreen;
+			farBlue = edgeABlue;
+		}
+
+		if (width > 0)
+		{
+			int32_t stepRed = (farRed - edgeBRed) / width;
+			int32_t stepGreen = (farGreen - edgeBGreen) / width;
+			int32_t stepBlue = (farBlue - edgeBBlue) / width;
+
+			destRow += (int32_t)edgeB->position.x;
+
+			int32_t textureU = (int32_t)(edgeB->uv.x * k_textureCoordinateScale);
+			if (textureU > k_textureCoordinateFixedMax)
+			{
+				textureU = k_textureCoordinateFixedMax;
+			}
+			textureU <<= k_textureCoordinateShift;
+
+			int32_t textureVValue = (int32_t)(edgeB->uv.y * k_textureCoordinateScale);
+			if (textureVValue > k_textureCoordinateFixedMax)
+			{
+				textureVValue = k_textureCoordinateFixedMax;
+			}
+			int32_t textureV = (k_textureCoordinateMax - textureVValue) << k_textureCoordinateShift;
+
+			int32_t farTextureU = (int32_t)(edgeA->uv.x * k_textureCoordinateScale);
+			if (farTextureU > k_textureCoordinateMax)
+			{
+				farTextureU = k_textureCoordinateMax;
+			}
+			farTextureU <<= k_textureCoordinateShift;
+			if (farTextureU > k_textureCoordinateFixedMax)
+			{
+				farTextureU = k_textureCoordinateFixedMax;
+			}
+			int32_t stepTextureU = (farTextureU - textureU) / width;
+
+			int32_t farTextureVValue = (int32_t)(edgeA->uv.y * k_textureCoordinateScale);
+			if (farTextureVValue > k_textureCoordinateMax)
+			{
+				farTextureVValue = k_textureCoordinateMax;
+			}
+			int32_t farTextureV = (k_textureCoordinateMax - farTextureVValue) << k_textureCoordinateShift;
+			if (farTextureV > k_textureCoordinateFixedMax)
+			{
+				farTextureV = k_textureCoordinateFixedMax;
+			}
+			int32_t stepTextureV = (farTextureV - textureV) / width;
+
+			do
+			{
+				int32_t textureIndex = ((textureV >> k_textureCoordinateShift) & k_lowerByteMask) * k_textureDimension
+					+ ((textureU >> k_textureCoordinateShift) & k_lowerByteMask);
+				uint32_t texel = texData[textureIndex];
+				if (texel > k_rgbMask)
+				{
+					uint16_t out = g_colourScaleTable0[(edgeBBlue & k_upperByteMask) + (texel & k_lowerByteMask)];
+					out += g_colourScaleTable0[k_colourScaleSubtableSize + (edgeBGreen & k_upperByteMask) + ((texel >> 8) & k_lowerByteMask)];
+					out += g_colourScaleTable0[k_colourScaleSubtableSize * 2 + (edgeBRed & k_upperByteMask) + ((texel >> 16) & k_lowerByteMask)];
+					*destRow = out;
+				}
+
+				destRow++;
+				textureU += stepTextureU;
+				textureV += stepTextureV;
+				edgeBRed += stepRed;
+				edgeBGreen += stepGreen;
+				edgeBBlue += stepBlue;
+				width--;
+			} while (width != 0);
+		}
+	}
 
 	// STUB: TOY2 0x004C5AC0
 	void UnkFunc51(Nu3D::VertexTL* leftEdge,
