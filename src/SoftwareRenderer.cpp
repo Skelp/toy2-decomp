@@ -795,6 +795,38 @@ namespace SoftwareRenderer
 	}
 #undef NU_FMIN
 
+	// Submits a triangle list (indexCount/3 independent triangles) for sorted
+	// transparency rasterization. Locks the vertex buffer, walks the index list
+	// back-to-front in groups of three, and forwards each triangle to
+	// SubmitSortedTriangle with fieldC=0 (SubmitQuad instead passes fieldC=
+	// textureIndex/field10=0; the two submitter families populate the sorted
+	// record's field10/fieldC pair in opposite slots). The index buffer is read
+	// via a pointer centered on the middle index of each triple so the three
+	// vertex pointers come from p[-1], p[0], p[1] as p walks backward. The
+	// count guard is written as an explicit if around a do-while so the pointer
+	// setup (the indices load and the LEA) is deferred past the guard, matching
+	// retail's callee-saved register scheduling; a plain while hoists the
+	// pointer init before the guard.
+	// FUNCTION: TOY2 0x004B5FB0 [MATCHED]
+	void SubmitTriangleList(int32_t renderFlags, LPDIRECT3DVERTEXBUFFER vertexBuffer, int32_t field10, WORD* indices, int32_t indexCount)
+	{
+		Nu3D::VertexTL* lockedVertices;
+		if (DrawingAPI::LockVertexBuffer(vertexBuffer, 0x801, (LPVOID*)&lockedVertices, 0) == 0)
+		{
+			if (indexCount != 0)
+			{
+				WORD* p = indices + indexCount + 1;
+				do
+				{
+					p -= 3;
+					indexCount -= 3;
+					SubmitSortedTriangle(renderFlags, field10, 0, &lockedVertices[p[-1]], &lockedVertices[p[0]], &lockedVertices[p[1]]);
+				} while (indexCount != 0);
+			}
+			DrawingAPI::UnlockVertexBuffer(vertexBuffer);
+		}
+	}
+
 	// FUNCTION: TOY2 0x004B6220 [MATCHED]
 	void SubmitQuad(int32_t renderFlags, int32_t textureIndex, LPDIRECT3DVERTEXBUFFER vertexBuffer, WORD* indices)
 	{
