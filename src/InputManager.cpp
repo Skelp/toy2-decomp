@@ -116,7 +116,7 @@ namespace InputManager
 	int16_t g_joystickConnected;
 
 	// GLOBAL: TOY2 0x00529D40
-	int16_t g_joystickDirectionFlags;
+	int32_t g_joystickDirectionFlags;
 
 	// clang-format off
 	// GLOBAL: TOY2 0x004ED398
@@ -164,6 +164,36 @@ namespace InputManager
 		{ NULL, -1 }
 	};
 	// clang-format on
+
+	// FUNCTION: TOY2 0x00415120
+	int32_t GetPressedInput()
+	{
+		for (int32_t inputCode = 0; inputCode < 256; inputCode++)
+		{
+			if (g_inputStates[inputCode])
+				return inputCode;
+		}
+
+		for (int32_t button = 0; button < 32; button++)
+		{
+			if (g_joystickState.rgbButtons[button])
+				return button + TOY_INPUT_JOY1;
+		}
+
+		return g_joystickDirectionFlags ? TOY_INPUT_DIRECTIONPAD : TOY_INPUT_UNKNOWN;
+	}
+
+	// FUNCTION: TOY2 0x004152A0
+	char* GetGameControlName(int32_t inputCode)
+	{
+		for (int32_t i = 0; g_inputMapping[i].name; i++)
+		{
+			if (g_inputMapping[i].id == inputCode)
+				return g_inputMapping[i].name;
+		}
+
+		return NULL;
+	}
 }
 
 namespace InputManager
