@@ -610,31 +610,182 @@ namespace SoftwareRenderer
 		int32_t rightBlue)
 	{}
 
-	// STUB: TOY2 0x004C48E0
-	void UnkFunc55(Nu3D::VertexTL* leftEdge,
-		Nu3D::VertexTL* rightEdge,
+	// Untextured opaque span for a 16-bit 555 surface. The rasterizer writes two
+	// pixels at a time with one interpolated colour. It writes a single pixel at
+	// each unaligned end of the span.
+	// FUNCTION: TOY2 0x004C48E0
+	void UnkFunc55(Nu3D::VertexTL* edgeA,
+		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
-		int32_t leftRed,
-		int32_t leftGreen,
-		int32_t leftBlue,
-		int32_t rightRed,
-		int32_t rightGreen,
-		int32_t rightBlue)
-	{}
+		int32_t edgeARed,
+		int32_t edgeAGreen,
+		int32_t edgeABlue,
+		int32_t edgeBRed,
+		int32_t edgeBGreen,
+		int32_t edgeBBlue)
+	{
+		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
+		if (width == 0)
+		{
+			return;
+		}
 
-	// STUB: TOY2 0x004C4A60
-	void UnkFunc40(Nu3D::VertexTL* leftEdge,
-		Nu3D::VertexTL* rightEdge,
+		int32_t farRed;
+		int32_t farGreen;
+		int32_t farBlue;
+		if (width < 0)
+		{
+			farRed = edgeBRed;
+			farGreen = edgeBGreen;
+			farBlue = edgeBBlue;
+			edgeBRed = edgeARed;
+			edgeBGreen = edgeAGreen;
+			edgeBBlue = edgeABlue;
+			Nu3D::VertexTL* swap = edgeA;
+			edgeA = edgeB;
+			edgeB = swap;
+			width = -width;
+		}
+		else
+		{
+			farRed = edgeARed;
+			farGreen = edgeAGreen;
+			farBlue = edgeABlue;
+		}
+
+		if (width > 0)
+		{
+			int32_t pairCount = width >> 1;
+			int32_t stepRed;
+			int32_t stepGreen;
+			int32_t stepBlue;
+			if (pairCount > 0)
+			{
+				stepRed = (farRed - edgeBRed) / pairCount;
+				stepGreen = (farGreen - edgeBGreen) / pairCount;
+				stepBlue = (farBlue - edgeBBlue) / pairCount;
+			}
+
+			int32_t startX = (int32_t)edgeB->position.x;
+			int32_t endX = (int32_t)edgeA->position.x;
+			destRow += startX;
+
+			if (startX & 1)
+			{
+				*destRow = (uint16_t)(((uint32_t)edgeBRed & 0xf800) >> 1) + (uint16_t)(((uint32_t)edgeBGreen & 0xf800) >> 6)
+					+ (uint16_t)(((uint32_t)edgeBBlue & 0xf800) >> 11);
+				destRow++;
+				pairCount = (width - 1) >> 1;
+			}
+
+			while (pairCount != 0)
+			{
+				uint32_t pixel = (((uint32_t)edgeBRed & 0xf800) >> 1) + (((uint32_t)edgeBGreen & 0xf800) >> 6) + ((uint32_t)edgeBBlue >> 11);
+				*(uint32_t*)destRow = MAKELONG(pixel, pixel);
+				destRow += 2;
+
+				edgeBRed += stepRed;
+				edgeBGreen += stepGreen;
+				edgeBBlue += stepBlue;
+				pairCount--;
+			}
+
+			if (endX & 1)
+			{
+				*destRow = (uint16_t)(((uint32_t)edgeBRed & 0xf800) >> 1) + (uint16_t)(((uint32_t)edgeBGreen & 0xf800) >> 6)
+					+ (uint16_t)(((uint32_t)edgeBBlue & 0xf800) >> 11);
+			}
+		}
+	}
+
+	// The 565 twin of UnkFunc55. It uses the same paired-pixel walk, but places
+	// the five interpolated green bits at bit 6 and red at bit 11.
+	// FUNCTION: TOY2 0x004C4A60
+	void UnkFunc40(Nu3D::VertexTL* edgeA,
+		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
-		int32_t leftRed,
-		int32_t leftGreen,
-		int32_t leftBlue,
-		int32_t rightRed,
-		int32_t rightGreen,
-		int32_t rightBlue)
-	{}
+		int32_t edgeARed,
+		int32_t edgeAGreen,
+		int32_t edgeABlue,
+		int32_t edgeBRed,
+		int32_t edgeBGreen,
+		int32_t edgeBBlue)
+	{
+		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
+		if (width == 0)
+		{
+			return;
+		}
+
+		int32_t farRed;
+		int32_t farGreen;
+		int32_t farBlue;
+		if (width < 0)
+		{
+			farRed = edgeBRed;
+			farGreen = edgeBGreen;
+			farBlue = edgeBBlue;
+			edgeBRed = edgeARed;
+			edgeBGreen = edgeAGreen;
+			edgeBBlue = edgeABlue;
+			Nu3D::VertexTL* swap = edgeA;
+			edgeA = edgeB;
+			edgeB = swap;
+			width = -width;
+		}
+		else
+		{
+			farRed = edgeARed;
+			farGreen = edgeAGreen;
+			farBlue = edgeABlue;
+		}
+
+		if (width > 0)
+		{
+			int32_t pairCount = width >> 1;
+			int32_t stepRed;
+			int32_t stepGreen;
+			int32_t stepBlue;
+			if (pairCount > 0)
+			{
+				stepRed = (farRed - edgeBRed) / pairCount;
+				stepGreen = (farGreen - edgeBGreen) / pairCount;
+				stepBlue = (farBlue - edgeBBlue) / pairCount;
+			}
+
+			int32_t startX = (int32_t)edgeB->position.x;
+			int32_t endX = (int32_t)edgeA->position.x;
+			destRow += startX;
+
+			if (startX & 1)
+			{
+				*destRow = (uint16_t)((uint32_t)edgeBRed & 0xf800) + (uint16_t)(((uint32_t)edgeBGreen & 0xf800) >> 5)
+					+ (uint16_t)(((uint32_t)edgeBBlue & 0xf800) >> 11);
+				destRow++;
+				pairCount = (width - 1) >> 1;
+			}
+
+			while (pairCount != 0)
+			{
+				uint32_t pixel = ((uint32_t)edgeBRed & 0xf800) + (((uint32_t)edgeBGreen & 0xf800) >> 5) + ((uint32_t)edgeBBlue >> 11);
+				*(uint32_t*)destRow = MAKELONG(pixel, pixel);
+				destRow += 2;
+
+				edgeBRed += stepRed;
+				edgeBGreen += stepGreen;
+				edgeBBlue += stepBlue;
+				pairCount--;
+			}
+
+			if (endX & 1)
+			{
+				*destRow = (uint16_t)((uint32_t)edgeBRed & 0xf800) + (uint16_t)(((uint32_t)edgeBGreen & 0xf800) >> 5)
+					+ (uint16_t)(((uint32_t)edgeBBlue & 0xf800) >> 11);
+			}
+		}
+	}
 
 	// STUB: TOY2 0x004C4BE0
 	void UnkFunc49(Nu3D::VertexTL* leftEdge,
