@@ -12,6 +12,36 @@ namespace Toy2
 
 	namespace Animation
 	{
+		struct ClipHeader
+		{
+			int16_t headerSize;
+			int16_t reserved;
+			uint16_t frameCountAndFlags;
+			uint16_t nodeCount;
+			uint16_t sampleStride;
+			uint16_t nodeOffsetCount;
+			uint16_t scaleFlagByteCount;
+			int16_t buzzOffsetNode;
+		};
+
+		struct KeyframeSample
+		{
+			int16_t translationX;
+			int16_t translationY;
+			int16_t translationZ;
+			uint16_t packedRotationLow;
+			uint16_t packedRotationHigh;
+			int16_t scaleX;
+			int16_t scaleY;
+			int16_t scaleZ;
+		};
+
+		union RotationScratch
+		{
+			Vector3I16 angles;
+			Matrix3x3I16 matrix;
+		};
+
 		// Per-actor, per-node euler rotation offsets applied during animation.
 		// Indexed as g_nodeAngles[actorIndex][nodeIndex]; up to 64 actors with
 		// 32 nodes each (64 * 32 * sizeof(Vector3F) == 0x6000).
@@ -33,8 +63,11 @@ namespace Toy2
 		void ResetNodeAngles();
 		void ParseHeader(int16_t* header);
 
-		// Evaluate one animation clip. arg1 is the clip data pointer; the
-		// remaining arguments are not yet reconstructed.
-		void EvaluateClip(void* clipData, int32_t arg2, uint16_t arg3, int32_t arg4);
+		void EvaluateClip(ClipHeader* clip, int32_t framePosition, uint16_t baseBoneIndex, int32_t track);
+		void TransformByBone(Vector3I* position, void* actor, int32_t boneIndex);
+
+		STATIC_ASSERT(sizeof(ClipHeader) == 0x10);
+		STATIC_ASSERT(sizeof(KeyframeSample) == 0x10);
+		STATIC_ASSERT(sizeof(RotationScratch) == 0x12);
 	}
 }

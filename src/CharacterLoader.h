@@ -9,12 +9,12 @@ namespace CharacterLoader
 	{
 		Vector3I translation;
 		int32_t unkInt4;
-		Vector3I16 unkVec4;
+		Vector3I16 rotationAngles;
 		int16_t unkInt6_;
-		int16_t unkInt7;
-		int16_t unkInt7_;
-		int16_t unkInt8;
-		uint8_t unkByte1;
+		int16_t scaleX;
+		int16_t scaleY;
+		int16_t scaleZ;
+		uint8_t hasScale;
 		uint8_t track;
 		int32_t unkInt9;
 		int32_t unkInt10;

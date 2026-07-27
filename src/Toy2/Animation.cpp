@@ -1,5 +1,9 @@
 #include "Toy2/Animation.h"
 
+#include "CharacterLoader.h"
+#include "Nu3D/Math.h"
+#include "Toy2/Buzz.h"
+
 #include <string.h>
 
 namespace Toy2
@@ -20,6 +24,36 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x00B423EC
 		uint8_t* g_keyframeData;
+
+		// GLOBAL: TOY2 0x0053E4B8
+		Vector3I16 g_buzzBoneOffset;
+
+		// GLOBAL: TOY2 0x0053E4BE
+		int16_t g_hasBuzzBoneOffset;
+
+		// GLOBAL: TOY2 0x0053E4C0
+		int16_t g_clipHasNegativeHeader;
+
+		// GLOBAL: TOY2 0x0053E4C4
+		uint8_t* g_clipScaleFlags;
+
+		// GLOBAL: TOY2 0x0053EEC8
+		int16_t* g_clipNodeOffsets;
+
+		// GLOBAL: TOY2 0x0053EECC
+		int32_t g_singleNodeIndex = -1;
+
+		// GLOBAL: TOY2 0x0053EED8
+		int16_t g_clipHeaderSize;
+
+		// GLOBAL: TOY2 0x00546D70
+		int16_t g_applyBuzzBoneOffset;
+
+		// GLOBAL: TOY2 0x00555354
+		RotationScratch g_keyframeRotation;
+
+		// GLOBAL: TOY2 0x00555374
+		RotationScratch g_nextKeyframeRotation;
 
 		STATIC_ASSERT(sizeof(g_nodeAngles) == 0x6000);
 
@@ -44,7 +78,159 @@ namespace Toy2
 			g_keyframeData = g_nodeScaleFlags + (uint16_t)header[6];
 		}
 
-		// STUB: TOY2 0x0043BA80
-		void EvaluateClip(void* clipData, int32_t arg2, uint16_t arg3, int32_t arg4) {}
+		// FUNCTION: TOY2 0x0043BA80
+		void EvaluateClip(ClipHeader* clip, int32_t framePosition, uint16_t baseBoneIndex, int32_t track)
+		{
+			if (clip->headerSize < 0)
+			{
+				g_clipHeaderSize = -clip->headerSize;
+				g_clipHasNegativeHeader = 1;
+			}
+			else
+			{
+				g_clipHeaderSize = sizeof(ClipHeader) - 4;
+				g_clipHasNegativeHeader = 0;
+			}
+
+			g_clipNodeOffsets = (int16_t*)((uint8_t*)clip + g_clipHeaderSize);
+			g_clipScaleFlags = (uint8_t*)clip + g_clipHeaderSize + clip->nodeOffsetCount * 2;
+			uint8_t* keyframeData = g_clipScaleFlags + clip->scaleFlagByteCount;
+			int32_t frameIndex = (int16_t)(framePosition >> 16);
+			if (frameIndex > (clip->frameCountAndFlags & 0x7fff))
+				return;
+
+			uint16_t fraction = (uint16_t)framePosition;
+			int32_t firstNode;
+			int32_t nodeEnd;
+			if (g_singleNodeIndex < 0)
+			{
+				firstNode = 0;
+				nodeEnd = clip->nodeCount;
+			}
+			else
+			{
+				firstNode = g_singleNodeIndex;
+				nodeEnd = g_singleNodeIndex + 1;
+				baseBoneIndex += (uint16_t)g_singleNodeIndex;
+			}
+
+			for (int32_t node = firstNode; node < nodeEnd; node++)
+			{
+				int16_t sampleIndex = g_clipNodeOffsets[node];
+				if (sampleIndex == -3)
+				{
+					baseBoneIndex++;
+					continue;
+				}
+				if (sampleIndex == -2 || sampleIndex == -1)
+					continue;
+
+				CharacterLoader::BoneTransform* transform = &CharacterLoader::g_boneTransforms[baseBoneIndex];
+				transform->track = (uint8_t)track;
+				KeyframeSample* sample = (KeyframeSample*)(keyframeData + (sampleIndex + clip->sampleStride * frameIndex) * 2);
+				KeyframeSample* nextSample;
+				if (frameIndex < (clip->frameCountAndFlags & 0x7fff) - 1)
+					nextSample = (KeyframeSample*)((uint8_t*)sample + clip->sampleStride * 2);
+				else
+					nextSample = (KeyframeSample*)(keyframeData + sampleIndex * 2);
+
+				if (fraction != 0)
+				{
+					transform->translation.x = (((nextSample->translationX >> 2) - (sample->translationX >> 2)) * fraction >> 16) + (sample->translationX >> 2);
+					transform->translation.y = (((nextSample->translationY >> 2) - (sample->translationY >> 2)) * fraction >> 16) + (sample->translationY >> 2);
+					transform->translation.z = (((nextSample->translationZ >> 2) - (sample->translationZ >> 2)) * fraction >> 16) + (sample->translationZ >> 2);
+
+					uint32_t packedRotation = sample->packedRotationLow | (sample->packedRotationHigh << 16);
+					g_keyframeRotation.angles.x = (int16_t)((packedRotation >> 18) & 0xffc) | (sample->translationX & 3);
+					g_keyframeRotation.angles.y = (int16_t)((packedRotation >> 8) & 0xffc) | (sample->translationY & 3);
+					g_keyframeRotation.angles.z = (int16_t)((packedRotation & 0x3ff) << 2) | (sample->translationZ & 3);
+					Nu3D::Math::EulerToRotationMatrix(&g_keyframeRotation.angles, &g_keyframeRotation.matrix);
+
+					packedRotation = nextSample->packedRotationLow | (nextSample->packedRotationHigh << 16);
+					g_nextKeyframeRotation.angles.x = (int16_t)((packedRotation >> 18) & 0xffc) | (nextSample->translationX & 3);
+					g_nextKeyframeRotation.angles.y = (int16_t)((packedRotation >> 8) & 0xffc) | (nextSample->translationY & 3);
+					g_nextKeyframeRotation.angles.z = (int16_t)((packedRotation & 0x3ff) << 2) | (nextSample->translationZ & 3);
+					Nu3D::Math::EulerToRotationMatrix(&g_nextKeyframeRotation.angles, &g_nextKeyframeRotation.matrix);
+
+					transform->rotation.m00 =
+						(int16_t)(((g_nextKeyframeRotation.matrix.m00 - g_keyframeRotation.matrix.m00) * fraction >> 16) + g_keyframeRotation.matrix.m00);
+					transform->rotation.m01 =
+						(int16_t)(((g_nextKeyframeRotation.matrix.m01 - g_keyframeRotation.matrix.m01) * fraction >> 16) + g_keyframeRotation.matrix.m01);
+					transform->rotation.m02 =
+						(int16_t)(((g_nextKeyframeRotation.matrix.m02 - g_keyframeRotation.matrix.m02) * fraction >> 16) + g_keyframeRotation.matrix.m02);
+					transform->rotation.m10 =
+						(int16_t)(((g_nextKeyframeRotation.matrix.m10 - g_keyframeRotation.matrix.m10) * fraction >> 16) + g_keyframeRotation.matrix.m10);
+					transform->rotation.m11 =
+						(int16_t)(((g_nextKeyframeRotation.matrix.m11 - g_keyframeRotation.matrix.m11) * fraction >> 16) + g_keyframeRotation.matrix.m11);
+					transform->rotation.m12 =
+						(int16_t)(((g_nextKeyframeRotation.matrix.m12 - g_keyframeRotation.matrix.m12) * fraction >> 16) + g_keyframeRotation.matrix.m12);
+					transform->rotation.m20 =
+						(int16_t)(((g_nextKeyframeRotation.matrix.m20 - g_keyframeRotation.matrix.m20) * fraction >> 16) + g_keyframeRotation.matrix.m20);
+					transform->rotation.m21 =
+						(int16_t)(((g_nextKeyframeRotation.matrix.m21 - g_keyframeRotation.matrix.m21) * fraction >> 16) + g_keyframeRotation.matrix.m21);
+					transform->rotation.m22 =
+						(int16_t)(((g_nextKeyframeRotation.matrix.m22 - g_keyframeRotation.matrix.m22) * fraction >> 16) + g_keyframeRotation.matrix.m22);
+				}
+				else
+				{
+					transform->translation.x = sample->translationX >> 2;
+					transform->translation.y = sample->translationY >> 2;
+					transform->translation.z = sample->translationZ >> 2;
+					uint32_t packedRotation = sample->packedRotationLow | (sample->packedRotationHigh << 16);
+					transform->rotationAngles.x = (int16_t)((packedRotation >> 18) & 0xffc) | (sample->translationX & 3);
+					transform->rotationAngles.y = (int16_t)((packedRotation >> 8) & 0xffc) | (sample->translationY & 3);
+					transform->rotationAngles.z = (int16_t)((packedRotation & 0x3ff) << 2) | (sample->translationZ & 3);
+					Nu3D::Math::EulerToRotationMatrix(&transform->rotationAngles, &transform->rotation);
+				}
+
+				if (g_clipHasNegativeHeader && clip->buzzOffsetNode == (int16_t)baseBoneIndex)
+				{
+					Vector3I offset = { 0, -200, 0 };
+					TransformByBone(&offset, &g_buzzActor, baseBoneIndex);
+					g_buzzBoneOffset.x = (int16_t)offset.x;
+					g_buzzBoneOffset.y = (int16_t)(offset.y + 200);
+					g_buzzBoneOffset.z = (int16_t)offset.z;
+					g_hasBuzzBoneOffset = 1;
+				}
+
+				if (g_applyBuzzBoneOffset && g_hasBuzzBoneOffset)
+				{
+					transform->translation.x += g_buzzBoneOffset.x;
+					transform->translation.y += g_buzzBoneOffset.y;
+					transform->translation.z += g_buzzBoneOffset.z;
+				}
+
+				uint8_t scaleMask = (uint8_t)(1 << (node & 7));
+				if ((g_clipScaleFlags[node >> 3] & scaleMask) != 0)
+				{
+					if (fraction != 0)
+					{
+						transform->scaleX = (int16_t)(((nextSample->scaleX - sample->scaleX) * fraction >> 16) + sample->scaleX);
+						transform->scaleY = (int16_t)(((nextSample->scaleY - sample->scaleY) * fraction >> 16) + sample->scaleY);
+						transform->scaleZ = (int16_t)(((nextSample->scaleZ - sample->scaleZ) * fraction >> 16) + sample->scaleZ);
+					}
+					else
+					{
+						transform->scaleX = sample->scaleX;
+						transform->scaleY = sample->scaleY;
+						transform->scaleZ = sample->scaleZ;
+					}
+					transform->hasScale = 1;
+				}
+				else
+				{
+					transform->hasScale = 0;
+				}
+
+				baseBoneIndex++;
+			}
+
+			if (g_applyBuzzBoneOffset && g_hasBuzzBoneOffset)
+				g_hasBuzzBoneOffset = 0;
+			g_singleNodeIndex = -1;
+		}
+
+		// STUB: TOY2 0x0043C0E0
+		void TransformByBone(Vector3I* position, void* actor, int32_t boneIndex) {}
 	}
 }
