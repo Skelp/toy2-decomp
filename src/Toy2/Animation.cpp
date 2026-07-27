@@ -32,14 +32,23 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00B223C0
 		Actor::Toy2Actor** g_actorAnimList;
 
+		// GLOBAL: TOY2 0x00B223DC
+		int32_t g_currentActorIndex;
+
 		// GLOBAL: TOY2 0x00B223E0
 		uint8_t* g_nodeKeyframeOffsets;
+
+		// GLOBAL: TOY2 0x00B223E8
+		D3DMATRIX g_nodeMatrices[64][32];
 
 		// GLOBAL: TOY2 0x00B423E8
 		uint8_t* g_nodeScaleFlags;
 
 		// GLOBAL: TOY2 0x00B423EC
 		uint8_t* g_keyframeData;
+
+		// GLOBAL: TOY2 0x00B62400
+		void* g_currentAnimationModel;
 
 		// GLOBAL: TOY2 0x0053E4B8
 		Vector3I16 g_buzzBoneOffset;
@@ -72,6 +81,7 @@ namespace Toy2
 		RotationScratch g_nextKeyframeRotation;
 
 		STATIC_ASSERT(sizeof(g_nodeAngles) == 0x6000);
+		STATIC_ASSERT(sizeof(g_nodeMatrices) == 0x20000);
 
 		// FUNCTION: TOY2 0x004CD120 [MATCHED]
 		void ResetNodeAngles()
@@ -262,6 +272,21 @@ namespace Toy2
 			position->x = transform->translation.x + transformed.x;
 			position->y = transform->translation.y + transformed.y;
 			position->z = transform->translation.z + transformed.z;
+		}
+	}
+}
+
+namespace Nu3D
+{
+	namespace Bones
+	{
+		// FUNCTION: TOY2 0x004CD140 [MATCHED]
+		void GetRootWorldPos(Vector3F* position, int32_t nodeIndex)
+		{
+			if (Toy2::Animation::g_currentAnimationModel != 0)
+			{
+				Math::TransformPointByMatrix(position, position, &Toy2::Animation::g_nodeMatrices[Toy2::Animation::g_currentActorIndex][nodeIndex]);
+			}
 		}
 	}
 }

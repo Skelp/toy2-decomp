@@ -3,6 +3,8 @@
 #include "Common.h"
 #include "Numerics.h"
 
+#include <directx6/d3d.h>
+
 namespace Toy2
 {
 	namespace Actor
@@ -50,6 +52,9 @@ namespace Toy2
 		// Pointer to the NULL-terminated list of actors currently being animated
 		// (set by AnimateActors, read by Actor::FindInActorList). NULL when idle.
 		extern Actor::Toy2Actor** g_actorAnimList;
+		extern int32_t g_currentActorIndex;
+		extern D3DMATRIX g_nodeMatrices[64][32];
+		extern void* g_currentAnimationModel;
 
 		// Pointers into the currently parsed animation data blob (set by ParseHeader,
 		// read by SampleNodeTransform). g_nodeKeyframeOffsets is a per-node short
@@ -69,5 +74,13 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(ClipHeader) == 0x10);
 		STATIC_ASSERT(sizeof(KeyframeSample) == 0x10);
 		STATIC_ASSERT(sizeof(RotationScratch) == 0x12);
+	}
+}
+
+namespace Nu3D
+{
+	namespace Bones
+	{
+		void GetRootWorldPos(Vector3F* position, int32_t nodeIndex);
 	}
 }
