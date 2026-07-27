@@ -109,7 +109,7 @@ namespace Renderer
 			vertexData[2].rhw = 1.0;
 
 			Renderer::InitRenderState(flags);
-			SoftwareRenderer::g_unkE4D950 = 5;
+			SoftwareRenderer::g_softwarePrimitiveType = 5;
 
 			Renderer::BindTexture(sprite->textureIndex);
 
@@ -166,7 +166,7 @@ namespace Renderer
 				Nu3D::Math::AddWorldSpaceTransform(&matrix, &sprite->position);
 				DrawingDevice::SetWorldTransform(&matrix);
 
-				SoftwareRenderer::g_unkE4D950 = 5;
+				SoftwareRenderer::g_softwarePrimitiveType = 5;
 
 				if (g_drawingTransparentBuckets == 0)
 				{
@@ -243,7 +243,7 @@ namespace Renderer
 				Nu3D::Math::AddWorldSpaceTransform(&matrix, &sprite->position);
 				DrawingDevice::SetWorldTransform(&matrix);
 
-				SoftwareRenderer::g_unkE4D950 = 5;
+				SoftwareRenderer::g_softwarePrimitiveType = 5;
 
 				if (g_drawingTransparentBuckets == 0)
 				{
@@ -294,7 +294,7 @@ namespace Renderer
 				Nu3D::Math::BuildIdentityMatrix(&matrix);
 				DrawingDevice::SetWorldTransform(&matrix);
 
-				SoftwareRenderer::g_unkE4D950 = 5;
+				SoftwareRenderer::g_softwarePrimitiveType = 5;
 
 				if (g_drawingTransparentBuckets == 0)
 				{
@@ -350,7 +350,7 @@ namespace Renderer
 				Nu3D::Math::BuildIdentityMatrix(&matrix);
 				DrawingDevice::SetWorldTransform(&matrix);
 
-				SoftwareRenderer::g_unkE4D950 = 2;
+				SoftwareRenderer::g_softwarePrimitiveType = 2;
 
 				if (g_drawingTransparentBuckets != 0)
 				{
@@ -391,7 +391,7 @@ namespace Renderer
 			DrawingDevice::SetWorldTransform(&matrix);
 
 			Renderer::InitRenderState(sprite->renderFlags | RENDER_CULL_NONE);
-			SoftwareRenderer::g_unkE4D950 = 5;
+			SoftwareRenderer::g_softwarePrimitiveType = 5;
 			Renderer::BindTexture(0);
 			SoftwareRenderer::g_viewportRect = &sprite->viewportRect;
 

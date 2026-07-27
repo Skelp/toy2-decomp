@@ -61,7 +61,7 @@ namespace SoftwareRenderer
 	int32_t g_unk839280;
 
 	// GLOBAL: TOY2 0x00E4D950
-	int32_t g_unkE4D950;
+	int32_t g_softwarePrimitiveType;
 
 	// GLOBAL: TOY2 0x009F6008
 	int32_t g_unk9F6008;
@@ -2531,7 +2531,7 @@ namespace SoftwareRenderer
 				vertices[0] = (Nu3D::VertexTL*)((uint8_t*)lpvVertices + indices[0] * 0x20);
 				vertices[1] = (Nu3D::VertexTL*)((uint8_t*)lpvVertices + indices[1] * 0x20);
 				vertices[2] = (Nu3D::VertexTL*)((uint8_t*)lpvVertices + indices[2] * 0x20);
-				UnkFunc22(vertices, 3, maskedTexData, Renderer::g_renderStateCache[0], g_unkE4D950, 0);
+				UnkFunc22(vertices, 3, maskedTexData, Renderer::g_renderStateCache[0], g_softwarePrimitiveType, 0);
 				indices += 3;
 				remaining--;
 			} while (remaining != 0);
@@ -2541,8 +2541,55 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x004C0320
 	void UnkFunc22(Nu3D::VertexTL* vertices[3], int32_t vertexCount, uint32_t* texData, int32_t renderState, int32_t primitiveType, DWORD drawFlags) {}
 
-	// STUB: TOY2 0x004C1540
-	void UnkFunc21(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags) {}
+	// FUNCTION: TOY2 0x004C1540
+	void UnkFunc21(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags)
+	{
+		TextureData texture;
+		uint32_t* texData = UnkFunc20(&texture) != 0 ? NULL : texture.texData;
+		Nu3D::VertexTL* vertexBase = (Nu3D::VertexTL*)lpvVertices;
+		Nu3D::VertexTL* vertices[4];
+
+		if (((dwIndexCount - 2) & ~1u) != 0)
+		{
+			uint16_t firstIndex = *lpwIndices++;
+			uint16_t secondIndex = *lpwIndices++;
+			uint16_t previousIndex0 = *lpwIndices++;
+			uint16_t previousIndex1 = *lpwIndices++;
+			vertices[0] = &vertexBase[previousIndex0];
+			vertices[3] = &vertexBase[firstIndex];
+			vertices[2] = &vertexBase[secondIndex];
+			vertices[1] = &vertexBase[previousIndex1];
+			UnkFunc22(vertices, 4, texData, Renderer::g_renderStateCache[0], g_softwarePrimitiveType, 0);
+
+			for (DWORD remaining = (dwIndexCount - 4) / 2; remaining != 0; remaining--)
+			{
+				uint16_t oldIndex0 = previousIndex0;
+				previousIndex0 = *lpwIndices++;
+				uint16_t oldIndex1 = previousIndex1;
+				previousIndex1 = *lpwIndices++;
+				vertices[0] = &vertexBase[previousIndex0];
+				vertices[3] = &vertexBase[oldIndex0];
+				vertices[2] = &vertexBase[oldIndex1];
+				vertices[1] = &vertexBase[previousIndex1];
+				UnkFunc22(vertices, 4, texData, Renderer::g_renderStateCache[0], g_softwarePrimitiveType, 0);
+			}
+
+			if ((dwIndexCount & 1) != 0)
+			{
+				vertices[0] = &vertexBase[*lpwIndices];
+				vertices[1] = &vertexBase[previousIndex1];
+				vertices[2] = &vertexBase[previousIndex0];
+				UnkFunc22(vertices, 3, texData, Renderer::g_renderStateCache[0], g_softwarePrimitiveType, 0);
+			}
+		}
+		else
+		{
+			vertices[0] = &vertexBase[lpwIndices[0]];
+			vertices[1] = &vertexBase[lpwIndices[1]];
+			vertices[2] = &vertexBase[lpwIndices[2]];
+			UnkFunc22(vertices, 3, texData, Renderer::g_renderStateCache[0], g_softwarePrimitiveType, 0);
+		}
+	}
 
 	// FUNCTION: TOY2 0x004C1720 [MATCHED]
 	void UnkFunc16(D3DPRIMITIVETYPE d3dptPrimitiveType, LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags)

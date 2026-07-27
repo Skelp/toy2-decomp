@@ -20,7 +20,7 @@ namespace SoftwareRenderer
 	extern SoftwareRenderItem** g_softwareRenderBuckets;
 	extern SoftwareRenderItem* g_softwareRenderBucketStorage[4096];
 	extern int32_t g_unk839280;
-	extern int32_t g_unkE4D950;
+	extern int32_t g_softwarePrimitiveType;
 	extern int32_t g_unk9F6008;
 
 	// The software renderer's DirectDraw palette and backing entry buffers.
