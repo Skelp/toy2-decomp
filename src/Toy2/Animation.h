@@ -14,6 +14,12 @@ namespace Toy2
 
 	namespace Animation
 	{
+		struct AnimationModel
+		{
+			uint8_t reserved[4];
+			int32_t nodeCount;
+		};
+
 		struct ClipHeader
 		{
 			int16_t headerSize;
@@ -54,7 +60,12 @@ namespace Toy2
 		extern Actor::Toy2Actor** g_actorAnimList;
 		extern int32_t g_currentActorIndex;
 		extern D3DMATRIX g_nodeMatrices[64][32];
-		extern void* g_currentAnimationModel;
+		extern D3DMATRIX g_worldNodeMatrices[64][32];
+		extern AnimationModel* g_currentAnimationModel;
+		extern int32_t g_identityNodeIndex;
+		extern int32_t g_isLastAnimatedActor;
+		extern int32_t g_applyRootNodeOffset;
+		extern int32_t g_rootOffsetNodeIndex;
 
 		// Pointers into the currently parsed animation data blob (set by ParseHeader,
 		// read by SampleNodeTransform). g_nodeKeyframeOffsets is a per-node short
@@ -67,6 +78,9 @@ namespace Toy2
 
 		void ResetNodeAngles();
 		void ParseHeader(int16_t* header);
+		int32_t SampleNodeTransform(int32_t nodeIndex, int16_t* clipData, int32_t framePosition, D3DMATRIX* matrix);
+		void EvaluateClipToMatrices(
+			int32_t actorIndex, AnimationModel* model, const D3DMATRIX* actorMatrix, int16_t* clipData, int32_t framePosition, int32_t isSecondaryTrack);
 
 		void EvaluateClip(ClipHeader* clip, int32_t framePosition, uint16_t baseBoneIndex, int32_t track);
 		void TransformByBone(Vector3I* position, void* actor, int32_t boneIndex);
@@ -74,6 +88,7 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(ClipHeader) == 0x10);
 		STATIC_ASSERT(sizeof(KeyframeSample) == 0x10);
 		STATIC_ASSERT(sizeof(RotationScratch) == 0x12);
+		STATIC_ASSERT(sizeof(AnimationModel) == 8);
 	}
 }
 

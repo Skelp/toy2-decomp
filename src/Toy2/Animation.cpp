@@ -47,8 +47,23 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00B423EC
 		uint8_t* g_keyframeData;
 
+		// GLOBAL: TOY2 0x00B423F0
+		D3DMATRIX g_worldNodeMatrices[64][32];
+
 		// GLOBAL: TOY2 0x00B62400
-		void* g_currentAnimationModel;
+		AnimationModel* g_currentAnimationModel;
+
+		// GLOBAL: TOY2 0x00508D00
+		int32_t g_identityNodeIndex;
+
+		// GLOBAL: TOY2 0x00E4D98C
+		int32_t g_isLastAnimatedActor;
+
+		// GLOBAL: TOY2 0x00E4D990
+		int32_t g_applyRootNodeOffset;
+
+		// GLOBAL: TOY2 0x00E4D9A4
+		int32_t g_rootOffsetNodeIndex;
 
 		// GLOBAL: TOY2 0x0053E4B8
 		Vector3I16 g_buzzBoneOffset;
@@ -82,6 +97,7 @@ namespace Toy2
 
 		STATIC_ASSERT(sizeof(g_nodeAngles) == 0x6000);
 		STATIC_ASSERT(sizeof(g_nodeMatrices) == 0x20000);
+		STATIC_ASSERT(sizeof(g_worldNodeMatrices) == 0x20000);
 
 		// FUNCTION: TOY2 0x004CD120 [MATCHED]
 		void ResetNodeAngles()
@@ -272,6 +288,41 @@ namespace Toy2
 			position->x = transform->translation.x + transformed.x;
 			position->y = transform->translation.y + transformed.y;
 			position->z = transform->translation.z + transformed.z;
+		}
+
+		// STUB: TOY2 0x004CD1B0
+		int32_t SampleNodeTransform(int32_t nodeIndex, int16_t* clipData, int32_t framePosition, D3DMATRIX* matrix) { return 0; }
+
+		// FUNCTION: TOY2 0x004CD7B0
+		void EvaluateClipToMatrices(
+			int32_t actorIndex, AnimationModel* model, const D3DMATRIX* actorMatrix, int16_t* clipData, int32_t framePosition, int32_t isSecondaryTrack)
+		{
+			if (clipData == 0)
+			{
+				return;
+			}
+
+			if (isSecondaryTrack != 0)
+			{
+				g_rootOffsetNodeIndex = 0;
+				g_applyRootNodeOffset = 0;
+			}
+			else
+			{
+				g_applyRootNodeOffset = g_isLastAnimatedActor;
+			}
+
+			ParseHeader(clipData);
+			for (int32_t nodeIndex = 0; nodeIndex < model->nodeCount; nodeIndex++)
+			{
+				D3DMATRIX nodeMatrix;
+				Nu3D::Math::BuildIdentityMatrix(&nodeMatrix);
+				if (nodeIndex == g_identityNodeIndex || SampleNodeTransform(nodeIndex, clipData, framePosition, &nodeMatrix) != 0 || isSecondaryTrack != 0)
+				{
+					g_nodeMatrices[actorIndex][nodeIndex] = nodeMatrix;
+					Nu3D::Math::MultiplyMatrix3x4(&g_worldNodeMatrices[actorIndex][nodeIndex], &nodeMatrix, actorMatrix);
+				}
+			}
 		}
 	}
 }
