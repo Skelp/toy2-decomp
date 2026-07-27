@@ -70,6 +70,13 @@ namespace Toy2
 
 		extern Toy2Actor g_creatureActors[64];
 
+		// Actor-system state reset by InitCreatureRam. Roles are not yet confirmed;
+		// the consuming functions (Game::UpdateActors et al.) are unreconstructed.
+		extern int32_t g_unk50A54C;
+		extern int32_t g_unk52ADD8[0x80];
+		extern int32_t g_unk52EF48;
+		extern int32_t g_unk52EF88;
+
 		void InitCreatureRam();
 		void GetCreatureList(uint8_t* creatureIdList);
 		int32_t FindInActorList(Toy2Actor* actor);

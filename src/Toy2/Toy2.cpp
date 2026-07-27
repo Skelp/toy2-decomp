@@ -13,6 +13,7 @@
 #include "Toy2/Buzz.h"
 #include "Toy2/Levels.h"
 #include "Toy2/MainMenu.h"
+#include "Toy2/Actor.h"
 
 #include "Nu3D/Font.h"
 #include "Nu3D/Viewport.h"
@@ -203,6 +204,9 @@ namespace Toy2
 
 	namespace Game
 	{
+		// STUB: TOY2 0x00406CD0
+		void InitActor(Actor::Toy2Actor* actor, int32_t param) {}
+
 		// STUB: TOY2 0x0049E330
 		void PauseLoop() {}
 
