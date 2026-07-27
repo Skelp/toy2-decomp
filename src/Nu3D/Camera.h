@@ -40,6 +40,18 @@ namespace Nu3D
 			int16_t unkShort;
 		};
 
+		struct FixedViewTransform
+		{
+			int16_t m00;
+			int16_t m01;
+			int16_t m02;
+			int16_t reserved0[3];
+			int16_t m10;
+			int16_t m11;
+			int16_t m12;
+			int16_t reserved1[7];
+		};
+
 		extern D3DMATRIX g_viewMatrix;
 		extern D3DMATRIX g_projectionMatrix;
 		extern D3DMATRIX g_clipNormMatrix;
@@ -49,6 +61,8 @@ namespace Nu3D
 		extern CameraData g_activeCamera;
 		extern CameraData* g_currentCamera;
 		extern ActiveCameraTransform g_activeCameraTransform;
+		extern Vector3I g_fixedViewPosition;
+		extern FixedViewTransform g_fixedViewTransform;
 		extern ReflectionState g_reflectionState;
 		extern int32_t g_effectMode;
 		extern int32_t g_cameraSkewEnabled;
@@ -87,6 +101,7 @@ namespace Nu3D
 		void GetMatrixScaleVector(Vector3F* scale);
 
 		STATIC_ASSERT(sizeof(ActiveCameraTransform) == 0x14);
+		STATIC_ASSERT(sizeof(FixedViewTransform) == 0x20);
 		STATIC_ASSERT(sizeof(CameraData) == 0x64);
 		STATIC_ASSERT(sizeof(ReflectionState) == 0x84);
 	}

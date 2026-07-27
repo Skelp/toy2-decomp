@@ -47,6 +47,12 @@ namespace Nu3D
 		// GLOBAL: TOY2 0x00B223C8
 		ActiveCameraTransform g_activeCameraTransform;
 
+		// GLOBAL: TOY2 0x00555314
+		Vector3I g_fixedViewPosition;
+
+		// GLOBAL: TOY2 0x00555334
+		FixedViewTransform g_fixedViewTransform;
+
 		// GLOBAL: TOY2 0x00B62404
 		int32_t g_cameraSkewEnabled;
 

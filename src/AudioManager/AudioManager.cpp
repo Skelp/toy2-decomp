@@ -1,7 +1,9 @@
 #include "AudioManager/AudioManager.h"
 #include "FileUtils.h"
 #include "Logger.h"
+#include "Nu3D/Camera.h"
 #include "Numerics.h"
+#include <math.h>
 #include <cstring>
 #include <stdio.h>
 #include <directx6/dsound.h>
@@ -602,12 +604,79 @@ namespace AudioManager
 	int32_t PlayOneShotSoundGlobal(int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume)
 	{ return PlaySoundBuffer(soundIndex + 1, leftVolume, rightVolume, 0, volume, 0); }
 
-	// STUB: TOY2 0x004A3C80
-	int32_t PlayOneShotSound3DActor(void* actor, int32_t soundIndex, int32_t frequency, int32_t volume, void* position, int32_t flag) { return 0; }
+	// FUNCTION: TOY2 0x004A3C80
+	int32_t PlayOneShotSound3DActor(void* actor, int32_t soundIndex, int32_t frequency, int32_t volume, void* position, int32_t flag)
+	{
+		int32_t leftVolume;
+		int32_t rightVolume;
+		if (position != NULL)
+		{
+			const Vector3I* soundPosition = (const Vector3I*)position;
+			int32_t z = (soundPosition->z >> 9) - (Nu3D::Camera::g_fixedViewPosition.z >> 9);
+			int32_t y = (soundPosition->y >> 9) - (Nu3D::Camera::g_fixedViewPosition.y >> 9);
+			int32_t x = (soundPosition->x >> 9) - (Nu3D::Camera::g_fixedViewPosition.x >> 9);
 
-	// A 16-byte preset table entry. The first three int16 fields are the only
-	// ones the Preset thunks read; the remaining bytes hold further preset data
-	// whose roles await reconstruction of PlayOneShotSound3DActor.
+			const Nu3D::Camera::FixedViewTransform& view = Nu3D::Camera::g_fixedViewTransform;
+			int32_t viewX = (view.m00 * x + view.m01 * y + view.m02 * z) / 4096;
+			int32_t viewY = (view.m10 * x + view.m11 * y + view.m12 * z) / 4096 / 2;
+			int32_t viewYSquared = viewY * viewY;
+
+			int32_t distance = (int32_t)sqrt((double)((viewX + 64) * (viewX + 64) + viewYSquared));
+			leftVolume = (192 - distance) * 16 / 24;
+			distance = (int32_t)sqrt((double)((viewX - 64) * (viewX - 64) + viewYSquared));
+			rightVolume = (192 - distance) * 16 / 24;
+		}
+		else
+		{
+			leftVolume = volume;
+			rightVolume = volume;
+		}
+
+		if (leftVolume < 0)
+		{
+			leftVolume = 0;
+		}
+		else if (leftVolume > 150)
+		{
+			leftVolume = 150;
+		}
+		if (rightVolume < 0)
+		{
+			rightVolume = 0;
+		}
+		else if (rightVolume > 150)
+		{
+			rightVolume = 150;
+		}
+
+		int32_t soundId = PlaySoundBuffer(soundIndex + 1, leftVolume, rightVolume, (int32_t)actor, 0, 0);
+		if (soundId != -1)
+		{
+			int32_t freeIndex = -1;
+			for (int32_t i = 0; i < 32; i++)
+			{
+				if (g_loopingSoundChannels[i][0] == soundId)
+				{
+					g_loopingSoundChannels[i][1] = -1;
+					return (leftVolume + rightVolume) / 2;
+				}
+				if (g_loopingSoundChannels[i][0] == -1)
+				{
+					freeIndex = i;
+				}
+			}
+			if (freeIndex != -1)
+			{
+				g_loopingSoundChannels[freeIndex][0] = (int16_t)soundId;
+				g_loopingSoundChannels[freeIndex][1] = -1;
+			}
+		}
+
+		return (leftVolume + rightVolume) / 2;
+	}
+
+	// A 16-byte preset table entry. The preset functions read the first three
+	// int16 fields. The roles of the remaining bytes are not known.
 	struct OneShotSoundPreset
 	{
 		int16_t soundIndex;
