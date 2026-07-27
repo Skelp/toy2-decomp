@@ -623,7 +623,23 @@ namespace SoftwareRenderer
 	// FUNCTION: TOY2 0x004C17B0
 	void PresentFrame()
 	{
+		union SurfacePointer
+		{
+			void* address;
+			uint8_t* bytes;
+			uint16_t* pixels;
+			uint32_t* pairs;
+		};
+
 		DDSURFACEDESC2 surfaceDesc;
+		SurfacePointer primaryRow;
+		SurfacePointer backRow;
+		uint32_t* primaryPixel;
+		uint32_t* backPixel;
+		uint32_t dwordCount;
+		int32_t rowCount;
+		int32_t rowOffset;
+
 		surfaceDesc.dwSize = sizeof(surfaceDesc);
 		if (g_backBuffer == NULL)
 		{
@@ -632,130 +648,134 @@ namespace SoftwareRenderer
 
 		DrawingDevice::LockPrimarySurface(&surfaceDesc);
 
-		uint8_t* primarySurface = (uint8_t*)g_primarySurfacePtr;
-		uint8_t* backBuffer = (uint8_t*)g_backBuffer;
-		uint32_t* backRow = (uint32_t*)backBuffer;
-		uint32_t rowDwordCount = (uint32_t)g_screenDimV >> 1;
-		uint32_t topDwords = rowDwordCount;
+		backRow.address = g_backBuffer;
+		dwordCount = static_cast<uint32_t>(g_screenDimV) >> 1;
 		do
 		{
-			*backRow++ = 0;
-			topDwords--;
-		} while (topDwords != 0);
+			*backRow.pairs++ = 0;
+			dwordCount--;
+		} while (dwordCount != 0);
 
-		uint8_t* backBorderRow = backBuffer;
-		int32_t middleRows = g_screenDimH - 1;
+		backRow.address = g_backBuffer;
+		rowCount = g_screenDimH - 1;
 		do
 		{
-			uint16_t* backPixel = (uint16_t*)backBorderRow;
-			backPixel[0] = 0;
-			backPixel[g_screenDimV - 1] = 0;
-			backBorderRow += g_primarySurfacePitch;
-			middleRows--;
-		} while (middleRows != 0);
+			backRow.pixels[0] = 0;
+			backRow.pixels[g_screenDimV - 1] = 0;
+			backRow.bytes += g_primarySurfacePitch;
+			rowCount--;
+		} while (rowCount != 0);
 
-		backRow = (uint32_t*)backBorderRow;
-		uint32_t bottomDwords = rowDwordCount;
+		dwordCount = static_cast<uint32_t>(g_screenDimV) >> 1;
 		do
 		{
-			*backRow++ = 0;
-			bottomDwords--;
-		} while (bottomDwords != 0);
+			*backRow.pairs++ = 0;
+			dwordCount--;
+		} while (dwordCount != 0);
 
-		int32_t bufferOffset = g_primarySurfacePitch * g_leftOffset + g_topOffset * sizeof(uint16_t);
-		uint8_t* primaryRow = primarySurface + bufferOffset;
-		uint8_t* backBufferRow = backBuffer + bufferOffset;
-		uint32_t visibleDwordCount = (uint32_t)(g_bottomOffset - g_topOffset + 1) >> 1;
-		int32_t visibleRows = g_rightOffset - g_leftOffset + 1;
+		dwordCount = static_cast<uint32_t>(g_bottomOffset - g_topOffset + 1) >> 1;
+		rowOffset = g_primarySurfacePitch * g_leftOffset + g_topOffset * sizeof(uint16_t);
+		rowCount = g_rightOffset - g_leftOffset + 1;
+		primaryRow.address = g_primarySurfacePtr;
+		primaryRow.bytes += rowOffset;
+		backRow.address = g_backBuffer;
+		backRow.bytes += rowOffset;
 		do
 		{
-			uint32_t* primaryPixel = (uint32_t*)primaryRow;
-			uint32_t* backPixelPair = (uint32_t*)backBufferRow;
-			uint32_t visibleDwords = visibleDwordCount;
+			primaryPixel = primaryRow.pairs;
+			backPixel = backRow.pairs;
+			uint32_t remaining = dwordCount;
 			do
 			{
-				*primaryPixel++ = *backPixelPair;
-				*backPixelPair++ = (uint32_t)g_softwareClearColor;
-				visibleDwords--;
-			} while (visibleDwords != 0);
-			primaryRow += g_primarySurfacePitch;
-			backBufferRow += g_primarySurfacePitch;
-			visibleRows--;
-		} while (visibleRows != 0);
+				*primaryPixel++ = *backPixel;
+				*backPixel++ = g_softwareClearColor;
+				remaining--;
+			} while (remaining != 0);
+			primaryRow.bytes += g_primarySurfacePitch;
+			backRow.bytes += g_primarySurfacePitch;
+			rowCount--;
+		} while (rowCount != 0);
 
-		primaryRow = primarySurface;
-		backBufferRow = backBuffer;
-		int32_t topMarginRows = g_leftOffset;
-		if (topMarginRows != 0)
+		primaryRow.address = g_primarySurfacePtr;
+		backRow.address = g_backBuffer;
+		rowCount = g_leftOffset;
+		if (rowCount != 0)
 		{
 			do
 			{
-				uint32_t* primaryPixel = (uint32_t*)primaryRow;
-				uint32_t* backPixelPair = (uint32_t*)backBufferRow;
-				uint32_t topMarginDwords = rowDwordCount;
+				primaryPixel = primaryRow.pairs;
+				backPixel = backRow.pairs;
+				dwordCount = static_cast<uint32_t>(g_screenDimV) >> 1;
 				do
 				{
-					*primaryPixel++ = *backPixelPair;
-					*backPixelPair++ = 0x00100010;
-					topMarginDwords--;
-				} while (topMarginDwords != 0);
-				primaryRow += g_primarySurfacePitch;
-				backBufferRow += g_primarySurfacePitch;
-				topMarginRows--;
-			} while (topMarginRows != 0);
+					*primaryPixel++ = *backPixel;
+					*backPixel++ = 0x00100010;
+					dwordCount--;
+				} while (dwordCount != 0);
+				primaryRow.bytes += g_primarySurfacePitch;
+				backRow.bytes += g_primarySurfacePitch;
+				rowCount--;
+			} while (rowCount != 0);
 		}
 
-		bufferOffset = (g_rightOffset + 1) * g_primarySurfacePitch;
-		primaryRow = primarySurface + bufferOffset;
-		backBufferRow = backBuffer + bufferOffset;
-		int32_t bottomMarginRows = g_leftOffset;
-		if (bottomMarginRows != 0)
+		rowOffset = (g_rightOffset + 1) * g_primarySurfacePitch;
+		primaryRow.address = g_primarySurfacePtr;
+		primaryRow.bytes += rowOffset;
+		backRow.address = g_backBuffer;
+		backRow.bytes += rowOffset;
+		rowCount = g_leftOffset;
+		if (rowCount != 0)
 		{
 			do
 			{
-				uint32_t* primaryPixel = (uint32_t*)primaryRow;
-				uint32_t* backPixelPair = (uint32_t*)backBufferRow;
-				uint32_t bottomMarginDwords = rowDwordCount;
+				primaryPixel = primaryRow.pairs;
+				backPixel = backRow.pairs;
+				dwordCount = static_cast<uint32_t>(g_screenDimV) >> 1;
 				do
 				{
-					*primaryPixel++ = *backPixelPair;
-					*backPixelPair++ = 0x00100010;
-					bottomMarginDwords--;
-				} while (bottomMarginDwords != 0);
-				primaryRow += g_primarySurfacePitch;
-				backBufferRow += g_primarySurfacePitch;
-				bottomMarginRows--;
-			} while (bottomMarginRows != 0);
+					*primaryPixel++ = *backPixel;
+					*backPixel++ = 0x00100010;
+					dwordCount--;
+				} while (dwordCount != 0);
+				primaryRow.bytes += g_primarySurfacePitch;
+				backRow.bytes += g_primarySurfacePitch;
+				rowCount--;
+			} while (rowCount != 0);
 		}
 
-		primaryRow = primarySurface + g_primarySurfacePitch * g_leftOffset;
-		backBufferRow = backBuffer + g_primarySurfacePitch * g_leftOffset;
+		rowOffset = g_primarySurfacePitch * g_leftOffset;
+		primaryRow.address = g_primarySurfacePtr;
+		primaryRow.bytes += rowOffset;
+		backRow.address = g_backBuffer;
+		backRow.bytes += rowOffset;
 		if (g_topOffset != 0)
 		{
-			uint32_t marginDwordCount = (uint32_t)g_topOffset >> 1;
+			uint32_t marginDwordCount = static_cast<uint32_t>(g_topOffset) >> 1;
 			int32_t rightMarginOffset = g_bottomOffset * sizeof(uint16_t);
-			int32_t marginRows = g_rightOffset - g_leftOffset + 1;
+			rowCount = g_rightOffset - g_leftOffset + 1;
 			do
 			{
-				uint32_t* primaryPixel = (uint32_t*)primaryRow;
-				uint32_t* backPixelPair = (uint32_t*)backBufferRow;
-				uint32_t* primaryRightPixel = (uint32_t*)(primaryRow + rightMarginOffset);
-				uint32_t* backRightPixel = (uint32_t*)(backBufferRow + rightMarginOffset);
+				primaryPixel = primaryRow.pairs;
+				backPixel = backRow.pairs;
+				SurfacePointer primaryRight = primaryRow;
+				SurfacePointer backRight = backRow;
+				primaryRight.bytes += rightMarginOffset;
+				backRight.bytes += rightMarginOffset;
 				uint32_t marginDwords = marginDwordCount;
 				do
 				{
-					*primaryPixel = *backPixelPair;
-					*backPixelPair = 0x00100010;
-					*primaryRightPixel++ = *backRightPixel;
-					*backRightPixel++ = 0x00100010;
+					*primaryPixel = *backPixel;
+					*backPixel = 0x00100010;
+					*primaryRight.pairs++ = *backRight.pairs;
+					*backRight.pairs++ = 0x00100010;
 					primaryPixel++;
-					backPixelPair++;
+					backPixel++;
 					marginDwords--;
 				} while (marginDwords != 0);
-				primaryRow += g_primarySurfacePitch;
-				backBufferRow += g_primarySurfacePitch;
-				marginRows--;
-			} while (marginRows != 0);
+				primaryRow.bytes += g_primarySurfacePitch;
+				backRow.bytes += g_primarySurfacePitch;
+				rowCount--;
+			} while (rowCount != 0);
 		}
 
 		DrawingDevice::UnlockPrimarySurface();
