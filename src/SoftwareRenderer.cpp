@@ -716,16 +716,13 @@ namespace SoftwareRenderer
 				backRow.bytes += g_primarySurfacePitch;
 				rowCount--;
 			} while (rowCount != 0);
-		}
 
-		rowOffset = (g_rightOffset + 1) * g_primarySurfacePitch;
-		primaryRow.address = g_primarySurfacePtr;
-		primaryRow.bytes += rowOffset;
-		backRow.address = g_backBuffer;
-		backRow.bytes += rowOffset;
-		rowCount = g_leftOffset;
-		if (rowCount != 0)
-		{
+			rowOffset = (g_rightOffset + 1) * g_primarySurfacePitch;
+			primaryRow.address = g_primarySurfacePtr;
+			primaryRow.bytes += rowOffset;
+			backRow.address = g_backBuffer;
+			backRow.bytes += rowOffset;
+			rowCount = g_leftOffset;
 			do
 			{
 				primaryPixel = primaryRow.pairs;
