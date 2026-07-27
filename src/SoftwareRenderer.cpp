@@ -3,6 +3,7 @@
 #include "Renderer/Renderer.h"
 #include "Toy2/MainMenu.h"
 #include "Toy2/Toy2.h"
+#include "Toy2/D3DApp.h"
 #include "Nu3D/BmpDataNode.h"
 #include "Nu3D/Camera.h"
 #include "Logger.h"
@@ -609,6 +610,26 @@ namespace SoftwareRenderer
 		g_unkB7FBB8 = 0;
 		g_unkB626C0 = 0;
 		g_unkA4CC80++;
+	}
+
+	// FUNCTION: TOY2 0x00470BF0 [MATCHED]
+	void SetPaletteOnAPI()
+	{
+		HRESULT result = D3DApp::g_d3dAppI.lpDD->CreatePalette(0x44, (LPPALETTEENTRY)g_paletteEntries, &g_lpPalette, NULL);
+		if (result < 0)
+		{
+			Logger::LogDDError("d3dappi.lpDD->CreatePalette(0x00000004l|0x00000040l,&pal[0],&SonicRPalette,0)", result);
+		}
+		result = D3DApp::g_d3dAppI.lpFrontBuffer->SetPalette(g_lpPalette);
+		if (result < 0)
+		{
+			Logger::LogDDError("d3dappi.lpFrontBuffer->SetPalette(SonicRPalette)", result);
+		}
+		result = D3DApp::g_d3dAppI.lpBackBuffer->SetPalette(g_lpPalette);
+		if (result < 0)
+		{
+			Logger::LogDDError("d3dappi.lpBackBuffer->SetPalette(SonicRPalette)", result);
+		}
 	}
 
 	// Rebuilds the live palette entries (1..255) by tinting the source palette

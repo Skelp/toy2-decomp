@@ -135,6 +135,7 @@ namespace SoftwareRenderer
 	void UnkFunc31();
 	void UnkFunc32();
 	void UnkFunc33();
+	void SetPaletteOnAPI();
 	void UnkFunc7();
 
 	void UnkFunc8(void* param1, int32_t param2);
