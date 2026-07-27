@@ -33,11 +33,12 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00839278
 	int32_t g_unk839278;
 
+	// Active base of the 4096 software-render depth buckets.
 	// GLOBAL: TOY2 0x00504D34
-	void* g_unk504D34;
+	SoftwareRenderItem** g_softwareRenderBuckets;
 
 	// GLOBAL: TOY2 0x0087E50C
-	int32_t g_unk87E50C;
+	SoftwareRenderItem* g_softwareRenderBucketStorage[4096];
 
 	// GLOBAL: TOY2 0x00839280
 	int32_t g_unk839280;
@@ -310,6 +311,48 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00882910
 	int32_t g_bitsPerPixel;
 
+	// Back-buffer surface state used by the software frame drain. The surface
+	// pointer is the retail `d3dappi.lpBackBuffer` member. The locked pointer is
+	// valid only between Lock and Unlock. The pitch is in pixels.
+	// GLOBAL: TOY2 0x00534558
+	void* g_lockedBackBuffer;
+
+	// GLOBAL: TOY2 0x00882778
+	int32_t g_backBufferPitchPixels;
+
+	// Counts deferred frame clears. Initialisation sets it to two, and the first
+	// successful clear consumes one count.
+	// GLOBAL: TOY2 0x00500C04
+	int32_t g_pendingBackBufferClears;
+
+	// The software queue uses a linked item header. The render payload before
+	// this header depends on the item kind selected by renderFlags.
+	struct SoftwareRenderItem
+	{
+		uint8_t payload[0x70];
+		SoftwareRenderItem* next;
+		uint16_t renderFlags;
+	};
+
+	STATIC_ASSERT(offsetof(SoftwareRenderItem, next) == 0x70);
+	STATIC_ASSERT(offsetof(SoftwareRenderItem, renderFlags) == 0x74);
+
+	typedef void (*SoftwareRenderCallback)(SoftwareRenderItem* item);
+
+	struct SoftwareRenderDispatchTable
+	{
+		SoftwareRenderCallback highPriority;
+		SoftwareRenderCallback unused04;
+		SoftwareRenderCallback flag20;
+		SoftwareRenderCallback flag1000;
+		SoftwareRenderCallback flag40[4];
+		SoftwareRenderCallback defaultCallback[4];
+		SoftwareRenderCallback flag80;
+	};
+
+	// GLOBAL: TOY2 0x00704E68
+	SoftwareRenderDispatchTable* g_softwareRenderDispatch;
+
 	// Render-buffer double-buffering state. SwapRenderBuffer toggles
 	// g_currentRenderBuffer between the two contiguous render buffers
 	// (g_renderBufferB follows g_renderBufferA at +0x3C420) and derives
@@ -487,6 +530,9 @@ namespace SoftwareRenderer
 
 	// FUNCTION: TOY2 0x004C1E60
 	void InitialisePrimarySurface_T() { InitialisePrimarySurface(); }
+
+	// STUB: TOY2 0x0040CD80
+	void ShowBackBuffer() {}
 
 	// FUNCTION: TOY2 0x0047D0F0
 	void Destroy()
@@ -2428,8 +2474,134 @@ namespace SoftwareRenderer
 		g_unk9F6008 = 0;
 	}
 
-	// STUB: TOY2 0x0047D210
-	void UnkFunc8(int32_t param1, int32_t param2) {}
+	// Locks the DirectDraw back buffer, clears it when the frame state requires
+	// a clear, drains all software-render depth buckets from far to near, then
+	// unlocks and presents the surface. The caller passes the highest active
+	// bucket and a zero clear value, but retail does not read either parameter.
+	// FUNCTION: TOY2 0x0047D210
+	void UnkFunc8(int32_t highestBucket, int32_t clearValue)
+	{
+		DDSURFACEDESC surfaceDesc;
+		memset(&surfaceDesc, 0, sizeof(surfaceDesc));
+		surfaceDesc.dwSize = sizeof(surfaceDesc);
+
+		HRESULT result;
+		do
+		{
+			result = D3DApp::g_d3dAppI.lpBackBuffer->Lock(NULL, &surfaceDesc, 0, NULL);
+		} while (result == DDERR_WASSTILLDRAWING);
+
+		if (result == DD_OK)
+		{
+			g_lockedBackBuffer = surfaceDesc.lpSurface;
+		}
+		else
+		{
+			g_lockedBackBuffer = NULL;
+			Logger::Log("SOFT : ERROR - Failed to lock back buffer - %s.\n", Logger::ErrorToMessage(result));
+		}
+
+		if (Nu3D::Camera::g_cameraTintBlue != 0x80 && D3DApp::g_renderMode == RENDERMODE_SOFTWARE && g_bitsPerPixel != 8)
+		{
+			int32_t rowSkip = (g_backBufferPitchPixels - Toy2::g_destRectWidth) / 2;
+			int32_t rowWidth = Toy2::g_destRectWidth / 2;
+			uint32_t* pixel = (uint32_t*)g_lockedBackBuffer;
+			for (int32_t row = Toy2::g_destRectHeight; row != 0; row--)
+			{
+				for (int32_t count = rowWidth; count != 0; count--)
+				{
+					*pixel++ = 0;
+				}
+				pixel = (uint32_t*)((uint8_t*)pixel + rowSkip);
+			}
+		}
+		else
+		{
+			if (g_pendingBackBufferClears != 0 && g_unk830C60 == 0)
+			{
+				uint32_t* pixel = (uint32_t*)g_lockedBackBuffer;
+				if (g_bitsPerPixel == 8)
+				{
+					int32_t rowSkip = (g_backBufferPitchPixels - Toy2::g_destRectWidth) / 4;
+					int32_t rowWidth = Toy2::g_destRectWidth / 4;
+					for (int32_t row = Toy2::g_destRectHeight; row != 0; row--)
+					{
+						for (int32_t count = rowWidth; count != 0; count--)
+						{
+							*pixel++ = 0;
+						}
+						pixel = (uint32_t*)((uint8_t*)pixel + rowSkip);
+					}
+				}
+				else
+				{
+					int32_t rowSkip = (g_backBufferPitchPixels - Toy2::g_destRectWidth) / 2;
+					int32_t rowWidth = Toy2::g_destRectWidth / 2;
+					for (int32_t row = Toy2::g_destRectHeight; row != 0; row--)
+					{
+						for (int32_t count = rowWidth; count != 0; count--)
+						{
+							*pixel++ = 0;
+						}
+						pixel = (uint32_t*)((uint8_t*)pixel + rowSkip);
+					}
+				}
+				g_unk830C60 = 1;
+				g_pendingBackBufferClears--;
+			}
+
+			for (int32_t bucket = 4095; bucket >= 0; bucket--)
+			{
+				SoftwareRenderItem* item = g_softwareRenderBuckets[bucket];
+				while (item != NULL)
+				{
+					uint16_t flags = item->renderFlags;
+					SoftwareRenderCallback callback = NULL;
+					if (flags & 0x8000)
+					{
+						callback = g_softwareRenderDispatch->highPriority;
+					}
+					else if (flags & 0x80)
+					{
+						g_softwareRenderDispatch->flag80(item);
+					}
+					else
+					{
+						int32_t kind = (flags >> 9) & 3;
+						if ((flags & 0x1000) && g_softwareRenderDispatch->flag1000 != NULL)
+						{
+							callback = g_softwareRenderDispatch->flag1000;
+						}
+						else if ((flags & 0x20) && g_softwareRenderDispatch->flag20 != NULL)
+						{
+							callback = g_softwareRenderDispatch->flag20;
+						}
+						else if ((flags & 0x40) && g_softwareRenderDispatch->flag40[kind] != NULL)
+						{
+							callback = g_softwareRenderDispatch->flag40[kind];
+						}
+						else
+						{
+							callback = g_softwareRenderDispatch->defaultCallback[kind];
+						}
+					}
+					if (callback != NULL)
+					{
+						callback(item);
+					}
+					item = item->next;
+				}
+			}
+		}
+
+		result = D3DApp::g_d3dAppI.lpBackBuffer->Unlock(NULL);
+		g_lockedBackBuffer = NULL;
+		if (result != DD_OK)
+		{
+			Logger::Log("SOFT : ERROR - Failed to unlock back buffer - %s.\n", Logger::ErrorToMessage(result));
+		}
+		ShowBackBuffer();
+	}
 
 	// Queues a transformed triangle for sorted (back-to-front) transparency
 	// rasterization. Claims a slot from Renderer::g_primitiveBuffer, copies the

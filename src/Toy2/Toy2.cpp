@@ -1416,9 +1416,9 @@ namespace Toy2
 	// Updates the Direct3D render-target state from the current destination
 	// rectangle. Computes the dest width and height, derives several scaled
 	// half-width / fixed-point variants used by the rasterizer, resets a few
-	// frame-local flags, points SoftwareRenderer::g_unk504D34 at the shared
-	// draw buffer, empties the shared vertex pool, and stamps the frame start
-	// time. Called on the hardware (D3D) render path (g_renderMode == 2); the
+	// frame-local flags, points SoftwareRenderer::g_softwareRenderBuckets at its
+	// shared bucket storage, empties the shared vertex pool, and records the
+	// frame start time. Called on the hardware (D3D) render path (g_renderMode == 2); the
 	// software path uses InitSoftwareRenderer.
 	//
 	// The halfWidth/halfHeight locals and the store interleaving (width store
@@ -1452,7 +1452,7 @@ namespace Toy2
 		g_softWindowHeight = height;
 		g_screenClipLeftFixed = 0;
 
-		SoftwareRenderer::g_unk504D34 = (void*)&SoftwareRenderer::g_unk87E50C;
+		SoftwareRenderer::g_softwareRenderBuckets = SoftwareRenderer::g_softwareRenderBucketStorage;
 		SoftwareRenderer::g_unk839278 = 0x3ff;
 
 		g_drawBuffer->VerticePoolCount = 0;

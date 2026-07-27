@@ -16,8 +16,9 @@ namespace SoftwareRenderer
 	extern int32_t g_unk830C60;
 	extern int32_t g_unk559C40;
 	extern int32_t g_unk839278;
-	extern void* g_unk504D34;
-	extern int32_t g_unk87E50C;
+	struct SoftwareRenderItem;
+	extern SoftwareRenderItem** g_softwareRenderBuckets;
+	extern SoftwareRenderItem* g_softwareRenderBucketStorage[4096];
 	extern int32_t g_unk839280;
 	extern int32_t g_unkE4D950;
 	extern int32_t g_unk9F6008;
@@ -112,6 +113,7 @@ namespace SoftwareRenderer
 	void ZoomOut();
 	void ZoomIn();
 	void PresentFrame();
+	void ShowBackBuffer();
 	void SetCameraNearFarZ(float nearZ, float farZ);
 
 	int32_t GetStrideFromFVF(int32_t fvf);
@@ -138,7 +140,7 @@ namespace SoftwareRenderer
 	void SetPaletteOnAPI();
 	void UnkFunc7();
 
-	void UnkFunc8(int32_t param1, int32_t param2);
+	void UnkFunc8(int32_t highestBucket, int32_t clearValue);
 
 	// A queued render command for the software rasterizer. UnkFunc29 enqueues
 	// transformed vertices (3 for a triangle, 4 for a quad when vertexCount is

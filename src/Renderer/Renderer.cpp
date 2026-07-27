@@ -1759,7 +1759,7 @@ namespace DevDraw
 					SoftwareRenderer::UnkFunc8(SoftwareRenderer::g_unk839278, 0);
 				}
 				SoftwareRenderer::g_unk839280 = 0;
-				Nu3D::MemSet32Util(SoftwareRenderer::g_unk504D34, 0x1000, 0);
+				Nu3D::MemSet32Util(SoftwareRenderer::g_softwareRenderBuckets, 0x1000, 0);
 				break;
 			case 2: {
 				int16_t i;
