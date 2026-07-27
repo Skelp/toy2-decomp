@@ -17,6 +17,7 @@ namespace SoftwareRenderer
 	extern int32_t g_unk559C40;
 	extern void* g_unk839278;
 	extern void* g_unk504D34;
+	extern int32_t g_unk87E50C;
 	extern int32_t g_unk839280;
 	extern int32_t g_unkE4D950;
 	extern int32_t g_unk9F6008;

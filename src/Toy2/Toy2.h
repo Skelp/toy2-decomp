@@ -27,6 +27,23 @@ namespace Toy2
 
 	extern ToyCfg g_toyCfgData;
 	extern int32_t g_levelFileIndex;
+	extern int32_t g_destRectWidth;
+	extern int32_t g_destRectWidthTimes1024Minus1;
+	extern int32_t g_destRectWidthCopy;
+	extern int32_t g_destRectWidthScaled;
+	extern int32_t g_destRectHeight;
+	extern int32_t g_unk8828BC;
+	extern int32_t g_destRectWidthMinus1;
+	extern int32_t g_destRectHeightMinus1;
+	extern int32_t g_destRectHalfWidthCopy;
+	extern int32_t g_destRectHalfHeight;
+	extern int32_t g_unk8828E0;
+	extern int32_t g_unk8828E4;
+	extern int32_t g_destRectHeightCopy;
+	extern void* g_unk500A10;
+	extern int32_t g_destRectHalfWidth;
+	extern int32_t g_unk72E340;
+	extern uint32_t g_unk731CBC;
 	extern int32_t g_isElevatorHopLevel;
 	extern int32_t g_hasBackdrop;
 	extern int32_t g_mainMenuState;

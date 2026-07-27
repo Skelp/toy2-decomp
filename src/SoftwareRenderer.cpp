@@ -36,6 +36,9 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00504D34
 	void* g_unk504D34;
 
+	// GLOBAL: TOY2 0x0087E50C
+	int32_t g_unk87E50C;
+
 	// GLOBAL: TOY2 0x00839280
 	int32_t g_unk839280;
 

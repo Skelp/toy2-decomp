@@ -43,6 +43,57 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0088278C
 	int32_t g_levelFileIndex;
 
+	// GLOBAL: TOY2 0x00882768
+	int32_t g_destRectWidth;
+
+	// GLOBAL: TOY2 0x00882784
+	int32_t g_destRectWidthTimes1024Minus1;
+
+	// GLOBAL: TOY2 0x00882798
+	int32_t g_destRectWidthCopy;
+
+	// GLOBAL: TOY2 0x008828A0
+	int32_t g_destRectWidthScaled;
+
+	// GLOBAL: TOY2 0x008828AC
+	int32_t g_destRectHeight;
+
+	// GLOBAL: TOY2 0x008828BC
+	int32_t g_unk8828BC;
+
+	// GLOBAL: TOY2 0x008828C4
+	int32_t g_destRectWidthMinus1;
+
+	// GLOBAL: TOY2 0x008828CC
+	int32_t g_destRectHeightMinus1;
+
+	// GLOBAL: TOY2 0x008828D8
+	int32_t g_destRectHalfWidthCopy;
+
+	// GLOBAL: TOY2 0x008828DC
+	int32_t g_destRectHalfHeight;
+
+	// GLOBAL: TOY2 0x008828E0
+	int32_t g_unk8828E0;
+
+	// GLOBAL: TOY2 0x008828E4
+	int32_t g_unk8828E4;
+
+	// GLOBAL: TOY2 0x008828E8
+	int32_t g_destRectHeightCopy;
+
+	// GLOBAL: TOY2 0x00500A10
+	void* g_unk500A10;
+
+	// GLOBAL: TOY2 0x00500A24
+	int32_t g_destRectHalfWidth;
+
+	// GLOBAL: TOY2 0x0072E340
+	int32_t g_unk72E340;
+
+	// GLOBAL: TOY2 0x00731CBC
+	uint32_t g_unk731CBC;
+
 	// GLOBAL: TOY2 0x0052AD9C
 	int32_t g_returnedToTitle;
 
@@ -1337,8 +1388,57 @@ namespace Toy2
 	// FUNCTION: TOY2 0x0047D7C0 [MATCHED]
 	void UpdateAudioChannels() { AudioManager::UpdateChannels(); }
 
-	// STUB: TOY2 0x00490BF0
-	int16_t UpdateD3DState() { return 0; }
+	// Updates the Direct3D render-target state from the current destination
+	// rectangle. Computes the dest width and height, derives several scaled
+	// half-width / fixed-point variants used by the rasterizer, resets a few
+	// frame-local flags, points SoftwareRenderer::g_unk504D34 at the shared
+	// draw buffer, zeros a word field in the object at g_unk500A10, and
+	// stamps the frame start time. Called on the hardware (D3D) render path
+	// (g_renderMode == 2); the software path uses InitSoftwareRenderer.
+	//
+	// g_unk500A10 points to a large object whose field at +0x9fdd8 (a word)
+	// is reset each frame; its full layout is not yet reconstructed.
+	//
+	// The halfWidth/halfHeight locals and the store interleaving (width store
+	// before the height field-loads; width-1 before height-1) reproduce
+	// retail's register assignment: width/2 in EDI (callee-saved) and the
+	// frame zero in EBX. The only residual is instruction scheduling of the
+	// SHL/SAR/DEC block against the E4/halfWidth stores, which reccmp treats
+	// as a behavior-neutral effective match.
+	// FUNCTION: TOY2 0x00490BF0 [MATCHED]
+	int16_t UpdateD3DState()
+	{
+		g_unk72E340 = 0;
+
+		RECT* destRect = DrawingDevice::GetDestRect();
+		int32_t width = destRect->right - destRect->left;
+		g_destRectWidth = width;
+		int32_t height = destRect->bottom - destRect->top;
+		int32_t halfWidth = width / 2;
+		int32_t halfHeight = height / 2;
+		g_destRectWidthCopy = width;
+		g_destRectWidthMinus1 = width - 1;
+		g_destRectHeightMinus1 = height - 1;
+		g_destRectHeight = height;
+		g_destRectWidthScaled = (width * 256) / 320;
+		g_unk8828E0 = 0;
+		g_unk8828E4 = 0;
+		g_destRectHalfWidth = halfWidth;
+		g_destRectWidthTimes1024Minus1 = width * 1024 - 1;
+		g_destRectHalfWidthCopy = halfWidth;
+		g_destRectHalfHeight = halfHeight;
+		g_destRectHeightCopy = height;
+		g_unk8828BC = 0;
+
+		SoftwareRenderer::g_unk504D34 = (void*)&SoftwareRenderer::g_unk87E50C;
+		SoftwareRenderer::g_unk839278 = (void*)0x3ff;
+
+		*(int16_t*)((char*)g_unk500A10 + 0x9fdd8) = 0;
+
+		g_unk731CBC = timeGetTime();
+
+		return 1;
+	}
 
 	// FUNCTION: TOY2 0x004909E0
 	void ProcessMiscEventsEx()
