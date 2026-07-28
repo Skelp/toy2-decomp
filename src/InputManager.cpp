@@ -475,13 +475,13 @@ namespace InputManager
 			int32_t joystickYAxis;
 			int32_t joystickXAxis;
 
-			if ((g_joystickDirectionLockState & 3) == 2)
+			if ((g_joystickDirectionLockState & JOYSTICK_HORIZONTAL_LOCK_MASK) == JOYSTICK_HORIZONTAL_LOCKED)
 			{
 				joystickYAxis = (((g_joystickState.lX >> 8) & 0xFF) - 128) << 8;
 				if (joystickYAxis <= -11200 || joystickYAxis >= 11200)
 				{
-					directionLockState = g_joystickDirectionLockState & 12;
-					g_joystickDirectionLockState &= 12u;
+					directionLockState = g_joystickDirectionLockState & JOYSTICK_VERTICAL_LOCK_MASK;
+					g_joystickDirectionLockState &= JOYSTICK_VERTICAL_LOCK_MASK;
 				}
 			}
 			else
@@ -489,12 +489,12 @@ namespace InputManager
 				joystickYAxis = (((g_joystickState.lX >> 8) & 0xFF) - 128) << 8;
 			}
 
-			if ((directionLockState & 0xC) == 8)
+			if ((directionLockState & JOYSTICK_VERTICAL_LOCK_MASK) == JOYSTICK_VERTICAL_LOCKED)
 			{
 				joystickXAxis = (128 - ((g_joystickState.lY >> 8) & 0xFF)) << 8;
 
 				if (joystickXAxis <= -11200 || joystickXAxis >= 11200)
-					g_joystickDirectionLockState = directionLockState & 3;
+					g_joystickDirectionLockState = directionLockState & JOYSTICK_HORIZONTAL_LOCK_MASK;
 			}
 			else
 			{
@@ -507,21 +507,21 @@ namespace InputManager
 
 			if (joystickYAxis < -11200)
 			{
-				dirFlags = 128;
+				dirFlags = INPUT_LEFT;
 				anyDirectionActive = 1;
-				g_joystickDirectionFlags = 128;
+				g_joystickDirectionFlags = INPUT_LEFT;
 			}
 
 			if (joystickYAxis > 11200)
 			{
-				dirFlags |= 32;
+				dirFlags |= INPUT_RIGHT;
 				anyDirectionActive = 1;
 				g_joystickDirectionFlags = dirFlags;
 			}
 
 			if (joystickXAxis < -11200)
 			{
-				dirFlags |= 64;
+				dirFlags |= INPUT_DOWN;
 				anyDirectionActive = 1;
 				g_joystickDirectionFlags = dirFlags;
 			}
@@ -533,7 +533,7 @@ namespace InputManager
 			}
 			else
 			{
-				dirFlags |= 16;
+				dirFlags |= INPUT_UP;
 				g_joystickDirectionFlags = dirFlags;
 			}
 

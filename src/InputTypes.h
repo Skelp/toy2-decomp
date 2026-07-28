@@ -18,6 +18,14 @@ enum GameControlId
 	INPUT_FIRE = 0x8000,
 };
 
+enum JoystickDirectionLock
+{
+	JOYSTICK_HORIZONTAL_LOCK_MASK = 0x3,
+	JOYSTICK_HORIZONTAL_LOCKED = 0x2,
+	JOYSTICK_VERTICAL_LOCK_MASK = 0xC,
+	JOYSTICK_VERTICAL_LOCKED = 0x8,
+};
+
 enum ToyInputCodes
 {
 	TOY_INPUT_ESC = 0x1,

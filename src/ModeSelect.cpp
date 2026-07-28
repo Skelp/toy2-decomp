@@ -12,6 +12,16 @@
 
 namespace ModeSelect
 {
+	enum DeviceSelectionFlags
+	{
+		DEVICE_SELECTION_WINDOWED_ONLY = 0x2,
+		DEVICE_SELECTION_RGB_SOFTWARE = 0x4,
+		DEVICE_SELECTION_REFERENCE = 0x8,
+		DEVICE_SELECTION_PRIMARY_HARDWARE = 0x10,
+		DEVICE_SELECTION_SECONDARY_HARDWARE = 0x20,
+		DEVICE_SELECTION_EXPLICIT_MASK = 0x3C,
+	};
+
 	// GLOBAL: TOY2 0x00505590
 	int32_t g_forceFullscreen = 1;
 
@@ -189,11 +199,11 @@ namespace ModeSelect
 
 		if (! g_forceFullscreen)
 		{
-			flags = selectionFlags | 2;
-			selectionFlags |= 2;
+			flags = selectionFlags | DEVICE_SELECTION_WINDOWED_ONLY;
+			selectionFlags |= DEVICE_SELECTION_WINDOWED_ONLY;
 		}
 
-		if ((flags & 60) != 0)
+		if ((flags & DEVICE_SELECTION_EXPLICIT_MASK) != 0)
 		{
 			DDAppDevice::App* appIter = g_ddAppListHead;
 
@@ -209,7 +219,7 @@ namespace ModeSelect
 
 						if (! memcmp(deviceIter->ref, &IID_IDirect3DRGBDevice, sizeof(GUID)))
 						{
-							if ((selectionFlags & 4) != 0)
+							if ((selectionFlags & DEVICE_SELECTION_RGB_SOFTWARE) != 0)
 							{
 								g_primaryDDApp = outerApp;
 								outerApp->primaryDevice = deviceIter;
@@ -218,7 +228,7 @@ namespace ModeSelect
 						}
 						else if (! memcmp(deviceIter->ref, &IID_IDirect3DRefDevice, sizeof(GUID)))
 						{
-							if ((selectionFlags & 8) != 0)
+							if ((selectionFlags & DEVICE_SELECTION_REFERENCE) != 0)
 							{
 								g_primaryDDApp = outerApp;
 								outerApp->primaryDevice = deviceIter;
@@ -227,10 +237,10 @@ namespace ModeSelect
 						}
 						else
 						{
-							if ((selectionFlags & 16) != 0)
+							if ((selectionFlags & DEVICE_SELECTION_PRIMARY_HARDWARE) != 0)
 								matchesDriverKind = outerApp == g_ddAppListHead;
 
-							if ((selectionFlags & 32) != 0 && outerApp != g_ddAppListHead || matchesDriverKind)
+							if ((selectionFlags & DEVICE_SELECTION_SECONDARY_HARDWARE) != 0 && outerApp != g_ddAppListHead || matchesDriverKind)
 							{
 								g_primaryDDApp = outerApp;
 								outerApp->primaryDevice = deviceIter;
