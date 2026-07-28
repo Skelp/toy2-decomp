@@ -20,6 +20,16 @@ namespace Renderer
 			uint32_t flags,
 			int32_t scaleX,
 			int32_t scaleY);
+		int16_t DrawScaledFixed(int16_t xPos,
+			int16_t yPos,
+			int32_t sheetIndex,
+			int32_t tileIndex,
+			uint32_t red,
+			uint32_t green,
+			uint32_t blue,
+			uint32_t flags,
+			int32_t scaleX,
+			int32_t scaleY);
 
 		void Queue2DSprite(float xPosition,
 			float yPosition,

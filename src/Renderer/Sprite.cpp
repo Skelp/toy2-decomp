@@ -927,6 +927,78 @@ namespace Renderer
 			return 1;
 		}
 
+		// FUNCTION: TOY2 0x004942D0
+		int16_t DrawScaledFixed(int16_t xPos,
+			int16_t yPos,
+			int32_t sheetIndex,
+			int32_t tileIndex,
+			uint32_t red,
+			uint32_t green,
+			uint32_t blue,
+			uint32_t flags,
+			int32_t scaleX,
+			int32_t scaleY)
+		{
+			SpriteSheet* sheet = (int16_t)sheetIndex < 0 ? g_fallbackSpriteSheet : g_spriteSheets[(int16_t)sheetIndex];
+			if (! sheet)
+				return 1;
+
+			int32_t textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
+			Vector2F uvMin;
+			Vector2F uvMax;
+
+			if (textureDataIndex)
+			{
+				uint32_t bitmapWidth;
+				uint32_t bitmapHeight;
+				NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
+
+				int16_t tile = (int16_t)tileIndex;
+				uvMin.x = (float)sheet->tiles[tile].x / (float)(int32_t)bitmapWidth;
+				uvMin.y = (float)sheet->tiles[tile].y / (float)(int32_t)bitmapHeight;
+				uvMax.x = ((float)sheet->tileWidth + (float)sheet->tiles[tile].x) / (float)(int32_t)bitmapWidth;
+				uvMax.y = ((float)sheet->tileHeight + (float)sheet->tiles[tile].y) / (float)(int32_t)bitmapHeight;
+			}
+
+			RGBA color;
+			color.r = (uint8_t)red;
+			color.g = (uint8_t)green;
+			color.b = (uint8_t)blue;
+
+			int32_t renderFlags;
+			switch (flags & 0x60)
+			{
+				case 0:
+					color.a = 128;
+					renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT;
+					break;
+				case 0x20:
+					color.a = 255;
+					renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_CUSTOM;
+					break;
+				case 0x40:
+					color.a = 255;
+					renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_ALT;
+					break;
+				default:
+					color.a = 255 - (uint8_t)(flags >> 8);
+					renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT;
+					break;
+			}
+
+			float invHeight = 1.0f / g_virtualScreenHeight;
+			Queue2DSprite((float)xPos * (1.0f / 512.0f),
+				(float)yPos * invHeight,
+				(float)((sheet->tileWidth * scaleX) >> 12) * (1.0f / 512.0f),
+				(float)((sheet->tileHeight * scaleY) >> 12) * invHeight,
+				&uvMin,
+				&uvMax,
+				textureDataIndex,
+				color,
+				renderFlags);
+			return 1;
+		}
+
 		// FUNCTION: TOY2 0x004B6300 [MATCHED]
 		void ResetQueue()
 		{

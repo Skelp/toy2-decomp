@@ -1345,6 +1345,82 @@ namespace Renderer
 		Sprite::DrawScaled(xPos + 2, yPos + 1, 6, 1, red, green, blue, 0, width - 0x4000, height - 0x2000);
 	}
 
+	// FUNCTION: TOY2 0x00401FB0
+	void DrawString(int32_t yPos, const char* text, uint32_t red, uint32_t green, uint32_t blue, int32_t fullWidthLayout)
+	{
+		int32_t centerX = fullWidthLayout != 0 ? 256 : 160;
+		int32_t textLength = 0;
+		while (text[textLength] != '\0')
+			textLength++;
+
+		int32_t xPos = centerX - textLength * 4;
+		if (textLength > 0)
+		{
+			do
+			{
+				DrawChar(xPos, yPos, *text, red, green, blue, fullWidthLayout);
+				text++;
+				xPos += 8;
+			} while (--textLength != 0);
+		}
+	}
+
+	// FUNCTION: TOY2 0x0049B630
+	void DrawChar(int32_t xPos, int32_t yPos, uint8_t character, uint32_t red, uint32_t green, uint32_t blue, int32_t fullWidthLayout)
+	{
+		if (character == '@')
+		{
+			Sprite::DrawTiledFixed((int16_t)xPos, (int16_t)(yPos - 2), 38, 1);
+			return;
+		}
+		if (character == '~')
+		{
+			Sprite::DrawTiledFixed((int16_t)xPos, (int16_t)(yPos - 2), 38, 0);
+			return;
+		}
+		if (character == ' ')
+			return;
+
+		switch (character)
+		{
+			case '!':
+				character = 41;
+				break;
+			case '\'':
+				character = 48;
+				break;
+			case '*':
+				character = 50;
+				break;
+			case ',':
+				character = 37;
+				break;
+			case '-':
+				character = 49;
+				break;
+			case '.':
+				character = 36;
+				break;
+			case '>':
+				character = 45;
+				break;
+			case '?':
+				character = 40;
+				break;
+			default:
+				if (character <= '9')
+					character += 0xEA;
+				else
+					character += 0x9F;
+				break;
+		}
+
+		if (fullWidthLayout)
+			Sprite::DrawScaled((int16_t)xPos, (int16_t)yPos, 20, character, red, green, blue, 255, 0x800, 0x800);
+		else
+			Sprite::DrawScaledFixed((int16_t)xPos, (int16_t)yPos, 20, character, red, green, blue, 255, 0x800, 0x800);
+	}
+
 	// FUNCTION: TOY2 0x0049B580
 	void DrawMainMenuText(int16_t yPos, char* text, int32_t fadeAlpha)
 	{
