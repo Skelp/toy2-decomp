@@ -1240,7 +1240,6 @@ namespace Renderer
 	// FUNCTION: TOY2 0x00490860 [MATCHED]
 	void DoFrameDelay(int32_t isGameplayFrame)
 	{
-		// This method does the FPS delay for each frame, it is the source of all pain
 		int32_t hrt = Nu3D::GetHighResolutionTime();
 		int32_t elapsedMs = hrt - g_lastFrameTimestamp;
 
@@ -1251,13 +1250,9 @@ namespace Renderer
 			if (elapsedMs < 33)
 			{
 				Nu3D::PrecisionSleep(33 - elapsedMs);
-				g_lastFrameTimestamp = Nu3D::GetHighResolutionTime();
-				return;
 			}
-
-			goto LBL_UPDATE_TIMESTAMP;
 		}
-
+		else
 		{
 			int32_t calculatedMultiplier = 60 * elapsedMs / 1000;
 			g_frameDelta = calculatedMultiplier;
@@ -1297,33 +1292,33 @@ namespace Renderer
 
 			if (isGameplayFrame)
 			{
-				if (delayFrames > 0)
-					goto LBL_WAIT_NEXT_FRAME;
-
-				int32_t stabilityCounter = g_frameStabilityCounter;
-				int32_t targetSpeedMultiplier = g_targetSpeedMultiplier;
-
-				if (g_frameStabilityCounter > 0)
+				if (delayFrames <= 0)
 				{
-					stabilityCounter = g_frameStabilityCounter - targetSpeedMultiplier;
-					g_frameStabilityCounter -= targetSpeedMultiplier;
-				}
+					int32_t stabilityCounter = g_frameStabilityCounter;
+					int32_t targetSpeedMultiplier = g_targetSpeedMultiplier;
 
-				if (calculatedMultiplier < targetSpeedMultiplier)
-				{
-					if (stabilityCounter > 0)
+					if (g_frameStabilityCounter > 0)
 					{
-						calculatedMultiplier = targetSpeedMultiplier;
-						targetSpeedMultiplier = calculatedMultiplier;
-						g_frameDelta = calculatedMultiplier;
+						stabilityCounter = g_frameStabilityCounter - targetSpeedMultiplier;
+						g_frameStabilityCounter -= targetSpeedMultiplier;
 					}
-				}
-				else
-				{
-					g_frameStabilityCounter = 60;
-				}
 
-				g_targetSpeedMultiplier = calculatedMultiplier;
+					if (calculatedMultiplier < targetSpeedMultiplier)
+					{
+						if (stabilityCounter > 0)
+						{
+							calculatedMultiplier = targetSpeedMultiplier;
+							targetSpeedMultiplier = calculatedMultiplier;
+							g_frameDelta = calculatedMultiplier;
+						}
+					}
+					else
+					{
+						g_frameStabilityCounter = 60;
+					}
+
+					g_targetSpeedMultiplier = calculatedMultiplier;
+				}
 			}
 			else
 			{
@@ -1332,15 +1327,11 @@ namespace Renderer
 				g_startupDelayFrames = 120;
 			}
 
-		LBL_WAIT_NEXT_FRAME:
-
 			int32_t sleepTimeMs = 1000 * calculatedMultiplier / 60 - elapsedMs;
 
 			if (sleepTimeMs > 0)
 				Nu3D::PrecisionSleep(sleepTimeMs);
 		}
-
-	LBL_UPDATE_TIMESTAMP:
 
 		g_lastFrameTimestamp = Nu3D::GetHighResolutionTime();
 	}
