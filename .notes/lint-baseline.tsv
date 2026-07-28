@@ -228,7 +228,6 @@ src/Toy2/Levels.h	placeholder-field	unkVar4	d2630a10c3c2	src/Toy2/Levels.h
 0x00437fb0	unstructured-control-flow	goto-count	1baffd3c3ff3	src/Toy2/MainMenu.cpp
 0x0047d4e0	unknown-symbol	g_unk72E340	573bb8ffd5cc	src/Toy2/Toy2.cpp
 0x0047d4e0	unknown-symbol	g_unk731CBC	ec1bb533539d	src/Toy2/Toy2.cpp
-0x00437b20	decompiler-identifier	iVar2	53b84ef3eab0	src/Toy2/Toy2.cpp
 0x0049d910	unstructured-control-flow	goto-count	77dd5e8ddf01	src/Toy2/Toy2.cpp
 0x00490bf0	unknown-symbol	g_unk72E340	573bb8ffd5cc	src/Toy2/Toy2.cpp
 0x00490bf0	unknown-symbol	g_unk839278	259cd00d89f0	src/Toy2/Toy2.cpp

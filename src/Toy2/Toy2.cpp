@@ -454,7 +454,7 @@ namespace Toy2
 
 	namespace GameOver
 	{
-		// FUNCTION: TOY2 0x00437B20
+		// FUNCTION: TOY2 0x00437B20 [MATCHED]
 		void Tick()
 		{
 			InputManager::g_curButtonsPressed = 0;
@@ -469,7 +469,7 @@ namespace Toy2
 			Renderer::g_frameDelta = 1;
 			SetBackdropByIndex(1);
 
-			int32_t iVar2 = 0x4b0;
+			int32_t exitTimer = 0x4b0;
 			AudioManager::PlayMusicOneShot(0x11);
 
 			while (true)
@@ -477,23 +477,23 @@ namespace Toy2
 				Nu3D::Camera::FadeToTargetTint();
 				MainMenu::RenderMenu();
 
-				if (iVar2 > 0)
+				if (exitTimer > 0)
 				{
-					iVar2 -= Renderer::g_frameDelta;
-					if (iVar2 <= 0)
-						iVar2 = 0;
+					exitTimer -= Renderer::g_frameDelta;
+					if (exitTimer <= 0)
+						exitTimer = 0;
 				}
 
 				if (AudioManager::IsStreamActive() == 0)
 				{
-					if (iVar2 > 0x17)
-						iVar2 = 0x17;
+					if (exitTimer > 0x17)
+						exitTimer = 0x17;
 				}
-				else if (iVar2 > 0x17)
+				else if (exitTimer > 0x17)
 				{
 					goto skip_tint;
 				}
-				if (Renderer::g_frameDelta + iVar2 > 0x17)
+				if (Renderer::g_frameDelta + exitTimer > 0x17)
 				{
 					Nu3D::Camera::SetTint(0, 0, 0, 12);
 				}
@@ -502,9 +502,10 @@ namespace Toy2
 				{
 					InputManager::g_curButtonsPressed |= 0x4000;
 				}
-				if ((InputManager::g_curButtonsPressed & 0xf000) == 0 || (InputManager::g_prevButtonsPressed & 0xf000) != 0 || iVar2 >= 0x474 || iVar2 <= 0x17)
+				if ((InputManager::g_curButtonsPressed & 0xf000) == 0 || (InputManager::g_prevButtonsPressed & 0xf000) != 0 || exitTimer >= 0x474
+					|| exitTimer <= 0x17)
 				{
-					if (iVar2 == 0)
+					if (exitTimer == 0)
 					{
 						AudioManager::StopAndWait();
 						return;
@@ -512,7 +513,7 @@ namespace Toy2
 				}
 				else
 				{
-					iVar2 = 0x18;
+					exitTimer = 0x18;
 				}
 			}
 		}
