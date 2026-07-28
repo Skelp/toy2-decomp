@@ -122,6 +122,7 @@ namespace SoftwareRenderer
 	void InitialisePrimarySurface_T();
 	void Destroy();
 	void ClearBackBufferOnce();
+	void FillRect32(uint32_t* dest, int32_t width, int32_t height, int32_t rowPaddingBytes, uint32_t value);
 	void CommitZoom();
 	void InitialiseColourScaleTables();
 	void ZoomOut();

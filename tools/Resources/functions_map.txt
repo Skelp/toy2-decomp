@@ -373,7 +373,7 @@
 0x0047D210 SoftwareRenderer::UnkFunc8
 0x0047D4E0 Toy2::BuildPerspectiveDivideTable
 0x0047D520 InputManager::MemSetUtil
-0x0047D540 SoftwareRenderer::UnkFunc6
+0x0047D540 SoftwareRenderer::FillRect32
 0x0047D650 SoftwareRenderer__UnkFunc66
 0x0047D670 AudioManager::LoadSoundPack
 0x0047D7C0 Toy2::UpdateAudioChannels

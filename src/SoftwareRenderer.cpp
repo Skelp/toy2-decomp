@@ -656,6 +656,21 @@ namespace SoftwareRenderer
 		g_pendingBackBufferClears--;
 	}
 
+	// FUNCTION: TOY2 0x0047D540
+	void FillRect32(uint32_t* dest, int32_t width, int32_t height, int32_t rowPaddingBytes, uint32_t value)
+	{
+		do
+		{
+			int32_t count = width;
+			do
+				*dest++ = value;
+			while (--count != 0);
+
+			uint8_t* nextRow = reinterpret_cast<uint8_t*>(dest) + rowPaddingBytes;
+			dest = reinterpret_cast<uint32_t*>(nextRow);
+		} while (--height != 0);
+	}
+
 	// FUNCTION: TOY2 0x004C1E70
 	void CommitZoom()
 	{
