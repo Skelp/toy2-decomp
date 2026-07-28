@@ -119,6 +119,30 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x005281DC
 	HMMIO g_waveMmioHandle;
 
+	// GLOBAL: TOY2 0x005281E0
+	MMCKINFO g_streamDataChunk;
+
+	// GLOBAL: TOY2 0x005281F4
+	MMCKINFO g_streamParentChunk;
+
+	// GLOBAL: TOY2 0x0052820C
+	uint32_t g_streamBufferBytes;
+
+	// GLOBAL: TOY2 0x00528210
+	uint32_t g_streamFillBytes;
+
+	// GLOBAL: TOY2 0x00528214
+	uint32_t g_streamWriteOffset;
+
+	// GLOBAL: TOY2 0x00528218
+	uint32_t g_streamBytesPlayed;
+
+	// GLOBAL: TOY2 0x0052821C
+	uint32_t g_streamLastPlayCursor;
+
+	// GLOBAL: TOY2 0x00528228
+	int32_t g_streamReachedEnd;
+
 	// GLOBAL: TOY2 0x00725F24
 	LPDIRECTSOUND g_directSound;
 
@@ -1485,8 +1509,91 @@ namespace AudioManager
 		g_streamFillEvent = NULL;
 	}
 
-	// STUB: TOY2 0x00436D80
-	void FillBuffer() {}
+	// FUNCTION: TOY2 0x00436D80
+	void FillBuffer()
+	{
+		uint32_t bytesRead = 0;
+		if (g_directSound == NULL || g_dsPrimaryBuffer == NULL)
+		{
+			return;
+		}
+
+		DWORD playCursor;
+		DWORD writeCursor;
+		if (g_dsPrimaryBuffer->GetCurrentPosition(&playCursor, &writeCursor) == DS_OK)
+		{
+			uint32_t bytesAdvanced;
+			if (playCursor < g_streamLastPlayCursor)
+			{
+				bytesAdvanced = g_streamBufferBytes - g_streamLastPlayCursor + playCursor;
+			}
+			else
+			{
+				bytesAdvanced = playCursor - g_streamLastPlayCursor;
+			}
+			g_streamLastPlayCursor = playCursor;
+			g_streamBytesPlayed += bytesAdvanced;
+		}
+
+		void* bufferData;
+		DWORD lockedBytes;
+		if (g_streamReachedEnd == 0)
+		{
+			if (g_dsPrimaryBuffer->Lock(g_streamWriteOffset, g_streamFillBytes, &bufferData, &lockedBytes, NULL, NULL, 0) != DS_OK)
+			{
+				return;
+			}
+
+			WaveReadFile(g_waveMmioHandle, lockedBytes, bufferData, &g_streamDataChunk, &bytesRead);
+			if (bytesRead < lockedBytes)
+			{
+				if (g_streamLooping == 0)
+				{
+					g_streamReachedEnd = 1;
+					uint8_t silence = static_cast<WAVEFORMATEX*>(g_waveFormatHandle)->wBitsPerSample == 8 ? 0x80 : 0;
+					uint8_t* bufferBytes = static_cast<uint8_t*>(bufferData);
+					memset(bufferBytes + bytesRead, silence, lockedBytes - bytesRead);
+				}
+				else
+				{
+					uint8_t* bufferBytes = static_cast<uint8_t*>(bufferData);
+					uint32_t filledBytes = bytesRead;
+					while (filledBytes < lockedBytes)
+					{
+						if (Wave::SeekToChunk(&g_waveMmioHandle, &g_streamDataChunk, &g_streamParentChunk) != MMSYSERR_NOERROR
+							|| WaveReadFile(g_waveMmioHandle, lockedBytes - filledBytes, bufferBytes + filledBytes, &g_streamDataChunk, &bytesRead)
+								!= MMSYSERR_NOERROR)
+						{
+							break;
+						}
+						filledBytes += bytesRead;
+					}
+				}
+			}
+
+			g_dsPrimaryBuffer->Unlock(bufferData, lockedBytes, NULL, 0);
+			g_streamWriteOffset += lockedBytes;
+			if (g_streamWriteOffset >= g_streamBufferBytes)
+			{
+				g_streamWriteOffset -= g_streamBufferBytes;
+			}
+		}
+		else
+		{
+			if (g_dsPrimaryBuffer->Lock(g_streamWriteOffset, g_streamFillBytes, &bufferData, &lockedBytes, NULL, NULL, 0) == DS_OK)
+			{
+				uint8_t silence = static_cast<WAVEFORMATEX*>(g_waveFormatHandle)->wBitsPerSample == 8 ? 0x80 : 0;
+				memset(bufferData, silence, lockedBytes);
+				g_dsPrimaryBuffer->Unlock(bufferData, lockedBytes, NULL, 0);
+			}
+
+			uint32_t streamBytes = g_streamParentChunk.cksize;
+			if ((streamBytes > g_streamFillBytes && g_streamBytesPlayed >= streamBytes - g_streamFillBytes) || g_streamBytesPlayed >= streamBytes)
+			{
+				g_streamPlaybackFinished = 1;
+			}
+		}
+	}
 
 	namespace Stream
 	{
