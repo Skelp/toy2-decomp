@@ -11,6 +11,12 @@
 
 namespace AudioManager
 {
+	enum MusicTrack
+	{
+		MUSIC_TRACK_BOSS = 15,
+		MUSIC_TRACK_CHALLENGE = 16,
+	};
+
 	struct SoundSequenceSlot
 	{
 		Vector3I position;

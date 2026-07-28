@@ -7,8 +7,15 @@ namespace Toy2
 {
 	namespace HUD
 	{
+		enum SlideSlot
+		{
+			SLIDE_CHALLENGE_STATUS = 6,
+			SLIDE_BOSS_STATUS = 7,
+		};
+
 		extern int16_t g_slideTimers[12];
-		extern int16_t g_slideAngles[16];
+		extern int16_t g_slideAngles[12];
+		extern int32_t g_challengeState;
 	}
 
 	void LoadLevelGraphics(int32_t levelFileIndex);
@@ -41,6 +48,7 @@ namespace Toy2
 	void ProcessMiscEvents();
 	void ProcessMiscEventsEx();
 	void RenderGame(int32_t fullRender);
+	void PlayLevelMusic();
 	void AdvanceFramePhase();
 	int32_t ComputeTokenProgress();
 	int32_t* BuildPerspectiveDivideTable(int32_t scale);

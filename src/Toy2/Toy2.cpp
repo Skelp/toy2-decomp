@@ -40,7 +40,10 @@ namespace Toy2
 		int16_t g_slideTimers[12];
 
 		// GLOBAL: TOY2 0x0052F2E0
-		int16_t g_slideAngles[16];
+		int16_t g_slideAngles[12];
+
+		// GLOBAL: TOY2 0x0052F2F8
+		int32_t g_challengeState;
 	}
 
 	// FUNCTION: TOY2 0x0044F840
@@ -51,6 +54,29 @@ namespace Toy2
 
 	// FUNCTION: TOY2 0x0049F490 [MATCHED]
 	void AdvanceFramePhase() { g_framePhase = (g_framePhase + 1) & 0xF; }
+
+	// FUNCTION: TOY2 0x0049EAC0 [MATCHED]
+	void PlayLevelMusic()
+	{
+		if (HUD::g_slideTimers[HUD::SLIDE_BOSS_STATUS] != 0)
+		{
+			if (AudioManager::g_loopingMusicTrackIndex != AudioManager::MUSIC_TRACK_BOSS)
+			{
+				AudioManager::PlayMusicLooping(AudioManager::MUSIC_TRACK_BOSS);
+			}
+		}
+		else if (HUD::g_slideTimers[HUD::SLIDE_CHALLENGE_STATUS] != 0 && HUD::g_challengeState > 1)
+		{
+			if (AudioManager::g_loopingMusicTrackIndex != AudioManager::MUSIC_TRACK_CHALLENGE)
+			{
+				AudioManager::PlayMusicLooping(AudioManager::MUSIC_TRACK_CHALLENGE);
+			}
+		}
+		else if (AudioManager::g_loopingMusicTrackIndex != g_levelIndex)
+		{
+			AudioManager::PlayMusicLooping(g_levelIndex);
+		}
+	}
 
 	// GLOBAL: TOY2 0x00508D70
 	ToyCfg g_toyCfgData = {
