@@ -14,7 +14,7 @@
 namespace SoftwareRenderer
 {
 	// GLOBAL: TOY2 0x004F7400
-	PointI g_unk4F7400 = { -32768, -32768 };
+	PointI g_backdropScrollOverride = { -32768, -32768 };
 
 	// GLOBAL: TOY2 0x004F73A8
 	int32_t g_backdropWidth = 0;
@@ -871,7 +871,7 @@ namespace SoftwareRenderer
 	}
 
 	// FUNCTION: TOY2 0x00490410
-	void UnkFunc67(int32_t x, int32_t y)
+	void SetBackdropScrollOverride(int32_t x, int32_t y)
 	{
 		int32_t* piPitch = Toy2::g_hasStaticBackdrop ? &g_staticBackdropWidth : &g_backdropWidth;
 		int32_t pitch = *piPitch;
@@ -879,12 +879,12 @@ namespace SoftwareRenderer
 		int32_t remainder = x - quotient * pitch;
 		if (remainder < 0)
 		{
-			g_unk4F7400.x = (1 - quotient) * pitch + x;
-			g_unk4F7400.y = y;
+			g_backdropScrollOverride.x = (1 - quotient) * pitch + x;
+			g_backdropScrollOverride.y = y;
 			return;
 		}
-		g_unk4F7400.x = remainder;
-		g_unk4F7400.y = y;
+		g_backdropScrollOverride.x = remainder;
+		g_backdropScrollOverride.y = y;
 	}
 
 	// STUB: TOY2 0x0048FB70
@@ -948,8 +948,8 @@ namespace SoftwareRenderer
 			clippedTop = 0;
 		}
 
-		if (g_unk4F7400.x != -0x8000)
-			g_backdropScrollX = g_unk4F7400.x;
+		if (g_backdropScrollOverride.x != -0x8000)
+			g_backdropScrollX = g_backdropScrollOverride.x;
 
 		int32_t backdropHeight = backdropWidth[1];
 		if (clippedTop <= backdropHeight && clippedTop >= 0 && g_backdropViewDepth > 0x800)

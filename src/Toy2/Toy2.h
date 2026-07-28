@@ -6,6 +6,7 @@
 namespace Toy2
 {
 	void LoadLevelGraphics(int32_t levelFileIndex);
+	void LoadLevelWithFadeIn(int32_t levelFileIndex, int32_t displayMode);
 	struct ToyCfg
 	{
 		uint32_t flags;

@@ -359,7 +359,7 @@ namespace Toy2
 			Nu3D::Camera::g_cameraTintGreen = 0;
 			Nu3D::Camera::g_cameraTintRed = 0;
 			Nu3D::Camera::SetTint(128, 128, 128, 12);
-			SoftwareRenderer::UnkFunc67(0, 0);
+			SoftwareRenderer::SetBackdropScrollOverride(0, 0);
 			Renderer::g_frameDelta = 1;
 			SetBackdropByIndex(1);
 
@@ -459,6 +459,40 @@ namespace Toy2
 	// STUB: TOY2 0x004500A0
 	void LoadLevelGraphics(int32_t levelFileIndex) {}
 
+	// FUNCTION: TOY2 0x00414270 [MATCHED]
+	void LoadLevelWithFadeIn(int32_t levelFileIndex, int32_t displayMode)
+	{
+		if (displayMode != 0 && displayMode != 123)
+		{
+			LoadLevelGraphics(0);
+		}
+		else
+		{
+			LoadLevelGraphics(levelFileIndex);
+		}
+
+		SoftwareRenderer::g_backdropScrollOverride.x = 0;
+		SoftwareRenderer::g_backdropScrollOverride.y = 0;
+		Nu3D::Camera::SetTint(128, 128, 128, 12);
+
+		int32_t fadeTimer = 28;
+		do
+		{
+			fadeTimer -= Renderer::g_frameDelta;
+			if (fadeTimer <= 0)
+			{
+				fadeTimer = 0;
+			}
+			Nu3D::Camera::FadeToTargetTint();
+			if (displayMode == 0)
+			{
+				Renderer::Sprite::DrawScaled(96, 200, 128, 1, 255, 255, 255, 255, 2048, 2048);
+			}
+			Nullsub3();
+			MainMenu::RenderMenu();
+		} while (fadeTimer != 0);
+	}
+
 	// FUNCTION: TOY2 0x00453D90 [MATCHED]
 	void ShowActClearScreen()
 	{
@@ -467,8 +501,8 @@ namespace Toy2
 		Renderer::g_virtualScreenWidth = 320.0f;
 		Renderer::g_virtualScreenHeight = 256.0f;
 		LoadLevelGraphics(g_levelFileIndex);
-		SoftwareRenderer::g_unk4F7400.x = 0;
-		SoftwareRenderer::g_unk4F7400.y = 0;
+		SoftwareRenderer::g_backdropScrollOverride.x = 0;
+		SoftwareRenderer::g_backdropScrollOverride.y = 0;
 		Nu3D::Camera::SetTint(128, 128, 128, 12);
 		int32_t fadeTimer = 28;
 		AudioManager::PlayMusicOneShot(21);
@@ -484,8 +518,8 @@ namespace Toy2
 
 		int32_t isFadingOut = 0;
 		int32_t blinkTimer = 0;
-		SoftwareRenderer::g_unk4F7400.x = 0;
-		SoftwareRenderer::g_unk4F7400.y = 0;
+		SoftwareRenderer::g_backdropScrollOverride.x = 0;
+		SoftwareRenderer::g_backdropScrollOverride.y = 0;
 		fadeTimer = 28;
 		do
 		{
@@ -512,8 +546,8 @@ namespace Toy2
 
 		AudioManager::StopAndWait();
 		g_hasStaticBackdrop = 0;
-		SoftwareRenderer::g_unk4F7400.x = -32768;
-		SoftwareRenderer::g_unk4F7400.y = -32768;
+		SoftwareRenderer::g_backdropScrollOverride.x = -32768;
+		SoftwareRenderer::g_backdropScrollOverride.y = -32768;
 		Renderer::g_virtualScreenWidth = 512.0f;
 		Renderer::g_virtualScreenHeight = 256.0f;
 		g_nextBackdropId = 36;
@@ -779,7 +813,7 @@ namespace Toy2
 		Nu3D::Camera::g_cameraTintGreen = 0;
 		Nu3D::Camera::g_cameraTintRed = 0;
 		Nu3D::Camera::SetTint(128, 128, 128, 12);
-		SoftwareRenderer::UnkFunc67(0, 0);
+		SoftwareRenderer::SetBackdropScrollOverride(0, 0);
 		Renderer::g_frameDelta = 1;
 		SetBackdropByIndex(backdropIndex);
 
@@ -790,7 +824,7 @@ namespace Toy2
 		while (true)
 		{
 			Nu3D::Camera::FadeToTargetTint();
-			SoftwareRenderer::UnkFunc67(0, 0);
+			SoftwareRenderer::SetBackdropScrollOverride(0, 0);
 			Nullsub3();
 			MainMenu::RenderMenu();
 
@@ -848,7 +882,7 @@ namespace Toy2
 				Nu3D::Camera::g_cameraTintRed = 0;
 
 				Nu3D::Camera::SetTint(128, 128, 128, 12);
-				SoftwareRenderer::UnkFunc67(0, 0);
+				SoftwareRenderer::SetBackdropScrollOverride(0, 0);
 				Renderer::g_frameDelta = 1;
 
 				SetBackdropByIndex(1);
@@ -908,7 +942,7 @@ namespace Toy2
 					Nu3D::Camera::g_cameraTintRed = 0;
 
 					Nu3D::Camera::SetTint(128, 128, 128, 12);
-					SoftwareRenderer::UnkFunc67(0, 0);
+					SoftwareRenderer::SetBackdropScrollOverride(0, 0);
 					Renderer::g_frameDelta = 1;
 					SetBackdropByIndex(0);
 
@@ -969,7 +1003,7 @@ namespace Toy2
 				Nu3D::Camera::g_cameraTintRed = 0;
 
 				Nu3D::Camera::SetTint(128, 128, 128, 12);
-				SoftwareRenderer::UnkFunc67(0, 0);
+				SoftwareRenderer::SetBackdropScrollOverride(0, 0);
 				Renderer::g_frameDelta = 1;
 
 				SetBackdropByIndex(0);

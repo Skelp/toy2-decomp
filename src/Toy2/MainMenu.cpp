@@ -66,7 +66,7 @@ namespace Toy2
 			Nu3D::Camera::g_cameraTintRed = 0;
 
 			Nu3D::Camera::SetTint(128, 128, 128, 12);
-			SoftwareRenderer::UnkFunc67(0, 0);
+			SoftwareRenderer::SetBackdropScrollOverride(0, 0);
 			Renderer::g_frameDelta = 1;
 			Toy2::SetBackdropByIndex(4);
 
@@ -252,7 +252,7 @@ namespace Toy2
 				Nu3D::Camera::g_cameraTintRed = 0;
 
 				Nu3D::Camera::SetTint(128, 128, 128, 12);
-				SoftwareRenderer::UnkFunc67(0, 0);
+				SoftwareRenderer::SetBackdropScrollOverride(0, 0);
 
 				int32_t showPressJumpPrompt = 1;
 				Renderer::g_frameDelta = 1;

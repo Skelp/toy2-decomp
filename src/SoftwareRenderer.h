@@ -14,7 +14,7 @@ namespace Renderer
 
 namespace SoftwareRenderer
 {
-	extern PointI g_unk4F7400;
+	extern PointI g_backdropScrollOverride;
 	extern int32_t g_backdropWidth;
 	extern int32_t g_staticBackdropWidth;
 	extern int32_t g_backdropTextureColumn;
@@ -127,6 +127,7 @@ namespace SoftwareRenderer
 	void InitialiseColourScaleTables();
 	void ZoomOut();
 	void ZoomIn();
+	void SetBackdropScrollOverride(int32_t x, int32_t y);
 	void PresentFrame();
 	void ShowBackBuffer();
 	void LockBackBuffer();
@@ -158,7 +159,6 @@ namespace SoftwareRenderer
 	void SubmitSortedTriangle(
 		int32_t renderFlags, Renderer::RenderEntry* renderEntry, int32_t textureIndex, Nu3D::VertexTL* v0, Nu3D::VertexTL* v1, Nu3D::VertexTL* v2);
 
-	void UnkFunc67(int32_t x, int32_t y);
 	void UnkFunc2();
 	int16_t UpdateBackdropScroll();
 	void FlushRenderCommands();

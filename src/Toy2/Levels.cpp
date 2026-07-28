@@ -768,8 +768,8 @@ namespace Toy2
 			memset(Collision::g_collisionMeshInstances, 0, sizeof(Collision::g_collisionMeshInstances));
 			memset(Collision::g_mathScratch, 0, sizeof(Collision::g_mathScratch));
 
-			SoftwareRenderer::g_unk4F7400.x = -32768;
-			SoftwareRenderer::g_unk4F7400.y = -32768;
+			SoftwareRenderer::g_backdropScrollOverride.x = -32768;
+			SoftwareRenderer::g_backdropScrollOverride.y = -32768;
 
 			g_hasBackdrop = 0;
 

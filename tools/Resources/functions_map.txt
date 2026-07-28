@@ -452,7 +452,7 @@
 0x0048F410 Renderer::RenderParallaxBackground
 0x0048FB70 SoftwareRenderer::UnkFunc2
 0x00490290 SoftwareRenderer::UpdateBackdropScroll
-0x00490410 SoftwareRenderer::UnkFunc67
+0x00490410 SoftwareRenderer::SetBackdropScrollOverride
 0x00490470 DevDraw::FlushDrawBufferSlot
 0x004905C0 DevDraw::FlushTransparentDrawBufferSlot
 0x00490730 Toy2::CheckForQuit
