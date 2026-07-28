@@ -1436,7 +1436,7 @@ namespace SoftwareRenderer
 	// pixels at a time with one interpolated colour. It writes a single pixel at
 	// each unaligned end of the span.
 	// FUNCTION: TOY2 0x004C48E0
-	void UnkFunc55(Nu3D::VertexTL* edgeA,
+	void RasterizeOpaqueSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -1521,10 +1521,10 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// The 565 twin of UnkFunc55. It uses the same paired-pixel walk, but places
+	// The 565 twin of RasterizeOpaqueSpan555. It uses the same paired-pixel walk, but places
 	// the five interpolated green bits at bit 6 and red at bit 11.
 	// FUNCTION: TOY2 0x004C4A60
-	void UnkFunc40(Nu3D::VertexTL* edgeA,
+	void RasterizeOpaqueSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -1612,7 +1612,7 @@ namespace SoftwareRenderer
 	// Textured additive span for a 16-bit 555 surface. A texel with a zero
 	// high byte is transparent. Other texels brighten the destination channels.
 	// FUNCTION: TOY2 0x004C4BE0
-	void UnkFunc49(Nu3D::VertexTL* edgeA,
+	void RasterizeTexturedAdditiveSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -1755,7 +1755,7 @@ namespace SoftwareRenderer
 	// siblings this one keeps them in full 32-bit registers, so retail uses a
 	// dword load and a logical shift rather than a word load.
 	// FUNCTION: TOY2 0x004C4E00
-	void UnkFunc52(Nu3D::VertexTL* edgeA,
+	void RasterizeAdditiveSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -1841,12 +1841,12 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// The 16-bit 565 twin of UnkFunc52. Identical additive span; only the channel
+	// The 16-bit 565 twin of RasterizeAdditiveSpan555. Only the channel
 	// positions move. Green starts at bit 6 and red at bit 11, and the rasterizer
 	// still takes five bits per channel, so it uses the high five bits of the
 	// six-bit green field.
 	// FUNCTION: TOY2 0x004C4F30
-	void UnkFunc36(Nu3D::VertexTL* edgeA,
+	void RasterizeAdditiveSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -1932,10 +1932,10 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// The 565 twin of UnkFunc49. It uses the same texture sampling and additive
+	// The 565 twin of RasterizeTexturedAdditiveSpan555 uses the same texture sampling and additive
 	// blend, but reads green at bit 6 and red at bit 11.
 	// FUNCTION: TOY2 0x004C5060
-	void UnkFunc41(Nu3D::VertexTL* edgeA,
+	void RasterizeTexturedAdditiveSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -2067,7 +2067,7 @@ namespace SoftwareRenderer
 	// Textured subtractive span for a 16-bit 555 surface. A texel with a zero
 	// high byte is transparent. Other texels darken the destination channels.
 	// FUNCTION: TOY2 0x004C5280
-	void UnkFunc50(Nu3D::VertexTL* edgeA,
+	void RasterizeTexturedSubtractiveSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -2209,7 +2209,7 @@ namespace SoftwareRenderer
 	// fixed-point value, so each read truncates to 16 bits and shifts down by 11.
 	// That is why retail uses a word load and needs no mask.
 	// FUNCTION: TOY2 0x004C5490
-	void UnkFunc53(Nu3D::VertexTL* edgeA,
+	void RasterizeSubtractiveSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -2293,12 +2293,12 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// The 16-bit 565 twin of UnkFunc53. Identical subtractive span; only the
-	// channel positions move. Green starts at bit 6 and red at bit 11, and the
+	// The 16-bit 565 twin of RasterizeSubtractiveSpan555 changes only the
+	// channel positions. Green starts at bit 6 and red at bit 11, and the
 	// rasterizer still takes five bits per channel, so it uses the high five bits
 	// of the six-bit green field.
 	// FUNCTION: TOY2 0x004C55B0
-	void UnkFunc37(Nu3D::VertexTL* edgeA,
+	void RasterizeSubtractiveSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -2382,10 +2382,10 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// The 565 twin of UnkFunc50. It uses the same texture sampling and
+	// The 565 twin of RasterizeTexturedSubtractiveSpan555 uses the same texture sampling and
 	// subtractive blend, but reads green at bit 6 and red at bit 11.
 	// FUNCTION: TOY2 0x004C56D0
-	void UnkFunc42(Nu3D::VertexTL* edgeA,
+	void RasterizeTexturedSubtractiveSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -2518,7 +2518,7 @@ namespace SoftwareRenderer
 	// with a zero high byte is transparent. The colour table entries already
 	// contain their packed destination-channel bits.
 	// FUNCTION: TOY2 0x004C58E0
-	void UnkFunc43(Nu3D::VertexTL* edgeA,
+	void RasterizeTexturedOpaqueSpan(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -2727,7 +2727,7 @@ namespace SoftwareRenderer
 	// Blends an untextured span with a 555 destination. The source and
 	// destination factors are in g_spanAlpha and g_spanInvAlpha.
 	// FUNCTION: TOY2 0x004C5D80
-	void UnkFunc56(Nu3D::VertexTL* edgeA,
+	void RasterizeAlphaBlendSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -2803,10 +2803,10 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// The alternate-format twin of UnkFunc56. It uses the same blend and
+	// The alternate-format twin of RasterizeAlphaBlendSpan555 uses the same blend and
 	// interpolation, but extracts and packs channels for the other surface mode.
 	// FUNCTION: TOY2 0x004C5F00
-	void UnkFunc38(Nu3D::VertexTL* edgeA,
+	void RasterizeAlphaBlendSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -3028,22 +3028,22 @@ namespace SoftwareRenderer
 			{
 				if (commandRenderState & Renderer::RENDER_ALPHA_CUSTOM)
 				{
-					g_spanRasterizer = UnkFunc52;
+					g_spanRasterizer = RasterizeAdditiveSpan555;
 				}
 				else if (commandRenderState & Renderer::RENDER_ALPHA_ALT)
 				{
-					g_spanRasterizer = UnkFunc53;
+					g_spanRasterizer = RasterizeSubtractiveSpan555;
 				}
 				else if (commandRenderState & Renderer::RENDER_ALPHA_DEFAULT)
 				{
 					g_spanAlpha = command->vertices[0].diffuse.value >> 24;
 					if (g_spanAlpha == 255)
 					{
-						g_spanRasterizer = UnkFunc55;
+						g_spanRasterizer = RasterizeOpaqueSpan555;
 					}
 					else
 					{
-						g_spanRasterizer = UnkFunc56;
+						g_spanRasterizer = RasterizeAlphaBlendSpan555;
 						g_spanInvAlpha = 255 - g_spanAlpha;
 					}
 				}
@@ -3054,23 +3054,23 @@ namespace SoftwareRenderer
 				}
 				else
 				{
-					g_spanRasterizer = UnkFunc55;
+					g_spanRasterizer = RasterizeOpaqueSpan555;
 				}
 			}
 			else if (commandRenderState & Renderer::RENDER_ALPHA_CUSTOM)
 			{
-				g_spanRasterizer = UnkFunc49;
+				g_spanRasterizer = RasterizeTexturedAdditiveSpan555;
 			}
 			else if (commandRenderState & Renderer::RENDER_ALPHA_ALT)
 			{
-				g_spanRasterizer = UnkFunc50;
+				g_spanRasterizer = RasterizeTexturedSubtractiveSpan555;
 			}
 			else if (commandRenderState & Renderer::RENDER_ALPHA_DEFAULT)
 			{
 				g_spanAlpha = command->vertices[0].diffuse.value >> 24;
 				if (g_spanAlpha == 255)
 				{
-					g_spanRasterizer = UnkFunc43;
+					g_spanRasterizer = RasterizeTexturedOpaqueSpan;
 				}
 				else
 				{
@@ -3087,22 +3087,22 @@ namespace SoftwareRenderer
 		{
 			if (commandRenderState & Renderer::RENDER_ALPHA_CUSTOM)
 			{
-				g_spanRasterizer = UnkFunc36;
+				g_spanRasterizer = RasterizeAdditiveSpan565;
 			}
 			else if (commandRenderState & Renderer::RENDER_ALPHA_ALT)
 			{
-				g_spanRasterizer = UnkFunc37;
+				g_spanRasterizer = RasterizeSubtractiveSpan565;
 			}
 			else if (commandRenderState & Renderer::RENDER_ALPHA_DEFAULT)
 			{
 				g_spanAlpha = command->vertices[0].diffuse.value >> 24;
 				if (g_spanAlpha == 255)
 				{
-					g_spanRasterizer = UnkFunc40;
+					g_spanRasterizer = RasterizeOpaqueSpan565;
 				}
 				else
 				{
-					g_spanRasterizer = UnkFunc38;
+					g_spanRasterizer = RasterizeAlphaBlendSpan565;
 					g_spanInvAlpha = 255 - g_spanAlpha;
 				}
 			}
@@ -3113,23 +3113,23 @@ namespace SoftwareRenderer
 			}
 			else
 			{
-				g_spanRasterizer = UnkFunc40;
+				g_spanRasterizer = RasterizeOpaqueSpan565;
 			}
 		}
 		else if (commandRenderState & Renderer::RENDER_ALPHA_CUSTOM)
 		{
-			g_spanRasterizer = UnkFunc41;
+			g_spanRasterizer = RasterizeTexturedAdditiveSpan565;
 		}
 		else if (commandRenderState & Renderer::RENDER_ALPHA_ALT)
 		{
-			g_spanRasterizer = UnkFunc42;
+			g_spanRasterizer = RasterizeTexturedSubtractiveSpan565;
 		}
 		else if (commandRenderState & Renderer::RENDER_ALPHA_DEFAULT)
 		{
 			g_spanAlpha = command->vertices[0].diffuse.value >> 24;
 			if (g_spanAlpha == 255)
 			{
-				g_spanRasterizer = UnkFunc43;
+				g_spanRasterizer = RasterizeTexturedOpaqueSpan;
 			}
 			else
 			{
@@ -3185,22 +3185,22 @@ namespace SoftwareRenderer
 			{
 				if (commandRenderState & Renderer::RENDER_ALPHA_CUSTOM)
 				{
-					g_spanRasterizer = UnkFunc52;
+					g_spanRasterizer = RasterizeAdditiveSpan555;
 				}
 				else if (commandRenderState & Renderer::RENDER_ALPHA_ALT)
 				{
-					g_spanRasterizer = UnkFunc53;
+					g_spanRasterizer = RasterizeSubtractiveSpan555;
 				}
 				else if (commandRenderState & Renderer::RENDER_ALPHA_DEFAULT)
 				{
 					g_spanAlpha = command->vertices[0].diffuse.value >> 24;
 					if (g_spanAlpha == 255)
 					{
-						g_spanRasterizer = UnkFunc55;
+						g_spanRasterizer = RasterizeOpaqueSpan555;
 					}
 					else
 					{
-						g_spanRasterizer = UnkFunc56;
+						g_spanRasterizer = RasterizeAlphaBlendSpan555;
 						g_spanInvAlpha = 255 - g_spanAlpha;
 					}
 				}
@@ -3211,23 +3211,23 @@ namespace SoftwareRenderer
 				}
 				else
 				{
-					g_spanRasterizer = UnkFunc55;
+					g_spanRasterizer = RasterizeOpaqueSpan555;
 				}
 			}
 			else if (commandRenderState & Renderer::RENDER_ALPHA_CUSTOM)
 			{
-				g_spanRasterizer = UnkFunc49;
+				g_spanRasterizer = RasterizeTexturedAdditiveSpan555;
 			}
 			else if (commandRenderState & Renderer::RENDER_ALPHA_ALT)
 			{
-				g_spanRasterizer = UnkFunc50;
+				g_spanRasterizer = RasterizeTexturedSubtractiveSpan555;
 			}
 			else if (commandRenderState & Renderer::RENDER_ALPHA_DEFAULT)
 			{
 				g_spanAlpha = command->vertices[0].diffuse.value >> 24;
 				if (g_spanAlpha == 255)
 				{
-					g_spanRasterizer = UnkFunc43;
+					g_spanRasterizer = RasterizeTexturedOpaqueSpan;
 				}
 				else
 				{
@@ -3263,22 +3263,22 @@ namespace SoftwareRenderer
 		{
 			if (commandRenderState & Renderer::RENDER_ALPHA_CUSTOM)
 			{
-				g_spanRasterizer = UnkFunc36;
+				g_spanRasterizer = RasterizeAdditiveSpan565;
 			}
 			else if (commandRenderState & Renderer::RENDER_ALPHA_ALT)
 			{
-				g_spanRasterizer = UnkFunc37;
+				g_spanRasterizer = RasterizeSubtractiveSpan565;
 			}
 			else if (commandRenderState & Renderer::RENDER_ALPHA_DEFAULT)
 			{
 				g_spanAlpha = command->vertices[0].diffuse.value >> 24;
 				if (g_spanAlpha == 255)
 				{
-					g_spanRasterizer = UnkFunc40;
+					g_spanRasterizer = RasterizeOpaqueSpan565;
 				}
 				else
 				{
-					g_spanRasterizer = UnkFunc38;
+					g_spanRasterizer = RasterizeAlphaBlendSpan565;
 					g_spanInvAlpha = 255 - g_spanAlpha;
 				}
 			}
@@ -3289,23 +3289,23 @@ namespace SoftwareRenderer
 			}
 			else
 			{
-				g_spanRasterizer = UnkFunc40;
+				g_spanRasterizer = RasterizeOpaqueSpan565;
 			}
 		}
 		else if (commandRenderState & Renderer::RENDER_ALPHA_CUSTOM)
 		{
-			g_spanRasterizer = UnkFunc41;
+			g_spanRasterizer = RasterizeTexturedAdditiveSpan565;
 		}
 		else if (commandRenderState & Renderer::RENDER_ALPHA_ALT)
 		{
-			g_spanRasterizer = UnkFunc42;
+			g_spanRasterizer = RasterizeTexturedSubtractiveSpan565;
 		}
 		else if (commandRenderState & Renderer::RENDER_ALPHA_DEFAULT)
 		{
 			g_spanAlpha = command->vertices[0].diffuse.value >> 24;
 			if (g_spanAlpha == 255)
 			{
-				g_spanRasterizer = UnkFunc43;
+				g_spanRasterizer = RasterizeTexturedOpaqueSpan;
 			}
 			else
 			{

@@ -218,10 +218,8 @@ namespace SoftwareRenderer
 	extern int32_t g_spanAlpha;
 	extern int32_t g_spanInvAlpha;
 
-	// The span variants themselves. Naming each one needs its body, so they keep
-	// their map names for now; the selector below documents which state picks
-	// which.
-	void UnkFunc36(Nu3D::VertexTL* edgeA,
+	// Each span name states its texture use, blend mode, and surface format.
+	void RasterizeAdditiveSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -231,7 +229,7 @@ namespace SoftwareRenderer
 		int32_t edgeBRed,
 		int32_t edgeBGreen,
 		int32_t edgeBBlue);
-	void UnkFunc37(Nu3D::VertexTL* edgeA,
+	void RasterizeSubtractiveSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -241,7 +239,7 @@ namespace SoftwareRenderer
 		int32_t edgeBRed,
 		int32_t edgeBGreen,
 		int32_t edgeBBlue);
-	void UnkFunc38(Nu3D::VertexTL* edgeA,
+	void RasterizeAlphaBlendSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -251,7 +249,7 @@ namespace SoftwareRenderer
 		int32_t edgeBRed,
 		int32_t edgeBGreen,
 		int32_t edgeBBlue);
-	void UnkFunc40(Nu3D::VertexTL* edgeA,
+	void RasterizeOpaqueSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -261,7 +259,7 @@ namespace SoftwareRenderer
 		int32_t edgeBRed,
 		int32_t edgeBGreen,
 		int32_t edgeBBlue);
-	void UnkFunc41(Nu3D::VertexTL* edgeA,
+	void RasterizeTexturedAdditiveSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -271,7 +269,7 @@ namespace SoftwareRenderer
 		int32_t edgeBRed,
 		int32_t edgeBGreen,
 		int32_t edgeBBlue);
-	void UnkFunc42(Nu3D::VertexTL* edgeA,
+	void RasterizeTexturedSubtractiveSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -281,7 +279,7 @@ namespace SoftwareRenderer
 		int32_t edgeBRed,
 		int32_t edgeBGreen,
 		int32_t edgeBBlue);
-	void UnkFunc43(Nu3D::VertexTL* edgeA,
+	void RasterizeTexturedOpaqueSpan(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -321,7 +319,7 @@ namespace SoftwareRenderer
 		int32_t edgeBRed,
 		int32_t edgeBGreen,
 		int32_t edgeBBlue);
-	void UnkFunc49(Nu3D::VertexTL* edgeA,
+	void RasterizeTexturedAdditiveSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -331,7 +329,7 @@ namespace SoftwareRenderer
 		int32_t edgeBRed,
 		int32_t edgeBGreen,
 		int32_t edgeBBlue);
-	void UnkFunc50(Nu3D::VertexTL* edgeA,
+	void RasterizeTexturedSubtractiveSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -351,7 +349,7 @@ namespace SoftwareRenderer
 		int32_t edgeBRed,
 		int32_t edgeBGreen,
 		int32_t edgeBBlue);
-	void UnkFunc52(Nu3D::VertexTL* edgeA,
+	void RasterizeAdditiveSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -363,7 +361,7 @@ namespace SoftwareRenderer
 		int32_t edgeBBlue);
 
 	// Subtractive span for a 16-bit 555 surface. See the definition.
-	void UnkFunc53(Nu3D::VertexTL* edgeA,
+	void RasterizeSubtractiveSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -373,7 +371,7 @@ namespace SoftwareRenderer
 		int32_t edgeBRed,
 		int32_t edgeBGreen,
 		int32_t edgeBBlue);
-	void UnkFunc55(Nu3D::VertexTL* edgeA,
+	void RasterizeOpaqueSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -383,7 +381,7 @@ namespace SoftwareRenderer
 		int32_t edgeBRed,
 		int32_t edgeBGreen,
 		int32_t edgeBBlue);
-	void UnkFunc56(Nu3D::VertexTL* edgeA,
+	void RasterizeAlphaBlendSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
