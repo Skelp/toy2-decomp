@@ -58,6 +58,12 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x00528220
 	int32_t g_streamPlaybackFinished;
 
+	// GLOBAL: TOY2 0x005282D8
+	CRITICAL_SECTION g_streamCriticalSection;
+
+	// GLOBAL: TOY2 0x005282F8
+	int32_t g_streamInitialized;
+
 	// GLOBAL: TOY2 0x005282FC
 	int32_t g_streamActive;
 
@@ -1078,8 +1084,75 @@ namespace AudioManager
 
 	namespace Stream
 	{
+		// FUNCTION: TOY2 0x00412FF0
+		int32_t Init()
+		{
+			if (g_streamInitialized == 0)
+			{
+				InitializeCriticalSection(&g_streamCriticalSection);
+				g_streamFillEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+				if (g_streamFillEvent != NULL)
+				{
+					g_streamStopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+					if (g_streamStopEvent != NULL)
+					{
+						g_streamCommandEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+						if (g_streamCommandEvent != NULL)
+						{
+							g_streamAckEvent = CreateSemaphore(NULL, 0, 1, NULL);
+							if (g_streamAckEvent == NULL)
+							{
+								CloseHandle(g_streamCommandEvent);
+								g_streamCommandEvent = NULL;
+							}
+							else
+							{
+								DWORD threadId;
+								HANDLE thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)ThreadProc, NULL, 0, &threadId);
+								if (thread != NULL)
+								{
+									while (! IsThreadReady()) {}
+									g_streamInitialized = 1;
+									atexit(OnExit);
+									return 1;
+								}
+
+								if (g_streamAckEvent != NULL)
+								{
+									CloseHandle(g_streamAckEvent);
+								}
+								if (g_streamCommandEvent != NULL)
+								{
+									CloseHandle(g_streamCommandEvent);
+								}
+								if (g_streamStopEvent != NULL)
+								{
+									CloseHandle(g_streamStopEvent);
+								}
+								if (g_streamFillEvent != NULL)
+								{
+									CloseHandle(g_streamFillEvent);
+								}
+								g_streamAckEvent = NULL;
+								g_streamCommandEvent = NULL;
+								g_streamStopEvent = NULL;
+								g_streamFillEvent = NULL;
+								return 0;
+							}
+						}
+						CloseHandle(g_streamStopEvent);
+						g_streamStopEvent = NULL;
+					}
+					CloseHandle(g_streamFillEvent);
+					g_streamFillEvent = NULL;
+					return 0;
+				}
+			}
+			return 0;
+		}
+
 		// FUNCTION: TOY2 0x00437010 [MATCHED]
-		int32_t ThreadProc()
+		int32_t __cdecl ThreadProc(LPVOID unused)
 		{
 			g_streamThreadReady = 1;
 			do

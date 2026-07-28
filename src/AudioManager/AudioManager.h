@@ -98,6 +98,8 @@ namespace AudioManager
 	extern HANDLE g_streamFillEvent;
 	extern HANDLE g_streamStopEvent;
 	extern int32_t g_streamPlaybackFinished;
+	extern CRITICAL_SECTION g_streamCriticalSection;
+	extern int32_t g_streamInitialized;
 	extern int32_t g_streamActive;
 	extern int32_t g_queuedStreamLooping;
 	extern int32_t g_streamLooping;
@@ -134,7 +136,8 @@ namespace AudioManager
 
 	namespace Stream
 	{
-		int32_t ThreadProc();
+		int32_t Init();
+		int32_t __cdecl ThreadProc(LPVOID unused);
 		void Stop();
 	}
 
