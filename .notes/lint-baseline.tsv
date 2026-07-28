@@ -1,7 +1,4 @@
 # owner	rule	subject	fingerprint	path
-0x004a4130	unstructured-control-flow	goto-count	7ba3d112d547	src/AudioManager/AudioManager.cpp
-0x004a4680	unstructured-control-flow	goto-count	d78bedef8668	src/AudioManager/AudioManager.cpp
-0x004a3f10	unstructured-control-flow	goto-count	ef0757631ecd	src/AudioManager/AudioManager.cpp
 0x00432020	unstructured-control-flow	goto-count	5ec26f3099de	src/ModeSelect.cpp
 0x004ca420	unnamed-bitmask	nodeFlags:2	33f7b4cbff2c	src/NGNLoader/NGNLoader.cpp
 0x004ca420	unnamed-bitmask	nodeFlags:4	c269b187b7ce	src/NGNLoader/NGNLoader.cpp

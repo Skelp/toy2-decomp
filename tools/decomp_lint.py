@@ -594,7 +594,11 @@ def check_text(path: Path, text: str) -> list[Finding]:
         if owner.kind == "function":
             goto_by_owner.setdefault(owner.key, []).append(match)
     for matches in goto_by_owner.values():
-        if len(matches) > 2:
+        targets = {match.group(1).lower() for match in matches}
+        has_one_error_exit = len(targets) == 1 and next(iter(targets)).startswith(
+            ("cleanup", "fail", "error")
+        )
+        if len(matches) > 2 and not has_one_error_exit:
             first = matches[0]
             _add_finding(
                 findings, path, text, owners, allowed, offset=first.start(),

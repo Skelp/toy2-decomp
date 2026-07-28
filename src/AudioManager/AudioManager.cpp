@@ -280,26 +280,22 @@ namespace AudioManager
 						pchEndRead = info.pchEndRead;
 						if (info.pchNext == pchEndRead)
 						{
-							goto emptyBuffer;
+							*outRead = 0;
+							return 0xe103;
 						}
 					}
 					((char*)buffer)[count++] = *info.pchNext++;
 				} while (count < size);
 			}
 			result = mmioSetInfo(hmmio, &info, 0);
-			if (result == 0)
-			{
-				goto success;
-			}
+			if (result != 0)
+				goto fail;
+
+			*outRead = size;
+			return result;
 		}
 	fail:
 		*outRead = 0;
-		return result;
-	emptyBuffer:
-		*outRead = 0;
-		return 0xe103;
-	success:
-		*outRead = size;
 		return result;
 	}
 
@@ -2148,7 +2144,8 @@ namespace AudioManager
 					}
 					if (parentChunk->ckid != mmioFOURCC('R', 'I', 'F', 'F') || parentChunk->fccType != mmioFOURCC('W', 'A', 'V', 'E'))
 					{
-						goto badFormat;
+						result = 0xe101;
+						goto cleanup;
 					}
 					MMCKINFO fmtChunk;
 					fmtChunk.ckid = mmioFOURCC('f', 'm', 't', ' ');
@@ -2159,7 +2156,6 @@ namespace AudioManager
 					}
 					if (fmtChunk.cksize < 0x10)
 					{
-					badFormat:
 						result = 0xe101;
 						goto cleanup;
 					}

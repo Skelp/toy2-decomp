@@ -209,6 +209,24 @@ class AnnotationTests(unittest.TestCase):
         self.assertNotIn("decompiler-identifier", rules(source))
 
 
+class ControlFlowTests(unittest.TestCase):
+    def test_several_targets_warn(self):
+        source = (
+            "// FUNCTION: TOY2 0x00401000\n"
+            "void f(int value) { if (value == 1) goto first; if (value == 2) goto second; "
+            "goto third; first: use(1); second: use(2); third: use(3); }\n"
+        )
+        self.assertIn("unstructured-control-flow", rules(source))
+
+    def test_one_cleanup_target_is_accepted(self):
+        source = (
+            "// FUNCTION: TOY2 0x00401000\n"
+            "void f(int value) { if (value == 1) goto cleanup; if (value == 2) goto cleanup; "
+            "if (value == 3) goto cleanup; cleanup: release(); }\n"
+        )
+        self.assertNotIn("unstructured-control-flow", rules(source))
+
+
 class LayoutAssertionTests(unittest.TestCase):
     def test_qualified_nested_struct_size_assertion_is_accepted(self):
         source = (
