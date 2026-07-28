@@ -107,7 +107,10 @@ namespace Toy2
 		void ActivateRocketBoots(GadgetPickup* pickup);
 		void DeactivateRocketBoots();
 		void CancelGrapple();
+		void TickCosmicShield();
+		void TickGrapple();
 		void TickBeamShots();
+		void TickGadgets();
 		void Launch(int32_t verticalVelocity, int16_t airborneMode);
 		void UpdateHorizontalMovement(Toy2BuzzActor* buzz, MovementRates* movementRates, int32_t forwardInput);
 		void UpdateRespawnAnchor();
@@ -123,6 +126,7 @@ namespace Toy2
 
 	extern Buzz::Toy2BuzzActor g_buzzActor;
 	extern int32_t g_rocketBootsTimer;
+	extern int32_t g_environmentSurfaceY;
 	extern Buzz::GadgetPickup* g_activeRocketBootsPickup;
 	extern int32_t g_savedRocketBootsPickupY;
 	extern Buzz::GadgetPickup* g_activeCosmicShieldPickup;

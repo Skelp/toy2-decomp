@@ -35,6 +35,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0053C5E0
 	int32_t g_rocketBootsTimer;
 
+	// GLOBAL: TOY2 0x0053C628
+	int32_t g_environmentSurfaceY;
+
 	// GLOBAL: TOY2 0x0053C5E4
 	int32_t g_poleRecordOffset;
 
@@ -486,6 +489,44 @@ namespace Toy2
 				shot++;
 				shotsRemaining--;
 			} while (shotsRemaining != 0);
+		}
+
+		// STUB: TOY2 0x004A5170
+		void TickCosmicShield() {}
+
+		// STUB: TOY2 0x004A5540
+		void TickGrapple() {}
+
+		// FUNCTION: TOY2 0x004A62A0
+		void TickGadgets()
+		{
+			if (g_rocketBootsTimer != 0)
+			{
+				if (g_environmentSurfaceY != 0 && g_buzzActor.posAngles.pos.y > g_environmentSurfaceY && g_buzzActor.gravityVel > -0x300)
+				{
+					g_buzzActor.gravityVel -= Renderer::g_frameDelta * 0x80;
+				}
+
+				AudioManager::PlaySoundEffect(0x40, &g_buzzActor.posAngles.pos);
+				g_rocketBootsTimer -= Renderer::g_frameDelta;
+				if (g_rocketBootsTimer <= 0)
+				{
+					g_rocketBootsTimer = 0;
+					for (int32_t particleIndex = 0; particleIndex < 64; particleIndex++)
+					{
+						Nu3D::Particles::ParticleInstance& particle = Nu3D::Particles::g_particleInstances[particleIndex];
+						if (particle.typeId == 0x2F)
+							particle.lifetime = 1;
+					}
+
+					Nu3D::Link::SetScaleFromFixedOffsets(g_activeRocketBootsPickup->linkId, 0x1000, 0x1000, 0x1000);
+					g_activeRocketBootsPickup->position.y = g_savedRocketBootsPickupY;
+				}
+			}
+
+			TickCosmicShield();
+			TickBeamShots();
+			TickGrapple();
 		}
 	}
 
