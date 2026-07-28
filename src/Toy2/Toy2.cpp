@@ -283,6 +283,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0052F1C4
 	uint8_t g_fourTickPulse;
 
+	// GLOBAL: TOY2 0x0052F1C2
+	uint8_t g_twoTickPulseCount;
+
 	// GLOBAL: TOY2 0x0052AD68
 	uint16_t g_framePhase;
 

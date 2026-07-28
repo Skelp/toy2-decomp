@@ -10,6 +10,7 @@
 #include "Nu3D/Link.h"
 #include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
+#include "Random.h"
 #include "Renderer/Renderer.h"
 #include <stdlib.h>
 #include <string.h>
@@ -201,6 +202,11 @@ namespace Toy2
 	{
 		const uint32_t GROUND_SLAM_BLOCKING_ACTIONS = 0xFFF7F;
 		const uint32_t ACTION_STATE_GROUND_SLAM = 0x40;
+		const uint32_t CLEAR_ACTION_STATE_GUN_FIRE = 0xFF7F;
+		const uint32_t ACTION_STATE_SPIN_HOVER = 0x2;
+		const uint32_t SPIN_START_BLOCKING_ACTIONS = 0xFFF7F;
+		const uint32_t SPIN_CHARGE_BLOCKING_ACTIONS = 0xFFFFE;
+		const uint32_t SPIN_HOVER_BLOCKING_ACTIONS = 0xFFF7E;
 		const int16_t GROUND_SLAM_ANIMATION_STATE = 8;
 
 		union GrappleBeamVector
@@ -567,6 +573,89 @@ namespace Toy2
 				}
 			}
 			return 0;
+		}
+
+		// FUNCTION: TOY2 0x00434EB0
+		void TickSpinHover(Toy2BuzzActor* buzz)
+		{
+			if (g_spinCooldownTimer > 0)
+			{
+				g_spinCooldownTimer -= Renderer::g_frameDelta;
+				if (g_spinCooldownTimer < 0)
+					g_spinCooldownTimer = 0;
+				if (g_twoTickPulseCount != 0 && g_spinCooldownTimer > 20)
+				{
+					Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(
+						buzz->posAngles.pos.x, buzz->posAngles.pos.y, buzz->posAngles.pos.z, (*g_randDatBufferPtr++ & 1) + 0x16, 2);
+					particle->groundAlignRot = ((-g_spinCooldownTimer) & 0xF) << 7;
+				}
+			}
+
+			if ((InputManager::g_directionInputState & INPUT_SPIN) != 0 && (InputManager::g_prevDirectionInputState & INPUT_SPIN) == 0
+				&& (g_actionStateFlags & SPIN_START_BLOCKING_ACTIONS) == 1 && g_spinHoverTimer == 0 && g_spinCooldownTimer == 0 && g_turnRecoveryTimer == 0)
+			{
+				g_spinCooldownTimer = 48;
+				if (g_gunFireTimer != 0)
+				{
+					g_gunFireTimer = 0;
+					g_actionStateFlags &= CLEAR_ACTION_STATE_GUN_FIRE;
+				}
+				g_spinHoverTimer = 1;
+				AudioManager::PlaySoundEffect(0x11, &buzz->posAngles.pos);
+			}
+
+			if ((InputManager::g_directionInputState & INPUT_SPIN) != 0 && (g_actionStateFlags & SPIN_CHARGE_BLOCKING_ACTIONS) == 0 && g_spinHoverTimer > 0)
+			{
+				g_spinHoverTimer += Renderer::g_frameDelta;
+				if (g_spinHoverTimer > 60)
+				{
+					g_spinHoverTimer = 60;
+				}
+				else if (g_spinHoverTimer <= 12)
+				{
+					return;
+				}
+				AudioManager::g_dynamicSoundFrequencies[3] = (int16_t)(g_spinHoverTimer * 0x50 + 0x800);
+				AudioManager::PlaySoundEffect(0x27, &buzz->posAngles.pos);
+				return;
+			}
+
+			if (g_spinHoverTimer >= 0)
+			{
+				if (g_spinHoverTimer >= 60 && (g_actionStateFlags & SPIN_HOVER_BLOCKING_ACTIONS) == 0)
+				{
+					g_spinHoverTimer = -300;
+					g_actionStateFlags |= ACTION_STATE_SPIN_HOVER;
+					return;
+				}
+				g_spinHoverTimer = 0;
+				return;
+			}
+
+			int32_t previousSpinHoverTime = g_spinHoverTimer;
+			int32_t updatedSpinHoverTime = previousSpinHoverTime + Renderer::g_frameDelta;
+			g_spinHoverTimer = updatedSpinHoverTime;
+			if (updatedSpinHoverTime <= -120)
+			{
+				AudioManager::PlaySoundEffect(0x26, &buzz->posAngles.pos);
+				if (g_twoTickPulseCount != 0)
+				{
+					Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(
+						buzz->posAngles.pos.x, buzz->posAngles.pos.y - 0x3000, buzz->posAngles.pos.z, (*g_randDatBufferPtr++ & 1) + 0x14, 2);
+					particle->groundAlignRot = ((-g_spinHoverTimer) & 0xF) * 0xC0;
+				}
+			}
+			else
+			{
+				if (previousSpinHoverTime <= -120)
+					AudioManager::PlaySoundEffect(0x18, &buzz->posAngles.pos);
+				buzz->actorFlags |= ACTOR_FLAG_LOCK_FACING;
+			}
+			if (g_spinCancelRequested != 0 || g_spinHoverTimer >= 0)
+			{
+				g_spinHoverTimer = 0;
+				buzz->actorFlags &= ~ACTOR_FLAG_LOCK_FACING;
+			}
 		}
 
 		// FUNCTION: TOY2 0x004A4B90 [MATCHED]
