@@ -80,6 +80,7 @@ namespace Toy2
 	extern int32_t g_saveLoaded;
 	extern int32_t g_showBlackFrames;
 	extern int32_t g_demoMode;
+	extern uint8_t g_fourTickPulse;
 	extern int32_t g_hasStaticBackdrop;
 	extern int32_t g_nextBackdropId;
 	extern int16_t g_levelIndex;

@@ -216,6 +216,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0052AD94
 	int32_t g_demoMode;
 
+	// GLOBAL: TOY2 0x0052F1C4
+	uint8_t g_fourTickPulse;
+
 	// GLOBAL: TOY2 0x0055A0E0
 	int32_t g_hasStaticBackdrop;
 
