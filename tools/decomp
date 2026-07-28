@@ -69,6 +69,7 @@ report() {
     local output="${1:-build/decomp-report.html}"
     local report_json="build/decomp-report-data.json"
     local report_summary="build/decomp-report-summary.txt"
+    local function_sizes="build/decomp-function-sizes.json"
 
     if [[ $# -gt 1 ]]; then
         echo "Usage: tools/decomp report [output.html]" >&2
@@ -86,11 +87,16 @@ report() {
     ) > "$report_summary"
     cat "$report_summary"
 
+    if command -v ghidra >/dev/null 2>&1; then
+        ghidra function list --json --limit 0 --fields address,size > "$function_sizes" || rm -f "$function_sizes"
+    fi
+
     python tools/generate-decomp-report.py \
         --input "$report_json" \
         --summary "$report_summary" \
         --source-root src \
         --functions-map tools/Resources/functions_map.txt \
+        --function-sizes "$function_sizes" \
         --template tools/decomp-report-template.html \
         --output "$output"
 }

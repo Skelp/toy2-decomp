@@ -76,6 +76,7 @@ function New-DecompReport([string] $Output = "build\decomp-report.html") {
     Ensure-Build
     $ReportJson = Join-Path $Root "build\decomp-report-data.json"
     $ReportSummary = Join-Path $Root "build\decomp-report-summary.txt"
+    $FunctionSizes = Join-Path $Root "build\decomp-function-sizes.json"
     if (-not [IO.Path]::IsPathRooted($Output)) {
         $Output = Join-Path $Root $Output
     }
@@ -89,11 +90,17 @@ function New-DecompReport([string] $Output = "build\decomp-report.html") {
         Pop-Location
     }
 
+    if (Get-Command ghidra -ErrorAction SilentlyContinue) {
+        & ghidra function list --json --limit 0 --fields address,size | Set-Content -Encoding utf8 $FunctionSizes
+        Assert-LastExit "Reading original function sizes"
+    }
+
     & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\generate-decomp-report.py") `
         --input $ReportJson `
         --summary $ReportSummary `
         --source-root (Join-Path $Root "src") `
         --functions-map (Join-Path $Root "tools\Resources\functions_map.txt") `
+        --function-sizes $FunctionSizes `
         --template (Join-Path $Root "tools\decomp-report-template.html") `
         --output $Output
     Assert-LastExit "Generating HTML report"

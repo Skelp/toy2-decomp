@@ -192,7 +192,7 @@
         <div class="panel-head">
           <div>
             <h2 class="panel-title">Project treemap</h2>
-            <p class="panel-copy">Area represents function count. Color represents machine-code accuracy. Select a region to drill down.</p>
+            <p class="panel-copy">Area represents bytes in the original executable. Analyzed extents take priority; mapped fallback spans can include alignment. Color represents machine-code accuracy.</p>
           </div>
           <div class="legend" aria-label="Accuracy legend">
             <span><i class="swatch" style="--swatch:var(--green)"></i> exact</span>
@@ -296,6 +296,8 @@
     const state = { group: null, file: null, search: "", status: "all", scope: "all", sort: "accuracy-asc", showStubs: false };
     const $ = id => document.getElementById(id);
     const pct = value => `${Number(value).toFixed(2)}%`;
+    const bytes = value => `${Number(value || 0).toLocaleString()} B`;
+    const originalSize = entity => Math.max(1, Number(entity.original_size || 0));
     const effectiveAccuracy = entity => entity.effective ? 1 : Number(entity.matching || 0);
     const topGroup = source => source.startsWith("[") ? source.split("/")[0] : (source.includes("/") ? source.split("/")[0] : "Core");
     const statusLabel = status => ({ exact:"Exact", effective:"Effective", partial:"Partial", zero:"Zero", unmatched:"Unmatched", stub:"Stub" }[status] || status);
@@ -350,6 +352,7 @@
       const comparable = items.filter(item => !item.stub && item.status !== "unmatched");
       return {
         count: items.length,
+        bytes: items.reduce((sum, item) => sum + Number(item.original_size || 0), 0),
         accuracy: comparable.length ? comparable.reduce((sum, item) => sum + effectiveAccuracy(item), 0) / comparable.length : 0,
         exact: items.filter(item => item.status === "exact" || item.status === "effective").length,
         unmatched: items.filter(item => item.status === "unmatched").length
@@ -396,14 +399,14 @@
       const host = $("treemap"); host.replaceChildren();
       let items;
       if (!state.group) {
-        items = [...groupedFunctions()].map(([name, members]) => ({ name, members, weight: members.length, kind: "group" }));
+        items = [...groupedFunctions()].map(([name, members]) => ({ name, members, weight: members.reduce((sum, item) => sum + originalSize(item), 0), kind: "group" }));
       } else if (!state.file) {
         const members = groupedFunctions().get(state.group) || [];
         const files = new Map();
         members.forEach(item => { if (!files.has(item.source)) files.set(item.source, []); files.get(item.source).push(item); });
-        items = [...files].map(([name, fileMembers]) => ({ name, members: fileMembers, weight: fileMembers.length, kind: "file" }));
+        items = [...files].map(([name, fileMembers]) => ({ name, members: fileMembers, weight: fileMembers.reduce((sum, item) => sum + originalSize(item), 0), kind: "file" }));
       } else {
-        items = entities.filter(item => !item.stub && item.source === state.file).map(item => ({ name: item.name, members: [item], weight: 1, kind: "function", entity: item }));
+        items = entities.filter(item => !item.stub && item.source === state.file).map(item => ({ name: item.name, members: [item], weight: originalSize(item), kind: "function", entity: item }));
       }
       const rects = layout(items, 0, 0, 100, 100);
       rects.forEach(item => {
@@ -412,9 +415,9 @@
         button.type = "button";
         button.style.left = `${item.x}%`; button.style.top = `${item.y}%`; button.style.width = `${item.width}%`; button.style.height = `${item.height}%`;
         button.style.setProperty("--node-color", item.kind === "function" ? colorFor(item.entity) : numericColor(stats.accuracy));
-        button.title = `${item.name}\n${stats.count} function${stats.count === 1 ? "" : "s"} · ${pct(stats.accuracy * 100)} effective accuracy`;
+        button.title = `${item.name}\n${bytes(stats.bytes)} original size · ${stats.count} function${stats.count === 1 ? "" : "s"} · ${pct(stats.accuracy * 100)} effective accuracy`;
         const label = element("span", "tree-label");
-        label.append(element("span", "tree-name", item.name.split("/").pop()), element("span", "tree-meta", item.kind === "function" ? (item.entity.status === "unmatched" ? "unmatched" : pct(effectiveAccuracy(item.entity) * 100)) : `${stats.count} fn · ${pct(stats.accuracy * 100)}`));
+        label.append(element("span", "tree-name", item.name.split("/").pop()), element("span", "tree-meta", item.kind === "function" ? `${bytes(stats.bytes)} · ${item.entity.status === "unmatched" ? "unmatched" : pct(effectiveAccuracy(item.entity) * 100)}` : `${bytes(stats.bytes)} · ${stats.count} fn · ${pct(stats.accuracy * 100)}`));
         button.append(label);
         if (item.kind !== "function" && item.width > 12 && item.height > 12) {
           const mosaic = element("span", "tree-mosaic");

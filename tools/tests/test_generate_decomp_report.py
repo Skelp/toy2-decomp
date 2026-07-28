@@ -11,6 +11,24 @@ SPEC.loader.exec_module(REPORT)
 
 
 class ReportMetricTests(unittest.TestCase):
+    def test_function_map_provides_original_address_spans(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "functions.txt"
+            path.write_text("0x00401000 First\n0x00401025 Second\n", encoding="utf-8")
+            names, sizes = REPORT.read_function_map(path)
+            self.assertEqual(names["0x401000"], "First")
+            self.assertEqual(sizes["0x401000"], 0x25)
+
+    def test_reads_original_function_sizes(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sizes.json"
+            path.write_text('[{"address":"00401000","size":37}]', encoding="utf-8")
+            self.assertEqual(REPORT.read_function_sizes(path), {"0x401000": 37})
+
     def test_project_and_runtime_metrics_are_separate(self):
         report = {
             "file": "toy2.exe",
@@ -36,6 +54,7 @@ class ReportMetricTests(unittest.TestCase):
                     {"severity": "warning", "rule": "unknown-symbol"},
                 ]
             },
+            {"0x401000": 16, "0x401010": 8, "0x401020": 24},
         )
         metrics = result["metrics"]
         self.assertEqual(metrics["project_total"], 3)
@@ -48,10 +67,12 @@ class ReportMetricTests(unittest.TestCase):
         game = next(item for item in result["entities"] if item["address"] == "0x401000")
         self.assertEqual(game["quality_errors"], 1)
         self.assertEqual(game["quality_warnings"], 1)
+        self.assertEqual(game["original_size"], 16)
         missing = next(item for item in result["entities"] if item["address"] == "0x401020")
         self.assertEqual(missing["name"], "Missing")
         self.assertEqual(missing["category"], "project")
         self.assertEqual(missing["status"], "unmatched")
+        self.assertEqual(missing["original_size"], 24)
 
 
 if __name__ == "__main__":

@@ -37,9 +37,9 @@ def read_annotations(source_root: Path) -> dict[str, dict[str, str]]:
     return annotations
 
 
-def read_function_names(path: Path | None) -> dict[str, str]:
+def read_function_map(path: Path | None) -> tuple[dict[str, str], dict[str, int]]:
     if path is None or not path.exists():
-        return {}
+        return {}, {}
     names: dict[str, str] = {}
     for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
         match = re.match(r"\s*(?:0x)?([0-9a-fA-F]{6,8})(?:\s+(.+?))?\s*$", line)
@@ -47,7 +47,26 @@ def read_function_names(path: Path | None) -> dict[str, str]:
             names[canonical_address(f"0x{match.group(1)}")] = (
                 match.group(2) or "Unknown function"
             )
-    return names
+    ordered = sorted(int(address, 16) for address in names)
+    spans = {
+        canonical_address(hex(address)): next_address - address
+        for address, next_address in zip(ordered, ordered[1:])
+    }
+    return names, spans
+
+
+def read_function_sizes(path: Path | None) -> dict[str, int]:
+    """Read original function extents exported by the Ghidra function table."""
+
+    if path is None or not path.exists():
+        return {}
+    sizes = {}
+    for item in json.loads(path.read_text(encoding="utf-8-sig")):
+        address = item.get("address") or item.get("entry_point")
+        size = item.get("size")
+        if address and isinstance(size, int) and size > 0:
+            sizes[canonical_address(f"0x{address}")] = size
+    return sizes
 
 
 def read_lint_quality(source_root: Path) -> tuple[dict[str, list[dict]], dict[str, int]]:
@@ -126,8 +145,10 @@ def enrich_report(
     names: dict[str, str],
     summary: dict[str, float | int],
     quality: dict[str, list[dict]] | None = None,
+    function_sizes: dict[str, int] | None = None,
 ) -> dict:
     quality = quality or {}
+    function_sizes = function_sizes or {}
     entities_by_address: dict[str, dict] = {}
     known_sources = sorted({item["source"] for item in annotations.values()})
     basename_index: dict[str, list[str]] = {}
@@ -160,6 +181,7 @@ def enrich_report(
         entity["quality"] = quality.get(address, [])
         entity["quality_errors"] = sum(item["severity"] == "error" for item in entity["quality"])
         entity["quality_warnings"] = sum(item["severity"] == "warning" for item in entity["quality"])
+        entity["original_size"] = function_sizes.get(address)
         entities_by_address[address] = entity
 
     # Make the treemap a project view, not merely a list of successful pairs.
@@ -181,6 +203,7 @@ def enrich_report(
             "quality": quality.get(address, []),
             "quality_errors": sum(item["severity"] == "error" for item in quality.get(address, [])),
             "quality_warnings": sum(item["severity"] == "warning" for item in quality.get(address, [])),
+            "original_size": function_sizes.get(address),
         }
 
     entities = sorted(entities_by_address.values(), key=lambda item: int(item["address"], 16))
@@ -201,6 +224,7 @@ def enrich_report(
                 "quality": quality.get(address, []),
                 "quality_errors": sum(item["severity"] == "error" for item in quality.get(address, [])),
                 "quality_warnings": sum(item["severity"] == "warning" for item in quality.get(address, [])),
+                "original_size": function_sizes.get(address),
             }
         )
 
@@ -301,17 +325,21 @@ def main() -> int:
     parser.add_argument("--summary", type=Path, help="Captured reccmp text summary")
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--functions-map", type=Path)
+    parser.add_argument("--function-sizes", type=Path, help="Ghidra function-list JSON for the original executable")
     parser.add_argument("--template", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
     report = json.loads(args.input.read_text(encoding="utf-8"))
     annotations = read_annotations(args.source_root)
-    names = read_function_names(args.functions_map)
+    names, function_sizes = read_function_map(args.functions_map)
+    # The original function table provides analyzed extents. It also prevents a
+    # map span from absorbing a deliberately excluded linked-library region.
+    function_sizes.update(read_function_sizes(args.function_sizes))
     summary = parse_summary(args.summary, report.get("data", []))
     quality, quality_summary = read_lint_quality(args.source_root)
     summary.update(quality_summary)
-    payload = enrich_report(report, annotations, names, summary, quality)
+    payload = enrich_report(report, annotations, names, summary, quality, function_sizes)
     template = args.template.read_text(encoding="utf-8")
     marker = "__DECOMP_REPORT_DATA__"
     if template.count(marker) != 1:
