@@ -1035,7 +1035,7 @@
 0x004C4080 NGNLoader::ParseTextures
 0x004C4220 NGNLoader::ParseCreatures
 0x004C4340 SoftwareRenderer::UnpackColourChannels
-0x004C4370 SoftwareRenderer::UnkFunc48
+0x004C4370 SoftwareRenderer::RasterizeTexturedSpan
 0x004C4640 SoftwareRenderer::RasterizeTexturedSpanPairSample
 0x004C48E0 SoftwareRenderer::UnkFunc55
 0x004C4A60 SoftwareRenderer::UnkFunc40
