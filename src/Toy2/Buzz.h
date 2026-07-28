@@ -43,6 +43,13 @@ namespace Toy2
 			int32_t turnRateLimit;
 		};
 
+		struct MovementVelocity
+		{
+			int32_t lateral;
+			int32_t vertical;
+			int32_t forward;
+		};
+
 		struct BeamShot
 		{
 			Vector3I start;
@@ -87,16 +94,7 @@ namespace Toy2
 			Vector3I respawnPos;
 			int32_t respawnYawAngle;
 			Vector3I motionTargetPos;
-			union
-			{
-				struct
-				{
-					int32_t velX;
-					int32_t gravityVel;
-					int32_t velForward;
-				};
-				Vector3I velocity;
-			};
+			MovementVelocity velocity;
 			int32_t forwardSpeed;
 			int32_t lateralSpeed;
 			int32_t movementState;
@@ -134,7 +132,7 @@ namespace Toy2
 		void HandleDamage(uint32_t direction, uint32_t damageFlags);
 		void ResolveFooting(Toy2BuzzActor* buzz);
 		void TickGunFire(Toy2BuzzActor* buzz);
-		void HandleCollisions(Toy2BuzzActor* buzz, Vector3I* movement, uint8_t* contactState, int32_t queryIndex);
+		void HandleCollisions(Toy2BuzzActor* buzz, MovementVelocity* movement, uint8_t* contactState, int32_t queryIndex);
 		int32_t TickGroundSlam(Toy2BuzzActor* buzz);
 		void TickSpinHover(Toy2BuzzActor* buzz);
 		void TickCosmicShield();
@@ -148,6 +146,7 @@ namespace Toy2
 
 		STATIC_ASSERT(sizeof(BeamShot) == 0x2C);
 		STATIC_ASSERT(sizeof(MovementRates) == 0x1C);
+		STATIC_ASSERT(sizeof(MovementVelocity) == 0xC);
 		STATIC_ASSERT(offsetof(BeamShot, fadeTimer) == 0x24);
 		STATIC_ASSERT(offsetof(BeamShot, movementTimer) == 0x26);
 		STATIC_ASSERT(offsetof(BeamShot, color) == 0x28);

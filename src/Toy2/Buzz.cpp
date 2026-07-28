@@ -256,7 +256,7 @@ namespace Toy2
 			g_buzzActor.collisionFlags = 0;
 			g_buzzActor.specialAirState = 0;
 			g_buzzActor.animationState = 2;
-			g_buzzActor.gravityVel = verticalVelocity;
+			g_buzzActor.velocity.vertical = verticalVelocity;
 			g_forcedFacingActive = 0;
 			g_turnRecoveryTimer = 0;
 			g_jumpHeightControlActive = 0;
@@ -271,8 +271,8 @@ namespace Toy2
 				int32_t yaw = buzz->posAngles.angles.yaw;
 				int32_t backwardSine = Numerics::g_sinCosLUT[(yaw - 0x800) & 0xFFF] >> 2;
 				int32_t cosine = Numerics::g_sinCosLUT[(yaw + 0x400) & 0xFFF] >> 2;
-				lateralSpeed = (buzz->velForward * backwardSine + buzz->velX * cosine) / 0x1000;
-				forwardSpeed = (buzz->velForward * cosine - buzz->velX * backwardSine) / 0x1000;
+				lateralSpeed = (buzz->velocity.forward * backwardSine + buzz->velocity.lateral * cosine) / 0x1000;
+				forwardSpeed = (buzz->velocity.forward * cosine - buzz->velocity.lateral * backwardSine) / 0x1000;
 			}
 
 			if ((buzz->actorFlags & ACTOR_FLAG_PRESERVE_HORIZONTAL_MOMENTUM) != 0)
@@ -350,8 +350,8 @@ namespace Toy2
 			int32_t yaw = buzz->posAngles.angles.yaw;
 			int32_t sine = Numerics::g_sinCosLUT[yaw] >> 2;
 			int32_t cosine = Numerics::g_sinCosLUT[(yaw + 0x400) & 0xFFF] >> 2;
-			buzz->velX = (lateralSpeed * cosine + forwardSpeed * sine) / 0x1000;
-			buzz->velForward = (forwardSpeed * cosine - lateralSpeed * sine) / 0x1000;
+			buzz->velocity.lateral = (lateralSpeed * cosine + forwardSpeed * sine) / 0x1000;
+			buzz->velocity.forward = (forwardSpeed * cosine - lateralSpeed * sine) / 0x1000;
 		}
 
 		static __inline void StopRocketBoots()
@@ -389,9 +389,9 @@ namespace Toy2
 			g_buzzActor.posAngles.angles.yaw = (uint16_t)g_buzzActor.respawnYawAngle;
 			g_buzzActor.rollAngle = 0;
 			g_buzzActor.facingAngle = (uint16_t)g_buzzActor.respawnYawAngle;
-			g_buzzActor.velX = 0;
-			g_buzzActor.gravityVel = 0;
-			g_buzzActor.velForward = 0;
+			g_buzzActor.velocity.lateral = 0;
+			g_buzzActor.velocity.vertical = 0;
+			g_buzzActor.velocity.forward = 0;
 			g_buzzActor.forwardSpeed = 0;
 			g_buzzActor.lateralSpeed = 0;
 			g_buzzActor.movementState = 0;
@@ -516,12 +516,12 @@ namespace Toy2
 		}
 
 		// STUB: TOY2 0x00484380
-		void ResolveCollisions(Toy2BuzzActor* buzz, Vector3I* movement, uint8_t* contactState, int32_t queryIndex, int32_t collisionPass) {}
+		void ResolveCollisions(Toy2BuzzActor* buzz, MovementVelocity* movement, uint8_t* contactState, int32_t queryIndex, int32_t collisionPass) {}
 
 		// FUNCTION: TOY2 0x004855F0 [MATCHED]
-		void HandleCollisions(Toy2BuzzActor* buzz, Vector3I* movement, uint8_t* contactState, int32_t queryIndex)
+		void HandleCollisions(Toy2BuzzActor* buzz, MovementVelocity* movement, uint8_t* contactState, int32_t queryIndex)
 		{
-			if (movement->x * movement->x + movement->y * movement->y + movement->z * movement->z > 0x400000)
+			if (movement->lateral * movement->lateral + movement->vertical * movement->vertical + movement->forward * movement->forward > 0x400000)
 			{
 				ResolveCollisions(buzz, movement, contactState, queryIndex, 1);
 				uint8_t firstPassContacts = contactState[0] | contactState[1];
@@ -543,9 +543,9 @@ namespace Toy2
 		// FUNCTION: TOY2 0x00434550
 		void ResolveFooting(Toy2BuzzActor* buzz)
 		{
-			int32_t previousLateralVelocity = buzz->velX;
-			int32_t previousGravityVelocity = buzz->gravityVel;
-			int32_t previousForwardVelocity = buzz->velForward;
+			int32_t previousLateralVelocity = buzz->velocity.lateral;
+			int32_t previousGravityVelocity = buzz->velocity.vertical;
+			int32_t previousForwardVelocity = buzz->velocity.forward;
 
 			HandleCollisions(buzz, &buzz->velocity, &buzz->collisionState, 0);
 			buzz->floorYPos = UpdateFloorHeight(buzz);
@@ -579,9 +579,9 @@ namespace Toy2
 						buzz->posAngles.pos.x = buzz->motionTargetPos.x + previousLateralVelocity;
 						buzz->posAngles.pos.y = buzz->motionTargetPos.y + previousGravityVelocity;
 						buzz->posAngles.pos.z = buzz->motionTargetPos.z + previousForwardVelocity;
-						buzz->velX = previousLateralVelocity;
-						buzz->gravityVel = previousGravityVelocity;
-						buzz->velForward = previousForwardVelocity;
+						buzz->velocity.lateral = previousLateralVelocity;
+						buzz->velocity.vertical = previousGravityVelocity;
+						buzz->velocity.forward = previousForwardVelocity;
 						buzz->collisionFlags = 0;
 						buzz->specialAirState = 0;
 						break;
@@ -598,8 +598,8 @@ namespace Toy2
 				g_slipperySurfaceState = 0;
 			}
 
-			if (abs(buzz->gravityVel) < 2)
-				buzz->gravityVel = 0;
+			if (abs(buzz->velocity.vertical) < 2)
+				buzz->velocity.vertical = 0;
 		}
 
 		// FUNCTION: TOY2 0x00434990
@@ -813,7 +813,7 @@ namespace Toy2
 						g_groundSlamTimer = groundSlamTime;
 						if (groundSlamTime > 14)
 						{
-							buzz->gravityVel = 0x800;
+							buzz->velocity.vertical = 0x800;
 							g_groundSlamTimer = 14;
 							return MOVEMENT_LOCK_LATERAL | MOVEMENT_LOCK_FORWARD;
 						}
@@ -833,9 +833,9 @@ namespace Toy2
 					if (groundSlamTime < -14)
 					{
 						if (buzz->collisionFlags == 0)
-							buzz->gravityVel += (frameDelta * 0x100) / 4;
-						if (buzz->gravityVel > 0x800)
-							buzz->gravityVel = 0x800;
+							buzz->velocity.vertical += (frameDelta * 0x100) / 4;
+						if (buzz->velocity.vertical > 0x800)
+							buzz->velocity.vertical = 0x800;
 						return MOVEMENT_LOCK_LATERAL | MOVEMENT_LOCK_FORWARD;
 					}
 				}
@@ -1180,9 +1180,9 @@ namespace Toy2
 				Nu3D::Math::NormalizeToFixedPoint(&grappleVector.direction, &grappleVector.direction);
 				if (g_grappleElapsedTime >= 10)
 				{
-					g_buzzActor.velX = grappleVector.direction.x / 3;
-					g_buzzActor.gravityVel = grappleVector.direction.y / 3;
-					g_buzzActor.velForward = grappleVector.direction.z / 3;
+					g_buzzActor.velocity.lateral = grappleVector.direction.x / 3;
+					g_buzzActor.velocity.vertical = grappleVector.direction.y / 3;
+					g_buzzActor.velocity.forward = grappleVector.direction.z / 3;
 				}
 				g_grappleElapsedTime += Renderer::g_frameDelta;
 				return;
@@ -1195,9 +1195,9 @@ namespace Toy2
 			g_buzzActor.posAngles.pos.x = g_grappleEndpoint.x;
 			g_buzzActor.posAngles.pos.y = g_grappleEndpoint.y + 0x1600;
 			g_buzzActor.posAngles.pos.z = g_grappleEndpoint.z;
-			g_buzzActor.velX = 0;
-			g_buzzActor.gravityVel = 0;
-			g_buzzActor.velForward = 0;
+			g_buzzActor.velocity.lateral = 0;
+			g_buzzActor.velocity.vertical = 0;
+			g_buzzActor.velocity.forward = 0;
 		}
 
 		// FUNCTION: TOY2 0x004A62A0
@@ -1205,9 +1205,9 @@ namespace Toy2
 		{
 			if (g_rocketBootsTimer != 0)
 			{
-				if (g_environmentSurfaceY != 0 && g_buzzActor.posAngles.pos.y > g_environmentSurfaceY && g_buzzActor.gravityVel > -0x300)
+				if (g_environmentSurfaceY != 0 && g_buzzActor.posAngles.pos.y > g_environmentSurfaceY && g_buzzActor.velocity.vertical > -0x300)
 				{
-					g_buzzActor.gravityVel -= Renderer::g_frameDelta * 0x80;
+					g_buzzActor.velocity.vertical -= Renderer::g_frameDelta * 0x80;
 				}
 
 				AudioManager::PlaySoundEffect(0x40, &g_buzzActor.posAngles.pos);
