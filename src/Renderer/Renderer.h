@@ -84,7 +84,7 @@ namespace Renderer
 		Nu3D::Material* material;
 
 		static RenderEntry* AllocObj(Nu3D::Material* material, Nu3D::Primitive* primitive, Nu3D::InstanceData* instanceData);
-		static RenderEntry* AllocPatch(Nu3D::Material* material, Nu3D::Primitive* primitive, Nu3D::InstanceData* instanceData);
+		static RenderEntry* AllocPatch(Nu3D::Material* material, Nu3D::Patch* patch, Nu3D::InstanceData* instanceData);
 		static void InsertIntoBucket(RenderEntry* entry);
 	};
 

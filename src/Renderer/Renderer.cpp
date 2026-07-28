@@ -1954,31 +1954,31 @@ namespace Renderer
 	void ProcessPatch(Nu3D::InstanceData* instanceData, Nu3D::Patch* patch)
 	{
 		Nu3D::Material* material = Nu3D::Material::GetFreeByIndex(patch->materialId);
-		RenderEntry::AllocPatch(material, (Nu3D::Primitive*)patch, instanceData);
+		RenderEntry::AllocPatch(material, patch, instanceData);
 
 		if ((material->metadata & 4) != 0)
 		{
-			RenderEntry::AllocPatch(NGNLoader::g_tex14Materials[0], (Nu3D::Primitive*)patch, instanceData);
+			RenderEntry::AllocPatch(NGNLoader::g_tex14Materials[0], patch, instanceData);
 		}
 
 		if ((material->metadata & 0x40) != 0)
 		{
-			RenderEntry::AllocPatch(NGNLoader::g_tex14Materials[1], (Nu3D::Primitive*)patch, instanceData);
+			RenderEntry::AllocPatch(NGNLoader::g_tex14Materials[1], patch, instanceData);
 		}
 
 		if ((material->metadata & 0x80) != 0)
 		{
-			RenderEntry::AllocPatch(NGNLoader::g_tex14Materials[2], (Nu3D::Primitive*)patch, instanceData);
+			RenderEntry::AllocPatch(NGNLoader::g_tex14Materials[2], patch, instanceData);
 		}
 	}
 
 	// FUNCTION: TOY2 0x004B89B0
-	RenderEntry* RenderEntry::AllocPatch(Nu3D::Material* material, Nu3D::Primitive* primitive, Nu3D::InstanceData* instanceData)
+	RenderEntry* RenderEntry::AllocPatch(Nu3D::Material* material, Nu3D::Patch* patch, Nu3D::InstanceData* instanceData)
 	{
 		if (g_renderEntryFreeCount)
 		{
 			RenderEntry* entry = &g_renderEntryPool[--g_renderEntryFreeCount];
-			entry->primitive = primitive;
+			entry->patch = patch;
 			entry->instanceData = instanceData;
 			entry->material = material;
 

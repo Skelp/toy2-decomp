@@ -71,7 +71,6 @@ src/Nu3D/Sprite.h	unpinned-layout	TextureProjectionData	59108e30e062	src/Nu3D/Sp
 0x004b84e0	unknown-symbol	g_unk9F5FF8	c7f305e008bf	src/Renderer/Renderer.cpp
 0x004b84e0	unnamed-bitmask	instanceData->renderModeFlags:2	e844954215ab	src/Renderer/Renderer.cpp
 0x004b8840	unknown-symbol	g_unk9F5FF8	c7f305e008bf	src/Renderer/Renderer.cpp
-0x004b8940	signature-concealment	AllocPatch:arg2	827705fcd580	src/Renderer/Renderer.cpp
 0x004b8400	unfinished-function	0x004b8400	bf21a9e8fbc5	src/Renderer/Renderer.cpp
 0x004b6a90	unfinished-function	0x004b6a90	bf21a9e8fbc5	src/Renderer/Renderer.cpp
 0x004b5cf0	unfinished-function	0x004b5cf0	bf21a9e8fbc5	src/Renderer/Renderer.cpp
