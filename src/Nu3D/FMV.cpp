@@ -1,6 +1,9 @@
 #include "Nu3D/FMV.h"
 #include "Logger.h"
 #include "DrawingDevice.h"
+#include "InputManager.h"
+#include "Renderer/Renderer.h"
+#include "Toy2/Toy2.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -121,6 +124,42 @@ Nu3DFMVInstance* Nu3D_FMV_CreateFMVInstance(char* filename)
 		}
 	}
 	return instance;
+}
+
+// FUNCTION: TOY2 0x004CE5F0 [MATCHED]
+int32_t Nu3D_FMV_PlayMovie(char* filename)
+{
+	int32_t interrupted = 0;
+	Renderer::ShowBlackFrames();
+	Nu3DFMVInstance* instance = Nu3D_FMV_CreateFMVInstance(filename);
+	if (instance != NULL)
+	{
+		Nu3D_FMV_SetDimensions(instance, 0, 0, DrawingDevice::GetDestWidth(), DrawingDevice::GetDestHeight());
+		Nu3D_FMV_Seek(instance, 0);
+		Nu3D_FMV_SetPaused(instance, 0);
+
+		do
+		{
+			Toy2::ProcessMiscEvents();
+			Nu3D_FMV_UpdateAndRenderFMV(instance);
+			if (Renderer::BeginScene())
+			{
+				int32_t wasSoftwareRendering = Renderer::g_isSoftwareRendering;
+				Renderer::g_isSoftwareRendering = 0;
+				Renderer::EndScene(1);
+				Renderer::g_isSoftwareRendering = wasSoftwareRendering;
+			}
+
+			if (InputManager::FindKeyReleased() != 0 || (InputManager::GetCurButtonsPressed() & 0xF000) != 0)
+			{
+				interrupted = 1;
+			}
+			Sleep(1);
+		} while (Nu3D_FMV_IsPlaying(instance) != 0 && interrupted == 0);
+
+		Nu3D_FMV_Destroy(instance);
+	}
+	return interrupted;
 }
 
 // FUNCTION: TOY2 0x004DB8C0 [MATCHED]

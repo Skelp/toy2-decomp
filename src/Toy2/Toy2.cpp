@@ -1671,6 +1671,47 @@ namespace Toy2
 		}
 	}
 
+	// FUNCTION: TOY2 0x00498550 [MATCHED]
+	void ProcessMiscEvents()
+	{
+		D3DApp::ProcessWndEvents();
+		if (D3DApp::g_windowData.wndIsExiting)
+		{
+			DrawingDevice::RestoreToGDISurface(1);
+			Logger::GetErrorHandler("C:\\projects\\toy2\\toy2.cpp", 0x123E)(&SaveManager::g_emptyString);
+		}
+
+		if (InputManager::IsKeyPressed(DIK_F3))
+		{
+			SoftwareRenderer::ZoomOut();
+			g_extraControlsUnused = 15;
+		}
+		if (InputManager::IsKeyPressed(DIK_F4))
+		{
+			SoftwareRenderer::ZoomIn();
+			g_extraControlsUnused = 15;
+		}
+		if (InputManager::IsKeyPressed(DIK_F5))
+		{
+			Graphics::RemoveDetailLevel();
+			g_extraControlsUnused = 15;
+		}
+		if (InputManager::IsKeyPressed(DIK_F6))
+		{
+			Graphics::AddDetailLevel();
+			g_extraControlsUnused = 15;
+		}
+
+		InputManager::UpdateButtonStates();
+		if (g_inputSuppressFrames != 0)
+		{
+			--g_inputSuppressFrames;
+			InputManager::g_curButtonsPressed = 0;
+		}
+		UpdateAudioChannels();
+		SoftwareRenderer::g_backBufferClearComplete = 0;
+	}
+
 	// STUB: TOY2 0x0047CC90
 	void InitSoftwareRenderer()
 	{

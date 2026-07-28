@@ -32,6 +32,7 @@ namespace InputManager
 	uint8_t IsKeyPressed(int32_t inputCode);
 	int32_t FindKeyPressed();
 	int32_t FindKeyReleased();
+	int32_t GetCurButtonsPressed();
 	void UpdateDirectionInputState();
 	void UpdateButtonStates();
 	void Cleanup();

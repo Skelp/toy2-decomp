@@ -26,6 +26,7 @@ namespace Toy2
 	void ShowModelNode(int32_t creatureIndex, int32_t nodeIndex);
 	void HideModelNode(int32_t creatureIndex, int32_t nodeIndex);
 	void ResetBackdropState();
+	void ProcessMiscEvents();
 	void ProcessMiscEventsEx();
 	void RenderGame(int32_t fullRender);
 	int32_t ComputeTokenProgress();

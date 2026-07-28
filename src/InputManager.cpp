@@ -330,6 +330,9 @@ namespace InputManager
 		return 0;
 	}
 
+	// FUNCTION: TOY2 0x00498620 [MATCHED]
+	int32_t GetCurButtonsPressed() { return g_curButtonsPressed; }
+
 	// FUNCTION: TOY2 0x0049EBA0
 	void UpdateDirectionInputState()
 	{
