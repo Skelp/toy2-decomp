@@ -25,6 +25,7 @@ namespace Toy2
 		extern uint8_t g_mathScratch[1024];
 
 		void BuildCollisionWorld(int32_t level, uint8_t** buffer, int32_t terrainNum);
+		void MarkPlatformAsMoving(int32_t platformIndex);
 
 		STATIC_ASSERT(sizeof(CollisionMeshInstance) == 0x34);
 	}
@@ -42,10 +43,15 @@ namespace Toy2
 		};
 
 		int32_t GetFlags(int32_t platformIndex);
+		void SetOrigin(int32_t platformIndex, int32_t x, int32_t y, int32_t z);
 		void AddFlags(int32_t platformIndex, uint16_t flags);
 		void ClearFlags(int32_t platformIndex, int32_t flags);
+		void DisableCollision(int32_t platformIndex);
+		void GetOrigin(int32_t platformIndex, Vector3I* origin);
+		void GetRotation(int32_t platformIndex, Vector3I* rotation);
 		void SetRotationAngles(int32_t platformIndex, int16_t x, int16_t y, int16_t z);
 		void GetRotationAngles(int32_t platformIndex, Vector3I* angles);
+		void CommitRotationToLink(int32_t platformIndex, int32_t linkId);
 		int32_t HadBuzzContactThisFrame(int32_t platformIndex);
 
 		extern PlatformState g_platformStates[32];

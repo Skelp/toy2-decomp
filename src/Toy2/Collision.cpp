@@ -1,4 +1,5 @@
 #include "Toy2/Collision.h"
+#include "Nu3D/Link.h"
 
 namespace Toy2
 {
@@ -12,6 +13,16 @@ namespace Toy2
 
 		// STUB: TOY2 0x00489C30
 		void BuildCollisionWorld(int32_t level, uint8_t** buffer, int32_t terrainNum) {}
+
+		// FUNCTION: TOY2 0x004878A0 [MATCHED]
+		void MarkPlatformAsMoving(int32_t platformIndex)
+		{
+			int16_t meshIndex = Platform::g_platformStates[platformIndex].collisionMeshIndex;
+			if (meshIndex != 0)
+			{
+				g_collisionMeshInstances[meshIndex].typeFlags = 8;
+			}
+		}
 	}
 
 	namespace Platform
@@ -22,11 +33,54 @@ namespace Toy2
 		// FUNCTION: TOY2 0x00488580 [MATCHED]
 		int32_t GetFlags(int32_t platformIndex) { return g_platformStates[platformIndex].flags; }
 
+		// FUNCTION: TOY2 0x00488510 [MATCHED]
+		void SetOrigin(int32_t platformIndex, int32_t x, int32_t y, int32_t z)
+		{
+			int16_t meshIndex = g_platformStates[platformIndex].collisionMeshIndex;
+			Collision::g_collisionMeshInstances[meshIndex].boundsMin.x += x - Collision::g_collisionMeshInstances[meshIndex].origin.x;
+			Collision::g_collisionMeshInstances[meshIndex].boundsMin.z += z - Collision::g_collisionMeshInstances[meshIndex].origin.z;
+			Collision::g_collisionMeshInstances[meshIndex].origin.x = x;
+			Collision::g_collisionMeshInstances[meshIndex].origin.y = y;
+			Collision::g_collisionMeshInstances[meshIndex].origin.z = z;
+		}
+
 		// FUNCTION: TOY2 0x00488A60 [MATCHED]
 		void AddFlags(int32_t platformIndex, uint16_t flags) { g_platformStates[platformIndex].flags |= flags; }
 
 		// FUNCTION: TOY2 0x00488A80 [MATCHED]
 		void ClearFlags(int32_t platformIndex, int32_t flags) { g_platformStates[platformIndex].flags &= ~flags; }
+
+		// FUNCTION: TOY2 0x004878D0 [MATCHED]
+		void DisableCollision(int32_t platformIndex)
+		{
+			int16_t meshIndex = g_platformStates[platformIndex].collisionMeshIndex;
+			if (meshIndex != 0)
+			{
+				Collision::g_collisionMeshInstances[meshIndex].typeFlags = 0;
+			}
+		}
+
+		// FUNCTION: TOY2 0x004879C0 [MATCHED]
+		void GetOrigin(int32_t platformIndex, Vector3I* origin)
+		{
+			if (g_platformStates[platformIndex].collisionMeshIndex != 0)
+			{
+				origin->x = Collision::g_collisionMeshInstances[g_platformStates[platformIndex].collisionMeshIndex].origin.x;
+				origin->y = Collision::g_collisionMeshInstances[g_platformStates[platformIndex].collisionMeshIndex].origin.y;
+				origin->z = Collision::g_collisionMeshInstances[g_platformStates[platformIndex].collisionMeshIndex].origin.z;
+			}
+		}
+
+		// FUNCTION: TOY2 0x00487A20 [MATCHED]
+		void GetRotation(int32_t platformIndex, Vector3I* rotation)
+		{
+			if (g_platformStates[platformIndex].collisionMeshIndex != 0)
+			{
+				rotation->x = g_platformStates[platformIndex].rotationAnglesFixed.x;
+				rotation->y = g_platformStates[platformIndex].rotationAnglesFixed.y;
+				rotation->z = g_platformStates[platformIndex].rotationAnglesFixed.z;
+			}
+		}
 
 		// FUNCTION: TOY2 0x00488AA0 [MATCHED]
 		void SetRotationAngles(int32_t platformIndex, int16_t x, int16_t y, int16_t z)
@@ -43,6 +97,15 @@ namespace Toy2
 			angles->x = g_platformStates[platformIndex].rotationAnglesFixed.x >> 2;
 			angles->y = g_platformStates[platformIndex].rotationAnglesFixed.y >> 2;
 			angles->z = g_platformStates[platformIndex].rotationAnglesFixed.z >> 2;
+		}
+
+		// FUNCTION: TOY2 0x00488BD0 [MATCHED]
+		void CommitRotationToLink(int32_t platformIndex, int32_t linkId)
+		{
+			Nu3D::Link::SetRotationAbsolute8bit(linkId,
+				g_platformStates[platformIndex].rotationAnglesFixed.x >> 2,
+				g_platformStates[platformIndex].rotationAnglesFixed.y >> 2,
+				g_platformStates[platformIndex].rotationAnglesFixed.z >> 2);
 		}
 
 		// FUNCTION: TOY2 0x0048B640 [MATCHED]
