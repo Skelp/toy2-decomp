@@ -324,8 +324,8 @@
     function renderMetrics() {
       const cards = [
         ["Source quality gate", metrics.quality_gate_passed ? "PASS" : "FAIL", `${metrics.quality_new_errors} new · ${metrics.quality_errors} legacy errors · ${metrics.quality_warnings} warnings · ${metrics.quality_stale_baseline} stale baseline entries`, metrics.quality_gate_passed ? "var(--cyan)" : "var(--red)"],
-        ["Byte progress", pct(metrics.project_byte_progress), `${bytes(Math.round(metrics.project_matched_bytes))} size-weighted raw match / ${bytes(metrics.project_original_bytes)} project code`, "var(--green)"],
-        ["Regalloc-adjusted byte progress", pct(metrics.project_effective_byte_progress), `${bytes(Math.round(metrics.project_effective_bytes))} matched · register-allocation and safe instruction-order differences excluded`, "var(--purple)"]
+        ["Byte-relative progress", pct(metrics.project_byte_progress), `${bytes(Math.round(metrics.project_matched_bytes))} matched / ${bytes(metrics.project_original_bytes)} original project code`, "var(--green)"],
+        ["Byte-relative progress (excluding regalloc mismatches)", pct(metrics.project_effective_byte_progress), `${bytes(Math.round(metrics.project_effective_bytes))} matched / ${bytes(metrics.project_original_bytes)} original project code`, "var(--purple)"]
       ];
       const host = $("metrics");
       cards.forEach(([label, value, detail, accent]) => {

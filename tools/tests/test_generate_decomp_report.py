@@ -11,6 +11,22 @@ SPEC.loader.exec_module(REPORT)
 
 
 class ReportMetricTests(unittest.TestCase):
+    def test_top_cards_only_show_quality_and_byte_relative_progress(self):
+        template = (SCRIPT.parent / "decomp-report-template.html").read_text(
+            encoding="utf-8"
+        )
+        cards = template[template.index("const cards = [") : template.index(
+            "];", template.index("const cards = [")
+        )]
+        self.assertIn('"Source quality gate"', cards)
+        self.assertIn('"Byte-relative progress"', cards)
+        self.assertIn(
+            '"Byte-relative progress (excluding regalloc mismatches)"', cards
+        )
+        self.assertNotIn('"Project progress"', cards)
+        self.assertNotIn('"Project coverage"', cards)
+        self.assertNotIn('"Project accuracy"', cards)
+
     def test_function_map_provides_original_address_spans(self):
         import tempfile
 
