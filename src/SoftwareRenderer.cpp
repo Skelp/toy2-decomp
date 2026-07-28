@@ -43,7 +43,7 @@ namespace SoftwareRenderer
 	int32_t g_backdropViewDepth;
 
 	// GLOBAL: TOY2 0x00830C60
-	int32_t g_unk830C60;
+	int32_t g_backBufferClearComplete;
 
 	// GLOBAL: TOY2 0x00559C40
 	int32_t g_unk559C40;
@@ -610,6 +610,50 @@ namespace SoftwareRenderer
 		{
 			free(g_softwareRendererBuffer);
 		}
+	}
+
+	// FUNCTION: TOY2 0x0047D120
+	void ClearBackBufferOnce()
+	{
+		if (g_backBufferClearComplete != 0)
+			return;
+
+		uint32_t* pixel = static_cast<uint32_t*>(g_lockedBackBuffer);
+		if (g_bitsPerPixel == 8)
+		{
+			int32_t rowPadding = (g_backBufferPitchPixels - Toy2::g_destRectWidth) / 4;
+			int32_t rowWidth = Toy2::g_destRectWidth / 4;
+			int32_t row = Toy2::g_destRectHeight;
+			do
+			{
+				int32_t count = rowWidth;
+				do
+					*pixel++ = 0;
+				while (--count != 0);
+
+				uint8_t* nextRow = reinterpret_cast<uint8_t*>(pixel) + rowPadding;
+				pixel = reinterpret_cast<uint32_t*>(nextRow);
+			} while (--row != 0);
+		}
+		else
+		{
+			int32_t rowPadding = (g_backBufferPitchPixels - Toy2::g_destRectWidth) / 2;
+			int32_t rowWidth = Toy2::g_destRectWidth / 2;
+			int32_t row = Toy2::g_destRectHeight;
+			do
+			{
+				int32_t count = rowWidth;
+				do
+					*pixel++ = 0;
+				while (--count != 0);
+
+				uint8_t* nextRow = reinterpret_cast<uint8_t*>(pixel) + rowPadding;
+				pixel = reinterpret_cast<uint32_t*>(nextRow);
+			} while (--row != 0);
+		}
+
+		g_backBufferClearComplete = 1;
+		g_pendingBackBufferClears--;
 	}
 
 	// FUNCTION: TOY2 0x004C1E70
@@ -3801,21 +3845,22 @@ namespace SoftwareRenderer
 		{
 			int32_t rowSkip = (g_backBufferPitchPixels - Toy2::g_destRectWidth) / 2;
 			int32_t rowWidth = Toy2::g_destRectWidth / 2;
-			uint32_t* pixel = (uint32_t*)g_lockedBackBuffer;
+			uint32_t* pixel = static_cast<uint32_t*>(g_lockedBackBuffer);
 			for (int32_t row = Toy2::g_destRectHeight; row != 0; row--)
 			{
 				for (int32_t count = rowWidth; count != 0; count--)
 				{
 					*pixel++ = 0;
 				}
-				pixel = (uint32_t*)((uint8_t*)pixel + rowSkip);
+				uint8_t* nextRow = reinterpret_cast<uint8_t*>(pixel) + rowSkip;
+				pixel = reinterpret_cast<uint32_t*>(nextRow);
 			}
 		}
 		else
 		{
-			if (g_pendingBackBufferClears != 0 && g_unk830C60 == 0)
+			if (g_pendingBackBufferClears != 0 && g_backBufferClearComplete == 0)
 			{
-				uint32_t* pixel = (uint32_t*)g_lockedBackBuffer;
+				uint32_t* pixel = static_cast<uint32_t*>(g_lockedBackBuffer);
 				if (g_bitsPerPixel == 8)
 				{
 					int32_t rowSkip = (g_backBufferPitchPixels - Toy2::g_destRectWidth) / 4;
@@ -3826,7 +3871,8 @@ namespace SoftwareRenderer
 						{
 							*pixel++ = 0;
 						}
-						pixel = (uint32_t*)((uint8_t*)pixel + rowSkip);
+						uint8_t* nextRow = reinterpret_cast<uint8_t*>(pixel) + rowSkip;
+						pixel = reinterpret_cast<uint32_t*>(nextRow);
 					}
 				}
 				else
@@ -3839,10 +3885,11 @@ namespace SoftwareRenderer
 						{
 							*pixel++ = 0;
 						}
-						pixel = (uint32_t*)((uint8_t*)pixel + rowSkip);
+						uint8_t* nextRow = reinterpret_cast<uint8_t*>(pixel) + rowSkip;
+						pixel = reinterpret_cast<uint32_t*>(nextRow);
 					}
 				}
-				g_unk830C60 = 1;
+				g_backBufferClearComplete = 1;
 				g_pendingBackBufferClears--;
 			}
 

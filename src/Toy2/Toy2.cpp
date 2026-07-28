@@ -1624,7 +1624,7 @@ namespace Toy2
 
 		UpdateAudioChannels();
 
-		SoftwareRenderer::g_unk830C60 = 0;
+		SoftwareRenderer::g_backBufferClearComplete = 0;
 
 		if (D3DApp::g_renderMode == RENDERMODE_SOFTWARE)
 		{

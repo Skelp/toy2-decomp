@@ -18,7 +18,7 @@ namespace SoftwareRenderer
 	extern int32_t g_backdropWidth;
 	extern int32_t g_staticBackdropWidth;
 	extern int32_t g_backdropTextureColumn;
-	extern int32_t g_unk830C60;
+	extern int32_t g_backBufferClearComplete;
 	extern int32_t g_unk559C40;
 	extern int32_t g_unk839278;
 	struct SoftwareRenderItem;
@@ -121,6 +121,7 @@ namespace SoftwareRenderer
 	void InitialisePrimarySurface();
 	void InitialisePrimarySurface_T();
 	void Destroy();
+	void ClearBackBufferOnce();
 	void CommitZoom();
 	void InitialiseColourScaleTables();
 	void ZoomOut();
