@@ -471,6 +471,9 @@ namespace Renderer
 	// GLOBAL: TOY2 0x00508718
 	int32_t g_primitiveRenderFlags = 5;
 
+	// GLOBAL: TOY2 0x0050871C
+	int32_t g_hardwareTransparencyEnabled = 1;
+
 	// GLOBAL: TOY2 0x005088B0
 	float g_primaryRenderDistanceSquared = 144000000.0f;
 
@@ -2219,11 +2222,41 @@ namespace Renderer
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004B8400
-	void FlushMaterialBuckets() {}
+	// FUNCTION: TOY2 0x004B8400 [MATCHED]
+	void FlushMaterialBuckets()
+	{
+		UnbindMaterial();
+		Nu3D::Material* material = Nu3D::Material::GetHead();
+		while (material != 0)
+		{
+			Nu3D::Sprite* command = reinterpret_cast<Nu3D::Sprite*>(material->renderEntryHead);
+			if (command != 0)
+			{
+				g_materialHorzOffset = material->horzOffset;
+				g_materialVertOffset = material->vertOffset;
+				BindMaterial(material, 0);
+				Sprite::DispatchCommand(command);
+			}
 
-	// FUNCTION: TOY2 0x004B6A90
-	void FlushTransparentBuckets() {}
+			material->renderEntryHead = 0;
+			material = material->next;
+		}
+	}
+
+	// FUNCTION: TOY2 0x004B6A90 [MATCHED]
+	void FlushTransparentBuckets()
+	{
+		g_drawingTransparentBuckets = g_isSoftwareRendering != 0 ? 0 : g_hardwareTransparencyEnabled;
+
+		Nu3D::Sprite** bucket = &Nu3D::g_spriteBuckets[255];
+		do
+		{
+			Sprite::DispatchCommand(*bucket);
+			bucket--;
+		} while (reinterpret_cast<int32_t>(bucket) >= reinterpret_cast<int32_t>(Nu3D::g_spriteBuckets));
+
+		g_drawingTransparentBuckets = 0;
+	}
 
 	// FUNCTION: TOY2 0x004B5CF0
 	void FlushPrimitives() {}

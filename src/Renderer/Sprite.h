@@ -3,6 +3,11 @@
 #include "Common.h"
 #include "Numerics.h"
 
+namespace Nu3D
+{
+	struct Sprite;
+}
+
 namespace Renderer
 {
 	namespace Sprite
@@ -83,6 +88,7 @@ namespace Renderer
 		void DrawBackdropTransition(int32_t* framesRemaining, int32_t* backdropIndex, int32_t duration);
 
 		void ResetQueue();
+		void DispatchCommand(Nu3D::Sprite* command);
 		void DrawQueuedSprite();
 	}
 }
