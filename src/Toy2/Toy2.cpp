@@ -75,6 +75,271 @@ namespace Toy2
 		int32_t g_challengeState;
 	}
 
+	namespace AndysHouse
+	{
+		// STUB: TOY2 0x004171D0
+		void Init() {}
+
+		// STUB: TOY2 0x00417680
+		void Interactions() {}
+	}
+
+	namespace AndysNeighborhood
+	{
+		// STUB: TOY2 0x00418E50
+		void Init() {}
+
+		// STUB: TOY2 0x004190C0
+		void Interactions() {}
+	}
+
+	namespace BombsAway
+	{
+		// STUB: TOY2 0x0041A8A0
+		void Init() {}
+
+		// STUB: TOY2 0x0041AA10
+		void Interactions() {}
+	}
+
+	namespace ConstructionYard
+	{
+		// STUB: TOY2 0x0041C190
+		void Init() {}
+
+		// STUB: TOY2 0x0041C640
+		void Interactions() {}
+	}
+
+	namespace AlleysAndGullies
+	{
+		// STUB: TOY2 0x0041E390
+		void Init() {}
+
+		// STUB: TOY2 0x0041E880
+		void Interactions() {}
+	}
+
+	namespace SlimeTime
+	{
+		// STUB: TOY2 0x0041FFB0
+		void Init() {}
+
+		// STUB: TOY2 0x00420060
+		void Interactions() {}
+	}
+
+	namespace AlsToyBarn
+	{
+		// STUB: TOY2 0x00421090
+		void Init() {}
+
+		// STUB: TOY2 0x00421340
+		void Interactions() {}
+	}
+
+	namespace AlsSpaceLand
+	{
+		// STUB: TOY2 0x00423020
+		void Init() {}
+
+		// STUB: TOY2 0x00423200
+		void Interactions() {}
+	}
+
+	namespace BarnEncounter
+	{
+		// STUB: TOY2 0x00424390
+		void Init() {}
+
+		// STUB: TOY2 0x00424490
+		void Interactions() {}
+	}
+
+	namespace ElevatorHop
+	{
+		// STUB: TOY2 0x00425B60
+		void Init() {}
+
+		// STUB: TOY2 0x00425F60
+		void Interactions() {}
+	}
+
+	namespace AlsPenthouse
+	{
+		// STUB: TOY2 0x00429D70
+		void Init() {}
+
+		// STUB: TOY2 0x0042A130
+		void Interactions() {}
+	}
+
+	namespace EvilEmperorZurg
+	{
+		// STUB: TOY2 0x0042B300
+		void Init() {}
+
+		// STUB: TOY2 0x0042B3A0
+		void Interactions() {}
+	}
+
+	namespace AirportInfiltration
+	{
+		// STUB: TOY2 0x0042C930
+		void Init() {}
+
+		// STUB: TOY2 0x0042CA60
+		void Interactions() {}
+	}
+
+	namespace TarmacTrouble
+	{
+		// STUB: TOY2 0x0042E600
+		void Init() {}
+
+		// STUB: TOY2 0x0042E790
+		void Interactions() {}
+	}
+
+	namespace FinalShowdown
+	{
+		// STUB: TOY2 0x0042FAA0
+		void Init() {}
+
+		// STUB: TOY2 0x0042FC50
+		void Interactions() {}
+	}
+
+	// FUNCTION: TOY2 0x00430930 [MATCHED]
+	void InitialiseLevel16() {}
+
+	// FUNCTION: TOY2 0x00430950 [MATCHED]
+	void InitialiseLevel17() {}
+
+	// FUNCTION: TOY2 0x00430940 [MATCHED]
+	void HandleLevel16Interactions() {}
+
+	// FUNCTION: TOY2 0x00430960 [MATCHED]
+	void HandleLevel17Interactions() {}
+
+	// FUNCTION: TOY2 0x004A1A50 [MATCHED]
+	void InitialiseLevelVariables(int32_t levelIndex)
+	{
+		switch (levelIndex)
+		{
+			case 1:
+				AndysHouse::Init();
+				break;
+			case 2:
+				AndysNeighborhood::Init();
+				break;
+			case 3:
+				BombsAway::Init();
+				break;
+			case 4:
+				ConstructionYard::Init();
+				break;
+			case 5:
+				AlleysAndGullies::Init();
+				break;
+			case 6:
+				SlimeTime::Init();
+				break;
+			case 7:
+				AlsToyBarn::Init();
+				break;
+			case 8:
+				AlsSpaceLand::Init();
+				break;
+			case 9:
+				BarnEncounter::Init();
+				break;
+			case 10:
+				ElevatorHop::Init();
+				break;
+			case 11:
+				AlsPenthouse::Init();
+				break;
+			case 12:
+				EvilEmperorZurg::Init();
+				break;
+			case 13:
+				AirportInfiltration::Init();
+				break;
+			case 14:
+				TarmacTrouble::Init();
+				break;
+			case 15:
+				FinalShowdown::Init();
+				break;
+			case 16:
+				InitialiseLevel16();
+				break;
+			case 17:
+				InitialiseLevel17();
+				break;
+		}
+	}
+
+	// FUNCTION: TOY2 0x004A1B00 [MATCHED]
+	void HandleLevelInteractions(int32_t levelIndex)
+	{
+		switch (levelIndex)
+		{
+			case 1:
+				AndysHouse::Interactions();
+				break;
+			case 2:
+				AndysNeighborhood::Interactions();
+				break;
+			case 3:
+				BombsAway::Interactions();
+				break;
+			case 4:
+				ConstructionYard::Interactions();
+				break;
+			case 5:
+				AlleysAndGullies::Interactions();
+				break;
+			case 6:
+				SlimeTime::Interactions();
+				break;
+			case 7:
+				AlsToyBarn::Interactions();
+				break;
+			case 8:
+				AlsSpaceLand::Interactions();
+				break;
+			case 9:
+				BarnEncounter::Interactions();
+				break;
+			case 10:
+				ElevatorHop::Interactions();
+				break;
+			case 11:
+				AlsPenthouse::Interactions();
+				break;
+			case 12:
+				EvilEmperorZurg::Interactions();
+				break;
+			case 13:
+				AirportInfiltration::Interactions();
+				break;
+			case 14:
+				TarmacTrouble::Interactions();
+				break;
+			case 15:
+				FinalShowdown::Interactions();
+				break;
+			case 16:
+				HandleLevel16Interactions();
+				break;
+			case 17:
+				HandleLevel17Interactions();
+				break;
+		}
+	}
+
 	// FUNCTION: TOY2 0x0044F840
 	void ShowModelNode(int32_t creatureIndex, int32_t nodeIndex) { Nu3D::Creature::SetNodeVisibleByIndex(creatureIndex, nodeIndex, 1); }
 

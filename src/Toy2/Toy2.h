@@ -19,6 +19,8 @@ namespace Toy2
 	}
 
 	void LoadLevelGraphics(int32_t levelFileIndex);
+	void InitialiseLevelVariables(int32_t levelIndex);
+	void HandleLevelInteractions(int32_t levelIndex);
 	void LoadLevelWithFadeIn(int32_t levelFileIndex, int32_t displayMode);
 	int32_t ShowLevelIntroScreen(int32_t backgroundId, int32_t displayMode);
 	struct ToyCfg
