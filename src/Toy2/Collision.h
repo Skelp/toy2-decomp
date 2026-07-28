@@ -9,6 +9,12 @@ namespace Toy2
 {
 	namespace Collision
 	{
+		struct MathScratchVector
+		{
+			Vector3I value;
+			int32_t reserved;
+		};
+
 		struct CollisionMeshInstance
 		{
 			Vector3I origin;
@@ -23,13 +29,14 @@ namespace Toy2
 
 		extern CollisionMeshInstance g_collisionMeshInstances[300];
 		extern int16_t g_groundCollisionMeshIndex;
-		extern uint8_t g_mathScratch[1024];
+		extern MathScratchVector g_mathScratch[64];
 
 		void BuildCollisionWorld(int32_t level, uint8_t** buffer, int32_t terrainNum);
 		void MarkPlatformAsMoving(int32_t platformIndex);
 		int32_t GetGroundContactIdx();
 
 		STATIC_ASSERT(sizeof(CollisionMeshInstance) == 0x34);
+		STATIC_ASSERT(sizeof(MathScratchVector) == 0x10);
 	}
 
 	namespace Platform

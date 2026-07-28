@@ -12,7 +12,7 @@ namespace Toy2
 		int16_t g_groundCollisionMeshIndex;
 
 		// GLOBAL: TOY2 0x00554FA0
-		uint8_t g_mathScratch[1024];
+		MathScratchVector g_mathScratch[64];
 
 		// STUB: TOY2 0x00489C30
 		void BuildCollisionWorld(int32_t level, uint8_t** buffer, int32_t terrainNum) {}
