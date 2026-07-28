@@ -50,7 +50,6 @@ src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNo
 0x004cddd0	unnamed-bitmask	renderFlags:2	068a128c65db	src/Nu3D/Scene.cpp
 src/Nu3D/Sprite.h	unpinned-layout	TextureProjectionData	59108e30e062	src/Nu3D/Sprite.h
 0x0047b170	unstructured-control-flow	goto-count	af283beb99ab	src/RawLoader.cpp
-0x00452310	anonymous-buffer-view	inline-view	5ae7febee2dd	src/RawLoader.cpp
 0x004cdd80	unknown-symbol	g_unk9F5FF8	c7f305e008bf	src/Renderer/Renderer.cpp
 0x004b9a60	unknown-symbol	g_unk9F5FF8	c7f305e008bf	src/Renderer/Renderer.cpp
 0x004b9710	unknown-symbol	g_unk9F5FF8	c7f305e008bf	src/Renderer/Renderer.cpp
@@ -76,7 +75,6 @@ src/Nu3D/Sprite.h	unpinned-layout	TextureProjectionData	59108e30e062	src/Nu3D/Sp
 0x004b70e0	unnamed-bitmask	instanceData->renderModeFlags:3	c7b113f0ba92	src/Renderer/Sprite.cpp
 0x004b70e0	unnamed-bitmask	renderFlags:0x2000	90890050a587	src/Renderer/Sprite.cpp
 0x004b70e0	unnamed-bitmask	instanceData->renderModeFlags:2	59ea614596cb	src/Renderer/Sprite.cpp
-0x004c17b0	anonymous-buffer-view	inline-view	d5be8a2428b8	src/SoftwareRenderer.cpp
 0x004bcbe0	unknown-symbol	g_unkA4CC80	5ab4de4fd354	src/SoftwareRenderer.cpp
 0x004bc980	unknown-symbol	g_unk9F6008	f8d33dc4bca5	src/SoftwareRenderer.cpp
 0x0047c870	signature-name-drift	RasterizeTexturedSpanPairSample	4ebfa3a87115	src/SoftwareRenderer.cpp

@@ -467,13 +467,14 @@ namespace RawLoader
 		while ((*buffer != 0xFF || buffer[1] != 0xFF || buffer[2] != 0xFF || buffer[3] != 0xFF) && resumeCounter != 2)
 		{
 			DecompressBuffer(buffer, decompBuffer);
+			uint32_t* packetType = reinterpret_cast<uint32_t*>(decompBuffer);
 
-			if (*reinterpret_cast<uint32_t*>(decompBuffer) == 35)
+			if (*packetType == 35)
 			{
 				memcpy(g_creatureListRam, decompBuffer + 4, sizeof(g_creatureListRam));
 				Logger::Log("LOAD: Type 35, CreatListRam.\n");
 			}
-			else if (*reinterpret_cast<uint32_t*>(decompBuffer) == 36)
+			else if (*packetType == 36)
 			{
 				// omitted
 				// $TODO: implement this portion, don't know if it actually does anything

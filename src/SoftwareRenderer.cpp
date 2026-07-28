@@ -765,10 +765,10 @@ namespace SoftwareRenderer
 
 		backRow = static_cast<uint8_t*>(g_backBuffer);
 		dwordCount = static_cast<uint32_t>(g_screenDimV) >> 1;
+		backPixel = reinterpret_cast<uint32_t*>(backRow);
 		do
 		{
-			*reinterpret_cast<uint32_t*>(backRow) = 0;
-			backRow += sizeof(uint32_t);
+			*backPixel++ = 0;
 			dwordCount--;
 		} while (dwordCount != 0);
 
@@ -783,10 +783,10 @@ namespace SoftwareRenderer
 		} while (rowCount != 0);
 
 		dwordCount = static_cast<uint32_t>(g_screenDimV) >> 1;
+		backPixel = reinterpret_cast<uint32_t*>(backRow);
 		do
 		{
-			*reinterpret_cast<uint32_t*>(backRow) = 0;
-			backRow += sizeof(uint32_t);
+			*backPixel++ = 0;
 			dwordCount--;
 		} while (dwordCount != 0);
 
