@@ -2,6 +2,8 @@
 #include "Toy2/Camera.h"
 #include "Nu3D/Link.h"
 
+#include <limits.h>
+
 namespace Toy2
 {
 	namespace Collectables
@@ -35,6 +37,14 @@ namespace Toy2
 			{
 				Nu3D::Link::SetScaleFromFixedOffsets(g_tokenStates[tokenIndex].linkId, 0x1000, 0x1000, 0x1000);
 			}
+		}
+
+		// FUNCTION: TOY2 0x004A0E60 [MATCHED]
+		void Deactivate(int32_t tokenIndex)
+		{
+			g_tokenStates[tokenIndex].active = 0;
+			*g_tokenStates[tokenIndex].verticalPosition = INT_MIN;
+			Nu3D::Link::SetScaleFromFixedOffsets(g_tokenStates[tokenIndex].linkId, 0, 0, 0);
 		}
 
 		// FUNCTION: TOY2 0x004CD110 [MATCHED]

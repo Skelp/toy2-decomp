@@ -18,6 +18,7 @@ namespace Toy2
 
 		void BuildPickupTable();
 		void Activate(int32_t tokenIndex, int32_t skipCutscene);
+		void Deactivate(int32_t tokenIndex);
 		int32_t ShowTokenSparkle(int32_t linkId);
 
 		STATIC_ASSERT(sizeof(TokenState) == 0x10);
