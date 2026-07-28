@@ -1,7 +1,9 @@
 #include "Toy2/Camera.h"
 #include "InputManager.h"
 #include "Nu3D/Camera.h"
+#include "Nu3D/Link.h"
 #include "Nu3D/Math.h"
+#include "Nu3D/Particles.h"
 #include "Toy2/Toy2.h"
 #include <math.h>
 
@@ -20,6 +22,12 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x0050A510
 		int32_t g_shakeTimer;
+
+		// GLOBAL: TOY2 0x0050A538
+		Nu3D::Particles::ParticleInstance* g_cameraMarkerParticle;
+
+		// GLOBAL: TOY2 0x0050A4DC
+		Nu3D::Particles::ParticleInstance* g_targetMarkerParticle;
 
 		// STUB: TOY2 0x00403450
 		void InitGameplayCamera(GameplayCamera* camera, Buzz::Toy2BuzzActor* buzz) {}
@@ -65,8 +73,34 @@ namespace Toy2
 			camera->angles.pitch = (uint16_t)(((pitchDelta >> 2) + camera->angles.pitch) & 0xfff);
 		}
 
-		// STUB: TOY2 0x00403730
-		void SnapBehindBuzz(GameplayCamera* camera) {}
+		// FUNCTION: TOY2 0x00403730 [MATCHED]
+		void SnapBehindBuzz(GameplayCamera* camera)
+		{
+			if (g_cameraMarkerParticle != (Nu3D::Particles::ParticleInstance*)-1)
+			{
+				g_cameraMarkerParticle->lifetime = 1;
+				g_cameraMarkerParticle = (Nu3D::Particles::ParticleInstance*)-1;
+			}
+			if (g_targetMarkerParticle != (Nu3D::Particles::ParticleInstance*)-1)
+			{
+				g_targetMarkerParticle->lifetime = 1;
+				g_targetMarkerParticle = (Nu3D::Particles::ParticleInstance*)-1;
+			}
+
+			camera->roll = g_buzzActor.posAngles.angles.yaw;
+			g_buzzActor.facingAngle = g_buzzActor.posAngles.angles.yaw;
+			camera->angles.yaw = 0x4B0;
+			camera->pos.y = g_buzzActor.posAngles.pos.y - 0x3000;
+			camera->target.visorAimAngles.pitch = 0;
+			camera->lookAt.x = camera->pos.x;
+			camera->data[3] = 0;
+			g_buzzActor.actorFlags |= 1;
+			g_scriptedCameraState = 0;
+
+			Nu3D::Link::SetScaleFromFixedOffsets(0x2D, 0, 0, 0);
+			Nu3D::Link::SetScaleFromFixedOffsets(0x2E, 0, 0, 0);
+			Nu3D::Link::SetScaleFromFixedOffsets(0x2F, 0, 0, 0);
+		}
 	}
 } // namespace Toy2
 
