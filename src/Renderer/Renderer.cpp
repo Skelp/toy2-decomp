@@ -198,6 +198,36 @@ namespace Renderer
 
 	namespace LensFlare
 	{
+		// GLOBAL: TOY2 0x004DC054
+		const float k_positionScale = 0.03125f;
+
+		// GLOBAL: TOY2 0x004DC084
+		const float k_depthOffset = 50.0f;
+
+		// GLOBAL: TOY2 0x004DC088
+		const float k_depthScale = 47950.0f;
+
+		// GLOBAL: TOY2 0x004F72D8
+		const Element g_elements[17] = {
+			{ 5, 72, 48, 96, 96, 96 },
+			{ 0, 0, 0, 0, 0, 0 },
+			{ 0, 0, 0, 0, 0, 0 },
+			{ 0, 0, 0, 0, 0, 0 },
+			{ 0, 0, 0, 0, 0, 0 },
+			{ 7, 42, 28, 4, 4, 56 },
+			{ 4, 36, 24, 24, 24, 72 },
+			{ 4, 24, 16, 64, 24, 24 },
+			{ 0, 0, 0, 0, 0, 0 },
+			{ 4, 6, 4, 64, 64, 64 },
+			{ 4, 12, 8, 64, 64, 64 },
+			{ 4, 36, 24, 64, 64, 24 },
+			{ 7, 66, 44, 48, 16, 16 },
+			{ 4, 36, 24, 32, 32, 72 },
+			{ 0, 0, 0, 0, 0, 0 },
+			{ 0, 0, 0, 0, 0, 0 },
+			{ 7, 96, 64, 12, 32, 12 },
+		};
+
 		// GLOBAL: TOY2 0x0054DD50
 		int32_t g_slotCounts[2];
 
@@ -264,8 +294,59 @@ namespace Renderer
 			}
 		}
 
-		// STUB: TOY2 0x0044F580
-		void RenderSlot(int32_t slotIndex) {}
+		// FUNCTION: TOY2 0x0044F580
+		void RenderSlot(int32_t slotIndex)
+		{
+			Vector3F position = {
+				(float)g_slots[g_bufferIndex][slotIndex].position.x * k_positionScale,
+				(float)g_slots[g_bufferIndex][slotIndex].position.y * k_positionScale,
+				(float)g_slots[g_bufferIndex][slotIndex].position.z * k_positionScale,
+			};
+			Vector3F projected;
+			Nu3D::TransformPointProjective(&projected, &position, 1, 0);
+
+			int32_t screenX = (int32_t)(projected.x * g_virtualScreenWidth / (float)DrawingDevice::GetDestWidth());
+			int32_t screenY = (int32_t)(projected.y * g_virtualScreenHeight / (float)DrawingDevice::GetDestHeight());
+			int32_t depth = (int32_t)(projected.z * k_depthScale + k_depthOffset);
+			int32_t screenXFixed = screenX * 8;
+			int32_t screenYFixed = screenY * 8;
+			int32_t centerOffsetX = 256 - screenX;
+			int32_t centerOffsetY = 128 - screenY;
+			int32_t distanceSquared = centerOffsetY * centerOffsetY + centerOffsetX * centerOffsetX;
+			if (distanceSquared > 0xFFFF)
+				distanceSquared = 0xFFFF;
+
+			const int32_t brightness = 0x103FF - distanceSquared;
+			const int32_t flareScale = brightness / (depth / 2 + 1) + g_slots[g_bufferIndex][slotIndex].scaleOffset;
+			const int32_t red = g_slots[g_bufferIndex][slotIndex].red * brightness;
+			const int32_t green = g_slots[g_bufferIndex][slotIndex].green * brightness;
+			const int32_t blue = g_slots[g_bufferIndex][slotIndex].blue * brightness;
+			const Element* element = g_elements;
+			int32_t remainingElements = 17;
+			do
+			{
+				if (element->spriteSheetIndex != 0)
+				{
+					const int32_t scaleX = element->scaleX * flareScale;
+					const int32_t scaleY = element->scaleY * flareScale;
+					Sprite::DrawScaled((int16_t)(screenXFixed >> 3) - (int16_t)(scaleX / 256),
+						(int16_t)(screenYFixed >> 3) - (int16_t)(scaleY / 256),
+						element->spriteSheetIndex,
+						0,
+						element->red * red >> 23,
+						element->green * green >> 23,
+						element->blue * blue >> 23,
+						0x20,
+						scaleX,
+						scaleY);
+				}
+
+				screenXFixed += centerOffsetX;
+				screenYFixed += centerOffsetY;
+				element++;
+				remainingElements--;
+			} while (remainingElements != 0);
+		}
 	}
 
 	// FUNCTION: TOY2 0x0044F190 [MATCHED]
