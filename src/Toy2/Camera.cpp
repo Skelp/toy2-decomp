@@ -1,10 +1,16 @@
 #include "Toy2/Camera.h"
+#include "InputManager.h"
 #include "Nu3D/Math.h"
+#include "Toy2/Toy2.h"
+#include <math.h>
 
 namespace Toy2
 {
 	namespace Camera
 	{
+		// GLOBAL: TOY2 0x0052F3A0
+		GameplayCamera g_gameplayCamera;
+
 		// FUNCTION: TOY2 0x00403640
 		void SmoothToTarget(GameplayCamera* camera)
 		{
@@ -47,6 +53,68 @@ namespace Toy2
 
 namespace Camera
 {
-	// STUB: TOY2 0x00433F40
-	int32_t CalculateMaxTurnAngle(uint16_t directionInputState) { return 0; }
+	// GLOBAL: TOY2 0x004F5AB4
+	int16_t g_analogDirectionAngles[9] = { 0x000, 0x200, 0x400, 0x600, 0x800, 0xA00, 0xC00, 0xE00, 0x1000 };
+
+	// GLOBAL: TOY2 0x004F5AC8
+	int16_t g_digitalDirectionAngles[16] = {
+		0x000,
+		0x000,
+		0x400,
+		0x200,
+		0x800,
+		0x000,
+		0x600,
+		0x000,
+		0xC00,
+		0xE00,
+		0x000,
+		0x000,
+		0xA00,
+		0x000,
+		0x000,
+		0x000,
+	};
+
+	// FUNCTION: TOY2 0x00433F40
+	int32_t CalculateMaxTurnAngle(uint16_t directionInputState)
+	{
+		int32_t inputMagnitude = 0;
+		int32_t cameraRelativeAngle = Nu3D::Math::CartesianToFixedAngle((Toy2::g_buzzActor.posAngles.pos.x - Toy2::Camera::g_gameplayCamera.lookAt.x) >> 5,
+			(Toy2::g_buzzActor.posAngles.pos.z - Toy2::Camera::g_gameplayCamera.lookAt.z) >> 5);
+
+		if ((InputManager::g_directionalInputCount == 1 || InputManager::g_directionalInputCount == 2) && Toy2::g_demoMode == 0)
+		{
+			if (abs(InputManager::g_analogInputX) < 0x1800)
+			{
+				InputManager::g_analogInputX = 0;
+			}
+			if (abs(InputManager::g_analogInputY) < 0x1800)
+			{
+				InputManager::g_analogInputY = 0;
+			}
+
+			int32_t analogAngle = Nu3D::Math::CartesianToFixedAngle(InputManager::g_analogInputX, InputManager::g_analogInputY) & 0xFFF;
+			int32_t octant = analogAngle >> 9;
+			int32_t octantFraction = analogAngle & 0x1FF;
+			int32_t inputAngle =
+				((g_analogDirectionAngles[octant + 1] - g_analogDirectionAngles[octant]) * octantFraction >> 9) + g_analogDirectionAngles[octant];
+			Toy2::g_buzzActor.facingAngle = (int16_t)((inputAngle + cameraRelativeAngle) & 0xFFF);
+
+			int32_t halfInputY = InputManager::g_analogInputY / 2;
+			int32_t halfInputX = InputManager::g_analogInputX / 2;
+			inputMagnitude = (int32_t)sqrt((double)(halfInputX * halfInputX + halfInputY * halfInputY));
+			if (inputMagnitude > 0x4000)
+			{
+				inputMagnitude = 0x4000;
+			}
+		}
+
+		if (InputManager::g_directionalInputCount == 0 || Toy2::g_demoMode != 0)
+		{
+			Toy2::g_buzzActor.facingAngle = (int16_t)((g_digitalDirectionAngles[(directionInputState >> 4) & 0xF] + cameraRelativeAngle) & 0xFFF);
+			return 0x4000;
+		}
+		return inputMagnitude;
+	}
 }

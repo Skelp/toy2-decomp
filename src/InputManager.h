@@ -24,6 +24,9 @@ namespace InputManager
 	extern int16_t g_prevDirectionInputState;
 	extern int16_t g_directionInputState2Frames;
 	extern int16_t g_directionInputState3Frames;
+	extern int32_t g_analogInputX;
+	extern int32_t g_analogInputY;
+	extern int32_t g_directionalInputCount;
 	extern uint8_t g_previousInputStates[256];
 
 	void Init();

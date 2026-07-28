@@ -24,6 +24,8 @@ namespace Toy2
 
 		STATIC_ASSERT(sizeof(GameplayCamera) == 0x34);
 
+		extern GameplayCamera g_gameplayCamera;
+
 		void SmoothToTarget(GameplayCamera* camera);
 		int32_t UpdateRocketBoots(Buzz::Toy2BuzzActor* buzz, Buzz::MovementRates* movementRates);
 	}
