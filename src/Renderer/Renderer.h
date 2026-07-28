@@ -270,6 +270,7 @@ namespace Renderer
 	void BindMaterial(Nu3D::Material* material, int32_t force);
 	void UnbindMaterial();
 	void DrawSingleTexturedTriangle(Nu3D::VertexTL* vertices, int32_t texIndex, int32_t renderFlags);
+	void DrawPrimitive(void* vertices, DWORD vertexCount);
 
 	STATIC_ASSERT(sizeof(RenderEntry) == 0x18);
 	STATIC_ASSERT(sizeof(ViewportPreset) == 0x18);

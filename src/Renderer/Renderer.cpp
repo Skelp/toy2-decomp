@@ -489,6 +489,9 @@ namespace Renderer
 	// GLOBAL: TOY2 0x0094FCD0
 	int32_t g_renderEntryFreeCount;
 
+	// GLOBAL: TOY2 0x0094FCE0
+	Nu3D::VertexTL g_primitiveVertices[1500];
+
 	// GLOBAL: TOY2 0x00508728
 	int32_t g_primitiveBufferFreeCount = 3000;
 
@@ -1345,7 +1348,13 @@ namespace Renderer
 	}
 
 	// FUNCTION: TOY2 0x004C2080
-	int32_t ConvertRGBATo16Bit(RGBA color) { return 0; }
+	int32_t ConvertRGBATo16Bit(RGBA color)
+	{
+		if (SoftwareRenderer::g_pixelFormatMode == 0)
+			return ((uint16_t)(color.g & 0xF8) << 2) + ((uint16_t)(color.b & 0xF8) << 7) + (uint16_t)(color.r >> 3);
+
+		return ((uint16_t)(color.g & 0xF8) << 3) + ((uint16_t)(color.b & 0xF8) << 8) + (uint16_t)(color.r >> 3);
+	}
 
 	// FUNCTION: TOY2 0x004B37B0
 	RGBA ApplyGammaCorrection(RGBA color)
@@ -2259,7 +2268,68 @@ namespace Renderer
 	}
 
 	// FUNCTION: TOY2 0x004B5CF0
-	void FlushPrimitives() {}
+	void FlushPrimitives()
+	{
+		int32_t vertexCount = 0;
+		int32_t currentRenderFlags;
+		int32_t currentTextureIndex;
+		Nu3D::Material* currentMaterial;
+
+		void** bucket = &g_renderBuckets[1024];
+		do
+		{
+			SortedPrimitive* primitive = static_cast<SortedPrimitive*>(*--bucket);
+			while (primitive != 0)
+			{
+				bool stateChanged = vertexCount >= 1500;
+				if (vertexCount != 0 && ! stateChanged)
+				{
+					if (primitive->renderEntry != 0)
+					{
+						stateChanged = currentMaterial != primitive->renderEntry->material || currentRenderFlags != primitive->renderFlags;
+					}
+					else
+					{
+						stateChanged = currentRenderFlags != primitive->renderFlags || currentTextureIndex != primitive->textureIndex || currentMaterial != 0;
+					}
+				}
+
+				if (stateChanged)
+				{
+					DrawPrimitive(g_primitiveVertices, vertexCount);
+					vertexCount = 0;
+				}
+
+				if (vertexCount == 0)
+				{
+					if (primitive->renderEntry != 0)
+					{
+						BindMaterial(primitive->renderEntry->material, 0);
+						SetupMaterialRenderState(primitive->renderEntry->material, primitive->renderFlags);
+						currentRenderFlags = primitive->renderFlags;
+						currentMaterial = primitive->renderEntry->material;
+					}
+					else
+					{
+						InitRenderState(primitive->renderFlags);
+						BindTexture(primitive->textureIndex);
+						currentRenderFlags = primitive->renderFlags;
+						currentTextureIndex = primitive->textureIndex;
+						currentMaterial = 0;
+					}
+				}
+
+				memcpy(&g_primitiveVertices[vertexCount], &primitive->v0, sizeof(Nu3D::VertexTL) * 3);
+				vertexCount += 3;
+				primitive = primitive->next;
+			}
+
+			*bucket = 0;
+		} while (bucket != g_renderBuckets);
+
+		DrawPrimitive(g_primitiveVertices, vertexCount);
+		g_primitiveBufferFreeCount = 3000;
+	}
 
 	// FUNCTION: TOY2 0x004B5E20
 	void DrawPrimitive(void* vertices, DWORD vertexCount)
