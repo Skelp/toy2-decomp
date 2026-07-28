@@ -1071,18 +1071,128 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// STUB: TOY2 0x004C4640
-	void UnkFunc47(Nu3D::VertexTL* leftEdge,
-		Nu3D::VertexTL* rightEdge,
+	// FUNCTION: TOY2 0x004C4640
+	void RasterizeTexturedSpanPairSample(Nu3D::VertexTL* edgeA,
+		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
-		int32_t leftRed,
-		int32_t leftGreen,
-		int32_t leftBlue,
-		int32_t rightRed,
-		int32_t rightGreen,
-		int32_t rightBlue)
-	{}
+		int32_t edgeARed,
+		int32_t edgeAGreen,
+		int32_t edgeABlue,
+		int32_t edgeBRed,
+		int32_t edgeBGreen,
+		int32_t edgeBBlue)
+	{
+		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
+		if (width == 0)
+			return;
+
+		int32_t farRed;
+		int32_t farGreen;
+		int32_t farBlue;
+		if (width < 0)
+		{
+			farRed = edgeBRed;
+			farGreen = edgeBGreen;
+			farBlue = edgeBBlue;
+			edgeBRed = edgeARed;
+			edgeBGreen = edgeAGreen;
+			edgeBBlue = edgeABlue;
+			Nu3D::VertexTL* swap = edgeA;
+			edgeA = edgeB;
+			edgeB = swap;
+			width = -width;
+		}
+		else
+		{
+			farRed = edgeARed;
+			farGreen = edgeAGreen;
+			farBlue = edgeABlue;
+		}
+
+		if (width > 0)
+		{
+			int32_t pairCount = width >> 1;
+			int32_t stepRed;
+			int32_t stepGreen;
+			int32_t stepBlue;
+			if (pairCount > 0)
+			{
+				stepRed = (farRed - edgeBRed) / pairCount;
+				stepGreen = (farGreen - edgeBGreen) / pairCount;
+				stepBlue = (farBlue - edgeBBlue) / pairCount;
+			}
+
+			int32_t startX = (int32_t)edgeB->position.x;
+			int32_t endX = (int32_t)edgeA->position.x;
+			destRow += startX;
+
+			int32_t textureU = (int32_t)(edgeB->uv.x * k_textureCoordinateScale);
+			if (textureU > k_textureCoordinateFixedMax)
+				textureU = k_textureCoordinateFixedMax;
+			textureU <<= k_textureCoordinateShift;
+
+			int32_t textureVValue = (int32_t)(edgeB->uv.y * k_textureCoordinateScale);
+			if (textureVValue > k_textureCoordinateFixedMax)
+				textureVValue = k_textureCoordinateFixedMax;
+			int32_t textureV = (k_textureCoordinateMax - textureVValue) << k_textureCoordinateShift;
+
+			int32_t farTextureU = (int32_t)(edgeA->uv.x * k_textureCoordinateScale);
+			if (farTextureU > k_textureCoordinateMax)
+				farTextureU = k_textureCoordinateMax;
+			farTextureU <<= k_textureCoordinateShift;
+			if (farTextureU > k_textureCoordinateFixedMax)
+				farTextureU = k_textureCoordinateFixedMax;
+			int32_t stepTextureU = (farTextureU - textureU) / width;
+
+			int32_t farTextureVValue = (int32_t)(edgeA->uv.y * k_textureCoordinateScale);
+			if (farTextureVValue > k_textureCoordinateMax)
+				farTextureVValue = k_textureCoordinateMax;
+			int32_t farTextureV = (k_textureCoordinateMax - farTextureVValue) << k_textureCoordinateShift;
+			if (farTextureV > k_textureCoordinateFixedMax)
+				farTextureV = k_textureCoordinateFixedMax;
+			int32_t stepTextureV = (farTextureV - textureV) / width;
+
+			if (startX & 1)
+			{
+				int32_t textureIndex = ((textureV >> 8) & 0xff) * 256 + ((textureU >> 8) & 0xff);
+				uint32_t texel = texData[textureIndex];
+				*destRow++ = g_colourScaleTable0[(edgeBBlue & 0xff00) + (texel & 0xff)]
+					+ g_colourScaleTable0[0x10000 + (edgeBGreen & 0xff00) + ((texel >> 8) & 0xff)]
+					+ g_colourScaleTable0[0x20000 + (edgeBRed & 0xff00) + ((texel >> 16) & 0xff)];
+				pairCount = (width - 1) >> 1;
+				textureU += stepTextureU;
+				textureV += stepTextureV;
+			}
+
+			while (pairCount != 0)
+			{
+				int32_t textureIndex = ((textureV >> 8) & 0xff) * 256 + ((textureU >> 8) & 0xff);
+				uint32_t texel = texData[textureIndex];
+				uint16_t pixel = g_colourScaleTable0[(edgeBBlue & 0xff00) + (texel & 0xff)]
+					+ g_colourScaleTable0[0x10000 + (edgeBGreen & 0xff00) + ((texel >> 8) & 0xff)]
+					+ g_colourScaleTable0[0x20000 + (edgeBRed & 0xff00) + ((texel >> 16) & 0xff)];
+				uint32_t* destPair = (uint32_t*)destRow;
+				*destPair = pixel | ((uint32_t)pixel << 16);
+				destRow += 2;
+				textureU += stepTextureU * 2;
+				textureV += stepTextureV * 2;
+				edgeBRed += stepRed;
+				edgeBGreen += stepGreen;
+				edgeBBlue += stepBlue;
+				pairCount--;
+			}
+
+			if (endX & 1)
+			{
+				int32_t textureIndex = ((textureV >> 8) & 0xff) * 256 + ((textureU >> 8) & 0xff);
+				uint32_t texel = texData[textureIndex];
+				*destRow = g_colourScaleTable0[(edgeBBlue & 0xff00) + (texel & 0xff)]
+					+ g_colourScaleTable0[0x10000 + (edgeBGreen & 0xff00) + ((texel >> 8) & 0xff)]
+					+ g_colourScaleTable0[0x20000 + (edgeBRed & 0xff00) + ((texel >> 16) & 0xff)];
+			}
+		}
+	}
 
 	// STUB: TOY2 0x004C4370
 	void UnkFunc48(Nu3D::VertexTL* leftEdge,
@@ -2750,7 +2860,7 @@ namespace SoftwareRenderer
 				}
 				if (commandUseAlternateSpans != 0)
 				{
-					g_spanRasterizer = UnkFunc47;
+					g_spanRasterizer = RasterizeTexturedSpanPairSample;
 				}
 				else
 				{
@@ -2828,7 +2938,7 @@ namespace SoftwareRenderer
 			}
 			if (commandUseAlternateSpans != 0)
 			{
-				g_spanRasterizer = UnkFunc47;
+				g_spanRasterizer = RasterizeTexturedSpanPairSample;
 			}
 			else
 			{

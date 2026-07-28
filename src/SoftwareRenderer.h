@@ -299,7 +299,7 @@ namespace SoftwareRenderer
 		int32_t rightRed,
 		int32_t rightGreen,
 		int32_t rightBlue);
-	void UnkFunc47(Nu3D::VertexTL* leftEdge,
+	void RasterizeTexturedSpanPairSample(Nu3D::VertexTL* leftEdge,
 		Nu3D::VertexTL* rightEdge,
 		uint16_t* destRow,
 		uint32_t* texData,
