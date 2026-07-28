@@ -151,7 +151,17 @@ namespace Renderer
 
 	namespace Beam
 	{
-		void QueueBeam(uint32_t textureIndex,
+		struct Command
+		{
+			uint32_t spriteSheetIndex;
+			uint32_t width;
+			int32_t segmentLength;
+			Vector4I position;
+			Vector4I direction;
+			RGB32 color;
+		};
+
+		void QueueBeam(uint32_t spriteSheetIndex,
 			uint32_t width,
 			int32_t segmentLength,
 			const Vector4I* position,
@@ -159,6 +169,14 @@ namespace Renderer
 			uint32_t red,
 			uint32_t green,
 			uint32_t blue);
+
+		STATIC_ASSERT(sizeof(Command) == 0x38);
+		STATIC_ASSERT(offsetof(Command, position) == 0x0C);
+		STATIC_ASSERT(offsetof(Command, direction) == 0x1C);
+		STATIC_ASSERT(offsetof(Command, color) == 0x2C);
+
+		extern int32_t g_queueHead;
+		extern Command g_commands[100];
 	}
 
 	void InitRenderState(int32_t newStage);

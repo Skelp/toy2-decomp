@@ -31,8 +31,14 @@ namespace Renderer
 {
 	namespace Beam
 	{
-		// STUB: TOY2 0x0044E100
-		void QueueBeam(uint32_t textureIndex,
+		// GLOBAL: TOY2 0x004F72D4
+		int32_t g_queueHead;
+
+		// GLOBAL: TOY2 0x0054F640
+		Command g_commands[100];
+
+		// FUNCTION: TOY2 0x0044E100 [MATCHED]
+		void QueueBeam(uint32_t spriteSheetIndex,
 			uint32_t width,
 			int32_t segmentLength,
 			const Vector4I* position,
@@ -40,7 +46,20 @@ namespace Renderer
 			uint32_t red,
 			uint32_t green,
 			uint32_t blue)
-		{}
+		{
+			if (g_queueHead != 0)
+			{
+				g_queueHead--;
+				g_commands[g_queueHead].spriteSheetIndex = spriteSheetIndex;
+				g_commands[g_queueHead].width = width;
+				g_commands[g_queueHead].segmentLength = segmentLength;
+				g_commands[g_queueHead].position = *position;
+				g_commands[g_queueHead].direction = *direction;
+				g_commands[g_queueHead].color.r = red;
+				g_commands[g_queueHead].color.g = green;
+				g_commands[g_queueHead].color.b = blue;
+			}
+		}
 	}
 
 	// GLOBAL: TOY2 0x00508D28
