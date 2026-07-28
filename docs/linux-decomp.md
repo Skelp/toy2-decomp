@@ -72,8 +72,18 @@ enabled.
 
 ### Build parallelism
 
-`TOY2_BUILD_JOBS` sets the Ninja job count. Its default is 4. Set it to another
-positive value when the host has a different CPU or memory limit.
+The default Ninja job count is 4. Create the ignored `.decomp-local` file to
+set a persistent value for one checkout:
+
+```sh
+TOY2_LOCAL_BUILD_JOBS=12
+```
+
+Set `TOY2_BUILD_JOBS` to override that value for one command:
+
+```sh
+TOY2_BUILD_JOBS=2 tools/decomp build
+```
 
 VC6 cannot safely update one compiler PDB from concurrent compiler processes.
 The `tools/vc6-compile` launcher gives each object file a separate compiler

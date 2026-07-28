@@ -5,6 +5,12 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+if [[ -f .decomp-local ]]; then
+    source .decomp-local
+fi
+
+build_jobs="${TOY2_BUILD_JOBS:-${TOY2_LOCAL_BUILD_JOBS:-4}}"
+
 configure() {
     cmake -S . -B build -G Ninja \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
@@ -22,7 +28,7 @@ build() {
     if [[ ! -f build/build.ninja ]]; then
         configure
     fi
-    cmake --build build -- "-j${TOY2_BUILD_JOBS:-4}"
+    cmake --build build -- "-j${build_jobs}"
     (
         cd build
         reccmp-project detect --what recompiled
@@ -33,7 +39,7 @@ build_game() {
     if [[ ! -f build/build.ninja ]]; then
         configure
     fi
-    cmake --build build --target toy2decomp -- "-j${TOY2_BUILD_JOBS:-4}"
+    cmake --build build --target toy2decomp -- "-j${build_jobs}"
     (
         cd build
         reccmp-project detect --what recompiled
@@ -162,8 +168,9 @@ the local Ghidra project. Extra arguments are forwarded to the importer, e.g.
   tools/decomp sync --debug
 The Ghidra project location is read from the `ghidra` CLI configuration.
 
-TOY2_BUILD_JOBS sets the build parallelism. The default is 4. The VC6 compiler
-launcher gives each object a separate compiler PDB. See docs/linux-decomp.md.
+TOY2_BUILD_JOBS sets the build parallelism for one command. The default is 4.
+Set TOY2_LOCAL_BUILD_JOBS in .decomp-local for this checkout. See
+docs/linux-decomp.md.
 EOF
 }
 

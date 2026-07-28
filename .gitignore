@@ -9,6 +9,7 @@ external/include/directx6
 external/libs/directx6
 reccmp-user.yml
 reccmp-build.yml
+.decomp-local
 
 # User-supplied game media and extracted installations. None of these files
 # belong in the repository.
