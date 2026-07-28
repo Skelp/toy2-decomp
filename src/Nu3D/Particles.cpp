@@ -20,5 +20,15 @@ namespace Nu3D
 
 		// GLOBAL: TOY2 0x0052AD90
 		int32_t g_particleAllocationCursor;
+
+		// FUNCTION: TOY2 0x00446FA0 [MATCHED]
+		void SetDefaultAlpha(ParticleInstance* particle)
+		{
+			particle->colourA = 0x2C;
+			if ((particle->renderFlags & PARTICLE_RENDER_ALPHA_MODE_MASK) != PARTICLE_RENDER_ALPHA_MODE_MASK)
+			{
+				particle->colourA = 0x2E;
+			}
+		}
 	}
 }

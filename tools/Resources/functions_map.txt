@@ -266,7 +266,7 @@
 0x00441980 Toy2::MainMenu::RenderMenu
 0x00445720 Renderer::Shadows::DrawAll
 0x00445980 Renderer::Particles::DrawParticles
-0x00446FA0 Nu3D::Particles::UpdateUnkShort6
+0x00446FA0 Nu3D::Particles::SetDefaultAlpha
 0x00446FC0 Nu3D::Camera::SetupViewMatrix
 0x00447BD0 Toy2::Camera::CullActors
 0x00447D30 Toy2::Shadow::ResetShadowCount
