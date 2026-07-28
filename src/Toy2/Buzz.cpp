@@ -95,6 +95,98 @@ namespace Toy2
 
 	namespace Buzz
 	{
+		// FUNCTION: TOY2 0x004343D0
+		void UpdateHorizontalMovement(Toy2BuzzActor* buzz, MovementRates* movementRates, int32_t forwardInput)
+		{
+			int32_t forwardSpeed;
+			int32_t lateralSpeed;
+			{
+				int32_t yaw = buzz->posAngles.angles.yaw;
+				int32_t backwardSine = Numerics::g_sinCosLUT[(yaw - 0x800) & 0xFFF] >> 2;
+				int32_t cosine = Numerics::g_sinCosLUT[(yaw + 0x400) & 0xFFF] >> 2;
+				lateralSpeed = (buzz->velForward * backwardSine + buzz->velX * cosine) / 0x1000;
+				forwardSpeed = (buzz->velForward * cosine - buzz->velX * backwardSine) / 0x1000;
+			}
+
+			if ((buzz->actorFlags & ACTOR_FLAG_PRESERVE_HORIZONTAL_MOMENTUM) != 0)
+			{
+				if (buzz->collisionFlags != 0)
+				{
+					buzz->actorFlags &= ~ACTOR_FLAG_PRESERVE_HORIZONTAL_MOMENTUM;
+				}
+			}
+			else
+			{
+				if (lateralSpeed < 0)
+				{
+					lateralSpeed += movementRates->lateralDeceleration;
+					if (lateralSpeed > 0)
+					{
+						lateralSpeed = 0;
+					}
+				}
+				else if (lateralSpeed > 0)
+				{
+					lateralSpeed -= movementRates->lateralDeceleration;
+					if (lateralSpeed < 0)
+					{
+						lateralSpeed = 0;
+					}
+				}
+
+				if (forwardSpeed < 0)
+				{
+					forwardSpeed += movementRates->forwardDeceleration;
+					if (forwardSpeed > 0)
+					{
+						forwardSpeed = 0;
+					}
+				}
+				else if (forwardSpeed > 0)
+				{
+					forwardSpeed -= movementRates->forwardDeceleration;
+					if (forwardSpeed < 0)
+					{
+						forwardSpeed = 0;
+					}
+				}
+
+				if (forwardInput > 0 && forwardSpeed < movementRates->lateralSpeedLimit)
+				{
+					forwardSpeed += movementRates->forwardAcceleration + movementRates->forwardDeceleration;
+				}
+				if (forwardInput < 0 && forwardSpeed > -movementRates->lateralSpeedLimit)
+				{
+					forwardSpeed -= movementRates->forwardAcceleration + movementRates->forwardDeceleration;
+				}
+			}
+
+			if (lateralSpeed > movementRates->lateralSpeedLimit)
+			{
+				lateralSpeed = movementRates->lateralSpeedLimit;
+			}
+			if (lateralSpeed < -movementRates->lateralSpeedLimit)
+			{
+				lateralSpeed = -movementRates->lateralSpeedLimit;
+			}
+			if (forwardSpeed > movementRates->forwardSpeedLimit)
+			{
+				forwardSpeed = movementRates->forwardSpeedLimit;
+			}
+			if (forwardSpeed < -movementRates->forwardSpeedLimit)
+			{
+				forwardSpeed = -movementRates->forwardSpeedLimit;
+			}
+
+			buzz->forwardSpeed = forwardSpeed;
+			buzz->lateralSpeed = lateralSpeed;
+			int32_t yaw = buzz->posAngles.angles.yaw;
+			int32_t sine = Numerics::g_sinCosLUT[yaw] >> 2;
+			int32_t cosine = Numerics::g_sinCosLUT[(yaw + 0x400) & 0xFFF] >> 2;
+			buzz->velX = (lateralSpeed * cosine + forwardSpeed * sine) / 0x1000;
+			buzz->velForward = (forwardSpeed * cosine - lateralSpeed * sine) / 0x1000;
+		}
+
 		static __inline void StopRocketBoots()
 		{
 			if (g_rocketBootsTimer != 0)

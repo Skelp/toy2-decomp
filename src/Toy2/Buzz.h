@@ -8,6 +8,11 @@ namespace Toy2
 {
 	namespace Buzz
 	{
+		enum ActorFlags
+		{
+			ACTOR_FLAG_PRESERVE_HORIZONTAL_MOMENTUM = 0x200,
+		};
+
 		struct MovementRates
 		{
 			int32_t lateralDeceleration;
@@ -66,8 +71,8 @@ namespace Toy2
 			int32_t velX;
 			int32_t gravityVel;
 			int32_t velForward;
-			int32_t unkVar30;
-			int32_t unkVar31;
+			int32_t forwardSpeed;
+			int32_t lateralSpeed;
 			int16_t unkWord13;
 			int16_t actorHealth;
 			int32_t unkVar33;
@@ -92,6 +97,7 @@ namespace Toy2
 		void DeactivateRocketBoots();
 		void CancelGrapple();
 		void TickBeamShots();
+		void UpdateHorizontalMovement(Toy2BuzzActor* buzz, MovementRates* movementRates, int32_t forwardInput);
 
 		STATIC_ASSERT(sizeof(BeamShot) == 0x2C);
 		STATIC_ASSERT(sizeof(MovementRates) == 0x1C);
