@@ -3,6 +3,7 @@
 #include "Nu3D/Link.h"
 
 #include <limits.h>
+#include <string.h>
 
 namespace Toy2
 {
@@ -11,8 +12,31 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00830CCC
 		TokenState g_tokenStates[5];
 
+		// GLOBAL: TOY2 0x0050A150
+		TokenDialogueEntry g_tokenDialogueEntries[10];
+
 		// STUB: TOY2 0x00447DB0
 		void BuildPickupTable() {}
+
+		// FUNCTION: TOY2 0x004025C0
+		void LoadTokenTable(const TokenDialogueValue* values)
+		{
+			memset(g_tokenDialogueEntries, 0, sizeof(g_tokenDialogueEntries));
+
+			TokenDialogueEntry* destination = g_tokenDialogueEntries;
+			do
+			{
+				int32_t tokenId = values++->number;
+				if (tokenId < 0)
+					return;
+
+				destination->tokenId = tokenId;
+				destination->dialogueRecordIndex = values++->number;
+				destination->subtitle = values++->text;
+				destination->facingAngle = values++->number;
+				destination++;
+			} while (destination < &g_tokenDialogueEntries[10]);
+		}
 
 		// FUNCTION: TOY2 0x004A0DB0
 		void Activate(int32_t tokenIndex, int32_t skipCutscene)

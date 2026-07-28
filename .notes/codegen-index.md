@@ -90,6 +90,7 @@ reconstruction. `tools/decomp lint` reports those.
 - `CAP-23` **an immediate constant resolves to different data labels** — The instruction bytes match. reccmp names the same immediate from different nearby data symbols and reports an operand difference.
 - `CAP-24` **retail retains paired divisors on the x87 stack, but the build spills and reloads them** — In four related UV expressions, the frame, calls, values, and stores agree. Expression and local forms change the spill pattern but do not reproduce the retail schedule.
 - `CAP-25` **retail reserves one extra FPO stack slot, but every body instruction agrees** — The unused four-byte frame difference shifts parameter offsets only. Natural direct-expression and named-local forms emit the same smaller frame. Do not add a dummy local.
+- `CAP-26` **serialized words copy into a typed record with a different destination anchor** — Retail anchors the destination on the second field. The build anchors it on the third field. Keep the typed fields and do not use negative indexes.
 
 ## TOOL
 
