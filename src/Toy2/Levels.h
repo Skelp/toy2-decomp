@@ -123,8 +123,12 @@ namespace Toy2
 		extern uint8_t* g_levelDataHeapBasePtr;
 		extern int32_t g_levelLoadConfig;
 		extern uint8_t* g_levelLoadArena;
+		extern int32_t g_ambientEmitterScanIndex;
+		extern int32_t g_alternateAmbientEmitterStart;
 
 		void InitLevelPlay(int32_t levelId);
+		void DeactivateAmbientEmitter(int32_t emitterIndex, int32_t useAlternateType);
+		void UpdateAmbientEmitters();
 
 		STATIC_ASSERT(sizeof(RecordData) == 0x4);
 		STATIC_ASSERT(sizeof(ModelTypeData_A) == 0x24);

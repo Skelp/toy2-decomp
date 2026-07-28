@@ -521,8 +521,8 @@
 0x0049F460 Toy2::Actor::IsInsideBounds
 0x0049F490 Toy2::AdvanceFramePhase
 0x0049F4B0 Toy2::Game::MenuLoop
-0x0049FAB0 Toy2::Levels::Method3
-0x0049FB40 Toy2::Level::UpdateAmbientEmitters
+0x0049FAB0 Toy2::Levels::DeactivateAmbientEmitter
+0x0049FB40 Toy2::Levels::UpdateAmbientEmitters
 0x0049FC60 Toy2::HUD::TickSlide
 0x0049FD40 Toy2::RenderHUD
 0x004A0C80 Toy2::Collectables::Init

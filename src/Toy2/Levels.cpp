@@ -14,6 +14,7 @@
 #include "Toy2/Collectables.h"
 #include "Toy2/Actor.h"
 #include "Toy2/Animation.h"
+#include "Toy2/Camera.h"
 #include "AudioManager/AudioManager.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/Shadows.h"
@@ -50,6 +51,12 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x00559DF4
 		uint8_t* g_levelLoadArena;
+
+		// GLOBAL: TOY2 0x00830C9C
+		int32_t g_ambientEmitterScanIndex;
+
+		// GLOBAL: TOY2 0x00830E28
+		int32_t g_alternateAmbientEmitterStart;
 
 		// GLOBAL: TOY2 0x0054DE98
 		void* g_levelDataBase;
@@ -119,6 +126,68 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x00559C4C
 		ObjectDescCache* g_objectDescCache;
+
+		// FUNCTION: TOY2 0x0049FAB0
+		void DeactivateAmbientEmitter(int32_t emitterIndex, int32_t useAlternateType)
+		{
+			if (useAlternateType != 0)
+				emitterIndex += g_alternateAmbientEmitterStart;
+
+			Vector3I& emitterPosition = g_recordData[58]->data[emitterIndex];
+			if (emitterPosition.y != (int32_t)0x80000000)
+			{
+				const int32_t particleType = useAlternateType * 2 + 0x71;
+				for (int32_t particleIndex = 0; particleIndex < 64; particleIndex++)
+				{
+					Nu3D::Particles::ParticleInstance& particle = Nu3D::Particles::g_particleInstances[particleIndex];
+					if (particle.pos.y == emitterPosition.y && particle.lifetime > 0 && particle.pos.x == emitterPosition.x
+						&& particle.pos.z == emitterPosition.z && particle.typeId == particleType)
+					{
+						particle.lifetime = 1;
+						break;
+					}
+				}
+
+				emitterPosition.y = (int32_t)0x80000000;
+			}
+		}
+
+		// FUNCTION: TOY2 0x0049FB40
+		void UpdateAmbientEmitters()
+		{
+			if (g_sixteenTickPulse != 0 && g_recordData[58] != 0)
+			{
+				int32_t emitterIndex = g_ambientEmitterScanIndex;
+				if (emitterIndex < g_recordData[58]->recordCount)
+				{
+					Vector3I* emitterPosition = &g_recordData[58]->data[emitterIndex];
+					do
+					{
+						if (emitterPosition->y != (int32_t)0x80000000)
+						{
+							const int32_t distanceY = (Camera::g_renderCameraTransform.pos.y - emitterPosition->y) >> 8;
+							const int32_t distanceX = (Camera::g_renderCameraTransform.pos.x - emitterPosition->x) >> 8;
+							const int32_t distanceZ = (Camera::g_renderCameraTransform.pos.z - emitterPosition->z) >> 8;
+							const int32_t distanceSquared = distanceZ * distanceZ + distanceY * distanceY + distanceX * distanceX;
+							if (distanceSquared < 360000 && distanceSquared + 1 != 0)
+							{
+								if (emitterIndex < g_alternateAmbientEmitterStart)
+									Nu3D::Particles::SpawnFromPreset(emitterPosition->x, emitterPosition->y, emitterPosition->z, 0x71, 2);
+								else
+									Nu3D::Particles::SpawnFromPreset(emitterPosition->x, emitterPosition->y, emitterPosition->z, 0x73, 2);
+							}
+						}
+
+						emitterIndex += 4;
+						emitterPosition += 4;
+					} while (emitterIndex < g_recordData[58]->recordCount);
+				}
+
+				g_ambientEmitterScanIndex++;
+				if (g_ambientEmitterScanIndex >= g_recordData[58]->recordCount || g_ambientEmitterScanIndex >= 4)
+					g_ambientEmitterScanIndex = 0;
+			}
+		}
 
 		// FUNCTION: TOY2 0x004CEA20
 		void FlushRenderer()
