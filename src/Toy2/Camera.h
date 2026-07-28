@@ -3,6 +3,14 @@
 #include "Numerics.h"
 #include "Toy2/Buzz.h"
 
+namespace Nu3D
+{
+	namespace Camera
+	{
+		struct ActiveCameraTransform;
+	}
+}
+
 namespace Toy2
 {
 	namespace Camera
@@ -25,6 +33,7 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(GameplayCamera) == 0x34);
 
 		extern GameplayCamera g_gameplayCamera;
+		extern Nu3D::Camera::ActiveCameraTransform g_renderCameraTransform;
 		extern int32_t g_scriptedCameraState;
 
 		void InitGameplayCamera(GameplayCamera* camera, Buzz::Toy2BuzzActor* buzz);

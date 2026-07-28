@@ -286,6 +286,12 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0052AD68
 	uint16_t g_framePhase;
 
+	// GLOBAL: TOY2 0x0052AD61
+	uint8_t g_sixteenTickPhase;
+
+	// GLOBAL: TOY2 0x0052AD62
+	uint8_t g_thirtyTwoTickPhase;
+
 	// GLOBAL: TOY2 0x0055A0E0
 	int32_t g_hasStaticBackdrop;
 

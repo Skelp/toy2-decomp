@@ -4,7 +4,9 @@
 #include "Toy2/Toy2.h"
 #include "AudioManager/AudioManager.h"
 #include "InputManager.h"
+#include "Nu3D/Camera.h"
 #include "Nu3D/Link.h"
+#include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
 #include <string.h>
@@ -491,8 +493,49 @@ namespace Toy2
 			} while (shotsRemaining != 0);
 		}
 
-		// STUB: TOY2 0x004A5170
-		void TickCosmicShield() {}
+		// FUNCTION: TOY2 0x004A5170
+		void TickCosmicShield()
+		{
+			if (g_activeCosmicShieldPickup == 0)
+				return;
+
+			Vector3I shieldPosition;
+			shieldPosition.x = (g_buzzActor.posAngles.pos.x - Camera::g_renderCameraTransform.pos.x) >> 5;
+			shieldPosition.y = (g_buzzActor.posAngles.pos.y - Camera::g_renderCameraTransform.pos.y - 0x2000) >> 5;
+			shieldPosition.z = (g_buzzActor.posAngles.pos.z - Camera::g_renderCameraTransform.pos.z) >> 5;
+			Nu3D::Math::NormalizeToFixedPoint(&shieldPosition, &shieldPosition);
+			shieldPosition.x = (g_buzzActor.posAngles.pos.x - shieldPosition.x) >> 5;
+			shieldPosition.y = (g_buzzActor.posAngles.pos.y - shieldPosition.y - 0x2000) >> 5;
+			shieldPosition.z = (g_buzzActor.posAngles.pos.z - shieldPosition.z) >> 5;
+
+			Nu3D::Link::SetPositionRawAndCommit(g_activeCosmicShieldPickup->linkId, shieldPosition.x, shieldPosition.y, shieldPosition.z);
+			Nu3D::Link::SetRotationRelative8bit(g_activeCosmicShieldPickup->linkId, 0, g_cosmicShieldYaw, g_cosmicShieldRoll);
+
+			g_cosmicShieldYaw = -g_buzzActor.posAngles.angles.yaw & 0xFFF;
+			g_cosmicShieldRoll = (g_cosmicShieldRoll - (g_buzzActor.forwardSpeed >> 4) * Renderer::g_frameDelta) & 0xFFF;
+
+			int32_t playSound = 1;
+			int32_t scale;
+			if (g_buzzActor.cosmicShieldTimer < 0x80)
+			{
+				scale = (Numerics::g_sinCosLUT[g_buzzActor.cosmicShieldTimer * 8] >> 2) * 3;
+				if (g_sixteenTickPhase < 8)
+					playSound = 0;
+			}
+			else
+			{
+				scale = (Numerics::g_sinCosLUT[(g_buzzActor.cosmicShieldTimer & 0x3F) * 0x40] >> 4) + 0x3000;
+			}
+
+			Nu3D::Link::SetScaleFromFixedOffsets(g_activeCosmicShieldPickup->linkId, scale, scale, scale);
+			if (playSound != 0)
+			{
+				AudioManager::g_dynamicSoundFrequencies[0] = (int16_t)((0x800 - g_buzzActor.cosmicShieldTimer) * 4);
+				AudioManager::PlaySoundEffect(0x4D, &g_buzzActor.posAngles.pos);
+			}
+
+			Renderer::BlitTextureByIndexOffset(0x10, 0x80, 0xC0, 0x40, 0x40, g_sixteenTickPhase * 4, g_thirtyTwoTickPhase * 2, 0, -0x40);
+		}
 
 		// STUB: TOY2 0x004A5540
 		void TickGrapple() {}

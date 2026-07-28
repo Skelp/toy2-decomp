@@ -138,6 +138,7 @@ namespace AudioManager
 	extern int16_t g_maxLeftVolume;
 	extern int16_t g_maxRightVolume;
 	extern int16_t g_maxVolume;
+	extern int16_t g_dynamicSoundFrequencies[14];
 	extern OneShotSoundPreset g_oneShotPresets[218];
 
 	extern int32_t g_pendingStreamTrack;

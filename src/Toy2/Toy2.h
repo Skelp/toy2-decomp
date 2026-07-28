@@ -91,6 +91,8 @@ namespace Toy2
 	extern int32_t g_demoMode;
 	extern uint8_t g_fourTickPulse;
 	extern uint16_t g_framePhase;
+	extern uint8_t g_sixteenTickPhase;
+	extern uint8_t g_thirtyTwoTickPhase;
 	extern int32_t g_hasStaticBackdrop;
 	extern int32_t g_nextBackdropId;
 	extern int16_t g_levelIndex;

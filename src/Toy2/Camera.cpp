@@ -1,5 +1,6 @@
 #include "Toy2/Camera.h"
 #include "InputManager.h"
+#include "Nu3D/Camera.h"
 #include "Nu3D/Math.h"
 #include "Toy2/Toy2.h"
 #include <math.h>
@@ -10,6 +11,9 @@ namespace Toy2
 	{
 		// GLOBAL: TOY2 0x0052F3A0
 		GameplayCamera g_gameplayCamera;
+
+		// GLOBAL: TOY2 0x0052ADC0
+		Nu3D::Camera::ActiveCameraTransform g_renderCameraTransform;
 
 		// GLOBAL: TOY2 0x0050A13C
 		int32_t g_scriptedCameraState;
