@@ -3,6 +3,7 @@
 #include "Logger.h"
 #include "Nu3D/Camera.h"
 #include "Numerics.h"
+#include "Renderer/Renderer.h"
 #include <math.h>
 #include <cstring>
 #include <stdio.h>
@@ -622,6 +623,44 @@ namespace AudioManager
 	int32_t PlayOneShotSoundGlobal(int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume)
 	{ return PlaySoundBuffer(soundIndex + 1, leftVolume, rightVolume, 0, volume, 0); }
 
+	// FUNCTION: TOY2 0x004A3810
+	int32_t PlayOneShotSound3D(int32_t soundIndex, int32_t frequency, int32_t volume, const Vector3I* position)
+	{
+		int32_t z = position->z - Nu3D::Camera::g_fixedViewPosition.z;
+		int32_t y = position->y - Nu3D::Camera::g_fixedViewPosition.y;
+		int32_t x = position->x - Nu3D::Camera::g_fixedViewPosition.x;
+
+		const Nu3D::Camera::FixedViewTransform& view = Nu3D::Camera::g_fixedViewTransform;
+		int32_t viewX = (view.rotation.m00 * x + view.rotation.m01 * y + view.rotation.m02 * z) / 0x20000;
+		int32_t viewY = (view.rotation.m20 * x + view.rotation.m21 * y + view.rotation.m22 * z) / 0x20000 / 2;
+		int32_t viewYSquared = viewY * viewY;
+
+		int32_t distance = (int32_t)sqrt((double)((viewX + 0x400) * (viewX + 0x400) + viewYSquared));
+		int32_t leftVolume = ((0xc00 - distance) / 24) * volume / 128;
+		distance = (int32_t)sqrt((double)((viewX - 0x400) * (viewX - 0x400) + viewYSquared));
+		int32_t rightVolume = ((0xc00 - distance) / 24) * volume / 128;
+
+		if (leftVolume < 0)
+		{
+			leftVolume = 0;
+		}
+		else if (leftVolume > 128)
+		{
+			leftVolume = 128;
+		}
+		if (rightVolume < 0)
+		{
+			rightVolume = 0;
+		}
+		else if (rightVolume > 128)
+		{
+			rightVolume = 128;
+		}
+
+		PlaySoundBuffer(soundIndex + 1, leftVolume, rightVolume, 0, frequency, 0);
+		return (leftVolume + rightVolume) / 2;
+	}
+
 	// FUNCTION: TOY2 0x004A3C80
 	int32_t PlayOneShotSound3DActor(void* actor, int32_t soundIndex, int32_t frequency, int32_t volume, void* position, int32_t flag)
 	{
@@ -789,6 +828,48 @@ namespace AudioManager
 			if (g_maxVolume < header->volume * 2)
 			{
 				g_maxVolume = header->volume * 2;
+			}
+		}
+	}
+
+	// FUNCTION: TOY2 0x0049E9D0
+	void UpdateSoundSequences()
+	{
+		for (SoundSequenceSlot* slot = g_soundSequenceSlots; slot < g_soundSequenceSlots + 8; slot++)
+		{
+			if (slot->cursor == NULL)
+			{
+				continue;
+			}
+
+			slot->timer -= Renderer::g_frameDelta;
+			if (slot->timer >= 0)
+			{
+				continue;
+			}
+
+			SoundSequenceEvent* event = (SoundSequenceEvent*)slot->cursor;
+			while (event->soundIndex < 0)
+			{
+				if (event->soundIndex == -1)
+				{
+					slot->cursor = NULL;
+					break;
+				}
+				if (event->soundIndex != -2)
+				{
+					break;
+				}
+
+				event = (SoundSequenceEvent*)(slot->cursor - event->frequency * 2);
+				slot->cursor = (uint8_t*)event;
+			}
+
+			if (event->soundIndex >= 0)
+			{
+				PlayOneShotSound3D(event->soundIndex - 1, event->frequency, event->volume, &slot->position);
+				slot->timer = event->delay;
+				slot->cursor += sizeof(SoundSequenceEvent);
 			}
 		}
 	}

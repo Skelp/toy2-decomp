@@ -35,6 +35,16 @@ namespace AudioManager
 
 	STATIC_ASSERT(sizeof(SoundSequenceSlot) == 0x14);
 
+	struct SoundSequenceEvent
+	{
+		int16_t soundIndex;
+		int16_t frequency;
+		int16_t volume;
+		int16_t delay;
+	};
+
+	STATIC_ASSERT(sizeof(SoundSequenceEvent) == 0x8);
+
 	extern int32_t g_curTrackIndex;
 	extern int32_t g_loopingMusicTrackIndex;
 
@@ -70,9 +80,11 @@ namespace AudioManager
 	int32_t IsThreadReady();
 	void LoadSfxPackForLevel(int32_t levelId);
 	int32_t PlayOneShotSoundGlobal(int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume);
+	int32_t PlayOneShotSound3D(int32_t soundIndex, int32_t frequency, int32_t volume, const Vector3I* position);
 	int32_t PlayOneShotSound3DActor(void* actor, int32_t soundIndex, int32_t frequency, int32_t volume, void* position, int32_t flag);
 	void ClearSequence7Cursor();
 	void StartSoundSequenceOnActor(int32_t sequenceId, Vector3I* position);
+	void UpdateSoundSequences();
 	BOOL CALLBACK Enumerate(LPGUID lpGuid, LPCSTR lpcstrDescription, LPCSTR lpcstrModule, LPVOID lpContext);
 	void PlayMusicOneShot(int32_t trackIndex);
 	void PlaySoundEffect(int32_t soundIndex, const Vector3I* position);
