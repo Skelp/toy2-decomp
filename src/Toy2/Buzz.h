@@ -64,6 +64,7 @@ namespace Toy2
 		};
 
 		void Respawn();
+		void RefreshDiscAmmo();
 		void ResetGravityBoots();
 		void ActivateRocketBoots(GadgetPickup* pickup);
 		void DeactivateRocketBoots();
@@ -79,4 +80,6 @@ namespace Toy2
 	extern int32_t g_savedRocketBootsPickupY;
 	extern Buzz::GadgetPickup* g_activeCosmicShieldPickup;
 	extern int32_t g_savedCosmicShieldPickupY;
+	extern int32_t g_discLauncherAmmo;
+	extern int32_t g_discLauncherShotSlotsAvailable;
 }

@@ -21,6 +21,12 @@ namespace Toy2
 	// GLOBAL: TOY2 0x00882958
 	int32_t g_savedCosmicShieldPickupY;
 
+	// GLOBAL: TOY2 0x00882964
+	int32_t g_discLauncherAmmo;
+
+	// GLOBAL: TOY2 0x00882968
+	int32_t g_discLauncherShotSlotsAvailable;
+
 	static __inline void RestoreCosmicShieldPickup()
 	{
 		if (g_activeCosmicShieldPickup != 0)
@@ -72,6 +78,29 @@ namespace Toy2
 
 		// STUB: TOY2 0x00414110
 		void Respawn() {}
+
+		// FUNCTION: TOY2 0x004A4910 [MATCHED]
+		void RefreshDiscAmmo()
+		{
+			int32_t availableShots = 6;
+			g_discLauncherShotSlotsAvailable = availableShots;
+			if (g_discLauncherAmmo != 0)
+			{
+				for (int32_t particleIndex = 0; particleIndex < 64; particleIndex++)
+				{
+					const Nu3D::Particles::ParticleInstance& particle = Nu3D::Particles::g_particleInstances[particleIndex];
+					if ((particle.typeId == 0x47 || particle.typeId == 0x48) && particle.lifetime > 0)
+					{
+						availableShots--;
+					}
+				}
+				g_discLauncherShotSlotsAvailable = availableShots;
+				if (availableShots < 0)
+				{
+					g_discLauncherShotSlotsAvailable = 0;
+				}
+			}
+		}
 
 		// FUNCTION: TOY2 0x004A4B90 [MATCHED]
 		void ResetGravityBoots()
