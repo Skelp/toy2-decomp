@@ -900,6 +900,40 @@ namespace SoftwareRenderer
 		*blue = (colour & 0x000000ff) << 8;
 	}
 
+	// FUNCTION: TOY2 0x0047C800
+	void LockBackBuffer()
+	{
+		DDSURFACEDESC surfaceDesc;
+		memset(&surfaceDesc, 0, sizeof(surfaceDesc));
+		surfaceDesc.dwSize = sizeof(surfaceDesc);
+
+		HRESULT result;
+		do
+		{
+			result = D3DApp::g_d3dAppI.lpBackBuffer->Lock(NULL, &surfaceDesc, 0, NULL);
+		} while (result == DDERR_WASSTILLDRAWING);
+
+		if (result == DD_OK)
+		{
+			g_lockedBackBuffer = surfaceDesc.lpSurface;
+			return;
+		}
+
+		g_lockedBackBuffer = NULL;
+		Logger::Log("SOFT : ERROR - Failed to lock back buffer - %s.\n", Logger::ErrorToMessage(result));
+	}
+
+	// FUNCTION: TOY2 0x0047C870 [MATCHED]
+	void UnlockBackBuffer()
+	{
+		HRESULT result = D3DApp::g_d3dAppI.lpBackBuffer->Unlock(NULL);
+		g_lockedBackBuffer = NULL;
+		if (result != DD_OK)
+		{
+			Logger::Log("SOFT : ERROR - Failed to unlock back buffer - %s.\n", Logger::ErrorToMessage(result));
+		}
+	}
+
 	// STUB: TOY2 0x004C4370
 	void UnkFunc48(Nu3D::VertexTL* leftEdge,
 		Nu3D::VertexTL* rightEdge,

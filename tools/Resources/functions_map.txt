@@ -364,7 +364,7 @@
 0x004776C0 SoftwareRenderer::UnkRenderAPI27
 0x00477EB0 SoftwareRenderer::UnkRenderAPI34
 0x0047B170 RawLoader::DecompressBuffer
-0x0047C800 SoftwareRenderer::UnkFunc4
+0x0047C800 SoftwareRenderer::LockBackBuffer
 0x0047C870 SoftwareRenderer::UnlockBackBuffer
 0x0047C8B0 SoftwareRenderer::UnkFunc1
 0x0047CC90 Toy2::InitSoftwareRenderer

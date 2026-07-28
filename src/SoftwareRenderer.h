@@ -119,6 +119,8 @@ namespace SoftwareRenderer
 	void ZoomIn();
 	void PresentFrame();
 	void ShowBackBuffer();
+	void LockBackBuffer();
+	void UnlockBackBuffer();
 	void SetCameraNearFarZ(float nearZ, float farZ);
 	void UnpackColourChannels(uint32_t colour, int32_t* red, int32_t* green, int32_t* blue);
 
