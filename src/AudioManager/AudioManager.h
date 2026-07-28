@@ -60,7 +60,7 @@ namespace AudioManager
 	void ThreadPlay(char* path, int32_t looping);
 	int32_t LoadFile(char* path);
 	void FillBuffer();
-	int32_t PlaySoundBuffer(int32_t soundIndex, int32_t leftVolume, int32_t rightVolume, int32_t pan, int32_t volume, int32_t flags);
+	int32_t PlaySoundBuffer(int32_t soundIndex, int32_t leftVolume, int32_t rightVolume, void* owner, int32_t unused, int32_t looping);
 	int32_t IsEffectPlaying(int32_t index);
 	int32_t IsActorSoundPlaying(void* owner);
 	void ReleaseAllBuffers();
