@@ -169,6 +169,7 @@ namespace SoftwareRenderer
 	void BuildSubtractivePaletteTable();
 	void BuildPaletteBlendTable(uint8_t* output, int32_t blendWeight);
 	void BuildPaletteColourOffsetTable();
+	void SetNewPalette(const uint8_t* source, uint32_t tableFlags);
 
 	void UnkFunc8(int32_t highestBucket, int32_t clearValue);
 

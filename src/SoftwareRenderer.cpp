@@ -2890,6 +2890,52 @@ namespace SoftwareRenderer
 		} while (palette < g_paletteSource + sizeof(g_paletteSource) + 1);
 	}
 
+	enum PaletteTableFlags
+	{
+		PALETTE_TABLE_RGB = 0x1,
+		PALETTE_TABLE_BLEND = 0x10,
+		PALETTE_TABLE_ADDITIVE = 0x100,
+		PALETTE_TABLE_SUBTRACTIVE = 0x1000,
+		PALETTE_TABLE_COLOUR_OFFSET = 0x10000
+	};
+
+	// FUNCTION: TOY2 0x00471300 [MATCHED]
+	void SetNewPalette(const uint8_t* source, uint32_t tableFlags)
+	{
+		Logger::Log("SOFT : SetNewPalette.\n");
+		LoadPaletteEntries(source);
+
+		if (g_rgbToPaletteIndex == NULL)
+			g_rgbToPaletteIndex = (uint8_t*)malloc(0x8000);
+		if (g_paletteBlend25Table == NULL)
+			g_paletteBlend25Table = (uint8_t*)malloc(0x10000);
+		if (g_paletteBlend50Table == NULL)
+			g_paletteBlend50Table = (uint8_t*)malloc(0x10000);
+		if (g_paletteBlend75Table == NULL)
+			g_paletteBlend75Table = (uint8_t*)malloc(0x10000);
+		if (g_additivePaletteTable == NULL)
+			g_additivePaletteTable = (uint8_t*)malloc(0x10000);
+		if (g_subtractivePaletteTable == NULL)
+			g_subtractivePaletteTable = (uint8_t*)malloc(0x10000);
+		if (g_paletteColourOffsetTable == NULL)
+			g_paletteColourOffsetTable = (uint8_t*)malloc(0x20000);
+
+		if (tableFlags & PALETTE_TABLE_RGB)
+			BuildRGBToPaletteTable();
+		if (tableFlags & PALETTE_TABLE_BLEND)
+		{
+			BuildPaletteBlendTable(g_paletteBlend25Table, 0x100);
+			BuildPaletteBlendTable(g_paletteBlend50Table, 0x200);
+			BuildPaletteBlendTable(g_paletteBlend75Table, 0x300);
+		}
+		if (tableFlags & PALETTE_TABLE_ADDITIVE)
+			BuildAdditivePaletteTable();
+		if (tableFlags & PALETTE_TABLE_SUBTRACTIVE)
+			BuildSubtractivePaletteTable();
+		if (tableFlags & PALETTE_TABLE_COLOUR_OFFSET)
+			BuildPaletteColourOffsetTable();
+	}
+
 	// FUNCTION: TOY2 0x004AC1F0 [MATCHED]
 	int32_t UnkFunc20(TextureData* out)
 	{
