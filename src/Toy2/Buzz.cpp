@@ -12,8 +12,14 @@ namespace Toy2
 {
 	namespace EvilEmperorZurg
 	{
-		// STUB: TOY2 0x0042B2D0
-		void BuzzRespawn() {}
+		// FUNCTION: TOY2 0x0042B2D0 [MATCHED]
+		void BuzzRespawn()
+		{
+			g_buzzActor.respawnPos.x = -0x1DA7C;
+			g_buzzActor.respawnPos.y = -0x12BD0;
+			g_buzzActor.respawnPos.z = 0xF699;
+			g_buzzActor.respawnYawAngle = 0x400;
+		}
 	}
 
 	// GLOBAL: TOY2 0x005281A4
