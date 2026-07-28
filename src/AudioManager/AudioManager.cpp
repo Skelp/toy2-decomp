@@ -615,8 +615,122 @@ namespace AudioManager
 		return 1;
 	}
 
-	// STUB: TOY2 0x0047EC20
-	void LoadSfxPackForLevel(int32_t levelId) {}
+	struct SoundPackDescriptor
+	{
+		char** soundNames;
+		int32_t firstSoundIndex;
+	};
+
+	STATIC_ASSERT(sizeof(SoundPackDescriptor) == 0x8);
+
+	// GLOBAL: TOY2 0x004FD140
+	SoundPackDescriptor g_primarySoundPacks[17];
+
+	// GLOBAL: TOY2 0x004FD5E0
+	SoundPackDescriptor g_secondarySoundPacks[17];
+
+	// GLOBAL: TOY2 0x004FCDC0
+	int32_t g_currentSfxLevelId;
+
+	// FUNCTION: TOY2 0x0047EC20
+	void LoadSfxPackForLevel(int32_t levelId)
+	{
+		char waveName[256];
+		if (g_audioInitialized != 0)
+		{
+			if (IsStreamActive())
+			{
+				StopAndWait();
+				while (IsStreamActive()) {}
+			}
+
+			g_streamPending = 0;
+			if (g_audioInitialized != 0)
+			{
+				int32_t i;
+				for (i = 767; i >= 0; i--)
+				{
+					if (g_dsBuffers[i] != NULL)
+					{
+						if ((IsEffectPlaying(i) & 1) == 1)
+						{
+							g_dsBuffers[i]->Stop();
+						}
+						g_dsBuffers[i]->Release();
+						g_dsBuffers[i] = NULL;
+						g_loopingSoundOwners[i] = NULL;
+					}
+				}
+
+				for (i = 0; i < 768; i++)
+				{
+					g_dsBuffers[i] = NULL;
+				}
+				for (i = 0; i < 768; i++)
+				{
+					g_loopingSoundOwners[i] = NULL;
+				}
+				for (i = 0; i < 32; i++)
+				{
+					g_loopingSoundChannels[i][0] = -1;
+					g_loopingSoundChannels[i][1] = -1;
+				}
+			}
+		}
+
+		SoundPackDescriptor* pack = &g_primarySoundPacks[0];
+		char** soundName = pack->soundNames;
+		int32_t soundIndex = pack->firstSoundIndex;
+		while (*soundName != NULL)
+		{
+			if (**soundName != '\0')
+			{
+				sprintf(waveName, "%s.wav", *soundName);
+				LoadSoundEffect(waveName, soundIndex, 0);
+			}
+			soundName++;
+			soundIndex++;
+		}
+
+		if (levelId > 0)
+		{
+			if (levelId <= 16)
+			{
+				pack = &g_primarySoundPacks[levelId];
+				soundName = pack->soundNames;
+				soundIndex = pack->firstSoundIndex;
+				while (*soundName != NULL)
+				{
+					if (**soundName != '\0')
+					{
+						sprintf(waveName, "%s.wav", *soundName);
+						LoadSoundEffect(waveName, soundIndex, 0);
+					}
+					soundName++;
+					soundIndex++;
+				}
+			}
+
+			if (levelId <= 16)
+			{
+				pack = &g_secondarySoundPacks[levelId];
+				soundName = pack->soundNames;
+				soundIndex = pack->firstSoundIndex;
+				while (*soundName != NULL)
+				{
+					if (**soundName != '\0')
+					{
+						sprintf(waveName, "%s.wav", *soundName);
+						LoadSoundEffect(waveName, soundIndex, 0);
+					}
+					soundName++;
+					soundIndex++;
+				}
+			}
+		}
+
+		g_currentSfxLevelId = levelId;
+	}
 
 	// FUNCTION: TOY2 0x004A37E0 [MATCHED]
 	int32_t PlayOneShotSoundGlobal(int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume)
