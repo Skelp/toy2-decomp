@@ -7,6 +7,15 @@ namespace Toy2
 {
 	namespace Buzz
 	{
+		struct GadgetPickup
+		{
+			uint8_t reserved0[4];
+			int32_t state;
+			uint8_t reserved8[4];
+			uint8_t linkId;
+			uint8_t reservedD[3];
+		};
+
 		struct Toy2BuzzActor
 		{
 			PosAndAngles posAngles;
@@ -58,10 +67,15 @@ namespace Toy2
 
 		void Respawn();
 		void ResetGravityBoots();
+		void DeactivateRocketBoots();
 		void CancelGrapple();
 
+		STATIC_ASSERT(sizeof(GadgetPickup) == 0x10);
 		STATIC_ASSERT(sizeof(Toy2BuzzActor) == 0xA0);
 	}
 
 	extern Buzz::Toy2BuzzActor g_buzzActor;
+	extern int32_t g_rocketBootsTimer;
+	extern Buzz::GadgetPickup* g_activeRocketBootsPickup;
+	extern int32_t g_savedRocketBootsPickupState;
 }
