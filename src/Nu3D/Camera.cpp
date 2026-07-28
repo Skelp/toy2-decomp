@@ -142,84 +142,71 @@ namespace Nu3D
 		}
 
 		// FUNCTION: TOY2 0x004A1BE0
-		void FadeToTargetTint()
+		int32_t FadeToTargetTint()
 		{
-			int32_t anyChannelChanged = 0;
 			int32_t fadeStep = Renderer::g_frameDelta * g_targetTintFadeSpeed / 2;
+			int32_t anyChannelChanged = 0;
 
-			if (! fadeStep)
+			if (fadeStep)
 			{
-				g_targetTintFadeSpeed = 0;
-				return;
-			}
-
-			if (g_cameraTintBlue != g_targetTintBlue)
-			{
-				anyChannelChanged = 1;
-
-				if (g_cameraTintBlue >= g_targetTintBlue)
+				if (g_cameraTintBlue != g_targetTintBlue)
 				{
-					g_cameraTintBlue -= fadeStep;
-
-					if (g_cameraTintBlue >= g_targetTintBlue)
-						goto LBL_FADE_GREEN;
+					anyChannelChanged = 1;
+					if (g_cameraTintBlue < g_targetTintBlue)
+					{
+						g_cameraTintBlue += fadeStep;
+						if (g_cameraTintBlue > g_targetTintBlue)
+							g_cameraTintBlue = g_targetTintBlue;
+					}
+					else
+					{
+						g_cameraTintBlue -= fadeStep;
+						if (g_cameraTintBlue < g_targetTintBlue)
+							g_cameraTintBlue = g_targetTintBlue;
+					}
 				}
-				else
+
+				if (g_cameraTintGreen != g_targetTintGreen)
 				{
-					g_cameraTintBlue += fadeStep;
-
-					if (g_cameraTintBlue <= g_targetTintBlue)
-						goto LBL_FADE_GREEN;
+					anyChannelChanged = 1;
+					if (g_cameraTintGreen < g_targetTintGreen)
+					{
+						g_cameraTintGreen += fadeStep;
+						if (g_cameraTintGreen > g_targetTintGreen)
+							g_cameraTintGreen = g_targetTintGreen;
+					}
+					else
+					{
+						g_cameraTintGreen -= fadeStep;
+						if (g_cameraTintGreen < g_targetTintGreen)
+							g_cameraTintGreen = g_targetTintGreen;
+					}
 				}
-				g_cameraTintBlue = g_targetTintBlue;
-			}
 
-		LBL_FADE_GREEN:
+				if (g_cameraTintRed != g_targetTintRed)
+				{
+					anyChannelChanged = 1;
+					if (g_cameraTintRed < g_targetTintRed)
+					{
+						g_cameraTintRed += fadeStep;
+						if (g_cameraTintRed > g_targetTintRed)
+							g_cameraTintRed = g_targetTintRed;
+					}
+					else
+					{
+						g_cameraTintRed -= fadeStep;
+						if (g_cameraTintRed < g_targetTintRed)
+							g_cameraTintRed = g_targetTintRed;
+					}
+					return anyChannelChanged;
+				}
 
-			if (g_cameraTintGreen == g_targetTintGreen)
-				goto LBL_FADE_RED;
-
-			anyChannelChanged = 1;
-
-			if (g_cameraTintGreen >= g_targetTintGreen)
-			{
-				g_cameraTintGreen -= fadeStep;
-				if (g_cameraTintGreen >= g_targetTintGreen)
-					goto LBL_FADE_RED;
-			}
-			else
-			{
-				g_cameraTintGreen += fadeStep;
-
-				if (g_cameraTintGreen <= g_targetTintGreen)
-					goto LBL_FADE_RED;
-			}
-
-			g_cameraTintGreen = g_targetTintGreen;
-
-		LBL_FADE_RED:
-
-			if (g_cameraTintRed == g_targetTintRed)
-			{
 				if (anyChannelChanged)
-					return;
-
-				g_targetTintFadeSpeed = 0;
-				return;
+					return anyChannelChanged;
 			}
 
-			if (g_cameraTintRed >= g_targetTintRed)
-			{
-				g_cameraTintRed -= fadeStep;
-				if (g_cameraTintRed < g_targetTintRed)
-					g_cameraTintRed = g_targetTintRed;
-			}
-			else
-			{
-				g_cameraTintRed += fadeStep;
-				if (g_cameraTintRed > g_targetTintRed)
-					g_cameraTintRed = g_targetTintRed;
-			}
+			g_targetTintFadeSpeed = 0;
+			return anyChannelChanged;
 		}
 
 		// STUB: TOY2 0x00446FC0

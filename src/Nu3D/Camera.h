@@ -95,7 +95,7 @@ namespace Nu3D
 
 		void SetTint(uint8_t blue, uint8_t green, uint8_t red, uint8_t fadeSpeed);
 		void InitViewMatrixGlobals();
-		void FadeToTargetTint();
+		int32_t FadeToTargetTint();
 		void SetupViewMatrix(ActiveCameraTransform* camera);
 		void SetObjectViewMatrix(const FixedViewTransform* transform);
 		void SetObjectViewPosition(const FixedViewTransform* transform);
