@@ -504,13 +504,12 @@ namespace Toy2
 			if (g_discLauncherShotSlotsAvailable <= 0)
 				return;
 
-			Actor::Toy2Actor* targetActor;
+			Actor::Toy2Actor* targetActor = 0;
 			if (Camera::g_scriptedCameraState >= 3)
 			{
 				if (g_aimTargetIndex != -1 && g_aimTargetIndex < 1000)
 				{
 					targetActor = &Actor::g_creatureActors[g_aimTargetIndex];
-					goto spawnHomingDisc;
 				}
 			}
 			else
@@ -536,32 +535,33 @@ namespace Toy2
 					actorSlot++;
 					actor = *actorSlot;
 				}
-				if (nearestDistanceSquared < 0x1000000)
-					goto spawnHomingDisc;
+				if (nearestDistanceSquared >= 0x1000000)
+					targetActor = 0;
 			}
 
-			Nu3D::Particles::SpawnInstance(g_aimTargetPosition.x,
-				g_aimTargetPosition.y,
-				g_aimTargetPosition.z,
-				(Numerics::g_sinCosLUT[(int16_t)g_buzzActor.posAngles.angles.yaw & 0xFFF] * Numerics::g_sinCosLUT[(launchPitch + 0x400) & 0xFFF] >> 14) / 3,
-				-Numerics::g_sinCosLUT[launchPitch & 0xFFF] / 3,
-				(Numerics::g_sinCosLUT[((int16_t)g_buzzActor.posAngles.angles.yaw + 0x400) & 0xFFF] * Numerics::g_sinCosLUT[(launchPitch + 0x400) & 0xFFF]
-					>> 14)
-					/ 3,
-				0,
-				0,
-				0,
-				0x48);
-			goto finishDiscShot;
+			if (targetActor != 0)
+			{
+				Nu3D::Particles::ParticleInstance* disc = Nu3D::Particles::SpawnInstance(
+					g_aimTargetPosition.x, g_aimTargetPosition.y, g_aimTargetPosition.z, 0, -2, 0, (int16_t)g_buzzActor.posAngles.angles.yaw << 2, 0, 0, 0x47);
+				disc->targetActor = targetActor;
+				disc->discPitchAngle = launchPitch & 0xFFF;
+			}
+			else
+			{
+				Nu3D::Particles::SpawnInstance(g_aimTargetPosition.x,
+					g_aimTargetPosition.y,
+					g_aimTargetPosition.z,
+					(Numerics::g_sinCosLUT[(int16_t)g_buzzActor.posAngles.angles.yaw & 0xFFF] * Numerics::g_sinCosLUT[(launchPitch + 0x400) & 0xFFF] >> 14) / 3,
+					-Numerics::g_sinCosLUT[launchPitch & 0xFFF] / 3,
+					(Numerics::g_sinCosLUT[((int16_t)g_buzzActor.posAngles.angles.yaw + 0x400) & 0xFFF] * Numerics::g_sinCosLUT[(launchPitch + 0x400) & 0xFFF]
+						>> 14)
+						/ 3,
+					0,
+					0,
+					0,
+					0x48);
+			}
 
-		spawnHomingDisc: {
-			Nu3D::Particles::ParticleInstance* disc = Nu3D::Particles::SpawnInstance(
-				g_aimTargetPosition.x, g_aimTargetPosition.y, g_aimTargetPosition.z, 0, -2, 0, (int16_t)g_buzzActor.posAngles.angles.yaw << 2, 0, 0, 0x47);
-			disc->targetActor = targetActor;
-			disc->discPitchAngle = launchPitch & 0xFFF;
-		}
-
-		finishDiscShot:
 			AudioManager::PlaySoundEffect(0x54, &g_buzzActor.posAngles.pos);
 			g_discLauncherShotSlotsAvailable--;
 			g_discLauncherAmmo--;
