@@ -80,6 +80,7 @@ namespace Toy2
 		void ActivateRocketBoots(GadgetPickup* pickup);
 		void DeactivateRocketBoots();
 		void CancelGrapple();
+		void TickBeamShots();
 
 		STATIC_ASSERT(sizeof(BeamShot) == 0x2C);
 		STATIC_ASSERT(offsetof(BeamShot, fadeTimer) == 0x24);

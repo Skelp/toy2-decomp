@@ -19,6 +19,14 @@ struct Vector3I
 	int32_t z;
 };
 
+struct Vector4I
+{
+	int32_t x;
+	int32_t y;
+	int32_t z;
+	int32_t w;
+};
+
 struct Vector2F
 {
 	float x;

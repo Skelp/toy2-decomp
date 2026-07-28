@@ -149,6 +149,18 @@ namespace Renderer
 	void DrawBlackBorderBox(int32_t xPos, int32_t yPos, int32_t width, int32_t height, uint32_t red, uint32_t green, uint32_t blue);
 	void DrawTintOverlay();
 
+	namespace Beam
+	{
+		void QueueBeam(uint32_t textureIndex,
+			uint32_t width,
+			int32_t segmentLength,
+			const Vector4I* position,
+			const Vector4I* direction,
+			uint32_t red,
+			uint32_t green,
+			uint32_t blue);
+	}
+
 	void InitRenderState(int32_t newStage);
 	int32_t SetupMaterialRenderState(Nu3D::Material* material, int32_t stateFlags);
 	void ResetParallax();

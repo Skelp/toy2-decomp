@@ -3,6 +3,7 @@
 #include "AudioManager/AudioManager.h"
 #include "Nu3D/Link.h"
 #include "Nu3D/Particles.h"
+#include "Renderer/Renderer.h"
 #include <string.h>
 
 namespace Toy2
@@ -184,6 +185,57 @@ namespace Toy2
 				}
 				g_grappleState = 0;
 			}
+		}
+
+		// FUNCTION: TOY2 0x004A5C40 [MATCHED]
+		void TickBeamShots()
+		{
+			BeamShot* shot = g_beamShots;
+			int32_t shotsRemaining = 4;
+			do
+			{
+				if (shot->fadeTimer != 0)
+				{
+					Vector4I position;
+					position.x = shot->end.x;
+					position.y = shot->end.y;
+					position.z = shot->end.z;
+					Vector4I direction;
+					direction.x = shot->start.x - position.x;
+					direction.y = shot->start.y - position.y;
+					direction.z = shot->start.z - position.z;
+
+					int32_t brightness = shot->fadeTimer * 4;
+					Renderer::Beam::QueueBeam(9,
+						shot->color.a,
+						400,
+						&position,
+						&direction,
+						shot->color.b * brightness >> 7,
+						shot->color.g * brightness >> 7,
+						shot->color.r * brightness >> 7);
+
+					shot->fadeTimer -= (int16_t)Renderer::g_frameDelta;
+					if (shot->fadeTimer <= 0)
+					{
+						shot->fadeTimer = 0;
+					}
+
+					shot->movementTimer -= (int16_t)Renderer::g_frameDelta;
+					if (shot->movementTimer <= 0)
+					{
+						shot->fadeTimer = 0;
+					}
+					else
+					{
+						shot->start.x += shot->velocity.x * Renderer::g_frameDelta;
+						shot->start.y += shot->velocity.y * Renderer::g_frameDelta;
+						shot->start.z += shot->velocity.z * Renderer::g_frameDelta;
+					}
+				}
+				shot++;
+				shotsRemaining--;
+			} while (shotsRemaining != 0);
 		}
 	}
 }
