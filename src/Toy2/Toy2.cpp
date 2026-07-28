@@ -493,6 +493,111 @@ namespace Toy2
 		} while (fadeTimer != 0);
 	}
 
+	// FUNCTION: TOY2 0x00414320 [MATCHED]
+	int32_t ShowLevelIntroScreen(int32_t backgroundId, int32_t displayMode)
+	{
+		int32_t result = 0;
+		int32_t autoAdvanceTimer;
+		int32_t fadeTimer;
+		int32_t isFadingOut;
+		int32_t slidePhase;
+		int32_t blinkTimer;
+
+		if (displayMode != 0 && displayMode != 123)
+		{
+			Nu3D::Camera::SetTint(0, 0, 0, 12);
+			Nu3D::Camera::g_cameraTintBlue = Nu3D::Camera::g_targetTintBlue;
+			Nu3D::Camera::g_cameraTintGreen = Nu3D::Camera::g_targetTintGreen;
+			Nu3D::Camera::g_cameraTintRed = Nu3D::Camera::g_targetTintRed;
+			Nu3D::Camera::g_targetTintFadeSpeed = 0;
+			goto cleanup;
+		}
+
+		if (g_attractModeTimer >= 0)
+		{
+			autoAdvanceTimer = g_attractModeTimer * 2;
+		}
+		else
+		{
+			autoAdvanceTimer = -1;
+		}
+
+		if (displayMode != 0 && displayMode != 123)
+		{
+			Nu3D::Camera::SetTint(0, 0, 0, 12);
+			slidePhase = 0x400;
+			isFadingOut = 1;
+		}
+		else
+		{
+			isFadingOut = 0;
+			slidePhase = 0;
+		}
+
+		blinkTimer = 0;
+		SoftwareRenderer::g_backdropScrollOverride.x = 0;
+		SoftwareRenderer::g_backdropScrollOverride.y = 0;
+		fadeTimer = 28;
+
+		do
+		{
+			if (isFadingOut)
+			{
+				fadeTimer -= Renderer::g_frameDelta;
+				if (fadeTimer <= 0)
+				{
+					fadeTimer = 0;
+				}
+			}
+
+			if (autoAdvanceTimer > 0)
+			{
+				autoAdvanceTimer -= Renderer::g_frameDelta;
+				if (autoAdvanceTimer <= 0)
+				{
+					InputManager::g_curButtonsPressed |= INPUT_SECRET_MENU;
+					autoAdvanceTimer = 0;
+				}
+			}
+
+			if ((InputManager::g_curButtonsPressed & INPUT_JUMP) != 0 && (InputManager::g_prevButtonsPressed & INPUT_JUMP) == 0 && ! isFadingOut)
+			{
+				Nu3D::Camera::SetTint(0, 0, 0, 12);
+				isFadingOut = 1;
+				AudioManager::PlaySoundEffect(7, 0);
+			}
+
+			if ((InputManager::g_curButtonsPressed & INPUT_SECRET_MENU) != 0 && ! isFadingOut && g_attractModeTimer >= 0)
+			{
+				Nu3D::Camera::SetTint(0, 0, 0, 12);
+				isFadingOut = 1;
+				result = 1;
+			}
+
+			Nu3D::Camera::FadeToTargetTint();
+			blinkTimer = (blinkTimer + Renderer::g_frameDelta) & 0x3f;
+			if (blinkTimer > 30)
+			{
+				Renderer::Sprite::DrawScaled(96, 200, 128, 0, 255, 255, 255, 255, 2048, 2048);
+			}
+
+			if (slidePhase < 0x400 && displayMode != 123)
+			{
+				slidePhase += Renderer::g_frameDelta * 32;
+				Renderer::Sprite::DrawScaled(96, 264 - (Numerics::g_sinCosLUT[slidePhase + 0x400] >> 8), 128, 1, 255, 255, 255, 255, 2048, 2048);
+			}
+
+			Nullsub3();
+			MainMenu::RenderMenu();
+		} while (fadeTimer != 0);
+
+	cleanup:
+		ResetBackdropState();
+		SoftwareRenderer::g_backdropScrollOverride.x = -32768;
+		SoftwareRenderer::g_backdropScrollOverride.y = -32768;
+		return result;
+	}
+
 	// FUNCTION: TOY2 0x00453D90 [MATCHED]
 	void ShowActClearScreen()
 	{

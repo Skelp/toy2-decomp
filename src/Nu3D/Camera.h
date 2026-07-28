@@ -87,6 +87,10 @@ namespace Nu3D
 		extern int16_t g_cameraTintBlue;
 		extern int16_t g_cameraTintGreen;
 		extern int16_t g_cameraTintRed;
+		extern uint8_t g_targetTintBlue;
+		extern uint8_t g_targetTintGreen;
+		extern uint8_t g_targetTintRed;
+		extern uint8_t g_targetTintFadeSpeed;
 
 		void SetTint(uint8_t blue, uint8_t green, uint8_t red, uint8_t fadeSpeed);
 		void InitViewMatrixGlobals();
