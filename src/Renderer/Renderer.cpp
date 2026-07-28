@@ -89,6 +89,9 @@ namespace Renderer
 	// GLOBAL: TOY2 0x00884484
 	int32_t g_isSoftwareRendering;
 
+	// GLOBAL: TOY2 0x00508218
+	int32_t g_textureBlitsEnabled = 1;
+
 	// GLOBAL: TOY2 0x0052F2D4
 	int32_t g_frameDelta;
 
@@ -1119,10 +1122,74 @@ namespace Renderer
 		}
 	}
 
-	// STUB: TOY2 0x004AFD30
+	// FUNCTION: TOY2 0x004AFD30
 	void BlitBitmapWithWrapping(
 		Nu3D::BmpDataNode* bitmap, int32_t sourceX, int32_t sourceY, int32_t width, int32_t height, int32_t wrapX, int32_t wrapY, int32_t destX, int32_t destY)
-	{}
+	{
+		if (g_textureBlitsEnabled == 0)
+		{
+			return;
+		}
+
+		DDBLTFX blitEffects;
+		blitEffects.dwSize = sizeof(DDBLTFX);
+		blitEffects.dwROP = SRCCOPY;
+		LPDIRECTDRAWSURFACE4 surface = bitmap->surface;
+
+		RECT sourceRect;
+		RECT destRect;
+		if (wrapY == 0)
+		{
+			int32_t sourceRight = sourceX + width;
+			int32_t sourceBottom = sourceY + height;
+			int32_t destRight = destX + width;
+			int32_t destBottom = destY + height;
+
+			sourceRect.left = sourceX + wrapX;
+			sourceRect.top = sourceY;
+			sourceRect.right = sourceRight - wrapX;
+			sourceRect.bottom = sourceBottom;
+
+			destRect.left = destX;
+			destRect.top = destY;
+			destRect.right = destRight - wrapX;
+			destRect.bottom = destBottom;
+			surface->Blt(&destRect, surface, &sourceRect, DDBLT_ROP | DDBLT_WAIT, &blitEffects);
+
+			if (wrapX != 0)
+			{
+				sourceRect.left = sourceX;
+				sourceRect.right = sourceX + wrapX;
+				destRect.left = destRight - wrapX;
+				destRect.right = destRight;
+				surface->Blt(&destRect, surface, &sourceRect, DDBLT_ROP | DDBLT_WAIT, &blitEffects);
+			}
+		}
+		else
+		{
+			int32_t sourceRight = sourceX + width;
+			int32_t sourceBottom = sourceY + height;
+			int32_t destRight = destX + width;
+			int32_t destBottom = destY + height;
+
+			sourceRect.left = sourceX;
+			sourceRect.top = sourceY + wrapY;
+			sourceRect.right = sourceRight;
+			sourceRect.bottom = sourceBottom;
+
+			destRect.left = destX;
+			destRect.top = destY;
+			destRect.right = destRight;
+			destRect.bottom = destBottom - wrapY;
+			surface->Blt(&destRect, surface, &sourceRect, DDBLT_ROP | DDBLT_WAIT, &blitEffects);
+
+			sourceRect.top = sourceY;
+			sourceRect.bottom = sourceY + wrapY;
+			destRect.top = destBottom - wrapY;
+			destRect.bottom = destBottom;
+			surface->Blt(&destRect, surface, &sourceRect, DDBLT_ROP | DDBLT_WAIT, &blitEffects);
+		}
+	}
 
 	// FUNCTION: TOY2 0x004CE510
 	void BlitTextureByIndex(
