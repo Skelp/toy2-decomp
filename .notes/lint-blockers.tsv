@@ -1,3 +1,4 @@
 # Lint items that need another reconstruction dependency.
 # addresses	checks	dependency
 0x004C2AB0,0x004C2BE0,0x004C2D20,0x004C2E70	signature-concealment	Confirm a shared ABI-compatible type for D3DVECTOR and Vector3F, or add an overload that preserves the retail call targets.
+0x004CA420	unnamed-bitmask	Reconstruct Nu3D::Scene::RenderActor at 0x004CAA60 to identify the copied node flag bits 2 and 4.

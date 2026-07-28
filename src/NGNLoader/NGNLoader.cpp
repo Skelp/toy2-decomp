@@ -573,7 +573,7 @@ namespace NGNLoader
 				case 0x201:
 					if (creature)
 					{
-						creature->dataFlags |= 1;
+						creature->dataFlags |= Nu3D::CREATURE_DATA_MATRICES;
 						creature->matrixList1 = (D3DMATRIX*)malloc(sizeof(D3DMATRIX) * creature->nodeCount);
 						creature->matrixList2 = (D3DMATRIX*)malloc(sizeof(D3DMATRIX) * creature->nodeCount);
 						creature->matrixList3 = (D3DMATRIX*)malloc(sizeof(D3DMATRIX) * creature->nodeCount);
@@ -591,7 +591,7 @@ namespace NGNLoader
 				case 0x202:
 					if (creature)
 					{
-						creature->dataFlags |= 2;
+						creature->dataFlags |= Nu3D::CREATURE_DATA_NODE_NAMES;
 						creature->nodeNames = (char**)malloc(sizeof(char*) * creature->nodeCount);
 						if (creature->nodeNames)
 						{
@@ -613,7 +613,7 @@ namespace NGNLoader
 				case 0x203:
 					if (creature)
 					{
-						creature->dataFlags |= 4;
+						creature->dataFlags |= Nu3D::CREATURE_DATA_PRIMITIVES;
 						creature->primitives = (Nu3D::Primitive**)malloc(sizeof(Nu3D::Primitive*) * creature->nodeCount);
 						creature->nodeMetadata = (int32_t*)malloc(sizeof(int32_t) * creature->nodeCount);
 

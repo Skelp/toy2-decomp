@@ -8,6 +8,16 @@ namespace NGNLoader
 {
 	namespace ObjectLoad
 	{
+		enum VertexDataFlags
+		{
+			VERTEX_DATA_POSITION = 0x1,
+			VERTEX_DATA_NORMAL = 0x2,
+			VERTEX_DATA_DIFFUSE_COLOR = 0x4,
+			VERTEX_DATA_SPECULAR_COLOR = 0x8,
+			VERTEX_DATA_TEXCOORD_COUNT_SHIFT = 4,
+			VERTEX_DATA_TEXCOORD_COUNT_MASK = 0xF0,
+		};
+
 		// GLOBAL: TOY2 0x00B0574C
 		Nu3D::Primitive* g_curPrimObject;
 
@@ -325,19 +335,19 @@ namespace NGNLoader
 
 			int32_t vertexSize = vertexDataLength;
 
-			if (vertexFlags & 1)
-				vertexSize -= 12; // position
+			if (vertexFlags & VERTEX_DATA_POSITION)
+				vertexSize -= 12;
 
-			if (vertexFlags & 2)
-				vertexSize -= 12; // normals
+			if (vertexFlags & VERTEX_DATA_NORMAL)
+				vertexSize -= 12;
 
-			if (vertexFlags & 4)
-				vertexSize -= 4; // diffuse color
+			if (vertexFlags & VERTEX_DATA_DIFFUSE_COLOR)
+				vertexSize -= 4;
 
-			if (vertexFlags & 8)
-				vertexSize -= 4; // specular color
+			if (vertexFlags & VERTEX_DATA_SPECULAR_COLOR)
+				vertexSize -= 4;
 
-			int32_t sizeCheck = vertexSize - 8 * (vertexFlags >> 4); // texcoord sets, 8 bytes each
+			int32_t sizeCheck = vertexSize - 8 * (vertexFlags >> VERTEX_DATA_TEXCOORD_COUNT_SHIFT);
 
 			if (sizeCheck < 0)
 				Logger::GetErrorHandler("C:\\projects\\nu3d\\objload.c", 449)("Given vertex size is not big enough to contain specified data");
@@ -353,7 +363,7 @@ namespace NGNLoader
 					shapeVertex->primVerticesSize = 65535;
 					shapeVertex->primIndex = 65535;
 
-					if (vertexFlags & 1)
+					if (vertexFlags & VERTEX_DATA_POSITION)
 					{
 						fread(shapeVertex, sizeof(Vector3F), 1, stream);
 
@@ -366,7 +376,7 @@ namespace NGNLoader
 						Logger::GetErrorHandler("C:\\projects\\nu3d\\objload.c", 462)("Vertex must contain a position");
 					}
 
-					if (vertexFlags & 2)
+					if (vertexFlags & VERTEX_DATA_NORMAL)
 					{
 						fread(&shapeVertex->normals, sizeof(Vector3F), 1, stream);
 					}
@@ -379,7 +389,7 @@ namespace NGNLoader
 
 					ARGB color;
 
-					if (vertexFlags & 4)
+					if (vertexFlags & VERTEX_DATA_DIFFUSE_COLOR)
 					{
 						fread(&color, sizeof(uint8_t), sizeof(ARGB), stream);
 					}
@@ -414,7 +424,7 @@ namespace NGNLoader
 
 					shapeVertex->diffuse.r = (uint8_t)scaled;
 
-					if (vertexFlags & 8)
+					if (vertexFlags & VERTEX_DATA_SPECULAR_COLOR)
 					{
 						fread(&color, sizeof(uint8_t), sizeof(ARGB), stream);
 					}
@@ -426,7 +436,7 @@ namespace NGNLoader
 						color.a = 255;
 					}
 
-					if (vertexFlags & 240)
+					if (vertexFlags & VERTEX_DATA_TEXCOORD_COUNT_MASK)
 					{
 						fread(&shapeVertex->coords, 4, 2, stream);
 					}
@@ -565,7 +575,7 @@ namespace NGNLoader
 				int32_t effectiveRenderFlags = Nu3D::g_defaultPrimitiveFlags | primObject->renderFlags;
 				primObject->renderFlags = effectiveRenderFlags;
 
-				if ((g_curVertexFlags & 4) != 0)
+				if ((g_curVertexFlags & VERTEX_DATA_DIFFUSE_COLOR) != 0)
 					primObject->renderFlags = effectiveRenderFlags | 0x40001000;
 
 				if (materialIndex >= g_curMaterialCount)
@@ -748,7 +758,7 @@ namespace NGNLoader
 							verticesSize = localVertCount;
 						}
 
-						if ((g_curVertexFlags & 4) != 0)
+						if ((g_curVertexFlags & VERTEX_DATA_DIFFUSE_COLOR) != 0)
 						{
 							if (Nu3D::g_useAsDiffuseModulation)
 							{

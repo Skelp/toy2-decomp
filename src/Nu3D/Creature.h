@@ -8,6 +8,13 @@
 
 namespace Nu3D
 {
+	enum CreatureDataFlags
+	{
+		CREATURE_DATA_MATRICES = 0x1,
+		CREATURE_DATA_NODE_NAMES = 0x2,
+		CREATURE_DATA_PRIMITIVES = 0x4,
+	};
+
 	struct Creature
 	{
 		int32_t dataFlags;
