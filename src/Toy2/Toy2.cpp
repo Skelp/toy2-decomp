@@ -220,6 +220,15 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0052AD7C
 	int32_t g_demoPathWriteIdx;
 
+	// GLOBAL: TOY2 0x00882920
+	int32_t g_gravityBootsTimer;
+
+	// GLOBAL: TOY2 0x00882938
+	int32_t g_grappleCharges;
+
+	// GLOBAL: TOY2 0x00882950
+	int32_t g_grappleState;
+
 	// GLOBAL: TOY2 0x0052EF40
 	int32_t g_demoInputRunLength;
 

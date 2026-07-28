@@ -36,6 +36,9 @@ namespace Toy2
 	extern int32_t g_perspectiveScaleFixed;
 	extern int32_t g_perspectiveDivideTable[0x8000];
 	extern int32_t g_perspectiveHalfScale;
+	extern int32_t g_gravityBootsTimer;
+	extern int32_t g_grappleCharges;
+	extern int32_t g_grappleState;
 	extern int32_t g_destRectWidth;
 	extern int32_t g_screenClipRightFixed;
 	extern int32_t g_softWindowWidth;

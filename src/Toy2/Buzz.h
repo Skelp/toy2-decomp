@@ -57,6 +57,8 @@ namespace Toy2
 		};
 
 		void Respawn();
+		void ResetGravityBoots();
+		void CancelGrapple();
 
 		STATIC_ASSERT(sizeof(Toy2BuzzActor) == 0xA0);
 	}
