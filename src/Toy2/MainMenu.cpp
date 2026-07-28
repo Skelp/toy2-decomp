@@ -275,10 +275,8 @@ namespace Toy2
 
 				AudioManager::PlayMusicOneShot(20);
 
-				while (! g_nextScreen)
+				while (! g_nextScreen || g_fadeTimer)
 				{
-				LBL_TITLE_FRAME:
-
 					Nu3D::Camera::FadeToTargetTint();
 
 					if (g_fadeTimer > 0)
@@ -301,32 +299,32 @@ namespace Toy2
 					Nullsub3();
 					RenderMenu();
 
-					if (g_attractModeTimer < 0)
+					if (! g_nextScreen)
 					{
-						if (elapsedTicks > timeoutTicks && ! g_nextScreen)
+						if (g_attractModeTimer < 0)
 						{
-							g_nextScreen = 1;
+							if (elapsedTicks > timeoutTicks)
+								g_nextScreen = 1;
+						}
+						else if ((InputManager::g_curButtonsPressed & INPUT_SECRET_MENU) != 0 || elapsedTicks > timeoutTicks)
+						{
+							if (showPressJumpPrompt)
+								g_nextScreen = 10;
+							else
+								g_nextScreen = (InputManager::g_curButtonsPressed & INPUT_SECRET_MENU) != 0 ? 10 : 1;
+						}
 
-						LBL_BEGIN_FADE_OUT:
-
+						if (g_nextScreen)
+						{
 							g_fadeTimer = 23;
 							Nu3D::Camera::SetTint(0, 0, 0, 12);
 						}
-					}
-					else if (((InputManager::g_curButtonsPressed & INPUT_SECRET_MENU) != 0 || elapsedTicks > timeoutTicks) && ! g_nextScreen)
-					{
-						if (showPressJumpPrompt)
-							g_nextScreen = 10;
-						else
-							g_nextScreen = (InputManager::g_curButtonsPressed & INPUT_SECRET_MENU) != 0 ? 10 : 1;
-
-						goto LBL_BEGIN_FADE_OUT;
 					}
 
 					if ((InputManager::g_curButtonsPressed & INPUT_JUMP) != 0 && (InputManager::g_prevButtonsPressed & INPUT_JUMP) == 0)
 					{
 						if (g_nextScreen)
-							break;
+							continue;
 
 						if (showPressJumpPrompt)
 						{
@@ -341,9 +339,6 @@ namespace Toy2
 						}
 					}
 				}
-
-				if (g_fadeTimer)
-					goto LBL_TITLE_FRAME;
 
 				AudioManager::StopAndWait();
 
