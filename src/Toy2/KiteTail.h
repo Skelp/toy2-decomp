@@ -24,6 +24,9 @@ namespace Toy2
 
 		extern Data* g_kiteTails[8];
 
+		STATIC_ASSERT(sizeof(Data::Segment) == 0x10);
+		STATIC_ASSERT(sizeof(Data) == 0x610);
+
 		void Init(const Vector3I* pos, int32_t count, int32_t spacing, int32_t index, int32_t maxAngle);
 		void Activate(int32_t index);
 		void Deactivate(int32_t index);

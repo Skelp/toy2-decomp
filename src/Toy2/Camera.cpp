@@ -9,6 +9,7 @@
 #include "Nu3D/Viewport.h"
 #include "Renderer/Shadows.h"
 #include "Toy2/Actor.h"
+#include "Toy2/Buzz.h"
 #include "Toy2/Collision.h"
 #include "Toy2/Toy2.h"
 #include <math.h>
@@ -278,8 +279,8 @@ namespace Toy2
 			}
 
 			g_gameplayStateFlags |= 1;
-			g_buzzActor.actorFlags |= 4;
-			InputManager::g_directionInputState &= 0x309;
+			g_buzzActor.actorFlags |= Buzz::ACTOR_FLAG_LOCK_FACING;
+			InputManager::g_directionInputState &= INPUT_SECRET_MENU | INPUT_MENU | INPUT_CAMERA_LEFT | INPUT_CAMERA_RIGHT;
 			g_cutsceneInputLockTimer = 0x40;
 			g_cutsceneFocusPosition.x = focusPosition->x;
 			g_cutsceneFocusPosition.y = focusPosition->y;

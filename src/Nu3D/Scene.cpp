@@ -114,7 +114,7 @@ namespace Nu3D
 				Camera::g_currentCamera->portalNearClip = g_secondaryPortalNearClip;
 				Camera::g_currentCamera->fogFarClip = FLT_MAX;
 
-				if ((renderFlags & 3) == 3)
+				if ((renderFlags & WORLD_RENDER_BYPASS_ALL_PORTALS) == WORLD_RENDER_BYPASS_ALL_PORTALS)
 				{
 					Camera::g_currentCamera->portalNearClip = 0.0f;
 					Camera::g_currentCamera->fogFarClip = FLT_MAX;
@@ -124,9 +124,9 @@ namespace Nu3D
 				Camera::ApplyTransformToCamera(&Camera::g_activeCameraTransform);
 				if (NGNLoader::g_ngnImage->shapeCounts[1])
 				{
-					if (! NGNLoader::g_ngnImage->portalEntryCount || areaIndex < 0 || (renderFlags & 1))
+					if (! NGNLoader::g_ngnImage->portalEntryCount || areaIndex < 0 || (renderFlags & WORLD_RENDER_BYPASS_SECONDARY_PORTALS))
 					{
-						RenderCellsInRadius((renderFlags & 1) ? 30 : 20, 1, NGNLoader::g_ngnImage);
+						RenderCellsInRadius((renderFlags & WORLD_RENDER_BYPASS_SECONDARY_PORTALS) ? 30 : 20, 1, NGNLoader::g_ngnImage);
 					}
 					else
 					{
@@ -147,7 +147,7 @@ namespace Nu3D
 			Camera::g_currentCamera->portalNearClip = 0.0f;
 			Camera::g_currentCamera->fogFarClip = g_primaryFogFarClip;
 
-			if ((renderFlags & 3) == 3)
+			if ((renderFlags & WORLD_RENDER_BYPASS_ALL_PORTALS) == WORLD_RENDER_BYPASS_ALL_PORTALS)
 			{
 				Camera::g_currentCamera->portalNearClip = 0.0f;
 				Camera::g_currentCamera->fogFarClip = FLT_MAX;
@@ -159,10 +159,10 @@ namespace Nu3D
 
 			if (g_renderPrimaryGeometry && NGNLoader::g_ngnImage->shapeCounts[0])
 			{
-				if (! NGNLoader::g_ngnImage->portalEntryCount || areaIndex < 0 || (renderFlags & 2))
+				if (! NGNLoader::g_ngnImage->portalEntryCount || areaIndex < 0 || (renderFlags & WORLD_RENDER_BYPASS_PRIMARY_PORTALS))
 				{
 					Portal::MarkAllAreasVisible();
-					RenderCellsInRadius((renderFlags & 2) ? 30 : 15, 0, NGNLoader::g_ngnImage);
+					RenderCellsInRadius((renderFlags & WORLD_RENDER_BYPASS_PRIMARY_PORTALS) ? 30 : 15, 0, NGNLoader::g_ngnImage);
 				}
 				else
 				{

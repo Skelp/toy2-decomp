@@ -225,7 +225,8 @@ namespace Nu3D
 			int32_t oldestParticleIndex = -1;
 			int32_t shortestLifetime = 9999;
 			int32_t checkedCount = 0;
-			while ((g_particleInstances[g_particleAllocationCursor].renderFlags & 0x80) != 0 && g_particleInstances[g_particleAllocationCursor].lifetime != 0)
+			while ((g_particleInstances[g_particleAllocationCursor].renderFlags & Renderer::RENDER_TEXTURE_WRAP_UV) != 0
+				&& g_particleInstances[g_particleAllocationCursor].lifetime != 0)
 			{
 				if (g_particleInstances[g_particleAllocationCursor].lifetime < shortestLifetime)
 				{
@@ -280,7 +281,7 @@ namespace Nu3D
 			particle->animationFrameCount = particleType->animationFrameCount;
 			particle->tileIndex = 0;
 			particle->groundAlignRot = groundAlignRotation;
-			particle->renderFlags = particleType->renderFlags | 0x200;
+			particle->renderFlags = particleType->renderFlags | Renderer::RENDER_BILINEAR_FILTER;
 			particle->rotSpeed = rotationSpeed / 2;
 			particle->colourR = particleType->colourR;
 			particle->colourG = particleType->colourG;

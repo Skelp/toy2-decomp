@@ -2,3 +2,6 @@
 # addresses	checks	dependency
 0x004C2AB0,0x004C2BE0,0x004C2D20,0x004C2E70	signature-concealment	Confirm a shared ABI-compatible type for D3DVECTOR and Vector3F, or add an overload that preserves the retail call targets.
 0x004CA420	unnamed-bitmask	Reconstruct Nu3D::Scene::RenderActor at 0x004CAA60 to identify the copied node flag bits 2 and 4.
+0x0042B300	unnamed-bitmask	Reconstruct Toy2::EvilEmperorZurg::Interactions at 0x0042B3A0 to identify actor flag bit 0x800.
+src/Nu3D/Sprite.h	unpinned-layout	Update the lint parser to recognize the qualified sizeof assertion for InstanceData::TextureProjectionData.
+src/Toy2/KiteTail.h	unpinned-layout	Update the lint parser to recognize the qualified sizeof assertion for Data::Segment.
