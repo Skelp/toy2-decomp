@@ -13,8 +13,71 @@ namespace Toy2
 {
 	namespace Collectables
 	{
-		// STUB: TOY2 0x004A0C80
-		void Init(int32_t, int32_t) {}
+		// GLOBAL: TOY2 0x00830CAC
+		int32_t g_exitLevelAfterToken;
+
+		// GLOBAL: TOY2 0x00830CC4
+		int32_t g_tokenCollectionState;
+
+		// FUNCTION: TOY2 0x004A0C80
+		void Init(int16_t* tokenLinkIds, int32_t firstHiddenLinkId)
+		{
+			int32_t collectedTokens = g_levelTokenBits[g_levelFileIndex];
+			int32_t i = 0;
+			g_tokenCollectionState = 0;
+
+			if (tokenLinkIds == 0)
+			{
+				g_exitLevelAfterToken = 1;
+				int32_t* active = &g_tokenStates[0].active;
+				do
+				{
+					*active = 0;
+					active += sizeof(TokenState) / sizeof(int32_t);
+				} while (reinterpret_cast<int32_t>(active) < reinterpret_cast<int32_t>(&g_tokenStates[5].active));
+				return;
+			}
+
+			g_exitLevelAfterToken = 0;
+			TokenState* token = g_tokenStates;
+			do
+			{
+				i = 0;
+				if ((collectedTokens & 1) != 0)
+					Nu3D::Link::CopyShapeId(*tokenLinkIds, firstHiddenLinkId);
+
+				token->linkId = *tokenLinkIds++;
+				token->active = 0;
+				Nu3D::Link::SetScaleFromFixedOffsets(token->linkId, 0, 0, 0);
+
+				Levels::RecordData* pickupRecords = Levels::g_recordData[63];
+				PickupRecord* pickup = reinterpret_cast<PickupRecord*>(pickupRecords + 1);
+				for (i = 0; i < pickupRecords->recordCount; i++, pickup++)
+				{
+					if (pickup->objectIndex == token->linkId)
+					{
+						pickup->position.y = INT_MIN;
+						pickupRecords = Levels::g_recordData[63];
+						token->verticalPosition = &pickup->position.y;
+						break;
+					}
+				}
+
+				collectedTokens >>= 1;
+				for (i = 0; i < pickupRecords->recordCount; i++, pickup++)
+				{
+					if (pickup->objectIndex == firstHiddenLinkId)
+					{
+						pickup->position.y = INT_MIN;
+						break;
+					}
+				}
+
+				Nu3D::Link::SetScaleFromFixedOffsets(firstHiddenLinkId, 0, 0, 0);
+				token++;
+				firstHiddenLinkId++;
+			} while (reinterpret_cast<int32_t>(token) < reinterpret_cast<int32_t>(&g_tokenStates[5]));
+		}
 
 		// GLOBAL: TOY2 0x00830CCC
 		TokenState g_tokenStates[5];

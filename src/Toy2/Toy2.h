@@ -111,6 +111,7 @@ namespace Toy2
 	extern int32_t g_levelObjectiveProgress;
 	extern uint16_t g_gameplayStateFlags;
 	extern int32_t g_levelFileConversion[15];
+	extern uint8_t g_levelTokenBits[16];
 
 	STATIC_ASSERT(sizeof(ToyCfg) == 0x18);
 }
