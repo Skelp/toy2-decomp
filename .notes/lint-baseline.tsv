@@ -20,7 +20,6 @@ src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNo
 0x004c2e70	signature-concealment	GetForwardVector:arg2	0111be2a6b73	src/Nu3D/Light.cpp
 0x0047b170	unstructured-control-flow	goto-count	af283beb99ab	src/RawLoader.cpp
 0x00490860	unstructured-control-flow	goto-count	4ff23c3c3c8b	src/Renderer/Renderer.cpp
-0x0044dd80	unstructured-control-flow	goto-count	9a1cde33b176	src/Renderer/Renderer.cpp
 0x004c9d00	unknown-symbol	UnkFunc54	6654c94c62ae	src/SoftwareRenderer.cpp
 0x004c9d00	unknown-symbol	UnkFunc39	ac5c2b44ceca	src/SoftwareRenderer.cpp
 0x004c9d00	unknown-symbol	UnkFunc46	69de56b951a5	src/SoftwareRenderer.cpp
