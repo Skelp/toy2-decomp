@@ -26,7 +26,7 @@ namespace SoftwareRenderer
 	extern SoftwareRenderItem* g_softwareRenderBucketStorage[4096];
 	extern int32_t g_unk839280;
 	extern int32_t g_softwarePrimitiveType;
-	extern int32_t g_unk9F6008;
+	extern int32_t g_reverseDepthSortEnabled;
 
 	// The software renderer's DirectDraw palette and backing entry buffers.
 	// SetPaletteOnAPI (0x00470BF0) creates the palette from g_paletteEntries and
@@ -57,7 +57,7 @@ namespace SoftwareRenderer
 	extern int32_t g_clipRight;
 	extern int32_t g_clipTop;
 	extern int32_t g_clipBottom;
-	// Last viewport-rect values seen by UnkFunc17. Each clip edge is recomputed
+	// Last viewport-rect values seen by UpdateViewportClipBounds. Each clip edge is recomputed
 	// only when its source rect field changes, so repeated draws with the same
 	// viewport skip the float scaling work. Named for the ViewportRect field each
 	// caches (see GetViewClipRect: the bottom field holds the left value).
@@ -86,7 +86,7 @@ namespace SoftwareRenderer
 	extern float g_secondaryRenderDistance;
 	extern const double k_vSpanScale;
 	extern const double k_hSpanScale;
-	// Viewport-to-clip-rect scale factors used by UnkFunc17. The vertical scale
+	// Viewport-to-clip-rect scale factors used by UpdateViewportClipBounds. The vertical scale
 	// maps the rect's top/bottom edges through the screen height, and the
 	// horizontal scale maps left/right through the screen width.
 	extern const double k_viewportScaleV;
@@ -417,11 +417,11 @@ namespace SoftwareRenderer
 	};
 	int32_t GetCurrentTextureData(TextureData* out);
 	void GetRenderDistances(float* primaryDistance, float* secondaryDistance);
-	void UnkFunc19(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags);
-	void UnkFunc21(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags);
+	void ProcessIndexedTriangleList(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags);
+	void ProcessIndexedTriangleStrip(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags);
 	void UnkFunc22(Nu3D::VertexTL* vertices[3], int32_t vertexCount, uint32_t* texData, int32_t renderState, int32_t primitiveType, DWORD drawFlags);
-	void UnkFunc17(int32_t top, int32_t bottom, int32_t left, int32_t right);
-	void UnkFunc16(D3DPRIMITIVETYPE d3dptPrimitiveType, LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags);
+	void UpdateViewportClipBounds(int32_t top, int32_t bottom, int32_t left, int32_t right);
+	void ProcessIndexedPrimitive(D3DPRIMITIVETYPE primitiveType, LPVOID vertices, LPWORD indices, DWORD indexCount, DWORD flags);
 }
 
 namespace SoftwareDevice

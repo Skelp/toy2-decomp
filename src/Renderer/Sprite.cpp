@@ -133,7 +133,7 @@ namespace Renderer
 			Renderer::BindTexture(sprite->textureIndex);
 
 			SoftwareRenderer::g_viewportRect = &sprite->viewportRect;
-			SoftwareRenderer::g_unk9F6008 = 1;
+			SoftwareRenderer::g_reverseDepthSortEnabled = 1;
 
 			return DrawingAPI::DrawIndexedPrimitive(D3DPT_TRIANGLESTRIP, D3DFVF_0x1C4, vertexData, 4, g_2DSpriteIndices, 4, 24);
 		}

@@ -65,7 +65,7 @@ namespace SoftwareRenderer
 	int32_t g_softwarePrimitiveType;
 
 	// GLOBAL: TOY2 0x009F6008
-	int32_t g_unk9F6008;
+	int32_t g_reverseDepthSortEnabled;
 
 	// The software renderer's DirectDraw palette and its backing entry buffers.
 	// SetPaletteOnAPI creates the palette from g_paletteEntries (entry 0 onward)
@@ -1042,7 +1042,7 @@ namespace SoftwareRenderer
 
 		float sortDepth = g_sortDepth;
 		int32_t bucket;
-		if (g_unk9F6008 == 1)
+		if (g_reverseDepthSortEnabled == 1)
 		{
 			sortDepth *= k_reverseDepthSortScale;
 			int32_t depth = 2 - (int32_t)sortDepth;
@@ -3702,7 +3702,7 @@ namespace SoftwareRenderer
 	// where retail re-reads [esp+0x20] at each use, which reorders the V/H
 	// conditional blocks. The scale and clamp blocks all match.
 	// FUNCTION: TOY2 0x004BCC70
-	void UnkFunc17(int32_t top, int32_t bottom, int32_t left, int32_t right)
+	void UpdateViewportClipBounds(int32_t top, int32_t bottom, int32_t left, int32_t right)
 	{
 		int32_t vCenter;
 		int32_t hCenter;
@@ -3785,7 +3785,7 @@ namespace SoftwareRenderer
 	// vertices; the divergence is register allocation plus the pointer-walk
 	// transformation. Robust across 5 source forms (34.8-36.5%).
 	// FUNCTION: TOY2 0x004C14A0
-	void UnkFunc19(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags)
+	void ProcessIndexedTriangleList(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags)
 	{
 		TextureData tex;
 		int32_t noTexture = GetCurrentTextureData(&tex);
@@ -3812,7 +3812,7 @@ namespace SoftwareRenderer
 	void UnkFunc22(Nu3D::VertexTL* vertices[3], int32_t vertexCount, uint32_t* texData, int32_t renderState, int32_t primitiveType, DWORD drawFlags) {}
 
 	// FUNCTION: TOY2 0x004C1540
-	void UnkFunc21(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags)
+	void ProcessIndexedTriangleStrip(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags)
 	{
 		TextureData texture;
 		uint32_t* texData = GetCurrentTextureData(&texture) != 0 ? NULL : texture.texData;
@@ -3862,19 +3862,19 @@ namespace SoftwareRenderer
 	}
 
 	// FUNCTION: TOY2 0x004C1720 [MATCHED]
-	void UnkFunc16(D3DPRIMITIVETYPE d3dptPrimitiveType, LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags)
+	void ProcessIndexedPrimitive(D3DPRIMITIVETYPE primitiveType, LPVOID vertices, LPWORD indices, DWORD indexCount, DWORD flags)
 	{
 		GetRenderDistances(&g_primaryRenderDistance, &g_secondaryRenderDistance);
-		switch (d3dptPrimitiveType)
+		switch (primitiveType)
 		{
 			case D3DPT_TRIANGLELIST:
-				UnkFunc19(lpvVertices, lpwIndices, dwIndexCount, dwFlags);
+				ProcessIndexedTriangleList(vertices, indices, indexCount, flags);
 				break;
 			case D3DPT_TRIANGLESTRIP:
-				UnkFunc21(lpvVertices, lpwIndices, dwIndexCount, dwFlags);
+				ProcessIndexedTriangleStrip(vertices, indices, indexCount, flags);
 				break;
 		}
-		g_unk9F6008 = 0;
+		g_reverseDepthSortEnabled = 0;
 	}
 
 	// Locks the DirectDraw back buffer, clears it when the frame state requires
@@ -4222,9 +4222,9 @@ namespace SoftwareDevice
 			if (SoftwareRenderer::g_viewportRect != NULL)
 			{
 				Nu3D::Viewport::ViewportRect* rect = SoftwareRenderer::g_viewportRect;
-				SoftwareRenderer::UnkFunc17((int32_t)rect->top, (int32_t)rect->bottom, (int32_t)rect->left, (int32_t)rect->right);
+				SoftwareRenderer::UpdateViewportClipBounds((int32_t)rect->top, (int32_t)rect->bottom, (int32_t)rect->left, (int32_t)rect->right);
 			}
-			SoftwareRenderer::UnkFunc16(primitiveType, lockedVertices, indices, indexCount, flags);
+			SoftwareRenderer::ProcessIndexedPrimitive(primitiveType, lockedVertices, indices, indexCount, flags);
 			DrawingAPI::UnlockVertexBuffer(vertexBuffer);
 		}
 		return 0;
@@ -4244,9 +4244,9 @@ namespace SoftwareDevice
 		if (SoftwareRenderer::g_viewportRect != NULL)
 		{
 			Nu3D::Viewport::ViewportRect* rect = SoftwareRenderer::g_viewportRect;
-			SoftwareRenderer::UnkFunc17((int32_t)rect->top, (int32_t)rect->bottom, (int32_t)rect->left, (int32_t)rect->right);
+			SoftwareRenderer::UpdateViewportClipBounds((int32_t)rect->top, (int32_t)rect->bottom, (int32_t)rect->left, (int32_t)rect->right);
 		}
-		SoftwareRenderer::UnkFunc16(d3dptPrimitiveType, lpvVertices, lpwIndices, dwIndexCount, dwFlags);
+		SoftwareRenderer::ProcessIndexedPrimitive(d3dptPrimitiveType, lpvVertices, lpwIndices, dwIndexCount, dwFlags);
 		return 0;
 	}
 
