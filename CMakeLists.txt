@@ -11,6 +11,10 @@ cmake_policy(SET CMP0091 NEW)
 
 project(${PROJECT_NAME} C CXX RC)
 
+if(CMAKE_HOST_UNIX AND MSVC)
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CMAKE_CURRENT_SOURCE_DIR}/tools/vc6-compile")
+endif()
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/patcher)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include)

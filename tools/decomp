@@ -22,11 +22,18 @@ build() {
     if [[ ! -f build/build.ninja ]]; then
         configure
     fi
-    # Wine-hosted VC6 must stay serialized. Every object shares one vc60.pdb
-    # per target, so a parallel build dies with "fatal error C1033: cannot open
-    # program database". This was measured; /Z7 does not fix it either. See
-    # docs/linux-decomp.md, "Build parallelism". Keep the default of 1.
-    cmake --build build -- "-j${TOY2_BUILD_JOBS:-1}"
+    cmake --build build -- "-j${TOY2_BUILD_JOBS:-4}"
+    (
+        cd build
+        reccmp-project detect --what recompiled
+    )
+}
+
+build_game() {
+    if [[ ! -f build/build.ninja ]]; then
+        configure
+    fi
+    cmake --build build --target toy2decomp -- "-j${TOY2_BUILD_JOBS:-4}"
     (
         cd build
         reccmp-project detect --what recompiled
@@ -110,7 +117,7 @@ Commands:
   build             Build toy2.exe/patcher.dll and register the output
   compare [args]    Run reccmp against the reference and recompiled EXEs
   score <addr>...   Print only the similarity verdict for one or more addresses
-  bc <addr>         Build, then show the verbose comparison for one address
+  bc <addr>         Build toy2.exe, then compare one address verbosely
   candidates [ns]   Rank reconstruction candidates (no Ghidra, no reccmp run)
   evidence <addr>   Collect bounded evidence for one target in a single call
   lint [files]      Check reconstructed source for decompiler residue
@@ -155,8 +162,8 @@ the local Ghidra project. Extra arguments are forwarded to the importer, e.g.
   tools/decomp sync --debug
 The Ghidra project location is read from the `ghidra` CLI configuration.
 
-TOY2_BUILD_JOBS sets the build parallelism. Keep the default of 1: VC6 shares
-one vc60.pdb per target, so a parallel build fails. See docs/linux-decomp.md.
+TOY2_BUILD_JOBS sets the build parallelism. The default is 4. The VC6 compiler
+launcher gives each object a separate compiler PDB. See docs/linux-decomp.md.
 EOF
 }
 
@@ -205,7 +212,7 @@ case "$command" in
             echo "Usage: tools/decomp bc <address>" >&2
             exit 2
         fi
-        build
+        build_game
         (cd build && reccmp-reccmp --target TOY2 --verbose "$1")
         ;;
     report)

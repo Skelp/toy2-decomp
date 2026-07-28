@@ -67,26 +67,21 @@ tools/decomp progress
 
 `build` configures CMake when needed, produces `build/toy2.exe`,
 `build/toy2.pdb`, and `build/patcher.dll`, then registers the output with
-reccmp. Compilation is serialized because concurrent Wine-hosted VC6 processes
-are unreliable. Incremental Ninja builds remain enabled.
+reccmp. Compilation uses four jobs by default. Incremental Ninja builds remain
+enabled.
 
 ### Build parallelism
 
-Do not spend time on this again. `TOY2_BUILD_JOBS` sets the Ninja job count,
-and the default of 1 is the only value that works.
+`TOY2_BUILD_JOBS` sets the Ninja job count. Its default is 4. Set it to another
+positive value when the host has a different CPU or memory limit.
 
-VC6 writes debug information for every object in one shared `vc60.pdb` per
-target directory. Two concurrent `CL.EXE` processes therefore fight for the
-same file, and the build fails:
+VC6 cannot safely update one compiler PDB from concurrent compiler processes.
+The `tools/vc6-compile` launcher gives each object file a separate compiler
+PDB. The linker still creates the normal target PDB. This keeps `/Zi` debug
+information and prevents concurrent writes to `vc60.pdb`.
 
-```text
-fatal error C1033: cannot open program database '...\vc60.pdb'
-```
-
-This was measured at `-j4`. `/Z7`, which writes debug information into each
-object file instead of a shared database, also failed to make a parallel build
-work. The serial build is the supported configuration. Keep `TOY2_BUILD_JOBS`
-at its default.
+`tools/decomp bc` builds only `toy2.exe` before it runs the comparison. Use
+`tools/decomp build` when you also need `patcher.dll`.
 
 `compare` calculates per-function machine-code similarity. Inspect an
 individual function with its original address:
