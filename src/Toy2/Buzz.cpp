@@ -41,6 +41,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0050A4FC
 	int32_t g_aimTargetIndex;
 
+	// GLOBAL: TOY2 0x0050A540
+	int32_t g_aimTargetLocked;
+
 	// GLOBAL: TOY2 0x0053C5D4
 	int32_t g_turnRecoveryTimer;
 
@@ -64,6 +67,9 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x0053C620
 	int32_t g_gunFireTimer;
+
+	// GLOBAL: TOY2 0x0053C824
+	int32_t g_poweredLaserCharge;
 
 	// GLOBAL: TOY2 0x0053C648
 	int32_t g_forcedFacingActive;
@@ -201,6 +207,12 @@ namespace Toy2
 	namespace Buzz
 	{
 		const uint32_t GROUND_SLAM_BLOCKING_ACTIONS = 0xFFF7F;
+		const uint32_t GUN_IDLE_BLOCKING_ACTIONS = 0xFBE3C;
+		const uint32_t GUN_START_BLOCKING_ACTIONS = 0xFBEFE;
+		const uint32_t GUN_REPEAT_BLOCKING_ACTIONS = 0xFBE7E;
+		const uint32_t ACTION_STATE_GUN_FIRE = 0x80;
+		const int32_t CAMERA_STATE_TARGETING = 3;
+		const int32_t CAMERA_STATE_VISOR = 4;
 		const uint32_t ACTION_STATE_GROUND_SLAM = 0x40;
 		const uint32_t CLEAR_ACTION_STATE_GUN_FIRE = 0xFF7F;
 		const uint32_t ACTION_STATE_SPIN_HOVER = 0x2;
@@ -511,6 +523,186 @@ namespace Toy2
 			else
 			{
 				ResolveCollisions(buzz, movement, contactState, queryIndex, 0);
+			}
+		}
+
+		// FUNCTION: TOY2 0x00434990
+		void TickGunFire(Toy2BuzzActor* buzz)
+		{
+			if ((g_actionStateFlags & GUN_IDLE_BLOCKING_ACTIONS) != 0)
+			{
+				g_gunFireTimer = 0;
+				g_gunChargeTimer = 0;
+			}
+			else if (g_gunFireTimer == 0)
+			{
+				g_gunChargeTimer = 0;
+			}
+
+			int32_t fireRequested = 0;
+			int32_t laserMode = 0;
+			bool fireHeld = (InputManager::g_directionInputState & INPUT_FIRE) != 0;
+			bool firePressed = fireHeld && (InputManager::g_prevDirectionInputState & INPUT_FIRE) == 0;
+
+			if (firePressed && (g_actionStateFlags & GUN_START_BLOCKING_ACTIONS) == 0)
+			{
+				g_actionStateFlags |= ACTION_STATE_GUN_FIRE;
+				g_gunChargeTimer = 0;
+				g_spinHoverTimer = 0;
+				g_spinCooldownTimer = 0;
+				g_gunFireTimer = 0;
+				g_gunFireTimer += Renderer::g_frameDelta;
+				if (g_gunFireTimer < 12)
+					return;
+				fireRequested = 1;
+				laserMode = 1;
+			}
+			else
+			{
+				if (g_gunFireTimer == 0)
+					return;
+				if (g_gunFireTimer < 12)
+				{
+					if (g_gunFireTimer == -1)
+						g_gunFireTimer = 0;
+					g_gunFireTimer += Renderer::g_frameDelta;
+					if (g_gunFireTimer < 12)
+						return;
+					fireRequested = 1;
+					laserMode = 1;
+				}
+				else
+				{
+					g_gunFireTimer += Renderer::g_frameDelta;
+					if (fireHeld)
+					{
+						g_gunChargeTimer += Renderer::g_frameDelta;
+						if (g_discLauncherAmmo != 0)
+						{
+							if (g_gunChargeTimer >= 14)
+							{
+								fireRequested = 1;
+								laserMode = 1;
+								g_gunChargeTimer = 0;
+							}
+						}
+						else if (g_poweredLaserCharge != 0)
+						{
+							if (g_gunChargeTimer >= 6)
+							{
+								fireRequested = 1;
+								laserMode = 1;
+								g_gunChargeTimer = 0;
+							}
+						}
+						else
+						{
+							if (g_gunChargeTimer > 63)
+								g_gunChargeTimer = 64;
+							if ((InputManager::g_prevDirectionInputState & INPUT_FIRE) == 0 && (g_actionStateFlags & GUN_REPEAT_BLOCKING_ACTIONS) == 0)
+							{
+								if (g_gunFireTimer < 52)
+								{
+									fireRequested = 1;
+									laserMode = 1;
+								}
+								else
+								{
+									g_gunFireTimer = 64 - g_gunFireTimer;
+								}
+							}
+							else if (g_gunFireTimer > 51)
+							{
+								g_gunFireTimer -= 40;
+							}
+
+							if (g_gunChargeTimer > 12)
+							{
+								AudioManager::g_dynamicSoundFrequencies[3] = (int16_t)(g_gunChargeTimer * 0x50 + 0x800);
+								AudioManager::PlaySoundEffect(0x27, &buzz->posAngles.pos);
+							}
+						}
+
+						if (g_poweredLaserCharge != 0 || g_discLauncherAmmo != 0)
+						{
+							if (g_gunFireTimer > 51)
+								g_gunFireTimer -= 40;
+						}
+					}
+					else
+					{
+						if (g_gunChargeTimer > 36)
+							g_gunFireTimer = 52;
+						if (g_gunChargeTimer == 64)
+						{
+							fireRequested = 2;
+							laserMode = 2;
+						}
+						g_gunChargeTimer = 0;
+						if (g_poweredLaserCharge != 0)
+							g_gunChargeTimer = 6;
+						if (g_discLauncherAmmo != 0)
+							g_gunChargeTimer = 14;
+					}
+
+					if (g_gunFireTimer >= 64)
+						g_gunFireTimer = 0;
+					if (fireRequested == 0)
+						return;
+				}
+			}
+
+			if (fireRequested == 1 && g_poweredLaserCharge != 0)
+			{
+				g_poweredLaserCharge -= 10;
+				laserMode = 3;
+				if (g_poweredLaserCharge < 0)
+					g_poweredLaserCharge = 0;
+			}
+
+			g_gunFireTimer = 12;
+			int32_t aimPitch;
+			int32_t aimYaw;
+			int32_t autoAim;
+			if (Camera::g_scriptedCameraState == CAMERA_STATE_VISOR)
+			{
+				aimPitch = -(int16_t)Camera::g_gameplayCamera.target.visorAimAngles.pitch;
+				aimYaw = (int16_t)Camera::g_gameplayCamera.target.visorAimAngles.yaw;
+				autoAim = 0;
+			}
+			else
+			{
+				aimPitch = 0;
+				aimYaw = (int16_t)buzz->posAngles.angles.yaw;
+				autoAim = 1;
+			}
+
+			Vector3I origin = buzz->posAngles.pos;
+			origin.y -= 0x2C00;
+			Vector3I aimOffset = { g_aimTargetPosition.x - origin.x, g_aimTargetPosition.y - origin.y, g_aimTargetPosition.z - origin.z };
+
+			if (g_grappleCharges != 0 && Camera::g_scriptedCameraState >= CAMERA_STATE_TARGETING && g_aimTargetLocked != 0 && g_aimTargetIndex >= 1000)
+			{
+				FireGrapple(aimYaw, aimPitch);
+				return;
+			}
+			if (g_discLauncherAmmo != 0)
+			{
+				FireDiscLauncher(aimPitch);
+				return;
+			}
+
+			AudioManager::PlaySoundEffect(laserMode == 1 ? 2 : 6, &g_buzzActor.posAngles.pos);
+			BeamShot* shot = SpawnBeamShot(laserMode - 1, aimYaw, aimPitch, &origin, &aimOffset, 4, autoAim);
+			if (shot != 0)
+			{
+				aimOffset.x = 0;
+				aimOffset.y = 0;
+				aimOffset.z = 0;
+				uint8_t randomAngle = *g_randDatBufferPtr;
+				g_randDatBufferPtr += 2;
+				SpawnBeamShot(laserMode - 1, (aimYaw + 0x600 + randomAngle * 4) & 0xFFF, (randomAngle * 4 - 0x200) & 0xFFF, &shot->end, &aimOffset, 4, 0);
+				AudioManager::PlaySoundEffect(7, &shot->end);
 			}
 		}
 
@@ -964,6 +1156,10 @@ namespace Toy2
 			TickGrapple();
 		}
 	}
+
+	// STUB: TOY2 0x004A5D30
+	Buzz::BeamShot* SpawnBeamShot(int32_t shotType, int32_t aimYaw, int32_t aimPitch, Vector3I* origin, Vector3I* offset, int32_t range, int32_t autoAim)
+	{ return 0; }
 
 	namespace Camera
 	{

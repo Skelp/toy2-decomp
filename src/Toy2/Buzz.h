@@ -124,6 +124,7 @@ namespace Toy2
 		void CancelGrapple();
 		void FireDiscLauncher(int32_t launchPitch);
 		void FireGrapple(int32_t aimYaw, int32_t aimPitch);
+		void TickGunFire(Toy2BuzzActor* buzz);
 		void HandleCollisions(Toy2BuzzActor* buzz, Vector3I* movement, uint8_t* contactState, int32_t queryIndex);
 		int32_t TickGroundSlam(Toy2BuzzActor* buzz);
 		void TickSpinHover(Toy2BuzzActor* buzz);
@@ -145,6 +146,8 @@ namespace Toy2
 	}
 
 	extern Buzz::Toy2BuzzActor g_buzzActor;
+	extern int32_t g_poweredLaserCharge;
+	extern int32_t g_aimTargetLocked;
 	extern int32_t g_rocketBootsTimer;
 	extern int32_t g_environmentSurfaceY;
 	extern Buzz::GadgetPickup* g_activeRocketBootsPickup;
@@ -159,4 +162,5 @@ namespace Toy2
 	extern int32_t g_cosmicShieldYaw;
 	extern int32_t g_cosmicShieldRoll;
 	extern Buzz::BeamShot g_beamShots[4];
+	Buzz::BeamShot* SpawnBeamShot(int32_t shotType, int32_t aimYaw, int32_t aimPitch, Vector3I* origin, Vector3I* offset, int32_t range, int32_t autoAim);
 }

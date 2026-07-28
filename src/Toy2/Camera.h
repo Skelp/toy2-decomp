@@ -22,15 +22,27 @@ namespace Toy2
 		// are reconstructed as the cluster is recovered.
 		struct GameplayCamera
 		{
+			struct TargetPosition
+			{
+				int32_t x;
+				int32_t y;
+				union
+				{
+					int32_t z;
+					Angles visorAimAngles;
+				};
+			};
+
 			Vector3I pos; // 0x00 — current camera position (fixed-point)
 			Vector3I lookAt; // 0x0C — look-at position (fixed-point)
-			Vector3I target; // 0x18 — position the camera moves toward (fixed-point)
+			TargetPosition target; // 0x18 — position the camera moves toward (fixed-point)
 			Angles angles; // 0x24 — pitch and yaw (12-bit fixed-point angles)
 			uint16_t roll; // 0x28 — roll angle (12-bit fixed-point)
 			uint16_t data[5]; // 0x2A — remaining camera state
 		};
 
 		STATIC_ASSERT(sizeof(GameplayCamera) == 0x34);
+		STATIC_ASSERT(sizeof(GameplayCamera::TargetPosition) == 0xC);
 
 		extern GameplayCamera g_gameplayCamera;
 		extern Nu3D::Camera::ActiveCameraTransform g_renderCameraTransform;
