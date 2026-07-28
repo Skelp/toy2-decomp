@@ -1200,8 +1200,8 @@ namespace Renderer
 
 			if (g_isSoftwareRendering)
 			{
-				SoftwareRenderer::UnkFunc31();
-				SoftwareRenderer::UnkFunc32();
+				SoftwareRenderer::FlushRenderCommands();
+				SoftwareRenderer::ResetRenderCommands();
 			}
 		}
 	}

@@ -967,10 +967,10 @@
 0x004BC720 Nu3D::Scene::RenderCellsInRadius
 0x004BC900 SoftwareRenderer::UnpackColourToFloats
 0x004BC980 SoftwareRenderer::QueueSortedRenderCommand
-0x004BCAD0 SoftwareRenderer::UnkFunc29
-0x004BCB60 SoftwareRenderer::UnkFunc33
-0x004BCBE0 SoftwareRenderer::UnkFunc31
-0x004BCC40 SoftwareRenderer::UnkFunc32
+0x004BCAD0 SoftwareRenderer::QueueRenderCommand
+0x004BCB60 SoftwareRenderer::FlushSortedRenderCommands
+0x004BCBE0 SoftwareRenderer::FlushRenderCommands
+0x004BCC40 SoftwareRenderer::ResetRenderCommands
 0x004BCC70 SoftwareRenderer::UnkFunc17
 0x004BCE00 SoftwareRenderer::InitialisePrimarySurface
 0x004BCF60 SoftwareRenderer::IsClockwiseWinding

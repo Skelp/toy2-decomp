@@ -1008,7 +1008,7 @@ namespace Renderer
 			Nu3D::Viewport::SetViewClipRect();
 
 			if (g_isSoftwareRendering)
-				SoftwareRenderer::UnkFunc32();
+				SoftwareRenderer::ResetRenderCommands();
 
 			return 1;
 		}
@@ -1719,8 +1719,8 @@ namespace Renderer
 
 		if (g_isSoftwareRendering)
 		{
-			SoftwareRenderer::UnkFunc33();
-			SoftwareRenderer::UnkFunc32();
+			SoftwareRenderer::FlushSortedRenderCommands();
+			SoftwareRenderer::ResetRenderCommands();
 		}
 	}
 

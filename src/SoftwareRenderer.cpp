@@ -86,30 +86,30 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00A4CC80
 	int32_t g_unkA4CC80;
 
-	// Reset by UnkFunc33 after the sorted bucket walk. g_unkB626C0 sits just
+	// Reset by FlushSortedRenderCommands after the sorted bucket walk. g_unkB626C0 sits just
 	// below the bucket array; g_unkB7FBB8 sits just below g_clipLeft. Roles
 	// not yet fully understood.
 	// GLOBAL: TOY2 0x00B626C0
 	int32_t g_unkB626C0;
 
 	// GLOBAL: TOY2 0x00DE20A8
-	int32_t g_unkDE20A8;
+	int32_t g_renderCommandCount;
 
-	// A queued render command for the software rasterizer. UnkFunc29 enqueues
+	// A queued render command for the software rasterizer. QueueRenderCommand enqueues
 	// transformed vertices (3 for a triangle, 4 for a quad when vertexCount is
 	// 4) and UnkFunc35 dequeues and rasterizes one. Stride 0x9C, capacity 1024
-	// (g_unkDE20A8 is the live count). The same struct is reused by the sorted
-	// path: UnkFunc33 walks the sorted depth buckets and threads nodes
+	// (g_renderCommandCount is the live count). The same struct is reused by the sorted
+	// path: FlushSortedRenderCommands walks the sorted depth buckets and threads nodes
 	// through the next pointer (+0x8C), calling UnkFunc34 per node. The
 	// metadata at +0x80 is only partially understood; refine the names when
-	// UnkFunc29 and UnkFunc35 are reconstructed.
+	// QueueRenderCommand and UnkFunc35 are reconstructed.
 	struct RenderCommand
 	{
 		Nu3D::VertexTL vertices[4]; // +0x00
 		uint32_t* texData; // +0x80 (NULL selects an untextured rasterizer)
 		int32_t vertexCount; // +0x84 (3 = triangle, 4 = quad)
 		int32_t renderState; // +0x88 (Renderer::RENDER_* alpha flags)
-		RenderCommand* next; // +0x8C (sorted-path list link, read by UnkFunc33)
+		RenderCommand* next; // +0x8C (sorted-path list link)
 		int32_t reserved90; // +0x90
 		// +0x94: nonzero selects alternate span rasterizers. UnkFunc35 ignores it;
 		// UnkFunc34 branches on it, which is what gives it this role.
@@ -137,7 +137,7 @@ namespace SoftwareRenderer
 	int32_t g_sortedRenderCommandCount;
 
 	// GLOBAL: TOY2 0x00DBB0A0
-	RenderCommand g_renderQueue[1024];
+	RenderCommand g_renderCommands[1024];
 
 	// GLOBAL: TOY2 0x00B7FBB8
 	int32_t g_unkB7FBB8;
@@ -875,12 +875,12 @@ namespace SoftwareRenderer
 	}
 
 	// FUNCTION: TOY2 0x004BCAD0
-	void UnkFunc29(Nu3D::VertexTL* vertices[4], int32_t vertexCount, uint32_t* texData, int32_t renderState)
+	void QueueRenderCommand(Nu3D::VertexTL* vertices[4], int32_t vertexCount, uint32_t* texData, int32_t renderState)
 	{
-		if (g_unkDE20A8 < 0x400)
+		if (g_renderCommandCount < 0x400)
 		{
-			RenderCommand* command = &g_renderQueue[g_unkDE20A8];
-			g_unkDE20A8++;
+			RenderCommand* command = &g_renderCommands[g_renderCommandCount];
+			g_renderCommandCount++;
 			Nu3D::VertexTL* dst = command->vertices;
 			for (int i = 0; i < 3; i++)
 			{
@@ -897,11 +897,11 @@ namespace SoftwareRenderer
 	}
 
 	// FUNCTION: TOY2 0x004BCBE0 [MATCHED]
-	void UnkFunc31()
+	void FlushRenderCommands()
 	{
-		for (int i = 0; i < g_unkDE20A8; i++)
+		for (int i = 0; i < g_renderCommandCount; i++)
 		{
-			RenderCommand& command = g_renderQueue[i];
+			RenderCommand& command = g_renderCommands[i];
 			UnkFunc35(&command, command.vertexCount, command.renderState, command.texData, command.useAlternateSpans);
 		}
 		g_unkA4CC80 = 0;
@@ -2460,7 +2460,7 @@ namespace SoftwareRenderer
 	// Three things select the variant: the surface pixel format, whether a
 	// texture is bound, and the alpha mode in the render state. The command
 	// already carries its own texture and render state, so the corresponding
-	// parameters are dead here; UnkFunc31 passes them because UnkFunc34 shares
+	// parameters are dead here; FlushRenderCommands passes them because UnkFunc34 shares
 	// the signature.
 	//
 	// An untextured quad and a textured quad have dedicated whole-primitive
@@ -2611,7 +2611,7 @@ namespace SoftwareRenderer
 	}
 
 	// FUNCTION: TOY2 0x004BCC40
-	void UnkFunc32()
+	void ResetRenderCommands()
 	{
 		if (g_unkA4CC80 == 0)
 		{
@@ -2620,7 +2620,7 @@ namespace SoftwareRenderer
 				g_sortedRenderBuckets[i] = NULL;
 			}
 			g_sortedRenderCommandCount = 0;
-			g_unkDE20A8 = 0;
+			g_renderCommandCount = 0;
 		}
 	}
 
@@ -2628,7 +2628,7 @@ namespace SoftwareRenderer
 	void UnkFunc34(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans) {}
 
 	// FUNCTION: TOY2 0x004BCB60 [MATCHED]
-	void UnkFunc33()
+	void FlushSortedRenderCommands()
 	{
 		if (g_unkA4CC80 == 1)
 		{

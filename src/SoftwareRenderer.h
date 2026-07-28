@@ -150,19 +150,19 @@ namespace SoftwareRenderer
 	void UnkFunc67(int32_t x, int32_t y);
 	void UnkFunc2();
 	int16_t UpdateBackdropScroll();
-	void UnkFunc31();
-	void UnkFunc32();
-	void UnkFunc33();
+	void FlushRenderCommands();
+	void ResetRenderCommands();
+	void FlushSortedRenderCommands();
 	void SetPaletteOnAPI();
 	void UnkFunc7();
 
 	void UnkFunc8(int32_t highestBucket, int32_t clearValue);
 
-	// A queued render command for the software rasterizer. UnkFunc29 enqueues
+	// A queued render command for the software rasterizer. QueueRenderCommand enqueues
 	// transformed vertices (3 for a triangle, 4 for a quad when vertexCount is
 	// 4) and UnkFunc35 dequeues and rasterizes one. Stride 0x9C, capacity 1024.
 	struct RenderCommand;
-	void UnkFunc29(Nu3D::VertexTL* vertices[4], int32_t vertexCount, uint32_t* texData, int32_t renderState);
+	void QueueRenderCommand(Nu3D::VertexTL* vertices[4], int32_t vertexCount, uint32_t* texData, int32_t renderState);
 
 	// One scanline of a triangle or a quad. UnkFunc34 and UnkFunc35 choose the
 	// variant from the render state and publish it in g_spanRasterizer; UnkFunc57
