@@ -1,4 +1,5 @@
 #include "Toy2/Collectables.h"
+#include "Toy2/Buzz.h"
 #include "Toy2/Camera.h"
 #include "Nu3D/Link.h"
 
@@ -69,6 +70,26 @@ namespace Toy2
 			g_tokenStates[tokenIndex].active = 0;
 			*g_tokenStates[tokenIndex].verticalPosition = INT_MIN;
 			Nu3D::Link::SetScaleFromFixedOffsets(g_tokenStates[tokenIndex].linkId, 0, 0, 0);
+		}
+
+		// FUNCTION: TOY2 0x004A50D0 [MATCHED]
+		void CosmicShield(Buzz::GadgetPickup* pickup)
+		{
+			if (g_activeCosmicShieldPickup != 0)
+			{
+				g_activeCosmicShieldPickup->position.y = g_savedCosmicShieldPickupY;
+				Nu3D::Link::SetScaleFromFixedOffsets(g_activeCosmicShieldPickup->linkId, 0x2000, 0x2000, 0x2000);
+				Nu3D::Link::SetPositionRawAndCommit(g_activeCosmicShieldPickup->linkId,
+					g_activeCosmicShieldPickup->position.x,
+					g_activeCosmicShieldPickup->position.y,
+					g_activeCosmicShieldPickup->position.z);
+				g_activeCosmicShieldPickup = 0;
+			}
+
+			g_savedCosmicShieldPickupY = pickup->position.y;
+			g_activeCosmicShieldPickup = pickup;
+			g_buzzActor.cosmicShieldTimer = 900;
+			Nu3D::Link::SetScaleFromFixedOffsets(pickup->linkId, 0x3000, 0x3000, 0x3000);
 		}
 
 		// FUNCTION: TOY2 0x004CD110 [MATCHED]

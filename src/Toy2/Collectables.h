@@ -4,6 +4,11 @@
 
 namespace Toy2
 {
+	namespace Buzz
+	{
+		struct GadgetPickup;
+	}
+
 	namespace Collectables
 	{
 		struct TokenState
@@ -35,6 +40,7 @@ namespace Toy2
 		void LoadTokenTable(const TokenDialogueValue* values);
 		void Activate(int32_t tokenIndex, int32_t skipCutscene);
 		void Deactivate(int32_t tokenIndex);
+		void CosmicShield(Buzz::GadgetPickup* pickup);
 		int32_t ShowTokenSparkle(int32_t linkId);
 
 		STATIC_ASSERT(sizeof(TokenState) == 0x10);
