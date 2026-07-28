@@ -2,6 +2,8 @@
 #include "Toy2/Animation.h"
 #include "Toy2/Buzz.h"
 #include "CharacterLoader.h"
+#include "Nu3D/Particles.h"
+#include "Random.h"
 
 #include <string.h>
 
@@ -132,6 +134,17 @@ namespace Toy2
 			}
 			g_renderActors[actorIndex++] = (Toy2Actor*)&Toy2::g_buzzActor;
 			g_renderActors[actorIndex] = 0;
+		}
+
+		// FUNCTION: TOY2 0x004104D0 [MATCHED]
+		void HitType1Particles(int32_t x, int32_t y, int32_t z)
+		{
+			for (int32_t count = 3; count != 0; count--)
+			{
+				Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(x, y, z, 0x5E, 9);
+				particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+				particle->lifetime = (*g_randDatBufferPtr++ & 0xF) * 2 + 0x18;
+			}
 		}
 
 		// FUNCTION: TOY2 0x00414A80

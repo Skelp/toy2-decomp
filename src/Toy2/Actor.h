@@ -86,6 +86,7 @@ namespace Toy2
 		void SetAnimation(Toy2Actor* actor, int16_t animationIndex, int32_t frameSequenceIndex);
 		int32_t IsInsideBounds(const Vector3I* position, int32_t minX, int32_t maxX, int32_t minZ, int32_t maxZ);
 		void PopulateActiveActors();
+		void HitType1Particles(int32_t x, int32_t y, int32_t z);
 		void GetCreatureList(uint8_t* creatureIdList);
 		int32_t FindInActorList(Toy2Actor* actor);
 		void SetNodeAngle(Toy2Actor* actor, int32_t nodeIndex, float x, float y, float z);
