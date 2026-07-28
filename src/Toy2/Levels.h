@@ -77,13 +77,11 @@ namespace Toy2
 
 		struct Object
 		{
+			int32_t x;
+			int32_t y;
+			int32_t z;
+			int16_t facingAngle;
 			int16_t modelId;
-			int8_t flags;
-			int8_t _pad3;
-			int32_t unk6;
-			int32_t z_or_coord;
-			int16_t type;
-			uint8_t paddingTail[2];
 			ObjectDesc* desc;
 		};
 
@@ -120,6 +118,7 @@ namespace Toy2
 		};
 
 		extern RecordData* g_recordData[96];
+		extern ObjectList* g_objectListBase;
 		extern uint8_t g_levelDataHeapBase[1249280];
 		extern uint8_t* g_levelDataHeapBasePtr;
 		extern int32_t g_levelLoadConfig;

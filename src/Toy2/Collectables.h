@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common.h"
+#include "Numerics.h"
 
 namespace Toy2
 {
@@ -11,6 +12,21 @@ namespace Toy2
 
 	namespace Collectables
 	{
+		struct PickupRecord
+		{
+			Vector3I position;
+			uint8_t objectIndex;
+			uint8_t facingAngle;
+			int16_t groundHeight;
+		};
+
+		struct PickupTable
+		{
+			uint16_t recordCount;
+			uint16_t recordType;
+			PickupRecord records[655];
+		};
+
 		struct TokenState
 		{
 			int32_t linkId;
@@ -46,5 +62,7 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(TokenState) == 0x10);
 		STATIC_ASSERT(sizeof(TokenDialogueEntry) == 0x10);
 		STATIC_ASSERT(sizeof(TokenDialogueValue) == 0x4);
+		STATIC_ASSERT(sizeof(PickupRecord) == 0x10);
+		STATIC_ASSERT(sizeof(PickupTable) == 0x28F4);
 	}
 }

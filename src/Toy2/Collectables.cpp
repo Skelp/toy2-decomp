@@ -1,6 +1,9 @@
 #include "Toy2/Collectables.h"
 #include "Toy2/Buzz.h"
 #include "Toy2/Camera.h"
+#include "Toy2/Collision.h"
+#include "Toy2/Levels.h"
+#include "Toy2/Toy2.h"
 #include "Nu3D/Link.h"
 
 #include <limits.h>
@@ -16,8 +19,105 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0050A150
 		TokenDialogueEntry g_tokenDialogueEntries[10];
 
-		// STUB: TOY2 0x00447DB0
-		void BuildPickupTable() {}
+		// GLOBAL: TOY2 0x005546B8
+		PickupTable g_pickupTable;
+
+		// GLOBAL: TOY2 0x00556FAC
+		Levels::RecordData* g_originalPickupRecords;
+
+		// FUNCTION: TOY2 0x00447DB0
+		void BuildPickupTable()
+		{
+			Vector3I position;
+			PosAndAngles groundProbe;
+			int32_t firstObjectIndex = 0x30;
+			if (g_levelFileIndex == 4)
+				firstObjectIndex = 0x60;
+			else if (g_levelFileIndex == 5)
+				firstObjectIndex = 0x50;
+			else if (g_levelFileIndex == 10)
+				firstObjectIndex = 0x60;
+			else if (g_levelFileIndex == 11)
+				firstObjectIndex = 0x60;
+			else if (g_levelFileIndex == 14)
+				firstObjectIndex = 0x60;
+			else if (g_levelFileIndex == 16)
+				firstObjectIndex = 400;
+
+			g_originalPickupRecords = Levels::g_recordData[63];
+			PickupRecord* destination = g_pickupTable.records;
+			if (Levels::g_recordData[59] != 0)
+			{
+				for (int32_t i = 0; i < Levels::g_recordData[59]->recordCount; i++)
+				{
+					groundProbe.pos.x = Levels::g_recordData[59]->data[i].x << 5;
+					groundProbe.pos.z = Levels::g_recordData[59]->data[i].z << 5;
+					groundProbe.pos.y = (Levels::g_recordData[59]->data[i].y - 10) << 5;
+					Levels::g_recordData[59]->data[i].y = Nu3D::Collision::GetGroundHeightEx(&groundProbe, 0, 0) >> 5;
+				}
+			}
+
+			if (g_originalPickupRecords == 0)
+			{
+				g_pickupTable.recordType = 0;
+				g_pickupTable.recordCount = 0;
+			}
+			else
+			{
+				PickupRecord* source = reinterpret_cast<PickupRecord*>(Levels::g_recordData[63] + 1);
+				for (int32_t i = 0; i < Levels::g_recordData[63]->recordCount; i++)
+				{
+					groundProbe.pos.x = source->position.x << 5;
+					groundProbe.pos.z = source->position.z << 5;
+					groundProbe.pos.y = (source->position.y - 10) << 5;
+					source->groundHeight = Nu3D::Collision::GetGroundHeightEx(&groundProbe, 0, 0) >> 5;
+					if (source->groundHeight == 0x7FFF)
+						source->groundHeight = 0x7FFE;
+					if (source->groundHeight - source->position.y > 0x1800)
+						source->groundHeight = 0x7FFF;
+					source->facingAngle = 0x11;
+					*destination++ = *source++;
+				}
+				g_pickupTable.recordType = g_originalPickupRecords->recordType;
+				g_pickupTable.recordCount = g_originalPickupRecords->recordCount;
+			}
+
+			Levels::g_recordData[63] = reinterpret_cast<Levels::RecordData*>(&g_pickupTable);
+
+			if (g_levelFileIndex == 5)
+			{
+				Levels::g_objectListBase->entries[89]->z = -18000;
+				Nu3D::Link::GetCurrentPosFixed(89, &position);
+				Nu3D::Link::SetPositionRawAndCommit(89, position.x >> 5, position.y >> 5, -18000);
+			}
+
+			if (Levels::g_objectListBase->count > 47 && firstObjectIndex <= Levels::g_objectListBase->count)
+			{
+				for (int32_t objectIndex = firstObjectIndex; objectIndex <= Levels::g_objectListBase->count; objectIndex++)
+				{
+					if (Levels::g_objectListBase->entries[objectIndex] != 0)
+					{
+						destination->position.x = Levels::g_objectListBase->entries[objectIndex]->x;
+						destination->position.y = Levels::g_objectListBase->entries[objectIndex]->y;
+						destination->position.z = Levels::g_objectListBase->entries[objectIndex]->z;
+						destination->objectIndex = objectIndex;
+						destination->facingAngle = Levels::g_objectListBase->entries[objectIndex]->facingAngle >> 3;
+
+						groundProbe.pos.x = destination->position.x << 5;
+						groundProbe.pos.z = destination->position.z << 5;
+						groundProbe.pos.y = (destination->position.y - 10) << 5;
+						destination->groundHeight = Nu3D::Collision::GetGroundHeightEx(&groundProbe, 0, 0) >> 5;
+						if (destination->groundHeight == 0x7FFF)
+							destination->groundHeight = 0x7FFE;
+						if (destination->groundHeight - destination->position.y > 0x1800)
+							destination->groundHeight = 0x7FFF;
+
+						destination++;
+						g_pickupTable.recordCount++;
+					}
+				}
+			}
+		}
 
 		// FUNCTION: TOY2 0x004025C0
 		void LoadTokenTable(const TokenDialogueValue* values)
