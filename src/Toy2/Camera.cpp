@@ -20,6 +20,21 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0050A13C
 		int32_t g_scriptedCameraState;
 
+		// GLOBAL: TOY2 0x0050A140
+		int32_t g_cutsceneInputLockTimer;
+
+		// GLOBAL: TOY2 0x0050A1F4
+		int32_t g_cutsceneDuration;
+
+		// GLOBAL: TOY2 0x0050A500
+		Vector3I g_cutsceneFocusPosition;
+
+		// GLOBAL: TOY2 0x0050A520
+		Vector3I g_cutsceneCameraPosition;
+
+		// GLOBAL: TOY2 0x0052B7E8
+		GameplayCamera g_cutsceneCamera;
+
 		// GLOBAL: TOY2 0x0050A510
 		int32_t g_shakeTimer;
 
@@ -32,8 +47,79 @@ namespace Toy2
 		// STUB: TOY2 0x00403450
 		void InitGameplayCamera(GameplayCamera* camera, Buzz::Toy2BuzzActor* buzz) {}
 
-		// STUB: TOY2 0x004020F0
-		void BeginScriptedCutsceneAtPoint(Vector3I* focusPosition, int32_t duration, int32_t cameraDistance) {}
+		// FUNCTION: TOY2 0x00402030
+		void InitCutsceneCamera(const Vector3I* focusPosition, const Vector3I* cameraPosition)
+		{
+			g_cutsceneCamera.pos.x = cameraPosition->x;
+			g_cutsceneCamera.pos.y = cameraPosition->y;
+			g_cutsceneCamera.pos.z = cameraPosition->z;
+			g_cutsceneCamera.lookAt.x = focusPosition->x;
+			g_cutsceneCamera.lookAt.y = focusPosition->y;
+			g_cutsceneCamera.lookAt.z = focusPosition->z;
+
+			int32_t deltaX = (g_cutsceneCamera.lookAt.x - g_cutsceneCamera.pos.x) >> 5;
+			int32_t deltaY = (g_cutsceneCamera.lookAt.y - g_cutsceneCamera.pos.y) >> 5;
+			int32_t deltaZ = (g_cutsceneCamera.lookAt.z - g_cutsceneCamera.pos.z) >> 5;
+
+			g_cutsceneCamera.target.x = g_cutsceneCamera.pos.x;
+			g_cutsceneCamera.target.y = g_cutsceneCamera.pos.y;
+			g_cutsceneCamera.target.z = g_cutsceneCamera.pos.z;
+			g_cutsceneCamera.angles.yaw = (uint16_t)Nu3D::Math::CartesianToFixedAngle(deltaX, deltaZ);
+			int32_t horizontalDistanceSq = deltaZ * deltaZ + deltaX * deltaX;
+			int32_t heightSq = deltaY < 0 ? deltaY * deltaY : -(deltaY * deltaY);
+			g_cutsceneCamera.angles.pitch = (uint16_t)-Nu3D::Math::CartesianToFixedAngle(heightSq, horizontalDistanceSq);
+			g_cutsceneCamera.roll = 0;
+		}
+
+		// FUNCTION: TOY2 0x004020F0 [MATCHED]
+		void BeginScriptedCutsceneAtPoint(Vector3I* focusPosition, int32_t duration, int32_t cameraDistance)
+		{
+			if (g_scriptedCameraState != 0)
+			{
+				if (g_cameraMarkerParticle != (Nu3D::Particles::ParticleInstance*)-1)
+				{
+					g_cameraMarkerParticle->lifetime = 1;
+					g_cameraMarkerParticle = (Nu3D::Particles::ParticleInstance*)-1;
+				}
+				if (g_targetMarkerParticle != (Nu3D::Particles::ParticleInstance*)-1)
+				{
+					g_targetMarkerParticle->lifetime = 1;
+					g_targetMarkerParticle = (Nu3D::Particles::ParticleInstance*)-1;
+				}
+
+				g_buzzActor.actorFlags |= 1;
+				g_gameplayCamera.roll = g_buzzActor.posAngles.angles.yaw;
+				g_buzzActor.facingAngle = g_buzzActor.posAngles.angles.yaw;
+				g_gameplayCamera.pos.y = g_buzzActor.posAngles.pos.y - 0x3000;
+				g_gameplayCamera.angles.yaw = 0x4B0;
+				g_gameplayCamera.target.visorAimAngles.pitch = 0;
+				g_gameplayCamera.lookAt.x = g_gameplayCamera.pos.x;
+				g_gameplayCamera.data[3] = 0;
+				g_scriptedCameraState = 0;
+
+				Nu3D::Link::SetScaleFromFixedOffsets(0x2D, 0, 0, 0);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x2E, 0, 0, 0);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x2F, 0, 0, 0);
+			}
+
+			g_gameplayStateFlags |= 1;
+			g_buzzActor.actorFlags |= 4;
+			InputManager::g_directionInputState &= 0x309;
+			g_cutsceneInputLockTimer = 0x40;
+			g_cutsceneFocusPosition.x = focusPosition->x;
+			g_cutsceneFocusPosition.y = focusPosition->y;
+			g_cutsceneFocusPosition.z = focusPosition->z;
+
+			int32_t yaw =
+				Nu3D::Math::CartesianToFixedAngle(
+					g_cutsceneFocusPosition.x - g_buzzActor.posAngles.pos.x, g_cutsceneFocusPosition.z - g_buzzActor.posAngles.pos.z)
+				& 0xFFF;
+			g_cutsceneCameraPosition.x = (Numerics::g_sinCosLUT[(yaw - 0x800) & 0xFFF] >> 4) * cameraDistance + g_cutsceneFocusPosition.x;
+			g_cutsceneCameraPosition.y = g_cutsceneFocusPosition.y;
+			g_cutsceneCameraPosition.z = (Numerics::g_sinCosLUT[(yaw - 0x400) & 0xFFF] >> 4) * cameraDistance + g_cutsceneFocusPosition.z;
+			g_cutsceneDuration = duration;
+			InitCutsceneCamera(&g_cutsceneFocusPosition, &g_cutsceneCameraPosition);
+		}
 
 		// FUNCTION: TOY2 0x00403640
 		void SmoothToTarget(GameplayCamera* camera)

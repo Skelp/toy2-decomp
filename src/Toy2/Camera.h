@@ -50,6 +50,7 @@ namespace Toy2
 		extern int32_t g_shakeTimer;
 
 		void InitGameplayCamera(GameplayCamera* camera, Buzz::Toy2BuzzActor* buzz);
+		void InitCutsceneCamera(const Vector3I* focusPosition, const Vector3I* cameraPosition);
 		void BeginScriptedCutsceneAtPoint(Vector3I* focusPosition, int32_t duration, int32_t cameraDistance);
 		void SmoothToTarget(GameplayCamera* camera);
 		void SnapBehindBuzz(GameplayCamera* camera);
