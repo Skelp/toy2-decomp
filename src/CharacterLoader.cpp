@@ -15,7 +15,7 @@ namespace CharacterLoader
 	int16_t g_unk547CD0;
 
 	// GLOBAL: TOY2 0x00547CD4
-	void* g_unk547CD4[128];
+	CharacterAnimationData* g_characterAnimationData[128];
 
 	// GLOBAL: TOY2 0x0053E4C8
 	int32_t g_alternateAllParse[128];

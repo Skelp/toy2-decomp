@@ -10,12 +10,6 @@ namespace Toy2
 {
 	namespace Animation
 	{
-		struct CharacterAnimationData
-		{
-			uint8_t reserved[4];
-			int16_t baseBoneIndex;
-		};
-
 		struct AnimationActor
 		{
 			Vector3I position;
@@ -276,7 +270,7 @@ namespace Toy2
 		void TransformByBone(Vector3I* position, void* actor, int32_t boneIndex)
 		{
 			AnimationActor* animationActor = (AnimationActor*)actor;
-			CharacterAnimationData* animationData = (CharacterAnimationData*)CharacterLoader::g_unk547CD4[animationActor->creatureId];
+			CharacterLoader::CharacterAnimationData* animationData = CharacterLoader::g_characterAnimationData[animationActor->creatureId];
 			CharacterLoader::BoneTransform* transform = &CharacterLoader::g_boneTransforms[animationData->baseBoneIndex + boneIndex];
 			int32_t x = position->x;
 			int32_t y = position->y;

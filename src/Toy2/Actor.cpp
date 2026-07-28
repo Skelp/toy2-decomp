@@ -94,11 +94,8 @@ namespace Toy2
 		// FUNCTION: TOY2 0x004019D0
 		void UpdatePrimaryAnimation(Toy2Actor* actor)
 		{
-			void* entry = CharacterLoader::g_unk547CD4[actor->creatureId];
-			Animation::EvaluateClip((Animation::ClipHeader*)*(void**)((uint8_t*)entry + 8 + actor->primaryAnimIdx * 4),
-				actor->animationFramePosition,
-				*(uint16_t*)((uint8_t*)entry + 4),
-				0);
+			CharacterLoader::CharacterAnimationData* animationData = CharacterLoader::g_characterAnimationData[actor->creatureId];
+			Animation::EvaluateClip(animationData->clips[actor->primaryAnimIdx], actor->animationFramePosition, animationData->baseBoneIndex, 0);
 		}
 
 		// FUNCTION: TOY2 0x00405C80
