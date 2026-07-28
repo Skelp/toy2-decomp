@@ -6,5 +6,5 @@ void Nullsub5() {}
 // FUNCTION: TOY2 0x00449090 [MATCHED]
 void Nullsub3() {}
 
-// FUNCTION: TOY2 0x0049D790
+// FUNCTION: TOY2 0x0049D790 [MATCHED]
 void Nullsub6() {}

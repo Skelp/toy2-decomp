@@ -700,8 +700,8 @@ namespace Renderer
 		// FUNCTION: TOY2 0x00493C30
 		int16_t DrawColoured(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t blue, uint8_t green, uint8_t red) { return 0; }
 
-		// FUNCTION: TOY2 0x0049D750
-		void DrawWhiteText(char* text, int32_t screenY, int32_t screenX) {}
+		// FUNCTION: TOY2 0x0049D750 [MATCHED]
+		void DrawWhiteText(char* text, int32_t screenY, int32_t screenX) { Renderer::DrawBitmapText(text, screenY, screenX, 255, 255, 255, 0x60); }
 
 		// FUNCTION: TOY2 0x0049D7A0
 		void DrawBackdropTransition(int32_t* framesRemaining, int32_t* backdropIndex, int32_t duration)
