@@ -1,5 +1,6 @@
 #include "Nu3D/Particles.h"
 #include "AudioManager/AudioManager.h"
+#include "Random.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/Shadows.h"
 #include "Toy2/Actor.h"
@@ -12,6 +13,39 @@ namespace Nu3D
 {
 	namespace Particles
 	{
+		// GLOBAL: TOY2 0x004EC948
+		ParticlePreset g_particlePresets[29] = {
+			{ 0x00A00032, 0x8020000B, 0x00180C07, 0x00320001, 0x00B00032, 0x000B, (int16_t)0x8020 },
+			{ 0x00001010, 0x0000003F, 0x00000000, 0x0000003F, 0xFFFFFFF0, 0, 0 },
+			{ 0, 0, 0, 0, 0, 0, 0 },
+			{ 0x00001010, 0x0000001F, 0xFFFFFE00, 0x0000001F, 0, 0, 0 },
+			{ 0x00001510, 0x0000007F, 0x0000087F, 0x0000007F, 0x00000040, 0, 0 },
+			{ 0, 0, 0, 0, 0, 0x0200, -48 },
+			{ 0, 0, 0, 0, 0, 0, -12 },
+			{ 0x00001510, 0x0000007F, 0x000010FF, 0x0000007F, 0x00000040, 0, 0 },
+			{ 0x00001010, 0x000000FF, 0xFFFFF800, 0x000000FF, 0x00000080, 0, 0 },
+			{ 0x00001510, 0x0000007F, 0x00000E7F, 0x0000007F, 0x00000080, 0, 0 },
+			{ 0x00001010, 0x0000000F, 0xFFFFFE00, 0x0000000F, 0xFFFFFFF0, 0, 0 },
+			{ 0, 0, 0, 0, 0, 0, -128 },
+			{ 0, 0, 0, 0, 0, 0, -192 },
+			{ 0x00003510, 0x000000FF, 0x00000E7F, 0x0000007F, 0x00000080, 0, 0 },
+			{ 0x00001510, 0x000000FF, 0x000016FF, 0x000000FF, 0x00000080, 0, 0 },
+			{ 0x00001110, 0x0000001F, 0x0000001F, 0x0000001F, 0, 0, 0 },
+			{ 0, 0, 0xFFFFFE00, 0, 0x00000020, 0, 0 },
+			{ 0x00001510, 0x000000FF, 0x00000E7F, 0x000000FF, 0x00000080, 0, 0 },
+			{ 0, 0, 0xFFFFFF00, 0, 0xFFFFFFF8, 0, 0 },
+			{ 0, 0, 0, 0, 0x000000C0, 0, 0 },
+			{ 0x00001010, 0x0000003F, 0xFFFFFF00, 0x0000003F, 0xFFFFFFF0, 0, 0 },
+			{ 0x00001010, 0x0000001F, 0xFFFFFB00, 0x0000001F, 0xFFFFFFC0, 0, 0 },
+			{ 0x00000110, 0xFFFFF600, 0x0000001F, 0x0000001F, 0xFFFFFFF8, 0, 0 },
+			{ 0x00000110, 0x00000A00, 0x0000001F, 0x0000001F, 0xFFFFFFF8, 0, 0 },
+			{ 0, 0, 0xFFFFF400, 0xFFFFFA00, 0x00000100, 0, 0 },
+			{ 0, 0x00001000, 0xFFFFF800, 0, 0x000000A0, 0, 0 },
+			{ 0x00001010, 0x0000001F, 0xFFFFFE00, 0x0000001F, 0xFFFFFFF0, 0, 0 },
+			{ 0x00001010, 0x0000001F, 0xFFFFFE00, 0x0000001F, 0x00000010, 0, 0 },
+			{ 0, 0, 0x00000140, 0, 0, 0, 0 },
+		};
+
 		// FUNCTION: TOY2 0x0040FAC0 [MATCHED]
 		void Init()
 		{
@@ -27,13 +61,109 @@ namespace Nu3D
 			int32_t velocityY,
 			int32_t velocityZ,
 			int32_t yawAngle,
-			int16_t groundAlignRotation,
+			int32_t groundAlignRotation,
 			int32_t rotationSpeed,
 			int32_t typeId)
 		{ return 0; }
 
-		// STUB: TOY2 0x0040FDF0
-		ParticleInstance* SpawnFromPreset(int32_t x, int32_t y, int32_t z, int32_t typeId, int32_t presetIndex) { return 0; }
+		// FUNCTION: TOY2 0x0040FDF0
+		ParticleInstance* SpawnFromPreset(int32_t x, int32_t y, int32_t z, int32_t typeId, int32_t presetIndex)
+		{
+			const ParticlePreset* preset = &g_particlePresets[presetIndex];
+			int32_t velocityX = preset->velocityXMask;
+			switch ((preset->randomModes >> 12) & 0xF)
+			{
+				case 1:
+					velocityX = ((*g_randDatBufferPtr++ & velocityX) - (velocityX >> 1)) << 3;
+					break;
+				case 2:
+					velocityX = (*g_randDatBufferPtr++ & velocityX) << 3;
+					break;
+				case 3:
+					velocityX = -(*g_randDatBufferPtr++ & velocityX) << 3;
+					break;
+				case 4:
+					velocityX = ((*g_randDatBufferPtr++ & velocityX) + ((velocityX >> 4) & 0xFF0)) << 3;
+					break;
+				case 5:
+					velocityX = ((*g_randDatBufferPtr++ & velocityX) - ((velocityX >> 4) & 0xFF0)) << 3;
+					break;
+				case 6:
+					velocityX = ((*g_randDatBufferPtr++ & velocityX) - (velocityX >> 1)) << 4;
+					break;
+			}
+
+			int32_t velocityY = preset->velocityYMask;
+			switch ((preset->randomModes >> 8) & 0xF)
+			{
+				case 1:
+					velocityY = ((*g_randDatBufferPtr++ & velocityY) - (velocityY >> 1)) << 3;
+					break;
+				case 2:
+					velocityY = (*g_randDatBufferPtr++ & velocityY) << 3;
+					break;
+				case 3:
+					velocityY = -(*g_randDatBufferPtr++ & velocityY) << 3;
+					break;
+				case 4:
+					velocityY = ((*g_randDatBufferPtr++ & velocityY) + ((velocityY >> 4) & 0xFF0)) << 3;
+					break;
+				case 5:
+					velocityY = ((*g_randDatBufferPtr++ & velocityY) - ((velocityY >> 4) & 0xFF0)) << 3;
+					break;
+				case 6:
+					velocityY = ((*g_randDatBufferPtr++ & velocityY) - (velocityY >> 1)) << 4;
+					break;
+			}
+
+			int32_t velocityZ = preset->velocityZMask;
+			switch ((preset->randomModes >> 4) & 0xF)
+			{
+				case 1:
+					velocityZ = ((*g_randDatBufferPtr++ & velocityZ) - (velocityZ >> 1)) << 3;
+					break;
+				case 2:
+					velocityZ = (*g_randDatBufferPtr++ & velocityZ) << 3;
+					break;
+				case 3:
+					velocityZ = -(*g_randDatBufferPtr++ & velocityZ) << 3;
+					break;
+				case 4:
+					velocityZ = ((*g_randDatBufferPtr++ & velocityZ) + ((velocityZ >> 4) & 0xFF0)) << 3;
+					break;
+				case 5:
+					velocityZ = ((*g_randDatBufferPtr++ & velocityZ) - ((velocityZ >> 4) & 0xFF0)) << 3;
+					break;
+				case 6:
+					velocityZ = ((*g_randDatBufferPtr++ & velocityZ) - (velocityZ >> 1)) << 4;
+					break;
+			}
+
+			int32_t yawAngle = preset->yawMask;
+			switch (preset->randomModes & 0xF)
+			{
+				case 1:
+					yawAngle = ((*g_randDatBufferPtr++ & yawAngle) - (yawAngle >> 1)) << 3;
+					break;
+				case 2:
+					yawAngle = (*g_randDatBufferPtr++ & yawAngle) << 3;
+					break;
+				case 3:
+					yawAngle = -(*g_randDatBufferPtr++ & yawAngle) << 3;
+					break;
+				case 4:
+					yawAngle = ((*g_randDatBufferPtr++ & yawAngle) + ((yawAngle >> 4) & 0xFF0)) << 3;
+					break;
+				case 5:
+					yawAngle = ((*g_randDatBufferPtr++ & yawAngle) - ((yawAngle >> 4) & 0xFF0)) << 3;
+					break;
+				case 6:
+					yawAngle = ((*g_randDatBufferPtr++ & yawAngle) - (yawAngle >> 1)) << 4;
+					break;
+			}
+
+			return SpawnInstance(x, y, z, velocityX, velocityY, velocityZ, yawAngle, preset->groundAlignRotation, preset->rotationSpeed, typeId);
+		}
 
 		// GLOBAL: TOY2 0x00529E58;
 		ParticleInstance g_particleInstances[64];

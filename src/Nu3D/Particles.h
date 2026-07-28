@@ -19,6 +19,17 @@ namespace Nu3D
 			PARTICLE_RENDER_ALPHA_MODE_MASK = 0x60,
 		};
 
+		struct ParticlePreset
+		{
+			int32_t randomModes;
+			int32_t velocityXMask;
+			int32_t velocityYMask;
+			int32_t velocityZMask;
+			int32_t yawMask;
+			int16_t groundAlignRotation;
+			int16_t rotationSpeed;
+		};
+
 		struct ParticleInstance
 		{
 			Vector3I pos;
@@ -57,6 +68,7 @@ namespace Nu3D
 		};
 
 		extern ParticleInstance g_particleInstances[64];
+		extern ParticlePreset g_particlePresets[29];
 		extern int32_t g_particleAllocationCursor;
 		void Init();
 		void SetDefaultAlpha(ParticleInstance* particle);
@@ -70,11 +82,12 @@ namespace Nu3D
 			int32_t velocityY,
 			int32_t velocityZ,
 			int32_t yawAngle,
-			int16_t groundAlignRotation,
+			int32_t groundAlignRotation,
 			int32_t rotationSpeed,
 			int32_t typeId);
 		ParticleInstance* SpawnFromPreset(int32_t x, int32_t y, int32_t z, int32_t typeId, int32_t presetIndex);
 
 		STATIC_ASSERT(sizeof(ParticleInstance) == 0x3C);
+		STATIC_ASSERT(sizeof(ParticlePreset) == 0x18);
 	}
 }
