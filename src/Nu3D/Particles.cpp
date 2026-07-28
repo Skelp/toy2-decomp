@@ -1,6 +1,8 @@
 #include "Nu3D/Particles.h"
+#include "AudioManager/AudioManager.h"
 #include "Renderer/Renderer.h"
 #include "Toy2/Toy2.h"
+#include <stdlib.h>
 #include <string.h>
 
 namespace Nu3D
@@ -30,6 +32,37 @@ namespace Nu3D
 			if ((particle->renderFlags & PARTICLE_RENDER_ALPHA_MODE_MASK) != PARTICLE_RENDER_ALPHA_MODE_MASK)
 			{
 				particle->colourA = 0x2E;
+			}
+		}
+
+		// FUNCTION: TOY2 0x00425AD0 [MATCHED]
+		void ReflectWallsSquareArena(ParticleInstance* particle)
+		{
+			const int32_t westWall = -0x169EB;
+			const int32_t eastWall = 0x16915;
+			const int32_t northWall = -0x16CEF;
+			const int32_t southWall = 0x16991;
+			const int32_t wallImpactSound = 0x4A;
+
+			if (particle->pos.x < westWall)
+			{
+				particle->velX = abs(particle->velX);
+				AudioManager::PlaySoundEffect(wallImpactSound, &particle->pos);
+			}
+			if (particle->pos.x > eastWall)
+			{
+				particle->velX = -abs(particle->velX);
+				AudioManager::PlaySoundEffect(wallImpactSound, &particle->pos);
+			}
+			if (particle->pos.z < northWall)
+			{
+				particle->velZ = abs(particle->velZ);
+				AudioManager::PlaySoundEffect(wallImpactSound, &particle->pos);
+			}
+			if (particle->pos.z > southWall)
+			{
+				particle->velZ = -abs(particle->velZ);
+				AudioManager::PlaySoundEffect(wallImpactSound, &particle->pos);
 			}
 		}
 

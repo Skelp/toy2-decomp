@@ -44,6 +44,7 @@ namespace Nu3D
 		extern int32_t g_particleAllocationCursor;
 		void Init();
 		void SetDefaultAlpha(ParticleInstance* particle);
+		void ReflectWallsSquareArena(ParticleInstance* particle);
 		void UpdateDrainTrail(ParticleInstance* particle);
 		ParticleInstance* SpawnFromPreset(int32_t x, int32_t y, int32_t z, int32_t typeId, int32_t presetIndex);
 
