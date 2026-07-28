@@ -150,6 +150,13 @@ namespace SoftwareRenderer
 	STATIC_ASSERT(offsetof(RenderCommand, next) == 0x8c);
 	STATIC_ASSERT(offsetof(RenderCommand, useAlternateSpans) == 0x94);
 
+	struct ScanlineScratch
+	{
+		uint8_t populated;
+		uint8_t data[0x4b];
+	};
+	STATIC_ASSERT(sizeof(ScanlineScratch) == 0x4c);
+
 	// GLOBAL: TOY2 0x00B626E0
 	RenderCommand* g_sortedRenderBuckets[30000];
 
@@ -669,6 +676,16 @@ namespace SoftwareRenderer
 			uint8_t* nextRow = reinterpret_cast<uint8_t*>(dest) + rowPaddingBytes;
 			dest = reinterpret_cast<uint32_t*>(nextRow);
 		} while (--height != 0);
+	}
+
+	// FUNCTION: TOY2 0x0047D650
+	void ClearScanlineFlags(ScanlineScratch* scanline, int32_t count)
+	{
+		do
+		{
+			scanline->populated = 0;
+			scanline++;
+		} while (--count != 0);
 	}
 
 	// FUNCTION: TOY2 0x004C1E70
