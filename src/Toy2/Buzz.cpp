@@ -482,6 +482,25 @@ namespace Toy2
 			g_discLauncherAmmo--;
 		}
 
+		// STUB: TOY2 0x00484380
+		void ResolveCollisions(Toy2BuzzActor* buzz, Vector3I* movement, uint8_t* contactState, int32_t queryIndex, int32_t collisionPass) {}
+
+		// FUNCTION: TOY2 0x004855F0 [MATCHED]
+		void HandleCollisions(Toy2BuzzActor* buzz, Vector3I* movement, uint8_t* contactState, int32_t queryIndex)
+		{
+			if (movement->x * movement->x + movement->y * movement->y + movement->z * movement->z > 0x400000)
+			{
+				ResolveCollisions(buzz, movement, contactState, queryIndex, 1);
+				uint8_t firstPassContacts = contactState[0] | contactState[1];
+				ResolveCollisions(buzz, movement, contactState, queryIndex, 2);
+				contactState[1] |= firstPassContacts;
+			}
+			else
+			{
+				ResolveCollisions(buzz, movement, contactState, queryIndex, 0);
+			}
+		}
+
 		// FUNCTION: TOY2 0x004A4B90 [MATCHED]
 		void ResetGravityBoots()
 		{

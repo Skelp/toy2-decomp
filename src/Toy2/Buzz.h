@@ -117,6 +117,7 @@ namespace Toy2
 		void CancelGrapple();
 		void FireDiscLauncher(int32_t launchPitch);
 		void FireGrapple(int32_t aimYaw, int32_t aimPitch);
+		void HandleCollisions(Toy2BuzzActor* buzz, Vector3I* movement, uint8_t* contactState, int32_t queryIndex);
 		void TickCosmicShield();
 		void TickGrapple();
 		void TickBeamShots();
