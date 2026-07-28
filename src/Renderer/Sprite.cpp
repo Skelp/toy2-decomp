@@ -1017,17 +1017,17 @@ namespace Renderer
 			int32_t renderFlags = instanceData->renderFlags;
 			int32_t metadata = material->metadata;
 			if (metadata & 1)
-				renderFlags |= 0xC00;
+				renderFlags |= RENDER_ZWRITE | RENDER_ALPHA_DEFAULT;
 			if (metadata & 0x10)
-				renderFlags |= 0x4800;
+				renderFlags |= RENDER_ZWRITE | RENDER_ALPHA_CUSTOM;
 			if (metadata & 0x20)
-				renderFlags |= 0x20800;
+				renderFlags |= RENDER_ZWRITE | RENDER_ALPHA_ALT;
 			if (metadata & 0x200)
-				renderFlags |= 0x100800;
+				renderFlags |= RENDER_ZWRITE | RENDER_ALPHA_TEX_MODULATE;
 			if (metadata & 0x400)
-				renderFlags |= 0x200800;
+				renderFlags |= RENDER_ZWRITE | RENDER_ALPHA_TEX_MOD_CUSTOM;
 			if (metadata & 0x800)
-				renderFlags |= 0x400800;
+				renderFlags |= RENDER_ZWRITE | RENDER_ALPHA_TEX_MOD_ALT;
 
 			Nu3D::Patch* patch = entry->patch;
 			renderFlags |= patch->renderFlags;

@@ -516,8 +516,11 @@ namespace Nu3D
 			g_textVertices[5].uv.x = glyph->uvMinX;
 			g_textVertices[5].uv.y = glyph->uvMaxY;
 
-			Renderer::DrawSingleTexturedTriangle(g_textVertices, g_currentFontTexIndex, g_fontRenderFlags | 0x444);
-			Renderer::DrawSingleTexturedTriangle(&g_textVertices[3], g_currentFontTexIndex, g_fontRenderFlags | 0x444);
+			Renderer::DrawSingleTexturedTriangle(
+				g_textVertices, g_currentFontTexIndex, g_fontRenderFlags | Renderer::RENDER_Z | Renderer::RENDER_CULL_NONE | Renderer::RENDER_ALPHA_DEFAULT);
+			Renderer::DrawSingleTexturedTriangle(&g_textVertices[3],
+				g_currentFontTexIndex,
+				g_fontRenderFlags | Renderer::RENDER_Z | Renderer::RENDER_CULL_NONE | Renderer::RENDER_ALPHA_DEFAULT);
 			return glyph->width;
 		}
 		return 0;
@@ -702,8 +705,11 @@ namespace Nu3D
 			g_textVertices[5].uv.x = glyph->uvMinX;
 			g_textVertices[5].uv.y = glyph->uvMaxY;
 
-			Renderer::DrawSingleTexturedTriangle(g_textVertices, g_currentFontTexIndex, g_fontRenderFlags | 0x444);
-			Renderer::DrawSingleTexturedTriangle(&g_textVertices[3], g_currentFontTexIndex, g_fontRenderFlags | 0x444);
+			Renderer::DrawSingleTexturedTriangle(
+				g_textVertices, g_currentFontTexIndex, g_fontRenderFlags | Renderer::RENDER_Z | Renderer::RENDER_CULL_NONE | Renderer::RENDER_ALPHA_DEFAULT);
+			Renderer::DrawSingleTexturedTriangle(&g_textVertices[3],
+				g_currentFontTexIndex,
+				g_fontRenderFlags | Renderer::RENDER_Z | Renderer::RENDER_CULL_NONE | Renderer::RENDER_ALPHA_DEFAULT);
 			return (int32_t)scaledWidth;
 		}
 		return 0;

@@ -35,8 +35,6 @@ src/NGNLoader/NGNTypes.h	placeholder-field	unkVar7	c4e96513da34	src/NGNLoader/NG
 0x004cbc90	unnamed-bitmask	primObject->renderFlags:3	d2d4602219bb	src/NGNLoader/ObjectLoad.cpp
 src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNode.h
 0x004a1be0	unstructured-control-flow	goto-count	2d873e3e3f1c	src/Nu3D/Camera.cpp
-0x004b4de0	unnamed-bitmask	g_fontRenderFlags:0x444	4ee965039152	src/Nu3D/Font.cpp
-0x004b46b0	unnamed-bitmask	g_fontRenderFlags:0x444	4ee965039152	src/Nu3D/Font.cpp
 0x004c2ab0	signature-concealment	GetPositionVector:arg2	c06c22f8bbfb	src/Nu3D/Light.cpp
 0x004c2ab0	signature-concealment	GetForwardVector:arg2	0111be2a6b73	src/Nu3D/Light.cpp
 0x004c2be0	signature-concealment	GetPositionVector:arg2	c06c22f8bbfb	src/Nu3D/Light.cpp
@@ -63,12 +61,6 @@ src/Nu3D/Sprite.h	unpinned-layout	TextureProjectionData	59108e30e062	src/Nu3D/Sp
 0x004907e0	unknown-symbol	g_unk839278	259cd00d89f0	src/Renderer/Renderer.cpp
 0x004907e0	unknown-symbol	g_unk839280	939424163ff3	src/Renderer/Renderer.cpp
 0x004b68b0	unknown-symbol	g_unk9F6008	f8d33dc4bca5	src/Renderer/Sprite.cpp
-0x004b6c10	unnamed-bitmask	renderFlags:0xC00	67bea385e2d8	src/Renderer/Sprite.cpp
-0x004b6c10	unnamed-bitmask	renderFlags:0x4800	e9e675f21f4e	src/Renderer/Sprite.cpp
-0x004b6c10	unnamed-bitmask	renderFlags:0x20800	172c9b1c6bd4	src/Renderer/Sprite.cpp
-0x004b6c10	unnamed-bitmask	renderFlags:0x100800	94fdf90436f8	src/Renderer/Sprite.cpp
-0x004b6c10	unnamed-bitmask	renderFlags:0x200800	99019990e80a	src/Renderer/Sprite.cpp
-0x004b6c10	unnamed-bitmask	renderFlags:0x400800	a69025723858	src/Renderer/Sprite.cpp
 0x004b70e0	unnamed-bitmask	instanceData->renderModeFlags:3	c7b113f0ba92	src/Renderer/Sprite.cpp
 0x004b70e0	unnamed-bitmask	renderFlags:0x2000	90890050a587	src/Renderer/Sprite.cpp
 0x004b70e0	unnamed-bitmask	instanceData->renderModeFlags:2	59ea614596cb	src/Renderer/Sprite.cpp
