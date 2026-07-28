@@ -35,6 +35,7 @@ namespace AudioManager
 
 	void StopAndFlush();
 	void OnExit();
+	void ShutdownHandles();
 	int32_t IsStreamActive();
 	int32_t PlayTrackByIndex(int32_t trackIndex, int32_t looping);
 	void QueuePlay(char* path, int32_t looping);
@@ -85,6 +86,8 @@ namespace AudioManager
 
 	extern HANDLE g_streamCommandEvent;
 	extern HANDLE g_streamAckEvent;
+	extern HANDLE g_streamFillEvent;
+	extern HANDLE g_streamStoppedEvent;
 	extern int32_t g_streamActive;
 	extern int32_t g_queuedStreamLooping;
 	extern int32_t g_streamLooping;

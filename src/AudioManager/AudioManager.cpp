@@ -49,6 +49,12 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x005282C4
 	HANDLE g_streamAckEvent;
 
+	// GLOBAL: TOY2 0x005282B8
+	HANDLE g_streamFillEvent;
+
+	// GLOBAL: TOY2 0x005282BC
+	HANDLE g_streamStoppedEvent;
+
 	// GLOBAL: TOY2 0x005282FC
 	int32_t g_streamActive;
 
@@ -1037,6 +1043,32 @@ namespace AudioManager
 
 	// FUNCTION: TOY2 0x00413140
 	void OnExit() { SignalThreadExit(); }
+
+	// FUNCTION: TOY2 0x00412EE0 [MATCHED]
+	void ShutdownHandles()
+	{
+		if (g_streamAckEvent != NULL)
+		{
+			CloseHandle(g_streamAckEvent);
+		}
+		if (g_streamCommandEvent != NULL)
+		{
+			CloseHandle(g_streamCommandEvent);
+		}
+		if (g_streamStoppedEvent != NULL)
+		{
+			CloseHandle(g_streamStoppedEvent);
+		}
+		if (g_streamFillEvent != NULL)
+		{
+			CloseHandle(g_streamFillEvent);
+		}
+
+		g_streamAckEvent = NULL;
+		g_streamCommandEvent = NULL;
+		g_streamStoppedEvent = NULL;
+		g_streamFillEvent = NULL;
+	}
 
 	// FUNCTION: TOY2 0x00413150
 	int32_t PlayTrackByIndex(int32_t trackIndex, int32_t looping)
