@@ -2520,18 +2520,101 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// STUB: TOY2 0x004C5AC0
-	void UnkFunc51(Nu3D::VertexTL* leftEdge,
-		Nu3D::VertexTL* rightEdge,
+	// FUNCTION: TOY2 0x004C5AC0
+	void RasterizeTexturedAlphaBlendSpan555(Nu3D::VertexTL* edgeA,
+		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
-		int32_t leftRed,
-		int32_t leftGreen,
-		int32_t leftBlue,
-		int32_t rightRed,
-		int32_t rightGreen,
-		int32_t rightBlue)
-	{}
+		int32_t edgeARed,
+		int32_t edgeAGreen,
+		int32_t edgeABlue,
+		int32_t edgeBRed,
+		int32_t edgeBGreen,
+		int32_t edgeBBlue)
+	{
+		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
+		int32_t farRed;
+		int32_t farGreen;
+		int32_t farBlue;
+		if (width < 0)
+		{
+			farRed = edgeBRed;
+			farGreen = edgeBGreen;
+			farBlue = edgeBBlue;
+			edgeBRed = edgeARed;
+			edgeBGreen = edgeAGreen;
+			edgeBBlue = edgeABlue;
+			edgeB = edgeA;
+			width = -width;
+		}
+		else
+		{
+			if (width == 0)
+				return;
+			farRed = edgeARed;
+			farGreen = edgeAGreen;
+			farBlue = edgeABlue;
+		}
+
+		destRow += (int32_t)edgeB->position.x;
+
+		int32_t textureU = (int32_t)(edgeB->uv.x * k_textureCoordinateScale) << k_textureCoordinateShift;
+		int32_t textureVValue = (int32_t)(edgeB->uv.y * k_textureCoordinateScale);
+		if (textureU > k_textureCoordinateFixedMax)
+			textureU = k_textureCoordinateFixedMax;
+		if (textureVValue > k_textureCoordinateMax)
+			textureVValue = k_textureCoordinateMax;
+		int32_t textureV = (k_textureCoordinateMax - textureVValue) << k_textureCoordinateShift;
+
+		int32_t farTextureU = (int32_t)(edgeA->uv.x * k_textureCoordinateScale) << k_textureCoordinateShift;
+		int32_t farTextureVValue = (int32_t)(edgeA->uv.y * k_textureCoordinateScale);
+		if (farTextureU > k_textureCoordinateFixedMax)
+			farTextureU = k_textureCoordinateFixedMax;
+		if (farTextureVValue > k_textureCoordinateMax)
+			farTextureVValue = k_textureCoordinateMax;
+		int32_t farTextureV = (k_textureCoordinateMax - farTextureVValue) << k_textureCoordinateShift;
+
+		int32_t stepRed = (farRed - edgeBRed) / width;
+		int32_t stepGreen = (farGreen - edgeBGreen) / width;
+		int32_t stepBlue = (farBlue - edgeBBlue) / width;
+		int32_t stepTextureU = (farTextureU - textureU) / width;
+		int32_t stepTextureV = (farTextureV - textureV) / width;
+
+		do
+		{
+			int32_t textureIndex =
+				((textureV >> k_textureCoordinateShift) & k_lowerByteMask) * k_textureDimension + ((textureU >> k_textureCoordinateShift) & k_lowerByteMask);
+			uint32_t texel = texData[textureIndex];
+			if (texel > k_rgbMask)
+			{
+				int32_t alpha = g_spanAlpha;
+				int32_t invAlpha = g_spanInvAlpha;
+				uint16_t pixel = *destRow;
+
+				int32_t blue = ((uint32_t)(((texel & 0xff) * edgeBBlue) >> 8) * alpha >> 8) + ((pixel & 0x1f) << 3) * invAlpha;
+				if (blue > 0xf800)
+					blue = 0xf800;
+
+				int32_t green = ((pixel >> 2) & 0xf8) * invAlpha + ((uint32_t)(alpha * (((texel >> 8) & 0xff) * edgeBGreen >> 8)) >> 8);
+				if (green > 0xf800)
+					green = 0xf800;
+
+				int32_t red = ((pixel >> 7) & 0xf8) * invAlpha + ((uint32_t)(alpha * (((texel >> 16) & 0xff) * edgeBRed >> 8)) >> 8);
+				if (red > 0xf800)
+					red = 0xf800;
+
+				*destRow = (uint16_t)(((red >> 1) & 0x7c00) + ((green >> 6) & 0x3e0) + (blue >> 11));
+			}
+
+			textureU += stepTextureU;
+			textureV += stepTextureV;
+			edgeBRed += stepRed;
+			edgeBGreen += stepGreen;
+			edgeBBlue += stepBlue;
+			destRow++;
+			width--;
+		} while (width != 0);
+	}
 
 	// Blends an untextured span with a 555 destination. The source and
 	// destination factors are in g_spanAlpha and g_spanInvAlpha.
@@ -2691,18 +2774,101 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// STUB: TOY2 0x004C6080
-	void UnkFunc44(Nu3D::VertexTL* leftEdge,
-		Nu3D::VertexTL* rightEdge,
+	// FUNCTION: TOY2 0x004C6080
+	void RasterizeTexturedAlphaBlendSpan565(Nu3D::VertexTL* edgeA,
+		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
 		uint32_t* texData,
-		int32_t leftRed,
-		int32_t leftGreen,
-		int32_t leftBlue,
-		int32_t rightRed,
-		int32_t rightGreen,
-		int32_t rightBlue)
-	{}
+		int32_t edgeARed,
+		int32_t edgeAGreen,
+		int32_t edgeABlue,
+		int32_t edgeBRed,
+		int32_t edgeBGreen,
+		int32_t edgeBBlue)
+	{
+		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
+		int32_t farRed;
+		int32_t farGreen;
+		int32_t farBlue;
+		if (width < 0)
+		{
+			farRed = edgeBRed;
+			farGreen = edgeBGreen;
+			farBlue = edgeBBlue;
+			edgeBRed = edgeARed;
+			edgeBGreen = edgeAGreen;
+			edgeBBlue = edgeABlue;
+			edgeB = edgeA;
+			width = -width;
+		}
+		else
+		{
+			if (width == 0)
+				return;
+			farRed = edgeARed;
+			farGreen = edgeAGreen;
+			farBlue = edgeABlue;
+		}
+
+		destRow += (int32_t)edgeB->position.x;
+
+		int32_t textureU = (int32_t)(edgeB->uv.x * k_textureCoordinateScale) << k_textureCoordinateShift;
+		int32_t textureVValue = (int32_t)(edgeB->uv.y * k_textureCoordinateScale);
+		if (textureU > k_textureCoordinateFixedMax)
+			textureU = k_textureCoordinateFixedMax;
+		if (textureVValue > k_textureCoordinateMax)
+			textureVValue = k_textureCoordinateMax;
+		int32_t textureV = (k_textureCoordinateMax - textureVValue) << k_textureCoordinateShift;
+
+		int32_t farTextureU = (int32_t)(edgeA->uv.x * k_textureCoordinateScale) << k_textureCoordinateShift;
+		int32_t farTextureVValue = (int32_t)(edgeA->uv.y * k_textureCoordinateScale);
+		if (farTextureU > k_textureCoordinateFixedMax)
+			farTextureU = k_textureCoordinateFixedMax;
+		if (farTextureVValue > k_textureCoordinateMax)
+			farTextureVValue = k_textureCoordinateMax;
+		int32_t farTextureV = (k_textureCoordinateMax - farTextureVValue) << k_textureCoordinateShift;
+
+		int32_t stepRed = (farRed - edgeBRed) / width;
+		int32_t stepGreen = (farGreen - edgeBGreen) / width;
+		int32_t stepBlue = (farBlue - edgeBBlue) / width;
+		int32_t stepTextureU = (farTextureU - textureU) / width;
+		int32_t stepTextureV = (farTextureV - textureV) / width;
+
+		do
+		{
+			int32_t textureIndex =
+				((textureV >> k_textureCoordinateShift) & k_lowerByteMask) * k_textureDimension + ((textureU >> k_textureCoordinateShift) & k_lowerByteMask);
+			uint32_t texel = texData[textureIndex];
+			if (texel > k_rgbMask)
+			{
+				int32_t alpha = g_spanAlpha;
+				int32_t invAlpha = g_spanInvAlpha;
+				uint16_t pixel = *destRow;
+
+				int32_t blue = ((uint32_t)(((texel & 0xff) * edgeBBlue) >> 8) * alpha >> 8) + ((pixel & 0x1f) << 3) * invAlpha;
+				if (blue > 0xf800)
+					blue = 0xf800;
+
+				int32_t green = ((pixel >> 3) & 0xf8) * invAlpha + ((uint32_t)(alpha * (((texel >> 8) & 0xff) * edgeBGreen >> 8)) >> 8);
+				if (green > 0xf800)
+					green = 0xf800;
+
+				int32_t red = ((pixel >> 8) & 0xf8) * invAlpha + ((uint32_t)(alpha * (((texel >> 16) & 0xff) * edgeBRed >> 8)) >> 8);
+				if (red > 0xf800)
+					red = 0xf800;
+
+				*destRow = (uint16_t)((red & 0xf800) + ((green >> 5) & 0x7c0) + (blue >> 11));
+			}
+
+			textureU += stepTextureU;
+			textureV += stepTextureV;
+			edgeBRed += stepRed;
+			edgeBGreen += stepGreen;
+			edgeBBlue += stepBlue;
+			destRow++;
+			width--;
+		} while (width != 0);
+	}
 
 	// Whole-primitive rasterizers for an untextured quad.
 
@@ -2800,7 +2966,7 @@ namespace SoftwareRenderer
 				}
 				else
 				{
-					g_spanRasterizer = UnkFunc51;
+					g_spanRasterizer = RasterizeTexturedAlphaBlendSpan555;
 					g_spanInvAlpha = 255 - g_spanAlpha;
 				}
 			}
@@ -2859,7 +3025,7 @@ namespace SoftwareRenderer
 			}
 			else
 			{
-				g_spanRasterizer = UnkFunc44;
+				g_spanRasterizer = RasterizeTexturedAlphaBlendSpan565;
 				g_spanInvAlpha = 255 - g_spanAlpha;
 			}
 		}
@@ -2957,7 +3123,7 @@ namespace SoftwareRenderer
 				}
 				else
 				{
-					g_spanRasterizer = UnkFunc51;
+					g_spanRasterizer = RasterizeTexturedAlphaBlendSpan555;
 					g_spanInvAlpha = 255 - g_spanAlpha;
 				}
 			}
@@ -3035,7 +3201,7 @@ namespace SoftwareRenderer
 			}
 			else
 			{
-				g_spanRasterizer = UnkFunc44;
+				g_spanRasterizer = RasterizeTexturedAlphaBlendSpan565;
 				g_spanInvAlpha = 255 - g_spanAlpha;
 			}
 		}

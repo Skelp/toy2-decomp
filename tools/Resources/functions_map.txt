@@ -1048,10 +1048,10 @@
 0x004C55B0 SoftwareRenderer::UnkFunc37
 0x004C56D0 SoftwareRenderer::UnkFunc42
 0x004C58E0 SoftwareRenderer::UnkFunc43
-0x004C5AC0 SoftwareRenderer::UnkFunc51
+0x004C5AC0 SoftwareRenderer::RasterizeTexturedAlphaBlendSpan555
 0x004C5D80 SoftwareRenderer::UnkFunc56
 0x004C5F00 SoftwareRenderer::UnkFunc38
-0x004C6080 SoftwareRenderer::UnkFunc44
+0x004C6080 SoftwareRenderer::RasterizeTexturedAlphaBlendSpan565
 0x004C6340 SoftwareRenderer::UnkFunc57
 0x004C6B80 SoftwareRenderer::UnkFunc46
 0x004C7630 SoftwareRenderer::UnkFunc45

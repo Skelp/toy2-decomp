@@ -289,7 +289,7 @@ namespace SoftwareRenderer
 		int32_t edgeBRed,
 		int32_t edgeBGreen,
 		int32_t edgeBBlue);
-	void UnkFunc44(Nu3D::VertexTL* leftEdge,
+	void RasterizeTexturedAlphaBlendSpan565(Nu3D::VertexTL* leftEdge,
 		Nu3D::VertexTL* rightEdge,
 		uint16_t* destRow,
 		uint32_t* texData,
@@ -339,7 +339,7 @@ namespace SoftwareRenderer
 		int32_t edgeBRed,
 		int32_t edgeBGreen,
 		int32_t edgeBBlue);
-	void UnkFunc51(Nu3D::VertexTL* leftEdge,
+	void RasterizeTexturedAlphaBlendSpan555(Nu3D::VertexTL* leftEdge,
 		Nu3D::VertexTL* rightEdge,
 		uint16_t* destRow,
 		uint32_t* texData,
