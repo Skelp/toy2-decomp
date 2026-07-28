@@ -34,7 +34,7 @@ class ReportMetricTests(unittest.TestCase):
             "file": "toy2.exe",
             "timestamp": 0,
             "data": [
-                {"address": "0x401000", "name": "Game", "matching": 0.5},
+                {"address": "0x401000", "name": "Game", "matching": 0.5, "effective": True},
                 {"address": "0x500000", "name": "memcpy", "matching": 1.0},
             ],
         }
@@ -61,7 +61,13 @@ class ReportMetricTests(unittest.TestCase):
         self.assertEqual(metrics["project_implemented"], 1)
         self.assertEqual(metrics["project_started"], 2)
         self.assertEqual(metrics["project_compared"], 1)
-        self.assertEqual(metrics["project_accuracy"], 50.0)
+        self.assertEqual(metrics["project_accuracy"], 100.0)
+        self.assertEqual(metrics["project_original_bytes"], 48)
+        self.assertEqual(metrics["project_matched_bytes"], 8)
+        self.assertEqual(metrics["project_effective_bytes"], 16)
+        self.assertAlmostEqual(metrics["project_byte_progress"], 100 / 6)
+        self.assertAlmostEqual(metrics["project_effective_byte_progress"], 100 / 3)
+        self.assertTrue(metrics["quality_gate_passed"])
         self.assertEqual(metrics["runtime_compared"], 1)
         self.assertEqual(metrics["runtime_accuracy"], 100.0)
         game = next(item for item in result["entities"] if item["address"] == "0x401000")

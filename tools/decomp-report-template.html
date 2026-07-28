@@ -47,7 +47,7 @@
     .subtitle { max-width: 760px; margin: 14px 0 0; color: var(--muted); font-size: 15px; line-height: 1.55; }
     .generated { flex: none; padding: 11px 14px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: rgb(8 19 28 / 75%); font: 12px ui-monospace, monospace; }
 
-    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+    .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
     .metric, .panel { border: 1px solid var(--line); background: linear-gradient(145deg, rgb(17 34 47 / 96%), rgb(9 21 31 / 96%)); box-shadow: var(--shadow); }
     .metric { min-height: 144px; padding: 20px; border-radius: var(--radius); position: relative; overflow: hidden; }
     .metric::after { content: ""; position: absolute; width: 140px; height: 140px; right: -62px; bottom: -76px; border: 24px solid color-mix(in srgb, var(--accent) 17%, transparent); border-radius: 50%; }
@@ -323,11 +323,9 @@
 
     function renderMetrics() {
       const cards = [
-        ["Project coverage", pct(metrics.project_implemented / metrics.project_total * 100), `${metrics.project_implemented} implemented · ${metrics.project_started} started / ${metrics.project_total} mapped`, "var(--cyan)"],
-        ["Project accuracy", pct(metrics.project_accuracy), `${metrics.project_compared} project functions paired by reccmp`, "var(--green)"],
-        ["Project progress", pct(metrics.project_progress), `${metrics.project_effective_score.toFixed(2)} effective matches / ${metrics.project_total} mapped`, "var(--purple)"],
-        ["Source quality", String(metrics.quality_errors), `${metrics.quality_new_errors} new errors · ${metrics.quality_warnings} advisory findings`, metrics.quality_new_errors ? "var(--red)" : "var(--cyan)"],
-        ["Linked runtime", pct(metrics.runtime_accuracy), `${metrics.runtime_compared} separately classified runtime functions`, "var(--gold)"]
+        ["Source quality gate", metrics.quality_gate_passed ? "PASS" : "FAIL", `${metrics.quality_new_errors} new · ${metrics.quality_errors} legacy errors · ${metrics.quality_warnings} warnings · ${metrics.quality_stale_baseline} stale baseline entries`, metrics.quality_gate_passed ? "var(--cyan)" : "var(--red)"],
+        ["Byte progress", pct(metrics.project_byte_progress), `${bytes(Math.round(metrics.project_matched_bytes))} size-weighted raw match / ${bytes(metrics.project_original_bytes)} project code`, "var(--green)"],
+        ["Regalloc-adjusted byte progress", pct(metrics.project_effective_byte_progress), `${bytes(Math.round(metrics.project_effective_bytes))} matched · register-allocation and safe instruction-order differences excluded`, "var(--purple)"]
       ];
       const host = $("metrics");
       cards.forEach(([label, value, detail, accent]) => {

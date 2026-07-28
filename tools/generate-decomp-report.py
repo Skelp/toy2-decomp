@@ -264,6 +264,25 @@ def enrich_report(
         1.0 if item.get("effective") else float(item.get("matching", 0))
         for item in runtime_compared
     )
+    project_entities = [
+        item
+        for item in entities
+        if item.get("category") == "project" and item.get("address") in mapped_addresses
+    ]
+    project_original_bytes = sum(
+        int(item.get("original_size") or 0) for item in project_entities
+    )
+    project_matched_bytes = sum(
+        int(item.get("original_size") or 0) * float(item.get("matching", 0))
+        for item in project_entities
+        if not item.get("stub") and item["status"] != "unmatched"
+    )
+    project_effective_bytes = sum(
+        int(item.get("original_size") or 0)
+        * (1.0 if item.get("effective") else float(item.get("matching", 0)))
+        for item in project_entities
+        if not item.get("stub") and item["status"] != "unmatched"
+    )
     summary.update(
         {
             "exact": sum(item["status"] == "exact" for item in comparable),
@@ -291,6 +310,21 @@ def enrich_report(
                 if mapped_addresses
                 else 0.0
             ),
+            "project_original_bytes": project_original_bytes,
+            "project_matched_bytes": project_matched_bytes,
+            "project_effective_bytes": project_effective_bytes,
+            "project_byte_progress": (
+                project_matched_bytes / project_original_bytes * 100
+                if project_original_bytes
+                else 0.0
+            ),
+            "project_effective_byte_progress": (
+                project_effective_bytes / project_original_bytes * 100
+                if project_original_bytes
+                else 0.0
+            ),
+            "quality_gate_passed": summary.get("quality_new_errors", 0) == 0
+            and summary.get("quality_stale_baseline", 0) == 0,
             "runtime_compared": len(runtime_compared),
             "runtime_effective_score": runtime_effective_score,
             "runtime_accuracy": (
