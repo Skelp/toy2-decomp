@@ -22,6 +22,15 @@ namespace ModeSelect
 		DEVICE_SELECTION_EXPLICIT_MASK = 0x3C,
 	};
 
+	enum SelectionState
+	{
+		SELECTION_STATE_DRIVER,
+		SELECTION_STATE_RENDER_METHOD,
+		SELECTION_STATE_DISPLAY_MODE,
+		SELECTION_STATE_WINDOW_MODE,
+		SELECTION_STATE_EXIT,
+	};
+
 	// GLOBAL: TOY2 0x00505590
 	int32_t g_forceFullscreen = 1;
 
@@ -752,7 +761,7 @@ namespace ModeSelect
 					DeleteDC(g_offscreenDC);
 				}
 
-				g_selectionState = 4;
+				g_selectionState = SELECTION_STATE_EXIT;
 				break;
 
 			case WM_PAINT:
@@ -910,7 +919,7 @@ namespace ModeSelect
 
 				int32_t deviceHightlightColor;
 
-				if (g_selectionState == 1)
+				if (g_selectionState == SELECTION_STATE_RENDER_METHOD)
 					deviceHightlightColor = g_highlightColor;
 				else
 					deviceHightlightColor = 0x8888;
@@ -923,7 +932,7 @@ namespace ModeSelect
 
 				int32_t modeTextY = 4 * g_lineHeight / 2 + deviceTextY;
 
-				if (g_selectionState == 3)
+				if (g_selectionState == SELECTION_STATE_WINDOW_MODE)
 				{
 					if (g_mainFont)
 						SelectObject(g_offscreenDC, g_mainFont);
@@ -969,7 +978,7 @@ namespace ModeSelect
 
 					int32_t modeHighlightColor;
 
-					if (g_selectionState == 2)
+					if (g_selectionState == SELECTION_STATE_DISPLAY_MODE)
 						modeHighlightColor = g_highlightColor;
 					else
 						modeHighlightColor = 0x8888;
@@ -986,13 +995,13 @@ namespace ModeSelect
 
 				if (g_selectionState)
 				{
-					if (g_selectionState == 1)
+					if (g_selectionState == SELECTION_STATE_RENDER_METHOD)
 					{
 						instructionLines = g_renderMethodInstructions;
 					}
 					else
 					{
-						if (g_selectionState != 2)
+						if (g_selectionState != SELECTION_STATE_DISPLAY_MODE)
 						{
 						LBL_FINISH_PAINT:
 
@@ -1349,7 +1358,7 @@ namespace ModeSelect
 		UpdateWindow(g_hWnd);
 		SetFocus(g_hWnd);
 
-		g_selectionState = 0;
+		g_selectionState = SELECTION_STATE_DRIVER;
 
 		while (true)
 		{
@@ -1371,7 +1380,7 @@ namespace ModeSelect
 					break;
 			}
 
-			if (g_selectionState == 4)
+			if (g_selectionState == SELECTION_STATE_EXIT)
 				break;
 
 			int32_t shouldRedraw = 0;
@@ -1384,11 +1393,11 @@ namespace ModeSelect
 
 			switch (g_selectionState)
 			{
-				case 0: {
+				case SELECTION_STATE_DRIVER: {
 					if (! g_ddAppIterator->chainDDApp)
 					{
 					LBL_ENTER_DEVICE_SELECT:
-						g_selectionState = 1;
+						g_selectionState = SELECTION_STATE_RENDER_METHOD;
 						shouldRedraw = 1;
 						goto LBL_NEXT_ITERATION;
 					}
@@ -1452,7 +1461,7 @@ namespace ModeSelect
 
 							g_ddAppSelectedDevice->primaryDisplayMode = restoredModeListHead;
 							g_savedModeIndex = restoredModeIndex;
-							g_selectionState = 2;
+							g_selectionState = SELECTION_STATE_DISPLAY_MODE;
 							shouldRedraw = 1;
 
 							goto LBL_NEXT_ITERATION;
@@ -1579,7 +1588,7 @@ namespace ModeSelect
 
 					break;
 				}
-				case 1: {
+				case SELECTION_STATE_RENDER_METHOD: {
 					DDAppDevice* fallbackDevice = g_selectedDDApp->deviceListHead;
 
 					if (fallbackDevice->nextDevice)
@@ -1591,7 +1600,7 @@ namespace ModeSelect
 
 							case VK_RETURN:
 							case VK_SPACE:
-								g_selectionState = 2;
+								g_selectionState = SELECTION_STATE_DISPLAY_MODE;
 								shouldRedraw = 1;
 								goto LBL_NEXT_ITERATION;
 
@@ -1746,13 +1755,13 @@ namespace ModeSelect
 
 					g_ddAppSelectedDevice->primaryDisplayMode = selectedModeListHead;
 					g_savedModeIndex = restoredModeIndex;
-					g_selectionState = 2;
+					g_selectionState = SELECTION_STATE_DISPLAY_MODE;
 					shouldRedraw = 1;
 
 					goto LBL_NEXT_ITERATION;
 				}
 
-				case 2: {
+				case SELECTION_STATE_DISPLAY_MODE: {
 					switch (g_keyDown)
 					{
 						case VK_BACK:
@@ -1764,7 +1773,7 @@ namespace ModeSelect
 							if (! g_ddAppIterator->chainDDApp)
 								goto LBL_NEXT_ITERATION;
 
-							g_selectionState = 0;
+							g_selectionState = SELECTION_STATE_DRIVER;
 							break;
 
 						case VK_RETURN:
@@ -1791,18 +1800,18 @@ namespace ModeSelect
 					goto LBL_NEXT_ITERATION;
 				}
 
-				case 3: {
+				case SELECTION_STATE_WINDOW_MODE: {
 					switch (g_keyDown)
 					{
 						case VK_BACK:
-							g_selectionState = 2;
+							g_selectionState = SELECTION_STATE_DISPLAY_MODE;
 							shouldRedraw = 1;
 							goto LBL_NEXT_ITERATION;
 
 						case VK_RETURN:
 						case VK_SPACE:
 						LBL_COMMIT_EXIT:
-							g_selectionState = 4;
+							g_selectionState = SELECTION_STATE_EXIT;
 							shouldRedraw = 1;
 							goto LBL_NEXT_ITERATION;
 

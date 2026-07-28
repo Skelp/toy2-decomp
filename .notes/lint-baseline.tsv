@@ -2,9 +2,6 @@
 0x004a4130	unstructured-control-flow	goto-count	7ba3d112d547	src/AudioManager/AudioManager.cpp
 0x004a4680	unstructured-control-flow	goto-count	d78bedef8668	src/AudioManager/AudioManager.cpp
 0x004a3f10	unstructured-control-flow	goto-count	ef0757631ecd	src/AudioManager/AudioManager.cpp
-0x00432ad0	unnamed-bitmask	g_selectionState:3	0f0bb1ee67c4	src/ModeSelect.cpp
-0x00432ad0	unnamed-bitmask	g_selectionState:2	e71b92710e09	src/ModeSelect.cpp
-0x00432020	unnamed-bitmask	g_selectionState:4	13d60fcbf1a6	src/ModeSelect.cpp
 0x00432020	unstructured-control-flow	goto-count	5ec26f3099de	src/ModeSelect.cpp
 0x004ca420	unnamed-bitmask	creature->dataFlags:2	4510a68f2914	src/NGNLoader/NGNLoader.cpp
 0x004ca420	unnamed-bitmask	creature->dataFlags:4	bf5db5b8fd5c	src/NGNLoader/NGNLoader.cpp
