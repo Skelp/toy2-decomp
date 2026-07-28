@@ -955,21 +955,6 @@ namespace AudioManager
 		return (leftVolume + rightVolume) / 2;
 	}
 
-	// Each preset contains its playback parameters and peak-volume contribution.
-	struct OneShotSoundPreset
-	{
-		uint16_t encodedSoundIndex;
-		int16_t baseFrequency;
-		int16_t leftVolume;
-		int16_t rightVolume;
-		int16_t randomFrequencyShift;
-		int16_t maxLeftVolume;
-		int16_t maxRightVolume;
-		int16_t maxVolumeScale;
-	};
-
-	STATIC_ASSERT(sizeof(OneShotSoundPreset) == 0x10);
-
 	// GLOBAL: TOY2 0x00502950
 	OneShotSoundPreset g_oneShotPresets[218];
 

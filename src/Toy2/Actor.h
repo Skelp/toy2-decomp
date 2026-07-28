@@ -9,6 +9,11 @@ namespace Toy2
 {
 	namespace Actor
 	{
+		enum ActorFlags
+		{
+			ACTOR_FLAG_ACTIVE = 0x2,
+		};
+
 		struct Toy2Actor
 		{
 			struct ActorBehaviourContext
@@ -87,6 +92,7 @@ namespace Toy2
 		int32_t IsInsideBounds(const Vector3I* position, int32_t minX, int32_t maxX, int32_t minZ, int32_t maxZ);
 		void PopulateActiveActors();
 		void HitType1Particles(int32_t x, int32_t y, int32_t z);
+		void PlayPeriodicHintSound(int32_t actorIndex, int32_t soundPresetIndex);
 		void GetCreatureList(uint8_t* creatureIdList);
 		int32_t FindInActorList(Toy2Actor* actor);
 		void SetNodeAngle(Toy2Actor* actor, int32_t nodeIndex, float x, float y, float z);

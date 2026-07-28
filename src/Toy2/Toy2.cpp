@@ -271,6 +271,12 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0052B7DC
 	int32_t g_levelTransition;
 
+	// GLOBAL: TOY2 0x0052B7D8
+	int32_t g_levelObjectiveProgress;
+
+	// GLOBAL: TOY2 0x0052B816
+	uint16_t g_gameplayStateFlags;
+
 	// GLOBAL: TOY2 0x0052AD94
 	int32_t g_demoMode;
 

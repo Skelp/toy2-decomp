@@ -1,9 +1,12 @@
 #include "Toy2/Actor.h"
 #include "Toy2/Animation.h"
 #include "Toy2/Buzz.h"
+#include "Toy2/Toy2.h"
+#include "AudioManager/AudioManager.h"
 #include "CharacterLoader.h"
 #include "Nu3D/Particles.h"
 #include "Random.h"
+#include "Renderer/Renderer.h"
 
 #include <string.h>
 
@@ -24,6 +27,9 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x004E0588
 		uint8_t* g_animationFrameSequences[26];
+
+		// GLOBAL: TOY2 0x00830D40
+		int32_t g_periodicHintSoundTimer;
 
 		// GLOBAL: TOY2 0x00529D48
 		Toy2Actor* g_renderActors[66];
@@ -145,6 +151,32 @@ namespace Toy2
 				particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
 				particle->lifetime = (*g_randDatBufferPtr++ & 0xF) * 2 + 0x18;
 			}
+		}
+
+		// FUNCTION: TOY2 0x004A26F0
+		void PlayPeriodicHintSound(int32_t actorIndex, int32_t soundPresetIndex)
+		{
+			if (soundPresetIndex == 0xB5)
+			{
+				if (Toy2::HUD::g_challengeState != 0)
+					return;
+			}
+			else if (Toy2::g_levelObjectiveProgress < 0)
+			{
+				return;
+			}
+
+			if ((g_creatureActors[actorIndex].actorFlags & ACTOR_FLAG_ACTIVE) == 0 || (Toy2::g_gameplayStateFlags & 1) != 0)
+				return;
+
+			g_periodicHintSoundTimer -= Renderer::g_frameDelta;
+			if (g_periodicHintSoundTimer >= 0)
+				return;
+
+			g_periodicHintSoundTimer = *g_randDatBufferPtr++ * 2 + 0xF0;
+			AudioManager::OneShotSoundPreset* preset = &AudioManager::g_oneShotPresets[soundPresetIndex];
+			AudioManager::PlayOneShotSound3DActor(
+				&g_creatureActors[actorIndex], preset->encodedSoundIndex - 1, preset->baseFrequency, preset->leftVolume, &g_creatureActors[actorIndex], 0);
 		}
 
 		// FUNCTION: TOY2 0x00414A80

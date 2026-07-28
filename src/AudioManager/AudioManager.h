@@ -46,6 +46,20 @@ namespace AudioManager
 
 	STATIC_ASSERT(sizeof(SoundSequenceEvent) == 0x8);
 
+	struct OneShotSoundPreset
+	{
+		int16_t encodedSoundIndex;
+		int16_t baseFrequency;
+		int16_t leftVolume;
+		int16_t rightVolume;
+		int16_t randomFrequencyShift;
+		int16_t maxLeftVolume;
+		int16_t maxRightVolume;
+		int16_t maxVolumeScale;
+	};
+
+	STATIC_ASSERT(sizeof(OneShotSoundPreset) == 0x10);
+
 	extern int32_t g_curTrackIndex;
 	extern int32_t g_loopingMusicTrackIndex;
 
@@ -124,6 +138,7 @@ namespace AudioManager
 	extern int16_t g_maxLeftVolume;
 	extern int16_t g_maxRightVolume;
 	extern int16_t g_maxVolume;
+	extern OneShotSoundPreset g_oneShotPresets[218];
 
 	extern int32_t g_pendingStreamTrack;
 	extern int16_t g_loopingSoundChannels[32][5];
