@@ -14,6 +14,17 @@ namespace Toy2
 			Vector3I data[];
 		};
 
+		struct LevelDataHeader
+		{
+			int32_t recordCount;
+			uint8_t records[];
+		};
+
+		struct LevelDataTrailer
+		{
+			int32_t size;
+		};
+
 		struct ModelTypeData_A
 		{
 			int32_t unk0;
@@ -137,6 +148,8 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(Object) == 0x14);
 		STATIC_ASSERT(sizeof(ObjectDesc) == 0xC);
 		STATIC_ASSERT(sizeof(ObjectDescCache) == 0x1C);
+		STATIC_ASSERT(sizeof(LevelDataHeader) == 0x4);
+		STATIC_ASSERT(sizeof(LevelDataTrailer) == 0x4);
 		STATIC_ASSERT(sizeof(ObjectList) == 0x4);
 		STATIC_ASSERT(sizeof(PortalEntry) == 0x2);
 		STATIC_ASSERT(sizeof(PortalZone) == 0x20);

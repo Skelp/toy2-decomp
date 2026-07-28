@@ -362,7 +362,7 @@ namespace Toy2
 			for (int16_t* p = l_region0400 + 170; p != g_layerScaleTable + (sizeof(g_layerScaleTable) / sizeof(g_layerScaleTable[0])); ++p)
 				*p = 512;
 
-			uint8_t* l_base = reinterpret_cast<uint8_t*>(g_levelDataBase);
+			LevelDataHeader* l_levelDataHeader = reinterpret_cast<LevelDataHeader*>(g_levelDataBase);
 			l_type64Count = 0;
 			Levels::g_unused9 = 0;
 
@@ -376,20 +376,21 @@ namespace Toy2
 				(l_type64Init++)->recordPtr = 0;
 			} while (l_type64Init < end);
 
-			uint8_t* l_recordPtr = (l_base + 4);
+			uint8_t* l_recordPtr = l_levelDataHeader->records;
 			memset(l_portalCounts, 0, sizeof(l_portalCounts));
 
 			l_type65Idx = 65;
 
-			if (*reinterpret_cast<int32_t*>(l_recordPtr - 4) > 0)
+			if (l_levelDataHeader->recordCount > 0)
 			{
-				l_totalRecordCount = *reinterpret_cast<int32_t*>(l_recordPtr - 4);
+				l_totalRecordCount = l_levelDataHeader->recordCount;
 
 				printf("Total Record Count -> %d\n", l_totalRecordCount);
 
 				do
 				{
-					l_recordType = *reinterpret_cast<int16_t*>(l_recordPtr + 2);
+					RecordData* l_record = reinterpret_cast<RecordData*>(l_recordPtr);
+					l_recordType = static_cast<int16_t>(l_record->recordType);
 
 					if (l_recordType >= 0)
 					{
@@ -400,7 +401,7 @@ namespace Toy2
 							g_type64Count = l_type64Count;
 							g_type64Structs[l_type64Idx].recordPtr = l_recordPtr;
 
-							l_recordPtr += 12 * *reinterpret_cast<int32_t*>(l_recordPtr) + 4;
+							l_recordPtr += 12 * static_cast<int16_t>(l_record->recordCount) + 4;
 						}
 						else
 						{
@@ -443,16 +444,16 @@ namespace Toy2
 								// ++l_type65Idx;
 							}
 
-							if (*reinterpret_cast<int16_t*>(l_recordPtr + 2) == 63)
-								l_recordPtr += 16 * *reinterpret_cast<int32_t*>(l_recordPtr) + 4;
+							if (static_cast<int16_t>(l_record->recordType) == 63)
+								l_recordPtr += 16 * static_cast<int16_t>(l_record->recordCount) + 4;
 							else
-								l_recordPtr += 12 * *reinterpret_cast<int32_t*>(l_recordPtr) + 4;
+								l_recordPtr += 12 * static_cast<int16_t>(l_record->recordCount) + 4;
 						}
 					}
 					else
 					{
 						g_recordData[-l_recordType] = reinterpret_cast<RecordData*>(l_recordPtr);
-						l_recordPtr += 4 * ((3 * *reinterpret_cast<int32_t*>(l_recordPtr) + 1) / 2) + 16;
+						l_recordPtr += 4 * ((3 * static_cast<int16_t>(l_record->recordCount) + 1) / 2) + 16;
 					}
 
 					--l_totalRecordCount;
@@ -572,9 +573,9 @@ namespace Toy2
 			}*/
 
 			g_objectListBase = (ObjectList*)((uint8_t*)l_secondSection_ + sizeof(InstanceSection));
-			l_secondSectionCount = *(int32_t*)((uint8_t*)l_secondSection_ + sizeof(InstanceSection));
+			l_secondSectionCount = g_objectListBase->count;
 
-			g_secondInstanceSection = (InstanceSection*)((uint8_t*)l_secondSection_ + 20 + 4 * l_secondSectionCount + 8);
+			g_secondInstanceSection = reinterpret_cast<InstanceSection*>(&g_objectListBase->entries[l_secondSectionCount + 1]);
 
 			printf("Second section count -> %d\n", l_secondSectionCount);
 			printf("Second Instance Flags -> %d\n", g_secondInstanceSection->flags);
@@ -658,7 +659,8 @@ namespace Toy2
 				} while (l_nextFlags);
 			}*/
 
-			l_lodTrailerSize = *(int32_t*)((uint8_t*)g_levelDataBase + fileSize - 4);
+			LevelDataTrailer* l_levelDataTrailer = reinterpret_cast<LevelDataTrailer*>(reinterpret_cast<uint8_t*>(g_levelDataBase) + fileSize) - 1;
+			l_lodTrailerSize = l_levelDataTrailer->size;
 			printf("Load trailer size -> %d\n", l_lodTrailerSize);
 			printf("Object List Base Count -> %d\n", g_objectListBase->count);
 

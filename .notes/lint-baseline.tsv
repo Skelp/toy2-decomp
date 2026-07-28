@@ -185,10 +185,6 @@ src/Toy2/Buzz.h	placeholder-field	unkVar23	899dd18df465	src/Toy2/Buzz.h
 src/Toy2/KiteTail.h	unpinned-layout	Data	e5e429bcc9c2	src/Toy2/KiteTail.h
 src/Toy2/KiteTail.h	unpinned-layout	Segment	44986cef8a39	src/Toy2/KiteTail.h
 0x00438a50	unstructured-control-flow	goto-count	8564fcf859bd	src/Toy2/LevelSelect.cpp
-0x0043e6e0	anonymous-buffer-view	inline-view	5e3febc69906	src/Toy2/Levels.cpp
-0x0043e6e0	implicit-record-layout	l_recordPtr	e8b7566e28f9	src/Toy2/Levels.cpp
-0x0043e6e0	raw-layout-access	literal-offset	52ea4f4299f4	src/Toy2/Levels.cpp
-0x0043e6e0	typed-byte-roundtrip	l_secondSection_	52ea4f4299f4	src/Toy2/Levels.cpp
 0x00452fc0	unknown-symbol	g_unk54717C	87a29dac69c7	src/Toy2/Levels.cpp
 0x00452fc0	unknown-symbol	g_unk546D78	fdc4f844f8e5	src/Toy2/Levels.cpp
 0x00452fc0	unknown-symbol	g_unk547CD0	c2480d2a0204	src/Toy2/Levels.cpp
