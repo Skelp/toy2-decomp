@@ -36,6 +36,7 @@ namespace Nu3D
 		};
 
 		extern ParticleInstance g_particleInstances[64];
+		extern int32_t g_particleAllocationCursor;
 		void Init();
 		ParticleInstance* SpawnFromPreset(int32_t x, int32_t y, int32_t z, int32_t typeId, int32_t presetIndex);
 
