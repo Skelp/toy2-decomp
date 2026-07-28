@@ -37,6 +37,7 @@ namespace SoftwareRenderer
 	extern uint8_t g_paletteEntries[0x400];
 	extern uint8_t* g_rgbToPaletteIndex;
 	extern uint8_t g_paletteSource[0x400];
+	extern uint8_t g_paletteLightingTable[128][256];
 	extern uint8_t* g_additivePaletteTable;
 	extern uint8_t* g_paletteColourOffsetTable;
 	extern uint8_t* g_subtractivePaletteTable;

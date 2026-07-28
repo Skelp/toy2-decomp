@@ -87,6 +87,11 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00704A38
 	uint8_t g_paletteSource[0x400];
 
+	// Maps a palette entry and a 0..127 light level to the nearest lit palette
+	// entry. Palette entry zero is reserved and is not selected.
+	// GLOBAL: TOY2 0x00534564
+	uint8_t g_paletteLightingTable[128][256];
+
 	// GLOBAL: TOY2 0x00704A34
 	uint8_t* g_additivePaletteTable;
 
@@ -2731,8 +2736,42 @@ namespace SoftwareRenderer
 		BuildPaletteLightingTable();
 	}
 
-	// STUB: TOY2 0x004319E0
-	void BuildPaletteLightingTable() {}
+	// FUNCTION: TOY2 0x004319E0
+	void BuildPaletteLightingTable()
+	{
+		for (int32_t lightLevel = 0; lightLevel < 128; lightLevel++)
+		{
+			for (int32_t sourceEntry = 0; sourceEntry < 256; sourceEntry++)
+			{
+				int32_t blue = g_paletteSource[sourceEntry * 4] * lightLevel / 64;
+				int32_t green = g_paletteSource[sourceEntry * 4 + 1] * lightLevel / 64;
+				int32_t red = g_paletteSource[sourceEntry * 4 + 2] * lightLevel / 64;
+				if (blue > 255)
+					blue = 255;
+				if (green > 255)
+					green = 255;
+				if (red > 255)
+					red = 255;
+
+				int32_t bestDistance = 0x7fffffff;
+				uint8_t bestEntry;
+				for (int32_t candidate = 1; candidate < 256; candidate++)
+				{
+					int32_t blueDifference = abs(blue - g_paletteSource[candidate * 4]) * 4;
+					int32_t greenDifference = abs(green - g_paletteSource[candidate * 4 + 1]) * 5;
+					int32_t redDifference = abs(red - g_paletteSource[candidate * 4 + 2]) * 3;
+					int32_t distance = blueDifference * blueDifference + greenDifference * greenDifference + redDifference * redDifference;
+					if (distance < bestDistance)
+					{
+						bestDistance = distance;
+						bestEntry = (uint8_t)candidate;
+					}
+				}
+				g_paletteLightingTable[lightLevel][sourceEntry] = bestEntry;
+			}
+		}
+		OutputDebugStringA("Generated lighting\n");
+	}
 
 	// FUNCTION: TOY2 0x00470D60
 	void BuildRGBToPaletteTable()
