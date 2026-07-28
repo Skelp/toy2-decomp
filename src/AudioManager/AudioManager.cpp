@@ -354,21 +354,23 @@ namespace AudioManager
 		return result;
 	}
 
-	struct SfxPackEntry
+	struct SoundPackDescriptor
 	{
-		char** filenames;
-		int32_t baseIndex;
+		char** soundNames;
+		int32_t firstSoundIndex;
 	};
+
+	STATIC_ASSERT(sizeof(SoundPackDescriptor) == 0x8);
 
 	void LoadSoundEffect(char* name, int32_t index, int32_t flag);
 
 	// FUNCTION: TOY2 0x0047D670 [MATCHED]
-	void LoadSoundPack(SfxPackEntry* table, int32_t index)
+	void LoadSoundPack(SoundPackDescriptor* table, int32_t index)
 	{
 		if (index >= 0 && index <= 0x10)
 		{
-			char** filenames = table[index].filenames;
-			int32_t baseIndex = table[index].baseIndex;
+			char** filenames = table[index].soundNames;
+			int32_t baseIndex = table[index].firstSoundIndex;
 			char* filename = *filenames;
 			while (filename != NULL)
 			{
@@ -529,14 +531,6 @@ namespace AudioManager
 		g_deviceCount = index + 1;
 		return TRUE;
 	}
-
-	struct SoundPackDescriptor
-	{
-		char** soundNames;
-		int32_t firstSoundIndex;
-	};
-
-	STATIC_ASSERT(sizeof(SoundPackDescriptor) == 0x8);
 
 	// GLOBAL: TOY2 0x004FD140
 	SoundPackDescriptor g_primarySoundPacks[17];
@@ -1357,8 +1351,118 @@ namespace AudioManager
 	int32_t PlayLoopingSound3DPositional(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, void* unused, int32_t rightVolume)
 	{ return PlayLoopingSound3D(owner, soundIndex, volume, leftVolume, rightVolume); }
 
-	// STUB: TOY2 0x0047D930
-	int32_t RestartLoopingSound(int32_t soundId) { return 0; }
+	enum
+	{
+		SOUND_BUFFER_GROUP_MASK = 0xFFFF8,
+	};
+
+	// FUNCTION: TOY2 0x0047D930
+	int32_t RestartLoopingSound(int32_t soundId)
+	{
+		char waveName[256];
+		DWORD status;
+		if (g_audioInitialized == 0)
+		{
+			return 0;
+		}
+
+		g_dsResult = g_dsBuffers[soundId]->GetStatus(&status);
+		if ((status & DSBSTATUS_BUFFERLOST) != 0)
+		{
+			int32_t bufferIndex = soundId & SOUND_BUFFER_GROUP_MASK;
+			int32_t bufferEnd = bufferIndex + 8;
+			for (; bufferIndex < bufferEnd; bufferIndex++)
+			{
+				g_loopingSoundOwners[bufferIndex] = NULL;
+				if (g_audioInitialized != 0)
+				{
+					g_dsBuffers[bufferIndex]->Release();
+				}
+			}
+
+			int32_t levelId = g_currentSfxLevelId;
+			g_loadedSfxPackIndex = soundId / 8;
+			if (g_audioInitialized != 0)
+			{
+				if (IsStreamActive())
+				{
+					StopAndWait();
+					while (IsStreamActive()) {}
+				}
+
+				g_streamPending = 0;
+				if (g_audioInitialized != 0)
+				{
+					ReleaseAllBuffers();
+					int32_t i;
+					for (i = 0; i < 768; i++)
+					{
+						g_dsBuffers[i] = NULL;
+					}
+					for (i = 0; i < 768; i++)
+					{
+						g_loopingSoundOwners[i] = NULL;
+					}
+					for (i = 0; i < 32; i++)
+					{
+						g_loopingSoundChannels[i][0] = -1;
+						g_loopingSoundChannels[i][1] = -1;
+					}
+				}
+			}
+
+			LoadSoundPack(g_primarySoundPacks, 0);
+			if (levelId > 0)
+			{
+				LoadSoundPack(g_primarySoundPacks, levelId);
+				if (levelId <= 16)
+				{
+					SoundPackDescriptor* pack = &g_secondarySoundPacks[levelId];
+					char** soundName = pack->soundNames;
+					int32_t soundIndex = pack->firstSoundIndex;
+					while (*soundName != NULL)
+					{
+						if (**soundName != '\0')
+						{
+							sprintf(waveName, "%s.wav", *soundName);
+							LoadSoundEffect(waveName, soundIndex, 0);
+						}
+						soundName++;
+						soundIndex++;
+					}
+				}
+			}
+
+			g_currentSfxLevelId = levelId;
+			g_loadedSfxPackIndex = -1;
+		}
+
+		DWORD loopingStatus;
+		if (g_audioInitialized == 0)
+		{
+			loopingStatus = 0;
+		}
+		else
+		{
+			g_dsResult = g_dsBuffers[soundId]->GetStatus(&status);
+			loopingStatus = status;
+		}
+
+		if ((loopingStatus & DSBSTATUS_LOOPING) != 0)
+		{
+			g_dsResult = g_dsBuffers[soundId]->Play(0, 0, 0);
+			if (g_dsResult != DS_OK)
+			{
+				g_dsResult = g_dsBuffers[soundId]->Stop();
+				if (g_dsResult != DS_OK)
+				{
+					return 1;
+				}
+			}
+			return 0;
+		}
+		return 1;
+	}
 
 	// FUNCTION: TOY2 0x004A3BC0
 	void ResetChannelsTable()
