@@ -228,6 +228,66 @@ namespace Nu3D
 {
 	namespace Collision
 	{
+		// FUNCTION: TOY2 0x00481140
+		int16_t IsPointInTriangle(int32_t pointX,
+			int32_t pointY,
+			int32_t pointZ,
+			int32_t edge1X,
+			int32_t edge1Y,
+			int32_t edge1Z,
+			int32_t edge2X,
+			int32_t edge2Y,
+			int32_t edge2Z,
+			const Vector3I16* normal)
+		{
+			int32_t absNormalX = abs(normal->x);
+			int32_t absNormalY = abs(normal->y);
+			int32_t absNormalZ = abs(normal->z);
+			PointI point;
+			PointI edge1;
+			PointI edge2;
+			int32_t normalDirection;
+
+			if (absNormalX >= absNormalY && absNormalX >= absNormalZ)
+			{
+				point.x = pointY;
+				point.y = pointZ;
+				edge1.x = edge1Y;
+				edge1.y = edge1Z;
+				edge2.x = edge2Y;
+				edge2.y = edge2Z;
+				normalDirection = normal->x;
+			}
+			else if (absNormalY >= absNormalZ)
+			{
+				point.x = pointX;
+				point.y = pointZ;
+				edge1.x = edge1X;
+				edge1.y = edge1Z;
+				edge2.x = edge2X;
+				edge2.y = edge2Z;
+				normalDirection = -normal->y;
+			}
+			else
+			{
+				point.x = pointX;
+				point.y = pointY;
+				edge1.x = edge1X;
+				edge1.y = edge1Y;
+				edge2.x = edge2X;
+				edge2.y = edge2Y;
+				normalDirection = normal->z;
+			}
+
+			int32_t side1 = edge1.x * point.y - edge1.y * point.x;
+			int32_t side2 = (edge1.y - edge2.y) * (point.x - edge2.x) - (point.y - edge2.y) * (edge1.x - edge2.x);
+			int32_t side3 = edge2.y * point.x - point.y * edge2.x;
+
+			if (normalDirection < 0)
+				return side1 >= 0 && side2 >= 0 && side3 >= 0;
+			return side1 <= 0 && side2 <= 0 && side3 <= 0;
+		}
+
 		// FUNCTION: TOY2 0x00486280 [MATCHED]
 		int32_t GetGroundHeight(const PosAndAngles* position, int32_t shadowSize)
 		{

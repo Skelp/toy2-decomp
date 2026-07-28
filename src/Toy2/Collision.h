@@ -148,6 +148,23 @@ namespace Nu3D
 {
 	namespace Collision
 	{
+		int16_t IsPointInTriangle(int32_t pointX,
+			int32_t pointY,
+			int32_t pointZ,
+			int32_t edge1X,
+			int32_t edge1Y,
+			int32_t edge1Z,
+			int32_t edge2X,
+			int32_t edge2Y,
+			int32_t edge2Z,
+			const Vector3I16* normal);
+	}
+}
+
+namespace Nu3D
+{
+	namespace Collision
+	{
 		int32_t IsFloorWalkable();
 		int32_t GetSurfaceQuality(int32_t queryIndex);
 		int32_t GetGroundHeight(const PosAndAngles* position, int32_t shadowSize);
