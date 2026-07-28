@@ -83,10 +83,6 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00704A3C
 	uint8_t g_paletteSource[0x400];
 
-	// Render-queue clear/reset state shared by the UnkFunc31/32/33 cluster
-	// and the FUN_004bc980 / FUN_004bcad0 helpers: g_unkA4CC80 is an active
-	// flag, g_unkB626E0 a 30000-dword buffer, g_unkDBB094 and g_unkDE20A8 are
-	// counts. UnkFunc32 clears the buffer and resets the counts when inactive.
 	// GLOBAL: TOY2 0x00A4CC80
 	int32_t g_unkA4CC80;
 
@@ -96,12 +92,6 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00B626C0
 	int32_t g_unkB626C0;
 
-	// GLOBAL: TOY2 0x00B626E0
-	int32_t g_unkB626E0[30000];
-
-	// GLOBAL: TOY2 0x00DBB094
-	int32_t g_unkDBB094;
-
 	// GLOBAL: TOY2 0x00DE20A8
 	int32_t g_unkDE20A8;
 
@@ -109,7 +99,7 @@ namespace SoftwareRenderer
 	// transformed vertices (3 for a triangle, 4 for a quad when vertexCount is
 	// 4) and UnkFunc35 dequeues and rasterizes one. Stride 0x9C, capacity 1024
 	// (g_unkDE20A8 is the live count). The same struct is reused by the sorted
-	// path: UnkFunc33 walks the g_unkB626E0 depth buckets and threads nodes
+	// path: UnkFunc33 walks the sorted depth buckets and threads nodes
 	// through the next pointer (+0x8C), calling UnkFunc34 per node. The
 	// metadata at +0x80 is only partially understood; refine the names when
 	// UnkFunc29 and UnkFunc35 are reconstructed.
@@ -126,6 +116,25 @@ namespace SoftwareRenderer
 		int32_t useAlternateSpans;
 		int32_t reserved98; // +0x98
 	};
+	STATIC_ASSERT(sizeof(RenderCommand) == 0x9c);
+	STATIC_ASSERT(offsetof(RenderCommand, texData) == 0x80);
+	STATIC_ASSERT(offsetof(RenderCommand, next) == 0x8c);
+	STATIC_ASSERT(offsetof(RenderCommand, useAlternateSpans) == 0x94);
+
+	// GLOBAL: TOY2 0x00B626E0
+	RenderCommand* g_sortedRenderBuckets[30000];
+
+	// GLOBAL: TOY2 0x00B7FBA0
+	uint32_t g_sortedRenderFlags;
+
+	// GLOBAL: TOY2 0x00B7FBB0
+	float g_sortDepth;
+
+	// GLOBAL: TOY2 0x00B7FBE0
+	RenderCommand g_sortedRenderCommands[15000];
+
+	// GLOBAL: TOY2 0x00DBB094
+	int32_t g_sortedRenderCommandCount;
 
 	// GLOBAL: TOY2 0x00DBB0A0
 	RenderCommand g_renderQueue[1024];
@@ -153,6 +162,12 @@ namespace SoftwareRenderer
 
 	// GLOBAL: TOY2 0x005088E0
 	int32_t g_bottomOffset = -1;
+
+	// GLOBAL: TOY2 0x005088E4
+	int32_t g_primaryBucketOffsets[16];
+
+	// GLOBAL: TOY2 0x00508924
+	int32_t g_secondaryBucketOffsets[16];
 
 	// GLOBAL: TOY2 0x00B7FBBC
 	int32_t g_clipLeft;
@@ -279,6 +294,9 @@ namespace SoftwareRenderer
 	// the triangle's minimum vertex z into the 1024-entry bucket range.
 	// GLOBAL: TOY2 0x004DDAC4
 	extern const float k_depthSortScale = 1023.0f;
+
+	// GLOBAL: TOY2 0x004DDAD4
+	extern const float k_reverseDepthSortScale = -25000.0f;
 
 	// GLOBAL: TOY2 0x009F6010
 	int32_t g_unk9F6010;
@@ -907,6 +925,65 @@ namespace SoftwareRenderer
 		*green = ((colour >> 8) & 0xff) * (1.0 / 255.0);
 		*blue = (colour & 0xff) * (1.0 / 255.0);
 		*alphaMask = colour & 0xff000000;
+	}
+
+	// FUNCTION: TOY2 0x004BC980
+	void QueueSortedRenderCommand(Nu3D::VertexTL* vertices[4], int32_t vertexCount, uint32_t* texData, int32_t renderState, int32_t bucketGroup)
+	{
+		if (g_sortedRenderCommandCount >= 15000)
+		{
+			return;
+		}
+
+		float sortDepth = g_sortDepth;
+		int32_t bucket;
+		if (g_unk9F6008 == 1)
+		{
+			sortDepth *= k_reverseDepthSortScale;
+			int32_t depth = 2 - (int32_t)sortDepth;
+			if ((g_sortedRenderFlags & 1) == 0)
+			{
+				bucket = depth + g_primaryBucketOffsets[bucketGroup] * 3;
+			}
+			else
+			{
+				bucket = depth + g_secondaryBucketOffsets[bucketGroup] * 3 + 1100;
+			}
+		}
+		else
+		{
+			int32_t depth = (int32_t)sortDepth;
+			if ((g_sortedRenderFlags & 1) == 0)
+			{
+				bucket = depth + g_primaryBucketOffsets[bucketGroup] * 3;
+			}
+			else
+			{
+				bucket = depth + g_secondaryBucketOffsets[bucketGroup] * 3 + 1100;
+			}
+		}
+
+		if (bucket >= 30000)
+		{
+			return;
+		}
+
+		RenderCommand* command = &g_sortedRenderCommands[g_sortedRenderCommandCount++];
+		Nu3D::VertexTL** source = vertices;
+		Nu3D::VertexTL* destination = command->vertices;
+		*destination++ = **source++;
+		*destination++ = **source++;
+		*destination = **source;
+		if (vertexCount == 4)
+		{
+			destination[1] = *source[1];
+		}
+		command->vertexCount = vertexCount;
+		command->texData = texData;
+		command->renderState = renderState;
+		command->next = g_sortedRenderBuckets[bucket];
+		g_sortedRenderBuckets[bucket] = command;
+		command->useAlternateSpans = g_sortedRenderFlags;
 	}
 
 	// FUNCTION: TOY2 0x004BCF60 [MATCHED]
@@ -2540,9 +2617,9 @@ namespace SoftwareRenderer
 		{
 			for (int i = 0; i < 30000; i++)
 			{
-				g_unkB626E0[i] = 0;
+				g_sortedRenderBuckets[i] = NULL;
 			}
-			g_unkDBB094 = 0;
+			g_sortedRenderCommandCount = 0;
 			g_unkDE20A8 = 0;
 		}
 	}
@@ -2557,7 +2634,7 @@ namespace SoftwareRenderer
 		{
 			for (int i = 29999; i >= 0; i--)
 			{
-				RenderCommand* command = (RenderCommand*)g_unkB626E0[i];
+				RenderCommand* command = g_sortedRenderBuckets[i];
 				while (command != NULL)
 				{
 					UnkFunc34(command, command->vertexCount, command->renderState, command->texData, command->useAlternateSpans);
