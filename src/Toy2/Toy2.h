@@ -29,9 +29,13 @@ namespace Toy2
 	void ProcessMiscEventsEx();
 	void RenderGame(int32_t fullRender);
 	int32_t ComputeTokenProgress();
+	int32_t* BuildPerspectiveDivideTable(int32_t scale);
 
 	extern ToyCfg g_toyCfgData;
 	extern int32_t g_levelFileIndex;
+	extern int32_t g_perspectiveScaleFixed;
+	extern int32_t g_perspectiveDivideTable[0x8000];
+	extern int32_t g_perspectiveHalfScale;
 	extern int32_t g_destRectWidth;
 	extern int32_t g_screenClipRightFixed;
 	extern int32_t g_softWindowWidth;

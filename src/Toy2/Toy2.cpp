@@ -51,6 +51,31 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0088278C
 	int32_t g_levelFileIndex;
 
+	// GLOBAL: TOY2 0x00704E6C
+	int32_t g_perspectiveScaleFixed;
+
+	// GLOBAL: TOY2 0x00704E74
+	int32_t g_perspectiveDivideTable[0x8000];
+
+	// GLOBAL: TOY2 0x00724E74
+	int32_t g_perspectiveHalfScale;
+
+	// FUNCTION: TOY2 0x0047D4E0
+	int32_t* BuildPerspectiveDivideTable(int32_t scale)
+	{
+		g_perspectiveHalfScale = scale >> 1;
+		int32_t fixedScale = scale << 12;
+		g_perspectiveScaleFixed = fixedScale;
+
+		int32_t divisor = 0x7fff;
+		do
+		{
+			g_perspectiveDivideTable[divisor] = fixedScale / divisor;
+		} while (--divisor != 0);
+
+		return g_perspectiveDivideTable;
+	}
+
 	// GLOBAL: TOY2 0x00882768
 	int32_t g_destRectWidth;
 
