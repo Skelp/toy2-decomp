@@ -34,6 +34,12 @@
 
 namespace Toy2
 {
+	namespace MoveableObject
+	{
+		// STUB: TOY2 0x004335D0
+		void InitTable(int32_t) {}
+	}
+
 	// GLOBAL: TOY2 0x004F5F54
 	extern const char g_creditsText[] =
 		"Congratulations!~~~~You have completed~~~~Toy Story 2!~~~~~~~~~~Traveller's Tales~~Credits~~~~~~"
@@ -176,9 +182,6 @@ namespace Toy2
 
 	namespace EvilEmperorZurg
 	{
-		// STUB: TOY2 0x0042B300
-		void Init() {}
-
 		// STUB: TOY2 0x0042B3A0
 		void Interactions() {}
 	}

@@ -13,6 +13,9 @@ namespace Toy2
 {
 	namespace Collectables
 	{
+		// STUB: TOY2 0x004A0C80
+		void Init(int32_t, int32_t) {}
+
 		// GLOBAL: TOY2 0x00830CCC
 		TokenState g_tokenStates[5];
 

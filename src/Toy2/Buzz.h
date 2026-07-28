@@ -6,6 +6,20 @@
 
 namespace Toy2
 {
+	namespace EvilEmperorZurg
+	{
+		extern int32_t g_previousPhase;
+		extern int32_t g_damageFlashTimer;
+		extern int32_t g_voiceTimer;
+		extern int32_t g_introSoundTimer;
+		extern int32_t g_encounterState;
+		extern int32_t g_damageFlashToggle;
+		extern int32_t g_attackTimer;
+		extern int32_t g_attackVariant;
+
+		void Init();
+	}
+
 	namespace Buzz
 	{
 		enum ActorFlags

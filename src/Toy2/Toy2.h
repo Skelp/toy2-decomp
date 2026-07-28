@@ -5,6 +5,11 @@
 
 namespace Toy2
 {
+	namespace MoveableObject
+	{
+		void InitTable(int32_t);
+	}
+
 	namespace HUD
 	{
 		enum SlideSlot

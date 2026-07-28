@@ -52,6 +52,7 @@ namespace Toy2
 		extern TokenState g_tokenStates[5];
 		extern TokenDialogueEntry g_tokenDialogueEntries[10];
 
+		void Init(int32_t, int32_t);
 		void BuildPickupTable();
 		void LoadTokenTable(const TokenDialogueValue* values);
 		void Activate(int32_t tokenIndex, int32_t skipCutscene);
