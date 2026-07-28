@@ -10,8 +10,50 @@
 
 namespace Toy2
 {
+	// GLOBAL: TOY2 0x0053C5D4
+	int32_t g_turnRecoveryTimer;
+
 	// GLOBAL: TOY2 0x0053C5E0
 	int32_t g_rocketBootsTimer;
+
+	// GLOBAL: TOY2 0x0053C5E4
+	int32_t g_poleRecordOffset;
+
+	// GLOBAL: TOY2 0x0053C608
+	int32_t g_spinCancelRequested;
+
+	// GLOBAL: TOY2 0x0053C618
+	int32_t g_ziplineState;
+
+	// GLOBAL: TOY2 0x0053C620
+	int32_t g_gunFireTimer;
+
+	// GLOBAL: TOY2 0x0053C648
+	int32_t g_forcedFacingActive;
+
+	// GLOBAL: TOY2 0x0053C64C
+	int32_t g_groundSlamTimer;
+
+	// GLOBAL: TOY2 0x0053C650
+	int32_t g_spinCooldownTimer;
+
+	// GLOBAL: TOY2 0x0053C660
+	int32_t g_ledgeClimbTimer;
+
+	// GLOBAL: TOY2 0x0053C668
+	int32_t g_poleClimbState;
+
+	// GLOBAL: TOY2 0x0053C66C
+	int32_t g_swingTimer;
+
+	// GLOBAL: TOY2 0x0053C838
+	int32_t g_airborneTimer;
+
+	// GLOBAL: TOY2 0x0053C83C
+	int32_t g_spinHoverTimer;
+
+	// GLOBAL: TOY2 0x0053C840
+	int32_t g_gunChargeTimer;
 
 	// GLOBAL: TOY2 0x00882924
 	Buzz::GadgetPickup* g_activeRocketBootsPickup;
@@ -60,8 +102,28 @@ namespace Toy2
 		}
 	}
 
-	// STUB: TOY2 0x00433ED0
-	void ResetBuzzState() {}
+	// FUNCTION: TOY2 0x00433ED0 [MATCHED]
+	void ResetBuzzState()
+	{
+		g_ledgeClimbTimer = 0;
+		g_airborneTimer = 0;
+		g_poleClimbState = 0;
+		g_poleRecordOffset = 0;
+		g_ziplineState = 0;
+		g_turnRecoveryTimer = 0;
+		g_spinHoverTimer = 0;
+		g_spinCooldownTimer = 0;
+		g_groundSlamTimer = 0;
+		g_gunFireTimer = 0;
+		g_gunChargeTimer = 0;
+		g_forcedFacingActive = 0;
+		g_swingTimer = 0;
+		g_spinCancelRequested = 0;
+		Buzz::DeactivateRocketBoots();
+		Buzz::CancelGrapple();
+		Buzz::ResetGravityBoots();
+		g_buzzActor.actorFlags &= ~(Buzz::ACTOR_FLAG_LOCK_FACING | Buzz::ACTOR_FLAG_UNCONTROLLED_MOMENTUM | Buzz::ACTOR_FLAG_PRESERVE_HORIZONTAL_MOMENTUM);
+	}
 
 	// FUNCTION: TOY2 0x004A48B0 [MATCHED]
 	void ResetGadgets()
