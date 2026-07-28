@@ -63,6 +63,5 @@ src/Toy2/Levels.h	placeholder-field	unkVar8	214a98fbd5fd	src/Toy2/Levels.h
 src/Toy2/Levels.h	placeholder-field	unkVar1	1dd893d22cd1	src/Toy2/Levels.h
 src/Toy2/Levels.h	placeholder-field	unkVar2	196b5971a77b	src/Toy2/Levels.h
 src/Toy2/Levels.h	placeholder-field	unkVar4	d2630a10c3c2	src/Toy2/Levels.h
-0x00437c40	unstructured-control-flow	goto-count	c2becc3c32de	src/Toy2/MainMenu.cpp
 0x0049d910	unstructured-control-flow	goto-count	77dd5e8ddf01	src/Toy2/Toy2.cpp
 0x004909e0	unknown-symbol	UnkFunc2	3628e6b79452	src/Toy2/Toy2.cpp

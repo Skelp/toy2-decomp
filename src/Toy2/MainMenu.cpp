@@ -73,14 +73,10 @@ namespace Toy2
 			int32_t selectedY = 120;
 			int32_t idleTimer = 0;
 			int32_t cursorY = 120;
-			bool cursorBelowTarget;
-
 			AudioManager::PlayMusicOneShot(19);
 
-			while (! g_nextScreen)
+			while (! g_nextScreen || g_fadeTimer)
 			{
-			LBL_FRAME_START:
-
 				Nu3D::Camera::FadeToTargetTint();
 
 				int32_t frameDelta = Renderer::g_frameDelta;
@@ -95,96 +91,76 @@ namespace Toy2
 
 				idleTimer += Renderer::g_frameDelta;
 
-				if (g_nextScreen)
+				if (! g_nextScreen && cursorY == selectedY)
 				{
-					cursorBelowTarget = cursorY < selectedY;
-					goto LBL_ANIMATE_CURSOR;
-				}
-
-				cursorBelowTarget = cursorY < selectedY;
-
-				if (cursorY != selectedY)
-					goto LBL_ANIMATE_CURSOR;
-
-				if ((InputManager::g_curButtonsPressed & INPUT_JUMP) == 0 || (InputManager::g_prevButtonsPressed & INPUT_JUMP) != 0 || idleTimer <= 30)
-				{
-					if ((InputManager::g_curButtonsPressed & INPUT_DOWN) != 0 && (InputManager::g_prevButtonsPressed & INPUT_DOWN) == 0 && selectedY < 200)
+					if ((InputManager::g_curButtonsPressed & INPUT_JUMP) == 0 || (InputManager::g_prevButtonsPressed & INPUT_JUMP) != 0 || idleTimer <= 30)
 					{
-						selectedY += 20;
-						AudioManager::PlayOneShotSoundGlobal(1, 4608, 80, 80);
+						if ((InputManager::g_curButtonsPressed & INPUT_DOWN) != 0 && (InputManager::g_prevButtonsPressed & INPUT_DOWN) == 0 && selectedY < 200)
+						{
+							selectedY += 20;
+							AudioManager::PlayOneShotSoundGlobal(1, 4608, 80, 80);
 
-						frameDelta = Renderer::g_frameDelta;
+							frameDelta = Renderer::g_frameDelta;
+						}
+
+						if ((InputManager::g_curButtonsPressed & INPUT_UP) != 0 && (InputManager::g_prevButtonsPressed & INPUT_UP) == 0 && selectedY > 120)
+						{
+							selectedY -= 20;
+							AudioManager::PlayOneShotSoundGlobal(1, 4608, 80, 80);
+						}
 					}
-
-					if ((InputManager::g_curButtonsPressed & INPUT_UP) == 0 || (InputManager::g_prevButtonsPressed & INPUT_UP) != 0 || selectedY <= 120)
+					else
 					{
-						cursorBelowTarget = cursorY < selectedY;
-						goto LBL_ANIMATE_CURSOR;
-					}
-
-					selectedY -= 20;
-
-					AudioManager::PlayOneShotSoundGlobal(1, 4608, 80, 80);
-				}
-				else
-				{
-					switch (cursorY)
-					{
-						case 120:
+						if (cursorY == 120)
+						{
 							g_nextScreen = 2;
-							break;
-
-						case 140:
+						}
+						else if (cursorY == 140)
+						{
 							g_nextScreen = 3;
-							break;
-
-						case 160:
+						}
+						else if (cursorY == 160)
+						{
 							g_nextScreen = 4;
-							break;
-						case 180:
-
+						}
+						else if (cursorY == 180)
+						{
 							g_nextScreen = 5;
-							break;
-
-						case 200:
+						}
+						else if (cursorY == 200)
+						{
 							exit(-1);
-					}
+						}
 
-					g_fadeTimer = 23;
-					Nu3D::Camera::SetTint(0, 0, 0, 12);
-					AudioManager::PlayOneShotSoundGlobal(0, 4608, 80, 80);
+						g_fadeTimer = 23;
+						Nu3D::Camera::SetTint(0, 0, 0, 12);
+						AudioManager::PlayOneShotSoundGlobal(0, 4608, 80, 80);
+					}
 				}
 
 				frameDelta = Renderer::g_frameDelta;
-				cursorBelowTarget = cursorY < selectedY;
 
-			LBL_ANIMATE_CURSOR:
-
-				if (cursorBelowTarget)
+				if (cursorY < selectedY)
 				{
 					cursorY += 2 * frameDelta;
 
-					if (cursorY < selectedY)
-						goto LBL_DRAW_FRAME;
+					if (cursorY >= selectedY)
+						cursorY = selectedY;
 				}
-				else
+				else if (cursorY > selectedY)
 				{
 					cursorY -= 2 * frameDelta;
 
-					if (cursorY > selectedY)
-						goto LBL_DRAW_FRAME;
+					if (cursorY <= selectedY)
+						cursorY = selectedY;
 				}
 
-				cursorY = selectedY;
-
-			LBL_DRAW_FRAME:
-
-				uint32_t bounce = idleTimer & 63;
+				int32_t bounce = idleTimer & 63;
 
 				if (bounce > 31)
 					bounce = 63 - bounce;
 
-				uint32_t spriteScale = 4 * bounce;
+				int32_t spriteScale = 4 * bounce;
 
 				Renderer::Sprite::DrawScaled(64, cursorY, 62, 0, 4 * bounce, 4 * bounce, 128, 255, 2048, 2048);
 				Renderer::Sprite::DrawScaled(240, cursorY, 62, 1, spriteScale, spriteScale, 128, 255, 2048, 2048);
@@ -206,7 +182,7 @@ namespace Toy2
 				if (g_attractModeTimer >= 0 && ((InputManager::g_curButtonsPressed & INPUT_SECRET_MENU) != 0 || idleTimer >= g_attractModeTimer))
 				{
 					if (g_nextScreen)
-						break;
+						continue;
 
 					g_nextScreen = 1;
 					g_fadeTimer = 23;
@@ -214,9 +190,6 @@ namespace Toy2
 					Nu3D::Camera::SetTint(0, 0, 0, 12);
 				}
 			}
-
-			if (g_fadeTimer)
-				goto LBL_FRAME_START;
 
 			AudioManager::StopAndWait();
 
