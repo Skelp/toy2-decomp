@@ -423,7 +423,7 @@
 0x004882F0 Nu3D::Collision::RaycastAgainstEdges
 0x00488510 Toy2::Platform::SetOrigin
 0x00488580 Toy2::Platform::GetFlags
-0x004885A0 Toy2::Platform::GetContactFace32
+0x004885A0 Toy2::Platform::GetContactFaceNormal
 0x004885C0 Toy2::Level::GetSectorAtPosition
 0x00488A60 Toy2::Platform::AddFlags
 0x00488A80 Toy2::Platform::ClearFlags

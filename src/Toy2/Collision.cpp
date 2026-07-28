@@ -46,6 +46,9 @@ namespace Toy2
 		// FUNCTION: TOY2 0x00488580 [MATCHED]
 		int32_t GetFlags(int32_t platformIndex) { return g_platformStates[platformIndex].flags; }
 
+		// FUNCTION: TOY2 0x004885A0 [MATCHED]
+		Vector3I16* GetContactFaceNormal(int32_t platformIndex) { return &g_platformStates[platformIndex].contactFace->normal; }
+
 		// FUNCTION: TOY2 0x00488510 [MATCHED]
 		void SetOrigin(int32_t platformIndex, int32_t x, int32_t y, int32_t z)
 		{

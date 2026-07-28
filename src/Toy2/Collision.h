@@ -34,6 +34,12 @@ namespace Toy2
 
 	namespace Platform
 	{
+		struct CollisionFace
+		{
+			uint8_t faceData[0x20];
+			Vector3I16 normal;
+		};
+
 		struct PlatformState
 		{
 			Vector3I16 rotationAnglesFixed;
@@ -42,13 +48,14 @@ namespace Toy2
 			Vector3I16 remainingTranslation;
 			Vector3I16 angularVelocity;
 			Vector3I16 remainingRotation;
-			uint8_t* contactFace;
+			CollisionFace* contactFace;
 			int16_t collisionMeshIndex;
 			int16_t flags;
 			uint8_t reserved[0xC];
 		};
 
 		int32_t GetFlags(int32_t platformIndex);
+		Vector3I16* GetContactFaceNormal(int32_t platformIndex);
 		void SetOrigin(int32_t platformIndex, int32_t x, int32_t y, int32_t z);
 		void AddFlags(int32_t platformIndex, uint16_t flags);
 		void ClearFlags(int32_t platformIndex, int32_t flags);
@@ -66,6 +73,7 @@ namespace Toy2
 		extern PlatformState g_platformStates[32];
 
 		STATIC_ASSERT(offsetof(PlatformState, velocity) == 0x8);
+		STATIC_ASSERT(offsetof(CollisionFace, normal) == 0x20);
 		STATIC_ASSERT(offsetof(PlatformState, remainingTranslation) == 0xE);
 		STATIC_ASSERT(offsetof(PlatformState, angularVelocity) == 0x14);
 		STATIC_ASSERT(offsetof(PlatformState, remainingRotation) == 0x1A);
