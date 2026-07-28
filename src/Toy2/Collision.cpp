@@ -60,6 +60,38 @@ namespace Toy2
 			}
 		}
 
+		// FUNCTION: TOY2 0x00487900 [MATCHED]
+		void SetVelocity(int32_t platformIndex, int32_t x, int32_t y, int32_t z)
+		{
+			if (g_platformStates[platformIndex].collisionMeshIndex != 0)
+			{
+				if (x == 0 && y == 0 && z == 0)
+				{
+					g_platformStates[platformIndex].flags &= ~0x80;
+					g_platformStates[platformIndex].velocity.x = 0;
+					g_platformStates[platformIndex].velocity.y = 0;
+					g_platformStates[platformIndex].velocity.z = 0;
+					return;
+				}
+				g_platformStates[platformIndex].flags |= 0x80;
+				g_platformStates[platformIndex].velocity.x = x;
+				g_platformStates[platformIndex].velocity.y = y;
+				g_platformStates[platformIndex].velocity.z = z;
+			}
+		}
+
+		// FUNCTION: TOY2 0x00487970 [MATCHED]
+		void SetAngularVelocity(int32_t platformIndex, int16_t x, int16_t y, int16_t z)
+		{
+			if (g_platformStates[platformIndex].collisionMeshIndex != 0)
+			{
+				g_platformStates[platformIndex].flags |= 8;
+				g_platformStates[platformIndex].angularVelocity.x = x;
+				g_platformStates[platformIndex].angularVelocity.y = y;
+				g_platformStates[platformIndex].angularVelocity.z = z;
+			}
+		}
+
 		// FUNCTION: TOY2 0x004879C0 [MATCHED]
 		void GetOrigin(int32_t platformIndex, Vector3I* origin)
 		{
