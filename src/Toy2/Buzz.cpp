@@ -13,7 +13,27 @@ namespace Toy2
 	Buzz::GadgetPickup* g_activeRocketBootsPickup;
 
 	// GLOBAL: TOY2 0x00882954
-	int32_t g_savedRocketBootsPickupState;
+	int32_t g_savedRocketBootsPickupY;
+
+	// GLOBAL: TOY2 0x00882934
+	Buzz::GadgetPickup* g_activeCosmicShieldPickup;
+
+	// GLOBAL: TOY2 0x00882958
+	int32_t g_savedCosmicShieldPickupY;
+
+	static __inline void RestoreCosmicShieldPickup()
+	{
+		if (g_activeCosmicShieldPickup != 0)
+		{
+			g_activeCosmicShieldPickup->position.y = g_savedCosmicShieldPickupY;
+			Nu3D::Link::SetScaleFromFixedOffsets(g_activeCosmicShieldPickup->linkId, 0x2000, 0x2000, 0x2000);
+			Nu3D::Link::SetPositionRawAndCommit(g_activeCosmicShieldPickup->linkId,
+				g_activeCosmicShieldPickup->position.x,
+				g_activeCosmicShieldPickup->position.y,
+				g_activeCosmicShieldPickup->position.z);
+			g_activeCosmicShieldPickup = 0;
+		}
+	}
 
 	// STUB: TOY2 0x00433ED0
 	void ResetBuzzState() {}
@@ -25,6 +45,9 @@ namespace Toy2
 		g_gravityBootsTimer = 600;
 		g_gravityBootsHoverHeight = 0x2000;
 	}
+
+	// FUNCTION: TOY2 0x004A5070 [MATCHED]
+	void RespawnCosmicShield() { RestoreCosmicShieldPickup(); }
 
 	namespace Buzz
 	{
@@ -43,7 +66,7 @@ namespace Toy2
 				}
 
 				Nu3D::Link::SetScaleFromFixedOffsets(g_activeRocketBootsPickup->linkId, 0x1000, 0x1000, 0x1000);
-				g_activeRocketBootsPickup->state = g_savedRocketBootsPickupState;
+				g_activeRocketBootsPickup->position.y = g_savedRocketBootsPickupY;
 			}
 		}
 
@@ -64,7 +87,7 @@ namespace Toy2
 		{
 			StopRocketBoots();
 			g_activeRocketBootsPickup = pickup;
-			g_savedRocketBootsPickupState = pickup->state;
+			g_savedRocketBootsPickupY = pickup->position.y;
 			ResetBuzzState();
 			g_rocketBootsTimer = 250;
 

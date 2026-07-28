@@ -9,9 +9,7 @@ namespace Toy2
 	{
 		struct GadgetPickup
 		{
-			uint8_t reserved0[4];
-			int32_t state;
-			uint8_t reserved8[4];
+			Vector3I position;
 			uint8_t linkId;
 			uint8_t reservedD[3];
 		};
@@ -59,7 +57,7 @@ namespace Toy2
 			int16_t unkVar38;
 			int16_t stunTimer;
 			int16_t health;
-			int16_t inhibitMovementTimer;
+			int16_t cosmicShieldTimer;
 			int16_t lives;
 			int16_t unkShort40;
 			int16_t coinsCollected;
@@ -78,5 +76,7 @@ namespace Toy2
 	extern Buzz::Toy2BuzzActor g_buzzActor;
 	extern int32_t g_rocketBootsTimer;
 	extern Buzz::GadgetPickup* g_activeRocketBootsPickup;
-	extern int32_t g_savedRocketBootsPickupState;
+	extern int32_t g_savedRocketBootsPickupY;
+	extern Buzz::GadgetPickup* g_activeCosmicShieldPickup;
+	extern int32_t g_savedCosmicShieldPickupY;
 }
