@@ -85,7 +85,7 @@ namespace Nu3D
 
 		extern ParticleInstance g_particleInstances[64];
 		extern ParticleInstance g_rejectedParticleInstance;
-		extern ParticleType g_particleTypes[125];
+		extern ParticleType g_particleTypes[124];
 		extern ParticlePreset g_particlePresets[29];
 		extern int32_t g_particleAllocationCursor;
 		void Init();

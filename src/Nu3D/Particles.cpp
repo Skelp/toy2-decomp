@@ -48,9 +48,8 @@ namespace Nu3D
 			{ 0, 0, 0x00000140, 0, 0, 0, 0 },
 		};
 
-		// GLOBAL: TOY2 0x004EC160
-		ParticleType g_particleTypes[125] = {
-			{ 0, 0, 0, 0, 0x00, 0, 0, 0x0000, 0, 0x00, 0x00, 0x00 },
+		// GLOBAL: TOY2 0x004EC170
+		ParticleType g_particleTypes[124] = {
 			{ 4, 100, 16, 1, 0x00, 100, 100, 0x0020, 4, 0x80, 0x20, 0x00 },
 			{ 1, 2, 16, 8, 0x00, 100, 100, 0x0020, 2, 0x30, 0x20, 0x10 },
 			{ 1, 2, 16, 8, 0x00, 50, 50, 0x0040, 2, 0x40, 0x60, 0x80 },
@@ -249,7 +248,7 @@ namespace Nu3D
 			}
 
 			ParticleInstance* particle = &g_particleInstances[g_particleAllocationCursor];
-			const ParticleType* particleType = &g_particleTypes[typeId];
+			const ParticleType* particleType = &g_particleTypes[typeId - 1];
 			particle->pos.z = z;
 			particle->pos.x = x;
 			particle->pos.y = y;
