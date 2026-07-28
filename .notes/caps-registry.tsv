@@ -45,3 +45,4 @@
 0x004DBB80	CAP-23	94.74	2026-07-28	FMV seek: instruction bytes match. reccmp resolves the 10000000 time-scale constant through different nearby data labels.
 0x00414320	CAP-23	99.38	2026-07-28	level intro sprite slide: instruction bytes match. reccmp labels the retail sine-table displacement as an anonymous offset and the build displacement as g_sinCosLUT[1024].
 0x004A4E60	CAP-23	96.00	2026-07-28	rocket boots deactivation: instruction bytes match. reccmp labels the one-past particle-array bound through different adjacent data symbols.
+0x004A4D60	CAP-23	98.33	2026-07-28	rocket boots activation: instruction bytes match. reccmp labels the one-past particle-array bound through different adjacent data symbols.

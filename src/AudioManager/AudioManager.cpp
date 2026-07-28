@@ -11,7 +11,7 @@
 namespace AudioManager
 {
 	// STUB: TOY2 0x0049E660
-	void PlaySoundEffect(int32_t soundIndex, int32_t flags) {}
+	void PlaySoundEffect(int32_t soundIndex, const Vector3I* position) {}
 
 	// GLOBAL: TOY2 0x005282CC
 	int32_t g_curTrackIndex;

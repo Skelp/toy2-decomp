@@ -18,7 +18,7 @@ namespace Nu3D
 			int16_t lifetime;
 			int16_t width;
 			int16_t height;
-			uint8_t unkByte1;
+			uint8_t updateParam;
 			uint8_t unkByte2;
 			uint8_t spriteSheet;
 			uint8_t typeId;
@@ -35,8 +35,9 @@ namespace Nu3D
 			uint8_t unkByte12;
 		};
 
-        extern ParticleInstance g_particleInstances[64];
+		extern ParticleInstance g_particleInstances[64];
+		ParticleInstance* SpawnFromPreset(int32_t x, int32_t y, int32_t z, int32_t typeId, int32_t presetIndex);
 
-	    STATIC_ASSERT(sizeof(ParticleInstance) == 0x3C);
+		STATIC_ASSERT(sizeof(ParticleInstance) == 0x3C);
 	}
 }

@@ -67,6 +67,7 @@ namespace Toy2
 
 		void Respawn();
 		void ResetGravityBoots();
+		void ActivateRocketBoots(GadgetPickup* pickup);
 		void DeactivateRocketBoots();
 		void CancelGrapple();
 
