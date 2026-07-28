@@ -28,6 +28,8 @@ namespace Toy2
 	void ShowModelNode(int32_t creatureIndex, int32_t nodeIndex);
 	void HideModelNode(int32_t creatureIndex, int32_t nodeIndex);
 	void ResetBackdropState();
+	void ResetBuzzState();
+	void ActivateGravityBoots();
 	void ProcessMiscEvents();
 	void ProcessMiscEventsEx();
 	void RenderGame(int32_t fullRender);
@@ -40,6 +42,7 @@ namespace Toy2
 	extern int32_t g_perspectiveDivideTable[0x8000];
 	extern int32_t g_perspectiveHalfScale;
 	extern int32_t g_gravityBootsTimer;
+	extern int32_t g_gravityBootsHoverHeight;
 	extern int32_t g_grappleCharges;
 	extern int32_t g_grappleState;
 	extern int32_t g_destRectWidth;

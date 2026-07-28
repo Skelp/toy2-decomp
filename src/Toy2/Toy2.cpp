@@ -237,6 +237,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x00882920
 	int32_t g_gravityBootsTimer;
 
+	// GLOBAL: TOY2 0x00882928
+	int32_t g_gravityBootsHoverHeight;
+
 	// GLOBAL: TOY2 0x00882938
 	int32_t g_grappleCharges;
 

@@ -3,6 +3,17 @@
 
 namespace Toy2
 {
+	// STUB: TOY2 0x00433ED0
+	void ResetBuzzState() {}
+
+	// FUNCTION: TOY2 0x004A4B70 [MATCHED]
+	void ActivateGravityBoots()
+	{
+		ResetBuzzState();
+		g_gravityBootsTimer = 600;
+		g_gravityBootsHoverHeight = 0x2000;
+	}
+
 	namespace Buzz
 	{
 		// STUB: TOY2 0x00414110
