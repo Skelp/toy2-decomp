@@ -39,6 +39,9 @@ namespace SoftwareRenderer
 	extern uint8_t g_paletteSource[0x400];
 	extern uint8_t* g_additivePaletteTable;
 	extern uint8_t* g_subtractivePaletteTable;
+	extern uint8_t* g_paletteBlend25Table;
+	extern uint8_t* g_paletteBlend50Table;
+	extern uint8_t* g_paletteBlend75Table;
 	extern Nu3D::Viewport::ViewportRect* g_viewportRect;
 	extern int32_t g_softwareClearColor;
 	extern int32_t g_leftOffset;
@@ -163,6 +166,7 @@ namespace SoftwareRenderer
 	void BuildRGBToPaletteTable();
 	void BuildAdditivePaletteTable();
 	void BuildSubtractivePaletteTable();
+	void BuildPaletteBlendTable(uint8_t* output, int32_t blendWeight);
 
 	void UnkFunc8(int32_t highestBucket, int32_t clearValue);
 

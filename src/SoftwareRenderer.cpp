@@ -93,6 +93,15 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00704E48
 	uint8_t* g_subtractivePaletteTable;
 
+	// GLOBAL: TOY2 0x00704E38
+	uint8_t* g_paletteBlend25Table;
+
+	// GLOBAL: TOY2 0x00704E3C
+	uint8_t* g_paletteBlend50Table;
+
+	// GLOBAL: TOY2 0x00704E40
+	uint8_t* g_paletteBlend75Table;
+
 	// GLOBAL: TOY2 0x00A4CC80
 	int32_t g_unkA4CC80;
 
@@ -2772,7 +2781,7 @@ namespace SoftwareRenderer
 					green = 255;
 				if (red > 255)
 					red = 255;
-				int32_t lookup = ((blue & 0xf8) * 32 + (green & 0xf8)) * 4 + (red >> 3);
+				int32_t lookup = ((blue & ~7) * 32 + (green & ~7)) * 4 + (red >> 3);
 				*output++ = g_rgbToPaletteIndex[lookup];
 			}
 		}
@@ -2798,7 +2807,27 @@ namespace SoftwareRenderer
 					green = 0;
 				if (red < 0)
 					red = 0;
-				int32_t lookup = ((blue & 0xf8) * 32 + (green & 0xf8)) * 4 + (red >> 3);
+				int32_t lookup = ((blue & ~7) * 32 + (green & ~7)) * 4 + (red >> 3);
+				*output++ = g_rgbToPaletteIndex[lookup];
+			}
+		}
+	}
+
+	// FUNCTION: TOY2 0x004710C0
+	void BuildPaletteBlendTable(uint8_t* output, int32_t blendWeight)
+	{
+		int32_t baseWeight = 1024 - blendWeight;
+		for (int32_t baseEntry = 0; baseEntry < 256; baseEntry++)
+		{
+			int32_t baseBlue = g_paletteSource[baseEntry * 4] * baseWeight;
+			int32_t baseGreen = g_paletteSource[baseEntry * 4 + 1] * baseWeight;
+			int32_t baseRed = g_paletteSource[baseEntry * 4 + 2] * baseWeight;
+			for (int32_t blendEntry = 0; blendEntry < 256; blendEntry++)
+			{
+				int32_t blue = (g_paletteSource[blendEntry * 4] * blendWeight + baseBlue) >> 10;
+				int32_t green = (g_paletteSource[blendEntry * 4 + 1] * blendWeight + baseGreen) >> 10;
+				int32_t red = (g_paletteSource[blendEntry * 4 + 2] * blendWeight + baseRed) >> 10;
+				int32_t lookup = ((blue & ~7) * 32 + (green & ~7)) * 4 + (red >> 3);
 				*output++ = g_rgbToPaletteIndex[lookup];
 			}
 		}
