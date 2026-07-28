@@ -689,10 +689,76 @@ namespace Renderer
 		}
 
 		// FUNCTION: TOY2 0x004946A0
-		int16_t DrawTiledFixed(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex) { return 0; }
+		int16_t DrawTiledFixed(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex)
+		{
+			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
+			if (sheet)
+			{
+				int32_t textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
+				Vector2F uvTopLeft;
+				Vector2F uvBottomRight;
+				if (textureDataIndex != 0)
+				{
+					uint32_t bitmapWidth;
+					uint32_t bitmapHeight;
+					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
+
+					uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;
+					uvTopLeft.y = (float)sheet->tiles[tileIndex].y / (int32_t)bitmapHeight;
+					uvBottomRight.x = ((float)sheet->tileWidth + sheet->tiles[tileIndex].x) / (int32_t)bitmapWidth;
+					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
+				}
+
+				RGBA color = { (uint8_t)Nu3D::Camera::g_cameraTintRed, (uint8_t)Nu3D::Camera::g_cameraTintGreen, (uint8_t)Nu3D::Camera::g_cameraTintBlue, 255 };
+
+				Queue2DSprite(xPos * (1.0f / 320.0f),
+					yPos * (1.0f / g_virtualScreenHeight),
+					sheet->tileWidth * (1.0f / 320.0f),
+					sheet->tileHeight * (1.0f / g_virtualScreenHeight),
+					&uvTopLeft,
+					&uvBottomRight,
+					textureDataIndex,
+					color,
+					RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT);
+			}
+			return 1;
+		}
 
 		// FUNCTION: TOY2 0x00494820
-		int16_t DrawTile(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex) { return 0; }
+		int16_t DrawTile(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex)
+		{
+			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
+			if (sheet)
+			{
+				int32_t textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
+				Vector2F uvTopLeft;
+				Vector2F uvBottomRight;
+				if (textureDataIndex != 0)
+				{
+					uint32_t bitmapWidth;
+					uint32_t bitmapHeight;
+					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
+
+					uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;
+					uvTopLeft.y = (float)sheet->tiles[tileIndex].y / (int32_t)bitmapHeight;
+					uvBottomRight.x = ((float)sheet->tileWidth + sheet->tiles[tileIndex].x) / (int32_t)bitmapWidth;
+					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
+				}
+
+				RGBA color = { (uint8_t)Nu3D::Camera::g_cameraTintRed, (uint8_t)Nu3D::Camera::g_cameraTintGreen, (uint8_t)Nu3D::Camera::g_cameraTintBlue, 255 };
+
+				Queue2DSprite(xPos * (1.0f / g_virtualScreenWidth),
+					yPos * (1.0f / g_virtualScreenHeight),
+					sheet->tileWidth * (1.0f / g_virtualScreenWidth),
+					sheet->tileHeight * (1.0f / g_virtualScreenHeight),
+					&uvTopLeft,
+					&uvBottomRight,
+					textureDataIndex,
+					color,
+					RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT);
+			}
+			return 1;
+		}
 
 		// FUNCTION: TOY2 0x00493DC0
 		int16_t DrawColouredFixed(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue) { return 0; }

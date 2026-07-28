@@ -81,8 +81,6 @@ src/Nu3D/Sprite.h	unpinned-layout	TextureProjectionData	59108e30e062	src/Nu3D/Sp
 0x004907e0	unknown-symbol	g_unk839278	259cd00d89f0	src/Renderer/Renderer.cpp
 0x004907e0	unknown-symbol	g_unk839280	939424163ff3	src/Renderer/Renderer.cpp
 0x004b68b0	unknown-symbol	g_unk9F6008	f8d33dc4bca5	src/Renderer/Sprite.cpp
-0x004946a0	unfinished-function	0x004946a0	7a7b9fc07b6b	src/Renderer/Sprite.cpp
-0x00494820	unfinished-function	0x00494820	7a7b9fc07b6b	src/Renderer/Sprite.cpp
 0x00493dc0	unfinished-function	0x00493dc0	7a7b9fc07b6b	src/Renderer/Sprite.cpp
 0x00493c30	unfinished-function	0x00493c30	7a7b9fc07b6b	src/Renderer/Sprite.cpp
 0x004b6c10	unnamed-bitmask	renderFlags:0xC00	67bea385e2d8	src/Renderer/Sprite.cpp

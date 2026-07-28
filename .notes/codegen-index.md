@@ -88,6 +88,7 @@ reconstruction. `tools/decomp lint` reports those.
 - `CAP-21` **merged arithmetic locals use opposite scratch registers** — Retail and the build select different scratch registers for two merged arithmetic results. Natural expression and local forms do not change the selection.
 - `CAP-22` **textured alpha spans reserve different FPO locals** — Retail reserves 20 bytes and keeps the destination pointer in EBP. The build reserves 12 bytes and keeps the destination pointer in ESI. This changes the stack homes and registers across the function. The 555 and 565 twins have the same result.
 - `CAP-23` **an immediate constant resolves to different data labels** — The instruction bytes match. reccmp names the same immediate from different nearby data symbols and reports an operand difference.
+- `CAP-24` **retail retains paired divisors on the x87 stack, but the build spills and reloads them** — In four related UV expressions, the frame, calls, values, and stores agree. Expression and local forms change the spill pattern but do not reproduce the retail schedule.
 
 ## TOOL
 
