@@ -18,6 +18,7 @@
 #include "Toy2/Actor.h"
 
 #include "Nu3D/Font.h"
+#include "Nu3D/FMV.h"
 #include "Nu3D/Viewport.h"
 #include "Nu3D/Camera.h"
 #include "Renderer/Renderer.h"
@@ -26,6 +27,7 @@
 
 #include <WINDOWS.H>
 #include <STDIO.H>
+#include <STRING.H>
 #include <DINPUT.H>
 
 #include <Numerics.h>
@@ -288,6 +290,7 @@ namespace Toy2
 
 	int32_t TickSaveMenuMachine(int32_t param);
 	int32_t MovieViewerTick(int32_t movieIdx);
+	int32_t PlayMovie(int32_t movieId);
 	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId);
 	int32_t CleanupManagers();
 }
@@ -648,6 +651,92 @@ namespace Toy2
 			g_movieUnlocked[movieId] = 1;
 			PlayMovieWithTransition(movieId + 10, backgroundId);
 		}
+	}
+
+	// FUNCTION: TOY2 0x0049A930 [MATCHED]
+	int32_t PlayMovie(int32_t movieId)
+	{
+		char moviePath[256];
+		FileUtils::AppendCDPath(moviePath);
+		strcat(moviePath, "rtlibs\\");
+
+		switch (movieId)
+		{
+			case 1:
+				strcat(moviePath, "tt");
+				break;
+			case 0:
+				strcat(moviePath, "dlogo");
+				break;
+			case 2:
+				strcat(moviePath, "acti");
+				break;
+			case 10:
+				strcat(moviePath, "1st trailer");
+				break;
+			case 11:
+				strcat(moviePath, "l 01 in");
+				break;
+			case 12:
+				strcat(moviePath, "l 02 in");
+				break;
+			case 13:
+				strcat(moviePath, "l 03 bo");
+				break;
+			case 14:
+				strcat(moviePath, "l 04 in");
+				break;
+			case 15:
+				strcat(moviePath, "l 05 in");
+				break;
+			case 16:
+				strcat(moviePath, "l 06 bo");
+				break;
+			case 17:
+				strcat(moviePath, "l 07 in");
+				break;
+			case 18:
+				strcat(moviePath, "l 08 in");
+				break;
+			case 19:
+				strcat(moviePath, "l 09 bo");
+				break;
+			case 20:
+				strcat(moviePath, "l 10 in");
+				break;
+			case 21:
+				strcat(moviePath, "l 11 in");
+				break;
+			case 22:
+				strcat(moviePath, "l 12 bo");
+				break;
+			case 23:
+				strcat(moviePath, "l 13 in");
+				break;
+			case 24:
+				strcat(moviePath, "l 14 in");
+				break;
+			case 25:
+				strcat(moviePath, "l 15 bo 1");
+				break;
+			case 26:
+				strcat(moviePath, "l 12 in");
+				break;
+			case 27:
+				strcat(moviePath, "l 15 bo 2");
+				break;
+			case 28:
+				strcat(moviePath, "end 01");
+				break;
+			default:
+				return 0;
+		}
+
+		strcat(moviePath, ".dll");
+		AudioManager::ReleaseBuffers();
+		int32_t interrupted = Nu3D_FMV_PlayMovie(moviePath);
+		AudioManager::Init();
+		return interrupted;
 	}
 
 	// STUB: TOY2 0x0049AB90
