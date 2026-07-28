@@ -99,6 +99,7 @@ namespace Toy2
 	extern int16_t g_levelIndex;
 	extern int16_t g_unlocks;
 	extern int16_t g_levelTransitionTimer;
+	extern int32_t g_levelTransition;
 	extern int32_t g_levelObjectiveProgress;
 	extern uint16_t g_gameplayStateFlags;
 	extern int32_t g_levelFileConversion[15];

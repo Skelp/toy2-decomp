@@ -87,9 +87,16 @@ namespace Toy2
 			Vector3I respawnPos;
 			int32_t respawnYawAngle;
 			Vector3I motionTargetPos;
-			int32_t velX;
-			int32_t gravityVel;
-			int32_t velForward;
+			union
+			{
+				struct
+				{
+					int32_t velX;
+					int32_t gravityVel;
+					int32_t velForward;
+				};
+				Vector3I velocity;
+			};
 			int32_t forwardSpeed;
 			int32_t lateralSpeed;
 			int32_t movementState;
@@ -124,6 +131,8 @@ namespace Toy2
 		void CancelGrapple();
 		void FireDiscLauncher(int32_t launchPitch);
 		void FireGrapple(int32_t aimYaw, int32_t aimPitch);
+		void HandleDamage(uint32_t direction, uint32_t damageFlags);
+		void ResolveFooting(Toy2BuzzActor* buzz);
 		void TickGunFire(Toy2BuzzActor* buzz);
 		void HandleCollisions(Toy2BuzzActor* buzz, Vector3I* movement, uint8_t* contactState, int32_t queryIndex);
 		int32_t TickGroundSlam(Toy2BuzzActor* buzz);
@@ -135,6 +144,7 @@ namespace Toy2
 		void Launch(int32_t verticalVelocity, int16_t airborneMode);
 		void UpdateHorizontalMovement(Toy2BuzzActor* buzz, MovementRates* movementRates, int32_t forwardInput);
 		void UpdateRespawnAnchor();
+		int32_t UpdateFloorHeight(Toy2BuzzActor* buzz);
 
 		STATIC_ASSERT(sizeof(BeamShot) == 0x2C);
 		STATIC_ASSERT(sizeof(MovementRates) == 0x1C);
@@ -143,9 +153,11 @@ namespace Toy2
 		STATIC_ASSERT(offsetof(BeamShot, color) == 0x28);
 		STATIC_ASSERT(sizeof(GadgetPickup) == 0x10);
 		STATIC_ASSERT(sizeof(Toy2BuzzActor) == 0xA0);
+		STATIC_ASSERT(offsetof(Toy2BuzzActor, velocity) == 0x68);
 	}
 
 	extern Buzz::Toy2BuzzActor g_buzzActor;
+	extern int32_t g_slipperySurfaceState;
 	extern int32_t g_poweredLaserCharge;
 	extern int32_t g_aimTargetLocked;
 	extern int32_t g_rocketBootsTimer;

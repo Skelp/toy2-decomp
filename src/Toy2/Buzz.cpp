@@ -71,6 +71,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0053C824
 	int32_t g_poweredLaserCharge;
 
+	// GLOBAL: TOY2 0x0053C818
+	int32_t g_slipperySurfaceState;
+
 	// GLOBAL: TOY2 0x0053C648
 	int32_t g_forcedFacingActive;
 
@@ -213,6 +216,11 @@ namespace Toy2
 		const uint32_t ACTION_STATE_GUN_FIRE = 0x80;
 		const int32_t CAMERA_STATE_TARGETING = 3;
 		const int32_t CAMERA_STATE_VISOR = 4;
+		const int32_t SURFACE_DAMAGE_GROUP = 0;
+		const int32_t SURFACE_DEATH_GROUP = 4;
+		const int32_t SLIPPERY_SURFACE_QUALITY = 13;
+		const uint32_t DAMAGE_NORMAL = 2;
+		const uint32_t DAMAGE_FORCE_DEATH = 4;
 		const uint32_t ACTION_STATE_GROUND_SLAM = 0x40;
 		const uint32_t CLEAR_ACTION_STATE_GUN_FIRE = 0xFF7F;
 		const uint32_t ACTION_STATE_SPIN_HOVER = 0x2;
@@ -524,6 +532,74 @@ namespace Toy2
 			{
 				ResolveCollisions(buzz, movement, contactState, queryIndex, 0);
 			}
+		}
+
+		// STUB: TOY2 0x004071E0
+		void HandleDamage(uint32_t direction, uint32_t damageFlags) {}
+
+		// STUB: TOY2 0x004863A0
+		int32_t UpdateFloorHeight(Toy2BuzzActor* buzz) { return 0; }
+
+		// FUNCTION: TOY2 0x00434550
+		void ResolveFooting(Toy2BuzzActor* buzz)
+		{
+			int32_t previousLateralVelocity = buzz->velX;
+			int32_t previousGravityVelocity = buzz->gravityVel;
+			int32_t previousForwardVelocity = buzz->velForward;
+
+			HandleCollisions(buzz, &buzz->velocity, &buzz->collisionState, 0);
+			buzz->floorYPos = UpdateFloorHeight(buzz);
+			buzz->isOnWalkableFloor = Nu3D::Collision::IsFloorWalkable();
+
+			if (g_pendingFootingType != -1)
+			{
+				g_footingType = g_pendingFootingType;
+			}
+			else
+			{
+				int32_t previousFootingType = g_footingType;
+				g_footingType = Nu3D::Collision::GetSurfaceQuality(0);
+				if (buzz->collisionFlags == 0 && buzz->specialAirState != 0)
+					g_footingType = previousFootingType;
+			}
+			g_pendingFootingType = -1;
+
+			if (g_footingType >= 0 && (int16_t)g_levelTransition == 0)
+			{
+				int32_t surfaceGroup = g_footingType >> 2;
+				switch (surfaceGroup)
+				{
+					case SURFACE_DAMAGE_GROUP:
+						if (buzz->cosmicShieldTimer == 0 && buzz->stunTimer == 0)
+							HandleDamage(0, DAMAGE_NORMAL);
+						break;
+
+					case SURFACE_DEATH_GROUP:
+						HandleDamage(0, DAMAGE_FORCE_DEATH);
+						buzz->posAngles.pos.x = buzz->motionTargetPos.x + previousLateralVelocity;
+						buzz->posAngles.pos.y = buzz->motionTargetPos.y + previousGravityVelocity;
+						buzz->posAngles.pos.z = buzz->motionTargetPos.z + previousForwardVelocity;
+						buzz->velX = previousLateralVelocity;
+						buzz->gravityVel = previousGravityVelocity;
+						buzz->velForward = previousForwardVelocity;
+						buzz->collisionFlags = 0;
+						buzz->specialAirState = 0;
+						break;
+				}
+			}
+
+			if (g_slipperySurfaceState == 0)
+			{
+				if (g_footingType == SLIPPERY_SURFACE_QUALITY && buzz->specialAirState != 0)
+					g_slipperySurfaceState = 2;
+			}
+			else if (g_footingType != SLIPPERY_SURFACE_QUALITY && buzz->specialAirState != 0)
+			{
+				g_slipperySurfaceState = 0;
+			}
+
+			if (abs(buzz->gravityVel) < 2)
+				buzz->gravityVel = 0;
 		}
 
 		// FUNCTION: TOY2 0x00434990

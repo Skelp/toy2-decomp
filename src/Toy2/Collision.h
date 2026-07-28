@@ -119,3 +119,12 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(PlatformState) == 0x34);
 	}
 }
+
+namespace Nu3D
+{
+	namespace Collision
+	{
+		int32_t IsFloorWalkable();
+		int32_t GetSurfaceQuality(int32_t queryIndex);
+	}
+}

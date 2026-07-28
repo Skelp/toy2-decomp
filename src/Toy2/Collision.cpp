@@ -203,3 +203,15 @@ namespace Toy2
 		}
 	}
 }
+
+namespace Nu3D
+{
+	namespace Collision
+	{
+		// STUB: TOY2 0x00487A60
+		int32_t IsFloorWalkable() { return 0; }
+
+		// STUB: TOY2 0x00487AB0
+		int32_t GetSurfaceQuality(int32_t queryIndex) { return -1; }
+	}
+}
