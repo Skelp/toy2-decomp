@@ -1058,8 +1058,8 @@
 0x004C80D0 SoftwareRenderer::UnkFunc54
 0x004C8930 SoftwareRenderer::UnkFunc39
 0x004C9190 SoftwareRenderer::UnkFunc58
-0x004C9A50 SoftwareRenderer::UnkFunc34
-0x004C9D00 SoftwareRenderer::UnkFunc35
+0x004C9A50 SoftwareRenderer::RasterizeSortedRenderCommand
+0x004C9D00 SoftwareRenderer::RasterizeRenderCommand
 0x004C9F50 Nu3D::Creature::Destroy
 0x004CA040 NGNLoader::ExtractAnimations
 0x004CA0C0 Nu3D::CopyNormalsFromNearestVertex

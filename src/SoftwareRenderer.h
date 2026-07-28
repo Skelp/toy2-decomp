@@ -176,11 +176,11 @@ namespace SoftwareRenderer
 
 	// A queued render command for the software rasterizer. QueueRenderCommand enqueues
 	// transformed vertices (3 for a triangle, 4 for a quad when vertexCount is
-	// 4) and UnkFunc35 dequeues and rasterizes one. Stride 0x9C, capacity 1024.
+	// 4) and RasterizeRenderCommand dequeues and rasterizes one. Stride 0x9C, capacity 1024.
 	struct RenderCommand;
 	void QueueRenderCommand(Nu3D::VertexTL* vertices[4], int32_t vertexCount, uint32_t* texData, int32_t renderState);
 
-	// One scanline of a triangle or a quad. UnkFunc34 and UnkFunc35 choose the
+	// One scanline of a triangle or a quad. RasterizeSortedRenderCommand and RasterizeRenderCommand choose the
 	// variant from the render state and publish it in g_spanRasterizer; UnkFunc57
 	// and UnkFunc58 then call it per scanline. There are 21 variants, one per
 	// combination of pixel format, texturing, and blend mode.
@@ -299,6 +299,16 @@ namespace SoftwareRenderer
 		int32_t rightRed,
 		int32_t rightGreen,
 		int32_t rightBlue);
+	void UnkFunc47(Nu3D::VertexTL* leftEdge,
+		Nu3D::VertexTL* rightEdge,
+		uint16_t* destRow,
+		uint32_t* texData,
+		int32_t leftRed,
+		int32_t leftGreen,
+		int32_t leftBlue,
+		int32_t rightRed,
+		int32_t rightGreen,
+		int32_t rightBlue);
 	void UnkFunc48(Nu3D::VertexTL* leftEdge,
 		Nu3D::VertexTL* rightEdge,
 		uint16_t* destRow,
@@ -387,11 +397,12 @@ namespace SoftwareRenderer
 	void UnkFunc39(RenderCommand* command);
 	void UnkFunc54(RenderCommand* command);
 	void UnkFunc46(RenderCommand* command, uint32_t* texData);
+	void UnkFunc45(RenderCommand* command, uint32_t* texData);
 	void UnkFunc57(RenderCommand* command, uint32_t* texData);
 	void UnkFunc58(RenderCommand* command, uint32_t* texData);
 
-	void UnkFunc35(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans);
-	void UnkFunc34(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans);
+	void RasterizeRenderCommand(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans);
+	void RasterizeSortedRenderCommand(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans);
 
 	// Snapshot of the current texture's writable data: the pixel buffer and the
 	// surface descriptor that holds its dimensions and pitch. UnkFunc20 fills
