@@ -53,7 +53,10 @@ namespace AudioManager
 	int32_t g_streamActive;
 
 	// GLOBAL: TOY2 0x0053C844
-	int32_t g_streamFadeMode;
+	int32_t g_queuedStreamLooping;
+
+	// GLOBAL: TOY2 0x00528224
+	int32_t g_streamLooping;
 
 	// GLOBAL: TOY2 0x0053C848
 	int32_t g_streamCommand;
@@ -1020,13 +1023,13 @@ namespace AudioManager
 		"levcomp" };
 
 	// FUNCTION: TOY2 0x00436CE0
-	void QueuePlay(char* path, int32_t fadeMode)
+	void QueuePlay(char* path, int32_t looping)
 	{
 		if (g_streamCommandEvent != NULL)
 		{
 			strcpy(g_streamPath, path);
 			g_streamCommand = 2;
-			g_streamFadeMode = fadeMode;
+			g_queuedStreamLooping = looping;
 			SetEvent(g_streamCommandEvent);
 			WaitForSingleObject(g_streamAckEvent, INFINITE);
 		}
@@ -1036,7 +1039,7 @@ namespace AudioManager
 	void OnExit() { SignalThreadExit(); }
 
 	// FUNCTION: TOY2 0x00413150
-	int32_t PlayTrackByIndex(int32_t trackIndex, int32_t fadeMode)
+	int32_t PlayTrackByIndex(int32_t trackIndex, int32_t looping)
 	{
 		char buffer[512];
 
@@ -1048,10 +1051,25 @@ namespace AudioManager
 		strcat(buffer, "audio\\");
 		strcat(buffer, g_trackNames[trackIndex]);
 		strcat(buffer, ".wav");
-		QueuePlay(buffer, fadeMode);
+		QueuePlay(buffer, looping);
 		g_curTrackIndex = trackIndex;
 		return 1;
 	}
+
+	// FUNCTION: TOY2 0x00413240 [MATCHED]
+	void ThreadPlay(char* path, int32_t looping)
+	{
+		if (g_directSound != NULL && LoadFile(path))
+		{
+			g_streamLooping = looping & 1;
+			g_dsPrimaryBuffer->SetCurrentPosition(0);
+			SetMusicVolume(g_musicVolumeLevel);
+			g_dsPrimaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
+		}
+	}
+
+	// STUB: TOY2 0x00413310
+	int32_t LoadFile(char* path) { return 0; }
 
 	// FUNCTION: TOY2 0x0047D8E0 [MATCHED]
 	int32_t IsEffectPlaying(int32_t index)

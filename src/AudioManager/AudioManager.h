@@ -36,8 +36,10 @@ namespace AudioManager
 	void StopAndFlush();
 	void OnExit();
 	int32_t IsStreamActive();
-	int32_t PlayTrackByIndex(int32_t trackIndex, int32_t fadeMode);
-	void QueuePlay(char* path, int32_t fadeMode);
+	int32_t PlayTrackByIndex(int32_t trackIndex, int32_t looping);
+	void QueuePlay(char* path, int32_t looping);
+	void ThreadPlay(char* path, int32_t looping);
+	int32_t LoadFile(char* path);
 	int32_t PlaySoundBuffer(int32_t soundIndex, int32_t leftVolume, int32_t rightVolume, int32_t pan, int32_t volume, int32_t flags);
 	int32_t IsEffectPlaying(int32_t index);
 	int32_t IsActorSoundPlaying(void* owner);
@@ -84,7 +86,8 @@ namespace AudioManager
 	extern HANDLE g_streamCommandEvent;
 	extern HANDLE g_streamAckEvent;
 	extern int32_t g_streamActive;
-	extern int32_t g_streamFadeMode;
+	extern int32_t g_queuedStreamLooping;
+	extern int32_t g_streamLooping;
 	extern int32_t g_streamCommand;
 	extern char g_streamPath[512];
 	extern int32_t g_streamThreadReady;
