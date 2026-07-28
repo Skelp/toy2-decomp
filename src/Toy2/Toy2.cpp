@@ -49,6 +49,9 @@ namespace Toy2
 	// FUNCTION: TOY2 0x0044F860
 	void HideModelNode(int32_t creatureIndex, int32_t nodeIndex) { Nu3D::Creature::SetNodeVisibleByIndex(creatureIndex, nodeIndex, 0); }
 
+	// FUNCTION: TOY2 0x0049F490 [MATCHED]
+	void AdvanceFramePhase() { g_framePhase = (g_framePhase + 1) & 0xF; }
+
 	// GLOBAL: TOY2 0x00508D70
 	ToyCfg g_toyCfgData = {
 		7, /* flags */
@@ -218,6 +221,9 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x0052F1C4
 	uint8_t g_fourTickPulse;
+
+	// GLOBAL: TOY2 0x0052AD68
+	uint16_t g_framePhase;
 
 	// GLOBAL: TOY2 0x0055A0E0
 	int32_t g_hasStaticBackdrop;

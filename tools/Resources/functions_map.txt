@@ -519,7 +519,7 @@
 0x0049F3C0 Nu3D::Math::IsWithinDistanceXZ
 0x0049F400 Nu3D::Vector3I::IsWithinDistance
 0x0049F460 Toy2::Actor::IsInsideBounds
-0x0049F490 Toy2::UnusedVarUpdate
+0x0049F490 Toy2::AdvanceFramePhase
 0x0049F4B0 Toy2::Game::MenuLoop
 0x0049FAB0 Toy2::Levels::Method3
 0x0049FB40 Toy2::Level::UpdateAmbientEmitters

@@ -41,6 +41,7 @@ namespace Toy2
 	void ProcessMiscEvents();
 	void ProcessMiscEventsEx();
 	void RenderGame(int32_t fullRender);
+	void AdvanceFramePhase();
 	int32_t ComputeTokenProgress();
 	int32_t* BuildPerspectiveDivideTable(int32_t scale);
 
@@ -81,6 +82,7 @@ namespace Toy2
 	extern int32_t g_showBlackFrames;
 	extern int32_t g_demoMode;
 	extern uint8_t g_fourTickPulse;
+	extern uint16_t g_framePhase;
 	extern int32_t g_hasStaticBackdrop;
 	extern int32_t g_nextBackdropId;
 	extern int16_t g_levelIndex;
