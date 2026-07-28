@@ -269,7 +269,7 @@ namespace Toy2
 	int32_t g_curDemoLevel;
 
 	// GLOBAL: TOY2 0x0052B7DC
-	int32_t g_levelTransition;
+	int16_t g_levelTransition;
 
 	// GLOBAL: TOY2 0x0052B7D8
 	int32_t g_levelObjectiveProgress;
