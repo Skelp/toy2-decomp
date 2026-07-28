@@ -7,6 +7,11 @@
 
 namespace Toy2
 {
+	namespace Shadow
+	{
+		void QueueStretched(int32_t x, int32_t groundY, int32_t z, int32_t size, int32_t sourceY);
+	}
+
 	namespace Platform
 	{
 		struct CollisionFace;
@@ -144,5 +149,7 @@ namespace Nu3D
 	{
 		int32_t IsFloorWalkable();
 		int32_t GetSurfaceQuality(int32_t queryIndex);
+		int32_t GetGroundHeight(const PosAndAngles* position, int32_t shadowSize);
+		int32_t GetGroundHeightEx(const PosAndAngles* position, int32_t shadowSize, int32_t probeRadius);
 	}
 }

@@ -1,5 +1,6 @@
 #include "Toy2/Collision.h"
 #include "Nu3D/Link.h"
+#include "Renderer/Shadows.h"
 
 namespace Toy2
 {
@@ -226,6 +227,38 @@ namespace Nu3D
 {
 	namespace Collision
 	{
+		// FUNCTION: TOY2 0x00486280 [MATCHED]
+		int32_t GetGroundHeight(const PosAndAngles* position, int32_t shadowSize)
+		{
+			int32_t previousTriangleCount = Toy2::Collision::g_collisionTriangleCount;
+			Toy2::Collision::GatherTrianglesAtXZ(&position->pos);
+
+			PosAndAngles groundPosition = *position;
+			Toy2::Collision::ResolveGroundCeiling(&groundPosition, 0x10000);
+			if (shadowSize != 0 && Renderer::Shadows::g_shadowCount < 47)
+			{
+				Toy2::Shadow::QueueStretched(groundPosition.pos.x, groundPosition.pos.y, groundPosition.pos.z, shadowSize, position->pos.y);
+			}
+			Toy2::Collision::g_collisionTriangleCount = previousTriangleCount;
+			return groundPosition.pos.y;
+		}
+
+		// FUNCTION: TOY2 0x00486310 [MATCHED]
+		int32_t GetGroundHeightEx(const PosAndAngles* position, int32_t shadowSize, int32_t probeRadius)
+		{
+			int32_t previousTriangleCount = Toy2::Collision::g_collisionTriangleCount;
+			Toy2::Collision::GatherTrianglesAtXZ(&position->pos);
+
+			PosAndAngles groundPosition = *position;
+			Toy2::Collision::ResolveGroundCeiling(&groundPosition, probeRadius);
+			if (shadowSize != 0 && Renderer::Shadows::g_shadowCount < 47)
+			{
+				Toy2::Shadow::QueueStretched(groundPosition.pos.x, groundPosition.pos.y, groundPosition.pos.z, shadowSize, position->pos.y);
+			}
+			Toy2::Collision::g_collisionTriangleCount = previousTriangleCount;
+			return groundPosition.pos.y;
+		}
+
 		// FUNCTION: TOY2 0x00487A60 [MATCHED]
 		int32_t IsFloorWalkable() { return Toy2::Collision::g_groundNormal.y >= -0x2000; }
 
@@ -237,5 +270,14 @@ namespace Nu3D
 				return -1;
 			return surfaceType & 0xFF;
 		}
+	}
+}
+
+namespace Toy2
+{
+	namespace Shadow
+	{
+		// STUB: TOY2 0x00485680
+		void QueueStretched(int32_t x, int32_t groundY, int32_t z, int32_t size, int32_t sourceY) {}
 	}
 }
