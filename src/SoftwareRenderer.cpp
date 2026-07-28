@@ -623,17 +623,9 @@ namespace SoftwareRenderer
 	// FUNCTION: TOY2 0x004C17B0
 	void PresentFrame()
 	{
-		union SurfacePointer
-		{
-			void* address;
-			uint8_t* bytes;
-			uint16_t* pixels;
-			uint32_t* pairs;
-		};
-
 		DDSURFACEDESC2 surfaceDesc;
-		SurfacePointer primaryRow;
-		SurfacePointer backRow;
+		uint8_t* primaryRow;
+		uint8_t* backRow;
 		uint32_t* primaryPixel;
 		uint32_t* backPixel;
 		uint32_t dwordCount;
@@ -648,42 +640,42 @@ namespace SoftwareRenderer
 
 		DrawingDevice::LockPrimarySurface(&surfaceDesc);
 
-		backRow.address = g_backBuffer;
+		backRow = static_cast<uint8_t*>(g_backBuffer);
 		dwordCount = static_cast<uint32_t>(g_screenDimV) >> 1;
 		do
 		{
-			*backRow.pairs++ = 0;
+			*reinterpret_cast<uint32_t*>(backRow) = 0;
+			backRow += sizeof(uint32_t);
 			dwordCount--;
 		} while (dwordCount != 0);
 
-		backRow.address = g_backBuffer;
+		backRow = static_cast<uint8_t*>(g_backBuffer);
 		rowCount = g_screenDimH - 1;
 		do
 		{
-			backRow.pixels[0] = 0;
-			backRow.pixels[g_screenDimV - 1] = 0;
-			backRow.bytes += g_primarySurfacePitch;
+			reinterpret_cast<uint16_t*>(backRow)[0] = 0;
+			reinterpret_cast<uint16_t*>(backRow)[g_screenDimV - 1] = 0;
+			backRow += g_primarySurfacePitch;
 			rowCount--;
 		} while (rowCount != 0);
 
 		dwordCount = static_cast<uint32_t>(g_screenDimV) >> 1;
 		do
 		{
-			*backRow.pairs++ = 0;
+			*reinterpret_cast<uint32_t*>(backRow) = 0;
+			backRow += sizeof(uint32_t);
 			dwordCount--;
 		} while (dwordCount != 0);
 
 		dwordCount = static_cast<uint32_t>(g_bottomOffset - g_topOffset + 1) >> 1;
 		rowOffset = g_primarySurfacePitch * g_leftOffset + g_topOffset * sizeof(uint16_t);
 		rowCount = g_rightOffset - g_leftOffset + 1;
-		primaryRow.address = g_primarySurfacePtr;
-		primaryRow.bytes += rowOffset;
-		backRow.address = g_backBuffer;
-		backRow.bytes += rowOffset;
+		primaryRow = static_cast<uint8_t*>(g_primarySurfacePtr) + rowOffset;
+		backRow = static_cast<uint8_t*>(g_backBuffer) + rowOffset;
 		do
 		{
-			primaryPixel = primaryRow.pairs;
-			backPixel = backRow.pairs;
+			primaryPixel = reinterpret_cast<uint32_t*>(primaryRow);
+			backPixel = reinterpret_cast<uint32_t*>(backRow);
 			uint32_t remaining = dwordCount;
 			do
 			{
@@ -691,20 +683,20 @@ namespace SoftwareRenderer
 				*backPixel++ = g_softwareClearColor;
 				remaining--;
 			} while (remaining != 0);
-			primaryRow.bytes += g_primarySurfacePitch;
-			backRow.bytes += g_primarySurfacePitch;
+			primaryRow += g_primarySurfacePitch;
+			backRow += g_primarySurfacePitch;
 			rowCount--;
 		} while (rowCount != 0);
 
-		primaryRow.address = g_primarySurfacePtr;
-		backRow.address = g_backBuffer;
+		primaryRow = static_cast<uint8_t*>(g_primarySurfacePtr);
+		backRow = static_cast<uint8_t*>(g_backBuffer);
 		rowCount = g_leftOffset;
 		if (rowCount != 0)
 		{
 			do
 			{
-				primaryPixel = primaryRow.pairs;
-				backPixel = backRow.pairs;
+				primaryPixel = reinterpret_cast<uint32_t*>(primaryRow);
+				backPixel = reinterpret_cast<uint32_t*>(backRow);
 				dwordCount = static_cast<uint32_t>(g_screenDimV) >> 1;
 				do
 				{
@@ -712,21 +704,19 @@ namespace SoftwareRenderer
 					*backPixel++ = 0x00100010;
 					dwordCount--;
 				} while (dwordCount != 0);
-				primaryRow.bytes += g_primarySurfacePitch;
-				backRow.bytes += g_primarySurfacePitch;
+				primaryRow += g_primarySurfacePitch;
+				backRow += g_primarySurfacePitch;
 				rowCount--;
 			} while (rowCount != 0);
 
 			rowOffset = (g_rightOffset + 1) * g_primarySurfacePitch;
-			primaryRow.address = g_primarySurfacePtr;
-			primaryRow.bytes += rowOffset;
-			backRow.address = g_backBuffer;
-			backRow.bytes += rowOffset;
+			primaryRow = static_cast<uint8_t*>(g_primarySurfacePtr) + rowOffset;
+			backRow = static_cast<uint8_t*>(g_backBuffer) + rowOffset;
 			rowCount = g_leftOffset;
 			do
 			{
-				primaryPixel = primaryRow.pairs;
-				backPixel = backRow.pairs;
+				primaryPixel = reinterpret_cast<uint32_t*>(primaryRow);
+				backPixel = reinterpret_cast<uint32_t*>(backRow);
 				dwordCount = static_cast<uint32_t>(g_screenDimV) >> 1;
 				do
 				{
@@ -734,17 +724,15 @@ namespace SoftwareRenderer
 					*backPixel++ = 0x00100010;
 					dwordCount--;
 				} while (dwordCount != 0);
-				primaryRow.bytes += g_primarySurfacePitch;
-				backRow.bytes += g_primarySurfacePitch;
+				primaryRow += g_primarySurfacePitch;
+				backRow += g_primarySurfacePitch;
 				rowCount--;
 			} while (rowCount != 0);
 		}
 
 		rowOffset = g_primarySurfacePitch * g_leftOffset;
-		primaryRow.address = g_primarySurfacePtr;
-		primaryRow.bytes += rowOffset;
-		backRow.address = g_backBuffer;
-		backRow.bytes += rowOffset;
+		primaryRow = static_cast<uint8_t*>(g_primarySurfacePtr) + rowOffset;
+		backRow = static_cast<uint8_t*>(g_backBuffer) + rowOffset;
 		if (g_topOffset != 0)
 		{
 			uint32_t marginDwordCount = static_cast<uint32_t>(g_topOffset) >> 1;
@@ -752,25 +740,23 @@ namespace SoftwareRenderer
 			rowCount = g_rightOffset - g_leftOffset + 1;
 			do
 			{
-				primaryPixel = primaryRow.pairs;
-				backPixel = backRow.pairs;
-				SurfacePointer primaryRight = primaryRow;
-				SurfacePointer backRight = backRow;
-				primaryRight.bytes += rightMarginOffset;
-				backRight.bytes += rightMarginOffset;
+				primaryPixel = reinterpret_cast<uint32_t*>(primaryRow);
+				backPixel = reinterpret_cast<uint32_t*>(backRow);
+				uint32_t* primaryRight = reinterpret_cast<uint32_t*>(primaryRow + rightMarginOffset);
+				uint32_t* backRight = reinterpret_cast<uint32_t*>(backRow + rightMarginOffset);
 				uint32_t marginDwords = marginDwordCount;
 				do
 				{
 					*primaryPixel = *backPixel;
 					*backPixel = 0x00100010;
-					*primaryRight.pairs++ = *backRight.pairs;
-					*backRight.pairs++ = 0x00100010;
+					*primaryRight++ = *backRight;
+					*backRight++ = 0x00100010;
 					primaryPixel++;
 					backPixel++;
 					marginDwords--;
 				} while (marginDwords != 0);
-				primaryRow.bytes += g_primarySurfacePitch;
-				backRow.bytes += g_primarySurfacePitch;
+				primaryRow += g_primarySurfacePitch;
+				backRow += g_primarySurfacePitch;
 				rowCount--;
 			} while (rowCount != 0);
 		}
@@ -2680,6 +2666,7 @@ namespace SoftwareRenderer
 		TextureData tex;
 		int32_t noTexture = UnkFunc20(&tex);
 		LPWORD indices = lpwIndices;
+		Nu3D::VertexTL* vertexBase = static_cast<Nu3D::VertexTL*>(lpvVertices);
 		uint32_t* maskedTexData = (noTexture != 0) ? NULL : tex.texData;
 		DWORD remaining = dwIndexCount / 3;
 		if (remaining != 0)
@@ -2687,9 +2674,9 @@ namespace SoftwareRenderer
 			do
 			{
 				Nu3D::VertexTL* vertices[3];
-				vertices[0] = (Nu3D::VertexTL*)((uint8_t*)lpvVertices + indices[0] * 0x20);
-				vertices[1] = (Nu3D::VertexTL*)((uint8_t*)lpvVertices + indices[1] * 0x20);
-				vertices[2] = (Nu3D::VertexTL*)((uint8_t*)lpvVertices + indices[2] * 0x20);
+				vertices[0] = &vertexBase[indices[0]];
+				vertices[1] = &vertexBase[indices[1]];
+				vertices[2] = &vertexBase[indices[2]];
 				UnkFunc22(vertices, 3, maskedTexData, Renderer::g_renderStateCache[0], g_softwarePrimitiveType, 0);
 				indices += 3;
 				remaining--;
