@@ -1,14 +1,127 @@
 #include "Nu3D/FMV.h"
 #include "Logger.h"
 #include "DrawingDevice.h"
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
+// GLOBAL: TOY2 0x004DD9C8
+EXTERN_C const CLSID CLSID_AMMultiMediaStream = { 0x49C47CE5, 0x9BA4, 0x11D0, { 0x82, 0x12, 0x00, 0xC0, 0x4F, 0xC3, 0x2C, 0x45 } };
+// GLOBAL: TOY2 0x004DD9D8
+EXTERN_C const IID IID_IAMMultiMediaStream = { 0xBEBE595C, 0x9A6F, 0x11D0, { 0x8F, 0xDE, 0x00, 0xC0, 0x4F, 0xD9, 0x18, 0x9D } };
+// GLOBAL: TOY2 0x004DD9A8
+EXTERN_C const MSPID MSPID_PrimaryAudio = { 0xA35FF56B, 0x9FDA, 0x11D0, { 0x8F, 0xDF, 0x00, 0xC0, 0x4F, 0xD9, 0x18, 0x9D } };
+// GLOBAL: TOY2 0x004DD9B8
+EXTERN_C const MSPID MSPID_PrimaryVideo = { 0xA35FF56A, 0x9FDA, 0x11D0, { 0x8F, 0xDF, 0x00, 0xC0, 0x4F, 0xD9, 0x18, 0x9D } };
+// GLOBAL: TOY2 0x004DD9E8
+EXTERN_C const IID IID_IDirectDrawMediaStream = { 0xF4104FCE, 0x9A70, 0x11D0, { 0x8F, 0xDE, 0x00, 0xC0, 0x4F, 0xD9, 0x18, 0x9D } };
+
 enum Nu3DFMVStateFlags
 {
+	NU3D_FMV_HAS_PRIMARY_VIDEO = 1,
 	NU3D_FMV_REPEAT = 2,
 	NU3D_FMV_PAUSED = 4
 };
+
+// GLOBAL: TOY2 0x00B62668
+int32_t g_fmvComInitialized;
+
+// FUNCTION: TOY2 0x004DB600
+Nu3DFMVInstance* Nu3D_FMV_CreateFMVInstance(char* filename)
+{
+	Nu3DFMVInstance* instance = (Nu3DFMVInstance*)malloc(sizeof(Nu3DFMVInstance));
+	if (instance != NULL)
+	{
+		memset(instance, 0, sizeof(Nu3DFMVInstance));
+
+		if (g_fmvComInitialized == 0)
+		{
+			CoInitialize(NULL);
+			g_fmvComInitialized = 1;
+		}
+
+		IAMMultiMediaStream* mediaStream;
+		CoCreateInstance(CLSID_AMMultiMediaStream, NULL, CLSCTX_INPROC_SERVER, IID_IAMMultiMediaStream, (void**)&mediaStream);
+
+		HRESULT result = mediaStream->Initialize(STREAMTYPE_READ, 0, NULL);
+		if (FAILED(result))
+		{
+			Logger::GetErrorHandler("C:\\projects\\nu3d\\fmv.c", 0x82)("Failed ot initialize HRESULT(0x%8.8X)\n", result);
+		}
+
+		result = mediaStream->AddMediaStream(DrawingDevice::GetDDraw4(), &MSPID_PrimaryVideo, 0, NULL);
+		if (FAILED(result))
+		{
+			Logger::GetErrorHandler("C:\\projects\\nu3d\\fmv.c", 0x87)("Failed to add video media stream HRESULT(0x%8.8X)\n", result);
+		}
+
+		result = mediaStream->AddMediaStream(NULL, &MSPID_PrimaryAudio, AMMSF_ADDDEFAULTRENDERER, NULL);
+		if (FAILED(result))
+		{
+			Logger::GetErrorHandler("C:\\projects\\nu3d\\fmv.c", 0x8D)("Failed to add audio media stream HRESULT(0x%8.8X)\n", result);
+		}
+
+		WCHAR wideFilename[MAX_PATH];
+		MultiByteToWideChar(CP_ACP, 0, filename, -1, wideFilename, MAX_PATH);
+		result = mediaStream->OpenFile(wideFilename, 0);
+		if (FAILED(result))
+		{
+			mediaStream->Release();
+			free(instance);
+			return NULL;
+		}
+
+		instance->mediaStream = mediaStream;
+		mediaStream->AddRef();
+		if (mediaStream == NULL)
+		{
+			printf("Could not create a CLSID_MultiMediaStream object\nCheck you have run regsvr32 amstream.dll\n");
+		}
+		mediaStream->Release();
+
+		result = instance->mediaStream->GetMediaStream(MSPID_PrimaryVideo, &instance->primaryVideoStream);
+		if (FAILED(result))
+		{
+			Logger::GetErrorHandler("C:\\projects\\nu3d\\fmv.c", 0xA7)("Failed to get media stream HRESULT(0x%8.8X)\n", result);
+		}
+
+		result = instance->primaryVideoStream->QueryInterface(IID_IDirectDrawMediaStream, (void**)&instance->directDrawStream);
+		if (FAILED(result))
+		{
+			Logger::GetErrorHandler("C:\\projects\\nu3d\\fmv.c", 0xAD)("Failed to query DirectDrawMediaStream interface HRESULT(0x%8.8X)\n", result);
+		}
+
+		result = instance->directDrawStream->CreateSample(NULL, NULL, 0, &instance->videoSample);
+		if (FAILED(result))
+		{
+			Logger::GetErrorHandler("C:\\projects\\nu3d\\fmv.c", 0xB3)("Failed to create sample HRESULT(0x%8.8X)\n", result);
+		}
+
+		RECT sourceRect;
+		result = instance->videoSample->GetSurface(&instance->sourceSurface, &sourceRect);
+		if (FAILED(result))
+		{
+			Logger::GetErrorHandler("C:\\projects\\nu3d\\fmv.c", 0xB9)("Failed get surface HRESULT(0x%8.8X)\n", result);
+		}
+
+		result = instance->sourceSurface->QueryInterface(IID_IDirectDrawSurface4, (void**)&instance->renderSurface);
+		if (FAILED(result))
+		{
+			Logger::GetErrorHandler("C:\\projects\\nu3d\\fmv.c", 0xBF)("Failed to query DirectDrawSurface4 interface HRESULT(0x%8.8X)\n", result);
+		}
+
+		DWORD streamFlags = 2;
+		if (instance->mediaStream->GetInformation(&streamFlags, NULL) == S_OK)
+		{
+			instance->stateFlags |= NU3D_FMV_HAS_PRIMARY_VIDEO;
+		}
+		else
+		{
+			instance->stateFlags &= ~NU3D_FMV_HAS_PRIMARY_VIDEO;
+		}
+	}
+	return instance;
+}
 
 // FUNCTION: TOY2 0x004DB8C0 [MATCHED]
 void Nu3D_FMV_Destroy(Nu3DFMVInstance* instance)

@@ -21,6 +21,7 @@ struct Nu3DFMVInstance
 	float height;
 };
 
+Nu3DFMVInstance* Nu3D_FMV_CreateFMVInstance(char* filename);
 int32_t Nu3D_FMV_IsPlaying(Nu3DFMVInstance* instance);
 void Nu3D_FMV_Destroy(Nu3DFMVInstance* instance);
 void Nu3D_FMV_Seek(Nu3DFMVInstance* instance, int32_t seconds);
