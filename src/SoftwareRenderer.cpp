@@ -908,6 +908,20 @@ namespace SoftwareRenderer
 			< 0.0;
 	}
 
+	// FUNCTION: TOY2 0x004BCFA0
+	void ProjectVertex(Nu3D::VertexTL* vertex)
+	{
+		vertex->specular.value = (uint32_t)(int32_t)vertex->position.x;
+		vertex->rhw = vertex->position.y;
+		if (vertex->position.z > 0.0)
+		{
+			vertex->position.x =
+				(float)(g_screenDimV / 2) + g_screenDimV * 0.5 * vertex->position.x / (vertex->position.z + 1.0f) * g_zoomScaleV * k_viewportScaleV;
+			vertex->position.y =
+				(float)(g_screenDimH / 2) + g_screenDimH * 0.5 * vertex->position.y / (vertex->position.z + 1.0f) * g_zoomScaleH * k_viewportScaleH;
+		}
+	}
+
 	// FUNCTION: TOY2 0x0047C800
 	void LockBackBuffer()
 	{
