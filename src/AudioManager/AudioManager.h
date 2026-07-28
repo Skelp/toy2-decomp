@@ -15,6 +15,7 @@ namespace AudioManager
 	{
 		MUSIC_TRACK_BOSS = 15,
 		MUSIC_TRACK_CHALLENGE = 16,
+		MUSIC_TRACK_CREDITS = 18,
 	};
 
 	enum StreamCommand

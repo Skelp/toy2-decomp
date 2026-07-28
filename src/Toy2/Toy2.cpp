@@ -34,6 +34,35 @@
 
 namespace Toy2
 {
+	// GLOBAL: TOY2 0x004F5F54
+	extern const char g_creditsText[] =
+		"Congratulations!~~~~You have completed~~~~Toy Story 2!~~~~~~~~~~Traveller's Tales~~Credits~~~~~~"
+		"~Game Design and~~Programming~~~^Jon Burton~~~~~3d engine programming~~~^dave dootson~~~~~pc con"
+		"version~~~^steve monks~~~~~software renderer~~~^andy holdroyd~~~~~character animation~~~^jeremy "
+		"pardon~~~~~character artwork~~~^neil allen~~^dave burton~~^jeremy pardon~~^will thompson~~~~~bac"
+		"kground artwork~~~^neil allen~~^dave burton~~^leon warren~~^jeremy pardon~~^barry thompson~~^jam"
+		"es cunliffe~~^bev bush~~~~~terrain design~~~^barry thompson~~~~~utility programming~~~^andy hold"
+		"royd~~^dave dootson~~^gary ireland~~~~~qa by~~~^arthur parsons~~~~~directed by~~~^Jon Burton~~~~"
+		"~~~~~~ACTIVISION credits~~~~~~Senior Producer~~~^Rob Letts~~~~~Associate Producer~~~^William Oer"
+		"tel~~~~~VP European Studios~~~^Julian Lynn-Evans~~~~~Executive VP~~Activision Studios~~~^Mitch L"
+		"asky~~~~~QA Manager~~~^Marilena Morini~~~~~Senior Test Lead~~~^Marietta Pashayan~~~~~Project Lea"
+		"d~~~^Nadine Theuzillot~~~~~PC Compatibility lead~~~^John Fritts~~~~~Test Team~~~^Richard Kurnadi"
+		"~~^Kragen Lum~~^Russell Shirley~~^Daniel Ramirez~~^Christian Biermann~~^David Silverman~~^David "
+		"Hakim~~^Keith Harris~~^Brian Ulmer~~^Josh Horowitz~~^Nicole Dodd~~^Eric Zimmerman~~^Jenn Spencie"
+		"r~~^Peter Muravez~~^Todd D. Jones~~^Chad Bordwell~~^Hector Garcia~~~~~~~~~~Disney Interactive~~C"
+		"redits~~~~~~Senior Producer~~~^Dan Winters~~~~~Producer~~~^Peter Wyse~~~~~Lead Designer~~~^Joel "
+		"Goodsell~~~~~Original Character~~Design~~~^Jeff Berting~~^Tom Barlow~~~~~Additional Art~~~^Jeff "
+		"Berting~~^Tom Barlow~~~~~Assistant Producer~~~^Renee Johnson~~~~~U.K. Production Lead~~~^Nick Br"
+		"idger~~~~~Game Dialogue~~~^Peter Wyse~~~~~Additional Dialogue~~~^Renee Johnson~~~~Senior Lead Te"
+		"ster~~~^Carlos Schulte~~~~~Lead Tester~~~^Kevin Cope~~~~~Test Team~~~^Patrick Larkin~~^Andre Agu"
+		"ilar~~^Bryan Martinez~~^Amir Firozkar~~~~~~~~~~~Music Credits~~~~~~original music score~~~^swall"
+		"ow studios~~~~~sound effects~~~^p.c. music~~~~~tt logo music~~~^aaron szpakowski~~~~~~~~~~Specia"
+		"l Thanks~~~^Helen Burton~~^John Lasseter~~^Ash Brannon~~^Helene Plotkin~~^Karen Robert Jackson~~"
+		"^Katherine Sarafian~~^Kathleen Handy~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~";
+
+	// GLOBAL: TOY2 0x0055A120
+	int32_t g_screenMusicStarted;
+
 	namespace HUD
 	{
 		// GLOBAL: TOY2 0x0052C824
@@ -1056,8 +1085,106 @@ namespace Toy2
 		}
 	}
 
-	// STUB: TOY2 0x0043A380
-	int32_t ShowCredits() { return 0; }
+	// FUNCTION: TOY2 0x0043A380
+	int32_t ShowCredits()
+	{
+		const int32_t lineCount = 40;
+		const int32_t lineLength = 64;
+		char lines[lineCount][lineLength];
+		const char* creditsCursor = g_creditsText;
+		int32_t scrollPosition = 0;
+		int32_t loadedLineCount = 0;
+
+		for (int32_t line = 0; line < lineCount; ++line)
+			lines[line][0] = '\0';
+
+		InputManager::g_curButtonsPressed = 0;
+		InputManager::g_prevButtonsPressed = 0;
+		MainMenu::g_fadeTimer = 0;
+		MainMenu::g_nextScreen = 0;
+		Nu3D::Camera::g_cameraTintBlue = 0;
+		Nu3D::Camera::g_cameraTintGreen = 0;
+		Nu3D::Camera::g_cameraTintRed = 0;
+		Nu3D::Camera::SetTint(128, 128, 128, 12);
+		SoftwareRenderer::SetBackdropScrollOverride(0, 0);
+		Renderer::g_frameDelta = 1;
+		SetBackdropByIndex(0);
+		MainMenu::g_menuClearColor.b = 0;
+		MainMenu::g_menuClearColor.g = 0;
+		MainMenu::g_menuClearColor.r = 0;
+
+		int32_t creditsTimer = 4000;
+		AudioManager::PlayMusicLooping(AudioManager::MUSIC_TRACK_CREDITS);
+		g_screenMusicStarted = 1;
+		Nu3D::Camera::SetTint(128, 128, 128, 6);
+
+		int32_t backdropFramesRemaining = 600;
+		int32_t backdropIndex = 0;
+
+		do
+		{
+			Nu3D::Camera::FadeToTargetTint();
+
+			int32_t visibleLineCount = scrollPosition / 128;
+			if (visibleLineCount > loadedLineCount)
+			{
+				int32_t linesToLoad = visibleLineCount - loadedLineCount;
+				int32_t ringIndex = loadedLineCount + 2;
+				loadedLineCount += linesToLoad;
+
+				do
+				{
+					int32_t characterIndex = 0;
+					while (*creditsCursor != '~' && *creditsCursor != '\0')
+					{
+						lines[ringIndex % lineCount][characterIndex++] = *creditsCursor++;
+					}
+
+					if (*creditsCursor == '\0')
+					{
+						lines[ringIndex % lineCount][characterIndex] = '\0';
+					}
+					else
+					{
+						++creditsCursor;
+						lines[ringIndex % lineCount][characterIndex] = '\0';
+					}
+					++ringIndex;
+				} while (--linesToLoad != 0);
+			}
+
+			SoftwareRenderer::SetBackdropScrollOverride(0, 0);
+			int32_t scrollPhase = (scrollPosition / 16) % 320;
+			char* line = lines[0];
+			for (int32_t lineY = 320; lineY < 640; lineY += 8)
+			{
+				Renderer::Sprite::DrawWhiteText(line, ((lineY - scrollPhase) % 320) - 33, 160);
+				line += lineLength;
+			}
+
+			Renderer::Sprite::DrawBackdropTransition(&backdropFramesRemaining, &backdropIndex, 600);
+			Nullsub6();
+			scrollPosition += Renderer::g_frameDelta * 8;
+
+			if (creditsTimer > 0 && creditsTimer < 1000)
+				creditsTimer -= Renderer::g_frameDelta;
+
+			if (((InputManager::g_curButtonsPressed & 0xf000) != 0 && (InputManager::g_prevButtonsPressed & 0xf000) == 0 || *creditsCursor == '\0')
+				&& creditsTimer > 53 && Nu3D::Camera::g_cameraTintBlue == 128)
+			{
+				creditsTimer = 53;
+				Nu3D::Camera::SetTint(0, 0, 0, 6);
+			}
+
+			MainMenu::RenderMenu();
+		} while (creditsTimer > 0);
+
+		AudioManager::StopAndWait();
+		MainMenu::g_menuClearColor.b = 32;
+		MainMenu::g_menuClearColor.g = 32;
+		MainMenu::g_menuClearColor.r = 32;
+		return 32;
+	}
 
 	// FUNCTION: TOY2 0x004381F0
 	int32_t ScreenDispatcher(int32_t index)

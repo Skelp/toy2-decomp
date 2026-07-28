@@ -9,6 +9,8 @@
 #include "NGNLoader/NGNLoader.h"
 #include "DrawingDevice.h"
 #include "Logger.h"
+#include "Renderer/Glue.h"
+#include "Toy2/Toy2.h"
 
 #include <STDIO.H>
 
@@ -700,6 +702,45 @@ namespace Renderer
 
 		// FUNCTION: TOY2 0x0049D750
 		void DrawWhiteText(char* text, int32_t screenY, int32_t screenX) {}
+
+		// FUNCTION: TOY2 0x0049D7A0
+		void DrawBackdropTransition(int32_t* framesRemaining, int32_t* backdropIndex, int32_t duration)
+		{
+			if (*framesRemaining > 0)
+			{
+				*framesRemaining -= Renderer::g_frameDelta;
+			}
+			else
+			{
+				*framesRemaining = duration;
+
+				if (++*backdropIndex > 9)
+					*backdropIndex = 0;
+
+				Toy2::g_nextBackdropId = *backdropIndex + 48;
+				Renderer::Glue::SetBackdrop(Toy2::g_nextBackdropId);
+			}
+
+			const int32_t overlayFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT;
+
+			if (*framesRemaining < 25)
+			{
+				Vector2F uvTopLeft = { 0.0f, 0.0f };
+				Vector2F uvBottomRight = { 1.0f, 1.0f };
+				RGBA fadeColor = { 0 };
+				fadeColor.a = (uint8_t)(-10 * *framesRemaining - 1);
+				Queue2DSprite(0.0f, 0.0f, 1.0f, 1.0f, &uvTopLeft, &uvBottomRight, 0, fadeColor, overlayFlags);
+			}
+
+			if (*framesRemaining > duration - 25)
+			{
+				Vector2F uvTopLeft = { 0.0f, 0.0f };
+				Vector2F uvBottomRight = { 1.0f, 1.0f };
+				RGBA fadeColor = { 0 };
+				fadeColor.a = (uint8_t)(10 * *framesRemaining - 10 * duration - 1);
+				Queue2DSprite(0.0f, 0.0f, 1.0f, 1.0f, &uvTopLeft, &uvBottomRight, 0, fadeColor, overlayFlags);
+			}
+		}
 
 		// FUNCTION: TOY2 0x00493F40
 		int16_t DrawScaled(int16_t xPos,
