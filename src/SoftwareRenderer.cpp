@@ -900,6 +900,14 @@ namespace SoftwareRenderer
 		*blue = (colour & 0x000000ff) << 8;
 	}
 
+	// FUNCTION: TOY2 0x004BCF60 [MATCHED]
+	int32_t IsClockwiseWinding(const Nu3D::VertexTL* first, const Nu3D::VertexTL* second, const Nu3D::VertexTL* third)
+	{
+		return (first->position.x - second->position.x) * (third->position.y - second->position.y)
+			- (third->position.x - second->position.x) * (first->position.y - second->position.y)
+			< 0.0;
+	}
+
 	// FUNCTION: TOY2 0x0047C800
 	void LockBackBuffer()
 	{

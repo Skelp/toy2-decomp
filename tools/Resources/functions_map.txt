@@ -973,7 +973,7 @@
 0x004BCC40 SoftwareRenderer::UnkFunc32
 0x004BCC70 SoftwareRenderer::UnkFunc17
 0x004BCE00 SoftwareRenderer::InitialisePrimarySurface
-0x004BCF60 SoftwareRenderer::UnkFunc28
+0x004BCF60 SoftwareRenderer::IsClockwiseWinding
 0x004BCFA0 SoftwareRenderer::UnkFunc26
 0x004BD040 SoftwareRenderer::UnkFunc24
 0x004BE0B0 SoftwareRenderer::UnkFunc25
