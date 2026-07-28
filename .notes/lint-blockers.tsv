@@ -3,3 +3,4 @@
 0x004C2AB0,0x004C2BE0,0x004C2D20,0x004C2E70	signature-concealment	Confirm a shared ABI-compatible type for D3DVECTOR and Vector3F, or add an overload that preserves the retail call targets.
 0x004CA420	unnamed-bitmask	Reconstruct Nu3D::Scene::RenderActor at 0x004CAA60 to identify the copied node flag bits 2 and 4.
 0x0042B300	unnamed-bitmask	Reconstruct Toy2::EvilEmperorZurg::Interactions at 0x0042B3A0 to identify actor flag bit 0x800.
+0x004BCB60	unknown-symbol	Find readers for globals 0x00B626C0 and 0x00B7FBB8 before you name their reset roles.

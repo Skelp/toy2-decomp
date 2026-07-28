@@ -1020,7 +1020,7 @@
 0x004C28E0 Nu3D::Material::GetHead
 0x004C28F0 Nu3D::Material::GetFreeByIndex
 0x004C2910 Nu3D::Material::Init
-0x004C2990 Nu3D::UnkFunc0
+0x004C2990 Nu3D::Material::Close
 0x004C29A0 Nu3D::Light::Destroy
 0x004C29D0 Nu3D::Light::Free
 0x004C2A20 Nu3D::Light::BuildAmbient

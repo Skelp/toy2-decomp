@@ -22,14 +22,12 @@
 #include <cstdarg>
 #include <cstdio>
 
-// Unidentified empty no-op (single RET) called once from Renderer::Cleanup
-// between the primitive-list teardown and the texture/light release. Its
-// address sits between Nu3D::Material::Init and Nu3D::Light::Destroy; the
-// retail body is empty, so it is a stubbed/placeholder cleanup step.
-// STUB: TOY2 0x004C2990
+// The later Nu3D source names this lifecycle hook NuMtlClose.
+// The Toy Story 2 retail function has an empty body.
+// FUNCTION: TOY2 0x004C2990 [MATCHED]
 namespace Nu3D
 {
-	void UnkFunc0() {}
+	void Material::Close() {}
 } // namespace Nu3D
 
 namespace Renderer
@@ -1180,7 +1178,7 @@ namespace Renderer
 			Nu3D::g_primListHead->listNext = NULL;
 			Nu3D::Primitive::Destroy(Nu3D::g_primListHead);
 		}
-		Nu3D::UnkFunc0();
+		Nu3D::Material::Close();
 		NGNLoader::ReleaseAllTextures();
 		Nu3D::Light::DestroyAllLights();
 		g_rendererValid = 0;

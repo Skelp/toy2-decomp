@@ -23,7 +23,6 @@ src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNo
 0x004c2e70	signature-concealment	GetPositionVector:arg2	c06c22f8bbfb	src/Nu3D/Light.cpp
 0x004c2e70	signature-concealment	GetForwardVector:arg2	0111be2a6b73	src/Nu3D/Light.cpp
 0x0047b170	unstructured-control-flow	goto-count	af283beb99ab	src/RawLoader.cpp
-0x004b37f0	unknown-symbol	UnkFunc0	347dc21e837d	src/Renderer/Renderer.cpp
 0x00490860	unstructured-control-flow	goto-count	4ff23c3c3c8b	src/Renderer/Renderer.cpp
 0x0044dd80	unstructured-control-flow	goto-count	9a1cde33b176	src/Renderer/Renderer.cpp
 0x004907e0	unknown-symbol	g_unk559C40	408f2424b79c	src/Renderer/Renderer.cpp
@@ -31,7 +30,6 @@ src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNo
 0x004907e0	unknown-symbol	g_unk839278	259cd00d89f0	src/Renderer/Renderer.cpp
 0x004907e0	unknown-symbol	g_unk839280	939424163ff3	src/Renderer/Renderer.cpp
 0x004b68b0	unknown-symbol	g_unk9F6008	f8d33dc4bca5	src/Renderer/Sprite.cpp
-0x004bcbe0	unknown-symbol	g_unkA4CC80	5ab4de4fd354	src/SoftwareRenderer.cpp
 0x004bc980	unknown-symbol	g_unk9F6008	f8d33dc4bca5	src/SoftwareRenderer.cpp
 0x004c48e0	unknown-symbol	UnkFunc55	6d4597ffbd36	src/SoftwareRenderer.cpp
 0x004c4a60	unknown-symbol	UnkFunc40	fedab3c1abfd	src/SoftwareRenderer.cpp
@@ -64,7 +62,6 @@ src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNo
 0x004c9d00	unknown-symbol	UnkFunc46	69de56b951a5	src/SoftwareRenderer.cpp
 0x004c9d00	unknown-symbol	UnkFunc57	bf138cc9ec15	src/SoftwareRenderer.cpp
 0x004c9d00	unknown-symbol	UnkFunc58	28cb2976955e	src/SoftwareRenderer.cpp
-0x004bcc40	unknown-symbol	g_unkA4CC80	5ab4de4fd354	src/SoftwareRenderer.cpp
 0x004c9a50	unknown-symbol	UnkFunc52	e71c8c31af78	src/SoftwareRenderer.cpp
 0x004c9a50	unknown-symbol	UnkFunc53	653d6c57444b	src/SoftwareRenderer.cpp
 0x004c9a50	unknown-symbol	UnkFunc55	6d4597ffbd36	src/SoftwareRenderer.cpp
@@ -84,7 +81,6 @@ src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNo
 0x004c9a50	unknown-symbol	UnkFunc42	33f1cc8392ae	src/SoftwareRenderer.cpp
 0x004c9a50	unknown-symbol	UnkFunc57	bf138cc9ec15	src/SoftwareRenderer.cpp
 0x004c9a50	unknown-symbol	UnkFunc58	28cb2976955e	src/SoftwareRenderer.cpp
-0x004bcb60	unknown-symbol	g_unkA4CC80	5ab4de4fd354	src/SoftwareRenderer.cpp
 0x004bcb60	unknown-symbol	g_unkB7FBB8	d45cabe36754	src/SoftwareRenderer.cpp
 0x004bcb60	unknown-symbol	g_unkB626C0	10f072ec7310	src/SoftwareRenderer.cpp
 0x004bcc70	unknown-symbol	UnkFunc17	be6d4bb29e87	src/SoftwareRenderer.cpp

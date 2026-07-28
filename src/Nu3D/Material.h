@@ -41,6 +41,7 @@ namespace Nu3D
 		float vertOffset;
 
 		static void Init();
+		static void Close();
 		static Material* Allocate();
 		static Material* GetFreeByIndex(int32_t index);
 		static Material* GetHead();

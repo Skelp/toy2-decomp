@@ -113,7 +113,7 @@ namespace SoftwareRenderer
 	uint8_t* g_paletteBlend75Table;
 
 	// GLOBAL: TOY2 0x00A4CC80
-	int32_t g_unkA4CC80;
+	int32_t g_sortedRenderFlushPhase;
 
 	// Reset by FlushSortedRenderCommands after the sorted bucket walk. g_unkB626C0 sits just
 	// below the bucket array; g_unkB7FBB8 sits just below g_clipLeft. Roles
@@ -1009,7 +1009,7 @@ namespace SoftwareRenderer
 			RenderCommand& command = g_renderCommands[i];
 			RasterizeRenderCommand(&command, command.vertexCount, command.renderState, command.texData, command.useAlternateSpans);
 		}
-		g_unkA4CC80 = 0;
+		g_sortedRenderFlushPhase = 0;
 	}
 
 	// The span rasterizers that RasterizeSortedRenderCommand and RasterizeRenderCommand select. Each writes one
@@ -3159,7 +3159,7 @@ namespace SoftwareRenderer
 	// FUNCTION: TOY2 0x004BCC40
 	void ResetRenderCommands()
 	{
-		if (g_unkA4CC80 == 0)
+		if (g_sortedRenderFlushPhase == 0)
 		{
 			for (int i = 0; i < 30000; i++)
 			{
@@ -3348,7 +3348,7 @@ namespace SoftwareRenderer
 	// FUNCTION: TOY2 0x004BCB60 [MATCHED]
 	void FlushSortedRenderCommands()
 	{
-		if (g_unkA4CC80 == 1)
+		if (g_sortedRenderFlushPhase == 1)
 		{
 			for (int i = 29999; i >= 0; i--)
 			{
@@ -3362,7 +3362,7 @@ namespace SoftwareRenderer
 		}
 		g_unkB7FBB8 = 0;
 		g_unkB626C0 = 0;
-		g_unkA4CC80++;
+		g_sortedRenderFlushPhase++;
 	}
 
 	// FUNCTION: TOY2 0x00470BF0 [MATCHED]
