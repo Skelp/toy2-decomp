@@ -134,6 +134,7 @@ set(TOY2_SOURCES
     src/Nu3D/Viewport.cpp
     src/Nu3D/Font.h
     src/Nu3D/Font.cpp
+    src/Nu3D/FMV.cpp
     src/Nu3D/DrawSurface.h
     src/Nu3D/DrawSurface.cpp
     src/Nu3D/Light.cpp
