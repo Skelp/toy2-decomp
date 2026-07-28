@@ -17,6 +17,14 @@ namespace AudioManager
 		MUSIC_TRACK_CHALLENGE = 16,
 	};
 
+	enum StreamCommand
+	{
+		STREAM_COMMAND_NONE = 0,
+		STREAM_COMMAND_STOP = 1,
+		STREAM_COMMAND_PLAY = 2,
+		STREAM_COMMAND_EXIT = 3,
+	};
+
 	struct SoundSequenceSlot
 	{
 		Vector3I position;
@@ -41,6 +49,7 @@ namespace AudioManager
 	void QueuePlay(char* path, int32_t looping);
 	void ThreadPlay(char* path, int32_t looping);
 	int32_t LoadFile(char* path);
+	void FillBuffer();
 	int32_t PlaySoundBuffer(int32_t soundIndex, int32_t leftVolume, int32_t rightVolume, int32_t pan, int32_t volume, int32_t flags);
 	int32_t IsEffectPlaying(int32_t index);
 	int32_t IsActorSoundPlaying(void* owner);
@@ -87,7 +96,8 @@ namespace AudioManager
 	extern HANDLE g_streamCommandEvent;
 	extern HANDLE g_streamAckEvent;
 	extern HANDLE g_streamFillEvent;
-	extern HANDLE g_streamStoppedEvent;
+	extern HANDLE g_streamStopEvent;
+	extern int32_t g_streamPlaybackFinished;
 	extern int32_t g_streamActive;
 	extern int32_t g_queuedStreamLooping;
 	extern int32_t g_streamLooping;
@@ -124,6 +134,7 @@ namespace AudioManager
 
 	namespace Stream
 	{
+		int32_t ThreadProc();
 		void Stop();
 	}
 

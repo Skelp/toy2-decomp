@@ -53,7 +53,10 @@ namespace AudioManager
 	HANDLE g_streamFillEvent;
 
 	// GLOBAL: TOY2 0x005282BC
-	HANDLE g_streamStoppedEvent;
+	HANDLE g_streamStopEvent;
+
+	// GLOBAL: TOY2 0x00528220
+	int32_t g_streamPlaybackFinished;
 
 	// GLOBAL: TOY2 0x005282FC
 	int32_t g_streamActive;
@@ -1055,9 +1058,9 @@ namespace AudioManager
 		{
 			CloseHandle(g_streamCommandEvent);
 		}
-		if (g_streamStoppedEvent != NULL)
+		if (g_streamStopEvent != NULL)
 		{
-			CloseHandle(g_streamStoppedEvent);
+			CloseHandle(g_streamStopEvent);
 		}
 		if (g_streamFillEvent != NULL)
 		{
@@ -1066,8 +1069,72 @@ namespace AudioManager
 
 		g_streamAckEvent = NULL;
 		g_streamCommandEvent = NULL;
-		g_streamStoppedEvent = NULL;
+		g_streamStopEvent = NULL;
 		g_streamFillEvent = NULL;
+	}
+
+	// STUB: TOY2 0x00436D80
+	void FillBuffer() {}
+
+	namespace Stream
+	{
+		// FUNCTION: TOY2 0x00437010 [MATCHED]
+		int32_t ThreadProc()
+		{
+			g_streamThreadReady = 1;
+			do
+			{
+				while (g_streamFillEvent != NULL)
+				{
+					DWORD waitResult = WaitForMultipleObjects(3, &g_streamFillEvent, FALSE, INFINITE);
+					if (waitResult == WAIT_FAILED)
+					{
+						break;
+					}
+
+					switch (waitResult - WAIT_OBJECT_0)
+					{
+						case 0:
+							if (g_streamPlaybackFinished == 1)
+							{
+								Stop();
+								ResetEvent(g_streamStopEvent);
+							}
+							else
+							{
+								FillBuffer();
+							}
+							break;
+
+						case 1:
+							Stop();
+							break;
+
+						case 2:
+							switch (g_streamCommand)
+							{
+								case STREAM_COMMAND_STOP:
+									Stop();
+									ResetEvent(g_streamStopEvent);
+									break;
+
+								case STREAM_COMMAND_PLAY:
+									ThreadPlay(g_streamPath, g_queuedStreamLooping);
+									break;
+
+								case STREAM_COMMAND_EXIT:
+									ShutdownHandles();
+									break;
+							}
+							g_streamCommand = STREAM_COMMAND_NONE;
+							ReleaseSemaphore(g_streamAckEvent, 1, NULL);
+							break;
+					}
+				}
+			} while (g_streamThreadReady != 0);
+
+			return 1;
+		}
 	}
 
 	// FUNCTION: TOY2 0x00413150
