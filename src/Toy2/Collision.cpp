@@ -8,6 +8,9 @@ namespace Toy2
 		// GLOBAL: TOY2 0x007295A8
 		CollisionMeshInstance g_collisionMeshInstances[300];
 
+		// GLOBAL: TOY2 0x00729130
+		int16_t g_groundCollisionMeshIndex;
+
 		// GLOBAL: TOY2 0x00554FA0
 		uint8_t g_mathScratch[1024];
 
@@ -22,6 +25,16 @@ namespace Toy2
 			{
 				g_collisionMeshInstances[meshIndex].typeFlags = 8;
 			}
+		}
+
+		// FUNCTION: TOY2 0x0048E1D0 [MATCHED]
+		int32_t GetGroundContactIdx()
+		{
+			if (g_groundCollisionMeshIndex != -1 && g_collisionMeshInstances[g_groundCollisionMeshIndex].typeFlags == 8)
+			{
+				return g_collisionMeshInstances[g_groundCollisionMeshIndex].platformIdx;
+			}
+			return -1;
 		}
 	}
 
@@ -89,6 +102,18 @@ namespace Toy2
 				g_platformStates[platformIndex].angularVelocity.x = x;
 				g_platformStates[platformIndex].angularVelocity.y = y;
 				g_platformStates[platformIndex].angularVelocity.z = z;
+			}
+		}
+
+		// FUNCTION: TOY2 0x0048E200 [MATCHED]
+		void CopyVelocity(int32_t sourcePlatformIndex, int32_t destinationPlatformIndex)
+		{
+			if (g_platformStates[sourcePlatformIndex].collisionMeshIndex != 0 && g_platformStates[destinationPlatformIndex].collisionMeshIndex != 0)
+			{
+				g_platformStates[destinationPlatformIndex].flags |= 0x80;
+				g_platformStates[destinationPlatformIndex].velocity.x = g_platformStates[sourcePlatformIndex].velocity.x;
+				g_platformStates[destinationPlatformIndex].velocity.y = g_platformStates[sourcePlatformIndex].velocity.y;
+				g_platformStates[destinationPlatformIndex].velocity.z = g_platformStates[sourcePlatformIndex].velocity.z;
 			}
 		}
 

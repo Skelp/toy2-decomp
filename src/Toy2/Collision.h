@@ -22,10 +22,12 @@ namespace Toy2
 		};
 
 		extern CollisionMeshInstance g_collisionMeshInstances[300];
+		extern int16_t g_groundCollisionMeshIndex;
 		extern uint8_t g_mathScratch[1024];
 
 		void BuildCollisionWorld(int32_t level, uint8_t** buffer, int32_t terrainNum);
 		void MarkPlatformAsMoving(int32_t platformIndex);
+		int32_t GetGroundContactIdx();
 
 		STATIC_ASSERT(sizeof(CollisionMeshInstance) == 0x34);
 	}
@@ -53,6 +55,7 @@ namespace Toy2
 		void DisableCollision(int32_t platformIndex);
 		void SetVelocity(int32_t platformIndex, int32_t x, int32_t y, int32_t z);
 		void SetAngularVelocity(int32_t platformIndex, int16_t x, int16_t y, int16_t z);
+		void CopyVelocity(int32_t sourcePlatformIndex, int32_t destinationPlatformIndex);
 		void GetOrigin(int32_t platformIndex, Vector3I* origin);
 		void GetRotation(int32_t platformIndex, Vector3I* rotation);
 		void SetRotationAngles(int32_t platformIndex, int16_t x, int16_t y, int16_t z);
