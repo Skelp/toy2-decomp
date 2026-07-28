@@ -57,6 +57,9 @@ namespace Toy2
 			}
 			return -1;
 		}
+
+		// STUB: TOY2 0x0048C860
+		int32_t SweepAndSlide(Vector3I* position, Vector3I* movement, int32_t collisionThreshold, int16_t* collisionAngles, int32_t radius) { return 0; }
 	}
 
 	namespace Platform

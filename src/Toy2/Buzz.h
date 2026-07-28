@@ -107,6 +107,7 @@ namespace Toy2
 		void ActivateRocketBoots(GadgetPickup* pickup);
 		void DeactivateRocketBoots();
 		void CancelGrapple();
+		void FireGrapple(int32_t aimYaw, int32_t aimPitch);
 		void TickCosmicShield();
 		void TickGrapple();
 		void TickBeamShots();
@@ -135,6 +136,7 @@ namespace Toy2
 	extern int32_t g_discLauncherShotSlotsAvailable;
 	extern int32_t g_grappleTraversalDuration;
 	extern int32_t g_grappleElapsedTime;
+	extern Vector3I g_grappleEndpoint;
 	extern int32_t g_cosmicShieldYaw;
 	extern int32_t g_cosmicShieldRoll;
 	extern Buzz::BeamShot g_beamShots[4];

@@ -440,7 +440,7 @@
 0x0048B660 Toy2::Levels::Method1
 0x0048B750 Nu3D::Collision::SweepAgainstCandidates
 0x0048C030 Nu3D::Collision::RaycastAgainstCandidates
-0x0048C860 Nu3D::Collision::SweepAndSlide
+0x0048C860 Toy2::Collision::SweepAndSlide
 0x0048D530 Nu3D::Collision::SweepQuery
 0x0048E1B0 Toy2::Collision::IsMeshMoving
 0x0048E1D0 Toy2::Collision::GetGroundContactIdx

@@ -60,6 +60,7 @@ namespace Toy2
 		bool IsMeshMoving();
 		int32_t IsSafeFooting(int32_t queryIndex, const uint8_t* contactState);
 		int32_t GetGroundContactIdx();
+		int32_t SweepAndSlide(Vector3I* position, Vector3I* movement, int32_t collisionThreshold, int16_t* collisionAngles, int32_t radius);
 
 		STATIC_ASSERT(sizeof(CollisionMeshInstance) == 0x34);
 		STATIC_ASSERT(sizeof(CollisionQueryResult) == 0x30);

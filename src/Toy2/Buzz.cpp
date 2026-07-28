@@ -1,6 +1,7 @@
 #include "Toy2/Buzz.h"
 #include "Toy2/Camera.h"
 #include "Toy2/Collision.h"
+#include "Toy2/Levels.h"
 #include "Toy2/Toy2.h"
 #include "AudioManager/AudioManager.h"
 #include "InputManager.h"
@@ -9,6 +10,7 @@
 #include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
+#include <stdlib.h>
 #include <string.h>
 
 namespace Toy2
@@ -30,6 +32,12 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x0052B81C
 	int32_t g_footingType;
+
+	// GLOBAL: TOY2 0x0050A0A0
+	Vector3I g_aimTargetPosition;
+
+	// GLOBAL: TOY2 0x0050A4FC
+	int32_t g_aimTargetIndex;
 
 	// GLOBAL: TOY2 0x0053C5D4
 	int32_t g_turnRecoveryTimer;
@@ -108,6 +116,9 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x00882930
 	int32_t g_grappleElapsedTime;
+
+	// GLOBAL: TOY2 0x00882940
+	Vector3I g_grappleEndpoint;
 
 	// GLOBAL: TOY2 0x0088295C
 	int32_t g_cosmicShieldYaw;
@@ -440,6 +451,53 @@ namespace Toy2
 				}
 				g_grappleState = 0;
 			}
+		}
+
+		// FUNCTION: TOY2 0x004A5370
+		void FireGrapple(int32_t aimYaw, int32_t aimPitch)
+		{
+			AudioManager::PlaySoundEffect(0x51, &g_buzzActor.posAngles.pos);
+
+			const Levels::RecordData* grappleRecords = Levels::g_recordData[59];
+			const Vector3I& grappleAnchor = grappleRecords->data[g_aimTargetIndex - 1000];
+			g_grappleEndpoint.x = g_buzzActor.posAngles.pos.x;
+			g_grappleEndpoint.y = g_buzzActor.posAngles.pos.y - 0x2C00;
+			g_grappleEndpoint.z = g_buzzActor.posAngles.pos.z;
+
+			Vector3I grappleOffset;
+			grappleOffset.x = grappleAnchor.x * 0x20 - g_grappleEndpoint.x;
+			grappleOffset.y = (grappleAnchor.y - 0xC0) * 0x20 - g_grappleEndpoint.y;
+			grappleOffset.z = grappleAnchor.z * 0x20 - g_grappleEndpoint.z;
+			g_grappleState = Collision::SweepAndSlide(&g_grappleEndpoint, &grappleOffset, 0x8000, 0, 0x100) != 0 ? 3 : 1;
+
+			g_grappleEndpoint.x += grappleOffset.x;
+			g_grappleEndpoint.y += grappleOffset.y;
+			g_grappleEndpoint.z += grappleOffset.z;
+
+			grappleOffset.x = (g_grappleEndpoint.x - g_aimTargetPosition.x) >> 2;
+			grappleOffset.y = (g_grappleEndpoint.y - g_aimTargetPosition.y) >> 2;
+			grappleOffset.z = (g_grappleEndpoint.z - g_aimTargetPosition.z) >> 2;
+			Nu3D::Math::NormalizeToFixedPoint(&grappleOffset, &grappleOffset);
+
+			int32_t dominantComponent = grappleOffset.y >> 1;
+			int32_t grappleDistance = g_grappleEndpoint.y - g_buzzActor.posAngles.pos.y + 0x1600;
+			if (abs(dominantComponent) < abs(grappleOffset.x >> 1))
+			{
+				dominantComponent = grappleOffset.x >> 1;
+				grappleDistance = g_grappleEndpoint.x - g_buzzActor.posAngles.pos.x;
+			}
+			if (abs(dominantComponent) <= abs(grappleOffset.z >> 1))
+			{
+				dominantComponent = grappleOffset.z >> 1;
+				grappleDistance = g_grappleEndpoint.z - g_buzzActor.posAngles.pos.z;
+			}
+			if (dominantComponent == 0)
+				dominantComponent = 1;
+
+			g_buzzActor.actorFlags |= ACTOR_FLAG_LOCK_FACING;
+			g_grappleElapsedTime = 0;
+			g_grappleTraversalDuration = abs(grappleDistance / dominantComponent);
+			InputManager::g_directionInputState &= INPUT_SECRET_MENU | INPUT_MENU | INPUT_CAMERA_LEFT | INPUT_CAMERA_RIGHT;
 		}
 
 		// FUNCTION: TOY2 0x004A5C40 [MATCHED]
