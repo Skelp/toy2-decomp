@@ -3,6 +3,7 @@
 #include "AudioManager/AudioManager.h"
 #include "Nu3D/Link.h"
 #include "Nu3D/Particles.h"
+#include <string.h>
 
 namespace Toy2
 {
@@ -27,6 +28,21 @@ namespace Toy2
 	// GLOBAL: TOY2 0x00882968
 	int32_t g_discLauncherShotSlotsAvailable;
 
+	// GLOBAL: TOY2 0x00882970
+	Buzz::BeamShot g_beamShots[4];
+
+	// GLOBAL: TOY2 0x0088292C
+	int32_t g_grappleTraversalDuration;
+
+	// GLOBAL: TOY2 0x00882930
+	int32_t g_grappleElapsedTime;
+
+	// GLOBAL: TOY2 0x0088295C
+	int32_t g_cosmicShieldYaw;
+
+	// GLOBAL: TOY2 0x00882960
+	int32_t g_cosmicShieldRoll;
+
 	static __inline void RestoreCosmicShieldPickup()
 	{
 		if (g_activeCosmicShieldPickup != 0)
@@ -43,6 +59,25 @@ namespace Toy2
 
 	// STUB: TOY2 0x00433ED0
 	void ResetBuzzState() {}
+
+	// FUNCTION: TOY2 0x004A48B0 [MATCHED]
+	void ResetGadgets()
+	{
+		memset(g_beamShots, 0, sizeof(g_beamShots));
+		g_activeCosmicShieldPickup = 0;
+		g_savedCosmicShieldPickupY = 0;
+		g_cosmicShieldYaw = 0;
+		g_cosmicShieldRoll = 0;
+		g_activeRocketBootsPickup = 0;
+		g_rocketBootsTimer = 0;
+		g_grappleCharges = 0;
+		g_grappleState = 0;
+		g_grappleTraversalDuration = 0;
+		g_grappleElapsedTime = 0;
+		g_discLauncherAmmo = 0;
+		g_discLauncherShotSlotsAvailable = 6;
+		g_gravityBootsTimer = 0;
+	}
 
 	// FUNCTION: TOY2 0x004A4B70 [MATCHED]
 	void ActivateGravityBoots()

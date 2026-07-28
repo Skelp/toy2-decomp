@@ -2,11 +2,22 @@
 
 #include "Common.h"
 #include "Numerics.h"
+#include <stddef.h>
 
 namespace Toy2
 {
 	namespace Buzz
 	{
+		struct BeamShot
+		{
+			Vector3I start;
+			Vector3I end;
+			Vector3I velocity;
+			int16_t fadeTimer;
+			int16_t movementTimer;
+			RGBA color;
+		};
+
 		struct GadgetPickup
 		{
 			Vector3I position;
@@ -70,6 +81,10 @@ namespace Toy2
 		void DeactivateRocketBoots();
 		void CancelGrapple();
 
+		STATIC_ASSERT(sizeof(BeamShot) == 0x2C);
+		STATIC_ASSERT(offsetof(BeamShot, fadeTimer) == 0x24);
+		STATIC_ASSERT(offsetof(BeamShot, movementTimer) == 0x26);
+		STATIC_ASSERT(offsetof(BeamShot, color) == 0x28);
 		STATIC_ASSERT(sizeof(GadgetPickup) == 0x10);
 		STATIC_ASSERT(sizeof(Toy2BuzzActor) == 0xA0);
 	}
@@ -82,4 +97,9 @@ namespace Toy2
 	extern int32_t g_savedCosmicShieldPickupY;
 	extern int32_t g_discLauncherAmmo;
 	extern int32_t g_discLauncherShotSlotsAvailable;
+	extern int32_t g_grappleTraversalDuration;
+	extern int32_t g_grappleElapsedTime;
+	extern int32_t g_cosmicShieldYaw;
+	extern int32_t g_cosmicShieldRoll;
+	extern Buzz::BeamShot g_beamShots[4];
 }

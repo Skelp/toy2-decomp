@@ -31,6 +31,7 @@ namespace Toy2
 	void ResetBuzzState();
 	void ActivateGravityBoots();
 	void RespawnCosmicShield();
+	void ResetGadgets();
 	void ProcessMiscEvents();
 	void ProcessMiscEventsEx();
 	void RenderGame(int32_t fullRender);
