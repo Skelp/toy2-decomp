@@ -66,6 +66,8 @@ namespace Toy2
 		extern Vector3I16 g_buzzGroundNormal;
 		extern int32_t g_groundPlatformIndex;
 		extern int32_t g_collisionTriangleCount;
+		extern int32_t g_collisionEdgeVertexCount;
+		extern Vector3I g_collisionEdgeVertices[32];
 		extern MathScratchVector g_mathScratch[64];
 
 		void BuildCollisionWorld(int32_t level, uint8_t** buffer, int32_t terrainNum);
@@ -158,6 +160,13 @@ namespace Nu3D
 			int32_t edge2Y,
 			int32_t edge2Z,
 			const Vector3I16* normal);
+		int32_t RaycastAgainstEdges(int32_t* nearestFraction,
+			int32_t* startDistance,
+			int32_t* endDistance,
+			Vector3I16* hitNormal,
+			uint16_t* reversed,
+			const Vector3I* start,
+			const Vector3I* movement);
 	}
 }
 

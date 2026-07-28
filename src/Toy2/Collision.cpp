@@ -1,5 +1,6 @@
 #include "Toy2/Collision.h"
 #include "Nu3D/Link.h"
+#include "Nu3D/Math.h"
 #include "Renderer/Shadows.h"
 #include "Toy2/Buzz.h"
 
@@ -27,6 +28,12 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x0072D2A0
 		int32_t g_collisionTriangleCount;
+
+		// GLOBAL: TOY2 0x0072D2AC
+		int32_t g_collisionEdgeVertexCount;
+
+		// GLOBAL: TOY2 0x00728DA0
+		Vector3I g_collisionEdgeVertices[32];
 
 		// GLOBAL: TOY2 0x00554FA0
 		MathScratchVector g_mathScratch[64];
@@ -286,6 +293,67 @@ namespace Nu3D
 			if (normalDirection < 0)
 				return side1 >= 0 && side2 >= 0 && side3 >= 0;
 			return side1 <= 0 && side2 <= 0 && side3 <= 0;
+		}
+
+		// FUNCTION: TOY2 0x004882F0
+		int32_t RaycastAgainstEdges(int32_t* nearestFraction,
+			int32_t* startDistance,
+			int32_t* endDistance,
+			Vector3I16* hitNormal,
+			uint16_t* reversed,
+			const Vector3I* start,
+			const Vector3I* movement)
+		{
+			if (Toy2::Collision::g_collisionEdgeVertexCount == 0)
+				return 0;
+
+			int32_t foundHit = 0;
+			for (int32_t vertexIndex = 0; vertexIndex < Toy2::Collision::g_collisionEdgeVertexCount; vertexIndex += 2)
+			{
+				const Vector3I& edgeStart = Toy2::Collision::g_collisionEdgeVertices[vertexIndex];
+				const Vector3I& edgeEnd = Toy2::Collision::g_collisionEdgeVertices[vertexIndex + 1];
+				Vector3I16 edgeNormal = {
+					(int16_t)(edgeStart.z - edgeEnd.z),
+					0,
+					(int16_t)(edgeEnd.x - edgeStart.x),
+				};
+				Nu3D::Math::NormalizeToFixedPoint16(&edgeNormal, &edgeNormal);
+
+				int32_t rayStartDistance = (((start->z >> 5) - edgeStart.z) * edgeNormal.z + ((start->x >> 5) - edgeStart.x) * edgeNormal.x) >> 12;
+				int32_t rayEndDistance =
+					((((start->z + movement->z) >> 5) - edgeStart.z) * edgeNormal.z + (((start->x + movement->x) >> 5) - edgeStart.x) * edgeNormal.x) >> 12;
+				bool rayReversed = rayStartDistance < rayEndDistance;
+				if (rayReversed)
+				{
+					rayStartDistance = -rayStartDistance;
+					rayEndDistance = -rayEndDistance;
+				}
+
+				if (rayStartDistance >= 0 && rayEndDistance < 0)
+				{
+					int32_t distanceRange = rayStartDistance - rayEndDistance;
+					int32_t hitX = start->x + movement->x * rayStartDistance / distanceRange;
+					int32_t hitZ = start->z + movement->z * rayStartDistance / distanceRange;
+					int32_t edgeDeltaX = edgeEnd.x - edgeStart.x;
+					int32_t edgeDeltaZ = edgeEnd.z - edgeStart.z;
+					int32_t fromStart = (hitX - edgeStart.x * 32) * edgeDeltaX + (hitZ - edgeStart.z * 32) * edgeDeltaZ;
+					int32_t fromEnd = (hitX - edgeEnd.x * 32) * edgeDeltaX + (hitZ - edgeEnd.z * 32) * edgeDeltaZ;
+					int32_t fraction = (rayStartDistance << 14) / distanceRange;
+
+					if (fromStart >= 0 && fromEnd <= 0 && fraction < *nearestFraction)
+					{
+						foundHit = 1;
+						*nearestFraction = fraction;
+						*startDistance = rayStartDistance;
+						*endDistance = rayEndDistance;
+						hitNormal->x = edgeNormal.x * 4;
+						hitNormal->y = 0;
+						hitNormal->z = edgeNormal.z * 4;
+						*reversed = rayReversed;
+					}
+				}
+			}
+			return foundHit;
 		}
 
 		// FUNCTION: TOY2 0x00486280 [MATCHED]
