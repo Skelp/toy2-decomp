@@ -120,6 +120,7 @@ namespace SoftwareRenderer
 	void PresentFrame();
 	void ShowBackBuffer();
 	void SetCameraNearFarZ(float nearZ, float farZ);
+	void UnpackColourChannels(uint32_t colour, int32_t* red, int32_t* green, int32_t* blue);
 
 	int32_t GetStrideFromFVF(int32_t fvf);
 

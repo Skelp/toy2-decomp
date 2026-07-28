@@ -892,6 +892,14 @@ namespace SoftwareRenderer
 	// The span rasterizers that UnkFunc34 and UnkFunc35 select. Each writes one
 	// scanline using the globals the selector published.
 
+	// FUNCTION: TOY2 0x004C4340 [MATCHED]
+	void UnpackColourChannels(uint32_t colour, int32_t* red, int32_t* green, int32_t* blue)
+	{
+		*red = (colour & 0x00ff0000) >> 8;
+		*green = colour & 0x0000ff00;
+		*blue = (colour & 0x000000ff) << 8;
+	}
+
 	// STUB: TOY2 0x004C4370
 	void UnkFunc48(Nu3D::VertexTL* leftEdge,
 		Nu3D::VertexTL* rightEdge,
