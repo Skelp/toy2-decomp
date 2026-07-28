@@ -8,6 +8,17 @@ namespace Toy2
 {
 	namespace Buzz
 	{
+		struct MovementRates
+		{
+			int32_t lateralDeceleration;
+			int32_t forwardDeceleration;
+			int32_t forwardAcceleration;
+			int32_t verticalAcceleration;
+			int32_t lateralSpeedLimit;
+			int32_t forwardSpeedLimit;
+			int32_t turnRateLimit;
+		};
+
 		struct BeamShot
 		{
 			Vector3I start;
@@ -83,6 +94,7 @@ namespace Toy2
 		void TickBeamShots();
 
 		STATIC_ASSERT(sizeof(BeamShot) == 0x2C);
+		STATIC_ASSERT(sizeof(MovementRates) == 0x1C);
 		STATIC_ASSERT(offsetof(BeamShot, fadeTimer) == 0x24);
 		STATIC_ASSERT(offsetof(BeamShot, movementTimer) == 0x26);
 		STATIC_ASSERT(offsetof(BeamShot, color) == 0x28);

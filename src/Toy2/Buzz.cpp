@@ -1,6 +1,8 @@
 #include "Toy2/Buzz.h"
+#include "Toy2/Camera.h"
 #include "Toy2/Toy2.h"
 #include "AudioManager/AudioManager.h"
+#include "InputManager.h"
 #include "Nu3D/Link.h"
 #include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
@@ -236,6 +238,48 @@ namespace Toy2
 				shot++;
 				shotsRemaining--;
 			} while (shotsRemaining != 0);
+		}
+	}
+
+	namespace Camera
+	{
+		// FUNCTION: TOY2 0x004A4F80
+		int32_t UpdateRocketBoots(Buzz::Toy2BuzzActor* buzz, Buzz::MovementRates* movementRates)
+		{
+			movementRates->lateralSpeedLimit = 0x800;
+			movementRates->forwardSpeedLimit = 0x800;
+
+			movementRates->forwardAcceleration = Renderer::g_frameDelta * 0x280 / 4;
+			movementRates->lateralDeceleration = Renderer::g_frameDelta * 0x200 / 4;
+			movementRates->forwardDeceleration = Renderer::g_frameDelta * 0x80 / 4;
+
+			if ((InputManager::g_directionInputState & (INPUT_UP | INPUT_RIGHT | INPUT_DOWN | INPUT_LEFT)) != 0)
+			{
+				::Camera::CalculateMaxTurnAngle(InputManager::g_directionInputState);
+			}
+
+			uint16_t yaw = buzz->posAngles.angles.yaw;
+			int32_t yawDelta = (yaw - buzz->facingAngle) & 0xFFF;
+			if (yawDelta >= 0x800)
+			{
+				int32_t turnAmount = 0x1000 - yawDelta;
+				if (turnAmount > movementRates->turnRateLimit)
+				{
+					turnAmount = movementRates->turnRateLimit;
+				}
+				buzz->posAngles.angles.yaw = (uint16_t)(yaw + Renderer::g_frameDelta * turnAmount / 8);
+			}
+			else
+			{
+				int32_t turnAmount = yawDelta;
+				if (turnAmount > movementRates->turnRateLimit)
+				{
+					turnAmount = movementRates->turnRateLimit;
+				}
+				buzz->posAngles.angles.yaw = (uint16_t)(yaw - Renderer::g_frameDelta * turnAmount / 8);
+			}
+			buzz->posAngles.angles.yaw &= 0xFFF;
+			return 1;
 		}
 	}
 }

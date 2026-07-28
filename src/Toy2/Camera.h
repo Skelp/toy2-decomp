@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Numerics.h"
+#include "Toy2/Buzz.h"
 
 namespace Toy2
 {
@@ -24,5 +25,11 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(GameplayCamera) == 0x34);
 
 		void SmoothToTarget(GameplayCamera* camera);
+		int32_t UpdateRocketBoots(Buzz::Toy2BuzzActor* buzz, Buzz::MovementRates* movementRates);
 	}
 } // namespace Toy2
+
+namespace Camera
+{
+	int32_t CalculateMaxTurnAngle(uint16_t directionInputState);
+}

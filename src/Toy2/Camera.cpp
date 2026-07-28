@@ -44,3 +44,9 @@ namespace Toy2
 		}
 	}
 } // namespace Toy2
+
+namespace Camera
+{
+	// STUB: TOY2 0x00433F40
+	int32_t CalculateMaxTurnAngle(uint16_t directionInputState) { return 0; }
+}
