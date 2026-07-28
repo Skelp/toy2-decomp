@@ -153,6 +153,18 @@ namespace Toy2
 	// GLOBAL: TOY2 0x00731CBC
 	uint32_t g_unk731CBC;
 
+	// GLOBAL: TOY2 0x0072E34C
+	int32_t g_mpegPlaybackDisabled;
+
+	// GLOBAL: TOY2 0x0072EF94
+	int32_t g_movieTimingRate;
+
+	// GLOBAL: TOY2 0x0072EFB0
+	uint32_t g_movieTimingStartMs;
+
+	// GLOBAL: TOY2 0x00731F0C
+	uint32_t g_cpuClockHz;
+
 	// GLOBAL: TOY2 0x0052AD9C
 	int32_t g_returnedToTitle;
 
@@ -878,8 +890,41 @@ namespace Toy2
 		return interrupted;
 	}
 
-	// STUB: TOY2 0x0049AB90
-	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId) { return 1; }
+	// FUNCTION: TOY2 0x0049AB90 [MATCHED]
+	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId)
+	{
+		int32_t result = 0;
+		Renderer::SetVirtualRatioTo54();
+		if (backgroundId != 0)
+		{
+			LoadLevelWithFadeIn(backgroundId, result);
+		}
+
+		int32_t samplesRemaining = 60;
+		do
+		{
+			g_movieTimingStartMs = timeGetTime();
+			int32_t elapsedMs = timeGetTime() - g_movieTimingStartMs;
+			g_movieTimingRate = g_cpuClockHz / (abs(elapsedMs) + 1);
+
+			do
+			{
+				elapsedMs = timeGetTime() - g_movieTimingStartMs;
+				g_movieTimingRate = 1000 / (abs(elapsedMs) + 1);
+			} while (g_movieTimingRate > 60);
+		} while (--samplesRemaining != 0);
+
+		if (backgroundId != 0)
+		{
+			ShowLevelIntroScreen(backgroundId, result);
+		}
+
+		if (! g_mpegPlaybackDisabled)
+		{
+			result = PlayMovie(movieId);
+		}
+		return result;
+	}
 
 	// FUNCTION: TOY2 0x0048F1B0
 	void SetBackdropByIndex(int32_t index)
