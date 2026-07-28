@@ -3,6 +3,7 @@
 #include "Common.h"
 #include "Numerics.h"
 #include <directx6/d3d.h>
+#include <stddef.h>
 
 namespace Nu3D
 {
@@ -42,14 +43,27 @@ namespace Nu3D
 
 		struct FixedViewTransform
 		{
-			int16_t m00;
-			int16_t m01;
-			int16_t m02;
-			int16_t reserved0[3];
-			int16_t m10;
-			int16_t m11;
-			int16_t m12;
-			int16_t reserved1[7];
+			Matrix3x3I16 rotation;
+			int16_t reserved;
+			Vector3I position;
+		};
+
+		struct ObjectViewTransform
+		{
+			int32_t m00;
+			int32_t m01;
+			int32_t m02;
+			int32_t reserved0;
+			int32_t m10;
+			int32_t m11;
+			int32_t m12;
+			int32_t reserved1;
+			int32_t m20;
+			int32_t m21;
+			int32_t m22;
+			int32_t reserved2;
+			Vector3I position;
+			int32_t reserved3;
 		};
 
 		extern D3DMATRIX g_viewMatrix;
@@ -63,6 +77,7 @@ namespace Nu3D
 		extern ActiveCameraTransform g_activeCameraTransform;
 		extern Vector3I g_fixedViewPosition;
 		extern FixedViewTransform g_fixedViewTransform;
+		extern ObjectViewTransform g_objectViewTransform;
 		extern ReflectionState g_reflectionState;
 		extern int32_t g_effectMode;
 		extern int32_t g_billboardYaw;
@@ -77,6 +92,8 @@ namespace Nu3D
 		void InitViewMatrixGlobals();
 		void FadeToTargetTint();
 		void SetupViewMatrix(ActiveCameraTransform* camera);
+		void SetObjectViewMatrix(const FixedViewTransform* transform);
+		void SetObjectViewPosition(const FixedViewTransform* transform);
 		void SetBillboardYaw(int32_t yaw);
 		void ToggleCameraSkew(int32_t enabled);
 		void EnableCameraSkew();
@@ -103,6 +120,9 @@ namespace Nu3D
 
 		STATIC_ASSERT(sizeof(ActiveCameraTransform) == 0x14);
 		STATIC_ASSERT(sizeof(FixedViewTransform) == 0x20);
+		STATIC_ASSERT(offsetof(FixedViewTransform, position) == 0x14);
+		STATIC_ASSERT(sizeof(ObjectViewTransform) == 0x40);
+		STATIC_ASSERT(offsetof(ObjectViewTransform, position) == 0x30);
 		STATIC_ASSERT(sizeof(CameraData) == 0x64);
 		STATIC_ASSERT(sizeof(ReflectionState) == 0x84);
 	}

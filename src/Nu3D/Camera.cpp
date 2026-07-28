@@ -53,6 +53,9 @@ namespace Nu3D
 		// GLOBAL: TOY2 0x00555334
 		FixedViewTransform g_fixedViewTransform;
 
+		// GLOBAL: TOY2 0x005D2AE0
+		ObjectViewTransform g_objectViewTransform;
+
 		// GLOBAL: TOY2 0x00B62404
 		int32_t g_cameraSkewEnabled;
 
@@ -221,6 +224,28 @@ namespace Nu3D
 
 		// STUB: TOY2 0x00446FC0
 		void SetupViewMatrix(ActiveCameraTransform* camera) {}
+
+		// FUNCTION: TOY2 0x004507F0 [MATCHED]
+		void SetObjectViewMatrix(const FixedViewTransform* transform)
+		{
+			g_objectViewTransform.m00 = transform->rotation.m00;
+			g_objectViewTransform.m01 = transform->rotation.m01;
+			g_objectViewTransform.m02 = transform->rotation.m02;
+			g_objectViewTransform.m10 = transform->rotation.m10;
+			g_objectViewTransform.m11 = transform->rotation.m11;
+			g_objectViewTransform.m12 = transform->rotation.m12;
+			g_objectViewTransform.m20 = transform->rotation.m20;
+			g_objectViewTransform.m21 = transform->rotation.m21;
+			g_objectViewTransform.m22 = transform->rotation.m22;
+		}
+
+		// FUNCTION: TOY2 0x00450850 [MATCHED]
+		void SetObjectViewPosition(const FixedViewTransform* transform)
+		{
+			g_objectViewTransform.position.x = transform->position.x;
+			g_objectViewTransform.position.y = transform->position.y;
+			g_objectViewTransform.position.z = transform->position.z;
+		}
 
 		// FUNCTION: TOY2 0x004B68A0 [MATCHED]
 		void SetBillboardYaw(int32_t yaw) { g_billboardYaw = yaw; }

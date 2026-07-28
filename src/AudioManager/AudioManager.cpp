@@ -617,8 +617,8 @@ namespace AudioManager
 			int32_t x = (soundPosition->x >> 9) - (Nu3D::Camera::g_fixedViewPosition.x >> 9);
 
 			const Nu3D::Camera::FixedViewTransform& view = Nu3D::Camera::g_fixedViewTransform;
-			int32_t viewX = (view.m00 * x + view.m01 * y + view.m02 * z) / 4096;
-			int32_t viewY = (view.m10 * x + view.m11 * y + view.m12 * z) / 4096 / 2;
+			int32_t viewX = (view.rotation.m00 * x + view.rotation.m01 * y + view.rotation.m02 * z) / 4096;
+			int32_t viewY = (view.rotation.m20 * x + view.rotation.m21 * y + view.rotation.m22 * z) / 4096 / 2;
 			int32_t viewYSquared = viewY * viewY;
 
 			int32_t distance = (int32_t)sqrt((double)((viewX + 64) * (viewX + 64) + viewYSquared));
