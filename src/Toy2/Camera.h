@@ -35,6 +35,7 @@ namespace Toy2
 		extern GameplayCamera g_gameplayCamera;
 		extern Nu3D::Camera::ActiveCameraTransform g_renderCameraTransform;
 		extern int32_t g_scriptedCameraState;
+		extern int32_t g_shakeTimer;
 
 		void InitGameplayCamera(GameplayCamera* camera, Buzz::Toy2BuzzActor* buzz);
 		void BeginScriptedCutsceneAtPoint(Vector3I* focusPosition, int32_t duration, int32_t cameraDistance);

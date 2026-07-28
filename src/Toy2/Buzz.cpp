@@ -91,6 +91,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0053C840
 	int32_t g_gunChargeTimer;
 
+	// GLOBAL: TOY2 0x0053C828
+	uint32_t g_actionStateFlags;
+
 	// GLOBAL: TOY2 0x00882924
 	Buzz::GadgetPickup* g_activeRocketBootsPickup;
 
@@ -196,6 +199,10 @@ namespace Toy2
 
 	namespace Buzz
 	{
+		const uint32_t GROUND_SLAM_BLOCKING_ACTIONS = 0xFFF7F;
+		const uint32_t ACTION_STATE_GROUND_SLAM = 0x40;
+		const int16_t GROUND_SLAM_ANIMATION_STATE = 8;
+
 		union GrappleBeamVector
 		{
 			Vector3I direction;
@@ -499,6 +506,67 @@ namespace Toy2
 			{
 				ResolveCollisions(buzz, movement, contactState, queryIndex, 0);
 			}
+		}
+
+		// FUNCTION: TOY2 0x00434D20 [MATCHED]
+		int32_t TickGroundSlam(Toy2BuzzActor* buzz)
+		{
+			if ((InputManager::g_directionInputState & INPUT_SPIN) != 0 && (InputManager::g_prevDirectionInputState & INPUT_SPIN) == 0
+				&& (g_actionStateFlags & GROUND_SLAM_BLOCKING_ACTIONS) == 0 && g_spinHoverTimer == 0 && g_spinCooldownTimer == 0
+				&& (buzz->airborneMode == 1 || buzz->airborneMode == 2 || buzz->animationState == GROUND_SLAM_ANIMATION_STATE))
+			{
+				g_groundSlamTimer = 1;
+				AudioManager::PlaySoundEffect(0x17, &buzz->posAngles.pos);
+			}
+
+			int32_t groundSlamTime = g_groundSlamTimer;
+			if (groundSlamTime != 0)
+			{
+				g_actionStateFlags |= ACTION_STATE_GROUND_SLAM;
+				if (groundSlamTime > 0)
+				{
+					if (buzz->collisionFlags != 0)
+					{
+						g_groundSlamTimer = -40;
+						Camera::g_shakeTimer = 40;
+						Nu3D::Particles::SpawnFromPreset(buzz->posAngles.pos.x, buzz->posAngles.pos.y - 0x400, buzz->posAngles.pos.z, 0x12, 0xB);
+						Nu3D::Particles::SpawnFromPreset(buzz->posAngles.pos.x, buzz->posAngles.pos.y - 0x400, buzz->posAngles.pos.z, 0x13, 0xC);
+						AudioManager::PlaySoundEffect(0xF, &g_buzzActor.posAngles.pos);
+					}
+					else
+					{
+						groundSlamTime += Renderer::g_frameDelta;
+						g_groundSlamTimer = groundSlamTime;
+						if (groundSlamTime > 14)
+						{
+							buzz->gravityVel = 0x800;
+							g_groundSlamTimer = 14;
+							return MOVEMENT_LOCK_LATERAL | MOVEMENT_LOCK_FORWARD;
+						}
+						return MOVEMENT_LOCK_LATERAL | MOVEMENT_LOCK_VERTICAL | MOVEMENT_LOCK_FORWARD;
+					}
+				}
+				else
+				{
+					int32_t frameDelta = Renderer::g_frameDelta;
+					groundSlamTime += frameDelta;
+					g_groundSlamTimer = groundSlamTime;
+					if (groundSlamTime > 0)
+					{
+						g_groundSlamTimer = 0;
+						return 0;
+					}
+					if (groundSlamTime < -14)
+					{
+						if (buzz->collisionFlags == 0)
+							buzz->gravityVel += (frameDelta * 0x100) / 4;
+						if (buzz->gravityVel > 0x800)
+							buzz->gravityVel = 0x800;
+						return MOVEMENT_LOCK_LATERAL | MOVEMENT_LOCK_FORWARD;
+					}
+				}
+			}
+			return 0;
 		}
 
 		// FUNCTION: TOY2 0x004A4B90 [MATCHED]

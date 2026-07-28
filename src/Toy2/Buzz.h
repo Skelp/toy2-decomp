@@ -25,6 +25,13 @@ namespace Toy2
 			GRAPPLE_BLOCKED = 3,
 		};
 
+		enum MovementAxisLocks
+		{
+			MOVEMENT_LOCK_LATERAL = 0x1,
+			MOVEMENT_LOCK_VERTICAL = 0x2,
+			MOVEMENT_LOCK_FORWARD = 0x4,
+		};
+
 		struct MovementRates
 		{
 			int32_t lateralDeceleration;
@@ -118,6 +125,7 @@ namespace Toy2
 		void FireDiscLauncher(int32_t launchPitch);
 		void FireGrapple(int32_t aimYaw, int32_t aimPitch);
 		void HandleCollisions(Toy2BuzzActor* buzz, Vector3I* movement, uint8_t* contactState, int32_t queryIndex);
+		int32_t TickGroundSlam(Toy2BuzzActor* buzz);
 		void TickCosmicShield();
 		void TickGrapple();
 		void TickBeamShots();

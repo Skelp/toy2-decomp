@@ -18,6 +18,9 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0050A13C
 		int32_t g_scriptedCameraState;
 
+		// GLOBAL: TOY2 0x0050A510
+		int32_t g_shakeTimer;
+
 		// STUB: TOY2 0x00403450
 		void InitGameplayCamera(GameplayCamera* camera, Buzz::Toy2BuzzActor* buzz) {}
 
