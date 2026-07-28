@@ -50,3 +50,4 @@
 0x0042B090	CAP-03	82.03	2026-07-28	arena particle bounce: retail keeps the floor value in EBX and the shadow count in CX. The build uses volatile registers and spills the typed shadow index. Control flow, field access, calls, and side effects agree. Three natural forms were tested.
 0x004946A0	CAP-24	56.00	2026-07-28	tiled sprite UVs: retail retains width and height on the x87 stack; build spills and reorders the four expressions; 4 credible forms tested
 0x00494820	CAP-24	57.14	2026-07-28	virtual-width twin of 0x004946A0; same x87 evaluation and spill difference
+0x0044EB90	CAP-03	36.48	2026-07-28	kite-tail draw: retail keeps tail-slot/texture/segment state in EBP/EBX/ESI/EDI; build changes the homes and reserves one extra packed-color slot; 3 structural forms tested

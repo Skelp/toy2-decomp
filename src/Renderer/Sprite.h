@@ -31,6 +31,7 @@ namespace Renderer
 			RGBA color,
 			int32_t flags);
 		void QueueType10(Vector3F* start, Vector3F* end, RGBA color);
+		void QueueSegment(Vector3I* start, Vector3I* delta, int32_t red, int32_t green, int32_t blue);
 
 		void QueueGroundAlignedSprite(Vector3F* position,
 			int32_t trigIndex,

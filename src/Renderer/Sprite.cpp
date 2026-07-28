@@ -766,6 +766,27 @@ namespace Renderer
 		// FUNCTION: TOY2 0x00493C30
 		int16_t DrawColoured(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t blue, uint8_t green, uint8_t red) { return 0; }
 
+		// FUNCTION: TOY2 0x0049D2D0 [MATCHED]
+		void QueueSegment(Vector3I* start, Vector3I* delta, int32_t red, int32_t green, int32_t blue)
+		{
+			Vector3F startPosition;
+			startPosition.x = (float)(start->x >> 5);
+			startPosition.y = (float)(start->y >> 5);
+			startPosition.z = (float)(start->z >> 5);
+
+			Vector3F endPosition;
+			endPosition.x = (float)((start->x + delta->x) >> 5);
+			endPosition.y = (float)((start->y + delta->y) >> 5);
+			endPosition.z = (float)((start->z + delta->z) >> 5);
+
+			RGBA color;
+			color.r = (uint8_t)red;
+			color.g = (uint8_t)green;
+			color.b = (uint8_t)blue;
+			color.a = 255;
+			QueueType10(&startPosition, &endPosition, color);
+		}
+
 		// FUNCTION: TOY2 0x0049D750 [MATCHED]
 		void DrawWhiteText(char* text, int32_t screenY, int32_t screenX) { Renderer::DrawBitmapText(text, screenY, screenX, 255, 255, 255, 0x60); }
 

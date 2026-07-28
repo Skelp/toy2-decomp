@@ -27,5 +27,6 @@ namespace Toy2
 		void Init(const Vector3I* pos, int32_t count, int32_t spacing, int32_t index, int32_t maxAngle);
 		void Activate(int32_t index);
 		void Deactivate(int32_t index);
+		void Draw();
 	}
 }
