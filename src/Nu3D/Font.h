@@ -7,6 +7,8 @@
 // Looks like these methods are purely for debug methods that are never called
 namespace Nu3D
 {
+	struct BmpDataNode;
+
 	typedef int32_t (*DrawTextStringFunc)(const char* text);
 	typedef int32_t (*CalculateTextSizeFunc)(const char* text);
 
@@ -36,7 +38,11 @@ namespace Nu3D
 		int16_t numGlyphs;
 		int16_t unkInt4;
 		HBITMAP bmpHandle;
-		int32_t texIndex;
+		union
+		{
+			int32_t texIndex;
+			BmpDataNode* bmpDataNode;
+		};
 		uint8_t charToGlyphIndex[256];
 		GlyphInfo glyphs[];
 

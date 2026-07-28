@@ -347,8 +347,8 @@ namespace Nu3D
 	// FUNCTION: TOY2 0x004B39D0
 	void Font::Destroy(Font* font)
 	{
-		if (font->texIndex)
-			ReleaseBmpDataNode_T((BmpDataNode*)font->texIndex);
+		if (font->bmpDataNode)
+			ReleaseBmpDataNode_T(font->bmpDataNode);
 		if (font->next)
 			font->next->prev = font->prev;
 		if (font->prev)

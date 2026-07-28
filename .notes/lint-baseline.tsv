@@ -45,7 +45,6 @@ src/Nu3D/BmpDataNode.h	placeholder-field	unkVar3	38c8e929d0c4	src/Nu3D/BmpDataNo
 src/Nu3D/BmpDataNode.h	placeholder-field	unkVar4	d2630a10c3c2	src/Nu3D/BmpDataNode.h
 src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNode.h
 0x004a1be0	unstructured-control-flow	goto-count	2d873e3e3f1c	src/Nu3D/Camera.cpp
-0x004b39d0	signature-concealment	ReleaseBmpDataNode_T:arg1	fc52c4253048	src/Nu3D/Font.cpp
 0x004b4de0	unnamed-bitmask	g_fontRenderFlags:0x444	4ee965039152	src/Nu3D/Font.cpp
 0x004b46b0	unnamed-bitmask	g_fontRenderFlags:0x444	4ee965039152	src/Nu3D/Font.cpp
 0x004c2ab0	signature-concealment	GetPositionVector:arg2	c06c22f8bbfb	src/Nu3D/Light.cpp
