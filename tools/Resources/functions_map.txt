@@ -351,8 +351,8 @@
 0x00470D60 SoftwareRenderer::BuildRGBToPaletteTable
 0x00470FB0 SoftwareRenderer::UnkFunc15
 0x004710C0 SoftwareRenderer::UnkFunc12
-0x00471190 SoftwareRenderer::UnkFunc13
-0x00471250 SoftwareRenderer::UnkFunc14
+0x00471190 SoftwareRenderer::BuildAdditivePaletteTable
+0x00471250 SoftwareRenderer::BuildSubtractivePaletteTable
 0x00471300 SoftwareRenderer::SetNewPalette
 0x00471520 SoftwareRenderer::UnkRenderAPI26
 0x00471B30 SoftwareRenderer::UnkRenderAPI30

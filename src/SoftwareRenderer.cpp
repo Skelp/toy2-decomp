@@ -87,6 +87,12 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00704A38
 	uint8_t g_paletteSource[0x400];
 
+	// GLOBAL: TOY2 0x00704A34
+	uint8_t* g_additivePaletteTable;
+
+	// GLOBAL: TOY2 0x00704E48
+	uint8_t* g_subtractivePaletteTable;
+
 	// GLOBAL: TOY2 0x00A4CC80
 	int32_t g_unkA4CC80;
 
@@ -2742,6 +2748,58 @@ namespace SoftwareRenderer
 					}
 					*output++ = nearestEntry;
 				}
+			}
+		}
+	}
+
+	// FUNCTION: TOY2 0x00471190
+	void BuildAdditivePaletteTable()
+	{
+		uint8_t* output = g_additivePaletteTable;
+		for (int32_t first = 0; first < 256; first++)
+		{
+			int32_t firstBlue = g_paletteSource[first * 4];
+			int32_t firstGreen = g_paletteSource[first * 4 + 1];
+			int32_t firstRed = g_paletteSource[first * 4 + 2];
+			for (int32_t second = 0; second < 256; second++)
+			{
+				int32_t blue = g_paletteSource[second * 4] + firstBlue;
+				int32_t green = g_paletteSource[second * 4 + 1] + firstGreen;
+				int32_t red = g_paletteSource[second * 4 + 2] + firstRed;
+				if (blue > 255)
+					blue = 255;
+				if (green > 255)
+					green = 255;
+				if (red > 255)
+					red = 255;
+				int32_t lookup = ((blue & 0xf8) * 32 + (green & 0xf8)) * 4 + (red >> 3);
+				*output++ = g_rgbToPaletteIndex[lookup];
+			}
+		}
+	}
+
+	// FUNCTION: TOY2 0x00471250
+	void BuildSubtractivePaletteTable()
+	{
+		uint8_t* output = g_subtractivePaletteTable;
+		for (int32_t first = 0; first < 256; first++)
+		{
+			int32_t firstBlue = g_paletteSource[first * 4];
+			int32_t firstGreen = g_paletteSource[first * 4 + 1];
+			int32_t firstRed = g_paletteSource[first * 4 + 2];
+			for (int32_t second = 0; second < 256; second++)
+			{
+				int32_t blue = firstBlue - g_paletteSource[second * 4];
+				int32_t green = firstGreen - g_paletteSource[second * 4 + 1];
+				int32_t red = firstRed - g_paletteSource[second * 4 + 2];
+				if (blue < 0)
+					blue = 0;
+				if (green < 0)
+					green = 0;
+				if (red < 0)
+					red = 0;
+				int32_t lookup = ((blue & 0xf8) * 32 + (green & 0xf8)) * 4 + (red >> 3);
+				*output++ = g_rgbToPaletteIndex[lookup];
 			}
 		}
 	}
