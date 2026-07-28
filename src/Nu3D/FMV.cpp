@@ -1,4 +1,5 @@
 #include "Nu3D/FMV.h"
+#include "Logger.h"
 #include <stdlib.h>
 
 enum Nu3DFMVStateFlags
@@ -9,21 +10,21 @@ enum Nu3DFMVStateFlags
 // FUNCTION: TOY2 0x004DB8C0 [MATCHED]
 void Nu3D_FMV_Destroy(Nu3DFMVInstance* instance)
 {
-	if (instance->basicVideo != NULL)
+	if (instance->videoSample != NULL)
 	{
-		instance->basicVideo->Release();
+		instance->videoSample->Release();
 	}
-	if (instance->videoWindow != NULL)
+	if (instance->directDrawStream != NULL)
 	{
-		instance->videoWindow->Release();
+		instance->directDrawStream->Release();
 	}
-	if (instance->mediaEvent != NULL)
+	if (instance->primaryVideoStream != NULL)
 	{
-		instance->mediaEvent->Release();
+		instance->primaryVideoStream->Release();
 	}
-	if (instance->mediaControl != NULL)
+	if (instance->mediaStream != NULL)
 	{
-		instance->mediaControl->Release();
+		instance->mediaStream->Release();
 	}
 	free(instance);
 }
@@ -39,3 +40,30 @@ void Nu3D_FMV_SetDimensions(Nu3DFMVInstance* instance, int32_t left, int32_t top
 
 // FUNCTION: TOY2 0x004DB940 [MATCHED]
 int32_t Nu3D_FMV_IsPlaying(Nu3DFMVInstance* instance) { return (instance->stateFlags & NU3D_FMV_PAUSED) == 0; }
+
+// FUNCTION: TOY2 0x004DBB80
+void Nu3D_FMV_Seek(Nu3DFMVInstance* instance, int32_t seconds) { instance->mediaStream->Seek((STREAM_TIME)seconds * 10000000); }
+
+// FUNCTION: TOY2 0x004DBB00 [MATCHED]
+void Nu3D_FMV_SetPaused(Nu3DFMVInstance* instance, int32_t paused)
+{
+	HRESULT result;
+	if (paused != 0)
+	{
+		instance->stateFlags |= NU3D_FMV_PAUSED;
+		result = instance->mediaStream->SetState(STREAMSTATE_STOP);
+		if (FAILED(result))
+		{
+			Logger::GetErrorHandler("C:\\projects\\nu3d\\fmv.c", 0x158)("Failed with HRESULT(0x%8.8X)\n", result);
+		}
+	}
+	else
+	{
+		instance->stateFlags &= ~NU3D_FMV_PAUSED;
+		result = instance->mediaStream->SetState(STREAMSTATE_RUN);
+		if (FAILED(result))
+		{
+			Logger::GetErrorHandler("C:\\projects\\nu3d\\fmv.c", 0x15E)("Failed with HRESULT(0x%8.8X)\n", result);
+		}
+	}
+}

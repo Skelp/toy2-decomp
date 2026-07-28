@@ -1,17 +1,19 @@
 #pragma once
 
 #include "Common.h"
+#include <directx6/ddraw.h>
+#include <amstream.h>
+#include <ddstream.h>
 #include <stddef.h>
-#include <windows.h>
 
 struct Nu3DFMVInstance
 {
-	IUnknown* mediaControl;
-	IUnknown* mediaEvent;
-	IUnknown* videoWindow;
-	IUnknown* sourceSurface;
-	IUnknown* basicVideo;
-	IUnknown* renderSurface;
+	IAMMultiMediaStream* mediaStream;
+	IMediaStream* primaryVideoStream;
+	IDirectDrawMediaStream* directDrawStream;
+	IDirectDrawSurface* sourceSurface;
+	IDirectDrawStreamSample* videoSample;
+	IDirectDrawSurface4* renderSurface;
 	uint32_t stateFlags;
 	float left;
 	float top;
@@ -21,6 +23,8 @@ struct Nu3DFMVInstance
 
 int32_t Nu3D_FMV_IsPlaying(Nu3DFMVInstance* instance);
 void Nu3D_FMV_Destroy(Nu3DFMVInstance* instance);
+void Nu3D_FMV_Seek(Nu3DFMVInstance* instance, int32_t seconds);
+void Nu3D_FMV_SetPaused(Nu3DFMVInstance* instance, int32_t paused);
 void Nu3D_FMV_SetDimensions(Nu3DFMVInstance* instance, int32_t left, int32_t top, int32_t right, int32_t bottom);
 
 STATIC_ASSERT(offsetof(Nu3DFMVInstance, stateFlags) == 0x18);
