@@ -10,6 +10,18 @@
 
 namespace Toy2
 {
+	namespace EvilEmperorZurg
+	{
+		// STUB: TOY2 0x0042B2D0
+		void BuzzRespawn() {}
+	}
+
+	// GLOBAL: TOY2 0x005281A4
+	int32_t g_pendingFootingType;
+
+	// GLOBAL: TOY2 0x0052B81C
+	int32_t g_footingType;
+
 	// GLOBAL: TOY2 0x0053C5D4
 	int32_t g_turnRecoveryTimer;
 
@@ -268,8 +280,54 @@ namespace Toy2
 			}
 		}
 
-		// STUB: TOY2 0x00414110
-		void Respawn() {}
+		// FUNCTION: TOY2 0x00414110
+		void Respawn()
+		{
+			if (g_levelFileIndex == 12)
+			{
+				EvilEmperorZurg::BuzzRespawn();
+			}
+
+			g_buzzActor.motionTargetPos.x = g_buzzActor.posAngles.pos.x = g_buzzActor.respawnPos.x;
+			g_buzzActor.floorYPos = g_buzzActor.motionTargetPos.y = g_buzzActor.posAngles.pos.y = g_buzzActor.respawnPos.y;
+			g_buzzActor.lives--;
+			g_buzzActor.motionTargetPos.z = g_buzzActor.posAngles.pos.z = g_buzzActor.respawnPos.z;
+			g_buzzActor.posAngles.angles.pitch = 0;
+			g_buzzActor.posAngles.angles.yaw = (uint16_t)g_buzzActor.respawnYawAngle;
+			g_buzzActor.rollAngle = 0;
+			g_buzzActor.facingAngle = (uint16_t)g_buzzActor.respawnYawAngle;
+			g_buzzActor.velX = 0;
+			g_buzzActor.gravityVel = 0;
+			g_buzzActor.velForward = 0;
+			g_buzzActor.forwardSpeed = 0;
+			g_buzzActor.lateralSpeed = 0;
+			g_buzzActor.movementState = 0;
+			g_buzzActor.animationEventPosition = 0;
+			g_buzzActor.surfaceClampY = 0x80000000;
+			g_buzzActor.cosmicShieldTimer = 0;
+			g_buzzActor.unkWord15 = 0;
+			g_buzzActor.collisionFlags = 0;
+			g_buzzActor.unkShort40 = 0;
+			g_buzzActor.animationState = 0;
+			g_buzzActor.previousAnimationState = 0;
+			g_buzzActor.actorFlags = ACTOR_FLAG_STUNNED;
+			g_buzzActor.stunTimer = -160;
+			g_buzzActor.health = 14;
+			g_footingType = -1;
+			g_pendingFootingType = -1;
+
+			Camera::InitGameplayCamera(&Camera::g_gameplayCamera, &g_buzzActor);
+			Nu3D::Particles::Init();
+			RespawnCosmicShield();
+			AudioManager::g_soundSequenceSlotIndex = 0;
+			memset(AudioManager::g_soundSequenceSlots, 0, sizeof(AudioManager::g_soundSequenceSlots));
+			AudioManager::g_maxLeftVolume = 0;
+			AudioManager::g_maxRightVolume = 0;
+			AudioManager::g_maxVolume = 0;
+			HUD::g_slideTimers[0] = 180;
+			HUD::g_slideAngles[0] = 0x400;
+			ResetBuzzState();
+		}
 
 		// FUNCTION: TOY2 0x004A4910 [MATCHED]
 		void RefreshDiscAmmo()

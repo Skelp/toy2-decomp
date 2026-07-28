@@ -2,7 +2,6 @@
 0x004a4130	unstructured-control-flow	goto-count	7ba3d112d547	src/AudioManager/AudioManager.cpp
 0x004a4680	unstructured-control-flow	goto-count	d78bedef8668	src/AudioManager/AudioManager.cpp
 0x004a3c80	unpinned-layout	OneShotSoundPreset	af60042c8ceb	src/AudioManager/AudioManager.cpp
-0x0049ea90	unpinned-layout	SoundSequenceSlot	e35f7960dfdc	src/AudioManager/AudioManager.cpp
 0x004a3f10	unstructured-control-flow	goto-count	ef0757631ecd	src/AudioManager/AudioManager.cpp
 0x00414af0	unnamed-bitmask	g_joystickDirectionLockState:3	87681004b0d3	src/InputManager.cpp
 0x00414af0	unnamed-bitmask	g_joystickDirectionLockState:12	d2b8d576a2a5	src/InputManager.cpp
@@ -218,9 +217,6 @@ src/Toy2/Buzz.h	placeholder-field	unkVar12	d0e8cda92968	src/Toy2/Buzz.h
 src/Toy2/Buzz.h	placeholder-field	unkVar13	0e749acae57b	src/Toy2/Buzz.h
 src/Toy2/Buzz.h	placeholder-field	unkVar22	0b31940ecb22	src/Toy2/Buzz.h
 src/Toy2/Buzz.h	placeholder-field	unkVar23	899dd18df465	src/Toy2/Buzz.h
-src/Toy2/Buzz.h	placeholder-field	unkVar33	4fefd1f542bf	src/Toy2/Buzz.h
-src/Toy2/Buzz.h	placeholder-field	unkVar37	91eb42a2ce1d	src/Toy2/Buzz.h
-src/Toy2/Buzz.h	placeholder-field	unkVar38	151027bc8c2b	src/Toy2/Buzz.h
 0x0048e1d0	unnamed-bitmask	typeFlags:8	016193f9683a	src/Toy2/Collision.cpp
 src/Toy2/KiteTail.h	unpinned-layout	Data	e5e429bcc9c2	src/Toy2/KiteTail.h
 src/Toy2/KiteTail.h	unpinned-layout	Segment	44986cef8a39	src/Toy2/KiteTail.h

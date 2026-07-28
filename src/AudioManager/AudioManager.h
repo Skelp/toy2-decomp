@@ -11,6 +11,16 @@
 
 namespace AudioManager
 {
+	struct SoundSequenceSlot
+	{
+		Vector3I position;
+		uint8_t* cursor;
+		int16_t timer;
+		int16_t reserved;
+	};
+
+	STATIC_ASSERT(sizeof(SoundSequenceSlot) == 0x14);
+
 	extern int32_t g_curTrackIndex;
 	extern int32_t g_loopingMusicTrackIndex;
 
@@ -72,6 +82,11 @@ namespace AudioManager
 	extern int32_t g_streamCommand;
 	extern char g_streamPath[512];
 	extern int32_t g_streamThreadReady;
+	extern SoundSequenceSlot g_soundSequenceSlots[8];
+	extern int32_t g_soundSequenceSlotIndex;
+	extern int16_t g_maxLeftVolume;
+	extern int16_t g_maxRightVolume;
+	extern int16_t g_maxVolume;
 
 	extern int32_t g_pendingStreamTrack;
 	extern int16_t g_loopingSoundChannels[32][5];

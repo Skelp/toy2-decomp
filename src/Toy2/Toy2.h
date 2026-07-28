@@ -5,6 +5,12 @@
 
 namespace Toy2
 {
+	namespace HUD
+	{
+		extern int16_t g_slideTimers[12];
+		extern int16_t g_slideAngles[16];
+	}
+
 	void LoadLevelGraphics(int32_t levelFileIndex);
 	void LoadLevelWithFadeIn(int32_t levelFileIndex, int32_t displayMode);
 	int32_t ShowLevelIntroScreen(int32_t backgroundId, int32_t displayMode);

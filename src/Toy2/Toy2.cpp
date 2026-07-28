@@ -34,6 +34,15 @@
 
 namespace Toy2
 {
+	namespace HUD
+	{
+		// GLOBAL: TOY2 0x0052C824
+		int16_t g_slideTimers[12];
+
+		// GLOBAL: TOY2 0x0052F2E0
+		int16_t g_slideAngles[16];
+	}
+
 	// FUNCTION: TOY2 0x0044F840
 	void ShowModelNode(int32_t creatureIndex, int32_t nodeIndex) { Nu3D::Creature::SetNodeVisibleByIndex(creatureIndex, nodeIndex, 1); }
 

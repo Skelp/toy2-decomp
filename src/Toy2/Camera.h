@@ -26,6 +26,7 @@ namespace Toy2
 
 		extern GameplayCamera g_gameplayCamera;
 
+		void InitGameplayCamera(GameplayCamera* camera, Buzz::Toy2BuzzActor* buzz);
 		void SmoothToTarget(GameplayCamera* camera);
 		int32_t UpdateRocketBoots(Buzz::Toy2BuzzActor* buzz, Buzz::MovementRates* movementRates);
 	}

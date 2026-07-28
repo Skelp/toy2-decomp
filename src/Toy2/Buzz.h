@@ -11,6 +11,7 @@ namespace Toy2
 		enum ActorFlags
 		{
 			ACTOR_FLAG_LOCK_FACING = 0x4,
+			ACTOR_FLAG_STUNNED = 0x20,
 			ACTOR_FLAG_UNCONTROLLED_MOMENTUM = 0x40,
 			ACTOR_FLAG_PRESERVE_HORIZONTAL_MOMENTUM = 0x200,
 		};
@@ -75,15 +76,14 @@ namespace Toy2
 			int32_t velForward;
 			int32_t forwardSpeed;
 			int32_t lateralSpeed;
-			int16_t unkWord13;
-			int16_t actorHealth;
-			int32_t unkVar33;
+			int32_t movementState;
+			int32_t animationEventPosition;
 			int32_t floorYPos;
 			int32_t isOnWalkableFloor;
 			int16_t unkWord15;
 			int16_t collisionFlags;
-			int16_t unkVar37;
-			int16_t unkVar38;
+			int16_t animationState;
+			int16_t previousAnimationState;
 			int16_t stunTimer;
 			int16_t health;
 			int16_t cosmicShieldTimer;
