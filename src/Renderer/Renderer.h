@@ -183,6 +183,19 @@ namespace Renderer
 		extern Command g_commands[100];
 	}
 
+	namespace LensFlare
+	{
+		extern int32_t g_slotCounts[2];
+		extern int16_t g_bufferActive[2];
+		extern int32_t g_bufferIndex;
+		extern int32_t g_registeredLightCount;
+
+		void CullAndQueue();
+		void RenderSlot(int32_t slotIndex);
+	}
+
+	void DrawLensFlares();
+
 	void InitRenderState(int32_t newStage);
 	int32_t SetupMaterialRenderState(Nu3D::Material* material, int32_t stateFlags);
 	void ResetParallax();

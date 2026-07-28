@@ -196,6 +196,49 @@ namespace Renderer
 		}
 	}
 
+	namespace LensFlare
+	{
+		// GLOBAL: TOY2 0x0054DD50
+		int32_t g_slotCounts[2];
+
+		// GLOBAL: TOY2 0x0054E050
+		int16_t g_bufferActive[2];
+
+		// GLOBAL: TOY2 0x00557710
+		int32_t g_bufferIndex;
+
+		// GLOBAL: TOY2 0x00559C64
+		int32_t g_registeredLightCount;
+
+		// STUB: TOY2 0x0044F420
+		void CullAndQueue() {}
+
+		// STUB: TOY2 0x0044F580
+		void RenderSlot(int32_t slotIndex) {}
+	}
+
+	// FUNCTION: TOY2 0x0044F190 [MATCHED]
+	void DrawLensFlares()
+	{
+		const uint32_t lensFlaresEnabled = 1;
+		if ((Toy2::g_toyCfgData.flags & lensFlaresEnabled) != 0)
+		{
+			LensFlare::CullAndQueue();
+			LensFlare::g_bufferIndex = 0;
+			if (LensFlare::g_bufferActive[0] != 0)
+			{
+				for (int32_t slotIndex = 0; slotIndex < LensFlare::g_slotCounts[LensFlare::g_bufferIndex]; slotIndex++)
+				{
+					LensFlare::RenderSlot(slotIndex);
+				}
+			}
+		}
+
+		LensFlare::g_bufferActive[LensFlare::g_bufferIndex] = 0;
+		LensFlare::g_slotCounts[LensFlare::g_bufferIndex] = 0;
+		LensFlare::g_registeredLightCount = 0;
+	}
+
 	// GLOBAL: TOY2 0x00508D28
 	ViewportPreset g_viewportPresets[] = {
 		{ 3000.0f, 3500.0f, 50.0f, 55.0f, 10000.0f, 0.0f },
