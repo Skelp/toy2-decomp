@@ -562,14 +562,14 @@ namespace Nu3D
 		DrawingDevice::GetSlotSurfaceCaps(slotIndex, &surfaceCaps);
 		DrawingDevice::GetSlotSurfaceByIndex(slotIndex, &slotSurface);
 
-		bmpDataNode->unkVar2 = slotIndex;
-		bmpDataNode->unkVar3 = (int32_t)slotSurface;
-		bmpDataNode->unkVar4 = 0;
+		bmpDataNode->sourceSlotIndex = slotIndex;
+		bmpDataNode->sourceSurface = slotSurface;
+		bmpDataNode->fallbackSurface = 0;
 
 		if ((surfaceCaps & DDSCAPS_TEXTURE) == 0)
-			bmpDataNode->unkVar1 = 1;
+			bmpDataNode->slotSurfaceMode = BmpDataNode::SLOT_SURFACE_COPY;
 		else
-			bmpDataNode->unkVar1 = 0;
+			bmpDataNode->slotSurfaceMode = BmpDataNode::SLOT_SURFACE_DIRECT;
 
 		bmpDataNode->texData = 0;
 		bmpDataNode->textureWidth = textureWidth;
@@ -577,7 +577,7 @@ namespace Nu3D
 		bmpDataNode->flags = alphaFlag;
 		strcpy(bmpDataNode->texName, textureName);
 
-		if (bmpDataNode->unkVar1 == 0)
+		if (bmpDataNode->slotSurfaceMode == BmpDataNode::SLOT_SURFACE_DIRECT)
 		{
 			bmpDataNode->flags |= 0x40;
 			bmpDataNode->surface = slotSurface;
@@ -592,7 +592,7 @@ namespace Nu3D
 		DDBLTFX bltfx;
 		bltfx.dwSize = sizeof(DDBLTFX);
 		bltfx.dwROP = SRCCOPY;
-		if (bmpDataNode->surface->Blt(NULL, (LPDIRECTDRAWSURFACE4)bmpDataNode->unkVar3, NULL, DDBLT_ROP | DDBLT_ASYNC, &bltfx) < 0)
+		if (bmpDataNode->surface->Blt(NULL, bmpDataNode->sourceSurface, NULL, DDBLT_ROP | DDBLT_ASYNC, &bltfx) < 0)
 		{
 			DDSURFACEDESC2 surfaceDesc;
 			memset(&surfaceDesc, 0, sizeof(surfaceDesc));
@@ -602,8 +602,8 @@ namespace Nu3D
 			surfaceDesc.dwWidth = bmpDataNode->textureWidth;
 			surfaceDesc.dwHeight = bmpDataNode->textureHeight;
 			LPDIRECTDRAW4 ddraw4 = DrawingDevice::GetDDraw4();
-			HRESULT result = ddraw4->CreateSurface(&surfaceDesc, (LPDIRECTDRAWSURFACE4*)&bmpDataNode->unkVar4, NULL);
-			bmpDataNode->unkVar1 = (result >= 0) ? 2 : 0;
+			HRESULT result = ddraw4->CreateSurface(&surfaceDesc, &bmpDataNode->fallbackSurface, NULL);
+			bmpDataNode->slotSurfaceMode = result >= 0 ? BmpDataNode::SLOT_SURFACE_FALLBACK : BmpDataNode::SLOT_SURFACE_DIRECT;
 		}
 
 		return bmpDataNode;
@@ -857,7 +857,7 @@ namespace Nu3D
 				int32_t* srcRowPtr = (int32_t*)((uint8_t*)dibSection.dsBm.bmBits
 					+ dibSection.dsBm.bmWidthBytes * (dibSection.dsBm.bmHeight - currentRow * dibSection.dsBm.bmHeight / surfaceDesc.dwHeight - 1));
 
-				int32_t* destRowPtr = (int32_t*)((uint8_t*)surfaceDesc.lpSurface + currentRow * surfaceDesc.lPitch);
+				uint8_t* destRow = static_cast<uint8_t*>(surfaceDesc.lpSurface) + currentRow * surfaceDesc.lPitch;
 
 				if (bitCount >= 15)
 				{
@@ -865,6 +865,7 @@ namespace Nu3D
 					{
 						if (bitCount == 32)
 						{
+							uint32_t* destPixel = reinterpret_cast<uint32_t*>(destRow);
 							for (uint32_t xPixel = 0; xPixel < surfaceDesc.dwWidth; ++xPixel)
 							{
 								BGRA color;
@@ -892,7 +893,7 @@ namespace Nu3D
 								else
 									shiftedRed = color.r << (int8_t)pixelFormat.redShift;
 
-								*destRowPtr++ = maskedBlue | (pixelFormat.redMask & shiftedRed);
+								*destPixel++ = maskedBlue | (pixelFormat.redMask & shiftedRed);
 
 								width = surfaceDesc.dwWidth;
 							}
@@ -901,6 +902,7 @@ namespace Nu3D
 					else
 					{
 						// 15 or 16 bit
+						uint16_t* destPixel = reinterpret_cast<uint16_t*>(destRow);
 						for (uint32_t xPixel = 0; xPixel < surfaceDesc.dwWidth; ++xPixel)
 						{
 							BGRA color;
@@ -928,8 +930,7 @@ namespace Nu3D
 							else
 								shiftedRed = color.r << (int8_t)pixelFormat.redShift;
 
-							*(uint16_t*)destRowPtr = maskedBlue | ((uint16_t)pixelFormat.redMask & shiftedRed);
-							destRowPtr = (int32_t*)((uint8_t*)destRowPtr + 2);
+							*destPixel++ = maskedBlue | ((uint16_t)pixelFormat.redMask & shiftedRed);
 
 							width = surfaceDesc.dwWidth;
 						}

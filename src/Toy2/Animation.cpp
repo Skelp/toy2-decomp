@@ -132,7 +132,7 @@ namespace Toy2
 			g_clipScaleFlags = (uint8_t*)clip + g_clipHeaderSize + clip->nodeOffsetCount * 2;
 			uint8_t* keyframeData = g_clipScaleFlags + clip->scaleFlagByteCount;
 			int32_t frameIndex = (int16_t)(framePosition >> 16);
-			if (frameIndex > (clip->frameCountAndFlags & 0x7fff))
+			if (frameIndex > (clip->frameCountAndFlags & ClipHeader::FRAME_COUNT_MASK))
 				return;
 
 			uint16_t fraction = (uint16_t)framePosition;
@@ -163,12 +163,13 @@ namespace Toy2
 
 				CharacterLoader::BoneTransform* transform = &CharacterLoader::g_boneTransforms[baseBoneIndex];
 				transform->track = (uint8_t)track;
-				KeyframeSample* sample = (KeyframeSample*)(keyframeData + (sampleIndex + clip->sampleStride * frameIndex) * 2);
+				KeyframeSample* sample =
+					reinterpret_cast<KeyframeSample*>(reinterpret_cast<int16_t*>(keyframeData) + sampleIndex + clip->sampleStride * frameIndex);
 				KeyframeSample* nextSample;
-				if (frameIndex < (clip->frameCountAndFlags & 0x7fff) - 1)
-					nextSample = (KeyframeSample*)((uint8_t*)sample + clip->sampleStride * 2);
+				if (frameIndex < (clip->frameCountAndFlags & ClipHeader::FRAME_COUNT_MASK) - 1)
+					nextSample = reinterpret_cast<KeyframeSample*>(reinterpret_cast<int16_t*>(sample) + clip->sampleStride);
 				else
-					nextSample = (KeyframeSample*)(keyframeData + sampleIndex * 2);
+					nextSample = reinterpret_cast<KeyframeSample*>(reinterpret_cast<int16_t*>(keyframeData) + sampleIndex);
 
 				if (fraction != 0)
 				{

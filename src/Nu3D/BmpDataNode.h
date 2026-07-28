@@ -11,6 +11,13 @@ namespace Nu3D
 {
 	struct BmpDataNode
 	{
+		enum SlotSurfaceMode
+		{
+			SLOT_SURFACE_DIRECT,
+			SLOT_SURFACE_COPY,
+			SLOT_SURFACE_FALLBACK
+		};
+
 		LPDIRECTDRAWSURFACE4 surface;
 		LPDIRECT3DTEXTURE2 d3dTexture;
 		DDSURFACEDESC2 surfaceDesc;
@@ -20,10 +27,10 @@ namespace Nu3D
 		uint32_t bitmapWidth;
 		uint32_t bitmapHeight;
 		HBITMAP bitmapHandle;
-		int32_t unkVar1;
-		int32_t unkVar2;
-		int32_t unkVar3;
-		int32_t unkVar4;
+		SlotSurfaceMode slotSurfaceMode;
+		int32_t sourceSlotIndex;
+		LPDIRECTDRAWSURFACE4 sourceSurface;
+		LPDIRECTDRAWSURFACE4 fallbackSurface;
 		char texName[80];
 		int32_t unkVar5;
 		int32_t flags;

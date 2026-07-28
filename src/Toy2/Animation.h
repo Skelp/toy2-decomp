@@ -22,6 +22,11 @@ namespace Toy2
 
 		struct ClipHeader
 		{
+			enum
+			{
+				FRAME_COUNT_MASK = 0x7FFF
+			};
+
 			int16_t headerSize;
 			int16_t reserved;
 			uint16_t frameCountAndFlags;

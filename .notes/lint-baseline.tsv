@@ -33,16 +33,6 @@ src/NGNLoader/NGNTypes.h	placeholder-field	unkVar7	c4e96513da34	src/NGNLoader/NG
 0x004cbc90	unnamed-bitmask	g_curVertexFlags:4	e49fa2f2f2c7	src/NGNLoader/ObjectLoad.cpp
 0x004cbc90	unnamed-bitmask	effectiveRenderFlags:0x40001000	8518b21d15b6	src/NGNLoader/ObjectLoad.cpp
 0x004cbc90	unnamed-bitmask	primObject->renderFlags:3	d2d4602219bb	src/NGNLoader/ObjectLoad.cpp
-0x004b0440	decompiler-identifier	unkVar2	196b5971a77b	src/Nu3D/BmpDataNode.cpp
-0x004b0440	decompiler-identifier	unkVar3	38c8e929d0c4	src/Nu3D/BmpDataNode.cpp
-0x004b0440	decompiler-identifier	unkVar4	d2630a10c3c2	src/Nu3D/BmpDataNode.cpp
-0x004b0440	decompiler-identifier	unkVar1	1dd893d22cd1	src/Nu3D/BmpDataNode.cpp
-0x004b0e00	raw-layout-access	literal-offset	083ecd42d62b	src/Nu3D/BmpDataNode.cpp
-0x004b0e00	typed-byte-roundtrip	destRowPtr	083ecd42d62b	src/Nu3D/BmpDataNode.cpp
-src/Nu3D/BmpDataNode.h	placeholder-field	unkVar1	1dd893d22cd1	src/Nu3D/BmpDataNode.h
-src/Nu3D/BmpDataNode.h	placeholder-field	unkVar2	196b5971a77b	src/Nu3D/BmpDataNode.h
-src/Nu3D/BmpDataNode.h	placeholder-field	unkVar3	38c8e929d0c4	src/Nu3D/BmpDataNode.h
-src/Nu3D/BmpDataNode.h	placeholder-field	unkVar4	d2630a10c3c2	src/Nu3D/BmpDataNode.h
 src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNode.h
 0x004a1be0	unstructured-control-flow	goto-count	2d873e3e3f1c	src/Nu3D/Camera.cpp
 0x004b4de0	unnamed-bitmask	g_fontRenderFlags:0x444	4ee965039152	src/Nu3D/Font.cpp
@@ -190,8 +180,6 @@ src/Toy2/Actor.h	placeholder-field	unkVar10	31f6ac62c669	src/Toy2/Actor.h
 src/Toy2/Actor.h	placeholder-field	unkVar12	d0e8cda92968	src/Toy2/Actor.h
 src/Toy2/Actor.h	placeholder-field	unkVar13	0e749acae57b	src/Toy2/Actor.h
 src/Toy2/Actor.h	placeholder-field	unkVar34	a583a3fdd72c	src/Toy2/Actor.h
-0x0043ba80	unnamed-bitmask	clip->frameCountAndFlags:0x7fff	86f39017c88c	src/Toy2/Animation.cpp
-0x0043ba80	typed-byte-roundtrip	sample	6191583c8848	src/Toy2/Animation.cpp
 src/Toy2/Buzz.h	placeholder-field	unkVar7	c4e96513da34	src/Toy2/Buzz.h
 src/Toy2/Buzz.h	placeholder-field	unkVar8	214a98fbd5fd	src/Toy2/Buzz.h
 src/Toy2/Buzz.h	placeholder-field	unkVar51	56907e0b478c	src/Toy2/Buzz.h
