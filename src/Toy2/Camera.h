@@ -33,8 +33,15 @@ namespace Toy2
 				};
 			};
 
-			Vector3I pos; // 0x00 — current camera position (fixed-point)
-			Vector3I lookAt; // 0x0C — look-at position (fixed-point)
+			union
+			{
+				struct
+				{
+					Vector3I pos; // 0x00 — current camera position (fixed-point)
+					Vector3I lookAt; // 0x0C — look-at position (fixed-point)
+				};
+				PosAndAngles groundProbe;
+			};
 			TargetPosition target; // 0x18 — position the camera moves toward (fixed-point)
 			Angles angles; // 0x24 — pitch and yaw (12-bit fixed-point angles)
 			uint16_t roll; // 0x28 — roll angle (12-bit fixed-point)
@@ -43,6 +50,7 @@ namespace Toy2
 
 		STATIC_ASSERT(sizeof(GameplayCamera) == 0x34);
 		STATIC_ASSERT(sizeof(GameplayCamera::TargetPosition) == 0xC);
+		STATIC_ASSERT(offsetof(GameplayCamera, groundProbe) == 0);
 
 		extern GameplayCamera g_gameplayCamera;
 		extern Nu3D::Camera::ActiveCameraTransform g_renderCameraTransform;

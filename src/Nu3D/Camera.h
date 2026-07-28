@@ -83,6 +83,7 @@ namespace Nu3D
 		extern int32_t g_billboardYaw;
 		extern int32_t g_cameraSkewEnabled;
 		extern int32_t g_cameraSkewPhase;
+		extern int32_t g_viewHistoryInitialized;
 
 		extern int16_t g_cameraTintBlue;
 		extern int16_t g_cameraTintGreen;

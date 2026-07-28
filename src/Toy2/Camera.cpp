@@ -4,8 +4,11 @@
 #include "Nu3D/Link.h"
 #include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
+#include "Toy2/Actor.h"
+#include "Toy2/Collision.h"
 #include "Toy2/Toy2.h"
 #include <math.h>
+#include <string.h>
 
 namespace Toy2
 {
@@ -35,6 +38,66 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0052B7E8
 		GameplayCamera g_cutsceneCamera;
 
+		// GLOBAL: TOY2 0x0050A0CC
+		int32_t g_unk50A0CC;
+
+		// GLOBAL: TOY2 0x0050A118
+		int32_t g_unk50A118;
+
+		// GLOBAL: TOY2 0x0050A128
+		int32_t g_unk50A128;
+
+		// GLOBAL: TOY2 0x0050A12C
+		int32_t g_unk50A12C;
+
+		// GLOBAL: TOY2 0x0050A134
+		int32_t g_unk50A134;
+
+		// GLOBAL: TOY2 0x0050A144
+		int32_t g_unk50A144;
+
+		// GLOBAL: TOY2 0x0050A148
+		int32_t g_unk50A148;
+
+		// GLOBAL: TOY2 0x0050A294
+		int32_t g_unk50A294;
+
+		// GLOBAL: TOY2 0x0050A4B4
+		int32_t g_unk50A4B4;
+
+		// GLOBAL: TOY2 0x0050A4B8
+		int32_t g_unk50A4B8;
+
+		// GLOBAL: TOY2 0x0050A4BC
+		int32_t g_unk50A4BC;
+
+		// GLOBAL: TOY2 0x0050A4E0
+		int32_t g_unk50A4E0;
+
+		// GLOBAL: TOY2 0x0050A4E4
+		int32_t g_unk50A4E4;
+
+		// GLOBAL: TOY2 0x0050A4E8
+		int32_t g_unk50A4E8;
+
+		// GLOBAL: TOY2 0x0050A514
+		int32_t g_unk50A514;
+
+		// GLOBAL: TOY2 0x0050A534
+		int32_t g_unk50A534;
+
+		// GLOBAL: TOY2 0x0050A53C
+		int32_t g_unk50A53C;
+
+		// GLOBAL: TOY2 0x0052AD98
+		int32_t g_unk52AD98;
+
+		// GLOBAL: TOY2 0x0052F118
+		int32_t g_unk52F118;
+
+		// GLOBAL: TOY2 0x0052F1CC
+		int32_t g_unk52F1CC;
+
 		// GLOBAL: TOY2 0x0050A510
 		int32_t g_shakeTimer;
 
@@ -44,8 +107,75 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0050A4DC
 		Nu3D::Particles::ParticleInstance* g_targetMarkerParticle;
 
-		// STUB: TOY2 0x00403450
-		void InitGameplayCamera(GameplayCamera* camera, Buzz::Toy2BuzzActor* buzz) {}
+		// FUNCTION: TOY2 0x00403450
+		void InitGameplayCamera(GameplayCamera* camera, Buzz::Toy2BuzzActor* buzz)
+		{
+			memset(&g_renderCameraTransform, 0, sizeof(g_renderCameraTransform));
+			memset(camera, 0, sizeof(*camera));
+			memset(&g_cutsceneCamera, 0, sizeof(g_cutsceneCamera) - sizeof(int32_t));
+
+			int16_t buzzYaw = buzz->posAngles.angles.yaw;
+			camera->angles.yaw = 0x4B0;
+			camera->target.visorAimAngles.yaw = buzzYaw;
+			camera->roll = buzzYaw;
+			camera->target.visorAimAngles.pitch = 0;
+			camera->angles.pitch = 0;
+			camera->pos.x = (Numerics::g_sinCosLUT[(buzzYaw - 0x800) & 0xFFF] * 0x4B0 >> 9) + buzz->posAngles.pos.x;
+			camera->pos.z = (Numerics::g_sinCosLUT[(buzzYaw - 0x400) & 0xFFF] * 0x4B0 >> 9) + buzz->posAngles.pos.z;
+			camera->pos.y = buzz->posAngles.pos.y;
+			camera->pos.y = Nu3D::Collision::GetGroundHeight(&camera->groundProbe, 0);
+			if (camera->pos.y == (int32_t)0x80000000)
+			{
+				camera->pos.y = buzz->posAngles.pos.y;
+			}
+			if (camera->pos.y > buzz->posAngles.pos.y - 0x4000)
+			{
+				camera->pos.y = buzz->posAngles.pos.y - 0x4000;
+			}
+
+			camera->lookAt.x = camera->pos.x;
+			camera->pos.y -= 0x3200;
+			camera->lookAt.y = camera->pos.y;
+			camera->lookAt.z = camera->pos.z;
+			camera->data[1] = 0;
+			camera->data[3] = 0;
+			camera->data[2] = 0x40;
+			Actor::g_renderActors[65] = 0;
+			g_unk52F118 = 0;
+			g_unk52F1CC = 0;
+			camera->data[4] = 0;
+			camera->target.x = g_buzzActor.posAngles.pos.y;
+			camera->target.y = g_buzzActor.posAngles.pos.y;
+			camera->data[0] = 0;
+
+			g_scriptedCameraState = 0;
+			g_unk50A118 = (int32_t)0x80000000;
+			g_cutsceneDuration = 0;
+			g_unk50A4E8 = 0;
+			g_unk52AD98 = 0x10;
+			g_unk50A4B4 = 0;
+			g_unk50A4B8 = 0;
+			g_unk50A12C = 0;
+			g_unk50A4E4 = 0;
+			g_unk50A128 = 0x4B0;
+			g_unk50A534 = 0;
+			g_shakeTimer = 0;
+			g_unk50A4E0 = 0;
+			g_cutsceneInputLockTimer = 0;
+			Nu3D::Camera::g_viewHistoryInitialized = 0;
+			g_unk50A294 = 0;
+			g_unk50A134 = 0;
+			g_unk50A53C = 0;
+			g_unk50A144 = 0;
+			g_unk50A0CC = 0;
+			g_unk50A148 = 0;
+			g_unk50A514 = 0;
+			g_unk50A4BC = 0;
+
+			Nu3D::Link::SetScaleFromFixedOffsets(0x2D, 0, 0, 0);
+			Nu3D::Link::SetScaleFromFixedOffsets(0x2E, 0, 0, 0);
+			Nu3D::Link::SetScaleFromFixedOffsets(0x2F, 0, 0, 0);
+		}
 
 		// FUNCTION: TOY2 0x00402030
 		void InitCutsceneCamera(const Vector3I* focusPosition, const Vector3I* cameraPosition)
