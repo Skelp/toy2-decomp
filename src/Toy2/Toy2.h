@@ -86,8 +86,8 @@ namespace Toy2
 	extern DevDraw::TransparentDrawBuffer* g_transparentDrawBuffer;
 	extern int16_t g_currentDrawSlot;
 	extern int32_t g_destRectHalfWidth;
-	extern int32_t g_unk72E340;
-	extern uint32_t g_unk731CBC;
+	extern int32_t g_unusedD3DFrameFlag;
+	extern uint32_t g_unusedD3DFrameStartTime;
 	extern int32_t g_isElevatorHopLevel;
 	extern int32_t g_hasBackdrop;
 	extern int32_t g_mainMenuState;

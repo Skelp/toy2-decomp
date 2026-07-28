@@ -2477,11 +2477,11 @@ namespace DevDraw
 		switch (D3DApp::g_renderMode)
 		{
 			case 1:
-				if (SoftwareRenderer::g_unk559C40 != 1 || (Renderer::g_frameDelta & 1) == 0)
+				if (SoftwareRenderer::g_skipOddSoftwareFrames != 1 || (Renderer::g_frameDelta & 1) == 0)
 				{
-					SoftwareRenderer::UnkFunc8(SoftwareRenderer::g_unk839278, 0);
+					SoftwareRenderer::RenderSoftwareFrame(SoftwareRenderer::g_displayMaxX, 0);
 				}
-				SoftwareRenderer::g_unk839280 = 0;
+				SoftwareRenderer::g_softwareRenderItemCount = 0;
 				Nu3D::MemSet32Util(SoftwareRenderer::g_softwareRenderBuckets, 0x1000, 0);
 				break;
 			case 2: {

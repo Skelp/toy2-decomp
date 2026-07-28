@@ -383,7 +383,7 @@
 0x0047CC90 Toy2::InitSoftwareRenderer
 0x0047D0F0 SoftwareRenderer::Destroy
 0x0047D120 SoftwareRenderer::ClearBackBufferOnce
-0x0047D210 SoftwareRenderer::UnkFunc8
+0x0047D210 SoftwareRenderer::RenderSoftwareFrame
 0x0047D4E0 Toy2::BuildPerspectiveDivideTable
 0x0047D520 InputManager::MemSetUtil
 0x0047D540 SoftwareRenderer::FillRect32

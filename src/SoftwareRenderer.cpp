@@ -46,10 +46,10 @@ namespace SoftwareRenderer
 	int32_t g_backBufferClearComplete;
 
 	// GLOBAL: TOY2 0x00559C40
-	int32_t g_unk559C40;
+	int32_t g_skipOddSoftwareFrames;
 
 	// GLOBAL: TOY2 0x00839278
-	int32_t g_unk839278;
+	int32_t g_displayMaxX;
 
 	// Active base of the 4096 software-render depth buckets.
 	// GLOBAL: TOY2 0x00504D34
@@ -59,7 +59,7 @@ namespace SoftwareRenderer
 	SoftwareRenderItem* g_softwareRenderBucketStorage[4096];
 
 	// GLOBAL: TOY2 0x00839280
-	int32_t g_unk839280;
+	int32_t g_softwareRenderItemCount;
 
 	// GLOBAL: TOY2 0x00E4D950
 	int32_t g_softwarePrimitiveType;
@@ -335,7 +335,7 @@ namespace SoftwareRenderer
 	extern const float k_reverseDepthSortScale = -25000.0f;
 
 	// GLOBAL: TOY2 0x009F6010
-	int32_t g_unk9F6010;
+	int32_t g_disableSortedPrimitiveSubmission;
 
 	// Heap buffer allocated by InitSoftwareRenderer (malloc'd, ~1.25MB) and
 	// released by Destroy on shutdown.
@@ -3879,10 +3879,10 @@ namespace SoftwareRenderer
 
 	// Locks the DirectDraw back buffer, clears it when the frame state requires
 	// a clear, drains all software-render depth buckets from far to near, then
-	// unlocks and presents the surface. The caller passes the highest active
-	// bucket and a zero clear value, but retail does not read either parameter.
+	// unlocks and presents the surface. The caller passes the display maximum x
+	// and a zero clear value. Retail does not read either parameter.
 	// FUNCTION: TOY2 0x0047D210
-	void UnkFunc8(int32_t highestBucket, int32_t clearValue)
+	void RenderSoftwareFrame(int32_t displayMaxX, int32_t clearValue)
 	{
 		DDSURFACEDESC surfaceDesc;
 		memset(&surfaceDesc, 0, sizeof(surfaceDesc));
@@ -4031,7 +4031,7 @@ namespace SoftwareRenderer
 	void SubmitSortedTriangle(
 		int32_t renderFlags, Renderer::RenderEntry* renderEntry, int32_t textureIndex, Nu3D::VertexTL* v0, Nu3D::VertexTL* v1, Nu3D::VertexTL* v2)
 	{
-		if (g_unk9F6010 != 0)
+		if (g_disableSortedPrimitiveSubmission != 0)
 		{
 			return;
 		}

@@ -482,11 +482,13 @@ namespace Toy2
 	// GLOBAL: TOY2 0x00500A24
 	int32_t g_destRectHalfWidth;
 
+	// Retail writes this flag during UpdateD3DState but never reads it.
 	// GLOBAL: TOY2 0x0072E340
-	int32_t g_unk72E340;
+	int32_t g_unusedD3DFrameFlag;
 
+	// Retail stores the frame start time but never reads it.
 	// GLOBAL: TOY2 0x00731CBC
-	uint32_t g_unk731CBC;
+	uint32_t g_unusedD3DFrameStartTime;
 
 	// GLOBAL: TOY2 0x0072E34C
 	int32_t g_mpegPlaybackDisabled;
@@ -2276,7 +2278,7 @@ namespace Toy2
 	// FUNCTION: TOY2 0x00490BF0 [MATCHED]
 	int16_t UpdateD3DState()
 	{
-		g_unk72E340 = 0;
+		g_unusedD3DFrameFlag = 0;
 
 		RECT* destRect = DrawingDevice::GetDestRect();
 		int32_t width = destRect->right - destRect->left;
@@ -2299,11 +2301,11 @@ namespace Toy2
 		g_screenClipLeftFixed = 0;
 
 		SoftwareRenderer::g_softwareRenderBuckets = SoftwareRenderer::g_softwareRenderBucketStorage;
-		SoftwareRenderer::g_unk839278 = 0x3ff;
+		SoftwareRenderer::g_displayMaxX = 0x3ff;
 
 		g_drawBuffer->VerticePoolCount = 0;
 
-		g_unk731CBC = timeGetTime();
+		g_unusedD3DFrameStartTime = timeGetTime();
 
 		return 1;
 	}

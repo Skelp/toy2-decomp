@@ -25,10 +25,6 @@ src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNo
 0x0047b170	unstructured-control-flow	goto-count	af283beb99ab	src/RawLoader.cpp
 0x00490860	unstructured-control-flow	goto-count	4ff23c3c3c8b	src/Renderer/Renderer.cpp
 0x0044dd80	unstructured-control-flow	goto-count	9a1cde33b176	src/Renderer/Renderer.cpp
-0x004907e0	unknown-symbol	g_unk559C40	408f2424b79c	src/Renderer/Renderer.cpp
-0x004907e0	unknown-symbol	UnkFunc8	f91b7e1cef93	src/Renderer/Renderer.cpp
-0x004907e0	unknown-symbol	g_unk839278	259cd00d89f0	src/Renderer/Renderer.cpp
-0x004907e0	unknown-symbol	g_unk839280	939424163ff3	src/Renderer/Renderer.cpp
 0x004c48e0	unknown-symbol	UnkFunc55	6d4597ffbd36	src/SoftwareRenderer.cpp
 0x004c4a60	unknown-symbol	UnkFunc40	fedab3c1abfd	src/SoftwareRenderer.cpp
 0x004c4be0	unknown-symbol	UnkFunc49	d79577abeb86	src/SoftwareRenderer.cpp
@@ -83,8 +79,6 @@ src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNo
 0x004bcb60	unknown-symbol	g_unkB626C0	10f072ec7310	src/SoftwareRenderer.cpp
 0x004c14a0	unknown-symbol	UnkFunc22	83cdc1e9d721	src/SoftwareRenderer.cpp
 0x004c1540	unknown-symbol	UnkFunc22	83cdc1e9d721	src/SoftwareRenderer.cpp
-0x0047d210	unknown-symbol	UnkFunc8	f91b7e1cef93	src/SoftwareRenderer.cpp
-0x004b5e40	unknown-symbol	g_unk9F6010	28148b04e9dc	src/SoftwareRenderer.cpp
 0x00407150	unknown-symbol	g_unk52ADD8	3a50af5af798	src/Toy2/Actor.cpp
 0x00407150	unknown-symbol	g_unk50A54C	dce86ed1f490	src/Toy2/Actor.cpp
 0x00407150	unknown-symbol	g_unk52EF48	6e12511dee10	src/Toy2/Actor.cpp
@@ -116,10 +110,5 @@ src/Toy2/Levels.h	placeholder-field	unkVar2	196b5971a77b	src/Toy2/Levels.h
 src/Toy2/Levels.h	placeholder-field	unkVar4	d2630a10c3c2	src/Toy2/Levels.h
 0x00437c40	unstructured-control-flow	goto-count	c2becc3c32de	src/Toy2/MainMenu.cpp
 0x00437fb0	unstructured-control-flow	goto-count	1baffd3c3ff3	src/Toy2/MainMenu.cpp
-0x0047d4e0	unknown-symbol	g_unk72E340	573bb8ffd5cc	src/Toy2/Toy2.cpp
-0x0047d4e0	unknown-symbol	g_unk731CBC	ec1bb533539d	src/Toy2/Toy2.cpp
 0x0049d910	unstructured-control-flow	goto-count	77dd5e8ddf01	src/Toy2/Toy2.cpp
-0x00490bf0	unknown-symbol	g_unk72E340	573bb8ffd5cc	src/Toy2/Toy2.cpp
-0x00490bf0	unknown-symbol	g_unk839278	259cd00d89f0	src/Toy2/Toy2.cpp
-0x00490bf0	unknown-symbol	g_unk731CBC	ec1bb533539d	src/Toy2/Toy2.cpp
 0x004909e0	unknown-symbol	UnkFunc2	3628e6b79452	src/Toy2/Toy2.cpp

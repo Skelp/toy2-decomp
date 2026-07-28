@@ -19,12 +19,12 @@ namespace SoftwareRenderer
 	extern int32_t g_staticBackdropWidth;
 	extern int32_t g_backdropTextureColumn;
 	extern int32_t g_backBufferClearComplete;
-	extern int32_t g_unk559C40;
-	extern int32_t g_unk839278;
+	extern int32_t g_skipOddSoftwareFrames;
+	extern int32_t g_displayMaxX;
 	struct SoftwareRenderItem;
 	extern SoftwareRenderItem** g_softwareRenderBuckets;
 	extern SoftwareRenderItem* g_softwareRenderBucketStorage[4096];
-	extern int32_t g_unk839280;
+	extern int32_t g_softwareRenderItemCount;
 	extern int32_t g_softwarePrimitiveType;
 	extern int32_t g_reverseDepthSortEnabled;
 
@@ -97,7 +97,7 @@ namespace SoftwareRenderer
 	extern const float k_depthSortScale;
 	// Gate read by SubmitSortedTriangle; when nonzero, triangle submission is
 	// skipped. No writer has been located yet (likely zero for the retail path).
-	extern int32_t g_unk9F6010;
+	extern int32_t g_disableSortedPrimitiveSubmission;
 	extern void* g_softwareRendererBuffer;
 	extern LPVOID g_primarySurfacePtr;
 	extern int32_t g_primarySurfacePitch;
@@ -174,7 +174,7 @@ namespace SoftwareRenderer
 	void BuildPaletteColourOffsetTable();
 	void SetNewPalette(const uint8_t* source, uint32_t tableFlags);
 
-	void UnkFunc8(int32_t highestBucket, int32_t clearValue);
+	void RenderSoftwareFrame(int32_t displayMaxX, int32_t clearValue);
 
 	// A queued render command for the software rasterizer. QueueRenderCommand enqueues
 	// transformed vertices (3 for a triangle, 4 for a quad when vertexCount is
