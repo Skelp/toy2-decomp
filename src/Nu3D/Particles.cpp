@@ -19,6 +19,19 @@ namespace Nu3D
 			g_particleAllocationCursor = 0;
 		}
 
+		// STUB: TOY2 0x0040FAE0
+		ParticleInstance* SpawnInstance(int32_t x,
+			int32_t y,
+			int32_t z,
+			int32_t velocityX,
+			int32_t velocityY,
+			int32_t velocityZ,
+			int32_t yawAngle,
+			int16_t groundAlignRotation,
+			int32_t rotationSpeed,
+			int32_t typeId)
+		{ return 0; }
+
 		// STUB: TOY2 0x0040FDF0
 		ParticleInstance* SpawnFromPreset(int32_t x, int32_t y, int32_t z, int32_t typeId, int32_t presetIndex) { return 0; }
 

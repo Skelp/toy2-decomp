@@ -2,6 +2,14 @@
 
 #include "Numerics.h"
 
+namespace Toy2
+{
+	namespace Actor
+	{
+		struct Toy2Actor;
+	}
+}
+
 namespace Nu3D
 {
 	namespace Particles
@@ -15,11 +23,19 @@ namespace Nu3D
 		{
 			Vector3I pos;
 			int32_t velX;
-			int32_t velY;
+			union
+			{
+				int32_t velY;
+				Toy2::Actor::Toy2Actor* targetActor;
+			};
 			int32_t velZ;
 			int32_t yawAngle;
 			int32_t groundHeightY;
-			int32_t pitchAngle;
+			union
+			{
+				int32_t pitchAngle;
+				int32_t discPitchAngle;
+			};
 			int16_t lifetime;
 			int16_t width;
 			int16_t height;
@@ -47,6 +63,16 @@ namespace Nu3D
 		void ReflectWallsSquareArena(ParticleInstance* particle);
 		void UpdateArenaBounce(ParticleInstance* particle);
 		void UpdateDrainTrail(ParticleInstance* particle);
+		ParticleInstance* SpawnInstance(int32_t x,
+			int32_t y,
+			int32_t z,
+			int32_t velocityX,
+			int32_t velocityY,
+			int32_t velocityZ,
+			int32_t yawAngle,
+			int16_t groundAlignRotation,
+			int32_t rotationSpeed,
+			int32_t typeId);
 		ParticleInstance* SpawnFromPreset(int32_t x, int32_t y, int32_t z, int32_t typeId, int32_t presetIndex);
 
 		STATIC_ASSERT(sizeof(ParticleInstance) == 0x3C);

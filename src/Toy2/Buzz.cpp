@@ -1,4 +1,5 @@
 #include "Toy2/Buzz.h"
+#include "Toy2/Actor.h"
 #include "Toy2/Camera.h"
 #include "Toy2/Collision.h"
 #include "Toy2/Levels.h"
@@ -409,6 +410,76 @@ namespace Toy2
 					g_discLauncherShotSlotsAvailable = 0;
 				}
 			}
+		}
+
+		// FUNCTION: TOY2 0x004A4960
+		void FireDiscLauncher(int32_t launchPitch)
+		{
+			int32_t nearestDistanceSquared = 0x7FFFFFFF;
+			if (g_discLauncherShotSlotsAvailable <= 0)
+				return;
+
+			Actor::Toy2Actor* targetActor;
+			if (Camera::g_scriptedCameraState >= 3)
+			{
+				if (g_aimTargetIndex != -1 && g_aimTargetIndex < 1000)
+				{
+					targetActor = &Actor::g_creatureActors[g_aimTargetIndex];
+					goto spawnHomingDisc;
+				}
+			}
+			else
+			{
+				Actor::Toy2Actor** actorSlot = Actor::g_activeActors;
+				Actor::Toy2Actor* actor = *actorSlot;
+				while (actor != 0)
+				{
+					if (actor->creatureRam->defenseMode != 0 && actor->hitpoints >= 0
+						&& (actor->actorFlags & (Actor::ACTOR_FLAG_TARGETABLE | Actor::ACTOR_FLAG_ACTIVE))
+							== (Actor::ACTOR_FLAG_TARGETABLE | Actor::ACTOR_FLAG_ACTIVE))
+					{
+						int32_t deltaX = (actor->pos.x - g_buzzActor.posAngles.pos.x) >> 5;
+						int32_t deltaY = (actor->pos.y - g_buzzActor.posAngles.pos.y) >> 5;
+						int32_t deltaZ = (actor->pos.z - g_buzzActor.posAngles.pos.z) >> 5;
+						int32_t distanceSquared = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
+						if (distanceSquared < nearestDistanceSquared)
+						{
+							nearestDistanceSquared = distanceSquared;
+							targetActor = actor;
+						}
+					}
+					actorSlot++;
+					actor = *actorSlot;
+				}
+				if (nearestDistanceSquared < 0x1000000)
+					goto spawnHomingDisc;
+			}
+
+			Nu3D::Particles::SpawnInstance(g_aimTargetPosition.x,
+				g_aimTargetPosition.y,
+				g_aimTargetPosition.z,
+				(Numerics::g_sinCosLUT[(int16_t)g_buzzActor.posAngles.angles.yaw & 0xFFF] * Numerics::g_sinCosLUT[(launchPitch + 0x400) & 0xFFF] >> 14) / 3,
+				-Numerics::g_sinCosLUT[launchPitch & 0xFFF] / 3,
+				(Numerics::g_sinCosLUT[((int16_t)g_buzzActor.posAngles.angles.yaw + 0x400) & 0xFFF] * Numerics::g_sinCosLUT[(launchPitch + 0x400) & 0xFFF]
+					>> 14)
+					/ 3,
+				0,
+				0,
+				0,
+				0x48);
+			goto finishDiscShot;
+
+		spawnHomingDisc: {
+			Nu3D::Particles::ParticleInstance* disc = Nu3D::Particles::SpawnInstance(
+				g_aimTargetPosition.x, g_aimTargetPosition.y, g_aimTargetPosition.z, 0, -2, 0, (int16_t)g_buzzActor.posAngles.angles.yaw << 2, 0, 0, 0x47);
+			disc->targetActor = targetActor;
+			disc->discPitchAngle = launchPitch & 0xFFF;
+		}
+
+		finishDiscShot:
+			AudioManager::PlaySoundEffect(0x54, &g_buzzActor.posAngles.pos);
+			g_discLauncherShotSlotsAvailable--;
+			g_discLauncherAmmo--;
 		}
 
 		// FUNCTION: TOY2 0x004A4B90 [MATCHED]

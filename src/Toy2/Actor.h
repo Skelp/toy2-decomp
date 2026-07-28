@@ -11,6 +11,7 @@ namespace Toy2
 	{
 		enum ActorFlags
 		{
+			ACTOR_FLAG_TARGETABLE = 0x1,
 			ACTOR_FLAG_ACTIVE = 0x2,
 			ACTOR_FLAG_INTERACTION_REQUESTED = 0x200,
 		};
@@ -56,7 +57,7 @@ namespace Toy2
 			Vector3I motionTargetPos;
 			int32_t targetYaw;
 			int32_t areaIndex;
-			int16_t unkVar29;
+			int16_t hitpoints;
 			int16_t unkVar29_;
 			uint8_t* animationFrameSequence;
 			int16_t unkShort1;

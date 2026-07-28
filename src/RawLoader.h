@@ -23,7 +23,8 @@ namespace RawLoader
 		int16_t boundHalfX;
 		int16_t boundHalfZ;
 		int16_t boundAngle;
-		int16_t defenseMode;
+		int8_t defenseMode;
+		uint8_t defenseReserved;
 		uint8_t latSpeedNoTarget;
 		uint8_t latSpeedTarget;
 		uint8_t speedNoTarget;

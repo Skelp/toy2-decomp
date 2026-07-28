@@ -115,6 +115,7 @@ namespace Toy2
 		void ActivateRocketBoots(GadgetPickup* pickup);
 		void DeactivateRocketBoots();
 		void CancelGrapple();
+		void FireDiscLauncher(int32_t launchPitch);
 		void FireGrapple(int32_t aimYaw, int32_t aimPitch);
 		void TickCosmicShield();
 		void TickGrapple();
