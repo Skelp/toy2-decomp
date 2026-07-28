@@ -25,8 +25,10 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(GameplayCamera) == 0x34);
 
 		extern GameplayCamera g_gameplayCamera;
+		extern int32_t g_scriptedCameraState;
 
 		void InitGameplayCamera(GameplayCamera* camera, Buzz::Toy2BuzzActor* buzz);
+		void BeginScriptedCutsceneAtPoint(Vector3I* focusPosition, int32_t duration, int32_t cameraDistance);
 		void SmoothToTarget(GameplayCamera* camera);
 		int32_t UpdateRocketBoots(Buzz::Toy2BuzzActor* buzz, Buzz::MovementRates* movementRates);
 	}

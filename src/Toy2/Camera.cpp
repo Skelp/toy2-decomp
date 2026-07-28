@@ -11,8 +11,14 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0052F3A0
 		GameplayCamera g_gameplayCamera;
 
+		// GLOBAL: TOY2 0x0050A13C
+		int32_t g_scriptedCameraState;
+
 		// STUB: TOY2 0x00403450
 		void InitGameplayCamera(GameplayCamera* camera, Buzz::Toy2BuzzActor* buzz) {}
+
+		// STUB: TOY2 0x004020F0
+		void BeginScriptedCutsceneAtPoint(Vector3I* focusPosition, int32_t duration, int32_t cameraDistance) {}
 
 		// FUNCTION: TOY2 0x00403640
 		void SmoothToTarget(GameplayCamera* camera)

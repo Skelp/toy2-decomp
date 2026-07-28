@@ -17,6 +17,7 @@ namespace Toy2
 		extern TokenState g_tokenStates[5];
 
 		void BuildPickupTable();
+		void Activate(int32_t tokenIndex, int32_t skipCutscene);
 		int32_t ShowTokenSparkle(int32_t linkId);
 
 		STATIC_ASSERT(sizeof(TokenState) == 0x10);
