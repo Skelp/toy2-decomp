@@ -34,6 +34,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0053C608
 	int32_t g_spinCancelRequested;
 
+	// GLOBAL: TOY2 0x0053C61C
+	int32_t g_jumpHeightControlActive;
+
 	// GLOBAL: TOY2 0x0053C618
 	int32_t g_ziplineState;
 
@@ -169,6 +172,19 @@ namespace Toy2
 
 	namespace Buzz
 	{
+		// FUNCTION: TOY2 0x00434090 [MATCHED]
+		void Launch(int32_t verticalVelocity, int16_t airborneMode)
+		{
+			g_buzzActor.airborneMode = airborneMode;
+			g_buzzActor.collisionFlags = 0;
+			g_buzzActor.specialAirState = 0;
+			g_buzzActor.animationState = 2;
+			g_buzzActor.gravityVel = verticalVelocity;
+			g_forcedFacingActive = 0;
+			g_turnRecoveryTimer = 0;
+			g_jumpHeightControlActive = 0;
+		}
+
 		// FUNCTION: TOY2 0x004343D0
 		void UpdateHorizontalMovement(Toy2BuzzActor* buzz, MovementRates* movementRates, int32_t forwardInput)
 		{
@@ -305,9 +321,9 @@ namespace Toy2
 			g_buzzActor.animationEventPosition = 0;
 			g_buzzActor.surfaceClampY = 0x80000000;
 			g_buzzActor.cosmicShieldTimer = 0;
-			g_buzzActor.unkWord15 = 0;
+			g_buzzActor.airborneMode = 0;
 			g_buzzActor.collisionFlags = 0;
-			g_buzzActor.unkShort40 = 0;
+			g_buzzActor.specialAirState = 0;
 			g_buzzActor.animationState = 0;
 			g_buzzActor.previousAnimationState = 0;
 			g_buzzActor.actorFlags = ACTOR_FLAG_STUNNED;

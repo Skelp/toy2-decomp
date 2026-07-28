@@ -80,7 +80,7 @@ namespace Toy2
 			int32_t animationEventPosition;
 			int32_t floorYPos;
 			int32_t isOnWalkableFloor;
-			int16_t unkWord15;
+			int16_t airborneMode;
 			int16_t collisionFlags;
 			int16_t animationState;
 			int16_t previousAnimationState;
@@ -88,7 +88,7 @@ namespace Toy2
 			int16_t health;
 			int16_t cosmicShieldTimer;
 			int16_t lives;
-			int16_t unkShort40;
+			int16_t specialAirState;
 			int16_t coinsCollected;
 		};
 
@@ -99,6 +99,7 @@ namespace Toy2
 		void DeactivateRocketBoots();
 		void CancelGrapple();
 		void TickBeamShots();
+		void Launch(int32_t verticalVelocity, int16_t airborneMode);
 		void UpdateHorizontalMovement(Toy2BuzzActor* buzz, MovementRates* movementRates, int32_t forwardInput);
 
 		STATIC_ASSERT(sizeof(BeamShot) == 0x2C);

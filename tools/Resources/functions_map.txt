@@ -205,7 +205,7 @@
 0x00433D50 Toy2::Buzz::Init
 0x00433ED0 Toy2::ResetBuzzState
 0x00433F40 Camera::CalculateMaxTurnAngle
-0x00434090 Toy2::Levels::Method2
+0x00434090 Toy2::Buzz::Launch
 0x004340D0 Toy2::Buzz::UpdateJumpAndGravity
 0x004343D0 Toy2::Buzz::UpdateHorizontalMovement
 0x00434550 Toy2::Buzz::ResolveFooting
