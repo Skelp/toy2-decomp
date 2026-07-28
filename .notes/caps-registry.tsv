@@ -47,3 +47,4 @@
 0x004A4E60	CAP-23	96.00	2026-07-28	rocket boots deactivation: instruction bytes match. reccmp labels the one-past particle-array bound through different adjacent data symbols.
 0x004A4D60	CAP-23	98.33	2026-07-28	rocket boots activation: instruction bytes match. reccmp labels the one-past particle-array bound through different adjacent data symbols.
 0x004A4910	CAP-23	95.45	2026-07-28	disc ammo refresh: instruction bytes match. reccmp labels the one-past particle-array bound through different adjacent data symbols.
+0x0042B090	CAP-03	82.03	2026-07-28	arena particle bounce: retail keeps the floor value in EBX and the shadow count in CX. The build uses volatile registers and spills the typed shadow index. Control flow, field access, calls, and side effects agree. Three natural forms were tested.
