@@ -3,7 +3,9 @@
 #include "Logger.h"
 #include "Nu3D/Camera.h"
 #include "Numerics.h"
+#include "Random.h"
 #include "Renderer/Renderer.h"
+#include "Toy2/Toy2.h"
 #include <math.h>
 #include <cstring>
 #include <stdio.h>
@@ -11,9 +13,6 @@
 
 namespace AudioManager
 {
-	// STUB: TOY2 0x0049E660
-	void PlaySoundEffect(int32_t soundIndex, const Vector3I* position) {}
-
 	// GLOBAL: TOY2 0x005282CC
 	int32_t g_curTrackIndex;
 
@@ -732,20 +731,34 @@ namespace AudioManager
 		return (leftVolume + rightVolume) / 2;
 	}
 
-	// A 16-byte preset table entry. The preset functions read the first three
-	// int16 fields. The roles of the remaining bytes are not known.
+	// Each preset contains its playback parameters and peak-volume contribution.
 	struct OneShotSoundPreset
 	{
-		int16_t soundIndex;
-		int16_t frequency;
-		int16_t volume;
-		int16_t reserved0;
-		int32_t reserved1;
-		int32_t reserved2;
+		uint16_t encodedSoundIndex;
+		int16_t baseFrequency;
+		int16_t leftVolume;
+		int16_t rightVolume;
+		int16_t randomFrequencyShift;
+		int16_t maxLeftVolume;
+		int16_t maxRightVolume;
+		int16_t maxVolumeScale;
 	};
+
+	STATIC_ASSERT(sizeof(OneShotSoundPreset) == 0x10);
 
 	// GLOBAL: TOY2 0x00502950
 	OneShotSoundPreset g_oneShotPresets[218];
+
+	struct LevelSoundMapping
+	{
+		int16_t levelFileIndex;
+		int16_t soundIndex;
+	};
+
+	STATIC_ASSERT(sizeof(LevelSoundMapping) == 0x4);
+
+	// GLOBAL: TOY2 0x005028E8
+	LevelSoundMapping g_levelSoundMappings[26];
 
 	namespace Preset
 	{
@@ -753,14 +766,14 @@ namespace AudioManager
 		void PlayOneShotSound2(int32_t index, void* actor)
 		{
 			OneShotSoundPreset& preset = g_oneShotPresets[index];
-			PlayOneShotSound3DActor(actor, preset.soundIndex - 1, preset.frequency, preset.volume, actor, 0);
+			PlayOneShotSound3DActor(actor, preset.encodedSoundIndex - 1, preset.baseFrequency, preset.leftVolume, actor, 0);
 		}
 
 		// FUNCTION: TOY2 0x0049EA90 [MATCHED]
 		void PlayOneShotSound(int32_t index, void* actor)
 		{
 			OneShotSoundPreset& preset = g_oneShotPresets[index];
-			PlayOneShotSound3DActor(actor, preset.soundIndex - 1, preset.frequency, preset.volume, actor, 1);
+			PlayOneShotSound3DActor(actor, preset.encodedSoundIndex - 1, preset.baseFrequency, preset.leftVolume, actor, 1);
 		}
 	}
 
@@ -802,6 +815,118 @@ namespace AudioManager
 	int16_t g_maxRightVolume;
 	// GLOBAL: TOY2 0x0052f2da
 	int16_t g_maxVolume;
+
+	// GLOBAL: TOY2 0x00830E3C
+	int16_t g_dynamicSoundFrequencies[14];
+
+	// FUNCTION: TOY2 0x0049E660
+	void PlaySoundEffect(int32_t soundIndex, const Vector3I* position)
+	{
+		if (soundIndex < 0)
+		{
+			int32_t slotIndex = g_soundSequenceSlotIndex;
+			g_soundSequenceSlots[slotIndex].position.x = position->x;
+			g_soundSequenceSlots[slotIndex].position.y = position->y;
+			g_soundSequenceSlots[slotIndex].position.z = position->z;
+			g_soundSequenceSlots[slotIndex].cursor = (uint8_t*)g_sequenceDataPtrs[-soundIndex - 1];
+			g_soundSequenceSlots[slotIndex].timer = 0;
+
+			SequenceHeader* header = (SequenceHeader*)g_soundSequenceSlots[slotIndex].cursor;
+			g_soundSequenceSlots[slotIndex].cursor = (uint8_t*)(header + 1);
+			if (header->leftVolume != 0 || header->rightVolume != 0)
+			{
+				if (g_maxLeftVolume < header->leftVolume * 2)
+				{
+					g_maxLeftVolume = header->leftVolume * 2;
+				}
+				if (g_maxRightVolume < header->rightVolume * 2)
+				{
+					g_maxRightVolume = header->rightVolume * 2;
+				}
+				if (g_maxVolume < header->volume * 2)
+				{
+					g_maxVolume = header->volume * 2;
+				}
+			}
+
+			slotIndex++;
+			g_soundSequenceSlotIndex = slotIndex;
+			if (slotIndex >= 7)
+			{
+				g_soundSequenceSlotIndex = 0;
+			}
+			return;
+		}
+
+		OneShotSoundPreset& preset = g_oneShotPresets[soundIndex];
+		int32_t audibility = 150;
+		uint16_t encodedSoundIndex = preset.encodedSoundIndex;
+		if ((encodedSoundIndex & 0x4000) != 0)
+		{
+			LevelSoundMapping* mapping = &g_levelSoundMappings[(encodedSoundIndex & 0x3fff) / 2];
+			while (mapping->levelFileIndex != Toy2::g_levelFileIndex)
+			{
+				mapping++;
+			}
+			encodedSoundIndex = mapping->soundIndex;
+		}
+
+		int16_t selectedSoundIndex = (int16_t)encodedSoundIndex;
+		if (selectedSoundIndex != 0)
+		{
+			int32_t frequency = preset.baseFrequency;
+			if (frequency <= 0)
+			{
+				frequency = g_dynamicSoundFrequencies[-frequency];
+			}
+			else if (preset.randomFrequencyShift >= 0)
+			{
+				frequency += ((int32_t)*g_randDatBufferPtr << 3) >> preset.randomFrequencyShift;
+				g_randDatBufferPtr++;
+			}
+
+			if (abs((int32_t)position) < 0x100)
+			{
+				if (selectedSoundIndex > 0)
+				{
+					PlayOneShotSoundGlobal(selectedSoundIndex - 1, frequency, preset.leftVolume, preset.rightVolume);
+				}
+				else
+				{
+					PlayLoopingSound3D(
+						(void*)(int32_t)preset.baseFrequency, (encodedSoundIndex & 0x7fff) - 1, frequency, preset.leftVolume, preset.rightVolume);
+				}
+			}
+			else if (selectedSoundIndex > 0)
+			{
+				audibility = PlayOneShotSound3D(selectedSoundIndex - 1, frequency, preset.leftVolume, position);
+			}
+			else
+			{
+				audibility = PlayLoopingSound3DPositional(
+					(void*)position, (encodedSoundIndex & 0x7fff) - 1, frequency, preset.leftVolume, (void*)position, preset.rightVolume);
+			}
+		}
+
+		if (g_maxLeftVolume < preset.maxLeftVolume * 2)
+		{
+			g_maxLeftVolume = preset.maxLeftVolume * 2;
+		}
+		if (g_maxRightVolume < preset.maxRightVolume * 2)
+		{
+			g_maxRightVolume = preset.maxRightVolume * 2;
+		}
+
+		int32_t scaledVolume = preset.maxVolumeScale * audibility / 64;
+		if (scaledVolume > 0xff)
+		{
+			scaledVolume = 0xff;
+		}
+		if (g_maxVolume < scaledVolume)
+		{
+			g_maxVolume = (int16_t)scaledVolume;
+		}
+	}
 
 	// FUNCTION: TOY2 0x0049E910
 	void StartSoundSequenceOnActor(int32_t sequenceId, Vector3I* position)
