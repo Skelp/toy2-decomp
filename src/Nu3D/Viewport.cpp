@@ -343,6 +343,24 @@ namespace Nu3D
 
 	namespace Frustum
 	{
+		// FUNCTION: TOY2 0x004BA1F0
+		uint32_t TestSphereAllPlanes(const Vector3F* center, float radius)
+		{
+			uint32_t result = 0;
+			for (int32_t planeIndex = 2; planeIndex < Viewport::g_frustumPlaneCount; ++planeIndex)
+			{
+				float distance = Math::GetSignedDistanceToPlane(center, &Viewport::g_frustumPlanes[planeIndex]);
+				if (distance > radius)
+				{
+					result |= 1 << (planeIndex * 2);
+					break;
+				}
+				if (distance > -radius)
+					result |= 2 << (planeIndex * 2);
+			}
+			return result;
+		}
+
 		// FUNCTION: TOY2 0x004BA270
 		uint32_t TestSphereAllPlanesAlt(const Vector3F* center, float radius)
 		{

@@ -14,6 +14,7 @@ namespace Toy2
 			ACTOR_FLAG_TARGETABLE = 0x1,
 			ACTOR_FLAG_ACTIVE = 0x2,
 			ACTOR_FLAG_INTERACTION_REQUESTED = 0x200,
+			ACTOR_FLAG_CULLED = 0x2000,
 		};
 
 		struct Toy2Actor
@@ -56,7 +57,8 @@ namespace Toy2
 			Vector3I boundary;
 			Vector3I motionTargetPos;
 			int32_t targetYaw;
-			int32_t areaIndex;
+			int8_t areaIndex;
+			uint8_t reservedArea[3];
 			int16_t hitpoints;
 			int16_t unkVar29_;
 			uint8_t* animationFrameSequence;
@@ -102,6 +104,7 @@ namespace Toy2
 
 		STATIC_ASSERT(sizeof(Toy2Actor) == 0x9C);
 		STATIC_ASSERT(offsetof(Toy2Actor, animationFramePosition) == 0x18);
+		STATIC_ASSERT(offsetof(Toy2Actor, areaIndex) == 0x6C);
 		STATIC_ASSERT(offsetof(Toy2Actor, animationFrameSequence) == 0x74);
 		STATIC_ASSERT(sizeof(Toy2Actor::ActorBehaviourContext) == 0xC);
 	}

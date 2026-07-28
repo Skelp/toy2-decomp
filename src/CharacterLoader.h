@@ -17,7 +17,8 @@ namespace CharacterLoader
 {
 	struct CharacterAnimationData
 	{
-		uint8_t reserved[4];
+		int16_t modelId;
+		int16_t reserved;
 		int16_t baseBoneIndex;
 		int16_t reserved2;
 		Toy2::Animation::ClipHeader* clips[1];
@@ -65,6 +66,7 @@ namespace CharacterLoader
 
 	STATIC_ASSERT(sizeof(BoneTransform) == 0x6C);
 	STATIC_ASSERT(sizeof(CharacterAnimationData) == 0xC);
+	STATIC_ASSERT(offsetof(CharacterAnimationData, modelId) == 0);
 	STATIC_ASSERT(offsetof(CharacterAnimationData, baseBoneIndex) == 4);
 	STATIC_ASSERT(offsetof(CharacterAnimationData, clips) == 8);
 }

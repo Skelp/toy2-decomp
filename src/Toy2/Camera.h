@@ -62,6 +62,7 @@ namespace Toy2
 		void BeginScriptedCutsceneAtPoint(Vector3I* focusPosition, int32_t duration, int32_t cameraDistance);
 		void SmoothToTarget(GameplayCamera* camera);
 		void SnapBehindBuzz(GameplayCamera* camera);
+		void CullActors(const Vector3I* cameraPosition);
 		int32_t UpdateRocketBoots(Buzz::Toy2BuzzActor* buzz, Buzz::MovementRates* movementRates);
 	}
 } // namespace Toy2

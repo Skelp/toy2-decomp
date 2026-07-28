@@ -1,9 +1,13 @@
 #include "Toy2/Camera.h"
 #include "InputManager.h"
+#include "CharacterLoader.h"
 #include "Nu3D/Camera.h"
 #include "Nu3D/Link.h"
 #include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
+#include "Nu3D/Portal.h"
+#include "Nu3D/Viewport.h"
+#include "Renderer/Shadows.h"
 #include "Toy2/Actor.h"
 #include "Toy2/Collision.h"
 #include "Toy2/Toy2.h"
@@ -106,6 +110,47 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x0050A4DC
 		Nu3D::Particles::ParticleInstance* g_targetMarkerParticle;
+
+		// FUNCTION: TOY2 0x00447BD0
+		void CullActors(const Vector3I* cameraPosition)
+		{
+			if (Actor::g_activeActors[0] == 0)
+				return;
+
+			Actor::Toy2Actor** actorSlot = Actor::g_activeActors;
+			do
+			{
+				Actor::Toy2Actor* actor = *actorSlot;
+				int32_t visibilityDistanceSquared = actor->visibilityDistance * actor->visibilityDistance * 16;
+				uint16_t previousFlags = actor->actorFlags;
+				int32_t targetableDistanceBonus = (previousFlags & Actor::ACTOR_FLAG_TARGETABLE) != 0 ? 250000 : 0;
+				actor->actorFlags &= ~(Actor::ACTOR_FLAG_TARGETABLE | Actor::ACTOR_FLAG_CULLED);
+
+				if (CharacterLoader::g_characterAnimationData[actor->creatureId]->modelId != 0)
+				{
+					if (actor->areaIndex < 0 || ! Nu3D::Portal::IsAreaVisible(actor->areaIndex))
+					{
+						actor->actorFlags |= Actor::ACTOR_FLAG_CULLED;
+					}
+					else
+					{
+						int32_t deltaX = (cameraPosition->x - actor->pos.x) >> 5;
+						int32_t deltaY = (cameraPosition->y - actor->pos.y) >> 5;
+						int32_t deltaZ = (cameraPosition->z - actor->pos.z) >> 5;
+						if (deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ < visibilityDistanceSquared + targetableDistanceBonus)
+						{
+							Vector3F center;
+							center.x = (float)(actor->pos.x / 32);
+							center.y = (float)(actor->pos.y / 32);
+							center.z = (float)(actor->pos.z / 32);
+							if ((Nu3D::Frustum::TestSphereAllPlanes(&center, (float)actor->boundingSphereRadius) & Nu3D::Frustum::OUTSIDE_PLANE_MASK) == 0)
+								actor->actorFlags |= Actor::ACTOR_FLAG_TARGETABLE;
+						}
+					}
+				}
+				actorSlot++;
+			} while (*actorSlot != 0);
+		}
 
 		// FUNCTION: TOY2 0x00403450
 		void InitGameplayCamera(GameplayCamera* camera, Buzz::Toy2BuzzActor* buzz)
@@ -316,6 +361,16 @@ namespace Toy2
 			Nu3D::Link::SetScaleFromFixedOffsets(0x2D, 0, 0, 0);
 			Nu3D::Link::SetScaleFromFixedOffsets(0x2E, 0, 0, 0);
 			Nu3D::Link::SetScaleFromFixedOffsets(0x2F, 0, 0, 0);
+		}
+	}
+
+	namespace Shadow
+	{
+		// FUNCTION: TOY2 0x00447D30 [MATCHED]
+		void ResetShadowCount()
+		{
+			Renderer::Shadows::g_shadowCount = 0;
+			Renderer::Shadows::g_unusedShadowVar = 0;
 		}
 	}
 } // namespace Toy2

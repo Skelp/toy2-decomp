@@ -60,6 +60,12 @@ namespace Nu3D
 
 	namespace Frustum
 	{
+		enum
+		{
+			OUTSIDE_PLANE_MASK = 0x55555555,
+		};
+
+		uint32_t TestSphereAllPlanes(const Vector3F* center, float radius);
 		uint32_t TestSphereAllPlanesAlt(const Vector3F* center, float radius);
 		uint32_t TestSphereDepthPlanes(const Vector3F* center, float radius);
 	}
