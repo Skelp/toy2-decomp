@@ -10,6 +10,7 @@ namespace Toy2
 	namespace Shadow
 	{
 		void QueueStretched(int32_t x, int32_t groundY, int32_t z, int32_t size, int32_t sourceY);
+		void QueueStretchedForBuzz(int32_t x, int32_t groundY, int32_t z, int32_t size);
 	}
 
 	namespace Platform

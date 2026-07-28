@@ -1,6 +1,7 @@
 #include "Toy2/Collision.h"
 #include "Nu3D/Link.h"
 #include "Renderer/Shadows.h"
+#include "Toy2/Buzz.h"
 
 namespace Toy2
 {
@@ -277,7 +278,84 @@ namespace Toy2
 {
 	namespace Shadow
 	{
-		// STUB: TOY2 0x00485680
-		void QueueStretched(int32_t x, int32_t groundY, int32_t z, int32_t size, int32_t sourceY) {}
+		// FUNCTION: TOY2 0x00485680
+		void QueueStretched(int32_t x, int32_t groundY, int32_t z, int32_t size, int32_t sourceY)
+		{
+			int32_t opacity = (sourceY - groundY) / 0x400 + 0x40;
+			if (opacity < 0)
+				return;
+			if (opacity > 0x20)
+				opacity = 0x20;
+
+			int16_t normalY = Collision::g_groundNormal.y;
+			if (normalY >= -0x1000 || Renderer::Shadows::g_shadowCount >= Renderer::Shadows::MAX_SHADOWS)
+				return;
+
+			int32_t shadowIndex = Renderer::Shadows::g_shadowCount;
+			Renderer::Shadows::g_shadowInstances[shadowIndex].opacity = (int16_t)opacity;
+			Renderer::Shadows::g_shadowInstances[shadowIndex].pos.x = x;
+			Renderer::Shadows::g_shadowInstances[shadowIndex].pos.z = z;
+			if (normalY > -0x3000)
+				size = ((-0x800 - normalY) * size) / 0x2800;
+
+			Renderer::Shadows::g_shadowInstances[shadowIndex].size = (int16_t)-size;
+			int32_t normalZ = Collision::g_groundNormal.z;
+			int32_t normalX = Collision::g_groundNormal.x;
+			int32_t slopeHeight = ((normalZ + normalX) * size) / normalY;
+			Renderer::Shadows::g_shadowInstances[shadowIndex].pos.y = groundY + slopeHeight * 0x20;
+
+			Renderer::Shadows::g_shadowProjections[shadowIndex].cornerYOffsets[0] = (int16_t)(((normalZ - normalX) * size) / normalY) - (int16_t)slopeHeight;
+			Renderer::Shadows::g_shadowProjections[shadowIndex].cornerYOffsets[1] = (int16_t)(((normalX - normalZ) * size) / normalY) - (int16_t)slopeHeight;
+			Renderer::Shadows::g_shadowProjections[shadowIndex].cornerYOffsets[2] = (int16_t)-(slopeHeight * 2);
+			if (Collision::g_groundNormal.y < -0x2000)
+			{
+				Renderer::Shadows::g_shadowCount++;
+				Renderer::Shadows::g_shadowProjections[shadowIndex].opacity = 0x30;
+				return;
+			}
+			int16_t projectionOpacity = (int16_t)((-0x1000 - normalY) * 3 >> 8);
+			Renderer::Shadows::g_shadowCount++;
+			Renderer::Shadows::g_shadowProjections[shadowIndex].opacity = projectionOpacity;
+		}
+
+		// FUNCTION: TOY2 0x004857E0
+		void QueueStretchedForBuzz(int32_t x, int32_t groundY, int32_t z, int32_t size)
+		{
+			int32_t opacity = (g_buzzActor.posAngles.pos.y - groundY) / 0x400 + 0x40;
+			if (opacity < 0)
+				return;
+			if (opacity > 0x20)
+				opacity = 0x20;
+
+			int16_t normalY = Collision::g_buzzGroundNormal.y;
+			if (normalY >= -0x1000 || Renderer::Shadows::g_shadowCount >= Renderer::Shadows::MAX_SHADOWS)
+				return;
+
+			int32_t shadowIndex = Renderer::Shadows::g_shadowCount;
+			Renderer::Shadows::g_shadowInstances[shadowIndex].opacity = (int16_t)opacity;
+			Renderer::Shadows::g_shadowInstances[shadowIndex].pos.x = x;
+			Renderer::Shadows::g_shadowInstances[shadowIndex].pos.z = z;
+			if (normalY > -0x3000)
+				size = ((-0x800 - normalY) * size) / 0x2800;
+
+			Renderer::Shadows::g_shadowInstances[shadowIndex].size = (int16_t)-size;
+			int32_t normalZ = Collision::g_buzzGroundNormal.z;
+			int32_t normalX = Collision::g_buzzGroundNormal.x;
+			int32_t slopeHeight = ((normalZ + normalX) * size) / normalY;
+			Renderer::Shadows::g_shadowInstances[shadowIndex].pos.y = groundY + slopeHeight * 0x20;
+
+			Renderer::Shadows::g_shadowProjections[shadowIndex].cornerYOffsets[0] = (int16_t)(((normalZ - normalX) * size) / normalY) - (int16_t)slopeHeight;
+			Renderer::Shadows::g_shadowProjections[shadowIndex].cornerYOffsets[1] = (int16_t)(((normalX - normalZ) * size) / normalY) - (int16_t)slopeHeight;
+			Renderer::Shadows::g_shadowProjections[shadowIndex].cornerYOffsets[2] = (int16_t)-(slopeHeight * 2);
+			if (Collision::g_buzzGroundNormal.y < -0x2000)
+			{
+				Renderer::Shadows::g_shadowCount++;
+				Renderer::Shadows::g_shadowProjections[shadowIndex].opacity = 0x30;
+				return;
+			}
+			int16_t projectionOpacity = (int16_t)((-0x1000 - normalY) * 3 >> 8);
+			Renderer::Shadows::g_shadowCount++;
+			Renderer::Shadows::g_shadowProjections[shadowIndex].opacity = projectionOpacity;
+		}
 	}
 }

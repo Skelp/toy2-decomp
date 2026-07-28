@@ -7,6 +7,11 @@ namespace Renderer
 {
 	namespace Shadows
 	{
+		enum
+		{
+			MAX_SHADOWS = 48,
+		};
+
 		struct ShadowInstance
 		{
 			Vector3I pos;
@@ -14,10 +19,18 @@ namespace Renderer
 			int16_t opacity;
 		};
 
+		struct ShadowProjection
+		{
+			int16_t cornerYOffsets[3];
+			int16_t opacity;
+		};
+
 		extern int16_t g_shadowCount;
 		extern int32_t g_unusedShadowVar;
-		extern ShadowInstance g_shadowInstances[48];
+		extern ShadowInstance g_shadowInstances[MAX_SHADOWS];
+		extern ShadowProjection g_shadowProjections[MAX_SHADOWS];
 
 		STATIC_ASSERT(sizeof(ShadowInstance) == 0x10);
+		STATIC_ASSERT(sizeof(ShadowProjection) == 0x8);
 	}
 }
