@@ -14,6 +14,9 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00729130
 		int16_t g_groundCollisionMeshIndex;
 
+		// GLOBAL: TOY2 0x00728698
+		Vector3I16 g_groundNormal;
+
 		// GLOBAL: TOY2 0x00554FA0
 		MathScratchVector g_mathScratch[64];
 
@@ -208,10 +211,16 @@ namespace Nu3D
 {
 	namespace Collision
 	{
-		// STUB: TOY2 0x00487A60
-		int32_t IsFloorWalkable() { return 0; }
+		// FUNCTION: TOY2 0x00487A60 [MATCHED]
+		int32_t IsFloorWalkable() { return Toy2::Collision::g_groundNormal.y >= -0x2000; }
 
-		// STUB: TOY2 0x00487AB0
-		int32_t GetSurfaceQuality(int32_t queryIndex) { return -1; }
+		// FUNCTION: TOY2 0x00487AB0 [MATCHED]
+		int32_t GetSurfaceQuality(int32_t queryIndex)
+		{
+			uint16_t surfaceType = Toy2::Collision::g_collisionQueryResults[queryIndex].surfaceType;
+			if ((int8_t)surfaceType == -1)
+				return -1;
+			return surfaceType & 0xFF;
+		}
 	}
 }

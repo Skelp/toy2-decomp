@@ -47,12 +47,14 @@ namespace Toy2
 		{
 			uint32_t contactFlags;
 			Platform::CollisionFace* face;
-			uint8_t reserved[0x28];
+			uint8_t reserved[0x26];
+			uint16_t surfaceType;
 		};
 
 		extern CollisionMeshInstance g_collisionMeshInstances[300];
 		extern CollisionQueryResult g_collisionQueryResults[2];
 		extern int16_t g_groundCollisionMeshIndex;
+		extern Vector3I16 g_groundNormal;
 		extern MathScratchVector g_mathScratch[64];
 
 		void BuildCollisionWorld(int32_t level, uint8_t** buffer, int32_t terrainNum);
@@ -64,6 +66,7 @@ namespace Toy2
 
 		STATIC_ASSERT(sizeof(CollisionMeshInstance) == 0x34);
 		STATIC_ASSERT(sizeof(CollisionQueryResult) == 0x30);
+		STATIC_ASSERT(offsetof(CollisionQueryResult, surfaceType) == 0x2E);
 		STATIC_ASSERT(sizeof(MathScratchVector) == 0x10);
 	}
 
