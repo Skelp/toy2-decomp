@@ -231,6 +231,7 @@ namespace Renderer
 		extern RegisteredLight g_registeredLights[8];
 		extern int32_t g_registeredLightCount;
 
+		void RegisterLight(int32_t x, int32_t y, int32_t z, int32_t red, int32_t green, int32_t blue, int32_t scaleOffset);
 		void CullAndQueue();
 		void RenderSlot(int32_t slotIndex);
 

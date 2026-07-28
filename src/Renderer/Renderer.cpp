@@ -14,6 +14,8 @@
 #include "Renderer/Sprite.h"
 #include "Toy2/Toy2.h"
 #include "Renderer/Glue.h"
+#include "Toy2/Camera.h"
+#include "Toy2/Collision.h"
 #include "Toy2/D3DApp.h"
 #include "Logger.h"
 
@@ -245,6 +247,49 @@ namespace Renderer
 
 		// GLOBAL: TOY2 0x00559C64
 		int32_t g_registeredLightCount;
+
+		// FUNCTION: TOY2 0x0044F200
+		void RegisterLight(int32_t x, int32_t y, int32_t z, int32_t red, int32_t green, int32_t blue, int32_t scaleOffset)
+		{
+			if (g_registeredLightCount >= 8)
+				return;
+
+			Vector3F projected;
+			Vector3F position;
+			Vector3I movement;
+			Vector3I cameraPosition;
+			cameraPosition = Toy2::Camera::g_renderCameraTransform.pos;
+			movement.x = (x - cameraPosition.x) * 9 / 10;
+			movement.y = (y - cameraPosition.y) * 9 / 10;
+			movement.z = (z - cameraPosition.z) * 9 / 10;
+			if (Toy2::Collision::SweepAndSlide(&cameraPosition, &movement, 0x8000, 0, 1) != 0)
+				return;
+
+			position.x = (float)x * k_positionScale;
+			position.y = (float)y * k_positionScale;
+			position.z = (float)z * k_positionScale;
+			Nu3D::TransformPointProjective(&projected, &position, 1, 0);
+
+			int32_t screenX = (int32_t)(projected.x * g_virtualScreenWidth / (float)DrawingDevice::GetDestWidth());
+			int32_t screenY = (int32_t)(projected.y * g_virtualScreenHeight / (float)DrawingDevice::GetDestHeight());
+			int32_t depth = (int32_t)((Nu3D::Camera::g_currentCamera->farClip - Nu3D::Camera::g_currentCamera->nearClip) * projected.z
+				+ Nu3D::Camera::g_currentCamera->nearClip);
+			if (screenX > 512 || screenX < 0 || screenY > 256 || screenY < 0 || depth <= 128 || projected.z <= 0.0f || projected.z >= 1.0f)
+				return;
+
+			const int32_t lightIndex = g_registeredLightCount;
+			g_registeredLights[lightIndex].position.x = x;
+			g_registeredLights[lightIndex].position.y = y;
+			g_registeredLights[lightIndex].position.z = z;
+			g_registeredLights[lightIndex].screenX = screenX;
+			g_registeredLights[lightIndex].screenY = screenY;
+			g_registeredLights[lightIndex].depth = depth;
+			g_registeredLights[lightIndex].red = red;
+			g_registeredLights[lightIndex].green = green;
+			g_registeredLights[lightIndex].blue = blue;
+			g_registeredLights[lightIndex].scaleOffset = scaleOffset;
+			g_registeredLightCount = lightIndex + 1;
+		}
 
 		// FUNCTION: TOY2 0x0044F420 [MATCHED]
 		void CullAndQueue()

@@ -92,6 +92,7 @@ reconstruction. `tools/decomp lint` reports those.
 - `CAP-25` **retail reserves one extra FPO stack slot, but every body instruction agrees** — The unused four-byte frame difference shifts parameter offsets only. Natural direct-expression and named-local forms emit the same smaller frame. Do not add a dummy local.
 - `CAP-26` **serialized words copy into a typed record with a different destination anchor** — Retail anchors the destination on the second field. The build anchors it on the third field. Keep the typed fields and do not use negative indexes.
 - `CAP-27` **typed table cursor uses a different interior-field anchor** — Retail anchors on a later field. The build anchors on an earlier field. Keep the typed record and accept the displacement changes.
+- `CAP-28` **retail keeps dead collision vectors separate from projection spill slots** — The build reuses eight bytes and makes a smaller FPO frame. Keep the typed vectors. Do not add dummy storage.
 
 ## TOOL
 
