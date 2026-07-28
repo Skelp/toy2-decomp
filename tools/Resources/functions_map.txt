@@ -698,7 +698,7 @@
 0x004AC150 DrawingDevice::SetTextureStageState
 0x004AC180 DrawingDevice::SetTexture
 0x004AC1A0 Nu3D::SetTexture
-0x004AC1F0 SoftwareRenderer::UnkFunc20
+0x004AC1F0 SoftwareRenderer::GetCurrentTextureData
 0x004AC220 NGNLoader::LoadTextureContents
 0x004AC240 NGNLoader::LoadLocalBmpTexture
 0x004AC260 Nu3D::ReleaseBmpDataNode_T
@@ -975,7 +975,7 @@
 0x004BC360 Nu3D::Portal::AreaPortal::BuildScalerEntry
 0x004BC3A0 Nu3D::Portal::AreaPortal::AllocScalerEntry
 0x004BC410 Renderer::SetRenderDistance
-0x004BC430 SoftwareRenderer::UnkFunc18
+0x004BC430 SoftwareRenderer::GetRenderDistances
 0x004BC460 Nu3D::Area::RenderBucketThroughPortals
 0x004BC720 Nu3D::Scene::RenderCellsInRadius
 0x004BC900 SoftwareRenderer::UnpackColourToFloats

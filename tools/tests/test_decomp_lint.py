@@ -209,6 +209,28 @@ class AnnotationTests(unittest.TestCase):
         self.assertNotIn("decompiler-identifier", rules(source))
 
 
+class LayoutAssertionTests(unittest.TestCase):
+    def test_qualified_nested_struct_size_assertion_is_accepted(self):
+        source = (
+            "struct Outer\n{\n"
+            "\tstruct Inner\n\t{\n\t\tint32_t unk10;\n\t};\n"
+            "};\n"
+            "STATIC_ASSERT(sizeof(Outer) == 4);\n"
+            "STATIC_ASSERT(sizeof(Outer::Inner) == 4);\n"
+        )
+        self.assertNotIn("unpinned-layout", rules(source))
+
+    def test_unrelated_qualified_size_assertion_does_not_pin_nested_struct(self):
+        source = (
+            "struct Outer\n{\n"
+            "\tstruct Inner\n\t{\n\t\tint32_t unk10;\n\t};\n"
+            "};\n"
+            "STATIC_ASSERT(sizeof(Outer) == 4);\n"
+            "STATIC_ASSERT(sizeof(Other::Inner) == 4);\n"
+        )
+        self.assertIn("unpinned-layout", rules(source))
+
+
 class BaselineTests(unittest.TestCase):
     def test_baseline_classification_and_stale_rows(self):
         source = "// FUNCTION: TOY2 0x00401000\nvoid f() { int iVar2 = 0; use(iVar2); }\n"

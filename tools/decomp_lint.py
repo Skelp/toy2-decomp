@@ -605,16 +605,29 @@ def check_text(path: Path, text: str) -> list[Finding]:
 
     # Layouts with unresolved storage should at least pin their total size.
     struct_re = re.compile(r"\bstruct\s+(\w+)\s*\{")
+    structs: list[tuple[re.Match[str], tuple[int, int]]] = []
     for match in struct_re.finditer(masked):
         body_range = _balanced_body(masked, masked.find("{", match.start()))
         if not body_range:
             continue
+        structs.append((match, body_range))
+
+    for match, body_range in structs:
         start, end = body_range
         body = masked[start:end]
         if not PLACEHOLDER_FIELD_RE.search(body):
             continue
         name = match.group(1)
-        if re.search(rf"STATIC_ASSERT\s*\(\s*sizeof\s*\(\s*{re.escape(name)}\s*\)", masked):
+        ancestors = [
+            parent.group(1)
+            for parent, (parent_start, parent_end) in structs
+            if parent_start < match.start() < parent_end
+        ]
+        asserted_names = [name]
+        if ancestors:
+            asserted_names.append("::".join([*ancestors, name]))
+        asserted_name_pattern = "|".join(re.escape(asserted_name) for asserted_name in asserted_names)
+        if re.search(rf"STATIC_ASSERT\s*\(\s*sizeof\s*\(\s*(?<![:\w])(?:{asserted_name_pattern})\s*\)", masked):
             continue
         _add_finding(
             findings, path, text, owners, allowed, offset=match.start(),

@@ -80,9 +80,8 @@ namespace SoftwareRenderer
 	extern float g_zoomScaleH;
 	extern int32_t g_screenDimV;
 	extern int32_t g_screenDimH;
-	// Square roots of Renderer::g_primaryRenderDistanceSquared and
-	// g_secondaryRenderDistanceSquared, refreshed by UnkFunc18 before each draw
-	// dispatch. The software rasterizer culls vertices against these distances.
+	// GetRenderDistances refreshes these square roots before each draw dispatch.
+	// The software rasterizer uses these distances to cull vertices.
 	extern float g_primaryRenderDistance;
 	extern float g_secondaryRenderDistance;
 	extern const double k_vSpanScale;
@@ -407,18 +406,17 @@ namespace SoftwareRenderer
 	void RasterizeRenderCommand(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans);
 	void RasterizeSortedRenderCommand(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans);
 
-	// Snapshot of the current texture's writable data: the pixel buffer and the
-	// surface descriptor that holds its dimensions and pitch. UnkFunc20 fills
-	// this from Nu3D::g_currentBmpDataNode; it returns 0 on success and 1 when
-	// no texture is bound. Callers mask the texData pointer with the return so a
-	// NULL texture becomes a NULL rasterizer source.
+	// This structure contains the current texture pixel buffer and surface descriptor.
+	// GetCurrentTextureData fills it from Nu3D::g_currentBmpDataNode.
+	// The function returns 0 on success and 1 when no texture is bound.
+	// Callers use the return value to select a NULL rasterizer source.
 	struct TextureData
 	{
 		uint32_t* texData;
 		DDSURFACEDESC2* surfaceDesc;
 	};
-	int32_t UnkFunc20(TextureData* out);
-	void UnkFunc18(float* primaryDistance, float* secondaryDistance);
+	int32_t GetCurrentTextureData(TextureData* out);
+	void GetRenderDistances(float* primaryDistance, float* secondaryDistance);
 	void UnkFunc19(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags);
 	void UnkFunc21(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags);
 	void UnkFunc22(Nu3D::VertexTL* vertices[3], int32_t vertexCount, uint32_t* texData, int32_t renderState, int32_t primitiveType, DWORD drawFlags);

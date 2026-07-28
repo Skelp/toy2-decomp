@@ -3665,7 +3665,7 @@ namespace SoftwareRenderer
 	}
 
 	// FUNCTION: TOY2 0x004AC1F0 [MATCHED]
-	int32_t UnkFunc20(TextureData* out)
+	int32_t GetCurrentTextureData(TextureData* out)
 	{
 		Nu3D::BmpDataNode* node = Nu3D::g_currentBmpDataNode;
 		if (node != NULL)
@@ -3678,7 +3678,7 @@ namespace SoftwareRenderer
 	}
 
 	// FUNCTION: TOY2 0x004BC430 [MATCHED]
-	void UnkFunc18(float* primaryDistance, float* secondaryDistance)
+	void GetRenderDistances(float* primaryDistance, float* secondaryDistance)
 	{
 		if (primaryDistance != NULL)
 		{
@@ -3769,11 +3769,10 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// Software triangle-list rasterizer dispatch. Resolves the current bound
-	// texture via UnkFunc20, groups the index stream into triples (one per
-	// triangle), and forwards each triple to the inner rasterizer UnkFunc22
-	// with the masked texture pointer (NULL when no texture is bound). Each
-	// index addresses a 32-byte VertexTL into lpvVertices.
+	// This function resolves the current texture with GetCurrentTextureData.
+	// It groups the index stream into one triple for each triangle.
+	// It sends each triple and the selected texture pointer to UnkFunc22.
+	// Each index selects one 32-byte VertexTL from lpvVertices.
 	//
 	// dwFlags is unused by the retail body.
 	//
@@ -3789,7 +3788,7 @@ namespace SoftwareRenderer
 	void UnkFunc19(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags)
 	{
 		TextureData tex;
-		int32_t noTexture = UnkFunc20(&tex);
+		int32_t noTexture = GetCurrentTextureData(&tex);
 		LPWORD indices = lpwIndices;
 		Nu3D::VertexTL* vertexBase = static_cast<Nu3D::VertexTL*>(lpvVertices);
 		uint32_t* maskedTexData = (noTexture != 0) ? NULL : tex.texData;
@@ -3816,7 +3815,7 @@ namespace SoftwareRenderer
 	void UnkFunc21(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags)
 	{
 		TextureData texture;
-		uint32_t* texData = UnkFunc20(&texture) != 0 ? NULL : texture.texData;
+		uint32_t* texData = GetCurrentTextureData(&texture) != 0 ? NULL : texture.texData;
 		Nu3D::VertexTL* vertexBase = (Nu3D::VertexTL*)lpvVertices;
 		Nu3D::VertexTL* vertices[4];
 
@@ -3865,7 +3864,7 @@ namespace SoftwareRenderer
 	// FUNCTION: TOY2 0x004C1720 [MATCHED]
 	void UnkFunc16(D3DPRIMITIVETYPE d3dptPrimitiveType, LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags)
 	{
-		UnkFunc18(&g_primaryRenderDistance, &g_secondaryRenderDistance);
+		GetRenderDistances(&g_primaryRenderDistance, &g_secondaryRenderDistance);
 		switch (d3dptPrimitiveType)
 		{
 			case D3DPT_TRIANGLELIST:
@@ -4219,7 +4218,7 @@ namespace SoftwareDevice
 		if (DrawingAPI::LockVertexBuffer(vertexBuffer, 0x801, &lockedVertices, 0) == 0)
 		{
 			SoftwareRenderer::TextureData scratch;
-			SoftwareRenderer::UnkFunc20(&scratch);
+			SoftwareRenderer::GetCurrentTextureData(&scratch);
 			if (SoftwareRenderer::g_viewportRect != NULL)
 			{
 				Nu3D::Viewport::ViewportRect* rect = SoftwareRenderer::g_viewportRect;
@@ -4241,7 +4240,7 @@ namespace SoftwareDevice
 		DWORD dwFlags)
 	{
 		SoftwareRenderer::TextureData scratch;
-		SoftwareRenderer::UnkFunc20(&scratch);
+		SoftwareRenderer::GetCurrentTextureData(&scratch);
 		if (SoftwareRenderer::g_viewportRect != NULL)
 		{
 			Nu3D::Viewport::ViewportRect* rect = SoftwareRenderer::g_viewportRect;
@@ -4307,7 +4306,7 @@ namespace SoftwareDevice
 	{
 		float halfScreenV = (float)(SoftwareRenderer::g_screenDimV * 0.5);
 		float halfScreenH = (float)(SoftwareRenderer::g_screenDimH * 0.5);
-		SoftwareRenderer::UnkFunc18(&SoftwareRenderer::g_primaryRenderDistance, &SoftwareRenderer::g_secondaryRenderDistance);
+		SoftwareRenderer::GetRenderDistances(&SoftwareRenderer::g_primaryRenderDistance, &SoftwareRenderer::g_secondaryRenderDistance);
 
 		Nu3D::Vertex* sourceVertices;
 		DWORD bufferSize;
