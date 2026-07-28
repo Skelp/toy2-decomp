@@ -1,0 +1,40 @@
+name: Source Quality
+
+on:
+  push:
+    paths:
+      - "src/**"
+      - "tools/decomp_lint.py"
+      - "tools/decomp_candidates.py"
+      - "tools/generate-decomp-report.py"
+      - "tools/tests/**"
+      - ".notes/lint-baseline.tsv"
+      - ".github/workflows/source-quality.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "tools/decomp_lint.py"
+      - "tools/decomp_candidates.py"
+      - "tools/generate-decomp-report.py"
+      - "tools/tests/**"
+      - ".notes/lint-baseline.tsv"
+      - ".github/workflows/source-quality.yml"
+  workflow_dispatch:
+
+jobs:
+  lint-source:
+    name: Lint reconstructed source
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Run tooling tests
+        run: python -m unittest discover -s tools/tests -v
+
+      - name: Check source plausibility
+        run: python tools/decomp_lint.py --quiet

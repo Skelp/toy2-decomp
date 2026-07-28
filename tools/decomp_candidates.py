@@ -27,7 +27,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -61,6 +60,7 @@ class Candidate:
     siblings: int = 0
     namespace: str = ""
     lint_errors: int = 0
+    lint_warnings: int = 0
     reasons: list[str] = field(default_factory=list)
     rank: float = 0.0
 
@@ -139,49 +139,35 @@ def namespace_of(name: str) -> str:
     return name.rsplit("::", 1)[0] if "::" in name else ""
 
 
-_ANNOTATION_LINE_RE = re.compile(r"//\s*(?:FUNCTION|STUB):\s*TOY2\s+(0x[0-9A-Fa-f]+)")
-
-
-def read_lint_errors() -> dict[int, int]:
-    """Count source-plausibility errors per retail address.
-
-    A finding is attributed to the nearest `// FUNCTION:` or `// STUB:`
-    annotation above it, which is the function that contains the line.
-    """
+def read_lint_findings() -> dict[int, tuple[int, int]]:
+    """Count blocking and advisory plausibility findings per retail address."""
 
     try:
         from tools import decomp_lint
     except ImportError:
         return {}
 
-    counts: dict[int, int] = {}
-    for path in sorted(SOURCE_ROOT.rglob("*")):
-        if path.suffix not in (".c", ".cpp"):
+    units = decomp_lint.target_units(False, [])
+    findings = decomp_lint.scan_units(units)
+    findings, _ = decomp_lint.apply_baseline(findings, decomp_lint.read_baseline())
+    counts: dict[int, tuple[int, int]] = {}
+    for finding in findings:
+        if not finding.owner_address or finding.suppressed:
             continue
-        try:
-            findings = decomp_lint.check_file(path)
-        except OSError:
-            continue
-        errors = [item for item in findings if item.severity == "error"]
-        if not errors:
-            continue
-        owners: list[tuple[int, int]] = []
-        for number, line in enumerate(
-            path.read_text(encoding="utf-8", errors="ignore").splitlines(), 1
-        ):
-            found = _ANNOTATION_LINE_RE.search(line)
-            if found:
-                owners.append((number, int(found.group(1), 16)))
-        for finding in errors:
-            owner = None
-            for number, address in owners:
-                if number <= finding.line:
-                    owner = address
-                else:
-                    break
-            if owner is not None:
-                counts[owner] = counts.get(owner, 0) + 1
+        address = int(finding.owner_address, 16)
+        errors, warnings = counts.get(address, (0, 0))
+        if finding.severity == "error":
+            errors += 1
+        else:
+            warnings += 1
+        counts[address] = errors, warnings
     return counts
+
+
+def read_lint_errors() -> dict[int, int]:
+    """Compatibility view used by older tooling tests."""
+
+    return {address: errors for address, (errors, _) in read_lint_findings().items()}
 
 
 def build_candidates() -> list[Candidate]:
@@ -189,7 +175,7 @@ def build_candidates() -> list[Candidate]:
     states = read_annotation_states()
     matches = read_match_percentages()
     caps = read_caps()
-    lint_errors = read_lint_errors()
+    lint_findings = read_lint_findings()
 
     reconstructed_per_namespace: dict[str, int] = {}
     for address, name in entries:
@@ -213,7 +199,8 @@ def build_candidates() -> list[Candidate]:
                 cap=caps.get(address, ""),
                 siblings=reconstructed_per_namespace.get(namespace, 0),
                 namespace=namespace,
-                lint_errors=lint_errors.get(address, 0),
+                lint_errors=lint_findings.get(address, (0, 0))[0],
+                lint_warnings=lint_findings.get(address, (0, 0))[1],
             )
         )
     return candidates
@@ -252,6 +239,9 @@ def score(candidate: Candidate) -> None:
     if candidate.lint_errors:
         rank += 45.0 + min(candidate.lint_errors, 10)
         reasons.append(f"{candidate.lint_errors} lint error(s): states offsets, not names")
+    if candidate.lint_warnings:
+        rank += min(candidate.lint_warnings, 10) * 0.5
+        reasons.append(f"{candidate.lint_warnings} plausibility warning(s)")
 
     if candidate.size and candidate.size <= LEAF_MAX_SIZE:
         rank += 30.0
@@ -314,12 +304,14 @@ def select(
             continue
         if exclude_capped and candidate.cap:
             continue
-        if debt_only and not candidate.lint_errors:
+        if debt_only and not (candidate.lint_errors or candidate.lint_warnings):
             continue
         if not (stubs_only or leaves_only or near_only or debt_only) and candidate.state == "FUNCTION":
             # A fully matched function is finished work only when its source also
             # reads like source. Lint errors keep it in the list.
-            if (candidate.match is None or candidate.match >= 0.999) and not candidate.lint_errors:
+            if (candidate.match is None or candidate.match >= 0.999) and not (
+                candidate.lint_errors or candidate.lint_warnings
+            ):
                 continue
         chosen.append(candidate)
 
@@ -408,6 +400,7 @@ def main() -> int:
                     "cap": item.cap,
                     "siblings": item.siblings,
                     "lint_errors": item.lint_errors,
+                    "lint_warnings": item.lint_warnings,
                     "rank": item.rank,
                     "reasons": item.reasons,
                 }

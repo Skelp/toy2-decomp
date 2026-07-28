@@ -30,6 +30,12 @@ class ReportMetricTests(unittest.TestCase):
             annotations,
             {"0x401000": "Game", "0x401010": "Stub", "0x401020": "Missing"},
             summary,
+            {
+                "0x401000": [
+                    {"severity": "error", "rule": "raw-layout-access"},
+                    {"severity": "warning", "rule": "unknown-symbol"},
+                ]
+            },
         )
         metrics = result["metrics"]
         self.assertEqual(metrics["project_total"], 3)
@@ -39,6 +45,9 @@ class ReportMetricTests(unittest.TestCase):
         self.assertEqual(metrics["project_accuracy"], 50.0)
         self.assertEqual(metrics["runtime_compared"], 1)
         self.assertEqual(metrics["runtime_accuracy"], 100.0)
+        game = next(item for item in result["entities"] if item["address"] == "0x401000")
+        self.assertEqual(game["quality_errors"], 1)
+        self.assertEqual(game["quality_warnings"], 1)
         missing = next(item for item in result["entities"] if item["address"] == "0x401020")
         self.assertEqual(missing["name"], "Missing")
         self.assertEqual(missing["category"], "project")

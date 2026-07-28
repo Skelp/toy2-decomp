@@ -132,6 +132,13 @@ match that still states byte offsets is a transliteration, not a
 reconstruction:
   tools/decomp lint                 # all of src/
   tools/decomp lint --staged        # only what you are about to commit
+  tools/decomp lint --show new      # only findings that are not in the baseline
+  tools/decomp lint --explain RULE  # rationale and required source form
+  tools/decomp lint --format json   # structured findings for other tools
+
+Reviewed old findings are in .notes/lint-baseline.tsv. They remain visible but
+do not stop unrelated work. New errors and stale baseline rows fail the gate.
+See .notes/lint-rules.md for the rule and suppression policy.
 
 `names` regenerates .notes/original-names.md, the developers' own structure and
 field names recovered from the retail assert strings. Those names outrank any

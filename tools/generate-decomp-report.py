@@ -12,6 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from decomp_annotations import canonical_address, read_source_annotations
+import decomp_lint
 
 SUMMARY_RE = {
     "implemented": re.compile(r"Implemented:\s+[\d.]+%\s+\((\d+)\s*/\s*(\d+)\)"),
@@ -47,6 +48,29 @@ def read_function_names(path: Path | None) -> dict[str, str]:
                 match.group(2) or "Unknown function"
             )
     return names
+
+
+def read_lint_quality(source_root: Path) -> tuple[dict[str, list[dict]], dict[str, int]]:
+    units = [
+        decomp_lint.SourceUnit(path, path.read_text(encoding="utf-8", errors="ignore"))
+        for path in sorted(source_root.rglob("*"))
+        if path.suffix in decomp_lint.SOURCE_SUFFIXES
+    ]
+    findings = decomp_lint.scan_units(units)
+    findings, stale = decomp_lint.apply_baseline(findings, decomp_lint.read_baseline())
+    by_address: dict[str, list[dict]] = {}
+    for finding in findings:
+        if finding.owner_address and not finding.suppressed:
+            by_address.setdefault(finding.owner_address, []).append(finding.to_json())
+    summary = {
+        "quality_errors": sum(item.severity == "error" and not item.suppressed for item in findings),
+        "quality_warnings": sum(item.severity == "warning" and not item.suppressed for item in findings),
+        "quality_new_errors": sum(
+            item.severity == "error" and not item.legacy and not item.suppressed for item in findings
+        ),
+        "quality_stale_baseline": len(stale),
+    }
+    return by_address, summary
 
 
 def parse_summary(path: Path | None, entities: list[dict]) -> dict[str, float | int]:
@@ -101,7 +125,9 @@ def enrich_report(
     annotations: dict[str, dict[str, str]],
     names: dict[str, str],
     summary: dict[str, float | int],
+    quality: dict[str, list[dict]] | None = None,
 ) -> dict:
+    quality = quality or {}
     entities_by_address: dict[str, dict] = {}
     known_sources = sorted({item["source"] for item in annotations.values()})
     basename_index: dict[str, list[str]] = {}
@@ -131,6 +157,9 @@ def enrich_report(
             if entity.get("matching", 0) > 0
             else "zero"
         )
+        entity["quality"] = quality.get(address, [])
+        entity["quality_errors"] = sum(item["severity"] == "error" for item in entity["quality"])
+        entity["quality_warnings"] = sum(item["severity"] == "warning" for item in entity["quality"])
         entities_by_address[address] = entity
 
     # Make the treemap a project view, not merely a list of successful pairs.
@@ -149,6 +178,9 @@ def enrich_report(
             "stub": is_stub,
             "status": "stub" if is_stub else "unmatched",
             "diff": None,
+            "quality": quality.get(address, []),
+            "quality_errors": sum(item["severity"] == "error" for item in quality.get(address, [])),
+            "quality_warnings": sum(item["severity"] == "warning" for item in quality.get(address, [])),
         }
 
     entities = sorted(entities_by_address.values(), key=lambda item: int(item["address"], 16))
@@ -166,6 +198,9 @@ def enrich_report(
                 "stub": False,
                 "status": "unmatched",
                 "diff": None,
+                "quality": quality.get(address, []),
+                "quality_errors": sum(item["severity"] == "error" for item in quality.get(address, [])),
+                "quality_warnings": sum(item["severity"] == "warning" for item in quality.get(address, [])),
             }
         )
 
@@ -274,7 +309,9 @@ def main() -> int:
     annotations = read_annotations(args.source_root)
     names = read_function_names(args.functions_map)
     summary = parse_summary(args.summary, report.get("data", []))
-    payload = enrich_report(report, annotations, names, summary)
+    quality, quality_summary = read_lint_quality(args.source_root)
+    summary.update(quality_summary)
+    payload = enrich_report(report, annotations, names, summary, quality)
     template = args.template.read_text(encoding="utf-8")
     marker = "__DECOMP_REPORT_DATA__"
     if template.count(marker) != 1:

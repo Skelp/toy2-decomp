@@ -4,6 +4,7 @@ import importlib.util
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 
@@ -38,12 +39,16 @@ def severities(source: str) -> dict[str, str]:
 class RawOffsetCastTests(unittest.TestCase):
     def test_literal_displacement_is_an_error(self):
         source = "int16_t f() { return ((int16_t*)((char*)g_buffer + 0x104))[slot]; }\n"
-        self.assertIn("raw-offset-cast", rules(source))
-        self.assertEqual(severities(source)["raw-offset-cast"], "error")
+        self.assertIn("raw-layout-access", rules(source))
+        self.assertEqual(severities(source)["raw-layout-access"], "error")
 
     def test_literal_displacement_dereference_is_an_error(self):
         source = "void f() { *(int16_t*)((char*)g_object + 0x9fdd8) = 0; }\n"
-        self.assertIn("raw-offset-cast", rules(source))
+        self.assertIn("raw-layout-access", rules(source))
+
+    def test_decimal_literal_displacement_is_an_error(self):
+        source = "void f() { *(int16_t*)((char*)g_object + 4) = 0; }\n"
+        self.assertIn("raw-layout-access", rules(source))
 
     def test_runtime_stride_is_accepted(self):
         # Walking a locked surface by its pitch is correct, idiomatic code.
@@ -51,7 +56,7 @@ class RawOffsetCastTests(unittest.TestCase):
             "uint16_t* row(void* base, int y, int pitch)\n"
             "{ return (uint16_t*)((uint8_t*)base + y * pitch); }\n"
         )
-        self.assertNotIn("raw-offset-cast", rules(source))
+        self.assertNotIn("raw-layout-access", rules(source))
 
     def test_a_declared_struct_access_is_accepted(self):
         source = "int16_t ok(DrawBuffer* drawb, int i) { return drawb->VerticeCount[i]; }\n"
@@ -82,6 +87,14 @@ class PlaceholderParameterTests(unittest.TestCase):
         source = "struct Command\n{\n\tint32_t field80;\n};\n"
         self.assertEqual(severities(source).get("placeholder-field"), "warning")
         self.assertNotIn("placeholder-parameter", rules(source))
+
+    def test_a_stub_parameter_is_advice_until_the_body_reveals_its_role(self):
+        source = "// STUB: TOY2 0x00401000\nvoid f(int32_t param1) {}\n"
+        self.assertEqual(severities(source).get("placeholder-parameter"), "warning")
+
+    def test_a_completed_local_is_an_error(self):
+        source = "// FUNCTION: TOY2 0x00401000\nvoid f() { int32_t iVar2 = 4; use(iVar2); }\n"
+        self.assertEqual(severities(source).get("decompiler-identifier"), "error")
 
 
 class MagicPointerTests(unittest.TestCase):
@@ -121,6 +134,140 @@ class CommentTests(unittest.TestCase):
     def test_a_retail_log_string_is_not_a_struct_declaration(self):
         source = '\t\t\tLogger::LogDDError("drawb->VerticeCount[i]", error);\n'
         self.assertEqual(rules(source), set())
+
+    def test_inactive_source_is_ignored(self):
+        source = "#if 0\nvoid f() { *(int*)((char*)p + 0x20) = 1; }\n#endif\n"
+        self.assertEqual(rules(source), set())
+
+    def test_multiline_offset_cast_is_detected(self):
+        source = "void f() { return_value((int16_t*)((uint8_t*)base\n + 0x20)); }\n"
+        self.assertIn("raw-layout-access", rules(source))
+
+
+class PointerModelTests(unittest.TestCase):
+    def test_vertex_pointer_byte_roundtrip_is_an_error(self):
+        source = (
+            "// FUNCTION: TOY2 0x00401000\n"
+            "void f(Nu3D::VertexTL* lpvVertices, int offset)\n"
+            "{ Nu3D::VertexTL* vertex = (Nu3D::VertexTL*)((uint8_t*)lpvVertices + offset); }\n"
+        )
+        self.assertEqual(severities(source).get("typed-byte-roundtrip"), "error")
+
+    def test_row_pointer_byte_roundtrip_is_an_error(self):
+        source = (
+            "uint32_t* next(uint32_t* primaryRow, int pitch)\n"
+            "{ return (uint32_t*)((uint8_t*)primaryRow + pitch); }\n"
+        )
+        self.assertEqual(severities(source).get("typed-byte-roundtrip"), "error")
+
+    def test_callback_context_can_be_named_once(self):
+        source = "void f(void* context) { Device* device = reinterpret_cast<Device*>(context); use(device); }\n"
+        self.assertNotIn("anonymous-buffer-view", rules(source))
+
+    def test_inline_untyped_dereference_is_an_error(self):
+        source = "int f(uint8_t* data) { return *reinterpret_cast<int32_t*>(data); }\n"
+        self.assertEqual(severities(source).get("anonymous-buffer-view"), "error")
+
+    def test_runtime_surface_cursor_with_named_view_is_accepted(self):
+        source = (
+            "void f(uint8_t* row, int pitch)\n"
+            "{ uint32_t* pixels = reinterpret_cast<uint32_t*>(row); use(pixels); row += pitch; }\n"
+        )
+        self.assertNotIn("anonymous-buffer-view", rules(source))
+
+    def test_narrow_suppression_needs_a_reason_and_applies_to_next_line(self):
+        source = (
+            "uint32_t* f(uint32_t* row, int pitch)\n{\n"
+            "// decomp-lint: allow[typed-byte-roundtrip] reason: SDK pitch is measured in bytes\n"
+            "return (uint32_t*)((uint8_t*)row + pitch);\n}\n"
+        )
+        findings = findings_for(source)
+        item = next(item for item in findings if item.rule == "typed-byte-roundtrip")
+        self.assertTrue(item.suppressed)
+
+    def test_repeated_scalar_offsets_require_a_record(self):
+        source = (
+            "// FUNCTION: TOY2 0x00401000\n"
+            "int f(uint8_t* record)\n"
+            "{ return *reinterpret_cast<int16_t*>(record + 2) + "
+            "*reinterpret_cast<int32_t*>(record + 8); }\n"
+        )
+        self.assertEqual(severities(source).get("implicit-record-layout"), "error")
+
+
+class AnnotationTests(unittest.TestCase):
+    def test_empty_function_must_be_a_stub(self):
+        source = "// FUNCTION: TOY2 0x00401000\nvoid f() {}\n"
+        self.assertEqual(severities(source).get("unfinished-function"), "error")
+
+    def test_matched_null_function_is_accepted(self):
+        source = "// FUNCTION: TOY2 0x00401000 [MATCHED]\nvoid f() {}\n"
+        self.assertNotIn("unfinished-function", rules(source))
+
+    def test_library_body_is_not_checked(self):
+        source = "// LIBRARY: TOY2 0x00401000\nvoid f() { int iVar2 = 0; }\n"
+        self.assertNotIn("decompiler-identifier", rules(source))
+
+
+class BaselineTests(unittest.TestCase):
+    def test_baseline_classification_and_stale_rows(self):
+        source = "// FUNCTION: TOY2 0x00401000\nvoid f() { int iVar2 = 0; use(iVar2); }\n"
+        finding = next(item for item in findings_for(source) if item.rule == "decompiler-identifier")
+        entry = lint.BaselineEntry(*finding.baseline_key, finding.relative_path)
+        classified, stale = lint.apply_baseline([finding], [entry])
+        self.assertTrue(classified[0].legacy)
+        self.assertEqual(stale, [])
+        _, stale = lint.apply_baseline([], [entry])
+        self.assertEqual(stale, [entry])
+
+
+class CrossFileTests(unittest.TestCase):
+    def test_project_call_cast_is_signature_concealment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            header = lint.SourceUnit(root / "Thing.h", "void UseThing(Thing* thing);\n")
+            source = lint.SourceUnit(
+                root / "Thing.cpp",
+                "// FUNCTION: TOY2 0x00401000\n"
+                "void Caller(void* value) { UseThing((Thing*)value); }\n",
+            )
+            findings = lint.scan_units([header, source])
+        self.assertIn("signature-concealment", {item.rule for item in findings})
+
+    def test_sdk_void_output_cast_is_accepted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            header = lint.SourceUnit(root / "Thing.h", "void Lock(void** output);\n")
+            source = lint.SourceUnit(
+                root / "Thing.cpp",
+                "// FUNCTION: TOY2 0x00401000\n"
+                "void Caller(Vertex** value) { Lock((void**)value); }\n",
+            )
+            findings = lint.scan_units([header, source])
+        self.assertNotIn("signature-concealment", {item.rule for item in findings})
+
+
+class StagedSourceTests(unittest.TestCase):
+    def test_staged_scan_reads_the_index_not_the_worktree(self):
+        listed = subprocess_result(stdout="src/Probe.cpp\n")
+        indexed = subprocess_result(
+            stdout=b"// FUNCTION: TOY2 0x00401000\nvoid f() { int iVar2 = 0; }\n"
+        )
+        with patch.object(lint.subprocess, "run", side_effect=[listed, indexed]):
+            units = lint.target_units(True, [])
+        self.assertEqual(len(units), 1)
+        self.assertIn("iVar2", units[0].text)
+        self.assertIn("decompiler-identifier", {item.rule for item in lint.scan_units(units)})
+
+
+def subprocess_result(*, stdout):
+    class Result:
+        returncode = 0
+
+        def __init__(self, value):
+            self.stdout = value
+
+    return Result(stdout)
 
 
 if __name__ == "__main__":

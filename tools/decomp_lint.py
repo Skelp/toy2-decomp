@@ -1,41 +1,131 @@
 #!/usr/bin/env python3
-"""Check reconstructed source for decompiler residue.
+"""Check reconstructed source for decompiler residue and implausible source forms.
 
-Machine-code similarity is measured every build. Source plausibility was not
-measured at all, so a function could reach an exact match while still reading
-like transliterated decompiler output. This tool supplies the missing signal.
+The machine-code comparison proves behavior. This linter checks the part that
+the comparison cannot measure: whether the reconstructed source states a
+coherent data model and resembles source that Traveller's Tales could maintain.
 
-An `error` means the source states an offset where it should state a name. Fix
-it or leave the function a `STUB` for a session that can. A `warning` means the
-name describes the arithmetic that produced a value rather than the value's
-role.
-
-Run `tools/decomp lint`, or `tools/decomp lint --staged` for the files in the
-index. It exits non-zero when any error is found.
+Run ``tools/decomp lint`` for the repository or add ``--staged`` before a
+commit. New errors fail. Reviewed legacy errors stay visible until their source
+is repaired, and a stale baseline entry fails so quality debt cannot disappear
+from the report without being removed from the baseline too.
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
+import hashlib
+import json
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 sys.dont_write_bytecode = True
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = ROOT / "src"
+BASELINE_PATH = ROOT / ".notes" / "lint-baseline.tsv"
 
-TYPE = r"(?:u?int(?:8|16|32|64)_t|unsigned\s+\w+|signed\s+\w+|short|long|char|void|float|double|WORD|DWORD|BYTE|LPVOID|LPWORD|HRESULT|BOOL)"
-PLACEHOLDER = r"(?:field[0-9A-Fa-f]{1,3}|param[0-9]+|arg[0-9]+|unk[0-9A-Fa-f]{2,}|[iu]Var[0-9]+|[pu][A-Za-z]?Var[0-9]+)"
-
-# A name whose suffix states the arithmetic instead of the role. Anchored at the
-# end so a legitimate word such as `Template` does not match.
-ARITHMETIC_SUFFIX = re.compile(
-    r"\b(?:g_|s_)?[A-Za-z0-9_]*?(Copy[0-9]?|Times[0-9]+[A-Za-z0-9]*|Minus[0-9]+|Plus[0-9]+|Tmp|Temp)\b"
+SOURCE_SUFFIXES = (".c", ".cpp", ".h", ".hpp")
+ANNOTATION_RE = re.compile(
+    r"//\s*(FUNCTION|STUB|LIBRARY):\s*TOY2\s+(0x[0-9A-Fa-f]+)([^\n]*)"
 )
+ALLOW_RE = re.compile(
+    r"//\s*decomp-lint:\s*allow\[([a-z0-9-]+)\]\s+reason:\s*(.{12,})\s*$",
+    re.IGNORECASE,
+)
+
+TYPE_WORD = r"(?:[A-Za-z_]\w*(?:::\w+)*(?:\s+const)?|unsigned\s+\w+|signed\s+\w+)"
+BYTE_TYPE = r"(?:char|signed\s+char|unsigned\s+char|u?int8_t|BYTE|std::byte)"
+DECOMPILER_NAME_RE = re.compile(
+    r"\b(?:"
+    r"[iu](?:Stack)?Var\d+|[psu][A-Za-z]*Var\d+|local_[0-9A-Fa-f]+|"
+    r"param_?\d+|arg_?\d+|field[0-9A-Fa-f]{1,4}|"
+    r"DAT_[0-9A-Fa-f]+|FUN_[0-9A-Fa-f]+|LAB_[0-9A-Fa-f]+"
+    r")\b"
+)
+PLACEHOLDER_FIELD_RE = re.compile(
+    r"\b(?:field[0-9A-Fa-f]{1,4}|unk[0-9A-Fa-f]{2,}|reserved[0-9A-Fa-f]*)\b"
+)
+UNKNOWN_SYMBOL_RE = re.compile(r"\b(?:g_unk[A-Za-z0-9_]*|UnkFunc\d*|unknown[A-Za-z0-9_]*)\b")
+ARITHMETIC_NAME_RE = re.compile(
+    r"\b(?:g_|s_)?[A-Za-z0-9_]*?(?:Copy[0-9]?|Times[0-9]+[A-Za-z0-9]*|"
+    r"Minus[0-9]+|Plus[0-9]+|Tmp|Temp)\b"
+)
+
+SUPPRESSIBLE_RULES = {"anonymous-buffer-view", "typed-byte-roundtrip"}
+
+RULE_HELP = {
+    "raw-layout-access": (
+        "A literal byte displacement states a structure offset instead of a field. "
+        "Declare the layout and use its field name."
+    ),
+    "typed-byte-roundtrip": (
+        "A typed pointer is converted to bytes, advanced, and converted to the same "
+        "type. Use typed indexing, a row stride in elements, or a declared layout."
+    ),
+    "anonymous-buffer-view": (
+        "An inline cast dereferences an untyped buffer. Convert the API or file boundary "
+        "once into a role-named typed local and use that local."
+    ),
+    "implicit-record-layout": (
+        "Several constant offsets reinterpret one scalar buffer as a record. Declare the "
+        "record header or element type and access named fields."
+    ),
+    "decompiler-identifier": (
+        "A completed function contains an analysis placeholder. Recover the value's role "
+        "from callers and uses, or leave the function as a STUB."
+    ),
+    "placeholder-field-use": (
+        "A completed function accesses an unresolved or reserved member. Name the member "
+        "from its role and pin the recovered layout."
+    ),
+    "placeholder-field": (
+        "A recovered layout still has an unresolved member. Keep it visible as debt until "
+        "enough uses establish the member's role."
+    ),
+    "magic-pointer": "A nonzero integer is cast to a pointer. Correct the type or name the handle.",
+    "unfinished-function": (
+        "A FUNCTION annotation has an empty or default-return body. Mark unfinished work "
+        "as STUB unless comparison proves that retail has the same null body."
+    ),
+    "unknown-symbol": (
+        "A completed function still uses a working unknown name. Recover a modest role-based "
+        "name when the evidence permits it."
+    ),
+    "arithmetic-name": "The identifier states how a value was computed instead of what reads it.",
+    "unnamed-bitmask": "A raw mask is applied to flags or state. Prefer an established named flag.",
+    "unstructured-control-flow": (
+        "Several gotos remain in one completed function. Recover structured control flow, "
+        "or retain only a clear cleanup or error path."
+    ),
+    "unpinned-layout": (
+        "A structure contains recovered padding or unresolved members but has no size assertion. "
+        "Pin its size and the offsets used by completed functions."
+    ),
+    "signature-name-drift": (
+        "A declaration and definition use different role names for the same parameters. "
+        "Keep the public reconstruction vocabulary consistent."
+    ),
+    "signature-concealment": (
+        "A cast at a project-function call hides disagreement between the caller's data "
+        "model and the declared interface. Correct the source type instead."
+    ),
+}
+
+
+@dataclass(frozen=True)
+class Owner:
+    kind: str = "shared"
+    address: str = ""
+    matched: bool = False
+
+    @property
+    def key(self) -> str:
+        return self.address.lower() if self.address else self.kind
 
 
 @dataclass(frozen=True)
@@ -46,183 +136,839 @@ class Finding:
     severity: str
     text: str
     detail: str
+    column: int = 1
+    owner_kind: str = "shared"
+    owner_address: str = ""
+    subject: str = ""
+    fingerprint: str = ""
+    legacy: bool = False
+    suppressed: bool = False
+
+    @property
+    def baseline_key(self) -> tuple[str, str, str, str]:
+        owner = self.owner_address.lower() if self.owner_address else self.relative_path
+        return owner, self.rule, self.subject, self.fingerprint
+
+    @property
+    def relative_path(self) -> str:
+        try:
+            return self.path.resolve().relative_to(ROOT).as_posix()
+        except ValueError:
+            return self.path.as_posix()
 
     def render(self) -> str:
-        try:
-            shown = self.path.relative_to(ROOT)
-        except ValueError:
-            shown = self.path
-        location = f"{shown}:{self.line}"
+        state = "legacy " if self.legacy else ""
+        state = "accepted " if self.suppressed else state
+        location = f"{self.relative_path}:{self.line}:{self.column}"
+        owner = f" ({self.owner_address})" if self.owner_address else ""
         return (
-            f"{location}: {self.severity}: [{self.rule}] {self.detail}\n"
+            f"{location}: {state}{self.severity}: [{self.rule}]{owner} {self.detail}\n"
             f"    {self.text.strip()}"
         )
 
+    def to_json(self) -> dict[str, object]:
+        data = asdict(self)
+        data["path"] = self.relative_path
+        data["baseline_key"] = list(self.baseline_key)
+        return data
 
-def strip_comment(line: str) -> str:
-    index = line.find("//")
-    return line[:index] if index >= 0 else line
+
+@dataclass(frozen=True)
+class SourceUnit:
+    path: Path
+    text: str
+
+
+@dataclass(frozen=True)
+class BaselineEntry:
+    owner: str
+    rule: str
+    subject: str
+    fingerprint: str
+    path: str
+
+    @property
+    def key(self) -> tuple[str, str, str, str]:
+        return self.owner, self.rule, self.subject, self.fingerprint
+
+
+def _mask_source(text: str) -> str:
+    """Replace comments, strings, and inactive #if 0 text while preserving positions."""
+
+    chars = list(text)
+    index = 0
+    state = "code"
+    quote = ""
+    line_start = True
+    active = True
+    preprocessor_stack: list[tuple[bool, bool]] = []
+
+    while index < len(chars):
+        char = chars[index]
+        following = chars[index + 1] if index + 1 < len(chars) else ""
+
+        if state == "line-comment":
+            if char == "\n":
+                state = "code"
+                line_start = True
+            else:
+                chars[index] = " "
+            index += 1
+            continue
+        if state == "block-comment":
+            if char == "*" and following == "/":
+                chars[index] = chars[index + 1] = " "
+                index += 2
+                state = "code"
+            else:
+                if char != "\n":
+                    chars[index] = " "
+                else:
+                    line_start = True
+                index += 1
+            continue
+        if state == "string":
+            if char == "\\":
+                chars[index] = " "
+                if index + 1 < len(chars) and chars[index + 1] != "\n":
+                    chars[index + 1] = " "
+                index += 2
+            elif char == quote:
+                chars[index] = " "
+                index += 1
+                state = "code"
+            else:
+                if char != "\n":
+                    chars[index] = " "
+                index += 1
+            continue
+
+        if line_start:
+            end = text.find("\n", index)
+            end = len(text) if end < 0 else end
+            raw_line = text[index:end]
+            directive = re.match(r"\s*#\s*(if|ifdef|ifndef|elif|else|endif)\b(.*)", raw_line)
+            if directive:
+                word, expression = directive.groups()
+                condition = expression.strip() not in ("0", "(0)")
+                if word in ("if", "ifdef", "ifndef"):
+                    preprocessor_stack.append((active, condition))
+                    active = active and condition
+                elif word == "elif" and preprocessor_stack:
+                    parent, taken = preprocessor_stack[-1]
+                    active = parent and not taken and condition
+                    preprocessor_stack[-1] = (parent, taken or condition)
+                elif word == "else" and preprocessor_stack:
+                    parent, taken = preprocessor_stack[-1]
+                    active = parent and not taken
+                    preprocessor_stack[-1] = (parent, True)
+                elif word == "endif" and preprocessor_stack:
+                    parent, _ = preprocessor_stack.pop()
+                    active = parent
+                for pos in range(index, end):
+                    chars[pos] = " "
+                index = end
+                continue
+            line_start = False
+
+        if not active:
+            if char != "\n":
+                chars[index] = " "
+            else:
+                line_start = True
+            index += 1
+            continue
+        if char == "/" and following == "/":
+            chars[index] = chars[index + 1] = " "
+            index += 2
+            state = "line-comment"
+            continue
+        if char == "/" and following == "*":
+            chars[index] = chars[index + 1] = " "
+            index += 2
+            state = "block-comment"
+            continue
+        if char in ('"', "'"):
+            quote = char
+            chars[index] = " "
+            index += 1
+            state = "string"
+            continue
+        if char == "\n":
+            line_start = True
+        index += 1
+    return "".join(chars)
+
+
+def _line_column(text: str, offset: int) -> tuple[int, int]:
+    line = text.count("\n", 0, offset) + 1
+    previous = text.rfind("\n", 0, offset)
+    return line, offset - previous
+
+
+def _line_text(text: str, line: int) -> str:
+    lines = text.splitlines()
+    return lines[line - 1] if 0 < line <= len(lines) else ""
+
+
+def _normalized(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip())
+
+
+def _fingerprint(value: str) -> str:
+    return hashlib.sha1(_normalized(value).encode("utf-8")).hexdigest()[:12]
+
+
+def _owners_by_line(text: str) -> list[Owner]:
+    lines = text.splitlines()
+    owners: list[Owner] = []
+    current = Owner()
+    for raw in lines:
+        found = ANNOTATION_RE.search(raw)
+        if found:
+            kind, address, tail = found.groups()
+            current = Owner(kind.lower(), address.lower(), "[MATCHED]" in tail)
+        owners.append(current)
+    return owners
+
+
+def _owner_at(owners: list[Owner], line: int) -> Owner:
+    return owners[line - 1] if 0 < line <= len(owners) else Owner()
+
+
+def _allowed_rules(text: str) -> dict[int, set[str]]:
+    allowed: dict[int, set[str]] = {}
+    for line, raw in enumerate(text.splitlines(), 1):
+        found = ALLOW_RE.search(raw)
+        if found and found.group(1) in SUPPRESSIBLE_RULES:
+            allowed.setdefault(line + 1, set()).add(found.group(1))
+    return allowed
+
+
+def _add_finding(
+    findings: list[Finding], path: Path, text: str, owners: list[Owner], allowed: dict[int, set[str]],
+    *, offset: int, rule: str, severity: str, detail: str, subject: str, excerpt: str,
+) -> None:
+    line, column = _line_column(text, offset)
+    owner = _owner_at(owners, line)
+    if owner.kind == "library":
+        return
+    suppressed = rule in allowed.get(line, set())
+    findings.append(
+        Finding(
+            path=path,
+            line=line,
+            column=column,
+            rule=rule,
+            severity=severity,
+            text=_line_text(text, line),
+            detail=detail,
+            owner_kind=owner.kind,
+            owner_address=owner.address,
+            subject=subject,
+            fingerprint=_fingerprint(excerpt),
+            suppressed=suppressed,
+        )
+    )
+
+
+def _balanced_body(masked: str, opening: int) -> tuple[int, int] | None:
+    depth = 0
+    for index in range(opening, len(masked)):
+        if masked[index] == "{":
+            depth += 1
+        elif masked[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return opening + 1, index
+    return None
+
+
+def check_text(path: Path, text: str) -> list[Finding]:
+    findings: list[Finding] = []
+    masked = _mask_source(text)
+    owners = _owners_by_line(text)
+    allowed = _allowed_rules(text)
+
+    parameter_offsets: set[int] = set()
+    parameter_name = re.compile(
+        rf"\b{TYPE_WORD}[\s*&]+(?P<name>param_?\d+|arg_?\d+|field[0-9A-Fa-f]{{1,4}}|"
+        rf"[iu](?:Stack)?Var\d+|[psu][A-Za-z]*Var\d+)\b\s*(?=[,)])"
+    )
+    for match in parameter_name.finditer(masked):
+        parameter_offsets.add(match.start("name"))
+        line, _ = _line_column(text, match.start("name"))
+        owner = _owner_at(owners, line)
+        severity = "warning" if owner.kind == "stub" else "error"
+        _add_finding(
+            findings, path, text, owners, allowed, offset=match.start("name"),
+            rule="placeholder-parameter", severity=severity,
+            detail=f"parameter {match.group('name')!r} has no role-based name",
+            subject=match.group("name"), excerpt=match.group("name"),
+        )
+
+    # Literal offsets expressed through byte-pointer casts, including multiline forms.
+    raw_offset = re.compile(
+        rf"(?:\(\s*{TYPE_WORD}\s*\*+\s*\)|(?:reinterpret|static)_cast\s*<\s*{TYPE_WORD}\s*\*+\s*>)"
+        rf"\s*\([^;{{}}]*?(?:\(\s*{BYTE_TYPE}\s*\*\s*\)|(?:reinterpret|static)_cast\s*<\s*{BYTE_TYPE}\s*\*\s*>)"
+        rf"\s*[A-Za-z_]\w*(?:->\w+|\.\w+)*\s*[+-]\s*(?:0x[0-9A-Fa-f]+|[1-9][0-9]*)[^;{{}}]*?\)",
+        re.DOTALL,
+    )
+    for match in raw_offset.finditer(masked):
+        _add_finding(
+            findings, path, text, owners, allowed, offset=match.start(),
+            rule="raw-layout-access", severity="error",
+            detail="literal byte displacement hides a structure field; declare the layout and check .notes/original-names.md",
+            subject="literal-offset", excerpt=match.group(0),
+        )
+
+    # A pointer returns to the same concrete type after byte arithmetic.
+    byte_roundtrip = re.compile(
+        rf"\(\s*(?P<outer>{TYPE_WORD})\s*\*\s*\)\s*\(\s*\(\s*{BYTE_TYPE}\s*\*\s*\)"
+        rf"\s*(?P<base>[A-Za-z_]\w*(?:->\w+|\.\w+)*)\s*[+-][^;{{}}]+\)",
+        re.DOTALL,
+    )
+    for match in byte_roundtrip.finditer(masked):
+        base = match.group("base")
+        declaration = re.search(
+            rf"\b(?P<type>{TYPE_WORD})\s*\*\s*{re.escape(base.split('.')[-1].split('->')[-1])}\b",
+            masked[: match.start()],
+        )
+        if declaration and _normalized(declaration.group("type")) == _normalized(match.group("outer")):
+            _add_finding(
+                findings, path, text, owners, allowed, offset=match.start(),
+                rule="typed-byte-roundtrip", severity="error",
+                detail="typed pointer is converted to bytes and back; use typed stride arithmetic or a row abstraction",
+                subject=base, excerpt=match.group(0),
+            )
+
+    # Direct access through an inline reinterpretation has no named source-level view.
+    anonymous_view = re.compile(
+        rf"(?:\*\s*|\breturn\s+)(?:\(\s*{TYPE_WORD}\s*\*\s*\)|reinterpret_cast\s*<\s*{TYPE_WORD}\s*\*\s*>)"
+        rf"\s*\([^;{{}}]+\)(?:\s*->)?",
+        re.DOTALL,
+    )
+    for match in anonymous_view.finditer(masked):
+        if re.search(r"\(\s*(?:0|NULL|nullptr)\s*\)", match.group(0)):
+            continue
+        _add_finding(
+            findings, path, text, owners, allowed, offset=match.start(),
+            rule="anonymous-buffer-view", severity="error",
+            detail="inline buffer cast has no role-named typed view",
+            subject="inline-view", excerpt=match.group(0),
+        )
+
+    magic_pointer_patterns = (
+        re.compile(rf"\(\s*{TYPE_WORD}\s*\*+\s*\)\s*0x[0-9A-Fa-f]{{2,}}"),
+        re.compile(rf"reinterpret_cast\s*<\s*{TYPE_WORD}\s*\*+\s*>\s*\(\s*0x[0-9A-Fa-f]{{2,}}\s*\)"),
+    )
+    for pattern in magic_pointer_patterns:
+        for match in pattern.finditer(masked):
+            _add_finding(
+                findings, path, text, owners, allowed, offset=match.start(),
+                rule="magic-pointer", severity="error",
+                detail="nonzero magic integer is cast to a pointer; correct the type or name the handle",
+                subject="integer-pointer", excerpt=match.group(0),
+            )
+
+    # Identifier rules are token based and only become blocking in completed functions.
+    for match in DECOMPILER_NAME_RE.finditer(masked):
+        if match.start() in parameter_offsets:
+            continue
+        line, _ = _line_column(text, match.start())
+        owner = _owner_at(owners, line)
+        severity = "error" if owner.kind == "function" else "warning"
+        rule = "decompiler-identifier" if owner.kind == "function" else "placeholder-field"
+        _add_finding(
+            findings, path, text, owners, allowed, offset=match.start(), rule=rule,
+            severity=severity,
+            detail=(
+                f"{match.group(0)!r} is an analysis placeholder; recover a role-based name"
+                if severity == "error"
+                else f"{match.group(0)!r} remains unresolved while this declaration or STUB is incomplete"
+            ),
+            subject=match.group(0), excerpt=match.group(0),
+        )
+
+    member_use = re.compile(r"(?:->|\.)\s*(field[0-9A-Fa-f]{1,4}|unk[0-9A-Fa-f]{2,}|reserved[0-9A-Fa-f]*)\b")
+    for match in member_use.finditer(masked):
+        line, _ = _line_column(text, match.start())
+        if _owner_at(owners, line).kind != "function":
+            continue
+        _add_finding(
+            findings, path, text, owners, allowed, offset=match.start(),
+            rule="placeholder-field-use", severity="error",
+            detail=f"completed code accesses unresolved member {match.group(1)!r}",
+            subject=match.group(1), excerpt=match.group(0),
+        )
+
+    record_view = re.compile(
+        rf"(?:\(\s*{TYPE_WORD}\s*\*\s*\)|reinterpret_cast\s*<\s*{TYPE_WORD}\s*\*\s*>)"
+        rf"\s*\(\s*(?P<base>[A-Za-z_]\w*)\s*(?P<offset>[+-]\s*(?:0x[0-9A-Fa-f]+|[1-9][0-9]*))\s*\)"
+    )
+    record_offsets: dict[tuple[str, str], list[re.Match[str]]] = {}
+    for match in record_view.finditer(masked):
+        line, _ = _line_column(text, match.start())
+        owner = _owner_at(owners, line)
+        if owner.kind == "function":
+            record_offsets.setdefault((owner.key, match.group("base")), []).append(match)
+    for (_, base), matches in record_offsets.items():
+        offsets = {re.sub(r"\s+", "", item.group("offset")) for item in matches}
+        if len(offsets) < 2:
+            continue
+        first = matches[0]
+        _add_finding(
+            findings, path, text, owners, allowed, offset=first.start(),
+            rule="implicit-record-layout", severity="error",
+            detail=f"{base!r} is read through {len(offsets)} constant record offsets; declare its layout",
+            subject=base, excerpt=" ".join(sorted(offsets)),
+        )
+
+    # Report working unknown names as advice. One finding per symbol and owner is enough.
+    seen_unknown: set[tuple[str, str]] = set()
+    for match in UNKNOWN_SYMBOL_RE.finditer(masked):
+        line, _ = _line_column(text, match.start())
+        owner = _owner_at(owners, line)
+        if owner.kind != "function":
+            continue
+        key = (owner.key, match.group(0))
+        if key in seen_unknown:
+            continue
+        seen_unknown.add(key)
+        _add_finding(
+            findings, path, text, owners, allowed, offset=match.start(),
+            rule="unknown-symbol", severity="warning",
+            detail=f"completed function still uses working name {match.group(0)!r}",
+            subject=match.group(0), excerpt=match.group(0),
+        )
+
+    for match in ARITHMETIC_NAME_RE.finditer(masked):
+        _add_finding(
+            findings, path, text, owners, allowed, offset=match.start(),
+            rule="arithmetic-name", severity="warning",
+            detail=f"{match.group(0)!r} names arithmetic instead of the value's role",
+            subject=match.group(0), excerpt=match.group(0),
+        )
+
+    # Only names that already state a flags/state role activate the mask heuristic.
+    mask_use = re.compile(
+        r"\b(?P<name>[A-Za-z_]\w*(?:->\w+|\.\w+)*(?:Flags|flags|State|state))\b\s*"
+        r"(?P<op>[&|^]=?|==|!=)\s*(?P<value>0x[0-9A-Fa-f]+|[2-9]|[1-9][0-9]+)"
+    )
+    for match in mask_use.finditer(masked):
+        _add_finding(
+            findings, path, text, owners, allowed, offset=match.start(),
+            rule="unnamed-bitmask", severity="warning",
+            detail=f"raw mask {match.group('value')} is applied to {match.group('name')!r}",
+            subject=f"{match.group('name')}:{match.group('value')}", excerpt=match.group(0),
+        )
+
+    # FUNCTION annotations with placeholder bodies must remain STUBs.
+    for annotation in ANNOTATION_RE.finditer(text):
+        kind, address, tail = annotation.groups()
+        if kind != "FUNCTION" or "[MATCHED]" in tail:
+            continue
+        opening = masked.find("{", annotation.end())
+        next_annotation = ANNOTATION_RE.search(text, annotation.end())
+        if opening < 0 or (next_annotation and opening > next_annotation.start()):
+            continue
+        body_range = _balanced_body(masked, opening)
+        if not body_range:
+            continue
+        start, end = body_range
+        body = _normalized(masked[start:end])
+        if body and not re.fullmatch(r"return\s+(?:0|-1|FALSE|NULL|nullptr)\s*;", body):
+            continue
+        _add_finding(
+            findings, path, text, owners, allowed, offset=opening,
+            rule="unfinished-function", severity="error",
+            detail="FUNCTION has a placeholder body; use STUB until retail behavior is implemented",
+            subject=address.lower(), excerpt=body or "{}",
+        )
+
+    # More than two gotos is advisory. Cleanup/error functions remain possible.
+    goto_by_owner: dict[str, list[re.Match[str]]] = {}
+    for match in re.finditer(r"\bgoto\s+([A-Za-z_]\w*)\s*;", masked):
+        line, _ = _line_column(text, match.start())
+        owner = _owner_at(owners, line)
+        if owner.kind == "function":
+            goto_by_owner.setdefault(owner.key, []).append(match)
+    for matches in goto_by_owner.values():
+        if len(matches) > 2:
+            first = matches[0]
+            _add_finding(
+                findings, path, text, owners, allowed, offset=first.start(),
+                rule="unstructured-control-flow", severity="warning",
+                detail=f"completed function contains {len(matches)} gotos; recover structured flow or one clear cleanup path",
+                subject="goto-count", excerpt=" ".join(item.group(0) for item in matches),
+            )
+
+    # Layouts with unresolved storage should at least pin their total size.
+    struct_re = re.compile(r"\bstruct\s+(\w+)\s*\{")
+    for match in struct_re.finditer(masked):
+        body_range = _balanced_body(masked, masked.find("{", match.start()))
+        if not body_range:
+            continue
+        start, end = body_range
+        body = masked[start:end]
+        if not PLACEHOLDER_FIELD_RE.search(body):
+            continue
+        name = match.group(1)
+        if re.search(rf"STATIC_ASSERT\s*\(\s*sizeof\s*\(\s*{re.escape(name)}\s*\)", masked):
+            continue
+        _add_finding(
+            findings, path, text, owners, allowed, offset=match.start(),
+            rule="unpinned-layout", severity="warning",
+            detail=f"layout {name!r} contains unresolved storage but has no size assertion",
+            subject=name, excerpt=name,
+        )
+
+    # Remove exact duplicates caused by overlapping lexical patterns.
+    unique: dict[tuple[str, str, str], Finding] = {}
+    for finding in findings:
+        owner = finding.owner_address or finding.relative_path
+        unique.setdefault((owner, finding.rule, finding.subject), finding)
+    return sorted(unique.values(), key=lambda item: (item.line, item.column, item.rule))
 
 
 def check_file(path: Path) -> list[Finding]:
-    findings: list[Finding] = []
-    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    return check_text(path, path.read_text(encoding="utf-8", errors="ignore"))
 
-    # A declared struct body may legitimately hold a placeholder field name
-    # while a layout is still being recovered, so those lines are only warned
-    # about. Track the brace depth at which the current struct opened. The
-    # opening brace is often on the line after the `struct` keyword, so arm a
-    # pending flag first and record the depth when the brace actually arrives.
-    struct_depth: int | None = None
-    pending_struct = False
+
+def _signature_records(unit: SourceUnit) -> list[tuple[str, tuple[str, ...], int, Owner]]:
+    masked = _mask_source(unit.text)
+    owners = _owners_by_line(unit.text)
+    records: list[tuple[str, tuple[str, ...], int, Owner]] = []
+    # This intentionally accepts only ordinary project declarations, not function pointers.
+    signature = re.compile(
+        r"(?m)^\s*(?:inline\s+|static\s+|virtual\s+)?[A-Za-z_]\w*(?:::\w+)*(?:\s*[&*])?\s+"
+        r"(?P<name>[A-Za-z_]\w*(?:::\w+)*)\s*\((?P<params>[^(){};]*)\)\s*(?P<tail>[;{])"
+    )
+    for match in signature.finditer(masked):
+        params: list[str] = []
+        for raw in match.group("params").split(","):
+            raw = raw.strip()
+            if not raw or raw == "void":
+                continue
+            found = re.search(r"([A-Za-z_]\w*)\s*(?:\[[^]]*\])?\s*(?:=.*)?$", raw)
+            params.append(found.group(1) if found else "")
+        line, _ = _line_column(unit.text, match.start())
+        records.append((match.group("name"), tuple(params), line, _owner_at(owners, line)))
+    return records
+
+
+def _typed_signature_records(
+    unit: SourceUnit,
+) -> list[tuple[str, tuple[str, ...], int, Owner]]:
+    masked = _mask_source(unit.text)
+    owners = _owners_by_line(unit.text)
+    records: list[tuple[str, tuple[str, ...], int, Owner]] = []
+    signature = re.compile(
+        r"(?m)^\s*(?:inline\s+|static\s+|virtual\s+)?[A-Za-z_]\w*(?:::\w+)*(?:\s*[&*])?\s+"
+        r"(?P<name>[A-Za-z_]\w*(?:::\w+)*)\s*\((?P<params>[^(){};]*)\)\s*(?:;|{)"
+    )
+    for match in signature.finditer(masked):
+        types: list[str] = []
+        for raw in match.group("params").split(","):
+            raw = re.sub(r"\s*=.*$", "", raw.strip())
+            if not raw or raw == "void":
+                continue
+            found = re.match(r"(?P<type>.+?[\s*&])(?:[A-Za-z_]\w*)(?:\s*\[[^]]*\])?$", raw)
+            types.append(_normalized(found.group("type")) if found else "")
+        line, _ = _line_column(unit.text, match.start())
+        records.append((match.group("name"), tuple(types), line, _owner_at(owners, line)))
+    return records
+
+
+def _matching_paren(text: str, opening: int) -> int | None:
     depth = 0
+    for index in range(opening, len(text)):
+        if text[index] == "(":
+            depth += 1
+        elif text[index] == ")":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
 
-    for number, raw in enumerate(lines, 1):
-        code = strip_comment(raw)
-        if not code.strip():
+
+def _split_arguments(text: str) -> list[str]:
+    arguments: list[str] = []
+    start = 0
+    depth = 0
+    for index, char in enumerate(text):
+        if char in "(<[{":
+            depth += 1
+        elif char in ")>]}":
+            depth = max(depth - 1, 0)
+        elif char == "," and depth == 0:
+            arguments.append(text[start:index].strip())
+            start = index + 1
+    tail = text[start:].strip()
+    if tail:
+        arguments.append(tail)
+    return arguments
+
+
+def check_signature_concealment(units: list[SourceUnit]) -> list[Finding]:
+    signatures: dict[tuple[str, int], set[tuple[str, ...]]] = {}
+    for unit in units:
+        for name, types, _, _ in _typed_signature_records(unit):
+            signatures.setdefault((name.rsplit("::", 1)[-1], len(types)), set()).add(types)
+
+    findings: list[Finding] = []
+    cast_argument = re.compile(
+        rf"^\s*(?:\(\s*(?P<cstyle>{TYPE_WORD}\s*\*+)\s*\)|"
+        rf"reinterpret_cast\s*<\s*(?P<cpp>{TYPE_WORD}\s*\*+)\s*>)"
+    )
+    for unit in units:
+        masked = _mask_source(unit.text)
+        owners = _owners_by_line(unit.text)
+        for call in re.finditer(r"\b([A-Za-z_]\w*)\s*\(", masked):
+            name = call.group(1)
+            line, _ = _line_column(unit.text, call.start())
+            owner = _owner_at(owners, line)
+            if owner.kind != "function":
+                continue
+            closing = _matching_paren(masked, masked.find("(", call.start()))
+            if closing is None:
+                continue
+            following = masked[closing + 1 :].lstrip()[:1]
+            if following == "{":
+                continue
+            opening = masked.find("(", call.start())
+            arguments = _split_arguments(masked[opening + 1 : closing])
+            variants = signatures.get((name, len(arguments)), set())
+            if len(variants) != 1:
+                continue
+            expected = next(iter(variants))
+            for index, (argument, expected_type) in enumerate(zip(arguments, expected)):
+                cast = cast_argument.match(argument)
+                if not cast or "*" not in expected_type:
+                    continue
+                cast_type = _normalized(cast.group("cstyle") or cast.group("cpp") or "")
+                if "LPVOID" in cast_type or re.fullmatch(r"(?:const )?void\s*\*+", cast_type):
+                    # DirectX and COM expose typed output buffers as void**.
+                    # The cast is part of the SDK boundary, not a project ABI patch.
+                    continue
+                subject = f"{name}:arg{index + 1}"
+                findings.append(
+                    Finding(
+                        unit.path, line, "signature-concealment", "error",
+                        _line_text(unit.text, line),
+                        f"cast at argument {index + 1} of project function {name!r} hides the caller's source type",
+                        owner_kind=owner.kind, owner_address=owner.address, subject=subject,
+                        fingerprint=_fingerprint(argument),
+                    )
+                )
+    unique: dict[tuple[str, str], Finding] = {}
+    for finding in findings:
+        unique.setdefault((finding.owner_address, finding.subject), finding)
+    return list(unique.values())
+
+
+def check_signature_drift(units: list[SourceUnit]) -> list[Finding]:
+    by_name: dict[tuple[str, str, int], list[tuple[SourceUnit, tuple[str, ...], int, Owner]]] = {}
+    for unit in units:
+        for name, params, line, owner in _signature_records(unit):
+            key = (unit.path.stem, name, len(params))
+            by_name.setdefault(key, []).append((unit, params, line, owner))
+    findings: list[Finding] = []
+    for (_, name, _), records in by_name.items():
+        # Overloads and repeated callback declarations need type resolution.
+        # Restrict this vocabulary check to one header/definition pair.
+        if len(records) != 2 or records[0][0].path.suffix == records[1][0].path.suffix:
             continue
-
-        # A forward declaration (`struct Foo;`) opens no body.
-        if re.search(r"\b(struct|union|class)\b", code) and not re.search(r"\b(struct|union|class)\b[^{]*;\s*$", code):
-            pending_struct = True
-
-        opens = code.count("{")
-        closes = code.count("}")
-
-        in_struct = struct_depth is not None
-
-        if pending_struct and opens:
-            if struct_depth is None:
-                struct_depth = depth
-                in_struct = True
-            pending_struct = False
-
-        depth += opens - closes
-        if struct_depth is not None and depth <= struct_depth:
-            struct_depth = None
-
-        # A byte-offset cast whose displacement is a HEX LITERAL. That is a
-        # structure field spelled as an offset. A cast whose displacement is a
-        # runtime value (`row * pitch`) is ordinary surface or buffer walking
-        # and is correct, so it must not be reported.
-        for match in re.finditer(
-            rf"\(\s*{TYPE}\s*\*+\s*\)\s*\(\s*\(\s*(?:char|uint8_t|BYTE)\s*\*\s*\)([^;]*)",
-            code,
-        ):
-            tail = match.group(1)
-            if not re.search(r"\+\s*0x[0-9A-Fa-f]{2,}", tail):
-                continue
-            findings.append(
-                Finding(
-                    path, number, "raw-offset-cast", "error", raw,
-                    "byte-offset cast with a literal displacement; declare the structure "
-                    "and name the field (check .notes/original-names.md first)",
-                )
+        named_sets = {params for _, params, _, _ in records if params and all(params)}
+        if len(named_sets) <= 1:
+            continue
+        definition = next((record for record in records if record[3].kind == "function"), records[0])
+        unit, params, line, owner = definition
+        other = next(other_params for _, other_params, _, _ in records if other_params != params)
+        excerpt = f"{name}({', '.join(params)}) != ({', '.join(other)})"
+        findings.append(
+            Finding(
+                unit.path, line, "signature-name-drift", "warning",
+                _line_text(unit.text, line),
+                f"parameter roles {params!r} differ from another declaration {other!r}",
+                owner_kind=owner.kind, owner_address=owner.address, subject=name,
+                fingerprint=_fingerprint(excerpt),
             )
-            break
-
-        # A placeholder used as a function parameter name. A struct field may
-        # stay a placeholder while a layout is recovered; a parameter may not,
-        # because the caller already proves the argument's role.
-        if "(" in code and not in_struct:
-            for match in re.finditer(rf"\b{TYPE}[\s*&]+({PLACEHOLDER})\b\s*(?=[,)])", code):
-                findings.append(
-                    Finding(
-                        path, number, "placeholder-parameter", "error", raw,
-                        f"parameter named {match.group(1)!r} states an offset or an index, "
-                        "not a role; name it from the caller's use",
-                    )
-                )
-
-        if in_struct:
-            for match in re.finditer(rf"\b{TYPE}[\s*&]+({PLACEHOLDER})\b\s*(?:\[[^\]]*\])?\s*;", code):
-                findings.append(
-                    Finding(
-                        path, number, "placeholder-field", "warning", raw,
-                        f"field named {match.group(1)!r}; check "
-                        ".notes/original-names.md for the developers' own name",
-                    )
-                )
-
-        # A magic integer stored through a pointer type. Either the type is
-        # wrong or the constant is a handle, mask, or sentinel.
-        if re.search(rf"\(\s*{TYPE}\s*\*+\s*\)\s*0x[0-9A-Fa-f]{{2,}}", code):
-            findings.append(
-                Finding(
-                    path, number, "magic-pointer", "error", raw,
-                    "magic integer cast to a pointer; correct the type or name the constant",
-                )
-            )
-
-        # A declaration whose name only restates the arithmetic.
-        for match in ARITHMETIC_SUFFIX.finditer(code):
-            name = re.search(r"\b[A-Za-z_][A-Za-z0-9_]*" + re.escape(match.group(1)) + r"\b", code)
-            if not name:
-                continue
-            findings.append(
-                Finding(
-                    path, number, "arithmetic-name", "warning", raw,
-                    f"{name.group(0)!r} names the arithmetic, not the role; say what reads it",
-                )
-            )
-            break
-
+        )
     return findings
 
 
-def target_files(staged: bool, explicit: list[str]) -> list[Path]:
+def target_units(staged: bool, explicit: list[str]) -> list[SourceUnit]:
     if explicit:
-        return [Path(item).resolve() for item in explicit]
+        paths = [Path(item).resolve() for item in explicit]
+        return [SourceUnit(path, path.read_text(encoding="utf-8", errors="ignore")) for path in paths]
     if staged:
         result = subprocess.run(
             ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
             capture_output=True, text=True, check=False, cwd=ROOT,
         )
-        paths = []
-        for name in result.stdout.split():
-            candidate = ROOT / name
-            if candidate.suffix in (".c", ".cpp", ".h", ".hpp") and candidate.exists():
-                paths.append(candidate)
-        return paths
-    return sorted(
-        path
-        for path in SOURCE_ROOT.rglob("*")
-        if path.suffix in (".c", ".cpp", ".h", ".hpp")
-    )
+        units: list[SourceUnit] = []
+        for name in result.stdout.splitlines():
+            path = ROOT / name
+            if path.suffix not in SOURCE_SUFFIXES:
+                continue
+            shown = subprocess.run(
+                ["git", "show", f":{name}"], capture_output=True, check=False, cwd=ROOT,
+            )
+            if shown.returncode == 0:
+                units.append(SourceUnit(path, shown.stdout.decode("utf-8", errors="ignore")))
+        return units
+    return [
+        SourceUnit(path, path.read_text(encoding="utf-8", errors="ignore"))
+        for path in sorted(SOURCE_ROOT.rglob("*")) if path.suffix in SOURCE_SUFFIXES
+    ]
+
+
+def scan_units(units: list[SourceUnit], *, cross_file: bool = True) -> list[Finding]:
+    findings = [finding for unit in units for finding in check_text(unit.path, unit.text)]
+    if cross_file:
+        findings.extend(check_signature_drift(units))
+        findings.extend(check_signature_concealment(units))
+    return sorted(findings, key=lambda item: (item.relative_path, item.line, item.column, item.rule))
+
+
+def read_baseline(path: Path = BASELINE_PATH) -> list[BaselineEntry]:
+    if not path.exists():
+        return []
+    entries: list[BaselineEntry] = []
+    with path.open(encoding="utf-8", newline="") as handle:
+        for row in csv.reader(handle, delimiter="\t"):
+            if not row or row[0].startswith("#") or len(row) < 5:
+                continue
+            entries.append(BaselineEntry(*row[:5]))
+    return entries
+
+
+def apply_baseline(
+    findings: list[Finding], entries: list[BaselineEntry]
+) -> tuple[list[Finding], list[BaselineEntry]]:
+    baseline = {entry.key: entry for entry in entries}
+    seen: set[tuple[str, str, str, str]] = set()
+    classified: list[Finding] = []
+    for finding in findings:
+        legacy = finding.baseline_key in baseline
+        if legacy:
+            seen.add(finding.baseline_key)
+        classified.append(replace(finding, legacy=legacy))
+    stale = [entry for entry in entries if entry.key not in seen]
+    return classified, stale
+
+
+def print_baseline(findings: list[Finding]) -> None:
+    print("# owner\trule\tsubject\tfingerprint\tpath")
+    for finding in findings:
+        if finding.suppressed:
+            continue
+        owner, rule, subject, fingerprint = finding.baseline_key
+        print("\t".join((owner, rule, subject, fingerprint, finding.relative_path)))
+
+
+def _show_finding(finding: Finding, show: str) -> bool:
+    if show == "legacy":
+        return finding.legacy
+    if show == "new":
+        return not finding.legacy
+    return True
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Check source for decompiler residue.")
+    parser = argparse.ArgumentParser(description="Check reconstructed source plausibility.")
     parser.add_argument("files", nargs="*", help="specific files (default: all of src/)")
-    parser.add_argument("--staged", action="store_true", help="check the files in the git index")
-    parser.add_argument(
-        "--warnings-as-errors", action="store_true", help="fail on warnings too"
-    )
+    parser.add_argument("--staged", action="store_true", help="check source from the git index")
+    parser.add_argument("--warnings-as-errors", action="store_true", help="fail on new advice too")
     parser.add_argument("--quiet", action="store_true", help="print only the summary")
+    parser.add_argument("--format", choices=("text", "json"), default="text")
+    parser.add_argument("--show", choices=("legacy", "new", "all"), default="all")
+    parser.add_argument("--explain", metavar="RULE", help="explain one rule and exit")
+    parser.add_argument(
+        "--print-baseline", action="store_true",
+        help="print reviewed-baseline rows; this never edits the repository",
+    )
+    parser.add_argument("--baseline", type=Path, default=BASELINE_PATH, help=argparse.SUPPRESS)
     args = parser.parse_args()
 
-    findings: list[Finding] = []
-    for path in target_files(args.staged, args.files):
-        findings.extend(check_file(path))
+    if args.explain:
+        detail = RULE_HELP.get(args.explain)
+        if detail is None:
+            print(f"unknown rule: {args.explain}", file=sys.stderr)
+            return 2
+        print(f"{args.explain}: {detail}")
+        return 0
 
-    errors = [item for item in findings if item.severity == "error"]
-    warnings = [item for item in findings if item.severity == "warning"]
+    units = target_units(args.staged, args.files)
+    findings = scan_units(units, cross_file=not args.staged and not args.files)
+    entries = read_baseline(args.baseline)
+    findings, stale = apply_baseline(findings, entries)
 
-    if not args.quiet:
-        for finding in sorted(findings, key=lambda item: (str(item.path), item.line)):
-            print(finding.render())
-        if findings:
-            print()
+    if args.print_baseline:
+        print_baseline(findings)
+        return 0
 
-    print(f"lint: {len(errors)} error(s), {len(warnings)} warning(s)")
-    if errors:
-        print(
-            "\nAn exact machine-code match with these findings is a matched\n"
-            "transliteration, not a reconstruction. Declare the type, or leave the\n"
-            "function a STUB. Check .notes/original-names.md: the retail binary\n"
-            "names many of these structures itself."
+    visible = [item for item in findings if _show_finding(item, args.show)]
+    new_errors = [item for item in findings if item.severity == "error" and not item.legacy and not item.suppressed]
+    legacy_errors = [item for item in findings if item.severity == "error" and item.legacy and not item.suppressed]
+    warnings = [item for item in findings if item.severity == "warning" and not item.suppressed]
+    new_warnings = [item for item in warnings if not item.legacy]
+    suppressed = [item for item in findings if item.suppressed]
+    visible_new_errors = [item for item in visible if item.severity == "error" and not item.legacy and not item.suppressed]
+    visible_legacy_errors = [item for item in visible if item.severity == "error" and item.legacy and not item.suppressed]
+    visible_warnings = [item for item in visible if item.severity == "warning" and not item.suppressed]
+    visible_suppressed = [item for item in visible if item.suppressed]
+
+    # A subset scan cannot prove that baseline rows elsewhere are stale.
+    stale_is_gate = not args.staged and not args.files
+
+    if args.format == "json":
+        json.dump(
+            {
+                "findings": [item.to_json() for item in visible],
+                "stale_baseline": [asdict(item) for item in stale] if stale_is_gate else [],
+                "summary": {
+                    "new_errors": len(new_errors), "legacy_errors": len(legacy_errors),
+                    "warnings": len(warnings), "new_warnings": len(new_warnings),
+                    "suppressed": len(suppressed), "stale_baseline": len(stale) if stale_is_gate else 0,
+                },
+                "displayed_summary": {
+                    "new_errors": len(visible_new_errors),
+                    "legacy_errors": len(visible_legacy_errors),
+                    "warnings": len(visible_warnings),
+                    "suppressed": len(visible_suppressed),
+                },
+            },
+            sys.stdout, indent=2,
         )
-    return 1 if errors or (args.warnings_as_errors and warnings) else 0
+        print()
+    else:
+        if not args.quiet:
+            for finding in visible:
+                print(finding.render())
+            for entry in stale if stale_is_gate else []:
+                print(
+                    f"{entry.path}: error: [stale-baseline] {entry.rule} debt for "
+                    f"{entry.owner} no longer exists; remove this baseline row"
+                )
+            if visible or (stale and stale_is_gate):
+                print()
+        print(
+            "lint: "
+            f"{len(visible_new_errors)} new error(s), {len(visible_legacy_errors)} legacy error(s), "
+            f"{len(visible_warnings)} warning(s), {len(visible_suppressed)} accepted, "
+            f"{len(stale) if stale_is_gate else 0} stale baseline row(s)"
+        )
+        if new_errors:
+            print(
+                "\nA machine-code match with a new error is a matched transliteration, "
+                "not a reconstruction. Fix the source model or keep the function a STUB."
+            )
+
+    return 1 if (
+        new_errors or (stale_is_gate and stale) or (args.warnings_as_errors and new_warnings)
+    ) else 0
 
 
 if __name__ == "__main__":

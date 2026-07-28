@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("configure", "build", "compare", "report", "progress", "run", "shell", "help")]
+    [ValidateSet("configure", "build", "compare", "lint", "report", "progress", "run", "shell", "help")]
     [string] $Command = "help",
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -107,6 +107,7 @@ Commands:
   configure         Configure the VC6 SP3 build with NMake
   build             Build toy2.exe/patcher.dll and register the output
   compare [args]    Run reccmp against the reference and recompiled EXEs
+  lint [args]       Check reconstructed source plausibility
   report [file]     Generate the self-contained HTML decompilation dashboard
   progress [scope]  Show annotation progress, optionally for a namespace
   run [args]        Run the recompiled toy2.exe
@@ -117,6 +118,11 @@ Commands:
 Set-Location $Root
 if ($Command -eq "help") {
     Show-Help
+    exit 0
+}
+if ($Command -eq "lint") {
+    & python (Join-Path $Root "tools\decomp_lint.py") @CommandArgs
+    Assert-LastExit "Checking source plausibility"
     exit 0
 }
 Import-VC6Environment

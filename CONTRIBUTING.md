@@ -57,6 +57,8 @@ source annotation. It does not measure how closely the machine code matches.
 - When a change affects startup, loading, rendering, or other runtime behavior,
   run the platform runtime check described below. Use your own installation.
 - Run `git diff --check`.
+- Run `tools/decomp lint --staged`. Fix each new error. Do not add new findings
+  to the legacy baseline.
 - Keep the change focused. Do not mix generated files or unrelated cleanup
   into a function reconstruction.
 - Verify that `git status` does not contain game media or local analysis files.
@@ -64,6 +66,11 @@ source annotation. It does not measure how closely the machine code matches.
 Compiler warnings already exist in partially reconstructed code. Avoid new
 warnings unless you need them to reproduce original behavior. Explain any such
 warning in the change.
+
+The source linter checks data models and names that the machine-code comparison
+cannot check. See [the lint rule catalog](.notes/lint-rules.md). A reviewed old
+finding stays visible as legacy debt. If your change removes that finding,
+remove its stale row from `.notes/lint-baseline.tsv`.
 
 The `toy2decomp` executable always compiles retail behavior for reccmp.
 `patcher.dll` enables runtime convenience changes only when `APPLY_FIXES`
