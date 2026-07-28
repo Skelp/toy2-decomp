@@ -258,7 +258,7 @@ namespace Renderer
 	void SetVertexColorModulation(int32_t red, int32_t green, int32_t blue);
 	int32_t EnableVertexColorModulation(int32_t enable);
 	int32_t Set508718(int32_t value);
-	int32_t Set9F5FF8(int32_t value);
+	int32_t EnableVertexLighting(int32_t enable);
 	void SetRenderDistance(float primaryDistance, float secondaryDistance);
 	void SetViewportPresetByDetail(int32_t detail);
 	void SetViewportPreset();

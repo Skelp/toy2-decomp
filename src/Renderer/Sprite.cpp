@@ -1046,7 +1046,7 @@ namespace Renderer
 			if (sourceBuffer != 0 && destBuffer != 0)
 			{
 				DWORD vertexOp = 1;
-				if ((instanceData->renderModeFlags & 1) != 0)
+				if ((instanceData->renderModeFlags & Nu3D::INSTANCE_RENDER_VERTEX_LIGHTING) != 0)
 					vertexOp = 0x401;
 				HRESULT result;
 				WORD* indices;
@@ -1114,12 +1114,13 @@ namespace Renderer
 			int32_t projectTexture = material == NGNLoader::g_tex14Materials[0] || material == NGNLoader::g_tex14Materials[1]
 				|| material == NGNLoader::g_tex14Materials[2];
 
-			if (g_drawingTransparentBuckets == 0 || (instanceData->renderModeFlags & 1) != 0)
+			if (g_drawingTransparentBuckets == 0 || (instanceData->renderModeFlags & Nu3D::INSTANCE_RENDER_VERTEX_LIGHTING) != 0)
 				Renderer::SetupMaterialRenderState(material, renderFlags);
 
 			LPDIRECT3DVERTEXBUFFER sourceBuffer = primitive->patchVerts.vertexBuffer;
 			LPDIRECT3DVERTEXBUFFER destBuffer = g_FVF_14C_Buffer_1.vertexBuffer;
-			if (instanceData->horzOffset != 0.0f || instanceData->vertOffset != 0.0f || (instanceData->renderModeFlags & 3) != 0
+			if (instanceData->horzOffset != 0.0f || instanceData->vertOffset != 0.0f
+				|| (instanceData->renderModeFlags & (Nu3D::INSTANCE_RENDER_VERTEX_LIGHTING | Nu3D::INSTANCE_RENDER_VERTEX_COLOR_MODULATION)) != 0
 				|| (material->metadata & 0x100) != 0 || projectTexture || primitive->header[0].drawType == 4 || primitive->header[0].drawType == 5
 				|| g_drawingTransparentBuckets != 0)
 			{
@@ -1132,9 +1133,9 @@ namespace Renderer
 				return;
 
 			DWORD vertexOp = 1;
-			if ((instanceData->renderModeFlags & 1) != 0)
+			if ((instanceData->renderModeFlags & Nu3D::INSTANCE_RENDER_VERTEX_LIGHTING) != 0)
 				vertexOp = 0x401;
-			if ((renderFlags & 0x2000) == 0 && g_drawingTransparentBuckets == 0)
+			if ((renderFlags & RENDER_NO_CLIP) == 0 && g_drawingTransparentBuckets == 0)
 				vertexOp |= 4;
 
 			HRESULT result;
@@ -1154,7 +1155,7 @@ namespace Renderer
 			}
 			if (projectTexture)
 				Renderer::Vertices::ProjectTex14Coordinates(&primitive->patchVerts, &instanceData->matrices[0]);
-			if ((instanceData->renderModeFlags & 2) != 0)
+			if ((instanceData->renderModeFlags & Nu3D::INSTANCE_RENDER_VERTEX_COLOR_MODULATION) != 0)
 			{
 				Renderer::Vertices::ModuleColor(
 					&primitive->patchVerts, instanceData->vertexModColor.r, instanceData->vertexModColor.g, instanceData->vertexModColor.b);
@@ -1166,7 +1167,7 @@ namespace Renderer
 				return;
 
 			DWORD drawFlags = 8;
-			if ((renderFlags & 0x2000) != 0 || g_drawingTransparentBuckets != 0)
+			if ((renderFlags & RENDER_NO_CLIP) != 0 || g_drawingTransparentBuckets != 0)
 				drawFlags = 12;
 			SoftwareRenderer::g_viewportRect = &instanceData->clipRect;
 
@@ -1366,14 +1367,14 @@ namespace Renderer
 						}
 						case RENDER_TYPE8: {
 							Renderer::RenderEntry* entry = (Renderer::RenderEntry*)item;
-							if (g_drawingTransparentBuckets == 0 || (entry->instanceData->renderModeFlags & 1) != 0)
+							if (g_drawingTransparentBuckets == 0 || (entry->instanceData->renderModeFlags & Nu3D::INSTANCE_RENDER_VERTEX_LIGHTING) != 0)
 								Renderer::BindMaterial(entry->material, 1);
 							RenderType8(entry->material, entry);
 							break;
 						}
 						case RENDER_TYPE9: {
 							Renderer::RenderEntry* entry = (Renderer::RenderEntry*)item;
-							if ((entry->instanceData->renderModeFlags & 1) != 0)
+							if ((entry->instanceData->renderModeFlags & Nu3D::INSTANCE_RENDER_VERTEX_LIGHTING) != 0)
 								Renderer::BindMaterial(entry->material, 1);
 							else if (g_drawingTransparentBuckets == 0)
 								Renderer::BindMaterial(entry->material, 0);

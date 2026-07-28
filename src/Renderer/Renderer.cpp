@@ -560,13 +560,13 @@ namespace Renderer
 	int32_t g_drawingTransparentBuckets;
 
 	// GLOBAL: TOY2 0x009F5FF8
-	int32_t g_unk9F5FF8;
+	int32_t g_vertexLightingEnabled;
 
 	// FUNCTION: TOY2 0x004B9A60 [MATCHED]
-	int32_t Set9F5FF8(int32_t value)
+	int32_t EnableVertexLighting(int32_t enable)
 	{
-		int32_t previousValue = g_unk9F5FF8;
-		g_unk9F5FF8 = value;
+		int32_t previousValue = g_vertexLightingEnabled;
+		g_vertexLightingEnabled = enable;
 		return previousValue;
 	}
 
@@ -1082,7 +1082,7 @@ namespace Renderer
 
 		g_whiteMaterial = Nu3D::Material::CreateFromColor(&whiteColor);
 
-		g_unk9F5FF8 = 0;
+		g_vertexLightingEnabled = 0;
 		g_useVertexColorMod = 0;
 
 		SoftwareRenderer::g_viewportRect = 0;
@@ -2012,11 +2012,11 @@ namespace Nu3D
 		instanceData->lodFactor = g_lodFactor;
 		instanceData->horzOffset = g_materialHorzOffset;
 		instanceData->vertOffset = g_materialVertOffset;
-		instanceData->renderModeFlags = g_unk9F5FF8 != 0;
+		instanceData->renderModeFlags = g_vertexLightingEnabled != 0;
 
 		if (g_useVertexColorMod)
 		{
-			instanceData->renderModeFlags |= 2;
+			instanceData->renderModeFlags |= Nu3D::INSTANCE_RENDER_VERTEX_COLOR_MODULATION;
 			instanceData->vertexModColor.r = g_vertexColorModRed;
 			instanceData->vertexModColor.g = g_vertexColorModGreen;
 			instanceData->vertexModColor.b = g_vertexColorModBlue;
@@ -2055,7 +2055,7 @@ namespace Nu3D
 		g_instanceDataPool[g_instanceDataFreeCount].lodFactor = g_lodFactor;
 		g_instanceDataPool[g_instanceDataFreeCount].horzOffset = g_materialHorzOffset;
 		g_instanceDataPool[g_instanceDataFreeCount].vertOffset = g_materialVertOffset;
-		g_instanceDataPool[g_instanceDataFreeCount].renderModeFlags = g_unk9F5FF8 != 0;
+		g_instanceDataPool[g_instanceDataFreeCount].renderModeFlags = g_vertexLightingEnabled != 0;
 		Nu3D::Viewport::GetViewClipRect(&g_instanceDataPool[g_instanceDataFreeCount].clipRect);
 		g_instanceDataPool[g_instanceDataFreeCount].unkInt6 = g_primitiveRenderFlags;
 		return &g_instanceDataPool[g_instanceDataFreeCount];

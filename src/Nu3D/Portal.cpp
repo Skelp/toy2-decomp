@@ -175,7 +175,7 @@ namespace Nu3D
 				if ((scaler != g_specialScaler || g_specialScalerToggle) && scaler->shapeId != g_excludedShapeId)
 				{
 					Renderer::Set508718(scaler->packedFlags);
-					Renderer::RenderPrimitive(primitive, &scaler->transformMatrix, frustumResult ? 0 : 0x2000);
+					Renderer::RenderPrimitive(primitive, &scaler->transformMatrix, frustumResult ? 0 : Renderer::RENDER_NO_CLIP);
 				}
 
 				if (scaler == g_specialScaler)

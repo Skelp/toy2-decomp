@@ -89,7 +89,7 @@ namespace Nu3D
 						if (frustumResult)
 							Renderer::RenderPrimitive(image->primitives[scaler->shapeId], &scaler->transformMatrix, 0);
 						else
-							Renderer::RenderPrimitive(image->primitives[scaler->shapeId], &scaler->transformMatrix, 0x2000);
+							Renderer::RenderPrimitive(image->primitives[scaler->shapeId], &scaler->transformMatrix, Renderer::RENDER_NO_CLIP);
 					}
 				}
 			}

@@ -32,6 +32,12 @@ namespace Nu3D
 		static void InsertIntoBucket(Sprite* sprite);
 	};
 
+	enum InstanceRenderModeFlags
+	{
+		INSTANCE_RENDER_VERTEX_LIGHTING = 0x1,
+		INSTANCE_RENDER_VERTEX_COLOR_MODULATION = 0x2,
+	};
+
 	struct InstanceData
 	{
 		struct TextureProjectionData

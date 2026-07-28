@@ -918,7 +918,7 @@
 0x004B9710 Renderer::InitResources
 0x004B9950 SoftwareRenderer::DrawIndexedPrimitiveVB
 0x004B99F0 SoftwareRenderer::DrawIndexedPrimitive
-0x004B9A60 Renderer::Set9F5FF8
+0x004B9A60 Renderer::EnableVertexLighting
 0x004B9B90 Nu3D::DrawDebugPortalOutlines
 0x004BA1F0 Nu3D::Frustum::TestSphereAllPlanes
 0x004BA270 Nu3D::Frustum::TestSphereAllPlanesAlt
