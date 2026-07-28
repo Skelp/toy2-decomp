@@ -1,6 +1,7 @@
 #include "Toy2/Actor.h"
 #include "Toy2/Animation.h"
 #include "Toy2/Buzz.h"
+#include "Toy2/Collectables.h"
 #include "Toy2/Toy2.h"
 #include "AudioManager/AudioManager.h"
 #include "CharacterLoader.h"
@@ -12,6 +13,12 @@
 
 namespace Toy2
 {
+	namespace Dialogue
+	{
+		// STUB: TOY2 0x004027F0
+		void Begin(int32_t actorIndex, int32_t recordIndex, char* subtitle, int32_t actorFacingAngle, int32_t cameraFacingAngle, int32_t duration) {}
+	}
+
 	namespace Game
 	{
 		void InitActor(Actor::Toy2Actor* actor, int32_t param);
@@ -30,6 +37,12 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x00830D40
 		int32_t g_periodicHintSoundTimer;
+
+		// GLOBAL: TOY2 0x00830C98
+		int32_t g_coinQuestHintTimer;
+
+		// GLOBAL: TOY2 0x00830D1C
+		int32_t g_coinTokenAwarded;
 
 		// GLOBAL: TOY2 0x00529D48
 		Toy2Actor* g_renderActors[66];
@@ -151,6 +164,60 @@ namespace Toy2
 				particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
 				particle->lifetime = (*g_randDatBufferPtr++ & 0xF) * 2 + 0x18;
 			}
+		}
+
+		// FUNCTION: TOY2 0x004A1CE0 [MATCHED]
+		void CollectQuestReward(int32_t actorIndex, int32_t dialogueRecordIndex, int32_t actorFacingAngle, int32_t cameraFacingAngle, int32_t tokenIndex)
+		{
+			if (Collectables::g_tokenStates[tokenIndex].active == 0 && (g_creatureActors[actorIndex].actorFlags & ACTOR_FLAG_ACTIVE) != 0
+				&& (Toy2::g_gameplayStateFlags & 1) == 0)
+			{
+				g_coinQuestHintTimer -= Renderer::g_frameDelta;
+				if (g_coinQuestHintTimer < 0)
+				{
+					g_coinQuestHintTimer = *g_randDatBufferPtr++ * 2 + 0xF0;
+					AudioManager::PlayOneShotSound3DActor(&g_creatureActors[actorIndex],
+						AudioManager::g_oneShotPresets[0xAC].encodedSoundIndex - 1,
+						AudioManager::g_oneShotPresets[0xAC].baseFrequency,
+						AudioManager::g_oneShotPresets[0xAC].leftVolume,
+						&g_creatureActors[actorIndex],
+						0);
+				}
+			}
+
+			if ((g_creatureActors[actorIndex].actorFlags & ACTOR_FLAG_INTERACTION_REQUESTED) == 0)
+				return;
+
+			g_creatureActors[actorIndex].actorFlags &= ~ACTOR_FLAG_INTERACTION_REQUESTED;
+			if (Collectables::g_tokenStates[tokenIndex].active != 0)
+				return;
+
+			if (Toy2::g_buzzActor.coinsCollected >= 50)
+			{
+				AudioManager::PlayOneShotSound3DActor(&g_creatureActors[actorIndex],
+					AudioManager::g_oneShotPresets[0xAE].encodedSoundIndex - 1,
+					AudioManager::g_oneShotPresets[0xAE].baseFrequency,
+					AudioManager::g_oneShotPresets[0xAE].leftVolume,
+					&g_creatureActors[actorIndex],
+					0);
+				g_coinTokenAwarded = 1;
+				Dialogue::Begin(
+					actorIndex, dialogueRecordIndex, "well done buzz! here is your pizza planet ^token^.", actorFacingAngle, cameraFacingAngle, tokenIndex);
+				return;
+			}
+
+			AudioManager::PlayOneShotSound3DActor(&g_creatureActors[actorIndex],
+				AudioManager::g_oneShotPresets[0xAD].encodedSoundIndex - 1,
+				AudioManager::g_oneShotPresets[0xAD].baseFrequency,
+				AudioManager::g_oneShotPresets[0xAD].leftVolume,
+				&g_creatureActors[actorIndex],
+				0);
+			Dialogue::Begin(actorIndex,
+				dialogueRecordIndex,
+				"hi buzz! if you can bring me ^fifty^ coins, i will give you a pizza planet ^token^.",
+				actorFacingAngle,
+				cameraFacingAngle,
+				-1);
 		}
 
 		// FUNCTION: TOY2 0x004A26F0
