@@ -47,7 +47,9 @@ namespace Toy2
 		{
 			uint32_t contactFlags;
 			Platform::CollisionFace* face;
-			uint8_t reserved[0x26];
+			uint8_t reserved[0x20];
+			int16_t platformIndex;
+			uint8_t reserved2[4];
 			uint16_t surfaceType;
 		};
 
@@ -55,6 +57,9 @@ namespace Toy2
 		extern CollisionQueryResult g_collisionQueryResults[2];
 		extern int16_t g_groundCollisionMeshIndex;
 		extern Vector3I16 g_groundNormal;
+		extern Vector3I16 g_buzzGroundNormal;
+		extern int32_t g_groundPlatformIndex;
+		extern int32_t g_collisionTriangleCount;
 		extern MathScratchVector g_mathScratch[64];
 
 		void BuildCollisionWorld(int32_t level, uint8_t** buffer, int32_t terrainNum);
@@ -63,15 +68,25 @@ namespace Toy2
 		int32_t IsSafeFooting(int32_t queryIndex, const uint8_t* contactState);
 		int32_t GetGroundContactIdx();
 		int32_t SweepAndSlide(Vector3I* position, Vector3I* movement, int32_t collisionThreshold, int16_t* collisionAngles, int32_t radius);
+		void GatherTrianglesAtXZ(const Vector3I* position);
+		void ResolveGroundCeiling(PosAndAngles* position, int32_t radius);
 
 		STATIC_ASSERT(sizeof(CollisionMeshInstance) == 0x34);
 		STATIC_ASSERT(sizeof(CollisionQueryResult) == 0x30);
+		STATIC_ASSERT(offsetof(CollisionQueryResult, platformIndex) == 0x28);
 		STATIC_ASSERT(offsetof(CollisionQueryResult, surfaceType) == 0x2E);
 		STATIC_ASSERT(sizeof(MathScratchVector) == 0x10);
 	}
 
 	namespace Platform
 	{
+		enum PlatformFlags
+		{
+			PLATFORM_FLAG_BUZZ_CONTACT = 0x2,
+			PLATFORM_FLAG_ROTATED = 0x8,
+			PLATFORM_FLAG_BUZZ_GROUNDED = 0x10,
+		};
+
 		struct CollisionFace
 		{
 			uint8_t faceData[0x20];

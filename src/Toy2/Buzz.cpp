@@ -537,8 +537,62 @@ namespace Toy2
 		// STUB: TOY2 0x004071E0
 		void HandleDamage(uint32_t direction, uint32_t damageFlags) {}
 
-		// STUB: TOY2 0x004863A0
-		int32_t UpdateFloorHeight(Toy2BuzzActor* buzz) { return 0; }
+		// FUNCTION: TOY2 0x004863A0
+		int32_t UpdateFloorHeight(Toy2BuzzActor* buzz)
+		{
+			int32_t previousTriangleCount = Collision::g_collisionTriangleCount;
+			Collision::GatherTrianglesAtXZ(&buzz->posAngles.pos);
+
+			PosAndAngles floorProbe = buzz->posAngles;
+			floorProbe.pos.y -= 0x400;
+			Collision::ResolveGroundCeiling(&floorProbe, 0x10000);
+			int32_t floorY = floorProbe.pos.y;
+
+			Collision::g_groundPlatformIndex = -1;
+			if (Collision::g_collisionMeshInstances[Collision::g_groundCollisionMeshIndex].typeFlags == Collision::COLLISION_MESH_MOVING)
+			{
+				int32_t platformIndex = Collision::g_collisionMeshInstances[Collision::g_groundCollisionMeshIndex].platformIdx;
+				Collision::g_groundPlatformIndex = platformIndex;
+				int16_t platformFlags = Platform::g_platformStates[platformIndex].flags;
+
+				int32_t buzzY;
+				if ((platformFlags & Platform::PLATFORM_FLAG_ROTATED) == Platform::PLATFORM_FLAG_ROTATED)
+				{
+					buzzY = g_buzzActor.posAngles.pos.y;
+					if (floorY + 0x200 < buzzY && buzzY < floorY + 0x6000)
+					{
+						buzzY = floorY - 0x1C0;
+						g_buzzActor.posAngles.pos.y = buzzY;
+						if (Collision::g_groundNormal.y >= -0x2000)
+						{
+							g_buzzActor.velocity.lateral = g_buzzActor.velocity.lateral * 3 / 4;
+							g_buzzActor.velocity.forward = g_buzzActor.velocity.forward * 3 / 4;
+						}
+					}
+				}
+				else
+				{
+					buzzY = g_buzzActor.posAngles.pos.y;
+				}
+
+				int32_t floorDistance = floorY - buzzY;
+				if (floorDistance < 0x200 && floorDistance > -0x400 && Collision::g_groundNormal.y < -0x2000)
+				{
+					Platform::g_platformStates[platformIndex].flags =
+						platformFlags | Platform::PLATFORM_FLAG_BUZZ_CONTACT | Platform::PLATFORM_FLAG_BUZZ_GROUNDED;
+					Collision::g_collisionQueryResults[0].platformIndex = (int16_t)platformIndex;
+					if (g_buzzActor.airborneMode == 0)
+					{
+						g_buzzActor.collisionState |= 1;
+						g_buzzActor.velocity.vertical += 0x20;
+					}
+				}
+			}
+
+			Collision::g_buzzGroundNormal = Collision::g_groundNormal;
+			Collision::g_collisionTriangleCount = previousTriangleCount;
+			return floorY;
+		}
 
 		// FUNCTION: TOY2 0x00434550
 		void ResolveFooting(Toy2BuzzActor* buzz)

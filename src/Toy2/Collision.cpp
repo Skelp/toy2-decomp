@@ -17,6 +17,15 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00728698
 		Vector3I16 g_groundNormal;
 
+		// GLOBAL: TOY2 0x00729118
+		Vector3I16 g_buzzGroundNormal;
+
+		// GLOBAL: TOY2 0x0072912C
+		int32_t g_groundPlatformIndex;
+
+		// GLOBAL: TOY2 0x0072D2A0
+		int32_t g_collisionTriangleCount;
+
 		// GLOBAL: TOY2 0x00554FA0
 		MathScratchVector g_mathScratch[64];
 
@@ -63,6 +72,12 @@ namespace Toy2
 
 		// STUB: TOY2 0x0048C860
 		int32_t SweepAndSlide(Vector3I* position, Vector3I* movement, int32_t collisionThreshold, int16_t* collisionAngles, int32_t radius) { return 0; }
+
+		// STUB: TOY2 0x00485940
+		void GatherTrianglesAtXZ(const Vector3I* position) {}
+
+		// STUB: TOY2 0x00486520
+		void ResolveGroundCeiling(PosAndAngles* position, int32_t radius) {}
 	}
 
 	namespace Platform
