@@ -185,13 +185,48 @@ namespace Renderer
 
 	namespace LensFlare
 	{
+		struct RegisteredLight
+		{
+			Vector3I position;
+			int32_t screenX;
+			int32_t screenY;
+			int32_t depth;
+			int32_t red;
+			int32_t green;
+			int32_t blue;
+			int32_t scaleOffset;
+		};
+
+		struct Slot
+		{
+			Vector3I position;
+			int32_t screenXFixed;
+			int32_t screenYFixed;
+			int32_t centerOffsetX;
+			int32_t centerOffsetY;
+			int32_t red;
+			int32_t green;
+			int32_t blue;
+			int32_t scaleOffset;
+		};
+
 		extern int32_t g_slotCounts[2];
 		extern int16_t g_bufferActive[2];
+		extern Slot g_slots[2][8];
 		extern int32_t g_bufferIndex;
+		extern RegisteredLight g_registeredLights[8];
 		extern int32_t g_registeredLightCount;
 
 		void CullAndQueue();
 		void RenderSlot(int32_t slotIndex);
+
+		STATIC_ASSERT(sizeof(RegisteredLight) == 0x28);
+		STATIC_ASSERT(offsetof(RegisteredLight, screenX) == 0x0C);
+		STATIC_ASSERT(offsetof(RegisteredLight, red) == 0x18);
+		STATIC_ASSERT(sizeof(Slot) == 0x2C);
+		STATIC_ASSERT(offsetof(Slot, screenXFixed) == 0x0C);
+		STATIC_ASSERT(offsetof(Slot, centerOffsetX) == 0x14);
+		STATIC_ASSERT(offsetof(Slot, red) == 0x1C);
 	}
 
 	void DrawLensFlares();

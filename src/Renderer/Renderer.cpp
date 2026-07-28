@@ -204,14 +204,65 @@ namespace Renderer
 		// GLOBAL: TOY2 0x0054E050
 		int16_t g_bufferActive[2];
 
+		// GLOBAL: TOY2 0x005543E0
+		Slot g_slots[2][8];
+
 		// GLOBAL: TOY2 0x00557710
 		int32_t g_bufferIndex;
+
+		// GLOBAL: TOY2 0x00554DC8
+		RegisteredLight g_registeredLights[8];
 
 		// GLOBAL: TOY2 0x00559C64
 		int32_t g_registeredLightCount;
 
-		// STUB: TOY2 0x0044F420
-		void CullAndQueue() {}
+		// FUNCTION: TOY2 0x0044F420 [MATCHED]
+		void CullAndQueue()
+		{
+			if (g_registeredLightCount > 0)
+			{
+				const int32_t bufferIndex = g_bufferIndex;
+				RegisteredLight* light = g_registeredLights;
+				int32_t remainingLights = g_registeredLightCount;
+				do
+				{
+					const int32_t screenX = light->screenX;
+					const int32_t screenY = light->screenY;
+					const int32_t depth = light->depth;
+					if (screenX <= 512 && screenX >= 0 && screenY <= 256 && screenY >= 0 && depth > 128)
+					{
+						const int32_t screenXFixed = screenX * 8;
+						const int32_t screenYFixed = screenY * 8;
+						const int32_t centerOffsetX = 256 - screenX;
+						const int32_t centerOffsetY = 128 - screenY;
+						int32_t distanceSquared = centerOffsetY * centerOffsetY + centerOffsetX * centerOffsetX;
+						if (distanceSquared > 0xFFFF)
+							distanceSquared = 0xFFFF;
+
+						const int32_t slotIndex = g_slotCounts[bufferIndex];
+						if (slotIndex < 8 && 0x103FF - distanceSquared > 0 && depth - 0x60 > 0x100)
+						{
+							g_bufferActive[bufferIndex] = 1;
+							g_slots[bufferIndex][slotIndex].position.x = light->position.x;
+							g_slots[bufferIndex][slotIndex].position.y = light->position.y;
+							g_slots[bufferIndex][slotIndex].position.z = light->position.z;
+							g_slots[bufferIndex][slotIndex].screenXFixed = screenXFixed;
+							g_slots[bufferIndex][slotIndex].screenYFixed = screenYFixed;
+							g_slots[bufferIndex][slotIndex].centerOffsetX = centerOffsetX;
+							g_slots[bufferIndex][slotIndex].centerOffsetY = centerOffsetY;
+							g_slots[bufferIndex][slotIndex].red = light->red;
+							g_slots[bufferIndex][slotIndex].green = light->green;
+							g_slots[bufferIndex][slotIndex].blue = light->blue;
+							g_slots[bufferIndex][slotIndex].scaleOffset = light->scaleOffset;
+							g_slotCounts[bufferIndex] = slotIndex + 1;
+						}
+					}
+
+					light++;
+					remainingLights--;
+				} while (remainingLights != 0);
+			}
+		}
 
 		// STUB: TOY2 0x0044F580
 		void RenderSlot(int32_t slotIndex) {}
