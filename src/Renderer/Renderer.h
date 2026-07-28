@@ -145,6 +145,8 @@ namespace Renderer
 		int32_t sourceOffsetY);
 
 	// Render Methods
+	void DrawBitmapText(const char* text, int32_t screenY, int32_t screenX, uint32_t red, uint32_t green, uint32_t blue, uint32_t flags);
+	void DrawFormattedText(int32_t screenX, int32_t screenY, const char* format, ...);
 	void DrawMainMenuText(int16_t yPos, char* text, int32_t fadeAlpha);
 	void DrawBlackBorderBox(int32_t xPos, int32_t yPos, int32_t width, int32_t height, uint32_t red, uint32_t green, uint32_t blue);
 	void DrawTintOverlay();

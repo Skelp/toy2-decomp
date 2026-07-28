@@ -17,6 +17,9 @@
 #include "Toy2/D3DApp.h"
 #include "Logger.h"
 
+#include <cstdarg>
+#include <cstdio>
+
 // Unidentified empty no-op (single RET) called once from Renderer::Cleanup
 // between the primitive-list teardown and the texture/light release. Its
 // address sits between Nu3D::Material::Init and Nu3D::Light::Destroy; the
@@ -29,6 +32,20 @@ namespace Nu3D
 
 namespace Renderer
 {
+	// STUB: TOY2 0x0049D390
+	void DrawBitmapText(const char* text, int32_t screenY, int32_t screenX, uint32_t red, uint32_t green, uint32_t blue, uint32_t flags) {}
+
+	// FUNCTION: TOY2 0x0049B990 [MATCHED]
+	void DrawFormattedText(int32_t screenX, int32_t screenY, const char* format, ...)
+	{
+		char text[512];
+		va_list arguments;
+
+		va_start(arguments, format);
+		vsprintf(text, format, arguments);
+		DrawBitmapText(text, screenY, screenX, 0xFF, 0xFF, 0xFF, 0x60);
+	}
+
 	namespace Beam
 	{
 		// GLOBAL: TOY2 0x004F72D4
