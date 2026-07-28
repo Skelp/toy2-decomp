@@ -5,6 +5,7 @@
 #include "Numerics.h"
 #include "Random.h"
 #include "Renderer/Renderer.h"
+#include "Toy2/D3DApp.h"
 #include "Toy2/Toy2.h"
 #include <math.h>
 #include <cstring>
@@ -27,6 +28,9 @@ namespace AudioManager
 
 	// GLOBAL: TOY2 0x00724E84
 	int32_t g_deviceCount;
+
+	// GLOBAL: TOY2 0x00534484
+	int32_t g_quietMode;
 
 	// GLOBAL: TOY2 0x00726F3C
 	int32_t g_streamPending;
@@ -502,8 +506,107 @@ namespace AudioManager
 		return TRUE;
 	}
 
-	// STUB: TOY2 0x0047EDE0
-	void Init() {}
+	struct SoundPackDescriptor
+	{
+		char** soundNames;
+		int32_t firstSoundIndex;
+	};
+
+	STATIC_ASSERT(sizeof(SoundPackDescriptor) == 0x8);
+
+	// GLOBAL: TOY2 0x004FD140
+	SoundPackDescriptor g_primarySoundPacks[17];
+
+	// GLOBAL: TOY2 0x004FD5E0
+	SoundPackDescriptor g_secondarySoundPacks[17];
+
+	// GLOBAL: TOY2 0x004FCDC0
+	int32_t g_currentSfxLevelId;
+
+	// FUNCTION: TOY2 0x0047EDE0
+	void Init()
+	{
+		char waveName[257];
+		ResetChannelsTable();
+
+		int32_t i;
+		for (i = 0; i < 768; i++)
+		{
+			g_dsBuffers[i] = NULL;
+		}
+		for (i = 0; i < 768; i++)
+		{
+			g_loopingSoundOwners[i] = NULL;
+		}
+
+		g_loadedBufferCount = 0;
+		g_deviceCount = 0;
+		g_audioInitialized = 0;
+		if (g_quietMode == 0)
+		{
+			DirectSoundEnumerateA(Enumerate, waveName);
+			DirectSoundCreate(g_deviceGuids[1], &g_directSound, NULL);
+			if (g_directSound != NULL)
+			{
+				g_directSound->SetCooperativeLevel(D3DApp::g_windowData.mainHwnd, DSSCL_EXCLUSIVE);
+				g_audioInitialized = 1;
+				if (IsStreamActive())
+				{
+					StopAndWait();
+					while (IsStreamActive()) {}
+				}
+
+				g_streamPending = 0;
+				if (g_audioInitialized != 0)
+				{
+					for (i = 767; i >= 0; i--)
+					{
+						if (g_dsBuffers[i] != NULL)
+						{
+							if ((IsEffectPlaying(i) & 1) == 1)
+							{
+								g_dsBuffers[i]->Stop();
+							}
+							g_dsBuffers[i]->Release();
+							g_dsBuffers[i] = NULL;
+							g_loopingSoundOwners[i] = NULL;
+						}
+					}
+
+					for (i = 0; i < 768; i++)
+					{
+						g_dsBuffers[i] = NULL;
+					}
+					for (i = 0; i < 768; i++)
+					{
+						g_loopingSoundOwners[i] = NULL;
+					}
+					for (i = 0; i < 32; i++)
+					{
+						g_loopingSoundChannels[i][0] = -1;
+						g_loopingSoundChannels[i][1] = -1;
+					}
+				}
+
+				SoundPackDescriptor* pack = &g_primarySoundPacks[0];
+				char** soundName = pack->soundNames;
+				int32_t soundIndex = pack->firstSoundIndex;
+				while (*soundName != NULL)
+				{
+					if (**soundName != '\0')
+					{
+						sprintf(waveName, "%s.wav", *soundName);
+						LoadSoundEffect(waveName, soundIndex, 0);
+					}
+					soundName++;
+					soundIndex++;
+				}
+
+				g_currentSfxLevelId = 0;
+				Stream::Init();
+			}
+		}
+	}
 
 	// FUNCTION: TOY2 0x0049AE20 [MATCHED]
 	void SetSfxVolume(int32_t sfxVolume) { g_sfxVolume = (sfxVolume & 0xff) << 1; }
@@ -614,23 +717,6 @@ namespace AudioManager
 		}
 		return 1;
 	}
-
-	struct SoundPackDescriptor
-	{
-		char** soundNames;
-		int32_t firstSoundIndex;
-	};
-
-	STATIC_ASSERT(sizeof(SoundPackDescriptor) == 0x8);
-
-	// GLOBAL: TOY2 0x004FD140
-	SoundPackDescriptor g_primarySoundPacks[17];
-
-	// GLOBAL: TOY2 0x004FD5E0
-	SoundPackDescriptor g_secondarySoundPacks[17];
-
-	// GLOBAL: TOY2 0x004FCDC0
-	int32_t g_currentSfxLevelId;
 
 	// FUNCTION: TOY2 0x0047EC20
 	void LoadSfxPackForLevel(int32_t levelId)
