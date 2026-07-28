@@ -19,6 +19,22 @@ namespace Nu3D
 			PARTICLE_RENDER_ALPHA_MODE_MASK = 0x60,
 		};
 
+		struct ParticleType
+		{
+			uint8_t spriteSheet;
+			int8_t animationRate;
+			int16_t lifetime;
+			uint8_t animationFrameCount;
+			uint8_t collisionFlags;
+			int16_t width;
+			int16_t height;
+			int16_t renderFlags;
+			uint8_t updateMode;
+			uint8_t colourR;
+			uint8_t colourG;
+			uint8_t colourB;
+		};
+
 		struct ParticlePreset
 		{
 			int32_t randomModes;
@@ -51,12 +67,12 @@ namespace Nu3D
 			int16_t width;
 			int16_t height;
 			uint8_t updateParam;
-			uint8_t unkByte2;
+			uint8_t animationTimer;
 			uint8_t spriteSheet;
 			uint8_t typeId;
 			uint8_t collisionFlags;
 			uint8_t updateMode;
-			uint8_t unkByte7;
+			uint8_t animationFrameCount;
 			uint8_t tileIndex;
 			int16_t renderFlags;
 			int16_t groundAlignRot;
@@ -68,6 +84,8 @@ namespace Nu3D
 		};
 
 		extern ParticleInstance g_particleInstances[64];
+		extern ParticleInstance g_rejectedParticleInstance;
+		extern ParticleType g_particleTypes[125];
 		extern ParticlePreset g_particlePresets[29];
 		extern int32_t g_particleAllocationCursor;
 		void Init();
@@ -88,6 +106,7 @@ namespace Nu3D
 		ParticleInstance* SpawnFromPreset(int32_t x, int32_t y, int32_t z, int32_t typeId, int32_t presetIndex);
 
 		STATIC_ASSERT(sizeof(ParticleInstance) == 0x3C);
+		STATIC_ASSERT(sizeof(ParticleType) == 0x10);
 		STATIC_ASSERT(sizeof(ParticlePreset) == 0x18);
 	}
 }
