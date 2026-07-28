@@ -137,6 +137,7 @@ namespace SoftwareRenderer
 	void QueueSortedRenderCommand(Nu3D::VertexTL* vertices[4], int32_t vertexCount, uint32_t* texData, int32_t renderState, int32_t bucketGroup);
 	int32_t IsClockwiseWinding(const Nu3D::VertexTL* first, const Nu3D::VertexTL* second, const Nu3D::VertexTL* third);
 	void ProjectVertex(Nu3D::VertexTL* vertex);
+	int32_t IsPrimitiveOutsideViewport(Nu3D::VertexTL* vertices[4], int32_t vertexCount);
 
 	int32_t GetStrideFromFVF(int32_t fvf);
 

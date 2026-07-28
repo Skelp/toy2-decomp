@@ -977,7 +977,7 @@
 0x004BCFA0 SoftwareRenderer::ProjectVertex
 0x004BD040 SoftwareRenderer::UnkFunc24
 0x004BE0B0 SoftwareRenderer::UnkFunc25
-0x004C0100 SoftwareRenderer::UnkFunc23
+0x004C0100 SoftwareRenderer::IsPrimitiveOutsideViewport
 0x004C0320 SoftwareRenderer::UnkFunc22
 0x004C14A0 SoftwareRenderer::UnkFunc19
 0x004C1540 SoftwareRenderer::UnkFunc21
