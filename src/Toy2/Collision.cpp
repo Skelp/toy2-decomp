@@ -5,6 +5,9 @@ namespace Toy2
 {
 	namespace Collision
 	{
+		// GLOBAL: TOY2 0x00729178
+		CollisionQueryResult g_collisionQueryResults[2];
+
 		// GLOBAL: TOY2 0x007295A8
 		CollisionMeshInstance g_collisionMeshInstances[300];
 
@@ -23,14 +26,32 @@ namespace Toy2
 			int16_t meshIndex = Platform::g_platformStates[platformIndex].collisionMeshIndex;
 			if (meshIndex != 0)
 			{
-				g_collisionMeshInstances[meshIndex].typeFlags = 8;
+				g_collisionMeshInstances[meshIndex].typeFlags = COLLISION_MESH_MOVING;
 			}
+		}
+
+		// FUNCTION: TOY2 0x0048E1B0 [MATCHED]
+		bool IsMeshMoving()
+		{
+			int32_t meshIndex = g_collisionQueryResults[0].contactFlags & COLLISION_CONTACT_MESH_INDEX_MASK;
+			return g_collisionMeshInstances[meshIndex].typeFlags == COLLISION_MESH_MOVING;
+		}
+
+		// FUNCTION: TOY2 0x00487AD0 [MATCHED]
+		int32_t IsSafeFooting(int32_t queryIndex, const uint8_t* contactState)
+		{
+			if (*contactState != 1)
+				return false;
+
+			if ((g_collisionQueryResults[queryIndex].contactFlags & COLLISION_CONTACT_SECONDARY_FACE) == 0)
+				return g_collisionQueryResults[queryIndex].face->normal.y < -0xF3C;
+			return g_collisionQueryResults[queryIndex].face->secondaryNormal.y < -0xF3C;
 		}
 
 		// FUNCTION: TOY2 0x0048E1D0 [MATCHED]
 		int32_t GetGroundContactIdx()
 		{
-			if (g_groundCollisionMeshIndex != -1 && g_collisionMeshInstances[g_groundCollisionMeshIndex].typeFlags == 8)
+			if (g_groundCollisionMeshIndex != -1 && g_collisionMeshInstances[g_groundCollisionMeshIndex].typeFlags == COLLISION_MESH_MOVING)
 			{
 				return g_collisionMeshInstances[g_groundCollisionMeshIndex].platformIdx;
 			}

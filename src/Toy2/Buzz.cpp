@@ -1,5 +1,6 @@
 #include "Toy2/Buzz.h"
 #include "Toy2/Camera.h"
+#include "Toy2/Collision.h"
 #include "Toy2/Toy2.h"
 #include "AudioManager/AudioManager.h"
 #include "InputManager.h"
@@ -178,6 +179,19 @@ namespace Toy2
 
 	namespace Buzz
 	{
+		// FUNCTION: TOY2 0x004A28F0 [MATCHED]
+		void UpdateRespawnAnchor()
+		{
+			g_buzzActor.actorFlags &= ~ACTOR_FLAG_RESPAWN_ANCHOR_VALID;
+			if (g_buzzActor.collisionFlags != 0 && g_levelTransitionTimer == 0 && Collision::IsSafeFooting(0, &g_buzzActor.collisionState)
+				&& (g_footingType & ~3) != 0)
+			{
+				g_buzzActor.actorFlags |= ACTOR_FLAG_RESPAWN_ANCHOR_VALID;
+				g_buzzActor.respawnPos = g_buzzActor.posAngles.pos;
+				g_buzzActor.respawnYawAngle = (int16_t)g_buzzActor.posAngles.angles.yaw;
+			}
+		}
+
 		// FUNCTION: TOY2 0x00434090 [MATCHED]
 		void Launch(int32_t verticalVelocity, int16_t airborneMode)
 		{

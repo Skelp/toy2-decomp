@@ -11,6 +11,7 @@ namespace Toy2
 		enum ActorFlags
 		{
 			ACTOR_FLAG_LOCK_FACING = 0x4,
+			ACTOR_FLAG_RESPAWN_ANCHOR_VALID = 0x8,
 			ACTOR_FLAG_STUNNED = 0x20,
 			ACTOR_FLAG_UNCONTROLLED_MOMENTUM = 0x40,
 			ACTOR_FLAG_PRESERVE_HORIZONTAL_MOMENTUM = 0x200,
@@ -81,7 +82,15 @@ namespace Toy2
 			int32_t floorYPos;
 			int32_t isOnWalkableFloor;
 			int16_t airborneMode;
-			int16_t collisionFlags;
+			union
+			{
+				int16_t collisionFlags;
+				struct
+				{
+					uint8_t collisionState;
+					uint8_t collisionFlagsHigh;
+				};
+			};
 			int16_t animationState;
 			int16_t previousAnimationState;
 			int16_t stunTimer;
@@ -101,6 +110,7 @@ namespace Toy2
 		void TickBeamShots();
 		void Launch(int32_t verticalVelocity, int16_t airborneMode);
 		void UpdateHorizontalMovement(Toy2BuzzActor* buzz, MovementRates* movementRates, int32_t forwardInput);
+		void UpdateRespawnAnchor();
 
 		STATIC_ASSERT(sizeof(BeamShot) == 0x2C);
 		STATIC_ASSERT(sizeof(MovementRates) == 0x1C);

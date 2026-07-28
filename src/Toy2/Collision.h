@@ -7,8 +7,24 @@
 
 namespace Toy2
 {
+	namespace Platform
+	{
+		struct CollisionFace;
+	}
+
 	namespace Collision
 	{
+		enum CollisionMeshType
+		{
+			COLLISION_MESH_MOVING = 8,
+		};
+
+		enum CollisionContactFlags
+		{
+			COLLISION_CONTACT_MESH_INDEX_MASK = 0x7FF,
+			COLLISION_CONTACT_SECONDARY_FACE = 0x4000,
+		};
+
 		struct MathScratchVector
 		{
 			Vector3I value;
@@ -27,15 +43,26 @@ namespace Toy2
 			int32_t boundingSqRadius;
 		};
 
+		struct CollisionQueryResult
+		{
+			uint32_t contactFlags;
+			Platform::CollisionFace* face;
+			uint8_t reserved[0x28];
+		};
+
 		extern CollisionMeshInstance g_collisionMeshInstances[300];
+		extern CollisionQueryResult g_collisionQueryResults[2];
 		extern int16_t g_groundCollisionMeshIndex;
 		extern MathScratchVector g_mathScratch[64];
 
 		void BuildCollisionWorld(int32_t level, uint8_t** buffer, int32_t terrainNum);
 		void MarkPlatformAsMoving(int32_t platformIndex);
+		bool IsMeshMoving();
+		int32_t IsSafeFooting(int32_t queryIndex, const uint8_t* contactState);
 		int32_t GetGroundContactIdx();
 
 		STATIC_ASSERT(sizeof(CollisionMeshInstance) == 0x34);
+		STATIC_ASSERT(sizeof(CollisionQueryResult) == 0x30);
 		STATIC_ASSERT(sizeof(MathScratchVector) == 0x10);
 	}
 
@@ -45,6 +72,7 @@ namespace Toy2
 		{
 			uint8_t faceData[0x20];
 			Vector3I16 normal;
+			Vector3I16 secondaryNormal;
 		};
 
 		struct PlatformState
