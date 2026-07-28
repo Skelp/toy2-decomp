@@ -4,3 +4,4 @@
 0x004CA420	unnamed-bitmask	Reconstruct Nu3D::Scene::RenderActor at 0x004CAA60 to identify the copied node flag bits 2 and 4.
 0x0042B300	unnamed-bitmask	Reconstruct Toy2::EvilEmperorZurg::Interactions at 0x0042B3A0 to identify actor flag bit 0x800.
 0x004BCB60	unknown-symbol	Find readers for globals 0x00B626C0 and 0x00B7FBB8 before you name their reset roles.
+0x004CBC90	unstructured-control-flow	Restructure the outer primitive loop and the three index conversion paths before you remove the four cross-scope jumps.

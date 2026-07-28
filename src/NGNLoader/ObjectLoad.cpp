@@ -576,7 +576,7 @@ namespace NGNLoader
 				primObject->renderFlags = effectiveRenderFlags;
 
 				if ((g_curVertexFlags & VERTEX_DATA_DIFFUSE_COLOR) != 0)
-					primObject->renderFlags = effectiveRenderFlags | 0x40001000;
+					primObject->renderFlags = effectiveRenderFlags | Renderer::RENDER_PRESET_FADE_OVERLAY | Renderer::RENDER_COLOR_VERTEX;
 
 				if (materialIndex >= g_curMaterialCount)
 				{
@@ -732,7 +732,7 @@ namespace NGNLoader
 								} while (curVertIdx < localVertCount);
 							}
 
-							if ((primObject->renderFlags & 32) == 0)
+							if ((primObject->renderFlags & Renderer::RENDER_CULL_BACK) == 0)
 							{
 								int32_t triangleIdx = 0;
 
