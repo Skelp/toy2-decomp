@@ -188,7 +188,7 @@
 0x004316C0 _WinMain@16
 0x004318F0 D3DApp::LogErrorNotSet
 0x00431900 Logger::LogDDError
-0x004319E0 SoftwareRenderer::UnkFunc11
+0x004319E0 SoftwareRenderer::BuildPaletteLightingTable
 0x00431C40 ModeSelect::DrawTextOutA
 0x00431CA0 ModeSelect::SelectDDAppByIndex
 0x00431CE0 ModeSelect::SelectDeviceByIndex
@@ -346,8 +346,8 @@
 0x0046D2C0 SoftwareRenderer::UnkRenderAPI2
 0x0046D7B0 SoftwareRenderer::UnkRenderAPI25
 0x00470BF0 SoftwareRenderer::SetPaletteOnAPI
-0x00470C70 SoftwareRenderer::UnkFunc7
-0x00470D00 SoftwareRenderer::UnkFunc9
+0x00470C70 SoftwareRenderer::UpdatePaletteTint
+0x00470D00 SoftwareRenderer::LoadPaletteEntries
 0x00470D60 SoftwareRenderer::UnkFunc10
 0x00470FB0 SoftwareRenderer::UnkFunc15
 0x004710C0 SoftwareRenderer::UnkFunc12

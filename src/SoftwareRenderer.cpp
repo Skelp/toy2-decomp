@@ -69,8 +69,8 @@ namespace SoftwareRenderer
 
 	// The software renderer's DirectDraw palette and its backing entry buffers.
 	// SetPaletteOnAPI creates the palette from g_paletteEntries (entry 0 onward)
-	// and attaches it to the front/back buffers. UnkFunc7 rebuilds the live
-	// entries (1..255) by tinting the source palette (entry 0 onward) by the
+	// and attaches it to the front/back buffers. UpdatePaletteTint rebuilds the live
+	// entries (1..255) by tinting the same range in the source palette by the
 	// camera tint colour, preserving entry 0, then SetEntries on the palette.
 	// The palette is stored B,G,R,X per entry (byte 0 = blue, 1 = green,
 	// 2 = red); entry 0 is skipped by the tint loop and the SetEntries call.
@@ -80,7 +80,7 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00704630
 	uint8_t g_paletteEntries[0x400];
 
-	// GLOBAL: TOY2 0x00704A3C
+	// GLOBAL: TOY2 0x00704A38
 	uint8_t g_paletteSource[0x400];
 
 	// GLOBAL: TOY2 0x00A4CC80
@@ -2672,22 +2672,43 @@ namespace SoftwareRenderer
 	// entry 0, then commits the tinted range to the DirectDraw palette. Called
 	// from Renderer::DrawTintOverlay.
 	//
-	// Residual ~4% is TOOL-07: the green/red reads are `mov al, [ecx +
-	// g_paletteSource - 3/-2]` (early-increment strip). reccmp resolves the
-	// negative-offset displacement to the preceding symbol, which differs by
-	// layout between retail and the build. A byte dump confirms both sides emit
-	// the identical `8a 81 <disp32>` pattern; only the symbol resolution differs.
-	// FUNCTION: TOY2 0x00470C70
-	void UnkFunc7()
+	// FUNCTION: TOY2 0x00470C70 [MATCHED]
+	void UpdatePaletteTint()
 	{
 		for (int32_t i = 0; i < 0x3fc; i += 4)
 		{
-			g_paletteEntries[i + 4] = (uint8_t)(g_paletteSource[i] * Nu3D::Camera::g_cameraTintBlue / 128);
-			g_paletteEntries[i + 5] = (uint8_t)(g_paletteSource[i + 1] * Nu3D::Camera::g_cameraTintGreen / 128);
-			g_paletteEntries[i + 6] = (uint8_t)(g_paletteSource[i + 2] * Nu3D::Camera::g_cameraTintRed / 128);
+			g_paletteEntries[i + 4] = (uint8_t)(g_paletteSource[i + 4] * Nu3D::Camera::g_cameraTintBlue / 128);
+			g_paletteEntries[i + 5] = (uint8_t)(g_paletteSource[i + 5] * Nu3D::Camera::g_cameraTintGreen / 128);
+			g_paletteEntries[i + 6] = (uint8_t)(g_paletteSource[i + 6] * Nu3D::Camera::g_cameraTintRed / 128);
 		}
 		g_lpPalette->SetEntries(0, 1, 255, (LPPALETTEENTRY)&g_paletteEntries[4]);
 	}
+
+	// FUNCTION: TOY2 0x00470D00
+	void LoadPaletteEntries(const uint8_t* source)
+	{
+		for (int32_t entry = 0; entry < 256; entry++)
+		{
+			g_paletteEntries[entry * 4] = 0;
+			g_paletteEntries[entry * 4 + 1] = 0;
+			g_paletteEntries[entry * 4 + 2] = 0;
+		}
+
+		for (int32_t sourceEntry = 0; sourceEntry < 256; sourceEntry++)
+		{
+			g_paletteSource[sourceEntry * 4] = source[sourceEntry * 3];
+			g_paletteSource[sourceEntry * 4 + 1] = source[sourceEntry * 3 + 1];
+			g_paletteSource[sourceEntry * 4 + 2] = source[sourceEntry * 3 + 2];
+		}
+
+		g_paletteSource[0] = 0;
+		g_paletteSource[1] = 0;
+		g_paletteSource[2] = 0;
+		BuildPaletteLightingTable();
+	}
+
+	// STUB: TOY2 0x004319E0
+	void BuildPaletteLightingTable() {}
 
 	// FUNCTION: TOY2 0x004AC1F0 [MATCHED]
 	int32_t UnkFunc20(TextureData* out)

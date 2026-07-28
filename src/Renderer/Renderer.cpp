@@ -1220,7 +1220,7 @@ namespace Renderer
 			Sprite::Queue2DSprite(0.0, 0.0, 1.0, 1.0, &uvTopLeft, &uvBottomRight, 0, brightenColor, RENDER_PRESET_COLOR_OVERLAY);
 
 			if (D3DApp::g_renderMode == RENDERMODE_SOFTWARE && SoftwareRenderer::g_bitsPerPixel == 8)
-				SoftwareRenderer::UnkFunc7();
+				SoftwareRenderer::UpdatePaletteTint();
 
 			return;
 		}
@@ -1311,7 +1311,7 @@ namespace Renderer
 		Sprite::Queue2DSprite(0.0, 0.0, 1.0, 1.0, &uvTopLeft, &uvBottomRight, texDataIndex, darkenColor, RENDER_PRESET_FADE_OVERLAY);
 
 		if (D3DApp::g_renderMode == RENDERMODE_SOFTWARE && SoftwareRenderer::g_bitsPerPixel == 8)
-			SoftwareRenderer::UnkFunc7();
+			SoftwareRenderer::UpdatePaletteTint();
 	}
 
 	// FUNCTION: TOY2 0x0048F3E0 [MATCHED]
