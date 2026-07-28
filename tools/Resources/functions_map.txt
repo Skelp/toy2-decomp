@@ -965,7 +965,7 @@
 0x004BC430 SoftwareRenderer::UnkFunc18
 0x004BC460 Nu3D::Area::RenderBucketThroughPortals
 0x004BC720 Nu3D::Scene::RenderCellsInRadius
-0x004BC900 SoftwareRenderer::UnkFunc27
+0x004BC900 SoftwareRenderer::UnpackColourToFloats
 0x004BC980 SoftwareRenderer::UnkFunc30
 0x004BCAD0 SoftwareRenderer::UnkFunc29
 0x004BCB60 SoftwareRenderer::UnkFunc33

@@ -900,6 +900,15 @@ namespace SoftwareRenderer
 		*blue = (colour & 0x000000ff) << 8;
 	}
 
+	// FUNCTION: TOY2 0x004BC900 [MATCHED]
+	void UnpackColourToFloats(uint32_t colour, float* red, float* green, float* blue, uint32_t* alphaMask)
+	{
+		*red = ((colour >> 16) & 0xff) * (1.0 / 255.0);
+		*green = ((colour >> 8) & 0xff) * (1.0 / 255.0);
+		*blue = (colour & 0xff) * (1.0 / 255.0);
+		*alphaMask = colour & 0xff000000;
+	}
+
 	// FUNCTION: TOY2 0x004BCF60 [MATCHED]
 	int32_t IsClockwiseWinding(const Nu3D::VertexTL* first, const Nu3D::VertexTL* second, const Nu3D::VertexTL* third)
 	{

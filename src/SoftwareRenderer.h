@@ -123,6 +123,7 @@ namespace SoftwareRenderer
 	void UnlockBackBuffer();
 	void SetCameraNearFarZ(float nearZ, float farZ);
 	void UnpackColourChannels(uint32_t colour, int32_t* red, int32_t* green, int32_t* blue);
+	void UnpackColourToFloats(uint32_t colour, float* red, float* green, float* blue, uint32_t* alphaMask);
 	int32_t IsClockwiseWinding(const Nu3D::VertexTL* first, const Nu3D::VertexTL* second, const Nu3D::VertexTL* third);
 	void ProjectVertex(Nu3D::VertexTL* vertex);
 
