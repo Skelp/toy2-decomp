@@ -38,6 +38,7 @@ namespace SoftwareRenderer
 	extern uint8_t* g_rgbToPaletteIndex;
 	extern uint8_t g_paletteSource[0x400];
 	extern uint8_t* g_additivePaletteTable;
+	extern uint8_t* g_paletteColourOffsetTable;
 	extern uint8_t* g_subtractivePaletteTable;
 	extern uint8_t* g_paletteBlend25Table;
 	extern uint8_t* g_paletteBlend50Table;
@@ -167,6 +168,7 @@ namespace SoftwareRenderer
 	void BuildAdditivePaletteTable();
 	void BuildSubtractivePaletteTable();
 	void BuildPaletteBlendTable(uint8_t* output, int32_t blendWeight);
+	void BuildPaletteColourOffsetTable();
 
 	void UnkFunc8(int32_t highestBucket, int32_t clearValue);
 

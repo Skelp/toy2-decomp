@@ -90,6 +90,11 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00704A34
 	uint8_t* g_additivePaletteTable;
 
+	// For each palette entry, stores the 8x8x8 combinations of channel offsets
+	// from -96 through +128 in steps of 32.
+	// GLOBAL: TOY2 0x00704A30
+	uint8_t* g_paletteColourOffsetTable;
+
 	// GLOBAL: TOY2 0x00704E48
 	uint8_t* g_subtractivePaletteTable;
 
@@ -2831,6 +2836,58 @@ namespace SoftwareRenderer
 				*output++ = g_rgbToPaletteIndex[lookup];
 			}
 		}
+	}
+
+	// FUNCTION: TOY2 0x00470FB0
+	void BuildPaletteColourOffsetTable()
+	{
+		uint8_t* output = g_paletteColourOffsetTable;
+		uint8_t* palette = g_paletteSource + 1;
+		do
+		{
+			int32_t sourceGreen = palette[0];
+			int32_t sourceBlue = palette[-1];
+			int32_t sourceRed = palette[1];
+			int32_t blue = sourceBlue - 96;
+			int32_t blueCount = 8;
+			do
+			{
+				int32_t green = sourceGreen - 96;
+				int32_t greenCount = 8;
+				do
+				{
+					int32_t red = sourceRed - 96;
+					int32_t redCount = 8;
+					do
+					{
+						int32_t clampedBlue = blue;
+						int32_t clampedGreen = green;
+						int32_t clampedRed = red;
+						if (clampedBlue < 0)
+							clampedBlue = 0;
+						else if (clampedBlue > 255)
+							clampedBlue = 255;
+						if (clampedGreen < 0)
+							clampedGreen = 0;
+						else if (clampedGreen > 255)
+							clampedGreen = 255;
+						if (clampedRed < 0)
+							clampedRed = 0;
+						else if (clampedRed > 255)
+							clampedRed = 255;
+						int32_t lookup = ((clampedBlue & ~7) * 32 + (clampedGreen & ~7)) * 4 + (clampedRed >> 3);
+						*output++ = g_rgbToPaletteIndex[lookup];
+						red += 32;
+						redCount--;
+					} while (redCount != 0);
+					green += 32;
+					greenCount--;
+				} while (greenCount != 0);
+				blue += 32;
+				blueCount--;
+			} while (blueCount != 0);
+			palette += 4;
+		} while (palette < g_paletteSource + sizeof(g_paletteSource) + 1);
 	}
 
 	// FUNCTION: TOY2 0x004AC1F0 [MATCHED]
