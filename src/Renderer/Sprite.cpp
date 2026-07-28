@@ -760,10 +760,10 @@ namespace Renderer
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x00493DC0
+		// STUB: TOY2 0x00493DC0
 		int16_t DrawColouredFixed(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue) { return 0; }
 
-		// FUNCTION: TOY2 0x00493C30
+		// STUB: TOY2 0x00493C30
 		int16_t DrawColoured(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t blue, uint8_t green, uint8_t red) { return 0; }
 
 		// FUNCTION: TOY2 0x0049D2D0 [MATCHED]

@@ -45,7 +45,6 @@ src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNo
 0x004c2d20	signature-concealment	GetForwardVector:arg2	0111be2a6b73	src/Nu3D/Light.cpp
 0x004c2e70	signature-concealment	GetPositionVector:arg2	c06c22f8bbfb	src/Nu3D/Light.cpp
 0x004c2e70	signature-concealment	GetForwardVector:arg2	0111be2a6b73	src/Nu3D/Light.cpp
-0x00438910	unfinished-function	0x00438910	bf21a9e8fbc5	src/Nu3D/Link.cpp
 0x004cddd0	unnamed-bitmask	renderFlags:3	779689f1f70a	src/Nu3D/Scene.cpp
 0x004cddd0	unnamed-bitmask	renderFlags:2	068a128c65db	src/Nu3D/Scene.cpp
 src/Nu3D/Sprite.h	unpinned-layout	TextureProjectionData	59108e30e062	src/Nu3D/Sprite.h
@@ -64,8 +63,6 @@ src/Nu3D/Sprite.h	unpinned-layout	TextureProjectionData	59108e30e062	src/Nu3D/Sp
 0x004907e0	unknown-symbol	g_unk839278	259cd00d89f0	src/Renderer/Renderer.cpp
 0x004907e0	unknown-symbol	g_unk839280	939424163ff3	src/Renderer/Renderer.cpp
 0x004b68b0	unknown-symbol	g_unk9F6008	f8d33dc4bca5	src/Renderer/Sprite.cpp
-0x00493dc0	unfinished-function	0x00493dc0	7a7b9fc07b6b	src/Renderer/Sprite.cpp
-0x00493c30	unfinished-function	0x00493c30	7a7b9fc07b6b	src/Renderer/Sprite.cpp
 0x004b6c10	unnamed-bitmask	renderFlags:0xC00	67bea385e2d8	src/Renderer/Sprite.cpp
 0x004b6c10	unnamed-bitmask	renderFlags:0x4800	e9e675f21f4e	src/Renderer/Sprite.cpp
 0x004b6c10	unnamed-bitmask	renderFlags:0x20800	172c9b1c6bd4	src/Renderer/Sprite.cpp
@@ -187,9 +184,6 @@ src/Toy2/Buzz.h	placeholder-field	unkVar22	0b31940ecb22	src/Toy2/Buzz.h
 src/Toy2/Buzz.h	placeholder-field	unkVar23	899dd18df465	src/Toy2/Buzz.h
 src/Toy2/KiteTail.h	unpinned-layout	Data	e5e429bcc9c2	src/Toy2/KiteTail.h
 src/Toy2/KiteTail.h	unpinned-layout	Segment	44986cef8a39	src/Toy2/KiteTail.h
-0x00438650	unfinished-function	0x00438650	bf21a9e8fbc5	src/Toy2/LevelSelect.cpp
-0x00438790	unfinished-function	0x00438790	bf21a9e8fbc5	src/Toy2/LevelSelect.cpp
-0x00494130	unfinished-function	0x00494130	bf21a9e8fbc5	src/Toy2/LevelSelect.cpp
 0x00438a50	unstructured-control-flow	goto-count	8564fcf859bd	src/Toy2/LevelSelect.cpp
 0x0043e6e0	anonymous-buffer-view	inline-view	5e3febc69906	src/Toy2/Levels.cpp
 0x0043e6e0	implicit-record-layout	l_recordPtr	e8b7566e28f9	src/Toy2/Levels.cpp

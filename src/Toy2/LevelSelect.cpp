@@ -133,13 +133,13 @@ namespace Toy2
 		// FUNCTION: TOY2 0x00452170
 		void ResetCursor() { g_levelSelectCursor = 0; }
 
-		// FUNCTION: TOY2 0x00438650
+		// STUB: TOY2 0x00438650
 		void TurnTowardLookDir(LevelSelectCamera* levelSelectCam, int32_t turnRate) {}
 
-		// FUNCTION: TOY2 0x00438790
+		// STUB: TOY2 0x00438790
 		void ApplyWallRepulsion(LevelSelectCamera* levelSelectCam, Vector3I* velocity, int32_t recordType) {}
 
-		// FUNCTION: TOY2 0x00494130
+		// STUB: TOY2 0x00494130
 		void DrawArrows() {}
 
 		// FUNCTION: TOY2 0x00438A50
