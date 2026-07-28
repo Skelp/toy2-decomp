@@ -34,7 +34,7 @@ namespace Toy2
 	int32_t g_footingType;
 
 	// GLOBAL: TOY2 0x0050A0A0
-	Vector3I g_aimTargetPosition;
+	Vector4I g_aimTargetPosition;
 
 	// GLOBAL: TOY2 0x0050A4FC
 	int32_t g_aimTargetIndex;
@@ -195,6 +195,13 @@ namespace Toy2
 
 	namespace Buzz
 	{
+		union GrappleBeamVector
+		{
+			Vector3I direction;
+			Vector4I beam;
+		};
+		STATIC_ASSERT(sizeof(GrappleBeamVector) == 0x10);
+
 		// FUNCTION: TOY2 0x004A28F0 [MATCHED]
 		void UpdateRespawnAnchor()
 		{
@@ -595,8 +602,88 @@ namespace Toy2
 			Renderer::BlitTextureByIndexOffset(0x10, 0x80, 0xC0, 0x40, 0x40, g_sixteenTickPhase * 4, g_thirtyTwoTickPhase * 2, 0, -0x40);
 		}
 
-		// STUB: TOY2 0x004A5540
-		void TickGrapple() {}
+		// FUNCTION: TOY2 0x004A5540
+		void TickGrapple()
+		{
+			if (g_grappleState == GRAPPLE_INACTIVE)
+				return;
+
+			g_airborneTimer = 0;
+			GrappleBeamVector grappleVector;
+			if ((g_grappleState & GRAPPLE_EXTENDING) != 0)
+			{
+				g_buzzActor.facingAngle =
+					(int16_t)Nu3D::Math::CartesianToFixedAngle(g_grappleEndpoint.x - g_aimTargetPosition.x, g_grappleEndpoint.z - g_aimTargetPosition.z);
+				g_grappleElapsedTime += Renderer::g_frameDelta * 2;
+
+				if (g_grappleElapsedTime <= g_grappleTraversalDuration)
+				{
+					grappleVector.beam.x = (g_grappleEndpoint.x - g_aimTargetPosition.x) * g_grappleElapsedTime / g_grappleTraversalDuration;
+					grappleVector.beam.y = (g_grappleEndpoint.y - g_aimTargetPosition.y) * g_grappleElapsedTime / g_grappleTraversalDuration;
+					grappleVector.beam.z = (g_grappleEndpoint.z - g_aimTargetPosition.z) * g_grappleElapsedTime / g_grappleTraversalDuration;
+					Renderer::Beam::QueueBeam(0x22, 0x1E, 400, &g_aimTargetPosition, &grappleVector.beam, 0x80, 0x60, 0x20);
+				}
+				else
+				{
+					AudioManager::PlaySoundEffect(0x52, &g_buzzActor.posAngles.pos);
+					if (g_grappleState == GRAPPLE_BLOCKED)
+					{
+						if (g_grappleCharges > 0)
+							g_grappleCharges--;
+						g_buzzActor.actorFlags &= ~ACTOR_FLAG_LOCK_FACING;
+						g_grappleState = GRAPPLE_INACTIVE;
+						return;
+					}
+
+					g_grappleState = GRAPPLE_PULLING;
+					g_grappleElapsedTime = 0;
+					if (Camera::g_scriptedCameraState != 0)
+						Camera::SnapBehindBuzz(&Camera::g_gameplayCamera);
+
+					int16_t grappleSide = g_buzzActor.posAngles.angles.yaw & 0x200;
+					if (grappleSide != 0)
+						Camera::g_gameplayCamera.roll = (Camera::g_gameplayCamera.roll + 0x400) & 0xFFF;
+					else
+						Camera::g_gameplayCamera.roll = (Camera::g_gameplayCamera.roll - 0x400) & 0xFFF;
+				}
+			}
+
+			if (g_grappleState != GRAPPLE_PULLING)
+				return;
+
+			if (g_grappleElapsedTime <= g_grappleTraversalDuration * 4 / 3 + 10)
+			{
+				AudioManager::PlaySoundEffect(0x53, &g_buzzActor.posAngles.pos);
+				grappleVector.beam.x = g_grappleEndpoint.x - g_aimTargetPosition.x;
+				grappleVector.beam.y = g_grappleEndpoint.y - g_aimTargetPosition.y;
+				grappleVector.beam.z = g_grappleEndpoint.z - g_aimTargetPosition.z;
+				Renderer::Beam::QueueBeam(0x22, 0x1E, 400, &g_aimTargetPosition, &grappleVector.beam, 0x80, 0x60, 0x20);
+
+				grappleVector.direction.y = (g_grappleEndpoint.y - g_buzzActor.posAngles.pos.y + 0x1600) >> 3;
+				grappleVector.direction.x = (g_grappleEndpoint.x - g_buzzActor.posAngles.pos.x) >> 3;
+				grappleVector.direction.z = (g_grappleEndpoint.z - g_buzzActor.posAngles.pos.z) >> 3;
+				Nu3D::Math::NormalizeToFixedPoint(&grappleVector.direction, &grappleVector.direction);
+				if (g_grappleElapsedTime >= 10)
+				{
+					g_buzzActor.velX = grappleVector.direction.x / 3;
+					g_buzzActor.gravityVel = grappleVector.direction.y / 3;
+					g_buzzActor.velForward = grappleVector.direction.z / 3;
+				}
+				g_grappleElapsedTime += Renderer::g_frameDelta;
+				return;
+			}
+
+			if (g_grappleCharges > 0)
+				g_grappleCharges--;
+			g_buzzActor.actorFlags &= ~ACTOR_FLAG_LOCK_FACING;
+			g_grappleState = GRAPPLE_INACTIVE;
+			g_buzzActor.posAngles.pos.x = g_grappleEndpoint.x;
+			g_buzzActor.posAngles.pos.y = g_grappleEndpoint.y + 0x1600;
+			g_buzzActor.posAngles.pos.z = g_grappleEndpoint.z;
+			g_buzzActor.velX = 0;
+			g_buzzActor.gravityVel = 0;
+			g_buzzActor.velForward = 0;
+		}
 
 		// FUNCTION: TOY2 0x004A62A0
 		void TickGadgets()

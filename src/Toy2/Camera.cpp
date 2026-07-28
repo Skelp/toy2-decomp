@@ -61,6 +61,9 @@ namespace Toy2
 				pitchDelta -= 0x1000;
 			camera->angles.pitch = (uint16_t)(((pitchDelta >> 2) + camera->angles.pitch) & 0xfff);
 		}
+
+		// STUB: TOY2 0x00403730
+		void SnapBehindBuzz(GameplayCamera* camera) {}
 	}
 } // namespace Toy2
 

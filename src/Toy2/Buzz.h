@@ -17,6 +17,14 @@ namespace Toy2
 			ACTOR_FLAG_PRESERVE_HORIZONTAL_MOMENTUM = 0x200,
 		};
 
+		enum GrappleState
+		{
+			GRAPPLE_INACTIVE = 0,
+			GRAPPLE_EXTENDING = 1,
+			GRAPPLE_PULLING = 2,
+			GRAPPLE_BLOCKED = 3,
+		};
+
 		struct MovementRates
 		{
 			int32_t lateralDeceleration;
