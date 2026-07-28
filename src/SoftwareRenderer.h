@@ -35,6 +35,7 @@ namespace SoftwareRenderer
 	// The palette is stored B,G,R,X per entry (byte 0 = blue, 1 = green, 2 = red).
 	extern LPDIRECTDRAWPALETTE g_lpPalette;
 	extern uint8_t g_paletteEntries[0x400];
+	extern uint8_t* g_rgbToPaletteIndex;
 	extern uint8_t g_paletteSource[0x400];
 	extern Nu3D::Viewport::ViewportRect* g_viewportRect;
 	extern int32_t g_softwareClearColor;
@@ -157,6 +158,7 @@ namespace SoftwareRenderer
 	void UpdatePaletteTint();
 	void LoadPaletteEntries(const uint8_t* source);
 	void BuildPaletteLightingTable();
+	void BuildRGBToPaletteTable();
 
 	void UnkFunc8(int32_t highestBucket, int32_t clearValue);
 

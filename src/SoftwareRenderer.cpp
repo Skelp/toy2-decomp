@@ -80,6 +80,10 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00704630
 	uint8_t g_paletteEntries[0x400];
 
+	// Maps each 5-bit BGR colour to the nearest entry in g_paletteSource.
+	// GLOBAL: TOY2 0x0070462C
+	uint8_t* g_rgbToPaletteIndex;
+
 	// GLOBAL: TOY2 0x00704A38
 	uint8_t g_paletteSource[0x400];
 
@@ -2709,6 +2713,38 @@ namespace SoftwareRenderer
 
 	// STUB: TOY2 0x004319E0
 	void BuildPaletteLightingTable() {}
+
+	// FUNCTION: TOY2 0x00470D60
+	void BuildRGBToPaletteTable()
+	{
+		uint8_t* output = g_rgbToPaletteIndex;
+		for (int32_t blue = 0; blue < 256; blue += 8)
+		{
+			for (int32_t green = 0; green < 256; green += 8)
+			{
+				for (int32_t red = 0; red < 256; red += 8)
+				{
+					uint8_t nearestEntry = 0;
+					int32_t nearestDistance = 9999999;
+					for (int32_t entry = 1; entry < 256; entry++)
+					{
+						int32_t blueDifference = (g_paletteSource[entry * 4] - blue) * 4;
+						int32_t greenDifference = (g_paletteSource[entry * 4 + 1] - green) * 5;
+						int32_t redDifference = (g_paletteSource[entry * 4 + 2] - red) * 3;
+						int32_t totalDifference = blueDifference + greenDifference + redDifference;
+						int32_t distance = totalDifference * totalDifference + blueDifference * blueDifference + greenDifference * greenDifference
+							+ redDifference * redDifference;
+						if (distance < nearestDistance)
+						{
+							nearestEntry = (uint8_t)entry;
+							nearestDistance = distance;
+						}
+					}
+					*output++ = nearestEntry;
+				}
+			}
+		}
+	}
 
 	// FUNCTION: TOY2 0x004AC1F0 [MATCHED]
 	int32_t UnkFunc20(TextureData* out)
