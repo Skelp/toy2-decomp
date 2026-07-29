@@ -55,10 +55,10 @@ namespace Toy2
 			Matrix3x3I16 matrix;
 		};
 
-		// Per-actor, per-node euler rotation offsets applied during animation.
-		// Indexed as g_nodeAngles[actorIndex][nodeIndex]; up to 64 actors with
-		// 32 nodes each (64 * 32 * sizeof(Vector3F) == 0x6000).
-		extern Vector3F g_nodeAngles[64][32];
+		// The animation system applies these fixed-angle offsets to each actor node.
+		// The first index selects one of 64 actors. The second index selects one of 32 nodes.
+		extern Vector3I g_nodeAngles[64][32];
+		extern RotationScratch g_keyframeRotation;
 
 		// Pointer to the NULL-terminated list of actors currently being animated
 		// (set by AnimateActors, read by Actor::FindInActorList). NULL when idle.

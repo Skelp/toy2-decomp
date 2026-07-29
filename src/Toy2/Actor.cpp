@@ -5,6 +5,7 @@
 #include "Toy2/Toy2.h"
 #include "AudioManager/AudioManager.h"
 #include "CharacterLoader.h"
+#include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
 #include "Random.h"
 #include "Renderer/Renderer.h"
@@ -358,14 +359,14 @@ namespace Toy2
 		}
 
 		// FUNCTION: TOY2 0x004CDBB0 [MATCHED]
-		void SetNodeAngle(Toy2Actor* actor, int32_t nodeIndex, float x, float y, float z)
+		void SetNodeAngle(Toy2Actor* actor, int32_t nodeIndex, int32_t pitch, int32_t yaw, int32_t roll)
 		{
 			int32_t actorIndex = FindInActorList(actor);
 			if (actorIndex >= 0)
 			{
-				Animation::g_nodeAngles[actorIndex][nodeIndex].x = x;
-				Animation::g_nodeAngles[actorIndex][nodeIndex].y = y;
-				Animation::g_nodeAngles[actorIndex][nodeIndex].z = z;
+				Animation::g_nodeAngles[actorIndex][nodeIndex].x = pitch;
+				Animation::g_nodeAngles[actorIndex][nodeIndex].y = yaw;
+				Animation::g_nodeAngles[actorIndex][nodeIndex].z = roll;
 			}
 		}
 	}
@@ -528,8 +529,19 @@ namespace Toy2
 			}
 		}
 
-		// STUB: TOY2 0x0043C070
-		void SetRCCarNodeAngle(Actor::Toy2Actor* actor, int32_t nodeIndex, int32_t pitch, int32_t yaw, int32_t roll) {}
+		// FUNCTION: TOY2 0x0043C070 [MATCHED]
+		void SetRCCarNodeAngle(Actor::Toy2Actor* actor, int32_t nodeIndex, int32_t pitch, int32_t yaw, int32_t roll)
+		{
+			CharacterLoader::CharacterAnimationData* animationData = CharacterLoader::g_characterAnimationData[actor->creatureId];
+			CharacterLoader::BoneTransform* transform = &CharacterLoader::g_boneTransforms[animationData->baseBoneIndex + nodeIndex];
+
+			Animation::g_keyframeRotation.angles.x = (int16_t)pitch;
+			Animation::g_keyframeRotation.angles.y = (int16_t)yaw;
+			Animation::g_keyframeRotation.angles.z = (int16_t)roll;
+
+			Nu3D::Math::EulerToRotationMatrix(&Animation::g_keyframeRotation.angles, &transform->rotation);
+			Actor::SetNodeAngle(actor, nodeIndex, pitch, yaw, roll);
+		}
 
 		// FUNCTION: TOY2 0x00416F30 [PROVISIONAL]
 		void RCCarLevel1(Actor::Toy2Actor::ActorBehaviourContext* context)

@@ -103,7 +103,7 @@ namespace Toy2
 		void PlayPeriodicHintSound(int32_t actorIndex, int32_t soundPresetIndex);
 		void GetCreatureList(uint8_t* creatureIdList);
 		int32_t FindInActorList(Toy2Actor* actor);
-		void SetNodeAngle(Toy2Actor* actor, int32_t nodeIndex, float x, float y, float z);
+		void SetNodeAngle(Toy2Actor* actor, int32_t nodeIndex, int32_t pitch, int32_t yaw, int32_t roll);
 		void ResolveBoneAttachmentPos(Vector4I* position, Toy2Actor* actor, int32_t boneIndex);
 
 		STATIC_ASSERT(sizeof(Toy2Actor) == 0x9C);

@@ -21,7 +21,7 @@ namespace Toy2
 		};
 
 		// GLOBAL: TOY2 0x00B1C3C0
-		Vector3F g_nodeAngles[64][32];
+		Vector3I g_nodeAngles[64][32];
 
 		// GLOBAL: TOY2 0x00B223C0
 		Actor::Toy2Actor** g_actorAnimList;
