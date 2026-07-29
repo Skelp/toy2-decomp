@@ -2,6 +2,66 @@
 #include "Logger.h"
 #include "Toy2/Direct6.h"
 
+// FUNCTION: TOY2 0x0040B290 [MATCHED]
+HRESULT D3DAppIGetSurfDesc(LPDDSURFACEDESC surfaceDesc, LPDIRECTDRAWSURFACE surface)
+{
+	memset(surfaceDesc, 0, sizeof(DDSURFACEDESC));
+	surfaceDesc->dwSize = sizeof(DDSURFACEDESC);
+	return surface->GetSurfaceDesc(surfaceDesc);
+}
+
+// FUNCTION: TOY2 0x0040B9D0 [PROVISIONAL]
+BOOL D3DAppISetCoopLevel(HWND hwnd, BOOL fullscreen)
+{
+	g_changingCoopLevel = TRUE;
+
+	if (fullscreen)
+	{
+		HRESULT result;
+		if ((result = d3dappi.lpDD->SetCooperativeLevel(hwnd, 0x00000010L | 0x00000001L | 0x00000040L)) < 0)
+			Logger::LogDDError("d3dappi.lpDD->SetCooperativeLevel(hwnd, 0x00000010l | 0x00000001l | 0x00000040l)", result);
+	}
+	else
+	{
+		HRESULT result;
+		if ((result = d3dappi.lpDD->SetCooperativeLevel(hwnd, 0x00000008L)) < 0)
+			Logger::LogDDError("d3dappi.lpDD->SetCooperativeLevel(hwnd, 0x00000008l)", result);
+	}
+
+	g_changingCoopLevel = FALSE;
+	return TRUE;
+}
+
+// FUNCTION: TOY2 0x0040BA30 [MATCHED]
+BOOL D3DAppIRestoreDispMode()
+{
+	g_changingCoopLevel = TRUE;
+
+	HRESULT result = d3dappi.lpDD->RestoreDisplayMode();
+	if (result < 0)
+		Logger::LogDDError("d3dappi.lpDD->RestoreDisplayMode()", result);
+
+	g_changingCoopLevel = FALSE;
+	return TRUE;
+}
+
+// FUNCTION: TOY2 0x0040BA70 [MATCHED]
+BOOL D3DAppIRememberWindowsMode()
+{
+	DDSURFACEDESC surfaceDesc;
+	memset(&surfaceDesc, 0, sizeof(surfaceDesc));
+	surfaceDesc.dwSize = sizeof(surfaceDesc);
+
+	HRESULT result = d3dappi.lpDD->GetDisplayMode(&surfaceDesc);
+	if (result < 0)
+		Logger::LogDDError("d3dappi.lpDD->GetDisplayMode(&ddsd)", result);
+
+	d3dappi.windowsDisplay.w = surfaceDesc.dwWidth;
+	d3dappi.windowsDisplay.h = surfaceDesc.dwHeight;
+	d3dappi.windowsDisplay.bpp = surfaceDesc.ddpfPixelFormat.dwRGBBitCount;
+	return TRUE;
+}
+
 // FUNCTION: TOY2 0x0040BAE0 [MATCHED]
 BOOL D3DAppIClearBuffers()
 {

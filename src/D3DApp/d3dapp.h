@@ -4,6 +4,10 @@
 
 extern "C"
 {
+	HRESULT D3DAppIGetSurfDesc(LPDDSURFACEDESC surfaceDesc, LPDIRECTDRAWSURFACE surface);
+	BOOL D3DAppISetCoopLevel(HWND hwnd, BOOL fullscreen);
+	BOOL D3DAppIRestoreDispMode();
+	BOOL D3DAppIRememberWindowsMode();
 	BOOL D3DAppIClearBuffers();
 	void D3DAppISetErrorString(char* format, ...);
 	char* D3DAppLastErrorString();
