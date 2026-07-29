@@ -376,12 +376,27 @@ namespace Toy2
 
 namespace Toy2
 {
+	namespace Particles
+	{
+		void SpawnCollectSparkle(int32_t x, int32_t y, int32_t z, int32_t particleSpread);
+	}
+
 	namespace CreatureBehaviour
 	{
 		// STUB: TOY2 0x0042D3E0
 		void SmithLevel14(Actor::Toy2Actor::ActorBehaviourContext* context) {}
 
-		// STUB: TOY2 0x0042D620
-		void Luggage(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// FUNCTION: TOY2 0x0042D620 [MATCHED]
+		void Luggage(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			if ((actor->actorFlags & Actor::ACTOR_FLAG_INTERACTION_REQUESTED) != 0 && actor->actorPhase == 0x66)
+			{
+				g_levelObjectiveProgress++;
+				Particles::SpawnCollectSparkle(actor->pos.x, actor->pos.y - 0x2000, actor->pos.z, 0x32);
+				AudioManager::PlaySoundEffect(0x1F, &actor->pos);
+				Actor::Kill(actor, 2);
+			}
+		}
 	}
 }
