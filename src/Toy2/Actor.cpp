@@ -625,8 +625,86 @@ namespace Toy2
 
 	namespace Actor
 	{
-		// STUB: TOY2 0x00408A60
-		void HandleDamage(Toy2Actor* actor, int32_t attackAngle, int32_t damageType) {}
+		enum DamageActorFlags
+		{
+			ACTOR_FLAG_BALLISTIC_MOTION = 0x400,
+			ACTOR_FLAGS_CLEARED_ON_DEFEAT = 0x19C,
+		};
+
+		struct DamageResponse
+		{
+			int16_t responseType;
+			int16_t cooldown;
+			int16_t phaseDamage;
+		};
+
+		// GLOBAL: TOY2 0x004E066C
+		DamageResponse g_damageResponses[] = {
+			{ 0, 0, 0 },
+			{ 1, 30, 2 },
+			{ 2, 4, 1 },
+			{ 2, 4, 4 },
+			{ 3, 4, 2 },
+			{ 1, 30, 2 },
+		};
+
+		// GLOBAL: TOY2 0x004DF7C8
+		uint16_t g_defeatMovementScript[] = { 0x16, 0xFFE0, 0xFFE0, 4, 0xFFFF, 1 };
+
+		// GLOBAL: TOY2 0x004E02CC
+		uint16_t* g_defeatMovementData = g_defeatMovementScript;
+
+		STATIC_ASSERT(sizeof(DamageResponse) == 6);
+
+		// FUNCTION: TOY2 0x00408A60 [MATCHED]
+		void HandleDamage(Toy2Actor* actor, int32_t attackAngle, int32_t damageType)
+		{
+			g_lastKilledActor = (Toy2Actor*)-1;
+			if (g_damageResponses[damageType].responseType != 2 || (actor->creatureRam->defenseMode & 1) != 0)
+			{
+				if (actor->creatureRam->latSpeedTarget != 0xFF && g_levelFileIndex != 6)
+				{
+					actor->velX = Numerics::g_sinCosLUT[attackAngle & 0xFFF] / 32;
+					actor->velForward = Numerics::g_sinCosLUT[(attackAngle + 0x400) & 0xFFF] / 32;
+					actor->actorFlags &= ~ACTOR_FLAG_BALLISTIC_MOTION;
+				}
+
+				if (actor->damageCooldownTimer == 0)
+				{
+					actor->damageCooldownTimer = g_damageResponses[damageType].cooldown;
+					if (g_damageResponses[damageType].responseType != 0)
+					{
+						if (g_damageResponses[damageType].responseType == 1)
+						{
+							if (damageType == 1)
+							{
+								HitType1Particles(g_buzzActor.posAngles.pos.x + Numerics::g_sinCosLUT[attackAngle] / 2,
+									g_buzzActor.posAngles.pos.y - 0x2C00,
+									g_buzzActor.posAngles.pos.z + Numerics::g_sinCosLUT[(attackAngle + 0x400) & 0xFFF] / 2);
+							}
+							else
+							{
+								HitType1Particles(g_buzzActor.posAngles.pos.x, g_buzzActor.posAngles.pos.y, g_buzzActor.posAngles.pos.z);
+							}
+						}
+
+						if (actor->actorPhase < 100)
+						{
+							actor->actorPhase -= g_damageResponses[damageType].phaseDamage;
+							AudioManager::PlaySoundEffect(9, &actor->pos);
+						}
+						if (actor->actorPhase <= 0)
+						{
+							actor->actorFlags &= ~ACTOR_FLAGS_CLEARED_ON_DEFEAT;
+							actor->actorPhase = 999;
+							actor->movementCommandTimer = 0;
+							actor->movementData = g_defeatMovementData;
+							Kill(actor, KILL_EFFECTS);
+						}
+					}
+				}
+			}
+		}
 
 		// FUNCTION: TOY2 0x00405D20 [PROVISIONAL]
 		void Kill(Toy2Actor* actor, uint8_t killFlags)
