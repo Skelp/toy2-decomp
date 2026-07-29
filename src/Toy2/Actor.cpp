@@ -1,11 +1,13 @@
 #include "Toy2/Actor.h"
 #include "Toy2/Animation.h"
 #include "Toy2/Buzz.h"
+#include "Toy2/Camera.h"
 #include "Toy2/Collectables.h"
 #include "Toy2/Collision.h"
 #include "Toy2/Toy2.h"
 #include "AudioManager/AudioManager.h"
 #include "CharacterLoader.h"
+#include "Nu3D/Camera.h"
 #include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
 #include "Random.h"
@@ -66,11 +68,76 @@ namespace Toy2
 			Lighting::SpawnLight(x, y, z, 0x604000, 0x10, x);
 		}
 
-		// STUB: TOY2 0x00410540
-		void SpawnBurstRingAtPoint(Actor::Toy2Actor* actor, int32_t red, int32_t green, int32_t blue, int32_t radius) {}
+		// FUNCTION: TOY2 0x00410540 [PROVISIONAL]
+		void SpawnBurstRingAtPoint(Actor::Toy2Actor* actor, uint8_t red, uint8_t green, uint8_t blue, int32_t verticalOffset)
+		{
+			int32_t cameraSine = Numerics::g_sinCosLUT[(int16_t)Camera::g_renderCameraTransform.angles.yaw & 0xFFF];
+			int32_t cameraCosine = Numerics::g_sinCosLUT[((int16_t)Camera::g_renderCameraTransform.angles.yaw + 0x400) & 0xFFF];
 
-		// STUB: TOY2 0x004106C0
-		void SpawnBurstRingAtActor(Actor::Toy2Actor* actor, int32_t red, int32_t green, int32_t blue, int32_t radius) {}
+			for (int32_t ringAngle = 0; ringAngle < 0x1000; ringAngle += 0x200)
+			{
+				int32_t radiusScale = Numerics::g_sinCosLUT[ringAngle] / 4;
+				int32_t offsetX = radiusScale * cameraCosine >> 14;
+				int32_t offsetZ = -(radiusScale * cameraSine) >> 14;
+				int32_t offsetY = Numerics::g_sinCosLUT[(ringAngle + 0x400) & 0xFFF] / 4;
+
+				Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnInstance(actor->pos.x + offsetX,
+					actor->pos.y - verticalOffset + offsetY,
+					actor->pos.z + offsetZ,
+					offsetX >> 2,
+					(offsetY >> 2) - 0x400,
+					offsetZ >> 2,
+					0x40,
+					ringAngle,
+					*g_randDatBufferPtr++ - 0x80,
+					0x7D);
+				particle->lifetime = (*g_randDatBufferPtr++ & 0x3F) + 0x50;
+				particle->colourR = red;
+				particle->colourG = green;
+				particle->colourB = blue;
+			}
+
+			Nu3D::Particles::SpawnInstance(actor->pos.x, actor->pos.y - verticalOffset, actor->pos.z, 0, -0x400, 0, 0x40, 0, 0, 0x7E);
+			Nu3D::Particles::SpawnInstance(actor->pos.x, actor->pos.y - verticalOffset, actor->pos.z, 0, -0x400, 0, 0x40, 0, 0, 0x7F);
+		}
+
+		// FUNCTION: TOY2 0x004106C0 [PROVISIONAL]
+		void SpawnBurstRingAtActor(Actor::Toy2Actor* actor, uint8_t red, uint8_t green, uint8_t blue, int32_t verticalOffset)
+		{
+			int32_t cameraSine = Numerics::g_sinCosLUT[(int16_t)Camera::g_renderCameraTransform.angles.yaw & 0xFFF];
+			int32_t cameraCosine = Numerics::g_sinCosLUT[((int16_t)Camera::g_renderCameraTransform.angles.yaw + 0x400) & 0xFFF];
+
+			int16_t* radiusSample = Numerics::g_sinCosLUT;
+			int32_t ringAngle = 0;
+			do
+			{
+				int32_t radiusScale = *radiusSample / 4;
+				int32_t offsetX = radiusScale * cameraCosine >> 14;
+				int32_t offsetZ = -(radiusScale * cameraSine) >> 14;
+				int32_t offsetY = Numerics::g_sinCosLUT[(ringAngle + 0x400) & 0xFFF] / 4;
+
+				Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnInstance(actor->pos.x + offsetX,
+					actor->pos.y + offsetY - verticalOffset,
+					actor->pos.z + offsetZ,
+					offsetX >> 3,
+					(offsetY >> 3) - 0x400,
+					offsetZ >> 3,
+					0x40,
+					ringAngle,
+					*g_randDatBufferPtr++ - 0x80,
+					0x7D);
+				particle->lifetime = (*g_randDatBufferPtr++ & 0x1F) + 0x32;
+				particle->colourR = red;
+				particle->colourG = green;
+				particle->colourB = blue;
+
+				radiusSample += 0x333;
+				ringAngle += 0x333;
+			} while (radiusSample < &Numerics::g_sinCosLUT[0xFFF]);
+
+			Nu3D::Particles::SpawnInstance(actor->pos.x, actor->pos.y - verticalOffset, actor->pos.z, 0, -0x400, 0, 0x40, 0, 0, 0x7E);
+			Nu3D::Particles::SpawnInstance(actor->pos.x, actor->pos.y - verticalOffset, actor->pos.z, 0, -0x400, 0, 0x40, 0, 0, 0x7F);
+		}
 	}
 
 	namespace Lighting
