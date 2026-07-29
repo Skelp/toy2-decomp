@@ -29,6 +29,7 @@ namespace Toy2
 		};
 
 		void ResetCursor();
+		void TurnTowardLookDir(LevelSelectCamera* levelSelectCam, int32_t turnRate);
 		int32_t Tick();
 
 		STATIC_ASSERT(sizeof(LevelSelectCamera) == 0x28);

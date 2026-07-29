@@ -133,8 +133,64 @@ namespace Toy2
 		// FUNCTION: TOY2 0x00452170
 		void ResetCursor() { g_levelSelectCursor = 0; }
 
-		// STUB: TOY2 0x00438650
-		void TurnTowardLookDir(LevelSelectCamera* levelSelectCam, int32_t turnRate) {}
+		// FUNCTION: TOY2 0x00438650
+		void TurnTowardLookDir(LevelSelectCamera* levelSelectCam, int32_t turnRate)
+		{
+			int32_t lookZ = levelSelectCam->lookDir.z;
+			int32_t lookX = levelSelectCam->lookDir.x;
+			int32_t lookY = levelSelectCam->lookDir.y;
+			int16_t yaw = levelSelectCam->angles.yaw;
+			int32_t targetYaw = Nu3D::Math::CartesianToFixedAngle(lookX, lookZ);
+			int32_t yawDelta = (targetYaw - yaw) & 0xFFF;
+
+			if (yawDelta < 0x800)
+			{
+				int32_t yawChange = yawDelta >> 3;
+				if (yawChange < Renderer::g_frameDelta * turnRate)
+					yaw += (int16_t)yawChange;
+				else
+				{
+					levelSelectCam->angles.yaw = (int16_t)(Renderer::g_frameDelta * turnRate) + yaw;
+					goto UPDATE_PITCH;
+				}
+			}
+			else
+			{
+				int32_t yawChange = (0x1000 - yawDelta) >> 3;
+				if (yawChange < Renderer::g_frameDelta * turnRate)
+					yaw -= (int16_t)yawChange;
+				else
+					yaw -= (int16_t)(Renderer::g_frameDelta * turnRate);
+			}
+			levelSelectCam->angles.yaw = yaw;
+
+		UPDATE_PITCH:
+			int16_t pitch = levelSelectCam->angles.pitch;
+			int32_t targetPitch;
+			if (lookY < 0)
+				targetPitch = Nu3D::Math::CartesianToFixedAngle(lookY * lookY, lookZ * lookZ + lookX * lookX);
+			else
+				targetPitch = Nu3D::Math::CartesianToFixedAngle(-(lookY * lookY), lookZ * lookZ + lookX * lookX);
+
+			int32_t pitchDelta = -(targetPitch + pitch) & 0xFFF;
+			if (pitchDelta < 0x800)
+			{
+				int32_t pitchChange = pitchDelta >> 3;
+				if (pitchChange < Renderer::g_frameDelta * turnRate)
+					pitch += (int16_t)pitchChange;
+				else
+					pitch += (int16_t)(Renderer::g_frameDelta * turnRate);
+			}
+			else
+			{
+				int32_t pitchChange = (0x1000 - pitchDelta) >> 3;
+				if (pitchChange < Renderer::g_frameDelta * turnRate)
+					pitch -= (int16_t)pitchChange;
+				else
+					pitch -= (int16_t)(Renderer::g_frameDelta * turnRate);
+			}
+			levelSelectCam->angles.pitch = pitch;
+		}
 
 		// STUB: TOY2 0x00438790
 		void ApplyWallRepulsion(LevelSelectCamera* levelSelectCam, Vector3I* velocity, int32_t recordType) {}
