@@ -128,7 +128,7 @@ namespace SoftwareRenderer
 	void ZoomIn();
 	void SetBackdropScrollOverride(int32_t x, int32_t y);
 	void PresentFrame();
-	void ShowBackBuffer();
+	void ClearRenderSurfaces();
 	void LockBackBuffer();
 	void UnlockBackBuffer();
 	void SetCameraNearFarZ(float nearZ, float farZ);

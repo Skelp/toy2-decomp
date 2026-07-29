@@ -12,6 +12,11 @@
 #include <stdlib.h>
 #include <math.h>
 
+namespace D3DApp
+{
+	BOOL ShowBackBuffer();
+}
+
 namespace SoftwareRenderer
 {
 	// GLOBAL: TOY2 0x004F7400
@@ -607,8 +612,8 @@ namespace SoftwareRenderer
 	// FUNCTION: TOY2 0x004C1E60 [MATCHED]
 	void InitialisePrimarySurface_T() { InitialisePrimarySurface(); }
 
-	// STUB: TOY2 0x0040CD80
-	void ShowBackBuffer() {}
+	// STUB: TOY2 0x0040BAE0
+	void ClearRenderSurfaces() {}
 
 	// FUNCTION: TOY2 0x0047D0F0 [MATCHED]
 	void Destroy()
@@ -4004,7 +4009,7 @@ namespace SoftwareRenderer
 		{
 			Logger::Log("SOFT : ERROR - Failed to unlock back buffer - %s.\n", Logger::ErrorToMessage(result));
 		}
-		ShowBackBuffer();
+		D3DApp::ShowBackBuffer();
 	}
 
 	// Queues a transformed triangle for sorted (back-to-front) transparency

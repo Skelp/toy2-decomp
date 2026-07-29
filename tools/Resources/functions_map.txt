@@ -44,9 +44,9 @@
 0x00409360 D3DApp::ProfileWndProc
 0x004093A0 D3DApp::BuildProfileMachine
 0x0040BAE0 SoftwareRenderer::ClearRenderSurfaces
-0x0040C130 Logger::LogErrorNotSetLn
+0x0040C130 D3DApp::SetErrorString
 0x0040CAC0 D3DApp::ProcessWndProc
-0x0040CD80 SoftwareRenderer::ShowBackBuffer
+0x0040CD80 D3DApp::ShowBackBuffer
 0x0040D2C0 D3DApp::GetErrorNotSet
 0x0040D490 Logger::ErrorToMessage
 0x0040FAC0 Nu3D::Particles::Init

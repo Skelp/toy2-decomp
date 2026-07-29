@@ -1,5 +1,7 @@
 #include "Toy2/D3DApp.h"
+#include "SoftwareRenderer.h"
 #include "Logger.h"
+#include <cstdarg>
 #include <cstdio>
 
 namespace D3DApp
@@ -39,18 +41,107 @@ namespace D3DApp
 
 	// GLOBAL: TOY2 0x0050AA58
 	LPDIRECTDRAWPALETTE g_lpPalette = 0;
+
+	// GLOBAL: TOY2 0x0051ABD0
+	HRESULT g_lastError;
+
+	// GLOBAL: TOY2 0x004E0698
+	char g_lastErrorString[256] = "ERROR NOT SET";
+
+	// Set when a presentation call reports that the DirectDraw surfaces were lost.
+	// GLOBAL: TOY2 0x0051A83C
+	uint16_t g_surfacesLost;
+
+	// Destination rectangles on the primary surface. ShowBackBuffer currently uses
+	// one entry, but the Direct3D application framework reserves a dirty-rectangle list.
+	// GLOBAL: TOY2 0x0051ABF0
+	RECT g_frontBufferRects[30];
 }
 
 namespace D3DApp
 {
+	// FUNCTION: TOY2 0x0040C130 [PROVISIONAL]
+	void SetErrorString(char* format, ...)
+	{
+		char buffer[256];
+		va_list arguments;
+
+		va_start(arguments, format);
+		buffer[0] = '\0';
+		vsprintf(buffer, format, arguments);
+		lstrcatA(buffer, "\r\n");
+		lstrcpyA(g_lastErrorString, buffer);
+		Logger::Log(buffer);
+	}
+
 	// FUNCTION: TOY2 0x0040D2C0 [MATCHED]
-	char* GetErrorNotSet() { return "ERROR NOT SET"; }
+	char* GetErrorNotSet() { return g_lastErrorString; }
 
 	// FUNCTION: TOY2 0x004318F0 [MATCHED]
 	void LogErrorNotSet()
 	{
 		char* error = GetErrorNotSet();
 		Logger::LogLn(error);
+	}
+
+	// FUNCTION: TOY2 0x0040CD80 [MATCHED]
+	BOOL ShowBackBuffer()
+	{
+		if (! d3dappi.bRenderingIsOK)
+		{
+			SetErrorString("Cannot call D3DAppShowBackBuffer while bRenderingIsOK is FALSE.\n");
+			return FALSE;
+		}
+
+		if (d3dappi.bPaused)
+			return TRUE;
+
+		if (g_pcStruct.fullscreenMode)
+		{
+			g_lastError = d3dappi.lpFrontBuffer->Flip(d3dappi.lpBackBuffer, DDFLIP_WAIT);
+			if (g_lastError == DDERR_SURFACELOST)
+			{
+				g_surfacesLost = 1;
+				d3dappi.lpFrontBuffer->Restore();
+				d3dappi.lpBackBuffer->Restore();
+				SoftwareRenderer::ClearRenderSurfaces();
+			}
+			else if (g_lastError != DD_OK)
+			{
+				SetErrorString("Flipping complex display surface failed.\n%s", Logger::ErrorToMessage(g_lastError));
+				return FALSE;
+			}
+		}
+		else
+		{
+			RECT backBufferRects[30];
+
+			SetRect(&backBufferRects[0], 0, 0, d3dappi.szClient.cx, d3dappi.szClient.cy);
+			SetRect(&g_frontBufferRects[0],
+				d3dappi.pClientOnPrimary.x,
+				d3dappi.pClientOnPrimary.y,
+				d3dappi.szClient.cx + d3dappi.pClientOnPrimary.x,
+				d3dappi.szClient.cy + d3dappi.pClientOnPrimary.y);
+
+			for (int32_t i = 0; i < 1; i++)
+			{
+				g_lastError = d3dappi.lpFrontBuffer->Blt(&g_frontBufferRects[i], d3dappi.lpBackBuffer, &backBufferRects[i], DDBLT_WAIT, 0);
+				if (g_lastError == DDERR_SURFACELOST)
+				{
+					g_surfacesLost = 1;
+					d3dappi.lpFrontBuffer->Restore();
+					d3dappi.lpBackBuffer->Restore();
+					SoftwareRenderer::ClearRenderSurfaces();
+				}
+				else if (g_lastError != DD_OK)
+				{
+					SetErrorString("Blt of back buffer to front buffer failed.\n%s", Logger::ErrorToMessage(g_lastError));
+					return FALSE;
+				}
+			}
+		}
+
+		return TRUE;
 	}
 
 	// FUNCTION: TOY2 0x004093A0 [PROVISIONAL]
