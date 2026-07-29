@@ -46,8 +46,16 @@
 
 namespace Toy2
 {
+	extern int32_t g_hudActorAnimationFrame;
+
 	namespace TarmacTrouble
 	{
+		enum SmithEncounterState
+		{
+			SMITH_ENCOUNTER_ACTIVE = 2,
+			SMITH_ENCOUNTER_DEFEATED = 3,
+		};
+
 		enum LightPuzzleStateBits
 		{
 			LIGHT_PUZZLE_BOTTOM_0 = 0x01,
@@ -383,8 +391,97 @@ namespace Toy2
 
 	namespace CreatureBehaviour
 	{
-		// STUB: TOY2 0x0042D3E0
-		void SmithLevel14(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// FUNCTION: TOY2 0x0042D3E0 [PROVISIONAL]
+		void SmithLevel14(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			TarmacTrouble::g_smithTintToggle = (TarmacTrouble::g_smithTintToggle - 1) & 1;
+
+			if (actor->actorPhase != TarmacTrouble::g_previousSmithPhase)
+			{
+				TarmacTrouble::g_previousSmithPhase = actor->actorPhase;
+				TarmacTrouble::g_smithTintTimer = 60;
+				actor->creatureRam->defenseMode = 4;
+			}
+
+			if (TarmacTrouble::g_smithEncounterState == TarmacTrouble::SMITH_ENCOUNTER_ACTIVE)
+			{
+				TarmacTrouble::g_smithTintTimer -= Renderer::g_frameDelta;
+				if (TarmacTrouble::g_smithTintTimer < 0)
+				{
+					TarmacTrouble::g_smithTintTimer = 0;
+					actor->creatureRam->defenseMode = 6;
+				}
+				else if (TarmacTrouble::g_smithTintToggle != 0)
+				{
+					actor->useTint = 1;
+					actor->actorTint.r = 0x2000;
+					actor->actorTint.g = 0x2000;
+					actor->actorTint.b = 0x2000;
+				}
+				else
+				{
+					actor->useTint = 0;
+				}
+			}
+			else
+			{
+				actor->useTint = 0;
+			}
+
+			if ((context->targetFlags & 1) != 0 && Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &actor->pos, 200) != 0
+				&& actor->primaryAnimIdx == 1)
+			{
+				Actor::SetAnimation(actor, 3, 0x18);
+				actor->creatureRam->speedTarget = 0;
+				TarmacTrouble::g_smithAttackTimer = 0x3F;
+			}
+
+			if (actor->primaryAnimIdx == 3 && (actor->animationFramePosition & (int32_t)0xFFFF0000) > 0x2E0000)
+			{
+				actor->movementCommandTimer = 0;
+				actor->movementData = g_smithMovementData + 16;
+				actor->creatureRam->speedTarget = 0x10;
+				actor->actorFlags &= ~(Actor::ACTOR_FLAG_TRACKS_TARGET | Actor::ACTOR_FLAG_TARGETS_BUZZ);
+			}
+
+			if (TarmacTrouble::g_smithAttackTimer != 0)
+			{
+				TarmacTrouble::g_smithAttackTimer -= Renderer::g_frameDelta;
+				if (TarmacTrouble::g_smithAttackTimer <= 0)
+				{
+					Vector4I effectPosition;
+					effectPosition.x = 0xB4;
+					effectPosition.y = -0x96;
+					effectPosition.z = -0x32;
+					Actor::ResolveBoneAttachmentPos(&effectPosition, actor, 4);
+					Nu3D::Particles::ParticleInstance* particle =
+						Nu3D::Particles::SpawnInstance(effectPosition.x, effectPosition.y, effectPosition.z, 0, -2, 0, actor->yawAngle << 2, 0, 0, 0x66);
+					particle->discPitchAngle = -1;
+					TarmacTrouble::g_smithAttackTimer = 0;
+					AudioManager::PlaySoundEffect(0xA7, &actor->pos);
+				}
+			}
+
+			if (TarmacTrouble::g_smithEncounterState == TarmacTrouble::SMITH_ENCOUNTER_ACTIVE)
+			{
+				g_hudActorAnimationFrame = (actor->actorPhase - 9) * 54 / 20;
+				HUD::g_slideTimers[HUD::SLIDE_BOSS_STATUS] = 90;
+			}
+
+			if (actor->actorPhase < 10 && TarmacTrouble::g_smithEncounterState == TarmacTrouble::SMITH_ENCOUNTER_ACTIVE)
+			{
+				actor->movementData = g_smithMovementData + 45;
+				actor->creatureRam->defenseMode = 4;
+				actor->actorFlags &= ~(Actor::ACTOR_FLAG_TARGETS_BUZZ | Actor::ACTOR_FLAG_DAMAGES_BUZZ);
+				actor->movementCommandTimer = 0;
+				AudioManager::PlaySoundEffect(-2, &actor->pos);
+				TarmacTrouble::g_smithEncounterState = TarmacTrouble::SMITH_ENCOUNTER_DEFEATED;
+				g_hudActorAnimationFrame = 0;
+				TarmacTrouble::g_smithAttackTimer = 0;
+				actor->creatureRam->speedTarget = 0x10;
+			}
+		}
 
 		// FUNCTION: TOY2 0x0042D620 [MATCHED]
 		void Luggage(Actor::Toy2Actor::ActorBehaviourContext* context)
