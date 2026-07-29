@@ -18,6 +18,7 @@ namespace Nu3D
 	{
 		enum RenderFlags
 		{
+			PARTICLE_INTERACTS_WITH_BUZZ = 0x2,
 			PARTICLE_RENDER_ALPHA_MODE_MASK = 0x60,
 		};
 
@@ -79,7 +80,7 @@ namespace Nu3D
 			uint8_t animationTimer;
 			uint8_t spriteSheet;
 			uint8_t typeId;
-			uint8_t collisionFlags;
+			int8_t collisionFlags;
 			uint8_t updateMode;
 			uint8_t animationFrameCount;
 			uint8_t tileIndex;
@@ -119,6 +120,12 @@ namespace Nu3D
 		STATIC_ASSERT(offsetof(ParticleInstance, groundProbe) == 0x0);
 		STATIC_ASSERT(offsetof(ParticleInstance, pos) == 0x0);
 		STATIC_ASSERT(offsetof(ParticleInstance, velX) == 0xC);
+		STATIC_ASSERT(offsetof(ParticleInstance, lifetime) == 0x24);
+		STATIC_ASSERT(offsetof(ParticleInstance, width) == 0x26);
+		STATIC_ASSERT(offsetof(ParticleInstance, updateParam) == 0x2A);
+		STATIC_ASSERT(offsetof(ParticleInstance, spriteSheet) == 0x2C);
+		STATIC_ASSERT(offsetof(ParticleInstance, collisionFlags) == 0x2E);
+		STATIC_ASSERT(offsetof(ParticleInstance, renderFlags) == 0x32);
 		STATIC_ASSERT(sizeof(ParticleType) == 0x10);
 		STATIC_ASSERT(sizeof(ParticlePreset) == 0x18);
 	}

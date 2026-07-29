@@ -47,6 +47,7 @@ namespace Toy2
 	{
 		enum SlideSlot
 		{
+			SLIDE_COINS = 2,
 			SLIDE_CHALLENGE_STATUS = 6,
 			SLIDE_BOSS_STATUS = 7,
 		};
