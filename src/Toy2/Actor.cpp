@@ -24,6 +24,12 @@ namespace Toy2
 		void InitActor(Actor::Toy2Actor* actor, int32_t param);
 	}
 
+	namespace Particles
+	{
+		// STUB: TOY2 0x00410410
+		void SpawnCollectSparkle(int32_t x, int32_t y, int32_t z, int32_t particleSpread) {}
+	}
+
 	namespace Actor
 	{
 		// GLOBAL: TOY2 0x0052F1D0
@@ -58,6 +64,9 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x0052EF88
 		int32_t g_unk52EF88;
+
+		// STUB: TOY2 0x00405D20
+		void Kill(Toy2Actor* actor, uint8_t killFlags) {}
 
 		// FUNCTION: TOY2 0x00407150 [PROVISIONAL]
 		void InitCreatureRam()
@@ -295,6 +304,19 @@ namespace Toy2
 
 	namespace CreatureBehaviour
 	{
+		// FUNCTION: TOY2 0x00416A60 [MATCHED]
+		void Sheep(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			if ((actor->actorFlags & Actor::ACTOR_FLAG_INTERACTION_REQUESTED) != 0)
+			{
+				g_levelObjectiveProgress++;
+				Particles::SpawnCollectSparkle(actor->pos.x, actor->pos.y - 0x2000, actor->pos.z, 0x32);
+				AudioManager::PlaySoundEffect(0x20, &actor->pos);
+				Actor::Kill(actor, 2);
+			}
+		}
+
 		// STUB: TOY2 0x00416F30
 		void RCCarLevel1(Actor::Toy2Actor::ActorBehaviourContext* context) {}
 

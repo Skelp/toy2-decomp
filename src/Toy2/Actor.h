@@ -94,6 +94,7 @@ namespace Toy2
 		void InitCreatureRam();
 		void StepCreatureAnimFrame(Toy2Actor* actor);
 		void SetAnimation(Toy2Actor* actor, int16_t animationIndex, int32_t frameSequenceIndex);
+		void Kill(Toy2Actor* actor, uint8_t killFlags);
 		int32_t IsInsideBounds(const Vector3I* position, int32_t minX, int32_t maxX, int32_t minZ, int32_t maxZ);
 		void PopulateActiveActors();
 		void HitType1Particles(int32_t x, int32_t y, int32_t z);
