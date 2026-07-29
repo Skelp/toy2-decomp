@@ -72,6 +72,18 @@ namespace SoftwareRenderer
 	extern int32_t g_zoomExtentV;
 	extern int32_t g_zoomExtentH;
 	extern int32_t g_bitsPerPixel;
+	extern uint16_t g_blueRampFull[64];
+	extern uint16_t g_greenRampFull[128];
+	extern uint16_t g_redRampFull[64];
+	extern uint16_t g_blueRampLow[64];
+	extern uint16_t g_blueRampHigh[64];
+	extern uint16_t g_blueRampMedium[64];
+	extern uint16_t g_greenRampLow[128];
+	extern uint16_t g_greenRampHigh[128];
+	extern uint16_t g_greenRampMedium[128];
+	extern uint16_t g_redRampLow[64];
+	extern uint16_t g_redRampHigh[64];
+	extern uint16_t g_redRampMedium[64];
 	extern uint32_t g_redMask;
 	extern uint32_t g_greenMask;
 	extern uint32_t g_blueMask;

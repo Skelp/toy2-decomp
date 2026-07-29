@@ -389,6 +389,42 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00882910
 	int32_t g_bitsPerPixel;
 
+	// GLOBAL: TOY2 0x00703E20
+	uint16_t g_blueRampFull[64];
+
+	// GLOBAL: TOY2 0x00703EA0
+	uint16_t g_greenRampFull[128];
+
+	// GLOBAL: TOY2 0x00703FA0
+	uint16_t g_redRampFull[64];
+
+	// GLOBAL: TOY2 0x00704028
+	uint16_t g_blueRampLow[64];
+
+	// GLOBAL: TOY2 0x007040A8
+	uint16_t g_blueRampHigh[64];
+
+	// GLOBAL: TOY2 0x00704128
+	uint16_t g_blueRampMedium[64];
+
+	// GLOBAL: TOY2 0x007041A8
+	uint16_t g_greenRampLow[128];
+
+	// GLOBAL: TOY2 0x007042A8
+	uint16_t g_greenRampHigh[128];
+
+	// GLOBAL: TOY2 0x007043A8
+	uint16_t g_greenRampMedium[128];
+
+	// GLOBAL: TOY2 0x007044A8
+	uint16_t g_redRampLow[64];
+
+	// GLOBAL: TOY2 0x00704528
+	uint16_t g_redRampHigh[64];
+
+	// GLOBAL: TOY2 0x007045A8
+	uint16_t g_redRampMedium[64];
+
 	// GLOBAL: TOY2 0x00731EFC
 	uint32_t g_redMask;
 
@@ -581,8 +617,122 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00704E68
 	SoftwareRenderDispatchTable* g_softwareRenderDispatch;
 
-	// STUB: TOY2 0x0047C8B0
-	void BuildColourRampTables() {}
+	// FUNCTION: TOY2 0x0047C8B0 [PROVISIONAL]
+	void BuildColourRampTables()
+	{
+		if (g_bitsPerPixel == 16)
+		{
+			int32_t source = -12;
+			int32_t tableIndex = 0;
+			do
+			{
+				int32_t level = source;
+				if (source < 0)
+					level = 0;
+				else if (source > 31)
+					level = 31;
+
+				g_redRampFull[tableIndex] = (uint16_t)(level << 11);
+				g_redRampLow[tableIndex] = (uint16_t)((level * 10 / 32) << 11);
+				g_redRampMedium[tableIndex] = (uint16_t)((level * 17 / 32) << 11);
+				g_redRampHigh[tableIndex] = (uint16_t)((level * 25 / 32) << 11);
+				++tableIndex;
+				++source;
+			} while (source + 12 < 64);
+
+			source = -24;
+			tableIndex = 0;
+			do
+			{
+				int32_t level = source;
+				if (source < 0)
+					level = 0;
+				else if (source > 63)
+					level = 63;
+
+				g_greenRampFull[tableIndex] = (uint16_t)(level << 5);
+				g_greenRampLow[tableIndex] = (uint16_t)((level * 18 / 64) << 5);
+				g_greenRampMedium[tableIndex] = (uint16_t)((level * 33 / 64) << 5);
+				g_greenRampHigh[tableIndex] = (uint16_t)((level * 49 / 64) << 5);
+				++tableIndex;
+				++source;
+			} while (source + 24 < 128);
+
+			source = -12;
+			tableIndex = 0;
+			do
+			{
+				int32_t level = source;
+				if (source < 0)
+					level = 0;
+				else if (source > 31)
+					level = 31;
+
+				g_blueRampFull[tableIndex] = (uint16_t)level;
+				g_blueRampLow[tableIndex] = (uint16_t)(level * 10 / 32);
+				g_blueRampMedium[tableIndex] = (uint16_t)(level * 17 / 32);
+				g_blueRampHigh[tableIndex] = (uint16_t)(level * 25 / 32);
+				++tableIndex;
+				++source;
+			} while (source + 12 < 64);
+		}
+		else
+		{
+			int32_t source = -12;
+			int32_t tableIndex = 0;
+			do
+			{
+				int32_t level = source;
+				if (source < 0)
+					level = 0;
+				else if (source > 31)
+					level = 31;
+
+				g_redRampFull[tableIndex] = (uint16_t)(level << 10);
+				g_redRampLow[tableIndex] = (uint16_t)((level * 10 / 32) << 10);
+				g_redRampMedium[tableIndex] = (uint16_t)((level * 17 / 32) << 10);
+				g_redRampHigh[tableIndex] = (uint16_t)((level * 25 / 32) << 10);
+				++tableIndex;
+				++source;
+			} while (source + 12 < 64);
+
+			source = -12;
+			tableIndex = 0;
+			do
+			{
+				int32_t level = source;
+				if (source < 0)
+					level = 0;
+				else if (source > 31)
+					level = 31;
+
+				g_greenRampFull[tableIndex] = (uint16_t)(level << 5);
+				g_greenRampLow[tableIndex] = (uint16_t)((level * 10 / 32) << 5);
+				g_greenRampMedium[tableIndex] = (uint16_t)((level * 17 / 32) << 5);
+				g_greenRampHigh[tableIndex] = (uint16_t)((level * 25 / 32) << 5);
+				++tableIndex;
+				++source;
+			} while (source + 12 < 64);
+
+			source = -12;
+			tableIndex = 0;
+			do
+			{
+				int32_t level = source;
+				if (source < 0)
+					level = 0;
+				else if (source > 31)
+					level = 31;
+
+				g_blueRampFull[tableIndex] = (uint16_t)level;
+				g_blueRampLow[tableIndex] = (uint16_t)(level * 10 / 32);
+				g_blueRampMedium[tableIndex] = (uint16_t)(level * 17 / 32);
+				g_blueRampHigh[tableIndex] = (uint16_t)(level * 25 / 32);
+				++tableIndex;
+				++source;
+			} while (source + 12 < 64);
+		}
+	}
 
 	// Render-buffer double-buffering state. SwapRenderBuffer toggles
 	// g_currentRenderBuffer between the two contiguous render buffers

@@ -22,8 +22,8 @@ namespace SaveManager
 	// GLOBAL: TOY2 0x00528160
 	char g_emptyString;
 
-	// STUB: TOY2 0x00498470
-	void SetLightShadowEffects(int32_t enabled) {}
+	// FUNCTION: TOY2 0x00498470 [MATCHED]
+	void SetLightShadowEffects(int32_t enabled) { g_save0Data.lightShadowEffects = enabled; }
 
 	// FUNCTION: TOY2 0x00415180 [MATCHED]
 	void AddInputEntry(int32_t inputCode, int32_t controlId)
