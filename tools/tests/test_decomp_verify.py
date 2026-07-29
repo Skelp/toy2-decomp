@@ -183,6 +183,59 @@ class VerifyRegressionTests(unittest.TestCase):
             self.assertEqual(row[12], "audited")
             self.assertEqual(row[13], "sub-50")
 
+    def test_ledger_refresh_keeps_an_effective_sub_50_audit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src"
+            source.mkdir()
+            (root / ".notes").mkdir()
+            (root / ".notes" / "caps-registry.tsv").write_text("", encoding="utf-8")
+            (source / "test.cpp").write_text(
+                "// FUNCTION: TOY2 0x00401000 [EFFECTIVE]\n"
+                "int Test() { return 1; }\n",
+                encoding="utf-8",
+            )
+            report = Path(directory) / "report.json"
+            report.write_text(
+                json.dumps(
+                    {
+                        "data": [
+                            {
+                                "address": "0x401000",
+                                "matching": 0.4,
+                                "effective": True,
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            ledger = root / "audit.tsv"
+            ledger.write_text(
+                "0x00401000\teffective\teffective\t40.00\tclean\tmanual-audit\t"
+                "the instruction stream differs only in interchangeable volatile registers\t"
+                "revisit if source evidence explains the register allocation difference\t"
+                "40.00\t-\t-\t-\taudited\tsub-50\n",
+                encoding="utf-8",
+            )
+            old_root = VERIFY.ROOT
+            VERIFY.ROOT = root
+            try:
+                VERIFY.write_audit_ledger(report, source, ledger)
+            finally:
+                VERIFY.ROOT = old_root
+            with ledger.open(encoding="utf-8", newline="") as handle:
+                row = next(
+                    row
+                    for row in csv.reader(handle, delimiter="\t")
+                    if row and not row[0].startswith("#")
+                )
+            self.assertEqual(row[1], "effective")
+            self.assertEqual(row[2], "effective")
+            self.assertEqual(row[5], "manual-audit")
+            self.assertEqual(row[12], "audited")
+            self.assertEqual(row[13], "sub-50")
+
     def test_audit_status_rejects_placeholder_classification(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

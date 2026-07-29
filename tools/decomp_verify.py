@@ -303,7 +303,14 @@ def write_audit_ledger(report: Path, source_root: Path, output: Path) -> None:
         verification = verification_status(
             status, tool_artifact=tool, source_clean=address not in debt
         )
-        if verification != "provisional":
+        scopes = []
+        if address in legacy:
+            scopes.append("former-cap")
+        if status is not None and status.matching < 0.5:
+            scopes.append("sub-50")
+        if status is not None and (status.matching == 1.0 or status.effective or tool) and address in debt:
+            scopes.append("verified-debt")
+        if verification != "provisional" and not scopes:
             continue
         old = legacy.get(address, [])
         previous = existing.get(address, [])
@@ -322,13 +329,6 @@ def write_audit_ledger(report: Path, source_root: Path, output: Path) -> None:
                 )
             else:
                 trigger = "recheck ABI, layout, control flow, and natural source forms"
-        scopes = []
-        if address in legacy:
-            scopes.append("former-cap")
-        if status is not None and status.matching < 0.5:
-            scopes.append("sub-50")
-        if status is not None and (status.matching == 1.0 or status.effective or tool) and address in debt:
-            scopes.append("verified-debt")
         audit_state = previous[12] if len(previous) > 12 else (
             "audited" if old and uncertainty != "binary or source model is not verified" else "pending"
         )
