@@ -760,11 +760,77 @@ namespace Renderer
 			return 1;
 		}
 
-		// STUB: TOY2 0x00493DC0
-		int16_t DrawColouredFixed(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue) { return 0; }
+		// FUNCTION: TOY2 0x00493DC0
+		int16_t DrawColouredFixed(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue)
+		{
+			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
+			if (sheet)
+			{
+				int32_t textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
+				Vector2F uvTopLeft;
+				Vector2F uvBottomRight;
+				if (textureDataIndex != 0)
+				{
+					uint32_t bitmapWidth;
+					uint32_t bitmapHeight;
+					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
 
-		// STUB: TOY2 0x00493C30
-		int16_t DrawColoured(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t blue, uint8_t green, uint8_t red) { return 0; }
+					uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;
+					uvTopLeft.y = (float)sheet->tiles[tileIndex].y / (int32_t)bitmapHeight;
+					uvBottomRight.x = ((float)sheet->tileWidth + sheet->tiles[tileIndex].x) / (int32_t)bitmapWidth;
+					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
+				}
+
+				RGBA color = { blue, green, red, 255 };
+				Queue2DSprite((float)xPos * (1.0f / 320.0f),
+					(float)yPos * (1.0f / g_virtualScreenHeight),
+					(float)sheet->tileWidth * (1.0f / 320.0f),
+					(float)sheet->tileHeight * (1.0f / g_virtualScreenHeight),
+					&uvTopLeft,
+					&uvBottomRight,
+					textureDataIndex,
+					color,
+					RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT);
+			}
+			return 1;
+		}
+
+		// FUNCTION: TOY2 0x00493C30
+		int16_t DrawColoured(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue)
+		{
+			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
+			if (sheet)
+			{
+				int32_t textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
+				Vector2F uvTopLeft;
+				Vector2F uvBottomRight;
+				if (textureDataIndex != 0)
+				{
+					uint32_t bitmapWidth;
+					uint32_t bitmapHeight;
+					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
+
+					uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;
+					uvTopLeft.y = (float)sheet->tiles[tileIndex].y / (int32_t)bitmapHeight;
+					uvBottomRight.x = ((float)sheet->tileWidth + sheet->tiles[tileIndex].x) / (int32_t)bitmapWidth;
+					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
+				}
+
+				RGBA color = { blue, green, red, 255 };
+				float inverseHeight = 1.0f / g_virtualScreenHeight;
+				float inverseWidth = 1.0f / g_virtualScreenWidth;
+				Queue2DSprite((float)xPos * inverseWidth,
+					(float)yPos * inverseHeight,
+					(float)sheet->tileWidth * inverseWidth,
+					(float)sheet->tileHeight * inverseHeight,
+					&uvTopLeft,
+					&uvBottomRight,
+					textureDataIndex,
+					color,
+					RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT);
+			}
+			return 1;
+		}
 
 		// FUNCTION: TOY2 0x0049D2D0 [MATCHED]
 		void QueueSegment(Vector3I* start, Vector3I* delta, int32_t red, int32_t green, int32_t blue)
