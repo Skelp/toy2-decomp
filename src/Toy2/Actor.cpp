@@ -1341,8 +1341,91 @@ namespace Toy2
 		void RCCarLevel1(Actor::Toy2Actor::ActorBehaviourContext* context);
 		void RCCarLevel2(Actor::Toy2Actor::ActorBehaviourContext* context);
 
-		// STUB: TOY2 0x00406220
-		void Zurg3(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// FUNCTION: TOY2 0x00406220 [MATCHED]
+		void Zurg3(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			int32_t localStrafeSpeed = context->localStrafeSpeed;
+			if (localStrafeSpeed > 0x100)
+				localStrafeSpeed = 0x100;
+			else if (localStrafeSpeed < -0x100)
+				localStrafeSpeed = -0x100;
+
+			actor->rollAngle -= (int16_t)((actor->rollAngle + localStrafeSpeed) * Renderer::g_frameDelta / 16);
+
+			if (actor->hitpoints >= 0)
+				AudioManager::PlaySoundEffect(0x2C, &actor->pos);
+
+			if ((context->targetFlags & 1) != 0)
+			{
+				int32_t previousAttackTimer = actor->previousActorPhase;
+				actor->previousActorPhase -= (int16_t)Renderer::g_frameDelta;
+				if (actor->previousActorPhase < 0)
+				{
+					actor->previousActorPhase = 0x168;
+					int32_t movementAngle = actor->yawAngle + 0x200;
+					if (*g_randDatBufferPtr++ < 0x80)
+						movementAngle -= 0x400;
+					actor->velX = Numerics::g_sinCosLUT[movementAngle] >> 4;
+					actor->velForward = Numerics::g_sinCosLUT[(movementAngle + 0x400) & 0xFFF] >> 4;
+					return;
+				}
+
+				if (previousAttackTimer > 200 && actor->previousActorPhase <= 200)
+				{
+					actor->primaryAnimIdx = 1;
+					actor->animationFrameSequence = Actor::g_animationFrameSequences[8];
+					actor->animationFramePosition = *actor->animationFrameSequence << 16;
+				}
+
+				if (previousAttackTimer > 182 && actor->previousActorPhase <= 182)
+				{
+					Nu3D::Particles::SpawnInstance(actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle + 0x400) & 0xFFF] >> 2),
+						actor->pos.y,
+						actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x800) & 0xFFF] >> 2),
+						Numerics::g_sinCosLUT[actor->yawAngle] >> 4,
+						-0x200,
+						Numerics::g_sinCosLUT[(actor->yawAngle + 0x400) & 0xFFF] >> 4,
+						0x40,
+						0,
+						0x80,
+						0x26);
+					AudioManager::PlaySoundEffect(0xD, &actor->pos);
+				}
+
+				if (previousAttackTimer > 166 && actor->previousActorPhase <= 166)
+				{
+					Nu3D::Particles::SpawnInstance(actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x400) & 0xFFF] >> 2),
+						actor->pos.y,
+						actor->pos.z + (Numerics::g_sinCosLUT[actor->yawAngle & 0xFFF] >> 2),
+						Numerics::g_sinCosLUT[actor->yawAngle] >> 4,
+						-0x200,
+						Numerics::g_sinCosLUT[(actor->yawAngle + 0x400) & 0xFFF] >> 4,
+						0x40,
+						0,
+						0x80,
+						0x26);
+					AudioManager::PlaySoundEffect(0xD, &actor->pos);
+				}
+
+				if (previousAttackTimer > 136 && actor->previousActorPhase <= 136)
+				{
+					actor->primaryAnimIdx = 0;
+					actor->animationFrameSequence = Actor::g_animationFrameSequences[7];
+					actor->animationFramePosition = *actor->animationFrameSequence << 16;
+				}
+			}
+			else
+			{
+				if (actor->primaryAnimIdx == 1)
+				{
+					actor->primaryAnimIdx = 0;
+					actor->animationFrameSequence = Actor::g_animationFrameSequences[7];
+					actor->animationFramePosition = *actor->animationFrameSequence << 16;
+				}
+				actor->previousActorPhase = 0x104;
+			}
+		}
 
 		// GLOBAL: TOY2 0x004E02F4
 		uint16_t* g_zgCarMovementData;
