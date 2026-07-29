@@ -435,7 +435,7 @@ BOOL D3DAppClearBackBuffer()
 	return TRUE;
 }
 
-// FUNCTION: TOY2 0x0040CFB0 [PROVISIONAL]
+// FUNCTION: TOY2 0x0040CFB0 [MATCHED]
 BOOL D3DAppCheckForLostSurfaces()
 {
 	BOOL restored = FALSE;
@@ -445,30 +445,21 @@ BOOL D3DAppCheckForLostSurfaces()
 	{
 		LastError = d3dappi.lpFrontBuffer->Restore();
 		if (LastError != DD_OK)
-		{
-			Logger::LogLn("Restoring of a lost surface failed.\n%s", D3DAppErrorToString(LastError));
-			return FALSE;
-		}
+			goto failure;
 		restored = TRUE;
 	}
 	if (d3dappi.lpBackBuffer && d3dappi.lpBackBuffer->IsLost() == DDERR_SURFACELOST)
 	{
 		LastError = d3dappi.lpBackBuffer->Restore();
 		if (LastError != DD_OK)
-		{
-			Logger::LogLn("Restoring of a lost surface failed.\n%s", D3DAppErrorToString(LastError));
-			return FALSE;
-		}
+			goto failure;
 		restored = TRUE;
 	}
 	if (d3dappi.lpZBuffer && d3dappi.lpZBuffer->IsLost() == DDERR_SURFACELOST)
 	{
 		LastError = d3dappi.lpZBuffer->Restore();
 		if (LastError != DD_OK)
-		{
-			Logger::LogLn("Restoring of a lost surface failed.\n%s", D3DAppErrorToString(LastError));
-			return FALSE;
-		}
+			goto failure;
 		restored = TRUE;
 	}
 	if (restored)
@@ -479,19 +470,19 @@ BOOL D3DAppCheckForLostSurfaces()
 
 	for (textureIndex = 0; textureIndex < 64; ++textureIndex)
 	{
-		LPDIRECTDRAWSURFACE3 textureSurface = d3dappi.lpTextureSurf[textureIndex];
-		if (textureSurface && textureSurface->IsLost() == DDERR_SURFACELOST)
+		if (d3dappi.lpTextureSurf[textureIndex] && d3dappi.lpTextureSurf[textureIndex]->IsLost() == DDERR_SURFACELOST)
 		{
-			LastError = textureSurface->Restore();
+			LastError = d3dappi.lpTextureSurf[textureIndex]->Restore();
 			if (LastError != DD_OK)
-			{
-				Logger::LogLn("Restoring of a lost surface failed.\n%s", D3DAppErrorToString(LastError));
-				return FALSE;
-			}
+				goto failure;
 			Logger::LogLn("Lost surface %d.\n", textureIndex);
 		}
 	}
 	return TRUE;
+
+failure:
+	Logger::LogLn("Restoring of a lost surface failed.\n%s", D3DAppErrorToString(LastError));
+	return FALSE;
 }
 
 // FUNCTION: TOY2 0x0040D0D0 [MATCHED]
