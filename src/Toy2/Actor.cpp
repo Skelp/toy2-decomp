@@ -837,6 +837,26 @@ namespace Toy2
 			}
 		}
 
+		// FUNCTION: TOY2 0x00422C70 [MATCHED]
+		void Martian(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			actor->previousActorPhase -= (int16_t)Renderer::g_frameDelta;
+			if (actor->previousActorPhase <= 0)
+			{
+				actor->previousActorPhase = (*g_randDatBufferPtr++ & 0x7F) + 0x12C;
+				AudioManager::PlaySoundEffect(0x80, &actor->pos);
+			}
+
+			if ((actor->actorFlags & Actor::ACTOR_FLAG_INTERACTION_REQUESTED) != 0 && actor->actorPhase == 0x66)
+			{
+				g_levelObjectiveProgress++;
+				Particles::SpawnCollectSparkle(actor->pos.x, actor->pos.y - 0x2000, actor->pos.z, 0x32);
+				AudioManager::PlaySoundEffect(0xB8, &actor->pos);
+				Actor::Kill(actor, 2);
+			}
+		}
+
 		// FUNCTION: TOY2 0x0041DEC0 [MATCHED]
 		void Ducks(Actor::Toy2Actor::ActorBehaviourContext* context)
 		{
