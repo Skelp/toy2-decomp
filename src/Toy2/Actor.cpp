@@ -744,7 +744,7 @@ namespace Toy2
 
 				if (effectCount != 0)
 				{
-					Vector3I16* effectOffset = actor->deathEffectOffset;
+					Vector3I16* effectOffset = &actor->collisionVolumes->offset;
 					int32_t effectX = actor->pos.x + effectOffset->x;
 					int32_t effectY = actor->pos.y + effectOffset->y;
 					int32_t effectZ = actor->pos.z + effectOffset->z;

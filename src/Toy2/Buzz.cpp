@@ -14,6 +14,7 @@
 #include "Nu3D/Particles.h"
 #include "Random.h"
 #include "Renderer/Renderer.h"
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -1552,9 +1553,206 @@ namespace Toy2
 		}
 	}
 
-	// STUB: TOY2 0x004A5D30
+	namespace Combat
+	{
+		enum SegmentCollisionFlags
+		{
+			SEGMENT_COLLISION_CONTINUES = 4,
+		};
+
+		// STUB: TOY2 0x004A5870
+		int32_t SweepSegmentVsActors(Vector3I* position, Vector3I* movement, int32_t damageType) { return 0; }
+	}
+
+	// FUNCTION: TOY2 0x004A5D30 [PROVISIONAL]
 	Buzz::BeamShot* SpawnBeamShot(int32_t shotType, int32_t aimYaw, int32_t aimPitch, Vector3I* origin, Vector3I* offset, int32_t range, int32_t autoAim)
-	{ return 0; }
+	{
+		Buzz::BeamShot* shot;
+		int16_t oldestFadeTimer = 1000;
+		for (int32_t shotIndex = 0; shotIndex < 4; shotIndex++)
+		{
+			if (g_beamShots[shotIndex].fadeTimer == 0)
+			{
+				shot = &g_beamShots[shotIndex];
+				break;
+			}
+
+			if (g_beamShots[shotIndex].fadeTimer < oldestFadeTimer)
+			{
+				oldestFadeTimer = g_beamShots[shotIndex].fadeTimer;
+				shot = &g_beamShots[shotIndex];
+			}
+		}
+
+		if (autoAim != 0)
+		{
+			int32_t closestAngleDelta = 0x7FFFFFFF;
+			Actor::Toy2Actor* autoAimTarget = 0;
+			for (Actor::Toy2Actor** activeActor = Actor::g_activeActors; *activeActor != 0; activeActor++)
+			{
+				Actor::Toy2Actor* actor = *activeActor;
+				if ((actor->actorFlags & Actor::ACTOR_FLAG_TARGETABLE) != 0 && (actor->creatureRam->defenseMode & 4) != 0 && actor->hitpoints >= 0)
+				{
+					int32_t deltaX = (actor->pos.x - origin->x) >> 5;
+					int32_t deltaY = (actor->pos.y - origin->y) >> 5;
+					int32_t deltaZ = (actor->pos.z - origin->z) >> 5;
+					if (deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ < 0x1000000 && abs(deltaY) < 0x300)
+					{
+						int32_t angleDelta = (Nu3D::Math::CartesianToFixedAngle(deltaX, deltaZ) - aimYaw) & 0xFFF;
+						if (angleDelta > 0x800)
+							angleDelta -= 0xFFF;
+						if (abs(angleDelta) < abs(closestAngleDelta))
+						{
+							closestAngleDelta = angleDelta;
+							autoAimTarget = actor;
+						}
+					}
+				}
+			}
+
+			if (autoAimTarget != 0)
+			{
+				Actor::ActorCollisionVolume* targetVolume = &autoAimTarget->collisionVolumes[autoAimTarget->primaryAnimIdx];
+				int32_t backwardSine = Numerics::g_sinCosLUT[(autoAimTarget->yawAngle - 0x800) & 0xFFF] >> 2;
+				int32_t cosine = Numerics::g_sinCosLUT[(autoAimTarget->yawAngle - 0x400) & 0xFFF] >> 2;
+				int32_t targetX = ((targetVolume->offset.x * cosine + targetVolume->offset.z * backwardSine) >> 12) + autoAimTarget->pos.x - origin->x;
+				int32_t targetY = targetVolume->offset.y + autoAimTarget->pos.y - origin->y;
+				int32_t targetZ = ((targetVolume->offset.z * cosine - targetVolume->offset.x * backwardSine) >> 12) + autoAimTarget->pos.z - origin->z;
+				targetX >>= 5;
+				targetY >>= 5;
+				targetZ >>= 5;
+
+				int32_t targetYaw = Nu3D::Math::CartesianToFixedAngle(targetX, targetZ);
+				if (((targetYaw - aimYaw + 0x80) & 0xFFF) < 0x100)
+				{
+					aimYaw = targetYaw;
+					int32_t horizontalDistance = (int32_t)sqrt((double)(targetX * targetX + targetZ * targetZ));
+					aimPitch = (Nu3D::Math::CartesianToFixedAngle(horizontalDistance, targetY) - 0x400) & 0xFFF;
+					if (aimPitch > 0x800)
+						aimPitch -= 0x1000;
+					if (aimPitch > 0x40)
+						aimPitch = 0x40;
+					else if (aimPitch < -0x40)
+						aimPitch = -0x40;
+				}
+				else
+				{
+					g_buzzActor.facingAngle = (int16_t)targetYaw;
+				}
+			}
+		}
+
+		int32_t pitchCosine = Numerics::g_sinCosLUT[(aimPitch + 0x400) & 0xFFF] * range;
+		int32_t pitchSine = Numerics::g_sinCosLUT[(aimPitch - 0x800) & 0xFFF] * range;
+		int32_t yawSine = Numerics::g_sinCosLUT[aimYaw & 0xFFF];
+		int32_t yawCosine = Numerics::g_sinCosLUT[(aimYaw + 0x400) & 0xFFF];
+
+		shot->start.x = origin->x + offset->x;
+		shot->start.y = origin->y + offset->y;
+		shot->start.z = origin->z + offset->z;
+		shot->end.x = origin->x + ((yawSine * pitchCosine) >> 13);
+		shot->end.y = origin->y + pitchSine * 2;
+		shot->end.z = origin->z + ((yawCosine * pitchCosine) >> 13);
+		shot->fadeTimer = 0x20;
+
+		Vector3I collisionPosition = *origin;
+		Vector3I movement = { shot->end.x - origin->x, shot->end.y - origin->y, shot->end.z - origin->z };
+
+		if (shotType == 0)
+		{
+			shot->color.b = 0x80;
+			shot->color.g = 0;
+			shot->color.r = 0;
+			shot->color.a = 0x20;
+		}
+		else if (shotType == 1)
+		{
+			shot->color.b = 0x80;
+			shot->color.g = 0x80;
+			shot->color.r = 0;
+			shot->color.a = 0x40;
+		}
+		else if (shotType == 2)
+		{
+			shot->color.b = 0;
+			shot->color.g = 0x80;
+			shot->color.r = 0;
+			shot->color.a = 0x20;
+		}
+
+		int32_t collisionFlags = Collision::SweepAndSlide(&collisionPosition, &movement, 0x8000, 0, 0x100);
+		collisionFlags |= Combat::SweepSegmentVsActors(&collisionPosition, &movement, shotType + 1);
+		if (collisionFlags != 0)
+		{
+			shot->end.x = collisionPosition.x + movement.x;
+			shot->end.y = collisionPosition.y + movement.y;
+			shot->end.z = collisionPosition.z + movement.z;
+
+			if (shotType == 0)
+			{
+				if (Camera::g_scriptedCameraState == Buzz::CAMERA_STATE_VISOR)
+					Nu3D::Particles::SpawnFromPreset(shot->end.x, shot->end.y, shot->end.z, 0xB, 5);
+				else
+					Nu3D::Particles::SpawnFromPreset(shot->end.x, shot->end.y, shot->end.z, 1, 2);
+			}
+			else if (shotType == 1)
+			{
+				Nu3D::Particles::SpawnFromPreset(shot->end.x, shot->end.y, shot->end.z, 0xA, 5);
+			}
+			else if (shotType == 2)
+			{
+				if (Camera::g_scriptedCameraState == Buzz::CAMERA_STATE_VISOR)
+					Nu3D::Particles::SpawnFromPreset(shot->end.x, shot->end.y, shot->end.z, 0x4A, 5);
+				else
+					Nu3D::Particles::SpawnFromPreset(shot->end.x, shot->end.y, shot->end.z, 0x49, 2);
+			}
+
+			if (collisionFlags == 1)
+			{
+				Nu3D::Particles::SpawnFromPreset(shot->end.x, shot->end.y, shot->end.z, 2, 5);
+				AudioManager::PlaySoundEffect(8, &shot->end);
+			}
+
+			for (int32_t particleCount = 5; particleCount != 0; particleCount--)
+			{
+				Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(shot->end.x, shot->end.y, shot->end.z, 4, 4);
+				particle->lifetime = (*g_randDatBufferPtr++ & 0xF) * 2 + 0x18;
+			}
+		}
+
+		Vector3I beamDirection = {
+			(shot->end.x - shot->start.x) >> 2,
+			(shot->end.y - shot->start.y) >> 2,
+			(shot->end.z - shot->start.z) >> 2,
+		};
+		Nu3D::Math::NormalizeToFixedPoint(&beamDirection, &beamDirection);
+		shot->velocity.x = beamDirection.x >> 1;
+		shot->velocity.y = beamDirection.y >> 1;
+		shot->velocity.z = beamDirection.z >> 1;
+
+		int32_t dominantVelocity;
+		int32_t beamDistance;
+		if (abs(shot->velocity.y) < abs(shot->velocity.x))
+		{
+			dominantVelocity = shot->velocity.x;
+			beamDistance = shot->end.x - shot->start.x;
+		}
+		else
+		{
+			dominantVelocity = shot->velocity.y;
+			beamDistance = shot->end.y - shot->start.y;
+		}
+		if (abs(dominantVelocity) <= abs(shot->velocity.z))
+		{
+			dominantVelocity = shot->velocity.z;
+			beamDistance = shot->end.z - shot->start.z;
+		}
+		if (dominantVelocity == 0)
+			dominantVelocity = 1;
+		shot->movementTimer = (int16_t)(beamDistance / dominantVelocity);
+
+		return (collisionFlags & Combat::SEGMENT_COLLISION_CONTINUES) != 0 ? shot : 0;
+	}
 
 	namespace Camera
 	{

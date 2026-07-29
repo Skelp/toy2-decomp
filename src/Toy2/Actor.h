@@ -14,6 +14,14 @@ namespace Toy2
 
 	namespace Actor
 	{
+		struct ActorCollisionVolume
+		{
+			Vector3I16 offset;
+			int16_t reserved;
+			Vector3I16 scale;
+			int16_t radius;
+		};
+
 		enum ActorFlags
 		{
 			ACTOR_FLAG_TARGETABLE = 0x1,
@@ -81,7 +89,7 @@ namespace Toy2
 			int16_t damageCooldownTimer;
 			int16_t actorPhase;
 			uint16_t* movementData;
-			Vector3I16* deathEffectOffset;
+			ActorCollisionVolume* collisionVolumes;
 			int16_t unkShort3;
 			int16_t previousActorPhase;
 			int16_t unkWord15;
@@ -121,6 +129,7 @@ namespace Toy2
 		void ResolveBoneAttachmentPos(Vector4I* position, Toy2Actor* actor, int32_t boneIndex);
 
 		STATIC_ASSERT(sizeof(Toy2Actor) == 0x9C);
+		STATIC_ASSERT(sizeof(ActorCollisionVolume) == 0x10);
 		STATIC_ASSERT(offsetof(Toy2Actor, animationFramePosition) == 0x18);
 		STATIC_ASSERT(offsetof(Toy2Actor, secondaryAnimationFramePosition) == 0x1C);
 		STATIC_ASSERT(offsetof(Toy2Actor, actorAlpha) == 0x2A);
@@ -131,7 +140,7 @@ namespace Toy2
 		STATIC_ASSERT(offsetof(Toy2Actor, movementCommandTimer) == 0x78);
 		STATIC_ASSERT(offsetof(Toy2Actor, respawnDelay) == 0x7A);
 		STATIC_ASSERT(offsetof(Toy2Actor, actorPhase) == 0x7E);
-		STATIC_ASSERT(offsetof(Toy2Actor, deathEffectOffset) == 0x84);
+		STATIC_ASSERT(offsetof(Toy2Actor, collisionVolumes) == 0x84);
 		STATIC_ASSERT(offsetof(Toy2Actor, previousActorPhase) == 0x8A);
 		STATIC_ASSERT(sizeof(Toy2Actor::ActorBehaviourContext) == 0xC);
 	}
