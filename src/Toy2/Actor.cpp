@@ -1428,8 +1428,54 @@ namespace Toy2
 				Nu3D::Particles::SpawnFromPreset(particlePosition.x, particlePosition.y, particlePosition.z, 0x58, 3);
 			}
 		}
-		// STUB: TOY2 0x00406A90
-		void FatBloke(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// FUNCTION: TOY2 0x00406A90 [PROVISIONAL]
+		void FatBloke(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			if (actor->previousActorPhase == 0)
+				return;
+
+			int32_t offsetX = Numerics::g_sinCosLUT[(actor->yawAngle + 0xE0) & 0xFFF];
+			int32_t offsetZ = Numerics::g_sinCosLUT[(actor->yawAngle + 0x4E0) & 0xFFF];
+			Vector3I collisionPosition = actor->pos;
+			collisionPosition.y -= 0x3000;
+
+			int32_t impactAngle =
+				Nu3D::Math::CartesianToFixedAngle(g_buzzActor.posAngles.pos.x - actor->pos.x - offsetX, g_buzzActor.posAngles.pos.z - actor->pos.z - offsetZ)
+				& 0xFFF;
+			if (((impactAngle - actor->yawAngle + 0x100) & 0xFFF) > 0x200)
+				impactAngle = actor->yawAngle;
+
+			int32_t velocityX = Numerics::g_sinCosLUT[impactAngle] >> 3;
+			int32_t velocityZ = Numerics::g_sinCosLUT[(impactAngle + 0x400) & 0xFFF] >> 3;
+			Vector3I movement = { velocityX * 0x50, 0, velocityZ * 0x50 };
+			Collision::SweepAndSlide(&collisionPosition, &movement, 0x8000, 0, 0x100);
+
+			int32_t movementScale;
+			if (abs(velocityX) > abs(velocityZ))
+				movementScale = movement.x / velocityX;
+			else
+				movementScale = movement.z / velocityZ;
+
+			Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnInstance(
+				collisionPosition.x + offsetX, collisionPosition.y, collisionPosition.z + offsetZ, velocityX, 0, velocityZ, 0, 0, 0, 0x61);
+			int32_t lifetime = abs(movementScale) * 2 - 0xF;
+			if (lifetime <= 0)
+				lifetime = 1;
+			particle->lifetime = (int16_t)lifetime;
+
+			AudioManager::PlaySoundEffect(0x56, &actor->pos);
+			if ((actor->actorFlags & Actor::ACTOR_FLAG_TARGETABLE) != 0)
+			{
+				for (int32_t particleCount = 5; particleCount != 0; particleCount--)
+				{
+					particle = Nu3D::Particles::SpawnFromPreset(collisionPosition.x, collisionPosition.y, collisionPosition.z, 0x64, 0xF);
+					particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+				}
+			}
+
+			actor->previousActorPhase = 0;
+		}
 
 		// GLOBAL: TOY2 0x004E0318
 		uint16_t* g_boxMovementData;
