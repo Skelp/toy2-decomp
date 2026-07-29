@@ -7,6 +7,8 @@ namespace Toy2
 {
 	namespace LevelSelect
 	{
+		extern char g_jumpToSelectTxt[];
+
 		struct LevelSelectCamera
 		{
 			Vector3I pos;

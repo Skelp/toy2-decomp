@@ -247,6 +247,18 @@ namespace Toy2
 		}
 	}
 
+	// GLOBAL: TOY2 0x004F5C9C
+	char g_saveGamePrompt[] = "SAVE GAME?";
+
+	// GLOBAL: TOY2 0x004F5CA8
+	char g_saveGameSeparator[] = "   /   ";
+
+	// GLOBAL: TOY2 0x004F5CB0
+	char g_yesText[] = "YES    ";
+
+	// GLOBAL: TOY2 0x004F5CB8
+	char g_noText[] = "    NO ";
+
 	// GLOBAL: TOY2 0x004F5F54
 	extern const char g_creditsText[] = {
 #include "CreditsText.inc"
@@ -811,8 +823,86 @@ namespace Toy2
 
 	namespace PostGameSaveMenu
 	{
-		// STUB: TOY2 0x0043A130
-		int32_t Tick() { return 0; }
+		// FUNCTION: TOY2 0x0043A130 [EFFECTIVE]
+		int32_t Tick()
+		{
+			InputManager::g_curButtonsPressed = 0;
+			InputManager::g_prevButtonsPressed = 0;
+			MainMenu::g_fadeTimer = 0;
+			MainMenu::g_nextScreen = 0;
+			Nu3D::Camera::g_cameraTintBlue = 0;
+			Nu3D::Camera::g_cameraTintGreen = 0;
+			Nu3D::Camera::g_cameraTintRed = 0;
+			Nu3D::Camera::SetTint(128, 128, 128, 12);
+			SoftwareRenderer::SetBackdropScrollOverride(0, 0);
+			Renderer::g_frameDelta = 1;
+			SetBackdropByIndex(0);
+
+			int32_t fadeTimer = 4000;
+			int32_t saveRequested = 1;
+			AudioManager::PlayMusicLooping(19);
+			g_screenMusicStarted = 1;
+			Nu3D::Camera::SetTint(128, 128, 128, 6);
+
+			while (true)
+			{
+				Nu3D::Camera::FadeToTargetTint();
+				SoftwareRenderer::SetBackdropScrollOverride(0, 0);
+
+				if (fadeTimer > 1000)
+				{
+					if ((InputManager::g_curButtonsPressed & INPUT_LEFT) != 0 && saveRequested == 0)
+					{
+						saveRequested = 1;
+						AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 0x40, 0x60);
+					}
+					if ((InputManager::g_curButtonsPressed & INPUT_RIGHT) != 0 && saveRequested == 1)
+					{
+						saveRequested = 0;
+						AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 0x60, 0x40);
+					}
+				}
+
+				if (saveRequested != 0)
+					Renderer::Sprite::DrawTile(0x1C0, 0x70, 0x39, 1);
+				else
+					Renderer::Sprite::DrawTile(0x20, 0x70, 0x39, 0);
+
+				Nullsub3();
+				Renderer::Sprite::DrawWhiteText(LevelSelect::g_jumpToSelectTxt, 200, 256);
+				Renderer::Sprite::DrawWhiteText(g_saveGamePrompt, 48, 256);
+				Renderer::Sprite::DrawWhiteText(g_saveGameSeparator, 128, 256);
+				if (saveRequested != 0)
+				{
+					Renderer::Sprite::DrawWhiteText(g_yesText, 128, 256);
+					Renderer::DrawBitmapText(g_noText, 128, 256, 64, 64, 64, 0);
+				}
+				else
+				{
+					Renderer::Sprite::DrawWhiteText(g_noText, 128, 256);
+					Renderer::DrawBitmapText(g_yesText, 128, 256, 64, 64, 64, 0);
+				}
+
+				Nullsub6();
+				MainMenu::RenderMenu();
+
+				if (fadeTimer > 0 && fadeTimer < 1000)
+					fadeTimer -= Renderer::g_frameDelta;
+
+				if ((InputManager::g_curButtonsPressed & INPUT_JUMP) != 0 && (InputManager::g_prevButtonsPressed & INPUT_JUMP) == 0 && fadeTimer > 0x17
+					&& Nu3D::Camera::g_cameraTintBlue == 128)
+				{
+					Nu3D::Camera::SetTint(0, 0, 0, 6);
+					fadeTimer = 0x35;
+					AudioManager::PlayOneShotSoundGlobal(0, 0x1200, 0x60, 0x60);
+				}
+				else if (fadeTimer <= 0)
+				{
+					AudioManager::StopAndWait();
+					return saveRequested;
+				}
+			}
+		}
 	}
 
 	namespace GameOver

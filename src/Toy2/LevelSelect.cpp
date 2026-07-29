@@ -173,7 +173,7 @@ namespace Toy2
 		};
 
 		// GLOBAL: TOY2 0x004F6878
-		char* g_jumpToSelectTxt = "jump to select";
+		char g_jumpToSelectTxt[] = "jump to select";
 
 		// FUNCTION: TOY2 0x00452170 [MATCHED]
 		void ResetCursor() { g_levelSelectCursor = 0; }
