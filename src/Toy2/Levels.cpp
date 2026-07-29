@@ -318,7 +318,7 @@ namespace Toy2
 
 			g_hasZoneData = 0;
 			Weather::g_spawnAccumulator = 0;
-			Weather::g_weatherBasePointer = 0;
+			Weather::g_precipitationParticles = 0;
 
 			Levels::g_unused3 = 512;
 			Levels::g_unused4 = 512;
