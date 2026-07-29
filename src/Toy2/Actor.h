@@ -63,8 +63,8 @@ namespace Toy2
 			int16_t hitpoints;
 			int16_t unkVar29_;
 			uint8_t* animationFrameSequence;
-			int16_t unkShort1;
-			int16_t unkShort2;
+			int16_t movementCommandTimer;
+			int16_t respawnDelay;
 			int16_t damageCooldownTimer;
 			int16_t actorPhase;
 			uint16_t* movementData;
@@ -108,6 +108,8 @@ namespace Toy2
 		STATIC_ASSERT(offsetof(Toy2Actor, animationFramePosition) == 0x18);
 		STATIC_ASSERT(offsetof(Toy2Actor, areaIndex) == 0x6C);
 		STATIC_ASSERT(offsetof(Toy2Actor, animationFrameSequence) == 0x74);
+		STATIC_ASSERT(offsetof(Toy2Actor, movementCommandTimer) == 0x78);
+		STATIC_ASSERT(offsetof(Toy2Actor, respawnDelay) == 0x7A);
 		STATIC_ASSERT(offsetof(Toy2Actor, actorPhase) == 0x7E);
 		STATIC_ASSERT(offsetof(Toy2Actor, previousActorPhase) == 0x8A);
 		STATIC_ASSERT(sizeof(Toy2Actor::ActorBehaviourContext) == 0xC);

@@ -351,7 +351,7 @@ namespace Toy2
 
 			for (int32_t actorIndex = 7; actorIndex < 12; actorIndex++)
 			{
-				Actor::g_creatureActors[actorIndex].unkShort2 = 10000;
+				Actor::g_creatureActors[actorIndex].respawnDelay = 10000;
 				Actor::g_creatureActors[actorIndex].actorPhase = 0;
 				Actor::g_creatureActors[actorIndex].unkVar13_ = 0;
 				Actor::g_creatureActors[actorIndex].creatureRam->boundHalfX = Actor::g_creatureActors[6].creatureRam->boundHalfX;

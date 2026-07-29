@@ -304,6 +304,39 @@ namespace Toy2
 
 	namespace CreatureBehaviour
 	{
+		// GLOBAL: TOY2 0x004E0318
+		uint16_t* g_boxMovementData;
+
+		// FUNCTION: TOY2 0x004068E0 [EFFECTIVE]
+		void Box(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			if (actor->previousActorPhase != 0)
+			{
+				actor->previousActorPhase = 0;
+				if (actor[1].actorPhase == 0)
+				{
+					actor[1].respawnDelay = 30;
+					uint16_t* movementData = g_boxMovementData + 53;
+					actor->movementCommandTimer = 0;
+					actor->movementData = movementData;
+				}
+				else if (actor[2].actorPhase == 0)
+				{
+					actor[2].respawnDelay = 30;
+					uint16_t* movementData = g_boxMovementData + 53;
+					actor->movementCommandTimer = 0;
+					actor->movementData = movementData;
+				}
+				else
+				{
+					uint16_t* movementData = g_boxMovementData;
+					actor->movementCommandTimer = 0;
+					actor->movementData = movementData + 59;
+				}
+			}
+		}
+
 		// FUNCTION: TOY2 0x00406C70 [MATCHED]
 		void Buzzard(Actor::Toy2Actor::ActorBehaviourContext* context)
 		{
