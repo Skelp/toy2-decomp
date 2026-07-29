@@ -394,9 +394,9 @@ int32_t WINAPI ExamineDDEnumCallback(LPGUID guid, LPSTR driverDesc, LPSTR driver
 		lpDD = 0;
 	}
 
-	g_changingCoopLevel = 1;
+	bIgnoreWM_SIZE = TRUE;
 	curDevice->DDDevice->SetCooperativeLevel(g_windowData.mainHwnd, 81);
-	g_changingCoopLevel = 0;
+	bIgnoreWM_SIZE = FALSE;
 
 	memset(&curDevice->ddCaps, 0, sizeof(curDevice->ddCaps));
 

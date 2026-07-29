@@ -13,7 +13,7 @@ HRESULT D3DAppIGetSurfDesc(LPDDSURFACEDESC surfaceDesc, LPDIRECTDRAWSURFACE surf
 // FUNCTION: TOY2 0x0040B9D0 [PROVISIONAL]
 BOOL D3DAppISetCoopLevel(HWND hwnd, BOOL fullscreen)
 {
-	g_changingCoopLevel = TRUE;
+	bIgnoreWM_SIZE = TRUE;
 
 	if (fullscreen)
 	{
@@ -28,20 +28,20 @@ BOOL D3DAppISetCoopLevel(HWND hwnd, BOOL fullscreen)
 			Logger::LogDDError("d3dappi.lpDD->SetCooperativeLevel(hwnd, 0x00000008l)", result);
 	}
 
-	g_changingCoopLevel = FALSE;
+	bIgnoreWM_SIZE = FALSE;
 	return TRUE;
 }
 
 // FUNCTION: TOY2 0x0040BA30 [MATCHED]
 BOOL D3DAppIRestoreDispMode()
 {
-	g_changingCoopLevel = TRUE;
+	bIgnoreWM_SIZE = TRUE;
 
 	HRESULT result = d3dappi.lpDD->RestoreDisplayMode();
 	if (result < 0)
 		Logger::LogDDError("d3dappi.lpDD->RestoreDisplayMode()", result);
 
-	g_changingCoopLevel = FALSE;
+	bIgnoreWM_SIZE = FALSE;
 	return TRUE;
 }
 

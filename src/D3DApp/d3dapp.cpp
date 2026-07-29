@@ -4,7 +4,10 @@
 #include "Toy2/Win95.h"
 
 // GLOBAL: TOY2 0x0050AF64
-int32_t g_changingCoopLevel = 0;
+BOOL bIgnoreWM_SIZE = FALSE;
+
+// GLOBAL: TOY2 0x0050A558
+D3DAppRenderState d3dapprs;
 
 // GLOBAL: TOY2 0x0051B0B8
 D3DAppInfo d3dappi;
@@ -13,13 +16,34 @@ D3DAppInfo d3dappi;
 int32_t g_readyForRender = 0;
 
 // GLOBAL: TOY2 0x0051ABD4
-int32_t g_usesPalette;
+BOOL bPaletteActivate;
 
 // GLOBAL: TOY2 0x0051AAC8
-int32_t g_backBufferSupportsAlpha;
+BOOL bPrimaryPalettized;
 
 // GLOBAL: TOY2 0x0050AA58
-LPDIRECTDRAWPALETTE g_lpPalette = 0;
+LPDIRECTDRAWPALETTE lpPalette;
+
+// GLOBAL: TOY2 0x0050AA60
+LPDIRECTDRAWCLIPPER lpClipper;
+
+// GLOBAL: TOY2 0x0050AF6C
+PALETTEENTRY ppe[256];
+
+// GLOBAL: TOY2 0x0050AB64
+PALETTEENTRY Originalppe[256];
+
+// GLOBAL: TOY2 0x0051A940
+BOOL (*D3DDeviceDestroyCallback)(LPVOID);
+
+// GLOBAL: TOY2 0x0051A9C4
+LPVOID D3DDeviceDestroyCallbackContext;
+
+// GLOBAL: TOY2 0x0050A718
+BOOL (*D3DDeviceCreateCallback)(int, int, LPDIRECT3DVIEWPORT2*, LPVOID);
+
+// GLOBAL: TOY2 0x0051AFB0
+LPVOID D3DDeviceCreateCallbackContext;
 
 // GLOBAL: TOY2 0x0051ABD0
 HRESULT LastError;
@@ -188,7 +212,7 @@ int32_t D3DAppWindowProc(WPARAM* wParamPtr, LPARAM* lParamPtr, HWND hWnd, UINT m
 				break;
 
 			case WM_SIZE:
-				if (g_changingCoopLevel)
+				if (bIgnoreWM_SIZE)
 					return 1;
 
 				*wParamPtr = 1;
@@ -196,10 +220,10 @@ int32_t D3DAppWindowProc(WPARAM* wParamPtr, LPARAM* lParamPtr, HWND hWnd, UINT m
 				break;
 
 			case WM_ACTIVATE:
-				if (! g_usesPalette || ! g_backBufferSupportsAlpha || ! d3dappi.lpFrontBuffer)
+				if (! bPaletteActivate || ! bPrimaryPalettized || ! d3dappi.lpFrontBuffer)
 					return 1;
 
-				d3dappi.lpFrontBuffer->SetPalette(g_lpPalette);
+				d3dappi.lpFrontBuffer->SetPalette(lpPalette);
 
 				result = 1;
 				break;

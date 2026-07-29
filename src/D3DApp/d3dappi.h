@@ -13,6 +13,24 @@ struct D3DAppMode
 	BOOL bThisDriverCanDo;
 };
 
+struct D3DAppRenderState
+{
+	BOOL bZBufferOn;
+	BOOL bPerspCorrect;
+	D3DSHADEMODE ShadeMode;
+	D3DTEXTUREFILTER TextureFilter;
+	D3DTEXTUREBLEND TextureBlend;
+	D3DFILLMODE FillMode;
+	BOOL bDithering;
+	BOOL bSpecular;
+	BOOL bAntialiasing;
+	BOOL bFogEnabled;
+	D3DCOLOR FogColor;
+	D3DFOGMODE FogMode;
+	D3DVALUE FogStart;
+	D3DVALUE FogEnd;
+};
+
 struct D3DAppInfo
 {
 	HWND hwnd;
@@ -50,15 +68,24 @@ struct D3DAppInfo
 };
 
 extern D3DAppInfo d3dappi;
-extern int32_t g_changingCoopLevel;
+extern D3DAppRenderState d3dapprs;
+extern BOOL bIgnoreWM_SIZE;
 extern int32_t g_readyForRender;
-extern int32_t g_usesPalette;
-extern int32_t g_backBufferSupportsAlpha;
-extern LPDIRECTDRAWPALETTE g_lpPalette;
+extern BOOL bPaletteActivate;
+extern BOOL bPrimaryPalettized;
+extern LPDIRECTDRAWCLIPPER lpClipper;
+extern LPDIRECTDRAWPALETTE lpPalette;
+extern PALETTEENTRY ppe[256];
+extern PALETTEENTRY Originalppe[256];
+extern BOOL (*D3DDeviceDestroyCallback)(LPVOID);
+extern LPVOID D3DDeviceDestroyCallbackContext;
+extern BOOL (*D3DDeviceCreateCallback)(int, int, LPDIRECT3DVIEWPORT2*, LPVOID);
+extern LPVOID D3DDeviceCreateCallbackContext;
 extern HRESULT LastError;
 extern char LastErrorString[256];
 extern uint16_t g_surfacesLost;
 extern RECT g_frontBufferRects[30];
 
 STATIC_ASSERT(sizeof(D3DAppMode) == 0x10);
+STATIC_ASSERT(sizeof(D3DAppRenderState) == 0x38);
 STATIC_ASSERT(sizeof(D3DAppInfo) == 0xD0A0);

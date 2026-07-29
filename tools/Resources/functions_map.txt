@@ -55,6 +55,7 @@
 0x0040BAE0 D3DAppIClearBuffers
 0x0040BD70 D3DAppISetRenderState
 0x0040BEC0 D3DAppISetDefaults
+0x0040BFA0 D3DAppISetClientSize
 0x0040C0B0 D3DAppIGetClientWin
 0x0040C130 D3DAppISetErrorString
 0x0040C190 dpf
