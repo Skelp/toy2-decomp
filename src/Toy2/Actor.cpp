@@ -4,10 +4,12 @@
 #include "Toy2/Camera.h"
 #include "Toy2/Collectables.h"
 #include "Toy2/Collision.h"
+#include "Toy2/Levels.h"
 #include "Toy2/Toy2.h"
 #include "AudioManager/AudioManager.h"
 #include "CharacterLoader.h"
 #include "Nu3D/Camera.h"
+#include "Nu3D/Link.h"
 #include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
 #include "Random.h"
@@ -45,8 +47,251 @@ namespace Toy2
 
 	namespace Dialogue
 	{
-		// STUB: TOY2 0x004027F0
-		void Begin(int32_t actorIndex, int32_t recordIndex, char* subtitle, int32_t actorFacingAngle, int32_t cameraFacingAngle, int32_t duration) {}
+		struct CutsceneScript
+		{
+			int32_t selectRecordCommand;
+			int32_t recordType;
+			int32_t moveBuzzCommand;
+			int32_t buzzActorIndex;
+			int32_t buzzPathPoint;
+			int32_t moveActorCommand;
+			int32_t actorIndex;
+			int32_t actorPathPoint;
+			int32_t faceBuzzCommand;
+			int32_t facingBuzzActorIndex;
+			int32_t buzzFacingAngle;
+			int32_t faceActorCommand;
+			int32_t facingActorIndex;
+			int32_t actorFacingAngle;
+		};
+
+		struct DialogueRecords
+		{
+			uint16_t recordCount;
+			uint16_t recordType;
+			Vector3I buzzPosition;
+			Vector3I actorPosition;
+		};
+
+		union SubtitleCells
+		{
+			uint16_t characters[72];
+			uint32_t pairs[36];
+		};
+
+		STATIC_ASSERT(sizeof(DialogueRecords) == 0x1C);
+		STATIC_ASSERT(offsetof(DialogueRecords, buzzPosition) == 0x4);
+		STATIC_ASSERT(offsetof(DialogueRecords, actorPosition) == 0x10);
+
+		// GLOBAL: TOY2 0x004DF6CC
+		CutsceneScript g_dialogueCutsceneScript = { 0, 0, 1, -1, 0, 1, 0, 1, 2, -1, 0, 2, 0, 0 };
+
+		// GLOBAL: TOY2 0x0050A1FC
+		SubtitleCells g_subtitleCells;
+
+		// GLOBAL: TOY2 0x0050A298
+		char g_wrappedSubtitleText[540];
+
+		// GLOBAL: TOY2 0x0050A530
+		char* g_subtitleTextCursor;
+
+		// GLOBAL: TOY2 0x0050A518
+		int32_t g_subtitleActive;
+
+		// GLOBAL: TOY2 0x0050A4C4
+		int32_t g_subtitleColumn;
+
+		// GLOBAL: TOY2 0x0050A114
+		int32_t g_subtitleRowStart;
+
+		// GLOBAL: TOY2 0x0050A4D8
+		int32_t g_subtitleVisibleStart;
+
+		// GLOBAL: TOY2 0x0050A110
+		int32_t g_subtitleColour;
+
+		// GLOBAL: TOY2 0x0050A4CC
+		int32_t g_subtitleCharacterDelay;
+
+		// GLOBAL: TOY2 0x0050A4D4
+		int32_t g_subtitleCharacterStyle;
+
+		// GLOBAL: TOY2 0x0050A4EC
+		int32_t g_subtitleBoxScale;
+
+		// GLOBAL: TOY2 0x0050A4C0
+		int32_t g_subtitlePageState;
+
+		// FUNCTION: TOY2 0x00401A00 [PROVISIONAL]
+		void WrapSubtitleText(char* subtitle)
+		{
+			char* destination = g_wrappedSubtitleText;
+			memset(g_wrappedSubtitleText, ' ', sizeof(g_wrappedSubtitleText));
+
+			for (;;)
+			{
+				int32_t visibleCharacters = 0;
+				char* scan = subtitle;
+				char* nextLine;
+				int32_t padding;
+				for (;;)
+				{
+					char character = *scan;
+					if (character == '\0')
+					{
+						nextLine = scan;
+						padding = 0;
+						break;
+					}
+					scan++;
+					if (character != '^')
+						visibleCharacters++;
+					if (visibleCharacters < 36)
+						continue;
+
+					if (*scan == ' ')
+					{
+						nextLine = scan + 1;
+						padding = 0;
+						break;
+					}
+					if (*scan == '\0')
+					{
+						nextLine = scan;
+						padding = 0;
+						break;
+					}
+
+					char* wordStart = scan - 1;
+					while (*wordStart != ' ')
+					{
+						if (*wordStart != '^')
+							visibleCharacters--;
+						wordStart--;
+					}
+					nextLine = wordStart + 1;
+					while (*wordStart == ' ')
+					{
+						wordStart--;
+						visibleCharacters--;
+					}
+					padding = 35 - visibleCharacters;
+					break;
+				}
+
+				int32_t copyWidth = 36 - padding;
+				if (copyWidth > 0)
+				{
+					int32_t copiedVisibleCharacters = 0;
+					do
+					{
+						uint32_t character = (uint8_t)*subtitle++;
+						if (character == '^')
+							copiedVisibleCharacters--;
+						*destination++ = (char)character;
+						if (character == '\0')
+							return;
+						copiedVisibleCharacters++;
+					} while (copiedVisibleCharacters < copyWidth);
+				}
+
+				subtitle = nextLine;
+				if (padding > 0)
+				{
+					memset(destination, ' ', padding);
+					destination += padding;
+				}
+			}
+		}
+
+		// FUNCTION: TOY2 0x004027F0 [TOOL]
+		void Begin(int32_t actorIndex, int32_t recordType, char* subtitle, int32_t buzzFacingAngle, int32_t actorFacingAngle, int32_t rewardTokenIndex)
+		{
+			if (buzzFacingAngle == -1)
+			{
+				DialogueRecords* dialogueRecords = reinterpret_cast<DialogueRecords*>(Levels::g_recordData[recordType]);
+				int32_t deltaX = (dialogueRecords->buzzPosition.x << 5) - (dialogueRecords->actorPosition.x << 5);
+				int32_t deltaZ = (dialogueRecords->buzzPosition.z << 5) - (dialogueRecords->actorPosition.z << 5);
+				actorFacingAngle = Nu3D::Math::CartesianToFixedAngle(deltaX, deltaZ) & 0xFFF;
+				buzzFacingAngle = (actorFacingAngle - 0x800) & 0xFFF;
+			}
+
+			g_dialogueCutsceneScript.recordType = recordType;
+			g_dialogueCutsceneScript.actorIndex = actorIndex;
+			g_dialogueCutsceneScript.facingActorIndex = actorIndex;
+			g_dialogueCutsceneScript.buzzFacingAngle = buzzFacingAngle;
+			g_dialogueCutsceneScript.actorFacingAngle = actorFacingAngle;
+
+			if (Nu3D::Camera::g_viewHistoryInitialized != 0)
+				return;
+
+			if (Camera::g_scriptedCameraState != 0)
+			{
+				if (Camera::g_cameraMarkerParticle != (Nu3D::Particles::ParticleInstance*)-1)
+				{
+					Camera::g_cameraMarkerParticle->lifetime = 1;
+					Camera::g_cameraMarkerParticle = (Nu3D::Particles::ParticleInstance*)-1;
+				}
+				if (Camera::g_targetMarkerParticle != (Nu3D::Particles::ParticleInstance*)-1)
+				{
+					Camera::g_targetMarkerParticle->lifetime = 1;
+					Camera::g_targetMarkerParticle = (Nu3D::Particles::ParticleInstance*)-1;
+				}
+
+				g_buzzActor.actorFlags |= 1;
+				int32_t cameraY = g_buzzActor.posAngles.pos.y - 0x3000;
+				Camera::g_gameplayCamera.roll = g_buzzActor.posAngles.angles.yaw;
+				g_buzzActor.facingAngle = g_buzzActor.posAngles.angles.yaw;
+				Camera::g_gameplayCamera.angles.yaw = 0x4B0;
+				Camera::g_gameplayCamera.pos.y = cameraY;
+				Camera::g_gameplayCamera.target.visorAimAngles.pitch = 0;
+				Camera::g_gameplayCamera.lookAt.x = Camera::g_gameplayCamera.pos.x;
+				Camera::g_gameplayCamera.modeTransitionState = 0;
+				Camera::g_scriptedCameraState = 0;
+
+				Nu3D::Link::SetScaleFromFixedOffsets(0x2D, 0, 0, 0);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x2E, 0, 0, 0);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x2F, 0, 0, 0);
+			}
+
+			if (rewardTokenIndex >= 0)
+				Nu3D::Camera::g_viewHistoryInitialized = rewardTokenIndex + 10;
+			else
+				Nu3D::Camera::g_viewHistoryInitialized = 1;
+			g_gameplayStateFlags |= 1;
+			Camera::g_cutsceneElapsedTime = 0;
+			Camera::g_cutsceneCommandCursor = reinterpret_cast<const int32_t*>(&g_dialogueCutsceneScript);
+			Camera::g_cutsceneWaitTimer = 0;
+			Camera::g_cutsceneSegmentProgress = 0;
+			Camera::g_cutsceneMoveSpeed = 0;
+			Camera::g_nextCutsceneMoveSpeed = 0;
+			Camera::g_cutsceneSegmentDuration = 0;
+			Camera::g_cutsceneFocusPathPoint = 0;
+			Camera::g_cutsceneCameraPathPoint = 0;
+			Camera::g_cutsceneRecordType = 0;
+
+			if (subtitle != 0)
+			{
+				WrapSubtitleText(subtitle);
+				g_subtitleActive = 1;
+				for (int32_t i = 0; i < 36; i++)
+					g_subtitleCells.pairs[i] = 0x00200020;
+				g_subtitleTextCursor = g_wrappedSubtitleText;
+				g_subtitleColumn = 0;
+				g_subtitleRowStart = 0;
+				g_subtitleVisibleStart = -72;
+				g_subtitleColour = 0x00808080;
+				g_subtitleCharacterDelay = 2;
+				g_subtitleCharacterStyle = 0;
+				g_subtitleBoxScale = 0;
+				g_subtitlePageState = 0;
+				AudioManager::PlaySoundEffect(0x1D, 0);
+			}
+			else
+			{
+				g_subtitleActive = 0;
+			}
+		}
 	}
 
 	namespace Game

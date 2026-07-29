@@ -7,6 +7,11 @@
 
 namespace Toy2
 {
+	namespace Dialogue
+	{
+		void Begin(int32_t actorIndex, int32_t recordType, char* subtitle, int32_t buzzFacingAngle, int32_t actorFacingAngle, int32_t rewardTokenIndex);
+	}
+
 	namespace Actor
 	{
 		enum ActorFlags

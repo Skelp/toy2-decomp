@@ -44,7 +44,10 @@ namespace Toy2
 		GameplayCamera g_cutsceneCamera;
 
 		// GLOBAL: TOY2 0x0050A0CC
-		int32_t g_unk50A0CC;
+		int32_t g_nextCutsceneMoveSpeed;
+
+		// GLOBAL: TOY2 0x0050A0C8
+		int32_t g_cutsceneRecordType;
 
 		// GLOBAL: TOY2 0x0050A118
 		int32_t g_unk50A118;
@@ -56,16 +59,16 @@ namespace Toy2
 		int32_t g_unk50A12C;
 
 		// GLOBAL: TOY2 0x0050A134
-		int32_t g_unk50A134;
+		int32_t g_cutsceneWaitTimer;
 
 		// GLOBAL: TOY2 0x0050A144
-		int32_t g_unk50A144;
+		int32_t g_cutsceneMoveSpeed;
 
 		// GLOBAL: TOY2 0x0050A148
 		int32_t g_unk50A148;
 
 		// GLOBAL: TOY2 0x0050A294
-		int32_t g_unk50A294;
+		const int32_t* g_cutsceneCommandCursor;
 
 		// GLOBAL: TOY2 0x0050A4B4
 		int32_t g_unk50A4B4;
@@ -74,7 +77,10 @@ namespace Toy2
 		int32_t g_unk50A4B8;
 
 		// GLOBAL: TOY2 0x0050A4BC
-		int32_t g_unk50A4BC;
+		int32_t g_cutsceneCameraPathPoint;
+
+		// GLOBAL: TOY2 0x0050A4D0
+		int32_t g_cutsceneElapsedTime;
 
 		// GLOBAL: TOY2 0x0050A4E0
 		int32_t g_unk50A4E0;
@@ -86,13 +92,16 @@ namespace Toy2
 		int32_t g_unk50A4E8;
 
 		// GLOBAL: TOY2 0x0050A514
-		int32_t g_unk50A514;
+		int32_t g_cutsceneFocusPathPoint;
 
 		// GLOBAL: TOY2 0x0050A534
 		int32_t g_unk50A534;
 
 		// GLOBAL: TOY2 0x0050A53C
-		int32_t g_unk50A53C;
+		int32_t g_cutsceneSegmentProgress;
+
+		// GLOBAL: TOY2 0x0050A1F0
+		int32_t g_cutsceneSegmentDuration;
 
 		// GLOBAL: TOY2 0x0052AD98
 		int32_t g_unk52AD98;
@@ -209,14 +218,14 @@ namespace Toy2
 			g_unk50A4E0 = 0;
 			g_cutsceneInputLockTimer = 0;
 			Nu3D::Camera::g_viewHistoryInitialized = 0;
-			g_unk50A294 = 0;
-			g_unk50A134 = 0;
-			g_unk50A53C = 0;
-			g_unk50A144 = 0;
-			g_unk50A0CC = 0;
+			g_cutsceneCommandCursor = 0;
+			g_cutsceneWaitTimer = 0;
+			g_cutsceneSegmentProgress = 0;
+			g_cutsceneMoveSpeed = 0;
+			g_nextCutsceneMoveSpeed = 0;
 			g_unk50A148 = 0;
-			g_unk50A514 = 0;
-			g_unk50A4BC = 0;
+			g_cutsceneFocusPathPoint = 0;
+			g_cutsceneCameraPathPoint = 0;
 
 			Nu3D::Link::SetScaleFromFixedOffsets(0x2D, 0, 0, 0);
 			Nu3D::Link::SetScaleFromFixedOffsets(0x2E, 0, 0, 0);
@@ -247,7 +256,7 @@ namespace Toy2
 			g_cutsceneCamera.roll = 0;
 		}
 
-		// FUNCTION: TOY2 0x004020F0 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004020F0 [EFFECTIVE]
 		void BeginScriptedCutsceneAtPoint(Vector3I* focusPosition, int32_t duration, int32_t cameraDistance)
 		{
 			if (g_scriptedCameraState != 0)
@@ -270,7 +279,7 @@ namespace Toy2
 				g_gameplayCamera.angles.yaw = 0x4B0;
 				g_gameplayCamera.target.visorAimAngles.pitch = 0;
 				g_gameplayCamera.lookAt.x = g_gameplayCamera.pos.x;
-				g_gameplayCamera.data[3] = 0;
+				g_gameplayCamera.modeTransitionState = 0;
 				g_scriptedCameraState = 0;
 
 				Nu3D::Link::SetScaleFromFixedOffsets(0x2D, 0, 0, 0);
@@ -335,7 +344,7 @@ namespace Toy2
 			camera->angles.pitch = (uint16_t)(((pitchDelta >> 2) + camera->angles.pitch) & 0xfff);
 		}
 
-		// FUNCTION: TOY2 0x00403730 [PROVISIONAL]
+		// FUNCTION: TOY2 0x00403730 [MATCHED]
 		void SnapBehindBuzz(GameplayCamera* camera)
 		{
 			if (g_cameraMarkerParticle != (Nu3D::Particles::ParticleInstance*)-1)
@@ -355,7 +364,7 @@ namespace Toy2
 			camera->pos.y = g_buzzActor.posAngles.pos.y - 0x3000;
 			camera->target.visorAimAngles.pitch = 0;
 			camera->lookAt.x = camera->pos.x;
-			camera->data[3] = 0;
+			camera->modeTransitionState = 0;
 			g_buzzActor.actorFlags |= 1;
 			g_scriptedCameraState = 0;
 
