@@ -94,7 +94,7 @@ namespace Toy2
 			int32_t unkVar8;
 			int32_t surfaceClampY;
 			Vector3I16 lightDirection;
-			int16_t unkVar51;
+			int16_t lightDistance;
 			int32_t unkVar12;
 			int32_t unkVar13;
 			RGBA color;

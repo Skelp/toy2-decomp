@@ -40,13 +40,34 @@ namespace Toy2
 			RGBColor3B colour;
 		};
 
-		extern DynamicLight g_dynamicLights[6];
+		struct LightingState
+		{
+			DynamicLight dynamicLights[6];
+			Vector3I blendedPosition;
+			int32_t reservedBlendState[2];
+			RGBColor3B blendedColour;
+			uint8_t reserved[0x18];
+		};
+
+		struct BuzzLightPreset
+		{
+			Vector3I positionOffset;
+			int32_t reserved;
+			int32_t colour;
+		};
+
+		extern LightingState g_lightingState;
 		void SpawnLight(int32_t x, int32_t y, int32_t z, int32_t colour, int32_t lifetime, int32_t sourceId);
+		void UpdateBuzzLight();
 
 		STATIC_ASSERT(sizeof(DynamicLight) == 0x18);
 		STATIC_ASSERT(offsetof(DynamicLight, lifetime) == 0xC);
 		STATIC_ASSERT(offsetof(DynamicLight, sourceId) == 0x10);
 		STATIC_ASSERT(offsetof(DynamicLight, colour) == 0x14);
+		STATIC_ASSERT(sizeof(LightingState) == 0xC0);
+		STATIC_ASSERT(offsetof(LightingState, blendedPosition) == 0x90);
+		STATIC_ASSERT(offsetof(LightingState, blendedColour) == 0xA4);
+		STATIC_ASSERT(sizeof(BuzzLightPreset) == 0x14);
 	}
 
 	namespace Particles
@@ -142,8 +163,34 @@ namespace Toy2
 
 	namespace Lighting
 	{
+		// GLOBAL: TOY2 0x0050387C
+		BuzzLightPreset g_buzzLightPresets[16] = {
+			{ { 0x40001000, 0x20008000, 0x20004000 }, 0x20008000, (int32_t)0x80004000 },
+			{ { 0x400, -0x400, 0x400 }, 0x960, 0x908060 },
+			{ { 0x400, -0x400, 0x400 }, 0x960, 0xA02000 },
+			{ { 0, -0x400, 0 }, 0x960, 0xC0C000 },
+			{ { 0x200, -0x400, 0x200 }, 0x960, 0x204080 },
+			{ { 0x200, -0x400, 0x200 }, 0x960, 0x204060 },
+			{ { 0x400, -0x400, 0x400 }, 0x960, 0xA02000 },
+			{ { 0x400, -0x400, 0x400 }, 0x960, 0x608090 },
+			{ { 0x400, -0x400, 0x400 }, 0x960, 0x608090 },
+			{ { 0x400, -0x400, 0x400 }, 0x960, 0x608090 },
+			{ { 0x400, -0x400, 0x400 }, 0x960, 0x204080 },
+			{ { 0, -0x400, -0x400 }, 0x960, 0x204080 },
+			{ { 0x400, -0x400, 0x400 }, 0x960, 0x204080 },
+			{ { 0x400, -0x400, 0x400 }, 0x960, 0x908060 },
+			{ { 0x200, -0x400, 0x200 }, 0x960, 0x204080 },
+			{ { 0x400, -0x400, 0x400 }, 0x960, 0x406080 },
+		};
+
 		// GLOBAL: TOY2 0x00830D60
-		DynamicLight g_dynamicLights[6];
+		LightingState g_lightingState;
+
+		// GLOBAL: TOY2 0x00830D3C
+		int32_t g_selectedLightIndex;
+
+		// GLOBAL: TOY2 0x00830D54
+		int32_t g_lightBlendTimer;
 
 		// FUNCTION: TOY2 0x0049EE50 [PROVISIONAL]
 		void SpawnLight(int32_t x, int32_t y, int32_t z, int32_t colour, int32_t lifetime, int32_t sourceId)
@@ -152,21 +199,42 @@ namespace Toy2
 			int32_t lightIndex = x;
 			for (int32_t candidateIndex = 2; candidateIndex < 6; candidateIndex++)
 			{
-				if (g_dynamicLights[candidateIndex].lifetime < shortestLifetime)
+				if (g_lightingState.dynamicLights[candidateIndex].lifetime < shortestLifetime)
 				{
-					shortestLifetime = g_dynamicLights[candidateIndex].lifetime;
+					shortestLifetime = g_lightingState.dynamicLights[candidateIndex].lifetime;
 					lightIndex = candidateIndex;
 				}
 			}
 
-			g_dynamicLights[lightIndex].position.x = x;
-			g_dynamicLights[lightIndex].position.y = y;
-			g_dynamicLights[lightIndex].position.z = z;
-			g_dynamicLights[lightIndex].colour.b = (uint8_t)colour;
-			g_dynamicLights[lightIndex].colour.g = (uint8_t)(colour >> 8);
-			g_dynamicLights[lightIndex].colour.r = (uint8_t)(colour >> 16);
-			g_dynamicLights[lightIndex].sourceId = sourceId;
-			g_dynamicLights[lightIndex].lifetime = lifetime;
+			g_lightingState.dynamicLights[lightIndex].position.x = x;
+			g_lightingState.dynamicLights[lightIndex].position.y = y;
+			g_lightingState.dynamicLights[lightIndex].position.z = z;
+			g_lightingState.dynamicLights[lightIndex].colour.b = (uint8_t)colour;
+			g_lightingState.dynamicLights[lightIndex].colour.g = (uint8_t)(colour >> 8);
+			g_lightingState.dynamicLights[lightIndex].colour.r = (uint8_t)(colour >> 16);
+			g_lightingState.dynamicLights[lightIndex].sourceId = sourceId;
+			g_lightingState.dynamicLights[lightIndex].lifetime = lifetime;
+		}
+
+		// STUB: TOY2 0x0049EEE0
+		void UpdateBuzzLight() {}
+
+		// FUNCTION: TOY2 0x0049F350 [PROVISIONAL]
+		void InitBuzzLight()
+		{
+			memset(&g_lightingState, 0, sizeof(g_lightingState));
+
+			g_lightBlendTimer = 0;
+			int32_t levelFileIndex = g_levelFileIndex;
+			g_selectedLightIndex = 0;
+			g_lightingState.dynamicLights[0].sourceId = 0;
+			g_buzzActor.lightDistance = 0x960;
+
+			g_lightingState.dynamicLights[0].colour.r = (uint8_t)(g_buzzLightPresets[levelFileIndex].colour >> 16);
+			g_lightingState.dynamicLights[0].colour.g = (uint8_t)(g_buzzLightPresets[levelFileIndex].colour >> 8);
+			g_lightingState.dynamicLights[0].colour.b = (uint8_t)g_buzzLightPresets[levelFileIndex].colour;
+
+			UpdateBuzzLight();
 		}
 	}
 
