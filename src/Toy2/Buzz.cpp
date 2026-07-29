@@ -314,7 +314,7 @@ namespace Toy2
 			g_jumpHeightControlActive = 0;
 		}
 
-		// FUNCTION: TOY2 0x004343D0
+		// FUNCTION: TOY2 0x004343D0 [PROVISIONAL]
 		void UpdateHorizontalMovement(Toy2BuzzActor* buzz, MovementRates* movementRates, int32_t forwardInput)
 		{
 			int32_t forwardSpeed;
@@ -425,7 +425,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x00414110
+		// FUNCTION: TOY2 0x00414110 [PROVISIONAL]
 		void Respawn()
 		{
 			if (g_levelFileIndex == 12)
@@ -474,7 +474,7 @@ namespace Toy2
 			ResetBuzzState();
 		}
 
-		// FUNCTION: TOY2 0x004A4910 [MATCHED]
+		// FUNCTION: TOY2 0x004A4910 [TOOL]
 		void RefreshDiscAmmo()
 		{
 			int32_t availableShots = 6;
@@ -497,7 +497,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x004A4960
+		// FUNCTION: TOY2 0x004A4960 [PROVISIONAL]
 		void FireDiscLauncher(int32_t launchPitch)
 		{
 			int32_t nearestDistanceSquared = 0x7FFFFFFF;
@@ -586,7 +586,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x004071E0
+		// FUNCTION: TOY2 0x004071E0 [PROVISIONAL]
 		void HandleDamage(uint32_t direction, uint32_t damageFlags)
 		{
 			if (g_buzzActor.health < 0 || (g_gameplayStateFlags & 1) != 0)
@@ -701,7 +701,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x004863A0
+		// FUNCTION: TOY2 0x004863A0 [PROVISIONAL]
 		int32_t UpdateFloorHeight(Toy2BuzzActor* buzz)
 		{
 			int32_t previousTriangleCount = Collision::g_collisionTriangleCount;
@@ -758,7 +758,7 @@ namespace Toy2
 			return floorY;
 		}
 
-		// FUNCTION: TOY2 0x00434550
+		// FUNCTION: TOY2 0x00434550 [PROVISIONAL]
 		void ResolveFooting(Toy2BuzzActor* buzz)
 		{
 			int32_t previousLateralVelocity = buzz->velocity.lateral;
@@ -820,7 +820,7 @@ namespace Toy2
 				buzz->velocity.vertical = 0;
 		}
 
-		// FUNCTION: TOY2 0x00434990
+		// FUNCTION: TOY2 0x00434990 [PROVISIONAL]
 		void TickGunFire(Toy2BuzzActor* buzz)
 		{
 			if ((g_actionStateFlags & GUN_IDLE_BLOCKING_ACTIONS) != 0)
@@ -1061,7 +1061,7 @@ namespace Toy2
 			return 0;
 		}
 
-		// FUNCTION: TOY2 0x00434EB0
+		// FUNCTION: TOY2 0x00434EB0 [PROVISIONAL]
 		void TickSpinHover(Toy2BuzzActor* buzz)
 		{
 			if (g_spinCooldownTimer > 0)
@@ -1153,7 +1153,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x004A4D60 [MATCHED]
+		// FUNCTION: TOY2 0x004A4D60 [TOOL]
 		void ActivateRocketBoots(GadgetPickup* pickup)
 		{
 			StopRocketBoots();
@@ -1177,7 +1177,7 @@ namespace Toy2
 			AudioManager::PlaySoundEffect(0x4C, &g_buzzActor.posAngles.pos);
 		}
 
-		// FUNCTION: TOY2 0x004A4E60 [MATCHED]
+		// FUNCTION: TOY2 0x004A4E60 [TOOL]
 		void DeactivateRocketBoots() { StopRocketBoots(); }
 
 		// FUNCTION: TOY2 0x004A5340 [MATCHED]
@@ -1193,7 +1193,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x004A5370
+		// FUNCTION: TOY2 0x004A5370 [PROVISIONAL]
 		void FireGrapple(int32_t aimYaw, int32_t aimPitch)
 		{
 			AudioManager::PlaySoundEffect(0x51, &g_buzzActor.posAngles.pos);
@@ -1291,7 +1291,7 @@ namespace Toy2
 			} while (shotsRemaining != 0);
 		}
 
-		// FUNCTION: TOY2 0x004A5170
+		// FUNCTION: TOY2 0x004A5170 [PROVISIONAL]
 		void TickCosmicShield()
 		{
 			if (g_activeCosmicShieldPickup == 0)
@@ -1335,7 +1335,7 @@ namespace Toy2
 			Renderer::BlitTextureByIndexOffset(0x10, 0x80, 0xC0, 0x40, 0x40, g_sixteenTickPhase * 4, g_thirtyTwoTickPhase * 2, 0, -0x40);
 		}
 
-		// FUNCTION: TOY2 0x004A5540
+		// FUNCTION: TOY2 0x004A5540 [PROVISIONAL]
 		void TickGrapple()
 		{
 			if (g_grappleState == GRAPPLE_INACTIVE)
@@ -1418,7 +1418,7 @@ namespace Toy2
 			g_buzzActor.velocity.forward = 0;
 		}
 
-		// FUNCTION: TOY2 0x004A62A0
+		// FUNCTION: TOY2 0x004A62A0 [TOOL]
 		void TickGadgets()
 		{
 			if (g_rocketBootsTimer != 0)
@@ -1457,7 +1457,7 @@ namespace Toy2
 
 	namespace Camera
 	{
-		// FUNCTION: TOY2 0x004A4F80
+		// FUNCTION: TOY2 0x004A4F80 [PROVISIONAL]
 		int32_t UpdateRocketBoots(Buzz::Toy2BuzzActor* buzz, Buzz::MovementRates* movementRates)
 		{
 			movementRates->lateralSpeedLimit = 0x800;

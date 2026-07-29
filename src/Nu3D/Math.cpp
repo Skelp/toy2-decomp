@@ -74,7 +74,7 @@ namespace Nu3D
 			return deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ < 2 * radius * radius;
 		}
 
-		// FUNCTION: TOY2 0x00450C70
+		// FUNCTION: TOY2 0x00450C70 [PROVISIONAL]
 		Matrix3x3I16* EulerToRotationMatrix(const Vector3I16* angles, Matrix3x3I16* output)
 		{
 			int32_t sineX = Numerics::g_sinCosLUT[angles->x & 0xFFF];
@@ -113,11 +113,11 @@ namespace Nu3D
 			return output;
 		}
 
-		// FUNCTION: TOY2 0x00451F80
+		// FUNCTION: TOY2 0x00451F80 [PROVISIONAL]
 		int32_t Cross2D(Point2I16 point1, Point2I16 point2, Point2I16 point3)
 		{ return (point1.y - point2.y) * (point3.x - point2.x) - (point3.y - point2.y) * (point1.x - point2.x); }
 
-		// FUNCTION: TOY2 0x00451FD0
+		// FUNCTION: TOY2 0x00451FD0 [PROVISIONAL]
 		int32_t NormalizeToFixedPoint(const Vector3I* input, Vector3I* output)
 		{
 			float x = (float)input->x;
@@ -148,11 +148,11 @@ namespace Nu3D
 			return 0;
 		}
 
-		// FUNCTION: TOY2 0x004520D0
+		// FUNCTION: TOY2 0x004520D0 [PROVISIONAL]
 		int32_t CartesianToFixedAngle(int32_t x, int32_t y)
 		{ return (int32_t)(atan2(x * 0.000244140625 * 6.283185308, y * 0.000244140625 * 6.283185308) * 0.15915494307111402 * 4096.0); }
 
-		// FUNCTION: TOY2 0x00480AE0
+		// FUNCTION: TOY2 0x00480AE0 [PROVISIONAL]
 		int16_t PointIntersectsTriangle(int32_t pointX,
 			int32_t pointY,
 			int32_t pointZ,
@@ -223,7 +223,7 @@ namespace Nu3D
 			return (int16_t)PointNearLineSegment(&pointFromEdge2, &finalEdge, tolerance);
 		}
 
-		// FUNCTION: TOY2 0x00490B90
+		// FUNCTION: TOY2 0x00490B90 [PROVISIONAL]
 		void CrossProduct3D(const Vector3I* left, const Vector3I* right, Vector3I* output)
 		{
 			int32_t z = right->y * left->x - right->x * left->y;
@@ -243,7 +243,7 @@ namespace Nu3D
 			return deltaX * deltaX + deltaZ * deltaZ < radius * radius;
 		}
 
-		// FUNCTION: TOY2 0x0049F400
+		// FUNCTION: TOY2 0x0049F400 [PROVISIONAL]
 		int32_t IsWithinDistance(const Vector3I* left, const Vector3I* right, int32_t radius)
 		{
 			int32_t deltaX = (left->x - right->x) >> 8;
@@ -275,7 +275,7 @@ namespace Nu3D
 			result->z = transformedZ;
 		}
 
-		// FUNCTION: TOY2 0x004A8C60
+		// FUNCTION: TOY2 0x004A8C60 [PROVISIONAL]
 		void ProjectPoint(Vector3F* result, const Vector3F* sourceVector, const D3DMATRIX* matrix)
 		{
 			float inverseW = 1.0f / (matrix->_34 * sourceVector->z + matrix->_14 * sourceVector->x + matrix->_24 * sourceVector->y + matrix->_44);
@@ -288,7 +288,7 @@ namespace Nu3D
 			result->z = transformedZ * inverseW;
 		}
 
-		// FUNCTION: TOY2 0x004A8D80
+		// FUNCTION: TOY2 0x004A8D80 [PROVISIONAL]
 		void TransformPointPerspective(Vector3F* result, const Vector3F* sourceVector, const D3DMATRIX* matrix)
 		{
 			float inverseW = 1.0f / (matrix->_34 * sourceVector->z + matrix->_14 * sourceVector->x + matrix->_24 * sourceVector->y);
@@ -379,7 +379,7 @@ namespace Nu3D
 			matrix->_33 *= scale->z;
 		}
 
-		// FUNCTION: TOY2 0x004A9D50 [MATCHED]
+		// FUNCTION: TOY2 0x004A9D50 [EFFECTIVE]
 		void RotateZFromLut(D3DMATRIX* matrix, int32_t trigOffset)
 		{
 			float cos = Numerics::g_trigLUT[(trigOffset + 0x4000) & 0xFFFF];
@@ -405,7 +405,7 @@ namespace Nu3D
 			matrix->_42 = cos * matrix->_42 + r4 * sin;
 		}
 
-		// FUNCTION: TOY2 0x004A9B40 [MATCHED]
+		// FUNCTION: TOY2 0x004A9B40 [EFFECTIVE]
 		void RotateYFromLut(D3DMATRIX* matrix, int32_t trigOffset)
 		{
 			float cos = Numerics::g_trigLUT[(trigOffset + 0x4000) & 0xFFFF];
@@ -431,7 +431,7 @@ namespace Nu3D
 			matrix->_43 = matrix->_43 * cos - _41 * sin;
 		}
 
-		// FUNCTION: TOY2 0x004A9930 [MATCHED]
+		// FUNCTION: TOY2 0x004A9930 [EFFECTIVE]
 		void PostRotateXFromLut(D3DMATRIX* matrix, int32_t trigOffset)
 		{
 			float cosAngle = Numerics::g_trigLUT[(trigOffset + 0x4000) & 0xFFFF];
@@ -458,7 +458,7 @@ namespace Nu3D
 			matrix->_43 = temp42 * sinAngle + cosAngle * matrix->_43;
 		}
 
-		// FUNCTION: TOY2 0x004A9AA0
+		// FUNCTION: TOY2 0x004A9AA0 [PROVISIONAL]
 		void MatrixRotatePitch(D3DMATRIX* matrix, int32_t trigOffset)
 		{
 			float cosine = Numerics::g_trigLUT[(trigOffset + 0x4000) & 0xFFFF];
@@ -475,7 +475,7 @@ namespace Nu3D
 			matrix->_33 = cosine * matrix->_33 - m23 * sine;
 		}
 
-		// FUNCTION: TOY2 0x004A9CB0
+		// FUNCTION: TOY2 0x004A9CB0 [PROVISIONAL]
 		void MatrixRotateYaw(D3DMATRIX* matrix, int32_t trigOffset)
 		{
 			float cosine = Numerics::g_trigLUT[(trigOffset + 0x4000) & 0xFFFF];
@@ -492,7 +492,7 @@ namespace Nu3D
 			matrix->_33 = cosine * matrix->_33 + m13 * sine;
 		}
 
-		// FUNCTION: TOY2 0x004A9EC0 [MATCHED]
+		// FUNCTION: TOY2 0x004A9EC0 [EFFECTIVE]
 		void MatrixRotateRoll(D3DMATRIX* matrix, int32_t trigOffset)
 		{
 			float cosine = Numerics::g_trigLUT[(trigOffset + 0x4000) & 0xFFFF];
@@ -587,7 +587,7 @@ namespace Nu3D
 			result->z = scale * vector->z;
 		}
 
-		// FUNCTION: TOY2 0x004A9270 [MATCHED]
+		// FUNCTION: TOY2 0x004A9270 [EFFECTIVE]
 		void VertexCrossProduct(Vector3F* result, Vector3F* v1, Vector3F* v2)
 		{
 			float y = v2->x * v1->z - v2->z * v1->x;
@@ -612,7 +612,7 @@ namespace Nu3D
 			return magnitude;
 		}
 
-		// FUNCTION: TOY2 0x004A9F60
+		// FUNCTION: TOY2 0x004A9F60 [PROVISIONAL]
 		void MultiplyMatrix3x4(D3DMATRIX* output, const D3DMATRIX* left, const D3DMATRIX* right)
 		{
 			g_matrixMultiplyResult._11 = left->_13 * right->_31 + left->_11 * right->_11 + left->_12 * right->_21;
@@ -635,7 +635,7 @@ namespace Nu3D
 			memcpy(output, &g_matrixMultiplyResult, sizeof(D3DMATRIX));
 		}
 
-		// FUNCTION: TOY2 0x004AA100
+		// FUNCTION: TOY2 0x004AA100 [PROVISIONAL]
 		void FullMatrixMultiply(D3DMATRIX* output, const D3DMATRIX* left, const D3DMATRIX* right)
 		{
 			g_matrixMultiplyResult._11 = left->_14 * right->_41 + left->_13 * right->_31 + left->_11 * right->_11 + left->_12 * right->_21;
@@ -673,7 +673,7 @@ namespace Nu3D
 			output->_44 = g_matrixMultiplyResult._44;
 		}
 
-		// FUNCTION: TOY2 0x004AA520 [MATCHED]
+		// FUNCTION: TOY2 0x004AA520 [EFFECTIVE]
 		void CreateInverseMatrix(D3DMATRIX* output, const D3DMATRIX* input)
 		{
 			float translationX = -input->_41;
@@ -701,7 +701,7 @@ namespace Nu3D
 			output->_43 = translationZ * output->_33 + translationX * output->_13 + translationY * output->_23;
 		}
 
-		// FUNCTION: TOY2 0x004AA620
+		// FUNCTION: TOY2 0x004AA620 [PROVISIONAL]
 		void InvertAffineMatrix(D3DMATRIX* output, const D3DMATRIX* input)
 		{
 			D3DMATRIX source = *input;
@@ -817,7 +817,7 @@ namespace Nu3D
 			output->_43 -= factor3 * output->_33;
 		}
 
-		// FUNCTION: TOY2 0x004AAC40
+		// FUNCTION: TOY2 0x004AAC40 [PROVISIONAL]
 		void BuildMatrixFromDirection(D3DMATRIX* matrix, Vector3F* direction)
 		{
 			Vector3F* right = (Vector3F*)&matrix->_11;

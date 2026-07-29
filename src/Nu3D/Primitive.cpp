@@ -149,7 +149,7 @@ namespace Nu3D
 		return allUpdated;
 	}
 
-	// FUNCTION: TOY2 0x004CC480
+	// FUNCTION: TOY2 0x004CC480 [PROVISIONAL]
 	void Primitive::ComputeBounds(Primitive* primitive)
 	{
 		float originRadiusSq = 0.0f;

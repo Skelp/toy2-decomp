@@ -114,7 +114,7 @@ namespace Toy2
 			g_keyframeData = g_nodeScaleFlags + (uint16_t)header[6];
 		}
 
-		// FUNCTION: TOY2 0x0043BA80
+		// FUNCTION: TOY2 0x0043BA80 [PROVISIONAL]
 		void EvaluateClip(ClipHeader* clip, int32_t framePosition, uint16_t baseBoneIndex, int32_t track)
 		{
 			if (clip->headerSize < 0)
@@ -267,7 +267,7 @@ namespace Toy2
 			g_singleNodeIndex = -1;
 		}
 
-		// FUNCTION: TOY2 0x0043C0E0
+		// FUNCTION: TOY2 0x0043C0E0 [PROVISIONAL]
 		void TransformByBone(Vector3I* position, void* actor, int32_t boneIndex)
 		{
 			AnimationActor* animationActor = (AnimationActor*)actor;
@@ -288,7 +288,7 @@ namespace Toy2
 		// STUB: TOY2 0x004CD1B0
 		int32_t SampleNodeTransform(int32_t nodeIndex, int16_t* clipData, int32_t framePosition, D3DMATRIX* matrix) { return 0; }
 
-		// FUNCTION: TOY2 0x004CD7B0
+		// FUNCTION: TOY2 0x004CD7B0 [PROVISIONAL]
 		void EvaluateClipToMatrices(
 			int32_t actorIndex, AnimationModel* model, const D3DMATRIX* actorMatrix, int16_t* clipData, int32_t framePosition, int32_t isSecondaryTrack)
 		{

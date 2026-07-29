@@ -53,7 +53,7 @@ namespace D3DApp
 		Logger::LogLn(error);
 	}
 
-	// FUNCTION: TOY2 0x004093A0
+	// FUNCTION: TOY2 0x004093A0 [PROVISIONAL]
 	int32_t BuildProfileMachine()
 	{
 		memset(&g_pcStruct, 0, sizeof(g_pcStruct));
@@ -407,7 +407,7 @@ namespace D3DApp
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x004A6B30
+	// FUNCTION: TOY2 0x004A6B30 [PROVISIONAL]
 	int32_t BuildWindow()
 	{
 		memset(&g_windowData.wndClass, 0, sizeof(g_windowData.wndClass));
@@ -508,7 +508,7 @@ namespace D3DApp
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x00408D30
+	// FUNCTION: TOY2 0x00408D30 [PROVISIONAL]
 	int32_t WINAPI EnumerateDevices(LPGUID guid, LPSTR driverDesc, LPSTR driverName, LPVOID lpContext)
 	{
 		memset(&g_pcStruct.examineDevices[g_pcStruct.ddDeviceCount], 0, sizeof(g_pcStruct.examineDevices[g_pcStruct.ddDeviceCount]));
@@ -691,7 +691,7 @@ namespace D3DApp
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x004092F0
+	// FUNCTION: TOY2 0x004092F0 [PROVISIONAL]
 	HRESULT WINAPI EnumDisplayModes(LPDDSURFACEDESC surfaceDesc, LPVOID context)
 	{
 		ExamineDevice* examineContext = (ExamineDevice*)context;
@@ -713,7 +713,7 @@ namespace D3DApp
 		return curDisplayModeCount != 128;
 	}
 
-	// FUNCTION: TOY2 0x00409130
+	// FUNCTION: TOY2 0x00409130 [PROVISIONAL]
 	HRESULT WINAPI
 	EnumDevices(LPGUID guid, LPSTR deviceDesc, LPSTR deviceName, LPD3DDEVICEDESC d3DHWDeviceDesc, LPD3DDEVICEDESC d3DHELDeviceDesc, LPVOID context)
 	{
@@ -788,7 +788,7 @@ namespace D3DApp
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x00408CD0
+	// FUNCTION: TOY2 0x00408CD0 [PROVISIONAL]
 	int32_t SortDisplayModes(const void* modeA, const void* modeB)
 	{
 		DisplayMode* displayModeA = (DisplayMode*)modeA;
@@ -818,7 +818,7 @@ namespace D3DApp
 			return -1;
 	}
 
-	// FUNCTION: TOY2 0x00409360
+	// FUNCTION: TOY2 0x00409360 [PROVISIONAL]
 	LRESULT WINAPI ProfileWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
 		if (msg == WM_DESTROY)
@@ -830,7 +830,7 @@ namespace D3DApp
 		return DefWindowProcA(hWnd, msg, wParam, lParam);
 	}
 
-	// FUNCTION: TOY2 0x0040CAC0
+	// FUNCTION: TOY2 0x0040CAC0 [PROVISIONAL]
 	int32_t ProcessWndProc(WPARAM* wParamPtr, LPARAM* lParamPtr, HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
 		int32_t result;
@@ -953,7 +953,7 @@ namespace D3DApp
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x004A6D40
+	// FUNCTION: TOY2 0x004A6D40 [PROVISIONAL]
 	LRESULT WINAPI NormalWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
 		WPARAM copyWParam = wParam;

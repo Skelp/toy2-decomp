@@ -70,7 +70,7 @@ namespace Renderer
 		};
 		// clang-format on
 
-		// FUNCTION: TOY2 0x004B68B0
+		// FUNCTION: TOY2 0x004B68B0 [PROVISIONAL]
 		HRESULT Render2DSprite(Nu3D::Sprite* sprite)
 		{
 			float xPos = DrawingDevice::GetDestWidth() * sprite->position.x;
@@ -138,7 +138,7 @@ namespace Renderer
 			return DrawingAPI::DrawIndexedPrimitive(D3DPT_TRIANGLESTRIP, D3DFVF_0x1C4, vertexData, 4, g_2DSpriteIndices, 4, 24);
 		}
 
-		// FUNCTION: TOY2 0x004B7B30
+		// FUNCTION: TOY2 0x004B7B30 [MATCHED]
 		void RenderQuadSprite(Nu3D::Sprite* sprite)
 		{
 			LPDIRECT3DVERTEXBUFFER destBuffer = g_FVF_14C_Buffer_2.vertexBuffer;
@@ -207,7 +207,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B7D60
+		// FUNCTION: TOY2 0x004B7D60 [PROVISIONAL]
 		void RenderBillboardSprite(Nu3D::Sprite* sprite)
 		{
 			LPDIRECT3DVERTEXBUFFER destBuffer = g_FVF_14C_Buffer_2.vertexBuffer;
@@ -391,7 +391,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B8330
+		// FUNCTION: TOY2 0x004B8330 [PROVISIONAL]
 		void RenderType10(Nu3D::Sprite* sprite)
 		{
 			Nu3D::Vertex lineVerts[2];
@@ -417,7 +417,7 @@ namespace Renderer
 			DrawingAPI::DrawIndexedPrimitive(D3DPT_LINESTRIP, D3DFVF_0x152, lineVerts, 2, g_lineSpriteIndices, 2, 24);
 		}
 
-		// FUNCTION: TOY2 0x004B8DD0
+		// FUNCTION: TOY2 0x004B8DD0 [PROVISIONAL]
 		void UpdateQueued2DRender(Nu3D::Sprite* sprite)
 		{
 			Nu3D::Sprite* queuedSprite = g_queued2DSprite;
@@ -462,7 +462,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B8CC0
+		// FUNCTION: TOY2 0x004B8CC0 [PROVISIONAL]
 		void Queue2DSprite(float xPosition,
 			float yPosition,
 			float width,
@@ -688,7 +688,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004946A0
+		// FUNCTION: TOY2 0x004946A0 [PROVISIONAL]
 		int16_t DrawTiledFixed(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex)
 		{
 			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
@@ -724,7 +724,7 @@ namespace Renderer
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x00494820
+		// FUNCTION: TOY2 0x00494820 [PROVISIONAL]
 		int16_t DrawTile(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex)
 		{
 			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
@@ -760,7 +760,7 @@ namespace Renderer
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x00493DC0
+		// FUNCTION: TOY2 0x00493DC0 [PROVISIONAL]
 		int16_t DrawColouredFixed(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue)
 		{
 			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
@@ -795,7 +795,7 @@ namespace Renderer
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x00493C30
+		// FUNCTION: TOY2 0x00493C30 [PROVISIONAL]
 		int16_t DrawColoured(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue)
 		{
 			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
@@ -832,7 +832,7 @@ namespace Renderer
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x0049D2D0 [MATCHED]
+		// FUNCTION: TOY2 0x0049D2D0 [EFFECTIVE]
 		void QueueSegment(Vector3I* start, Vector3I* delta, int32_t red, int32_t green, int32_t blue)
 		{
 			Vector3F startPosition;
@@ -856,7 +856,7 @@ namespace Renderer
 		// FUNCTION: TOY2 0x0049D750 [MATCHED]
 		void DrawWhiteText(char* text, int32_t screenY, int32_t screenX) { Renderer::DrawBitmapText(text, screenY, screenX, 255, 255, 255, 0x60); }
 
-		// FUNCTION: TOY2 0x0049D7A0
+		// FUNCTION: TOY2 0x0049D7A0 [PROVISIONAL]
 		void DrawBackdropTransition(int32_t* framesRemaining, int32_t* backdropIndex, int32_t duration)
 		{
 			if (*framesRemaining > 0)
@@ -895,7 +895,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x00493F40
+		// FUNCTION: TOY2 0x00493F40 [PROVISIONAL]
 		int16_t DrawScaled(int16_t xPos,
 			int16_t yPos,
 			int16_t sheetIndex,
@@ -993,7 +993,7 @@ namespace Renderer
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x004942D0
+		// FUNCTION: TOY2 0x004942D0 [PROVISIONAL]
 		int16_t DrawScaledFixed(int16_t xPos,
 			int16_t yPos,
 			int32_t sheetIndex,
@@ -1072,7 +1072,7 @@ namespace Renderer
 			g_spriteBuffer2DCount = 2000;
 		}
 
-		// FUNCTION: TOY2 0x004B6C10
+		// FUNCTION: TOY2 0x004B6C10 [PROVISIONAL]
 		void RenderType8(Nu3D::Material* material, Renderer::RenderEntry* entry)
 		{
 			D3DMATRIX* transforms = entry->instanceData->matrices;
@@ -1166,7 +1166,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B70E0
+		// FUNCTION: TOY2 0x004B70E0 [PROVISIONAL]
 		void RenderType9(Nu3D::Material* material, Renderer::RenderEntry* entry)
 		{
 			Nu3D::InstanceData* instanceData = entry->instanceData;
@@ -1324,7 +1324,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B7920
+		// FUNCTION: TOY2 0x004B7920 [MATCHED]
 		void RenderGroundAlignedSprite(Nu3D::Sprite* sprite)
 		{
 			LPDIRECT3DVERTEXBUFFER destBuffer = g_FVF_14C_Buffer_2.vertexBuffer;
@@ -1459,7 +1459,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B8460
+		// FUNCTION: TOY2 0x004B8460 [PROVISIONAL]
 		void DrawQueuedSprite()
 		{
 			DispatchCommand(g_queued2DSprite);
@@ -1482,7 +1482,7 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x009F600C
 	int32_t g_maxBucketDepth;
 
-	// FUNCTION: TOY2 0x004B8B10
+	// FUNCTION: TOY2 0x004B8B10 [PROVISIONAL]
 	void Sprite::InsertIntoBucket(Nu3D::Sprite* sprite)
 	{
 		Vector3F cameraPosition;

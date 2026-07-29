@@ -24,7 +24,7 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00559C20
 		Data* g_kiteTails[8];
 
-		// FUNCTION: TOY2 0x0044E620
+		// FUNCTION: TOY2 0x0044E620 [PROVISIONAL]
 		void Init(const Vector3I* pos, int32_t count, int32_t spacing, int32_t index, int32_t maxAngle)
 		{
 			g_kiteTails[index] = (Data*)Levels::g_levelLoadArena;
@@ -54,13 +54,13 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x0044E6D0
+		// FUNCTION: TOY2 0x0044E6D0 [MATCHED]
 		void Activate(int32_t index) { g_kiteTails[index]->flags |= 1; }
 
-		// FUNCTION: TOY2 0x0044E6F0
+		// FUNCTION: TOY2 0x0044E6F0 [MATCHED]
 		void Deactivate(int32_t index) { g_kiteTails[index]->flags &= ~1; }
 
-		// FUNCTION: TOY2 0x0044E710
+		// FUNCTION: TOY2 0x0044E710 [PROVISIONAL]
 		void Simulate(const Vector3I* anchor, int32_t index)
 		{
 			const int32_t collisionMinX = 0x1CDC4;
@@ -179,7 +179,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x0044EB90
+		// FUNCTION: TOY2 0x0044EB90 [PROVISIONAL]
 		void Draw()
 		{
 			uint32_t bitmapWidth = 255;

@@ -14,7 +14,7 @@ namespace Renderer
 		// GLOBAL: TOY2 0x00B6240C
 		int32_t g_selectedTex;
 
-		// FUNCTION: TOY2 0x004CE4D0
+		// FUNCTION: TOY2 0x004CE4D0 [PROVISIONAL]
 		int32_t BackdropBltFast()
 		{
 			if (! g_sysMemBackdrop)
@@ -44,7 +44,7 @@ namespace Renderer
 			g_selectedTex = -1;
 		}
 
-		// FUNCTION: TOY2 0x004CE380
+		// FUNCTION: TOY2 0x004CE380 [PROVISIONAL]
 		HBITMAP SetBackdrop(int32_t textureIndex)
 		{
 			int32_t texIndex = NGNLoader::GetTextureDataIndex(textureIndex);

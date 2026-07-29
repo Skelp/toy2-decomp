@@ -114,7 +114,7 @@ namespace Nu3D
 			g_screenSpaceMatrixDirty = 1;
 		}
 
-		// FUNCTION: TOY2 0x004B5630
+		// FUNCTION: TOY2 0x004B5630 [PROVISIONAL]
 		void Reset()
 		{
 			DrawingDevice::SetViewport(&g_currentViewport);
@@ -176,7 +176,7 @@ namespace Nu3D
 			++g_viewportChangeCount;
 		}
 
-		// FUNCTION: TOY2 0x004B5900
+		// FUNCTION: TOY2 0x004B5900 [PROVISIONAL]
 		void SetViewportRect(float left, float top, float right, float bottom, float centreX, float centreY)
 		{
 			float width = right - left + 1.0f;
@@ -217,7 +217,7 @@ namespace Nu3D
 			g_screenSpaceMatrixDirty = 1;
 		}
 
-		// FUNCTION: TOY2 0x004B5A30
+		// FUNCTION: TOY2 0x004B5A30 [PROVISIONAL]
 		void SetCentre(float centreX, float centreY)
 		{
 			float left = g_currentViewportX;
@@ -240,7 +240,7 @@ namespace Nu3D
 			memcpy(output, &g_clipNormMatrix, sizeof(*output));
 		}
 
-		// FUNCTION: TOY2 0x004B5AD0
+		// FUNCTION: TOY2 0x004B5AD0 [PROVISIONAL]
 		void BuildClipNormMatrix()
 		{
 			float depth = g_pendingViewport.dvMaxZ - g_pendingViewport.dvMinZ;
@@ -264,7 +264,7 @@ namespace Nu3D
 			memcpy(output, &g_screenSpaceMatrix, sizeof(*output));
 		}
 
-		// FUNCTION: TOY2 0x004B5C00
+		// FUNCTION: TOY2 0x004B5C00 [PROVISIONAL]
 		void BuildScreenSpaceMatrix()
 		{
 			float width = (float)g_pendingViewport.dwWidth;
@@ -302,7 +302,7 @@ namespace Nu3D
 			}
 		}
 
-		// FUNCTION: TOY2 0x004BABE0
+		// FUNCTION: TOY2 0x004BABE0 [PROVISIONAL]
 		void CacheViewport(ViewportCache* cache)
 		{
 			memcpy(cache->frustumPlanes, g_frustumPlanes, sizeof(cache->frustumPlanes));
@@ -322,7 +322,7 @@ namespace Nu3D
 			output->right = g_viewClipRect.right;
 		}
 
-		// FUNCTION: TOY2 0x004BAC70
+		// FUNCTION: TOY2 0x004BAC70 [PROVISIONAL]
 		void RestoreViewportCache(const ViewportCache* cache)
 		{
 			memcpy(g_frustumPlanes, cache->frustumPlanes, sizeof(cache->frustumPlanes));
@@ -343,7 +343,7 @@ namespace Nu3D
 
 	namespace Frustum
 	{
-		// FUNCTION: TOY2 0x004BA1F0
+		// FUNCTION: TOY2 0x004BA1F0 [PROVISIONAL]
 		uint32_t TestSphereAllPlanes(const Vector3F* center, float radius)
 		{
 			uint32_t result = 0;
@@ -361,7 +361,7 @@ namespace Nu3D
 			return result;
 		}
 
-		// FUNCTION: TOY2 0x004BA270
+		// FUNCTION: TOY2 0x004BA270 [PROVISIONAL]
 		uint32_t TestSphereAllPlanesAlt(const Vector3F* center, float radius)
 		{
 			uint32_t result = 0;
@@ -379,7 +379,7 @@ namespace Nu3D
 			return result;
 		}
 
-		// FUNCTION: TOY2 0x004BA2F0
+		// FUNCTION: TOY2 0x004BA2F0 [PROVISIONAL]
 		uint32_t TestSphereDepthPlanes(const Vector3F* center, float radius)
 		{
 			uint32_t result = 0;

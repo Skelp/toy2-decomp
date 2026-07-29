@@ -75,7 +75,7 @@ namespace FileUtils
 		strcpy(pathOut, g_pathRegValue);
 	}
 
-	// FUNCTION: TOY2 0x004A6940
+	// FUNCTION: TOY2 0x004A6940 [PROVISIONAL]
 	size_t LoadFile(const char* fileName, void* buffer)
 	{
 		if (! g_registryKeysRead)
@@ -115,7 +115,7 @@ namespace FileUtils
 		return elemSize;
 	}
 
-	// FUNCTION: TOY2 0x004A6390
+	// FUNCTION: TOY2 0x004A6390 [PROVISIONAL]
 	void ValidateInstall()
 	{
 		HKEY keyHandle;

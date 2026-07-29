@@ -19,6 +19,8 @@ class ReportMetricTests(unittest.TestCase):
             "];", template.index("const cards = [")
         )]
         self.assertIn('"Change gate"', cards)
+        self.assertIn('"Source debt"', cards)
+        self.assertIn('"Binary fidelity"', cards)
         self.assertIn('"Verified functions"', cards)
         self.assertIn('"Verified bytes"', cards)
         self.assertNotIn('"Project progress"', cards)
@@ -84,6 +86,8 @@ class ReportMetricTests(unittest.TestCase):
         self.assertTrue(metrics["change_gate_passed"])
         self.assertEqual(metrics["verified_functions"], 0)
         self.assertEqual(metrics["provisional_functions"], 1)
+        self.assertEqual(metrics["source_debt_functions"], 1)
+        self.assertEqual(metrics["binary_effective_functions"], 1)
         self.assertEqual(metrics["runtime_compared"], 1)
         self.assertEqual(metrics["runtime_accuracy"], 100.0)
         game = next(item for item in result["entities"] if item["address"] == "0x401000")

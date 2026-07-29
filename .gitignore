@@ -27,3 +27,26 @@ __pycache__/
 
 # Agent working notes (local analysis only)
 .notes/
+!.notes/
+.notes/*
+!.notes/README.md
+!.notes/codegen-index.md
+!.notes/codegen-rules.md
+!.notes/codegen-caps.md
+!.notes/reccmp-mechanics.md
+!.notes/original-names.md
+!.notes/refactor-debt.md
+!.notes/shared-globals.md
+!.notes/caps-registry.tsv
+!.notes/lint-baseline.tsv
+!.notes/lint-rules.md
+!.notes/implementation-plan.md
+
+# The decompilation procedure is a normative project input.
+!/AGENTS.md
+!.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/continue-decomp/
+!.agents/skills/continue-decomp/SKILL.md

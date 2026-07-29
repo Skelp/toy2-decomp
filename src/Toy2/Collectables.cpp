@@ -19,7 +19,7 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00830CC4
 		int32_t g_tokenCollectionState;
 
-		// FUNCTION: TOY2 0x004A0C80
+		// FUNCTION: TOY2 0x004A0C80 [PROVISIONAL]
 		void Init(int16_t* tokenLinkIds, int32_t firstHiddenLinkId)
 		{
 			int32_t collectedTokens = g_levelTokenBits[g_levelFileIndex];
@@ -91,7 +91,7 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00556FAC
 		Levels::RecordData* g_originalPickupRecords;
 
-		// FUNCTION: TOY2 0x00447DB0
+		// FUNCTION: TOY2 0x00447DB0 [PROVISIONAL]
 		void BuildPickupTable()
 		{
 			Vector3I position;
@@ -185,7 +185,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x004025C0
+		// FUNCTION: TOY2 0x004025C0 [PROVISIONAL]
 		void LoadTokenTable(const TokenDialogueValue* values)
 		{
 			memset(g_tokenDialogueEntries, 0, sizeof(g_tokenDialogueEntries));
@@ -205,7 +205,7 @@ namespace Toy2
 			} while (destination < &g_tokenDialogueEntries[10]);
 		}
 
-		// FUNCTION: TOY2 0x004A0DB0
+		// FUNCTION: TOY2 0x004A0DB0 [PROVISIONAL]
 		void Activate(int32_t tokenIndex, int32_t skipCutscene)
 		{
 			if (g_tokenStates[tokenIndex].active != 0)

@@ -23,7 +23,7 @@ namespace Nu3D
 	// FUNCTION: TOY2 0x004B1880 [MATCHED]
 	void SetIsSoftwareRendering(int32_t value) { g_isSoftwareRendering = value; }
 
-	// FUNCTION: TOY2 0x004AB7D0 [MATCHED]
+	// FUNCTION: TOY2 0x004AB7D0 [PROVISIONAL]
 	void GetCPUFeatures()
 	{
 		// GLOBAL: TOY2 0x00883FF9
@@ -171,7 +171,7 @@ namespace Nu3D
 		}
 	}
 
-	// FUNCTION: TOY2 0x0047D520
+	// FUNCTION: TOY2 0x0047D520 [PROVISIONAL]
 	void MemSet32Util(void* buffer, int32_t count, uint32_t value)
 	{
 		__asm
@@ -183,9 +183,9 @@ namespace Nu3D
 		}
 	}
 
-	// FUNCTION: TOY2 0x004CB2C0
+	// FUNCTION: TOY2 0x004CB2C0 [PROVISIONAL]
 	void SetUseAsDiffuseModulation(int32_t option) { g_useAsDiffuseModulation = option; }
 
-	// FUNCTION: TOY2 0x004CB2A0
+	// FUNCTION: TOY2 0x004CB2A0 [PROVISIONAL]
 	void SetDefaultPrimFlags(int32_t option) { g_defaultPrimitiveFlags = option; }
 }

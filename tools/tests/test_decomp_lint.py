@@ -145,6 +145,22 @@ class CommentTests(unittest.TestCase):
 
 
 class PointerModelTests(unittest.TestCase):
+    def test_numbered_data_slot_is_source_debt(self):
+        findings = lint.check_text(
+            Path("Camera.cpp"),
+            "// FUNCTION: TOY2 0x00401000 [PROVISIONAL]\n"
+            "void Init() { camera.data[3] = 0; }\n",
+        )
+        self.assertIn("opaque-state-slot", {item.rule for item in findings})
+
+    def test_address_named_global_is_source_debt(self):
+        findings = lint.check_text(
+            Path("Camera.cpp"),
+            "// FUNCTION: TOY2 0x00401000 [PROVISIONAL]\n"
+            "void Init() { g_unk50A118 = 0; }\n",
+        )
+        self.assertIn("address-named-symbol", {item.rule for item in findings})
+
     def test_vertex_pointer_byte_roundtrip_is_an_error(self):
         source = (
             "// FUNCTION: TOY2 0x00401000\n"

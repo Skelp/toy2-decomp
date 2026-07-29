@@ -28,6 +28,10 @@ Use `STUB` only when the current body intentionally stands in for unfinished
 behavior. Preserve known addresses when you move code between files. Duplicate
 annotations make progress data ambiguous. Fix them before you submit.
 
+Each `FUNCTION` uses one status tag. `[MATCHED]` is exact and clean.
+`[EFFECTIVE]` is reccmp-effective and clean. `[TOOL]` is a verified tool-label
+artifact and clean. `[PROVISIONAL]` covers all other complete bodies.
+
 Use this feedback loop:
 
 ```text
@@ -52,7 +56,8 @@ source annotation. It does not measure how closely the machine code matches.
 ## Submission checklist
 
 - Format touched C/C++ files using the repository `.clang-format`.
-- Run `tools/decomp validate --target <address>` for each changed function.
+- Stage the intended source. Run `tools/decomp validate --target <address>
+  --staged` for each changed function.
   Use `--allow-target-regression` only when the source model improves and the
   lower score is intentional.
 - Run reccmp. Describe relevant accuracy changes in the pull request.

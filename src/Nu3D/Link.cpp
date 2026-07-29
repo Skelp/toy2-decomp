@@ -106,7 +106,7 @@ namespace Nu3D
 			RebuildMatrixAndCommit(link);
 		}
 
-		// FUNCTION: TOY2 0x004CCBE0
+		// FUNCTION: TOY2 0x004CCBE0 [PROVISIONAL]
 		void RebuildMatrixAndCommit(Linker* link)
 		{
 			DynamicScaler* scaler = link->dynamicScaler;
@@ -175,7 +175,7 @@ namespace Nu3D
 			output->z = link->currentRot.z >> 4;
 		}
 
-		// FUNCTION: TOY2 0x004CCDA0
+		// FUNCTION: TOY2 0x004CCDA0 [PROVISIONAL]
 		void TransformVectorInt3x3(int32_t linkId, Vector3I* vector)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
@@ -198,7 +198,7 @@ namespace Nu3D
 			vector->z = (int32_t)transformed.z;
 		}
 
-		// FUNCTION: TOY2 0x004CCE30
+		// FUNCTION: TOY2 0x004CCE30 [PROVISIONAL]
 		void SetPositionRawAndCommit(int32_t linkId, int32_t x, int32_t y, int32_t z)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
@@ -261,7 +261,7 @@ namespace Nu3D
 			output->z = (int32_t)link->targetPos.z << shift;
 		}
 
-		// FUNCTION: TOY2 0x004CCFF0
+		// FUNCTION: TOY2 0x004CCFF0 [PROVISIONAL]
 		void SnapToOtherLinkUsingScale(int32_t linkId, int32_t targetLinkId)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
@@ -297,7 +297,7 @@ namespace Nu3D
 			image->links[destinationLinkId].dynamicScaler->shapeId = image->links[sourceLinkId].dynamicScaler->shapeId;
 		}
 
-		// FUNCTION: TOY2 0x00438910
+		// FUNCTION: TOY2 0x00438910 [PROVISIONAL]
 		void FollowWaypointPath(int32_t linkId, int32_t pathTableIdx, int32_t* progress)
 		{
 			*progress += 0x40;

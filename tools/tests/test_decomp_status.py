@@ -61,6 +61,36 @@ class DecompStatusTests(unittest.TestCase):
         )
         self.assertFalse(is_symbol_only_diff(status))
 
+    def test_tool_artifact_rejects_a_register_change_beside_symbols(self):
+        status = MatchStatus(
+            matching=0.9,
+            diff=[
+                [
+                    0,
+                    [
+                        {
+                            "orig": [[0, "mov eax, g_first (OFFSET)"]],
+                            "recomp": [[0, "mov ecx, g_second (OFFSET)"]],
+                        }
+                    ],
+                ]
+            ],
+        )
+        self.assertFalse(is_symbol_only_diff(status))
+
+    def test_tool_artifact_rejects_frame_and_scheduling_differences(self):
+        for original, recompiled in (
+            ("mov ebp, g_first (OFFSET)", "mov esp, g_second (OFFSET)"),
+            ("push g_first (OFFSET)", "pop g_second (OFFSET)"),
+            ("jne g_first (OFFSET)", "je g_second (OFFSET)"),
+        ):
+            with self.subTest(original=original, recompiled=recompiled):
+                status = MatchStatus(
+                    matching=0.9,
+                    diff=[[0, [{"orig": [[0, original]], "recomp": [[0, recompiled]]}]]],
+                )
+                self.assertFalse(is_symbol_only_diff(status))
+
     def test_tool_artifact_accepts_an_immediate_rendered_as_a_symbol(self):
         status = MatchStatus(
             matching=0.9,

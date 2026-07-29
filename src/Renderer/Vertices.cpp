@@ -10,7 +10,7 @@ namespace Renderer
 {
 	namespace Vertices
 	{
-		// FUNCTION: TOY2 0x004B6ED0
+		// FUNCTION: TOY2 0x004B6ED0 [PROVISIONAL]
 		void ApplyOffset(Nu3D::Patch::PatchVertices* vertices, float du, float dv)
 		{
 			if (g_FVF_14C_Buffer_2.vertexBuffer != 0)
@@ -30,7 +30,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B6F50
+		// FUNCTION: TOY2 0x004B6F50 [PROVISIONAL]
 		void ProjectToScreen(Nu3D::Patch::PatchVertices* vertices, D3DMATRIX* transforms, int32_t transformCount)
 		{
 			if (g_FVF_14C_Buffer_2.vertexBuffer != 0)
@@ -80,7 +80,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B75E0
+		// FUNCTION: TOY2 0x004B75E0 [PROVISIONAL]
 		void ProjectCustomTextureCoordinates(
 			Nu3D::Patch::PatchVertices* vertices, D3DMATRIX* transform, const Nu3D::InstanceData::TextureProjectionData* projection)
 		{
@@ -114,7 +114,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B7710
+		// FUNCTION: TOY2 0x004B7710 [PROVISIONAL]
 		void ProjectTex14Coordinates(Nu3D::Patch::PatchVertices* vertices, D3DMATRIX* transform)
 		{
 			if (g_FVF_14C_Buffer_2.vertexBuffer != 0)
@@ -141,7 +141,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B7830
+		// FUNCTION: TOY2 0x004B7830 [PROVISIONAL]
 		void ModuleColor(Nu3D::Patch::PatchVertices* vertices, int32_t red, int32_t green, int32_t blue)
 		{
 			if (g_FVF_14C_Buffer_2.vertexBuffer != 0)

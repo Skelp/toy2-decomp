@@ -86,6 +86,10 @@ def read_lint_quality(source_root: Path) -> tuple[dict[str, list[dict]], dict[st
     summary = {
         "quality_errors": sum(item.severity == "error" and not item.suppressed for item in findings),
         "quality_warnings": sum(item.severity == "warning" and not item.suppressed for item in findings),
+        "quality_new_warnings": sum(
+            item.severity == "warning" and not item.legacy and not item.suppressed
+            for item in findings
+        ),
         "quality_new_errors": sum(
             item.severity == "error" and not item.legacy and not item.suppressed for item in findings
         ),
@@ -351,6 +355,7 @@ def enrich_report(
                 else 0.0
             ),
             "change_gate_passed": summary.get("quality_new_errors", 0) == 0
+            and summary.get("quality_new_warnings", 0) == 0
             and summary.get("quality_stale_baseline", 0) == 0,
             "verified_functions": len(verified_project),
             "verified_function_progress": (
@@ -361,9 +366,24 @@ def enrich_report(
                 verified_bytes / project_original_bytes * 100 if project_original_bytes else 0.0
             ),
             "provisional_functions": sum(
-                item.get("verification") == "provisional" for item in project_entities
+                item.get("verification") == "provisional" and not item.get("stub")
+                for item in project_entities
             ),
             "tool_artifacts": sum(item.get("verification") == "tool" for item in project_entities),
+            "source_debt_functions": sum(
+                bool(item.get("quality_errors") or item.get("quality_warnings"))
+                for item in project_entities
+            ),
+            "binary_exact_functions": sum(
+                item.get("binary_status") == "exact" for item in project_entities
+            ),
+            "binary_effective_functions": sum(
+                item.get("binary_status") == "effective" for item in project_entities
+            ),
+            "binary_partial_functions": sum(
+                item.get("binary_status") in ("partial", "zero")
+                for item in project_entities
+            ),
             "runtime_compared": len(runtime_compared),
             "runtime_effective_score": runtime_effective_score,
             "runtime_accuracy": (

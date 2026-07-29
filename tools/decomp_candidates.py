@@ -38,6 +38,7 @@ SOURCE_ROOT = ROOT / "src"
 REPORT_JSON = ROOT / "build" / "decomp-report-data.json"
 CAPS_REGISTRY = ROOT / ".notes" / "caps-registry.tsv"
 TOOL_ARTIFACTS = ROOT / "tools" / "Resources" / "tool_artifacts.tsv"
+AUDIT_FREEZE = ROOT / "tools" / "Resources" / "audit-freeze.txt"
 
 sys.path.insert(0, str(ROOT))
 from tools.decomp_annotations import read_source_annotations  # noqa: E402
@@ -393,6 +394,16 @@ def main() -> int:
         action="store_true",
         help="only functions with source-plausibility errors (see .notes/refactor-debt.md)",
     )
+    parser.add_argument(
+        "--quality",
+        action="store_true",
+        help="alias for --debt; audit functions with source-quality findings",
+    )
+    parser.add_argument(
+        "--new-work",
+        action="store_true",
+        help="show STUB and unannotated work during the audit freeze",
+    )
     parser.add_argument("--max-size", type=int, help="drop candidates larger than this many bytes")
     parser.add_argument(
         "--include-capped",
@@ -408,15 +419,20 @@ def main() -> int:
         print(f"error: {MAP_PATH} not found", file=sys.stderr)
         return 2
 
+    audit_default = (
+        AUDIT_FREEZE.exists()
+        and not args.new_work
+        and not (args.stubs or args.leaves or args.near or args.audit or args.debt or args.quality)
+    )
     chosen = select(
         build_candidates(),
         namespace=args.namespace,
         stubs_only=args.stubs,
         leaves_only=args.leaves,
-        near_only=args.near or args.audit,
+        near_only=args.near or args.audit or audit_default,
         max_size=args.max_size,
         exclude_capped=not args.include_capped,
-        debt_only=args.debt,
+        debt_only=args.debt or args.quality,
     )
     if args.legacy_caps:
         chosen = [item for item in chosen if item.cap]

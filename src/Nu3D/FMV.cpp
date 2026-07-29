@@ -29,7 +29,7 @@ enum Nu3DFMVStateFlags
 // GLOBAL: TOY2 0x00B62668
 int32_t g_fmvComInitialized;
 
-// FUNCTION: TOY2 0x004DB600
+// FUNCTION: TOY2 0x004DB600 [PROVISIONAL]
 Nu3DFMVInstance* Nu3D_FMV_CreateFMVInstance(char* filename)
 {
 	Nu3DFMVInstance* instance = (Nu3DFMVInstance*)malloc(sizeof(Nu3DFMVInstance));
@@ -196,7 +196,7 @@ void Nu3D_FMV_SetDimensions(Nu3DFMVInstance* instance, int32_t left, int32_t top
 // FUNCTION: TOY2 0x004DB940 [MATCHED]
 int32_t Nu3D_FMV_IsPlaying(Nu3DFMVInstance* instance) { return (instance->stateFlags & NU3D_FMV_PAUSED) == 0; }
 
-// FUNCTION: TOY2 0x004DB950
+// FUNCTION: TOY2 0x004DB950 [PROVISIONAL]
 void Nu3D_FMV_UpdateAndRenderFMV(Nu3DFMVInstance* instance)
 {
 	HRESULT result = instance->videoSample->Update(2, NULL, NULL, 0);
@@ -260,7 +260,7 @@ void Nu3D_FMV_UpdateAndRenderFMV(Nu3DFMVInstance* instance)
 	DrawingDevice::GetBackBuffer()->Blt(&destination, instance->renderSurface, &source, DDBLT_WAIT, NULL);
 }
 
-// FUNCTION: TOY2 0x004DBB80
+// FUNCTION: TOY2 0x004DBB80 [TOOL]
 void Nu3D_FMV_Seek(Nu3DFMVInstance* instance, int32_t seconds) { instance->mediaStream->Seek((STREAM_TIME)seconds * 10000000); }
 
 // FUNCTION: TOY2 0x004DBB00 [MATCHED]

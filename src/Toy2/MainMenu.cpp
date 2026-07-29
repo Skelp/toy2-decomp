@@ -21,7 +21,7 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00559E84
 		RGB32 g_menuClearColor;
 
-		// FUNCTION: TOY2 0x00441980
+		// FUNCTION: TOY2 0x00441980 [PROVISIONAL]
 		void RenderMenu()
 		{
 			Toy2::ProcessMiscEventsEx();
@@ -52,7 +52,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x00437C40
+		// FUNCTION: TOY2 0x00437C40 [PROVISIONAL]
 		int32_t Draw()
 		{
 			InputManager::g_curButtonsPressed = 0;
@@ -196,7 +196,7 @@ namespace Toy2
 			return g_nextScreen;
 		}
 
-		// FUNCTION: TOY2 0x00437FB0
+		// FUNCTION: TOY2 0x00437FB0 [PROVISIONAL]
 		int32_t Tick()
 		{
 			if (g_mainMenuState != -1)

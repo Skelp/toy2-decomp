@@ -39,7 +39,7 @@ namespace Nu3D
 		// GLOBAL: TOY2 0x00508D20
 		int32_t g_renderPrimaryGeometry = 1;
 
-		// FUNCTION: TOY2 0x004BC720
+		// FUNCTION: TOY2 0x004BC720 [PROVISIONAL]
 		void RenderCellsInRadius(int32_t cellRadius, int32_t scalerType, NGNLoader::NGNImage* image)
 		{
 			Vector3F cameraPosition;

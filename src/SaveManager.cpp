@@ -22,7 +22,7 @@ namespace SaveManager
 	// GLOBAL: TOY2 0x00528160
 	char g_emptyString;
 
-	// FUNCTION: TOY2 0x00415180
+	// FUNCTION: TOY2 0x00415180 [PROVISIONAL]
 	void AddInputEntry(int32_t inputCode, int32_t controlId)
 	{
 		int32_t writeIndex = 0;
@@ -50,7 +50,7 @@ namespace SaveManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x004151E0
+	// FUNCTION: TOY2 0x004151E0 [MATCHED]
 	void ClearBindByControlId(int32_t controlId)
 	{
 		for (int32_t i = 0; i < 38; i++)
@@ -63,7 +63,7 @@ namespace SaveManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x00415210
+	// FUNCTION: TOY2 0x00415210 [MATCHED]
 	void ClearBindByInputCode(int32_t inputCode)
 	{
 		for (int32_t i = 0; i < 38; i++)
@@ -76,7 +76,7 @@ namespace SaveManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x00415240
+	// FUNCTION: TOY2 0x00415240 [MATCHED]
 	int32_t GetInputCodeByControlId(int32_t controlId)
 	{
 		for (int32_t i = 0; i < 38; i++)
@@ -88,7 +88,7 @@ namespace SaveManager
 		return TOY_INPUT_UNKNOWN;
 	}
 
-	// FUNCTION: TOY2 0x00415270
+	// FUNCTION: TOY2 0x00415270 [MATCHED]
 	int32_t GetControlSettingId(int32_t inputCode)
 	{
 		for (int32_t i = 0; i < 38; i++)
@@ -100,7 +100,7 @@ namespace SaveManager
 		return TOY_INPUT_UNKNOWN;
 	}
 
-	// FUNCTION: TOY2 0x00414F20
+	// FUNCTION: TOY2 0x00414F20 [PROVISIONAL]
 	void Init()
 	{
 		memset(InputManager::g_previousInputStates, 255, sizeof(InputManager::g_previousInputStates));
@@ -149,7 +149,7 @@ namespace SaveManager
 		AddInputEntry(TOY_INPUT_F2, INPUT_MENU);
 	}
 
-	// FUNCTION: TOY2 0x004A2C20
+	// FUNCTION: TOY2 0x004A2C20 [PROVISIONAL]
 	void InitProgressData(Save0Data* save)
 	{
 		save->lastLevel = 0;
@@ -185,7 +185,7 @@ namespace SaveManager
 		save->health = (uint16_t)Toy2::g_buzzActor.health;
 	}
 
-	// FUNCTION: TOY2 0x0049B830
+	// FUNCTION: TOY2 0x0049B830 [MATCHED]
 	void SaveToFile(int32_t saveNum, const char* saveName)
 	{
 		char nameChar = g_emptyString;

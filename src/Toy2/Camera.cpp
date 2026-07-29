@@ -112,7 +112,7 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0050A4DC
 		Nu3D::Particles::ParticleInstance* g_targetMarkerParticle;
 
-		// FUNCTION: TOY2 0x00447BD0
+		// FUNCTION: TOY2 0x00447BD0 [PROVISIONAL]
 		void CullActors(const Vector3I* cameraPosition)
 		{
 			if (Actor::g_activeActors[0] == 0)
@@ -153,7 +153,7 @@ namespace Toy2
 			} while (*actorSlot != 0);
 		}
 
-		// FUNCTION: TOY2 0x00403450
+		// FUNCTION: TOY2 0x00403450 [PROVISIONAL]
 		void InitGameplayCamera(GameplayCamera* camera, Buzz::Toy2BuzzActor* buzz)
 		{
 			memset(&g_renderCameraTransform, 0, sizeof(g_renderCameraTransform));
@@ -223,7 +223,7 @@ namespace Toy2
 			Nu3D::Link::SetScaleFromFixedOffsets(0x2F, 0, 0, 0);
 		}
 
-		// FUNCTION: TOY2 0x00402030
+		// FUNCTION: TOY2 0x00402030 [PROVISIONAL]
 		void InitCutsceneCamera(const Vector3I* focusPosition, const Vector3I* cameraPosition)
 		{
 			g_cutsceneCamera.pos.x = cameraPosition->x;
@@ -247,7 +247,7 @@ namespace Toy2
 			g_cutsceneCamera.roll = 0;
 		}
 
-		// FUNCTION: TOY2 0x004020F0 [MATCHED]
+		// FUNCTION: TOY2 0x004020F0 [PROVISIONAL]
 		void BeginScriptedCutsceneAtPoint(Vector3I* focusPosition, int32_t duration, int32_t cameraDistance)
 		{
 			if (g_scriptedCameraState != 0)
@@ -297,7 +297,7 @@ namespace Toy2
 			InitCutsceneCamera(&g_cutsceneFocusPosition, &g_cutsceneCameraPosition);
 		}
 
-		// FUNCTION: TOY2 0x00403640
+		// FUNCTION: TOY2 0x00403640 [PROVISIONAL]
 		void SmoothToTarget(GameplayCamera* camera)
 		{
 			camera->pos.x += (camera->target.x - camera->pos.x) >> 3;
@@ -335,7 +335,7 @@ namespace Toy2
 			camera->angles.pitch = (uint16_t)(((pitchDelta >> 2) + camera->angles.pitch) & 0xfff);
 		}
 
-		// FUNCTION: TOY2 0x00403730 [MATCHED]
+		// FUNCTION: TOY2 0x00403730 [PROVISIONAL]
 		void SnapBehindBuzz(GameplayCamera* camera)
 		{
 			if (g_cameraMarkerParticle != (Nu3D::Particles::ParticleInstance*)-1)
@@ -401,7 +401,7 @@ namespace Camera
 		0x000,
 	};
 
-	// FUNCTION: TOY2 0x00433F40
+	// FUNCTION: TOY2 0x00433F40 [PROVISIONAL]
 	int32_t CalculateMaxTurnAngle(uint16_t directionInputState)
 	{
 		int32_t inputMagnitude = 0;

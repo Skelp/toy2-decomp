@@ -18,7 +18,7 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x00A4CC88
 	Material* g_materialActiveListHead;
 
-	// FUNCTION: TOY2 0x004C2910
+	// FUNCTION: TOY2 0x004C2910 [PROVISIONAL]
 	void Material::Init()
 	{
 		memset(Renderer::g_boundTextureIndices, 255, sizeof(Renderer::g_boundTextureIndices));
@@ -84,7 +84,7 @@ namespace Nu3D
 	// FUNCTION: TOY2 0x004C28E0 [MATCHED]
 	Material* Material::GetHead() { return g_materialActiveListHead; }
 
-	// FUNCTION: TOY2 0x004C2750
+	// FUNCTION: TOY2 0x004C2750 [PROVISIONAL]
 	void Material::InsertSorted(Material* material)
 	{
 		Material* activeHead1 = g_materialActiveListHead;
@@ -197,7 +197,7 @@ namespace Nu3D
 		material->originalMetadata = materialFile->metadata;
 	}
 
-	// FUNCTION: TOY2 0x004C2450
+	// FUNCTION: TOY2 0x004C2450 [PROVISIONAL]
 	Material* Material::TryCache(MaterialFile* materialFile)
 	{
 		Material nu3dMaterial;
@@ -247,7 +247,7 @@ namespace Nu3D
 		LPDIRECT3DDEVICE3 device = DrawingDevice::g_drawingDevice->m_pd3dDevice;
 		return direct3DMaterial3->GetHandle(device, d3dMaterialHandle);
 	}
-	// FUNCTION: TOY2 0x004C26D0
+	// FUNCTION: TOY2 0x004C26D0 [PROVISIONAL]
 	void Material::AttachTexture(Material* material, uint32_t texDataIndex)
 	{
 		NGNLoader::NGNTextureData* textureData = NGNLoader::GetTextureDataByIndex(texDataIndex);
@@ -321,7 +321,7 @@ namespace Nu3D
 		return material;
 	}
 
-	// FUNCTION: TOY2 0x004C24D0
+	// FUNCTION: TOY2 0x004C24D0 [PROVISIONAL]
 	Material* Material::CreateFromFile(MaterialFile* materialFile)
 	{
 		Material* cached = TryCache(materialFile);
@@ -365,7 +365,7 @@ namespace Nu3D
 		return material;
 	}
 
-	// FUNCTION: TOY2 0x004C2630
+	// FUNCTION: TOY2 0x004C2630 [PROVISIONAL]
 	void Material::SetOpacity(Material* material, float alpha)
 	{
 		if (material->opacity != alpha)

@@ -97,7 +97,7 @@ namespace Nu3D
 		return light;
 	}
 
-	// FUNCTION: TOY2 0x004C2A70
+	// FUNCTION: TOY2 0x004C2A70 [PROVISIONAL]
 	Light* Light::Alloc()
 	{
 		Light* light = g_freeLightHead;
@@ -118,7 +118,7 @@ namespace Nu3D
 		return light;
 	}
 
-	// FUNCTION: TOY2 0x004C2AB0
+	// FUNCTION: TOY2 0x004C2AB0 [PROVISIONAL]
 	Light* Light::BuildPoint(const D3DMATRIX* transform, const LightColor* color, float range, int32_t enabled)
 	{
 		Light* light = Alloc();
@@ -163,7 +163,7 @@ namespace Nu3D
 		return light;
 	}
 
-	// FUNCTION: TOY2 0x004C2BE0
+	// FUNCTION: TOY2 0x004C2BE0 [PROVISIONAL]
 	Light* Light::BuildDirectional(const D3DMATRIX* transform, const LightColor* color, int32_t enabled)
 	{
 		Light* light = Alloc();
@@ -208,7 +208,7 @@ namespace Nu3D
 		return light;
 	}
 
-	// FUNCTION: TOY2 0x004C2D20
+	// FUNCTION: TOY2 0x004C2D20 [PROVISIONAL]
 	Light* Light::BuildSpot(const D3DMATRIX* transform, const LightColor* color, float range,
 		int32_t theta, int32_t phi, int32_t enabled)
 	{
@@ -254,7 +254,7 @@ namespace Nu3D
 		return light;
 	}
 
-	// FUNCTION: TOY2 0x004C2E70
+	// FUNCTION: TOY2 0x004C2E70 [PROVISIONAL]
 	void Light::Update(Light* light)
 	{
 		if (light->type != TYPE_AMBIENT)
@@ -284,7 +284,7 @@ namespace Nu3D
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C2FF0
+	// FUNCTION: TOY2 0x004C2FF0 [PROVISIONAL]
 	int32_t Light::InitPool(int32_t poolSize)
 	{
 		if (g_lightPool)
@@ -342,7 +342,7 @@ namespace Nu3D
 		Update(g_directionalLight);
 	}
 
-	// FUNCTION: TOY2 0x004CE910
+	// FUNCTION: TOY2 0x004CE910 [PROVISIONAL]
 	void Light::BuildGlobalLights()
 	{
 		InitPool(8);
@@ -364,7 +364,7 @@ namespace Nu3D
 		g_directionalLight = BuildDirectional(&firstTransform, &white, 1);
 	}
 
-	// FUNCTION: TOY2 0x004CEA50
+	// FUNCTION: TOY2 0x004CEA50 [PROVISIONAL]
 	void Light::Cleanup()
 	{
 		Destroy(g_defaultDirectionalLight1);

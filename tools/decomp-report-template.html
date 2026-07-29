@@ -323,7 +323,9 @@
 
     function renderMetrics() {
       const cards = [
-        ["Change gate", metrics.change_gate_passed ? "PASS" : "FAIL", `${metrics.quality_new_errors} new errors · ${metrics.quality_errors} known errors · ${metrics.quality_warnings} known warnings · ${metrics.quality_stale_baseline} stale baseline entries`, metrics.change_gate_passed ? "var(--cyan)" : "var(--red)"],
+        ["Change gate", metrics.change_gate_passed ? "PASS" : "FAIL", `${metrics.quality_new_errors} new errors · ${metrics.quality_new_warnings} new warnings · ${metrics.quality_errors} total errors · ${metrics.quality_warnings} total warnings · ${metrics.quality_stale_baseline} stale baseline entries`, metrics.change_gate_passed ? "var(--cyan)" : "var(--red)"],
+        ["Source debt", String(metrics.source_debt_functions), `${metrics.quality_errors} errors · ${metrics.quality_warnings} warnings`, metrics.source_debt_functions ? "var(--orange)" : "var(--green)"],
+        ["Binary fidelity", `${metrics.binary_exact_functions} exact`, `${metrics.binary_effective_functions} effective · ${metrics.tool_artifacts} tool-equivalent · ${metrics.binary_partial_functions} partial or zero`, "var(--cyan)"],
         ["Verified functions", pct(metrics.verified_function_progress), `${metrics.verified_functions} verified · ${metrics.provisional_functions} provisional · ${metrics.tool_artifacts} tool artifacts`, "var(--green)"],
         ["Verified bytes", pct(metrics.verified_byte_progress), `${bytes(metrics.verified_bytes)} verified / ${bytes(metrics.project_original_bytes)} mapped project code`, "var(--purple)"]
       ];

@@ -96,6 +96,22 @@ RULE_HELP = {
         "A completed function still uses a working unknown name. Recover a modest role-based "
         "name when the evidence permits it."
     ),
+    "opaque-state-slot": (
+        "A completed function accesses a numbered state slot. Declare a role-based "
+        "field or accessor for the supported state value."
+    ),
+    "address-named-symbol": (
+        "A symbol name contains a retail address. Replace the address with the "
+        "value's supported role."
+    ),
+    "unexplained-helper": (
+        "A helper name does not state its source-level role. Name the operation "
+        "from its callers and side effects."
+    ),
+    "original-name-vocabulary": (
+        "The retail binary states a different name for this engine object. Use "
+        "the original vocabulary or document why it does not identify this value."
+    ),
     "arithmetic-name": "The identifier states how a value was computed instead of what reads it.",
     "unnamed-bitmask": "A raw mask is applied to flags or state. Prefer an established named flag.",
     "unstructured-control-flow": (
@@ -391,6 +407,70 @@ def check_text(path: Path, text: str) -> list[Finding]:
     allowed = _allowed_rules(text)
 
     parameter_offsets: set[int] = set()
+
+    opaque_state_slot = re.compile(
+        r"\b[A-Za-z_]\w*(?:(?:->|\.)[A-Za-z_]\w*)*(?:->|\.)data\s*"
+        r"\[\s*(?:0x[0-9A-Fa-f]+|[0-9]+)\s*\]"
+    )
+    for match in opaque_state_slot.finditer(masked):
+        line, _ = _line_column(text, match.start())
+        owner = _owner_at(owners, line)
+        if owner.kind != "function":
+            continue
+        _add_finding(
+            findings,
+            path,
+            text,
+            owners,
+            allowed,
+            offset=match.start(),
+            rule="opaque-state-slot",
+            severity="warning",
+            detail="numbered data slot hides a state field's role",
+            subject=match.group(0),
+            excerpt=match.group(0),
+        )
+
+    address_name = re.compile(r"\b(?:g_|s_)(?:unk)?[0-9A-Fa-f]{6,8}\b")
+    for match in address_name.finditer(masked):
+        line, _ = _line_column(text, match.start())
+        if _owner_at(owners, line).kind != "function":
+            continue
+        _add_finding(
+            findings, path, text, owners, allowed, offset=match.start(),
+            rule="address-named-symbol", severity="warning",
+            detail=f"symbol {match.group(0)!r} uses an address as its name",
+            subject=match.group(0), excerpt=match.group(0),
+        )
+
+    unexplained_helper = re.compile(r"\b[A-Za-z_]\w*Helper\s*(?=\()")
+    for match in unexplained_helper.finditer(masked):
+        line, _ = _line_column(text, match.start())
+        if _owner_at(owners, line).kind != "function":
+            continue
+        _add_finding(
+            findings, path, text, owners, allowed, offset=match.start(),
+            rule="unexplained-helper", severity="warning",
+            detail=f"helper {match.group(0).strip()!r} does not identify its operation",
+            subject=match.group(0).strip(), excerpt=match.group(0),
+        )
+
+    original_aliases = {
+        "g_d3dAppI": "d3dappi",
+        "g_drawBuffer": "drawb",
+        "g_transparentDrawBuffer": "drawtranb",
+    }
+    for alias, original in original_aliases.items():
+        for match in re.finditer(rf"\b{re.escape(alias)}\b", masked):
+            line, _ = _line_column(text, match.start())
+            if _owner_at(owners, line).kind != "function":
+                continue
+            _add_finding(
+                findings, path, text, owners, allowed, offset=match.start(),
+                rule="original-name-vocabulary", severity="warning",
+                detail=f"retail text names {alias!r} as {original!r}",
+                subject=alias, excerpt=match.group(0),
+            )
     parameter_name = re.compile(
         rf"\b{TYPE_WORD}[\s*&]+(?P<name>param_?\d+|arg_?\d+|field[0-9A-Fa-f]{{1,4}}|"
         rf"[iu](?:Stack)?Var\d+|[psu][A-Za-z]*Var\d+)\b\s*(?=[,)])"

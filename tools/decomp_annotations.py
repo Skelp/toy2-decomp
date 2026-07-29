@@ -9,7 +9,9 @@ from pathlib import Path
 
 ANNOTATION_RE = re.compile(
     r"//\s*(FUNCTION|STUB|LIBRARY|GLOBAL):\s*TOY2\s+0x([0-9a-fA-F]+)"
+    r"([^\n]*)"
 )
+VERIFICATION_TAG_RE = re.compile(r"\[(MATCHED|EFFECTIVE|TOOL|PROVISIONAL)\]")
 DIRECTIVE_RE = re.compile(r"^\s*#\s*(if|ifdef|ifndef|elif|else|endif)\b(.*)$")
 
 
@@ -19,6 +21,7 @@ class Annotation:
     address: str
     source: str
     line: int
+    tag: str = ""
 
 
 def canonical_address(value: str | int) -> str:
@@ -76,13 +79,15 @@ def read_source_annotations(source_root: Path) -> list[Annotation]:
         relative = path.relative_to(source_root).as_posix()
         text = path.read_text(encoding="utf-8", errors="ignore")
         for line_number, line in active_source_lines(text):
-            for kind, address in ANNOTATION_RE.findall(line):
+            for kind, address, tail in ANNOTATION_RE.findall(line):
+                tag_match = VERIFICATION_TAG_RE.search(tail)
                 annotations.append(
                     Annotation(
                         kind=kind.lower(),
                         address=canonical_address(f"0x{address}"),
                         source=relative,
                         line=line_number,
+                        tag=tag_match.group(1).lower() if tag_match else "",
                     )
                 )
     return annotations

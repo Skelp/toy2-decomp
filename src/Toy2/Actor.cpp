@@ -59,7 +59,7 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0052EF88
 		int32_t g_unk52EF88;
 
-		// FUNCTION: TOY2 0x00407150
+		// FUNCTION: TOY2 0x00407150 [PROVISIONAL]
 		void InitCreatureRam()
 		{
 			memset(g_creatureActors, 0, sizeof(g_creatureActors));
@@ -91,14 +91,14 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x004019D0
+		// FUNCTION: TOY2 0x004019D0 [MATCHED]
 		void UpdatePrimaryAnimation(Toy2Actor* actor)
 		{
 			CharacterLoader::CharacterAnimationData* animationData = CharacterLoader::g_characterAnimationData[actor->creatureId];
 			Animation::EvaluateClip(animationData->clips[actor->primaryAnimIdx], actor->animationFramePosition, animationData->baseBoneIndex, 0);
 		}
 
-		// FUNCTION: TOY2 0x00405C80
+		// FUNCTION: TOY2 0x00405C80 [PROVISIONAL]
 		void StepCreatureAnimFrame(Toy2Actor* actor)
 		{
 			if (actor->animationFrameSequence[2] == 0xff && actor->animationFrameSequence[3] == 0)
@@ -127,7 +127,7 @@ namespace Toy2
 			actor->animationFramePosition += (uint32_t)*actor->animationFrameSequence << 16;
 		}
 
-		// FUNCTION: TOY2 0x00405CF0
+		// FUNCTION: TOY2 0x00405CF0 [MATCHED]
 		void SetAnimation(Toy2Actor* actor, int16_t animationIndex, int32_t frameSequenceIndex)
 		{
 			actor->primaryAnimIdx = animationIndex;
@@ -135,11 +135,11 @@ namespace Toy2
 			actor->animationFramePosition = (uint32_t)*actor->animationFrameSequence << 16;
 		}
 
-		// FUNCTION: TOY2 0x0049F460
+		// FUNCTION: TOY2 0x0049F460 [MATCHED]
 		int32_t IsInsideBounds(const Vector3I* position, int32_t minX, int32_t maxX, int32_t minZ, int32_t maxZ)
 		{ return position->x > minX && position->x < maxX && position->z > minZ && position->z < maxZ; }
 
-		// FUNCTION: TOY2 0x004A28B0
+		// FUNCTION: TOY2 0x004A28B0 [MATCHED]
 		void PopulateActiveActors()
 		{
 			int32_t actorIndex = 0;
@@ -217,7 +217,7 @@ namespace Toy2
 				-1);
 		}
 
-		// FUNCTION: TOY2 0x004A26F0
+		// FUNCTION: TOY2 0x004A26F0 [PROVISIONAL]
 		void PlayPeriodicHintSound(int32_t actorIndex, int32_t soundPresetIndex)
 		{
 			if (soundPresetIndex == 0xB5)
@@ -243,7 +243,7 @@ namespace Toy2
 				&g_creatureActors[actorIndex], preset->encodedSoundIndex - 1, preset->baseFrequency, preset->leftVolume, &g_creatureActors[actorIndex], 0);
 		}
 
-		// FUNCTION: TOY2 0x00414A80
+		// FUNCTION: TOY2 0x00414A80 [PROVISIONAL]
 		void GetCreatureList(uint8_t* creatureIdList)
 		{
 			InitCreatureRam();

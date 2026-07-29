@@ -99,7 +99,7 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x00884598
 	int32_t g_fontRenderFlags = 0;
 
-	// FUNCTION: TOY2 0x004B38E0
+	// FUNCTION: TOY2 0x004B38E0 [MATCHED]
 	void Font::SetFontScale(float scaleX, float scaleY)
 	{
 		g_fontScaleX = scaleX;
@@ -121,7 +121,7 @@ namespace Nu3D
 		}
 	}
 
-	// FUNCTION: TOY2 0x004B3AD0
+	// FUNCTION: TOY2 0x004B3AD0 [MATCHED]
 	int32_t Font::Init()
 	{
 		if (g_fontInitialized)
@@ -160,7 +160,7 @@ namespace Nu3D
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x004B3FD0
+	// FUNCTION: TOY2 0x004B3FD0 [MATCHED]
 	void Font::ResetContext()
 	{
 		if (g_fontDC)
@@ -173,7 +173,7 @@ namespace Nu3D
 		g_fontDCReady = 0;
 	}
 
-	// FUNCTION: TOY2 0x004B4080
+	// FUNCTION: TOY2 0x004B4080 [MATCHED]
 	HBITMAP Font::CreateAtlasBmp(int32_t width, int32_t height)
 	{
 		HBITMAP h = 0;
@@ -205,7 +205,7 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x005086F8
 	int16_t g_defaultGlyphChar = 0x3F;
 
-	// FUNCTION: TOY2 0x004B4010
+	// FUNCTION: TOY2 0x004B4010 [MATCHED]
 	HDC Font::CreateDC()
 	{
 		if (g_fontDC || g_fontDCReady)
@@ -226,7 +226,7 @@ namespace Nu3D
 		return g_fontDC;
 	}
 
-	// FUNCTION: TOY2 0x004B4110
+	// FUNCTION: TOY2 0x004B4110 [PROVISIONAL]
 	Font* Font::Build(const char* fontName, int32_t fontSize, const char* charSet)
 	{
 		char glyphChar[2];
@@ -325,7 +325,7 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x004DDABC
 	int16_t g_defaultFontType = 0;
 
-	// FUNCTION: TOY2 0x004B3A20
+	// FUNCTION: TOY2 0x004B3A20 [PROVISIONAL]
 	Font* Font::BuildObject(int32_t numGlyphs)
 	{
 		int32_t size = sizeof(Font) + numGlyphs * sizeof(GlyphInfo);
@@ -344,7 +344,7 @@ namespace Nu3D
 		return font;
 	}
 
-	// FUNCTION: TOY2 0x004B39D0
+	// FUNCTION: TOY2 0x004B39D0 [MATCHED]
 	void Font::Destroy(Font* font)
 	{
 		if (font->bmpDataNode)
@@ -361,7 +361,7 @@ namespace Nu3D
 		free(font);
 	}
 
-	// FUNCTION: TOY2 0x004B3A90
+	// FUNCTION: TOY2 0x004B3A90 [EFFECTIVE]
 	void Font::ClearList()
 	{
 		if (! g_fontInitialized)
@@ -421,7 +421,7 @@ namespace Nu3D
 		g_textClipY2 = y2;
 	}
 
-	// FUNCTION: TOY2 0x004B3CC0
+	// FUNCTION: TOY2 0x004B3CC0 [MATCHED]
 	int32_t Font::BuildTexResource(Font* font)
 	{
 		font->texIndex = 0;
@@ -436,7 +436,7 @@ namespace Nu3D
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004B3C20
+	// FUNCTION: TOY2 0x004B3C20 [MATCHED]
 	void Font::BuildFontTextures()
 	{
 		if (DrawingDevice::GetD3DDevice())
@@ -457,7 +457,7 @@ namespace Nu3D
 	// FUNCTION: TOY2 0x004B38C0 [MATCHED]
 	void Font::SetRenderFlags(int32_t flags) { g_fontRenderFlags = flags ? 0x200 : 0; }
 
-	// FUNCTION: TOY2 0x004B5310
+	// FUNCTION: TOY2 0x004B5310 [MATCHED]
 	int32_t Font::ComputeUnscaledCharClip(char c)
 	{
 		Font* font = g_currentFont;
@@ -482,7 +482,7 @@ namespace Nu3D
 	// keep the quad within the glyph's texel bounds. Note g_textCursorOffsetX is
 	// applied to the top edge only -- the bottom edge uses the raw cursor X,
 	// matching the retail vertex setup.
-	// FUNCTION: TOY2 0x004B4DE0 [MATCHED]
+	// FUNCTION: TOY2 0x004B4DE0 [EFFECTIVE]
 	int32_t Font::DrawUnscaledGlyph(char c)
 	{
 		LPDIRECT3DDEVICE3 device = DrawingDevice::GetD3DDevice();
@@ -542,7 +542,7 @@ namespace Nu3D
 	// callee-saved-register saves earlier and offsets the scratch stack slots
 	// (esp+0xc/0x14 vs retail's esp+0x10/0x18). The per-edge vertex logic is
 	// otherwise identical (confirmed against the not-clipped-left block).
-	// FUNCTION: TOY2 0x004B4FA0
+	// FUNCTION: TOY2 0x004B4FA0 [PROVISIONAL]
 	int32_t Font::DrawClippedUnscaledGlyph(char c)
 	{
 		LPDIRECT3DDEVICE3 device = DrawingDevice::GetD3DDevice();
@@ -651,7 +651,7 @@ namespace Nu3D
 	// ascent/descent are taken from the precomputed scaled float globals
 	// (g_fontScaleX * glyph->width, g_scaledFontAscent, g_scaledFontHeight) and
 	// truncated back to int via __ftol before the same four clip-delta tests.
-	// FUNCTION: TOY2 0x004B4C10
+	// FUNCTION: TOY2 0x004B4C10 [PROVISIONAL]
 	int32_t Font::ComputeScaledCharClip(char c)
 	{
 		Font* font = g_currentFont;
@@ -715,7 +715,7 @@ namespace Nu3D
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004B4880
+	// FUNCTION: TOY2 0x004B4880 [PROVISIONAL]
 	int32_t Font::DrawClippedScaledGlyph(char c)
 	{
 		LPDIRECT3DDEVICE3 device = DrawingDevice::GetD3DDevice();
@@ -824,7 +824,7 @@ namespace Nu3D
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004B4CD0
+	// FUNCTION: TOY2 0x004B4CD0 [PROVISIONAL]
 	int32_t Font::DrawTextString(const char* text)
 	{
 		Font* font = g_currentFont;
@@ -883,7 +883,7 @@ namespace Nu3D
 		return maxWidth > width ? maxWidth : width;
 	}
 
-	// FUNCTION: TOY2 0x004B45A0
+	// FUNCTION: TOY2 0x004B45A0 [PROVISIONAL]
 	int32_t Font::DrawScaledTextString(const char* text)
 	{
 		Font* font = g_currentFont;
@@ -942,7 +942,7 @@ namespace Nu3D
 		return maxWidth > width ? maxWidth : width;
 	}
 
-	// FUNCTION: TOY2 0x004B5480
+	// FUNCTION: TOY2 0x004B5480 [PROVISIONAL]
 	int32_t Font::CalculateUnscaledTextSize(const char* text)
 	{
 		Font* font = g_currentFont;
@@ -984,7 +984,7 @@ namespace Nu3D
 		return maxWidth > width ? maxWidth : width;
 	}
 
-	// FUNCTION: TOY2 0x004B53D0
+	// FUNCTION: TOY2 0x004B53D0 [PROVISIONAL]
 	int32_t Font::CalculateScaledTextSize(const char* text)
 	{
 		Font* font = g_currentFont;

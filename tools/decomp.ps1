@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("configure", "build", "compare", "score", "candidates", "audit", "baseline", "validate", "lint", "report", "progress", "run", "shell", "help")]
+    [ValidateSet("configure", "build", "compare", "score", "candidates", "audit", "baseline", "validate", "experiment", "lint", "report", "progress", "run", "shell", "help")]
     [string] $Command = "help",
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -130,6 +130,7 @@ Commands:
   candidates [args] Rank reconstruction candidates
   audit [args]      Review provisional and legacy CAP functions
   validate [args]   Build and reject comparison or source-quality regressions
+  experiment [args] Store and compare one source-form experiment
   lint [args]       Check reconstructed source plausibility
   report [file]     Generate the self-contained HTML decompilation dashboard
   progress [scope]  Show annotation progress, optionally for a namespace
@@ -183,7 +184,7 @@ switch ($Command) {
         $Report = Join-Path $Root "build\decomp-baseline-report.json"
         Write-ComparisonReport $Report
         & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") metadata `
-            (Join-Path $Root "build\decomp-baseline-meta.json")
+            (Join-Path $Root "build\decomp-baseline-meta.json") --report $Report
         Assert-LastExit "Recording baseline metadata"
     }
     "validate" {
@@ -194,31 +195,84 @@ switch ($Command) {
         Write-ComparisonReport $Current
         $Targets = @()
         $AllowTargetRegression = $false
+        $Staged = $false
         for ($Index = 0; $Index -lt $CommandArgs.Count; $Index++) {
             if ($CommandArgs[$Index] -eq "--target" -and $Index + 1 -lt $CommandArgs.Count) {
                 $Index++
                 $Targets += $CommandArgs[$Index]
             } elseif ($CommandArgs[$Index] -eq "--allow-target-regression") {
                 $AllowTargetRegression = $true
+            } elseif ($CommandArgs[$Index] -eq "--staged") {
+                $Staged = $true
             } else {
                 throw "Unknown validate argument: $($CommandArgs[$Index])"
             }
         }
         if ($Targets.Count -eq 0) { throw "Validate needs at least one --target address." }
         $VerifyArgs = @("validate", $Baseline, $Current) + $Targets
+        $VerifyArgs += @("--metadata", (Join-Path $Root "build\decomp-baseline-meta.json"))
         if ($AllowTargetRegression) { $VerifyArgs += "--allow-target-regression" }
         & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") @VerifyArgs
         Assert-LastExit "Validating comparison results"
-        $ChangedSources = @(& git diff --name-only --diff-filter=ACM) + @(& git diff --cached --name-only --diff-filter=ACM)
-        $ChangedSources = @($ChangedSources | Sort-Object -Unique | Where-Object { $_ -match '\.(c|cc|cpp|cxx|h|hh|hpp|hxx)$' })
-        if ($ChangedSources.Count -gt 0) {
-            & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_lint.py") --warnings-as-errors @ChangedSources
-            Assert-LastExit "Validating changed source plausibility"
-        } else {
-            Write-Host "lint: no changed C/C++ source files"
+        if ($Staged) {
+            & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_lint.py") --staged --warnings-as-errors
+            Assert-LastExit "Validating staged source plausibility"
         }
+        & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\ghidra_sync.py") check
+        Assert-LastExit "Checking the function map"
         & git diff --check
         Assert-LastExit "Checking the working tree diff"
+    }
+    "experiment" {
+        if ($CommandArgs.Count -lt 2) {
+            throw "Usage: tools/decomp.ps1 experiment start|try|report <address> [label]"
+        }
+        $Action = $CommandArgs[0]
+        $Address = $CommandArgs[1]
+        $Directory = Join-Path $Root "build\decomp-experiments\$Address"
+        if ($Action -eq "start") {
+            New-Item -ItemType Directory -Force $Directory | Out-Null
+            Build-Project
+            $Report = Join-Path $Root "build\decomp-baseline-report.json"
+            Write-ComparisonReport $Report
+            & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") metadata `
+                (Join-Path $Root "build\decomp-baseline-meta.json") --report $Report
+            Assert-LastExit "Recording experiment baseline"
+            & git diff --binary | Set-Content -Encoding utf8 (Join-Path $Directory "baseline.patch")
+            Copy-Item (Join-Path $Root "build\decomp-baseline-meta.json") (Join-Path $Directory "compiler-context.json")
+        } elseif ($Action -eq "try") {
+            if ($CommandArgs.Count -ne 3 -or $CommandArgs[2] -notmatch '^[A-Za-z0-9._-]+$') {
+                throw "Give the experiment a label with letters, numbers, dots, dashes, or underscores."
+            }
+            $Label = $CommandArgs[2]
+            New-Item -ItemType Directory -Force $Directory | Out-Null
+            Build-Project
+            $Report = Join-Path $Root "build\decomp-experiment-$Address-$Label.json"
+            Write-ComparisonReport $Report
+            & git diff --binary | Set-Content -Encoding utf8 (Join-Path $Directory "$Label.patch")
+            Push-Location (Join-Path $Root "build")
+            try {
+                & reccmp-reccmp --target TOY2 --no-color --verbose $Address | Set-Content -Encoding utf8 (Join-Path $Directory "$Label.diff.txt")
+                Assert-LastExit "Comparing the experiment"
+            } finally {
+                Pop-Location
+            }
+            Copy-Item $Report (Join-Path $Directory "$Label.report.json")
+            Copy-Item (Join-Path $Root "build\decomp-baseline-meta.json") (Join-Path $Directory "$Label.compiler-context.json")
+            & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") experiment `
+                (Join-Path $Directory "$Label.report.json") $Address (Join-Path $Directory "$Label.normalized.json")
+            Assert-LastExit "Recording normalized experiment data"
+            & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") classify `
+                (Join-Path $Directory "$Label.report.json") $Address | Tee-Object -FilePath (Join-Path $Directory "$Label.summary.txt")
+            Assert-LastExit "Classifying the experiment"
+        } elseif ($Action -eq "report") {
+            Get-ChildItem $Directory -Filter "*.summary.txt" | Sort-Object Name | ForEach-Object {
+                Write-Host $_.FullName
+                Get-Content $_.FullName -TotalCount 4
+            }
+        } else {
+            throw "The experiment action must be start, try, or report."
+        }
     }
     "report" {
         if ($CommandArgs.Count -gt 1) {

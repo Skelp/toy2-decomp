@@ -222,7 +222,7 @@ namespace AudioManager
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x0047E4E0
+	// FUNCTION: TOY2 0x0047E4E0 [PROVISIONAL]
 	int32_t WriteToBuffer(LPDIRECTSOUNDBUFFER buf, DWORD offset, const void* src, DWORD bytes)
 	{
 		void* audioPtr1;
@@ -251,7 +251,7 @@ namespace AudioManager
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004A4130
+	// FUNCTION: TOY2 0x004A4130 [PROVISIONAL]
 	MMRESULT WaveReadFile(HMMIO hmmio, uint32_t size, void* buffer, MMCKINFO* chunk, uint32_t* outRead)
 	{
 		MMIOINFO info;
@@ -299,7 +299,7 @@ namespace AudioManager
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x004A4680
+	// FUNCTION: TOY2 0x004A4680 [PROVISIONAL]
 	int32_t WaveLoadFile(char* path, int32_t* outBytes, int32_t* outFormatSize, HGLOBAL* outFormatHandle, void** outData)
 	{
 		HMMIO hmmio;
@@ -389,7 +389,7 @@ namespace AudioManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x0047E5B0 [MATCHED]
+	// FUNCTION: TOY2 0x0047E5B0 [EFFECTIVE]
 	void LoadSoundEffect(char* name, int32_t index, int32_t flag)
 	{
 		char path[1024];
@@ -524,7 +524,7 @@ namespace AudioManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x0047E3C0
+	// FUNCTION: TOY2 0x0047E3C0 [PROVISIONAL]
 	BOOL CALLBACK Enumerate(LPGUID lpGuid, LPCSTR lpcstrDescription, LPCSTR lpcstrModule, LPVOID lpContext)
 	{
 		int32_t index = g_deviceCount;
@@ -543,7 +543,7 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x004FCDC0
 	int32_t g_currentSfxLevelId;
 
-	// FUNCTION: TOY2 0x0047EDE0
+	// FUNCTION: TOY2 0x0047EDE0 [PROVISIONAL]
 	void Init()
 	{
 		char waveName[257];
@@ -631,7 +631,7 @@ namespace AudioManager
 	// FUNCTION: TOY2 0x0049AE20 [MATCHED]
 	void SetSfxVolume(int32_t sfxVolume) { g_sfxVolume = (sfxVolume & 0xff) << 1; }
 
-	// FUNCTION: TOY2 0x0049AE40 [MATCHED]
+	// FUNCTION: TOY2 0x0049AE40 [PROVISIONAL]
 	void SetMusicVolume(int32_t musicVolume)
 	{
 		g_musicVolumeLevel = musicVolume;
@@ -712,7 +712,7 @@ namespace AudioManager
 		Logger::Log("FlushSoundVoices : End.\n");
 	}
 
-	// FUNCTION: TOY2 0x00436C90
+	// FUNCTION: TOY2 0x00436C90 [MATCHED]
 	void SignalThreadExit()
 	{
 		if (g_streamCommandEvent != NULL)
@@ -723,7 +723,7 @@ namespace AudioManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x00436CC0
+	// FUNCTION: TOY2 0x00436CC0 [MATCHED]
 	int32_t IsThreadReady() { return g_streamThreadReady; }
 
 	// FUNCTION: TOY2 0x00436D40 [MATCHED]
@@ -738,7 +738,7 @@ namespace AudioManager
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x0047EC20
+	// FUNCTION: TOY2 0x0047EC20 [PROVISIONAL]
 	void LoadSfxPackForLevel(int32_t levelId)
 	{
 		char waveName[256];
@@ -842,7 +842,7 @@ namespace AudioManager
 	int32_t PlayOneShotSoundGlobal(int32_t soundIndex, int32_t volume, int32_t leftVolume, int32_t rightVolume)
 	{ return PlaySoundBuffer(soundIndex + 1, leftVolume, rightVolume, 0, volume, 0); }
 
-	// FUNCTION: TOY2 0x004A3810
+	// FUNCTION: TOY2 0x004A3810 [PROVISIONAL]
 	int32_t PlayOneShotSound3D(int32_t soundIndex, int32_t frequency, int32_t volume, const Vector3I* position)
 	{
 		int32_t z = position->z - Nu3D::Camera::g_fixedViewPosition.z;
@@ -880,7 +880,7 @@ namespace AudioManager
 		return (leftVolume + rightVolume) / 2;
 	}
 
-	// FUNCTION: TOY2 0x004A3C80
+	// FUNCTION: TOY2 0x004A3C80 [PROVISIONAL]
 	int32_t PlayOneShotSound3DActor(void* actor, int32_t soundIndex, int32_t frequency, int32_t volume, void* position, int32_t flag)
 	{
 		int32_t leftVolume;
@@ -1024,7 +1024,7 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x00830E3C
 	int16_t g_dynamicSoundFrequencies[14];
 
-	// FUNCTION: TOY2 0x0049E660
+	// FUNCTION: TOY2 0x0049E660 [PROVISIONAL]
 	void PlaySoundEffect(int32_t soundIndex, const Vector3I* position)
 	{
 		if (soundIndex < 0)
@@ -1133,7 +1133,7 @@ namespace AudioManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x0049E910
+	// FUNCTION: TOY2 0x0049E910 [PROVISIONAL]
 	void StartSoundSequenceOnActor(int32_t sequenceId, Vector3I* position)
 	{
 		SoundSequenceSlot& slot = g_soundSequenceSlots[7];
@@ -1162,7 +1162,7 @@ namespace AudioManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x0049E9D0
+	// FUNCTION: TOY2 0x0049E9D0 [PROVISIONAL]
 	void UpdateSoundSequences()
 	{
 		for (SoundSequenceSlot* slot = g_soundSequenceSlots; slot < g_soundSequenceSlots + 8; slot++)
@@ -1219,7 +1219,7 @@ namespace AudioManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x0047D880
+	// FUNCTION: TOY2 0x0047D880 [MATCHED]
 	void PlayMusicLooping(int16_t trackIndex)
 	{
 		if (g_audioInitialized)
@@ -1235,7 +1235,7 @@ namespace AudioManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x004A3980
+	// FUNCTION: TOY2 0x004A3980 [PROVISIONAL]
 	int32_t PlayLoopingSound3D(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, int16_t rightVolume)
 	{
 		int32_t leftVol = leftVolume;
@@ -1334,7 +1334,7 @@ namespace AudioManager
 		return (leftVol + rightVol) / 2;
 	}
 
-	// FUNCTION: TOY2 0x004A3B90
+	// FUNCTION: TOY2 0x004A3B90 [MATCHED]
 	int32_t PlayLoopingSound3DPositional(void* owner, int32_t soundIndex, int32_t volume, int32_t leftVolume, void* unused, int32_t rightVolume)
 	{ return PlayLoopingSound3D(owner, soundIndex, volume, leftVolume, rightVolume); }
 
@@ -1343,7 +1343,7 @@ namespace AudioManager
 		SOUND_BUFFER_GROUP_MASK = 0xFFFF8,
 	};
 
-	// FUNCTION: TOY2 0x0047D930
+	// FUNCTION: TOY2 0x0047D930 [PROVISIONAL]
 	int32_t RestartLoopingSound(int32_t soundId)
 	{
 		char waveName[256];
@@ -1451,7 +1451,7 @@ namespace AudioManager
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x004A3BC0
+	// FUNCTION: TOY2 0x004A3BC0 [PROVISIONAL]
 	void ResetChannelsTable()
 	{
 		int16_t* p = &g_loopingSoundChannels[0][0];
@@ -1462,7 +1462,7 @@ namespace AudioManager
 		} while (p < &g_loopingSoundChannels[32][0]);
 	}
 
-	// FUNCTION: TOY2 0x004A3BE0
+	// FUNCTION: TOY2 0x004A3BE0 [PROVISIONAL]
 	void UpdateChannels()
 	{
 		if (g_streamPending != 0 && --g_streamPending == 0)
@@ -1497,7 +1497,7 @@ namespace AudioManager
 		} while (p < &g_loopingSoundChannels[32][1]);
 	}
 
-	// FUNCTION: TOY2 0x004A3E60
+	// FUNCTION: TOY2 0x004A3E60 [PROVISIONAL]
 	int32_t IsActorSoundPlaying(void* owner)
 	{
 		if (g_audioInitialized != 0)
@@ -1558,7 +1558,7 @@ namespace AudioManager
 		"titlescr",
 		"levcomp" };
 
-	// FUNCTION: TOY2 0x00436CE0
+	// FUNCTION: TOY2 0x00436CE0 [MATCHED]
 	void QueuePlay(char* path, int32_t looping)
 	{
 		if (g_streamCommandEvent != NULL)
@@ -1571,7 +1571,7 @@ namespace AudioManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x00413140
+	// FUNCTION: TOY2 0x00413140 [MATCHED]
 	void OnExit() { SignalThreadExit(); }
 
 	// FUNCTION: TOY2 0x00412EE0 [MATCHED]
@@ -1600,7 +1600,7 @@ namespace AudioManager
 		g_streamFillEvent = NULL;
 	}
 
-	// FUNCTION: TOY2 0x00436D80
+	// FUNCTION: TOY2 0x00436D80 [PROVISIONAL]
 	void FillBuffer()
 	{
 		uint32_t bytesRead = 0;
@@ -1688,7 +1688,7 @@ namespace AudioManager
 
 	namespace Stream
 	{
-		// FUNCTION: TOY2 0x00412FF0
+		// FUNCTION: TOY2 0x00412FF0 [PROVISIONAL]
 		int32_t Init()
 		{
 			if (g_streamInitialized == 0)
@@ -1814,7 +1814,7 @@ namespace AudioManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x00413150
+	// FUNCTION: TOY2 0x00413150 [MATCHED]
 	int32_t PlayTrackByIndex(int32_t trackIndex, int32_t looping)
 	{
 		char buffer[512];
@@ -1859,7 +1859,7 @@ namespace AudioManager
 		return status;
 	}
 
-	// FUNCTION: TOY2 0x0047DE50
+	// FUNCTION: TOY2 0x0047DE50 [PROVISIONAL]
 	int32_t PlaySoundBuffer(int32_t soundIndex, int32_t leftVolume, int32_t rightVolume, void* owner, int32_t unused, int32_t looping)
 	{
 		char waveName[256];
@@ -2108,7 +2108,7 @@ namespace AudioManager
 
 	namespace Wave
 	{
-		// FUNCTION: TOY2 0x004A4200
+		// FUNCTION: TOY2 0x004A4200 [MATCHED]
 		int32_t CloseFile(HMMIO* hmmio, HGLOBAL* dataHandle)
 		{
 			if (*dataHandle != NULL)
@@ -2124,7 +2124,7 @@ namespace AudioManager
 			return 0;
 		}
 
-		// FUNCTION: TOY2 0x004A3F10
+		// FUNCTION: TOY2 0x004A3F10 [PROVISIONAL]
 		MMRESULT OpenFile(LPSTR path, HMMIO* outHmmio, HGLOBAL* outFormatHandle, MMCKINFO* parentChunk)
 		{
 			*outFormatHandle = NULL;
@@ -2233,7 +2233,7 @@ namespace AudioManager
 
 	namespace Stream
 	{
-		// FUNCTION: TOY2 0x004132A0
+		// FUNCTION: TOY2 0x004132A0 [MATCHED]
 		void Stop()
 		{
 			if (g_directSound != NULL && g_dsPrimaryBuffer != NULL)

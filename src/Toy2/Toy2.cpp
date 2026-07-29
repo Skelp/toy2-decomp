@@ -50,7 +50,7 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0053C680
 		State g_objects[10];
 
-		// FUNCTION: TOY2 0x004334D0
+		// FUNCTION: TOY2 0x004334D0 [PROVISIONAL]
 		void ComputeSegment(int32_t pathRecordType, State* object)
 		{
 			Levels::RecordData* path = Levels::g_recordData[pathRecordType];
@@ -78,7 +78,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x004335D0
+		// FUNCTION: TOY2 0x004335D0 [PROVISIONAL]
 		void InitTable(const InitEntry* initTable)
 		{
 			memset(g_objects, 0, sizeof(g_objects));
@@ -472,10 +472,10 @@ namespace Toy2
 		}
 	}
 
-	// FUNCTION: TOY2 0x0044F840
+	// FUNCTION: TOY2 0x0044F840 [MATCHED]
 	void ShowModelNode(int32_t creatureIndex, int32_t nodeIndex) { Nu3D::Creature::SetNodeVisibleByIndex(creatureIndex, nodeIndex, 1); }
 
-	// FUNCTION: TOY2 0x0044F860
+	// FUNCTION: TOY2 0x0044F860 [MATCHED]
 	void HideModelNode(int32_t creatureIndex, int32_t nodeIndex) { Nu3D::Creature::SetNodeVisibleByIndex(creatureIndex, nodeIndex, 0); }
 
 	// FUNCTION: TOY2 0x0049F490 [MATCHED]
@@ -526,7 +526,7 @@ namespace Toy2
 	// GLOBAL: TOY2 0x00724E74
 	int32_t g_perspectiveHalfScale;
 
-	// FUNCTION: TOY2 0x0047D4E0
+	// FUNCTION: TOY2 0x0047D4E0 [PROVISIONAL]
 	int32_t* BuildPerspectiveDivideTable(int32_t scale)
 	{
 		g_perspectiveHalfScale = scale >> 1;
@@ -921,7 +921,7 @@ namespace Toy2
 	// STUB: TOY2 0x00440F70
 	void RenderGame(int32_t fullRender) {}
 
-	// FUNCTION: TOY2 0x00453CA0
+	// FUNCTION: TOY2 0x00453CA0 [MATCHED]
 	void ResetBackdropState()
 	{
 		g_hasStaticBackdrop = 0;
@@ -1166,7 +1166,7 @@ namespace Toy2
 		g_levelFileIndex = previousLevelFileIndex;
 	}
 
-	// FUNCTION: TOY2 0x0049EB50
+	// FUNCTION: TOY2 0x0049EB50 [PROVISIONAL]
 	int32_t ComputeTokenProgress()
 	{
 		int32_t collected = 0;
@@ -1288,7 +1288,7 @@ namespace Toy2
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x0049EB20
+	// FUNCTION: TOY2 0x0049EB20 [MATCHED]
 	void UnlockAndPlayMovie(int32_t movieId, int32_t backgroundId, int32_t forcePlay)
 	{
 		if (! g_movieUnlocked[movieId] || forcePlay)
@@ -1420,7 +1420,7 @@ namespace Toy2
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x0048F1B0
+	// FUNCTION: TOY2 0x0048F1B0 [PROVISIONAL]
 	void SetBackdropByIndex(int32_t index)
 	{
 		int32_t sectorIdx = index + 1;
@@ -1446,7 +1446,7 @@ namespace Toy2
 		}
 	}
 
-	// FUNCTION: TOY2 0x00438520
+	// FUNCTION: TOY2 0x00438520 [MATCHED]
 	int32_t ShowStaticScreen(int32_t backdropIndex)
 	{
 		InputManager::g_curButtonsPressed = 0;
@@ -1503,7 +1503,7 @@ namespace Toy2
 		}
 	}
 
-	// FUNCTION: TOY2 0x0043A380
+	// FUNCTION: TOY2 0x0043A380 [PROVISIONAL]
 	int32_t ShowCredits()
 	{
 		const int32_t lineCount = 40;
@@ -1604,7 +1604,7 @@ namespace Toy2
 		return 32;
 	}
 
-	// FUNCTION: TOY2 0x004381F0
+	// FUNCTION: TOY2 0x004381F0 [PROVISIONAL]
 	int32_t ScreenDispatcher(int32_t index)
 	{
 		int32_t defaultFadeFramesRemaining;
@@ -1804,7 +1804,7 @@ namespace Toy2
 		SaveManager::Init();
 	}
 
-	// FUNCTION: TOY2 0x00490730
+	// FUNCTION: TOY2 0x00490730 [MATCHED]
 	void CheckForQuit()
 	{
 		if (D3DApp::g_windowData.wndIsExiting != 0)
@@ -1873,7 +1873,7 @@ namespace Toy2
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x00412B50
+	// FUNCTION: TOY2 0x00412B50 [PROVISIONAL]
 	void RunModeSelect()
 	{
 		if (! g_modeSelectFinished)
@@ -1929,7 +1929,7 @@ namespace Toy2
 		}
 	}
 
-	// FUNCTION: TOY2 0x0047D8D0
+	// FUNCTION: TOY2 0x0047D8D0 [MATCHED]
 	void UnusedInit()
 	{
 		// GLOBAL: TOY2 0x00725F20
@@ -1938,7 +1938,7 @@ namespace Toy2
 		g_unusedInit = 2;
 	}
 
-	// FUNCTION: TOY2 0x00412D70
+	// FUNCTION: TOY2 0x00412D70 [PROVISIONAL]
 	int32_t ShowModeSelect()
 	{
 		char cdFileName[8];
@@ -1984,7 +1984,7 @@ namespace Toy2
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x0049D910
+	// FUNCTION: TOY2 0x0049D910 [PROVISIONAL]
 	int32_t Run(int32_t argCount, char** argList)
 	{
 		g_returnedToTitle = 0;
@@ -2376,7 +2376,7 @@ namespace Toy2
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x00412E80
+	// FUNCTION: TOY2 0x00412E80 [MATCHED]
 	int32_t CleanupManagers()
 	{
 		InputManager::Cleanup();
@@ -2404,7 +2404,7 @@ namespace Toy2
 	// frame zero in EBX. The only residual is instruction scheduling of the
 	// SHL/SAR/DEC block against the E4/halfWidth stores, which reccmp treats
 	// as a behavior-neutral effective match.
-	// FUNCTION: TOY2 0x00490BF0 [MATCHED]
+	// FUNCTION: TOY2 0x00490BF0 [PROVISIONAL]
 	int16_t UpdateD3DState()
 	{
 		g_unusedD3DFrameFlag = 0;
@@ -2439,7 +2439,7 @@ namespace Toy2
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x004909E0
+	// FUNCTION: TOY2 0x004909E0 [PROVISIONAL]
 	void ProcessMiscEventsEx()
 	{
 		Nu3D::Font::SetTextCursor(0, (int32_t)Nu3D::g_scaledFontAscent);
@@ -2612,7 +2612,7 @@ void AllocateConsole()
 	printf("[Debug Console Allocated!]\n");
 }
 
-// FUNCTION: TOY2 0x004316C0
+// FUNCTION: TOY2 0x004316C0 [PROVISIONAL]
 int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, char* cmdLine, int32_t cmdShow)
 {
 #ifdef APPLY_FIXES

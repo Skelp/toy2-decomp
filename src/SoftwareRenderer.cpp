@@ -457,7 +457,7 @@ namespace SoftwareRenderer
 		g_cameraFarZ = farZ;
 	}
 
-	// FUNCTION: TOY2 0x004B2B80
+	// FUNCTION: TOY2 0x004B2B80 [MATCHED]
 	int32_t GetStrideFromFVF(int32_t fvf)
 	{
 		switch (fvf)
@@ -473,7 +473,7 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x00452130
+	// FUNCTION: TOY2 0x00452130 [MATCHED]
 	void SwapRenderBuffer()
 	{
 		Toy2::MainMenu::g_menuClearColor.b = 0;
@@ -509,7 +509,7 @@ namespace SoftwareRenderer
 		}                                                                 \
 	} while (0)
 
-	// FUNCTION: TOY2 0x004C1C40
+	// FUNCTION: TOY2 0x004C1C40 [PROVISIONAL]
 	void InitialiseColourScaleTables()
 	{
 		g_colourScaleTables = malloc(0x80000);
@@ -536,7 +536,7 @@ namespace SoftwareRenderer
 
 #undef TOY2_BUILD_COLOUR_SCALE_TABLE
 
-	// FUNCTION: TOY2 0x004BCE00
+	// FUNCTION: TOY2 0x004BCE00 [PROVISIONAL]
 	void InitialisePrimarySurface()
 	{
 		DDSURFACEDESC2 surfaceDesc;
@@ -603,13 +603,13 @@ namespace SoftwareRenderer
 		InitialiseColourScaleTables();
 	}
 
-	// FUNCTION: TOY2 0x004C1E60
+	// FUNCTION: TOY2 0x004C1E60 [MATCHED]
 	void InitialisePrimarySurface_T() { InitialisePrimarySurface(); }
 
 	// STUB: TOY2 0x0040CD80
 	void ShowBackBuffer() {}
 
-	// FUNCTION: TOY2 0x0047D0F0
+	// FUNCTION: TOY2 0x0047D0F0 [MATCHED]
 	void Destroy()
 	{
 		Logger::Log("QUIT : Destroying software renderer.\n");
@@ -619,7 +619,7 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x0047D120
+	// FUNCTION: TOY2 0x0047D120 [PROVISIONAL]
 	void ClearBackBufferOnce()
 	{
 		if (g_backBufferClearComplete != 0)
@@ -663,7 +663,7 @@ namespace SoftwareRenderer
 		g_pendingBackBufferClears--;
 	}
 
-	// FUNCTION: TOY2 0x0047D540
+	// FUNCTION: TOY2 0x0047D540 [PROVISIONAL]
 	void FillRect32(uint32_t* dest, int32_t width, int32_t height, int32_t rowPaddingBytes, uint32_t value)
 	{
 		do
@@ -678,7 +678,7 @@ namespace SoftwareRenderer
 		} while (--height != 0);
 	}
 
-	// FUNCTION: TOY2 0x0047D650
+	// FUNCTION: TOY2 0x0047D650 [PROVISIONAL]
 	void ClearScanlineFlags(ScanlineScratch* scanline, int32_t count)
 	{
 		do
@@ -688,7 +688,7 @@ namespace SoftwareRenderer
 		} while (--count != 0);
 	}
 
-	// FUNCTION: TOY2 0x004C1E70
+	// FUNCTION: TOY2 0x004C1E70 [MATCHED]
 	void CommitZoom()
 	{
 		g_topOffsetF = (float)g_topOffset;
@@ -699,7 +699,7 @@ namespace SoftwareRenderer
 		g_zoomScaleH = (float)g_zoomExtentH / g_screenDimH;
 	}
 
-	// FUNCTION: TOY2 0x004C1FC0
+	// FUNCTION: TOY2 0x004C1FC0 [MATCHED]
 	void ZoomOut()
 	{
 		if (g_zoomLevel >= 10)
@@ -721,7 +721,7 @@ namespace SoftwareRenderer
 		CommitZoom();
 	}
 
-	// FUNCTION: TOY2 0x004C1F00
+	// FUNCTION: TOY2 0x004C1F00 [MATCHED]
 	void ZoomIn()
 	{
 		if (g_zoomLevel <= 0)
@@ -743,7 +743,7 @@ namespace SoftwareRenderer
 		CommitZoom();
 	}
 
-	// FUNCTION: TOY2 0x004C17B0
+	// FUNCTION: TOY2 0x004C17B0 [PROVISIONAL]
 	void PresentFrame()
 	{
 		DDSURFACEDESC2 surfaceDesc;
@@ -887,7 +887,7 @@ namespace SoftwareRenderer
 		DrawingDevice::UnlockPrimarySurface();
 	}
 
-	// FUNCTION: TOY2 0x00490410
+	// FUNCTION: TOY2 0x00490410 [MATCHED]
 	void SetBackdropScrollOverride(int32_t x, int32_t y)
 	{
 		int32_t* piPitch = Toy2::g_hasStaticBackdrop ? &g_staticBackdropWidth : &g_backdropWidth;
@@ -910,7 +910,7 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00547EE2
 	int16_t g_backdropCameraYaw;
 
-	// FUNCTION: TOY2 0x00490290
+	// FUNCTION: TOY2 0x00490290 [PROVISIONAL]
 	int16_t UpdateBackdropScroll()
 	{
 		volatile int32_t clampedVisibleHeight;
@@ -979,7 +979,7 @@ namespace SoftwareRenderer
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x004BCAD0
+	// FUNCTION: TOY2 0x004BCAD0 [PROVISIONAL]
 	void QueueRenderCommand(Nu3D::VertexTL* vertices[4], int32_t vertexCount, uint32_t* texData, int32_t renderState)
 	{
 		if (g_renderCommandCount < 0x400)
@@ -1001,7 +1001,7 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004BCBE0 [MATCHED]
+	// FUNCTION: TOY2 0x004BCBE0 [EFFECTIVE]
 	void FlushRenderCommands()
 	{
 		for (int i = 0; i < g_renderCommandCount; i++)
@@ -1032,7 +1032,7 @@ namespace SoftwareRenderer
 		*alphaMask = colour & 0xff000000;
 	}
 
-	// FUNCTION: TOY2 0x004BC980
+	// FUNCTION: TOY2 0x004BC980 [PROVISIONAL]
 	void QueueSortedRenderCommand(Nu3D::VertexTL* vertices[4], int32_t vertexCount, uint32_t* texData, int32_t renderState, int32_t bucketGroup)
 	{
 		if (g_sortedRenderCommandCount >= 15000)
@@ -1099,7 +1099,7 @@ namespace SoftwareRenderer
 			< 0.0;
 	}
 
-	// FUNCTION: TOY2 0x004BCFA0
+	// FUNCTION: TOY2 0x004BCFA0 [PROVISIONAL]
 	void ProjectVertex(Nu3D::VertexTL* vertex)
 	{
 		vertex->specular.value = (uint32_t)(int32_t)vertex->position.x;
@@ -1113,7 +1113,7 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C0100
+	// FUNCTION: TOY2 0x004C0100 [PROVISIONAL]
 	int32_t IsPrimitiveOutsideViewport(Nu3D::VertexTL* vertices[4], int32_t vertexCount)
 	{
 		Nu3D::VertexTL* vertex0 = vertices[0];
@@ -1145,7 +1145,7 @@ namespace SoftwareRenderer
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x0047C800
+	// FUNCTION: TOY2 0x0047C800 [PROVISIONAL]
 	void LockBackBuffer()
 	{
 		DDSURFACEDESC surfaceDesc;
@@ -1168,7 +1168,7 @@ namespace SoftwareRenderer
 		Logger::Log("SOFT : ERROR - Failed to lock back buffer - %s.\n", Logger::ErrorToMessage(result));
 	}
 
-	// FUNCTION: TOY2 0x0047C870 [MATCHED]
+	// FUNCTION: TOY2 0x0047C870 [PROVISIONAL]
 	void UnlockBackBuffer()
 	{
 		HRESULT result = D3DApp::g_d3dAppI.lpBackBuffer->Unlock(NULL);
@@ -1179,7 +1179,7 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C4640
+	// FUNCTION: TOY2 0x004C4640 [PROVISIONAL]
 	void RasterizeTexturedSpanPairSample(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -1302,7 +1302,7 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C4370
+	// FUNCTION: TOY2 0x004C4370 [PROVISIONAL]
 	void RasterizeTexturedSpan(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -1435,7 +1435,7 @@ namespace SoftwareRenderer
 	// Untextured opaque span for a 16-bit 555 surface. The rasterizer writes two
 	// pixels at a time with one interpolated colour. It writes a single pixel at
 	// each unaligned end of the span.
-	// FUNCTION: TOY2 0x004C48E0
+	// FUNCTION: TOY2 0x004C48E0 [PROVISIONAL]
 	void RasterizeOpaqueSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -1523,7 +1523,7 @@ namespace SoftwareRenderer
 
 	// The 565 twin of RasterizeOpaqueSpan555. It uses the same paired-pixel walk, but places
 	// the five interpolated green bits at bit 6 and red at bit 11.
-	// FUNCTION: TOY2 0x004C4A60
+	// FUNCTION: TOY2 0x004C4A60 [PROVISIONAL]
 	void RasterizeOpaqueSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -1611,7 +1611,7 @@ namespace SoftwareRenderer
 
 	// Textured additive span for a 16-bit 555 surface. A texel with a zero
 	// high byte is transparent. Other texels brighten the destination channels.
-	// FUNCTION: TOY2 0x004C4BE0
+	// FUNCTION: TOY2 0x004C4BE0 [PROVISIONAL]
 	void RasterizeTexturedAdditiveSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -1754,7 +1754,7 @@ namespace SoftwareRenderer
 	// fixed-point value, so each read shifts down by 11. Unlike the subtractive
 	// siblings this one keeps them in full 32-bit registers, so retail uses a
 	// dword load and a logical shift rather than a word load.
-	// FUNCTION: TOY2 0x004C4E00
+	// FUNCTION: TOY2 0x004C4E00 [PROVISIONAL]
 	void RasterizeAdditiveSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -1845,7 +1845,7 @@ namespace SoftwareRenderer
 	// positions move. Green starts at bit 6 and red at bit 11, and the rasterizer
 	// still takes five bits per channel, so it uses the high five bits of the
 	// six-bit green field.
-	// FUNCTION: TOY2 0x004C4F30
+	// FUNCTION: TOY2 0x004C4F30 [PROVISIONAL]
 	void RasterizeAdditiveSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -1934,7 +1934,7 @@ namespace SoftwareRenderer
 
 	// The 565 twin of RasterizeTexturedAdditiveSpan555 uses the same texture sampling and additive
 	// blend, but reads green at bit 6 and red at bit 11.
-	// FUNCTION: TOY2 0x004C5060
+	// FUNCTION: TOY2 0x004C5060 [PROVISIONAL]
 	void RasterizeTexturedAdditiveSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -2066,7 +2066,7 @@ namespace SoftwareRenderer
 
 	// Textured subtractive span for a 16-bit 555 surface. A texel with a zero
 	// high byte is transparent. Other texels darken the destination channels.
-	// FUNCTION: TOY2 0x004C5280
+	// FUNCTION: TOY2 0x004C5280 [PROVISIONAL]
 	void RasterizeTexturedSubtractiveSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -2208,7 +2208,7 @@ namespace SoftwareRenderer
 	// The accumulators carry a five-bit channel in the high half of a 16-bit
 	// fixed-point value, so each read truncates to 16 bits and shifts down by 11.
 	// That is why retail uses a word load and needs no mask.
-	// FUNCTION: TOY2 0x004C5490
+	// FUNCTION: TOY2 0x004C5490 [PROVISIONAL]
 	void RasterizeSubtractiveSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -2297,7 +2297,7 @@ namespace SoftwareRenderer
 	// channel positions. Green starts at bit 6 and red at bit 11, and the
 	// rasterizer still takes five bits per channel, so it uses the high five bits
 	// of the six-bit green field.
-	// FUNCTION: TOY2 0x004C55B0
+	// FUNCTION: TOY2 0x004C55B0 [PROVISIONAL]
 	void RasterizeSubtractiveSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -2384,7 +2384,7 @@ namespace SoftwareRenderer
 
 	// The 565 twin of RasterizeTexturedSubtractiveSpan555 uses the same texture sampling and
 	// subtractive blend, but reads green at bit 6 and red at bit 11.
-	// FUNCTION: TOY2 0x004C56D0
+	// FUNCTION: TOY2 0x004C56D0 [PROVISIONAL]
 	void RasterizeTexturedSubtractiveSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -2517,7 +2517,7 @@ namespace SoftwareRenderer
 	// Converts a textured span to the active 16-bit surface format. A texel
 	// with a zero high byte is transparent. The colour table entries already
 	// contain their packed destination-channel bits.
-	// FUNCTION: TOY2 0x004C58E0
+	// FUNCTION: TOY2 0x004C58E0 [PROVISIONAL]
 	void RasterizeTexturedOpaqueSpan(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -2628,7 +2628,7 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C5AC0
+	// FUNCTION: TOY2 0x004C5AC0 [PROVISIONAL]
 	void RasterizeTexturedAlphaBlendSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -2726,7 +2726,7 @@ namespace SoftwareRenderer
 
 	// Blends an untextured span with a 555 destination. The source and
 	// destination factors are in g_spanAlpha and g_spanInvAlpha.
-	// FUNCTION: TOY2 0x004C5D80
+	// FUNCTION: TOY2 0x004C5D80 [PROVISIONAL]
 	void RasterizeAlphaBlendSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -2805,7 +2805,7 @@ namespace SoftwareRenderer
 
 	// The alternate-format twin of RasterizeAlphaBlendSpan555 uses the same blend and
 	// interpolation, but extracts and packs channels for the other surface mode.
-	// FUNCTION: TOY2 0x004C5F00
+	// FUNCTION: TOY2 0x004C5F00 [PROVISIONAL]
 	void RasterizeAlphaBlendSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -2882,7 +2882,7 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C6080
+	// FUNCTION: TOY2 0x004C6080 [PROVISIONAL]
 	void RasterizeTexturedAlphaBlendSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
 		uint16_t* destRow,
@@ -3014,7 +3014,7 @@ namespace SoftwareRenderer
 	// Everything else falls through to the shared tail, which walks a triangle
 	// or a quad one scanline at a time.
 
-	// FUNCTION: TOY2 0x004C9D00 [MATCHED]
+	// FUNCTION: TOY2 0x004C9D00 [PROVISIONAL]
 	void RasterizeRenderCommand(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans)
 	{
 		int32_t pixelFormatMode = g_pixelFormatMode;
@@ -3156,7 +3156,7 @@ namespace SoftwareRenderer
 		UnkFunc58(command, commandTexData);
 	}
 
-	// FUNCTION: TOY2 0x004BCC40
+	// FUNCTION: TOY2 0x004BCC40 [MATCHED]
 	void ResetRenderCommands()
 	{
 		if (g_sortedRenderFlushPhase == 0)
@@ -3170,7 +3170,7 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C9A50 [MATCHED]
+	// FUNCTION: TOY2 0x004C9A50 [PROVISIONAL]
 	void RasterizeSortedRenderCommand(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans)
 	{
 		int32_t pixelFormatMode = g_pixelFormatMode;
@@ -3345,7 +3345,7 @@ namespace SoftwareRenderer
 		UnkFunc58(command, commandTexData);
 	}
 
-	// FUNCTION: TOY2 0x004BCB60 [MATCHED]
+	// FUNCTION: TOY2 0x004BCB60 [PROVISIONAL]
 	void FlushSortedRenderCommands()
 	{
 		if (g_sortedRenderFlushPhase == 1)
@@ -3365,7 +3365,7 @@ namespace SoftwareRenderer
 		g_sortedRenderFlushPhase++;
 	}
 
-	// FUNCTION: TOY2 0x00470BF0 [MATCHED]
+	// FUNCTION: TOY2 0x00470BF0 [PROVISIONAL]
 	void SetPaletteOnAPI()
 	{
 		HRESULT result = D3DApp::g_d3dAppI.lpDD->CreatePalette(0x44, (LPPALETTEENTRY)g_paletteEntries, &g_lpPalette, NULL);
@@ -3402,7 +3402,7 @@ namespace SoftwareRenderer
 		g_lpPalette->SetEntries(0, 1, 255, (LPPALETTEENTRY)&g_paletteEntries[4]);
 	}
 
-	// FUNCTION: TOY2 0x00470D00
+	// FUNCTION: TOY2 0x00470D00 [PROVISIONAL]
 	void LoadPaletteEntries(const uint8_t* source)
 	{
 		for (int32_t entry = 0; entry < 256; entry++)
@@ -3425,7 +3425,7 @@ namespace SoftwareRenderer
 		BuildPaletteLightingTable();
 	}
 
-	// FUNCTION: TOY2 0x004319E0
+	// FUNCTION: TOY2 0x004319E0 [PROVISIONAL]
 	void BuildPaletteLightingTable()
 	{
 		for (int32_t lightLevel = 0; lightLevel < 128; lightLevel++)
@@ -3462,7 +3462,7 @@ namespace SoftwareRenderer
 		OutputDebugStringA("Generated lighting\n");
 	}
 
-	// FUNCTION: TOY2 0x00470D60
+	// FUNCTION: TOY2 0x00470D60 [PROVISIONAL]
 	void BuildRGBToPaletteTable()
 	{
 		uint8_t* output = g_rgbToPaletteIndex;
@@ -3494,7 +3494,7 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x00471190
+	// FUNCTION: TOY2 0x00471190 [PROVISIONAL]
 	void BuildAdditivePaletteTable()
 	{
 		uint8_t* output = g_additivePaletteTable;
@@ -3520,7 +3520,7 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x00471250
+	// FUNCTION: TOY2 0x00471250 [PROVISIONAL]
 	void BuildSubtractivePaletteTable()
 	{
 		uint8_t* output = g_subtractivePaletteTable;
@@ -3546,7 +3546,7 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004710C0
+	// FUNCTION: TOY2 0x004710C0 [PROVISIONAL]
 	void BuildPaletteBlendTable(uint8_t* output, int32_t blendWeight)
 	{
 		int32_t baseWeight = 1024 - blendWeight;
@@ -3566,7 +3566,7 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x00470FB0
+	// FUNCTION: TOY2 0x00470FB0 [PROVISIONAL]
 	void BuildPaletteColourOffsetTable()
 	{
 		uint8_t* output = g_paletteColourOffsetTable;
@@ -3701,7 +3701,7 @@ namespace SoftwareRenderer
 	// Residual diff is CAP-15: the build CSEs the right param load into ECX
 	// where retail re-reads [esp+0x20] at each use, which reorders the V/H
 	// conditional blocks. The scale and clamp blocks all match.
-	// FUNCTION: TOY2 0x004BCC70
+	// FUNCTION: TOY2 0x004BCC70 [PROVISIONAL]
 	void UpdateViewportClipBounds(int32_t top, int32_t bottom, int32_t left, int32_t right)
 	{
 		int32_t vCenter;
@@ -3784,7 +3784,7 @@ namespace SoftwareRenderer
 	// [esi]/[esi+2] then bumps twice before [esi]. Both compute identical
 	// vertices; the divergence is register allocation plus the pointer-walk
 	// transformation. Robust across 5 source forms (34.8-36.5%).
-	// FUNCTION: TOY2 0x004C14A0
+	// FUNCTION: TOY2 0x004C14A0 [PROVISIONAL]
 	void ProcessIndexedTriangleList(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags)
 	{
 		TextureData tex;
@@ -3811,7 +3811,7 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x004C0320
 	void UnkFunc22(Nu3D::VertexTL* vertices[3], int32_t vertexCount, uint32_t* texData, int32_t renderState, int32_t primitiveType, DWORD drawFlags) {}
 
-	// FUNCTION: TOY2 0x004C1540
+	// FUNCTION: TOY2 0x004C1540 [PROVISIONAL]
 	void ProcessIndexedTriangleStrip(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags)
 	{
 		TextureData texture;
@@ -3881,7 +3881,7 @@ namespace SoftwareRenderer
 	// a clear, drains all software-render depth buckets from far to near, then
 	// unlocks and presents the surface. The caller passes the display maximum x
 	// and a zero clear value. Retail does not read either parameter.
-	// FUNCTION: TOY2 0x0047D210
+	// FUNCTION: TOY2 0x0047D210 [PROVISIONAL]
 	void RenderSoftwareFrame(int32_t displayMaxX, int32_t clearValue)
 	{
 		DDSURFACEDESC surfaceDesc;
@@ -4119,7 +4119,7 @@ namespace SoftwareRenderer
 	// to SubmitQuad). Residual ~3% is CAP-17: MSVC hoists the loop-invariant
 	// `remaining = indexCount - 3` init as `LEA EBX,[edx-3]` with an early count
 	// load, where retail loads count into EBX late and SUBtracts in place.
-	// FUNCTION: TOY2 0x004B6040
+	// FUNCTION: TOY2 0x004B6040 [PROVISIONAL]
 	void SubmitTriangleStrip(int32_t renderFlags, LPDIRECT3DVERTEXBUFFER vertexBuffer, Renderer::RenderEntry* renderEntry, WORD* indices, int32_t indexCount)
 	{
 		Nu3D::VertexTL* lockedVertices;
@@ -4252,14 +4252,14 @@ namespace SoftwareDevice
 
 	// Vertex Methods
 
-	// FUNCTION: TOY2 0x004B2B20
+	// FUNCTION: TOY2 0x004B2B20 [MATCHED]
 	HRESULT ReleaseVertexBuffer(LPDIRECT3DVERTEXBUFFER buffer)
 	{
 		free(buffer);
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004B2B30
+	// FUNCTION: TOY2 0x004B2B30 [MATCHED]
 	HRESULT CreateVertexBuffer(D3DVERTEXBUFFERDESC* desc, LPDIRECT3DVERTEXBUFFER* outBuffer, DWORD flags)
 	{
 		int32_t count = (int32_t)desc->dwNumVertices;
@@ -4279,7 +4279,7 @@ namespace SoftwareDevice
 		return E_INVALIDARG;
 	}
 
-	// FUNCTION: TOY2 0x004B2BB0
+	// FUNCTION: TOY2 0x004B2BB0 [MATCHED]
 	HRESULT LockVertexBuffer(LPDIRECT3DVERTEXBUFFER vertexBuffer, DWORD dwFlags, LPVOID* lplpData, DWORD* lpStride)
 	{
 		SoftwareVertexBuffer* vb = (SoftwareVertexBuffer*)vertexBuffer;
@@ -4295,7 +4295,7 @@ namespace SoftwareDevice
 	// FUNCTION: TOY2 0x004B2BE0 [MATCHED]
 	HRESULT OptimizeVertexBuffer(LPDIRECT3DVERTEXBUFFER buffer, LPDIRECT3DDEVICE3 device, DWORD flags) { return 0; }
 
-	// FUNCTION: TOY2 0x004C19E0
+	// FUNCTION: TOY2 0x004C19E0 [PROVISIONAL]
 	HRESULT ProcessVerticesOnBuffer(LPDIRECT3DVERTEXBUFFER destBuffer,
 		DWORD dwVertexOp,
 		DWORD dwDestIndex,

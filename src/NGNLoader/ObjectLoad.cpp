@@ -88,7 +88,7 @@ namespace NGNLoader
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x004CB320
+		// FUNCTION: TOY2 0x004CB320 [PROVISIONAL]
 		int32_t ExtractShapeTextures(FILE* stream)
 		{
 			int16_t nameTableCount;
@@ -159,7 +159,7 @@ namespace NGNLoader
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x004CB4E0
+		// FUNCTION: TOY2 0x004CB4E0 [PROVISIONAL]
 		int32_t ExtractShapeMaterials(FILE* stream)
 		{
 			int16_t textureIndex[16];
@@ -316,7 +316,7 @@ namespace NGNLoader
 			}
 		}
 
-		// FUNCTION: TOY2 0x004CB970
+		// FUNCTION: TOY2 0x004CB970 [PROVISIONAL]
 		int32_t ExtractShapeVertices(FILE* stream)
 		{
 			uint32_t vertexFlags;
@@ -458,7 +458,7 @@ namespace NGNLoader
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x004CBC90
+		// FUNCTION: TOY2 0x004CBC90 [PROVISIONAL]
 		int32_t ExtractShapePrimitives(FILE* stream)
 		{
 			uint32_t curPrim = 0;
@@ -853,7 +853,7 @@ namespace NGNLoader
 			g_isHardwareRendering = Renderer::g_isSoftwareRendering == 0;
 		}
 
-		// FUNCTION: TOY2 0x004CC970
+		// FUNCTION: TOY2 0x004CC970 [PROVISIONAL]
 		Nu3D::Primitive* ExtractShapeData(FILE* stream)
 		{
 			PrepareGlobals();
@@ -917,7 +917,7 @@ namespace NGNLoader
 			return result;
 		}
 
-		// FUNCTION: TOY2 0x004CB940
+		// FUNCTION: TOY2 0x004CB940 [PROVISIONAL]
 		Nu3D::Material* GetCurrentMatByIndex(uint32_t index)
 		{
 			if (index >= g_curMaterialCount || index < 0)
@@ -930,7 +930,7 @@ namespace NGNLoader
 
 namespace Nu3D
 {
-	// FUNCTION: TOY2 0x004CBC40
+	// FUNCTION: TOY2 0x004CBC40 [PROVISIONAL]
 	int32_t CopyShapeVertex(int32_t index, Vertex* output)
 	{
 		if (index < 0 || index >= NGNLoader::ObjectLoad::g_curVertexCount || ! output)

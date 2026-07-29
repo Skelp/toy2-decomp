@@ -127,7 +127,7 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00559C4C
 		ObjectDescCache* g_objectDescCache;
 
-		// FUNCTION: TOY2 0x0049FAB0
+		// FUNCTION: TOY2 0x0049FAB0 [PROVISIONAL]
 		void DeactivateAmbientEmitter(int32_t emitterIndex, int32_t useAlternateType)
 		{
 			if (useAlternateType != 0)
@@ -152,7 +152,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x0049FB40
+		// FUNCTION: TOY2 0x0049FB40 [PROVISIONAL]
 		void UpdateAmbientEmitters()
 		{
 			if (g_sixteenTickPulse != 0 && g_recordData[58] != 0)
@@ -189,7 +189,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x004CEA20
+		// FUNCTION: TOY2 0x004CEA20 [MATCHED]
 		void FlushRenderer()
 		{
 			Renderer::Glue::ReleaseBackdrop();
@@ -202,7 +202,7 @@ namespace Toy2
 			Renderer::Cleanup();
 		}
 
-		// FUNCTION: TOY2 0x004CE8B0
+		// FUNCTION: TOY2 0x004CE8B0 [PROVISIONAL]
 		int32_t InitLevelDefaults()
 		{
 			Renderer::Init();
@@ -233,7 +233,7 @@ namespace Toy2
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x0043E6E0
+		// FUNCTION: TOY2 0x0043E6E0 [PROVISIONAL]
 		int32_t LoadDAT(int32_t levelId, int32_t fileSize)
 		{
 			// FUNCTION IS WIP, very big and confusing
@@ -797,7 +797,7 @@ namespace Toy2
 			return 32 * g_instanceRecordCount;
 		}
 
-		// FUNCTION: TOY2 0x004521A0
+		// FUNCTION: TOY2 0x004521A0 [PROVISIONAL]
 		void BuildLevelPath(int32_t level, char* output, const char* suffix)
 		{
 			if (level >= 10)
@@ -816,7 +816,7 @@ namespace Toy2
 			strcat(output, suffix);
 		}
 
-		// FUNCTION: TOY2 0x00452FC0
+		// FUNCTION: TOY2 0x00452FC0 [PROVISIONAL]
 		void InitLevelPlay(int32_t levelId)
 		{
 			SoftwareRenderer::SetLevelFileIndex(g_levelFileIndex);

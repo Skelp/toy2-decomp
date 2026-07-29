@@ -1,0 +1,8 @@
+The initial reconstruction audit is active.
+
+The default candidate queue contains provisional functions only. Use
+`tools/decomp candidates --new-work` only when the selected function can reach
+exact, effective, or tool-equivalent status in the same session.
+
+Remove this file after all former CAP claims, all functions below 50 percent,
+and all verified-code quality findings have a recorded classification.

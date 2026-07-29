@@ -175,10 +175,10 @@ namespace Toy2
 		// GLOBAL: TOY2 0x004F6878
 		char* g_jumpToSelectTxt = "jump to select";
 
-		// FUNCTION: TOY2 0x00452170
+		// FUNCTION: TOY2 0x00452170 [MATCHED]
 		void ResetCursor() { g_levelSelectCursor = 0; }
 
-		// FUNCTION: TOY2 0x00438650
+		// FUNCTION: TOY2 0x00438650 [PROVISIONAL]
 		void TurnTowardLookDir(LevelSelectCamera* levelSelectCam, int32_t turnRate)
 		{
 			int32_t lookZ = levelSelectCam->lookDir.z;
@@ -237,7 +237,7 @@ namespace Toy2
 			levelSelectCam->angles.pitch = pitch;
 		}
 
-		// FUNCTION: TOY2 0x00438790
+		// FUNCTION: TOY2 0x00438790 [PROVISIONAL]
 		void ApplyWallRepulsion(LevelSelectCamera* levelSelectCam, Vector3I* velocity, int32_t recordType)
 		{
 			Levels::RecordData* wallRecords = Levels::g_recordData[recordType];
@@ -284,7 +284,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x00494130
+		// FUNCTION: TOY2 0x00494130 [PROVISIONAL]
 		void DrawArrows()
 		{
 			RGBA color;
@@ -342,7 +342,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x00438A50
+		// FUNCTION: TOY2 0x00438A50 [PROVISIONAL]
 		int32_t Tick()
 		{
 			g_unusedColour.r = 128;

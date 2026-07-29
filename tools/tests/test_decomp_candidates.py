@@ -137,6 +137,22 @@ class SelectTests(unittest.TestCase):
             make(0x403000, "N::Big", size=4000, state="NOT_STARTED"),
             make(0x404000, "N::Done", size=64, state="FUNCTION", match=1.0),
             make(0x405000, "N::Near", size=64, state="FUNCTION", match=0.7),
+            make(
+                0x405100,
+                "N::Effective",
+                size=64,
+                state="FUNCTION",
+                match=0.91,
+                effective=True,
+            ),
+            make(
+                0x405200,
+                "N::Tool",
+                size=64,
+                state="FUNCTION",
+                match=0.95,
+                tool_artifact="TOOL-SYMBOL",
+            ),
             make(0x406000, "N::Capped", size=64, state="STUB", cap="CAP-01"),
             make(0x407000, "Other::Stub", size=64, state="STUB"),
             make(
@@ -159,6 +175,10 @@ class SelectTests(unittest.TestCase):
 
     def test_a_fully_matched_function_is_not_a_candidate(self):
         self.assertNotIn("N::Done", self.choose())
+
+    def test_effective_and_tool_functions_are_not_new_work(self):
+        self.assertNotIn("N::Effective", self.choose())
+        self.assertNotIn("N::Tool", self.choose())
 
     def test_a_fully_matched_function_with_lint_errors_stays_a_candidate(self):
         # Otherwise the worst debt is invisible: it already matches at 100%.

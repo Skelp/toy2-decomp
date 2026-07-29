@@ -186,7 +186,7 @@ namespace Nu3D
 			g_particleAllocationCursor = 0;
 		}
 
-		// FUNCTION: TOY2 0x0040FAE0
+		// FUNCTION: TOY2 0x0040FAE0 [PROVISIONAL]
 		ParticleInstance* SpawnInstance(int32_t x,
 			int32_t y,
 			int32_t z,
@@ -290,7 +290,7 @@ namespace Nu3D
 			return particle;
 		}
 
-		// FUNCTION: TOY2 0x0040FDF0
+		// FUNCTION: TOY2 0x0040FDF0 [PROVISIONAL]
 		ParticleInstance* SpawnFromPreset(int32_t x, int32_t y, int32_t z, int32_t typeId, int32_t presetIndex)
 		{
 			const ParticlePreset* preset = &g_particlePresets[presetIndex];
@@ -436,7 +436,7 @@ namespace Nu3D
 			}
 		}
 
-		// FUNCTION: TOY2 0x0042B090
+		// FUNCTION: TOY2 0x0042B090 [PROVISIONAL]
 		void UpdateArenaBounce(ParticleInstance* particle)
 		{
 			const int32_t drainCenterX = -0xBD7C;

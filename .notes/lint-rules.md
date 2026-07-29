@@ -61,6 +61,11 @@ of a real file or API format.
 - `placeholder-field`: A shared layout or stub signature still has an
   unresolved name.
 - `arithmetic-name`: An identifier states a calculation instead of a role.
+- `opaque-state-slot`: A numbered `data[N]` slot hides a state field.
+- `address-named-symbol`: A completed function uses an address as a symbol name.
+- `unexplained-helper`: A helper name does not identify its operation.
+- `original-name-vocabulary`: Source uses an alias where retail text supplies
+  the original engine name.
 
 The linter does not reject integer lookup tables, fixed-point arithmetic, manual
 shifts, IEEE 754 bit operations, or other established Nu3D idioms.

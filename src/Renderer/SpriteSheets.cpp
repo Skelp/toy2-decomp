@@ -1402,7 +1402,7 @@ namespace Renderer
 		0,
 	};
 
-	// FUNCTION: TOY2 0x00447D40
+	// FUNCTION: TOY2 0x00447D40 [PROVISIONAL]
 	void InitSpriteSheets()
 	{
 		uint32_t levelSheetBytes = 0;

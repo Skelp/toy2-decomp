@@ -61,7 +61,7 @@ namespace Logger
 		exit(-1);
 	}
 
-	// FUNCTION: TOY2 0x004A66A0 [MODIFIED]
+	// FUNCTION: TOY2 0x004A66A0 [MODIFIED] [PROVISIONAL]
 	void Log(char* format, ...)
 	{
 		char buffer[1024];

@@ -11,7 +11,7 @@
 
 namespace Nu3D
 {
-	// FUNCTION: TOY2 0x004B9B90
+	// FUNCTION: TOY2 0x004B9B90 [PROVISIONAL]
 	void DrawDebugPortalOutlines(Portal::AreaPortal* portal)
 	{
 		int32_t previousFlags = Renderer::SetAdditionalRenderFlags(4);
@@ -46,7 +46,7 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x00E4D7C0
 	Link::DynamicScaler* Area::g_specialScaler;
 
-	// FUNCTION: TOY2 0x004B33B0
+	// FUNCTION: TOY2 0x004B33B0 [PROVISIONAL]
 	void Portal::AreaPortal::CalculateBoundingSphere(AreaPortal* portal)
 	{
 		float minimumZ = FLT_MAX;
@@ -113,7 +113,7 @@ namespace Nu3D
 			image->portalStatePool[index].visited = 0;
 	}
 
-	// FUNCTION: TOY2 0x004BC460
+	// FUNCTION: TOY2 0x004BC460 [PROVISIONAL]
 	void Area::RenderBucketThroughPortals(NGNLoader::NGNImage* image, int32_t areaIndex, int32_t scalerType, Portal::PortalState* incomingPortal)
 	{
 		if (areaIndex >= 64)

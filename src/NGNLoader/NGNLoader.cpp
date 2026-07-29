@@ -15,10 +15,10 @@ namespace NGNLoader
 	// GLOBAL: TOY2 0x00B62410
 	NGNImage* g_ngnImage;
 
-	// FUNCTION: TOY2 0x004B33A0
+	// FUNCTION: TOY2 0x004B33A0 [MATCHED]
 	void NGNImage::DestroyPortal(Nu3D::Portal::AreaPortal* portal) { free(portal); }
 
-	// FUNCTION: TOY2 0x004C32B0
+	// FUNCTION: TOY2 0x004C32B0 [MATCHED]
 	void NGNImage::Destroy(NGNImage* ngnImage)
 	{
 		if (ngnImage)
@@ -103,7 +103,7 @@ namespace NGNLoader
 	// FUNCTION: TOY2 0x004CB300 [MATCHED]
 	void GetScaleVector(Vector3F* output) { *output = g_vertexScaleVector; }
 
-	// FUNCTION: TOY2 0x004BB320
+	// FUNCTION: TOY2 0x004BB320 [PROVISIONAL]
 	NGNTextureData* GetTextureData(NGNTextureParams* texParams, int32_t ignoreParams)
 	{
 		NGNTextureParams localTexParams;
@@ -247,7 +247,7 @@ namespace NGNLoader
 	// FUNCTION: TOY2 0x004AC240 [MATCHED]
 	Nu3D::BmpDataNode* LoadLocalBmpTexture(const char* rawTexStr, int32_t flags) { return Nu3D::LoadLocalBmpTexture(rawTexStr, flags); }
 
-	// FUNCTION: TOY2 0x004BB3C0
+	// FUNCTION: TOY2 0x004BB3C0 [PROVISIONAL]
 	uint32_t GetOrAllocateTexture(NGNTextureParams* texParams)
 	{
 		char rawTexStrBuffer[256];
@@ -301,7 +301,7 @@ namespace NGNLoader
 	// FUNCTION: TOY2 0x004AC220 [MATCHED]
 	Nu3D::BmpDataNode* LoadTextureContents(FILE* stream, const char* rawTexStr, int32_t flags) { return Nu3D::LoadTextureByStream(stream, rawTexStr, flags); }
 
-	// FUNCTION: TOY2 0x004BC320
+	// FUNCTION: TOY2 0x004BC320 [PROVISIONAL]
 	Nu3D::Portal::PortalState* AllocAreaPortal(NGNImage* ngnImage)
 	{
 		int32_t entryCount = ngnImage->portalEntryCount;
@@ -405,7 +405,7 @@ namespace NGNLoader
 		return portal;
 	}
 
-	// FUNCTION: TOY2 0x004C4080
+	// FUNCTION: TOY2 0x004C4080 [PROVISIONAL]
 	void ParseTextures(FILE* stream, NGNImage* ngnImage)
 	{
 		NGNTextureParams texParams;
@@ -467,7 +467,7 @@ namespace NGNLoader
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C3EB0
+	// FUNCTION: TOY2 0x004C3EB0 [PROVISIONAL]
 	void ParseLinker(FILE* stream, NGNImage* ngnImage)
 	{
 		int32_t maxLinkId;
@@ -539,7 +539,7 @@ namespace NGNLoader
 		}
 	}
 
-	// FUNCTION: TOY2 0x004CA420
+	// FUNCTION: TOY2 0x004CA420 [PROVISIONAL]
 	Nu3D::Creature* ExtractCreatureData(FILE* stream)
 	{
 		Nu3D::Creature* creature = 0;
@@ -680,7 +680,7 @@ namespace NGNLoader
 		return creature;
 	}
 
-	// FUNCTION: TOY2 0x004C4220
+	// FUNCTION: TOY2 0x004C4220 [PROVISIONAL]
 	uint32_t ParseCreatures(FILE* stream, NGNImage* ngnImage)
 	{
 		uint32_t creatureCount;
@@ -734,7 +734,7 @@ namespace NGNLoader
 		return creatureCount;
 	}
 
-	// FUNCTION: TOY2 0x004C3CA0
+	// FUNCTION: TOY2 0x004C3CA0 [PROVISIONAL]
 	void Parse266(FILE* stream, NGNImage* ngnImage)
 	{
 		// data266 isn't actually used anywhere in the game
@@ -785,7 +785,7 @@ namespace NGNLoader
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C3DF0
+	// FUNCTION: TOY2 0x004C3DF0 [PROVISIONAL]
 	void ParseAreaPortalIdx(FILE* stream, NGNImage* ngnImage)
 	{
 		int32_t portalId, targetAreaIdx, sourceAreaIdx, portalCount;
@@ -808,7 +808,7 @@ namespace NGNLoader
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C3BE0
+	// FUNCTION: TOY2 0x004C3BE0 [PROVISIONAL]
 	void ParseAreaPortalPos(FILE* stream, NGNImage* ngnImage)
 	{
 		int32_t portalCount;
@@ -851,7 +851,7 @@ namespace NGNLoader
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C3740
+	// FUNCTION: TOY2 0x004C3740 [PROVISIONAL]
 	int32_t ParseGscale(FILE* stream, NGNImage* ngnImage)
 	{
 		Vector3F scaleVector;
@@ -1030,7 +1030,7 @@ namespace NGNLoader
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004C35C0
+	// FUNCTION: TOY2 0x004C35C0 [PROVISIONAL]
 	int32_t ParseGeometry(FILE* stream, NGNImage* ngnImage)
 	{
 		int32_t shapeCount;
@@ -1085,7 +1085,7 @@ namespace NGNLoader
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x004B9630
+	// FUNCTION: TOY2 0x004B9630 [PROVISIONAL]
 	void BuildTex14(int32_t unused)
 	{
 		RGBColor color;
@@ -1115,7 +1115,7 @@ namespace NGNLoader
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C36A0
+	// FUNCTION: TOY2 0x004C36A0 [PROVISIONAL]
 	void BuildGrid(int32_t gridWidth, int32_t gridHeight, int32_t type, NGNImage* ngnImage)
 	{
 		int32_t gridSize = gridWidth * gridHeight;
@@ -1135,7 +1135,7 @@ namespace NGNLoader
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C3240
+	// FUNCTION: TOY2 0x004C3240 [PROVISIONAL]
 	void BuildScalerEntries(NGNImage* ngnImage)
 	{
 		for (int32_t type = 0; type < 2 && ngnImage->dynamicScalers[type]; ++type)
@@ -1148,7 +1148,7 @@ namespace NGNLoader
 		}
 	}
 
-	// FUNCTION: TOY2 0x004CA040
+	// FUNCTION: TOY2 0x004CA040 [PROVISIONAL]
 	int32_t ExtractAnimations(FILE* stream, Nu3D::Creature* creature, uint32_t dataSize)
 	{
 		if (! creature->animData)
@@ -1170,7 +1170,7 @@ namespace NGNLoader
 		return ++creature->animCount;
 	}
 
-	// FUNCTION: TOY2 0x004CA1D0
+	// FUNCTION: TOY2 0x004CA1D0 [PROVISIONAL]
 	int32_t ExtractShapePatch(FILE* stream, Nu3D::Creature* creature)
 	{
 		int32_t patchCount;
@@ -1343,7 +1343,7 @@ namespace NGNLoader
 		Nu3D::Portal::ClearVisibleAreaFlags();
 	}
 
-	// FUNCTION: TOY2 0x004BB720
+	// FUNCTION: TOY2 0x004BB720 [PROVISIONAL]
 	void Init()
 	{
 		FreeAllBmpDataNodes();
@@ -1440,7 +1440,7 @@ namespace NGNLoader
 			Renderer::Glue::SetBackdrop(Toy2::g_nextBackdropId);
 	}
 
-	// FUNCTION: TOY2 0x004CE2C0
+	// FUNCTION: TOY2 0x004CE2C0 [PROVISIONAL]
 	int32_t GetTextureDataIndex(uint32_t textureIndex)
 	{
 		if (g_ngnImage && textureIndex < 64)
@@ -1449,10 +1449,10 @@ namespace NGNLoader
 			return 0;
 	}
 
-	// FUNCTION: TOY2 0x004BB0E0
+	// FUNCTION: TOY2 0x004BB0E0 [PROVISIONAL]
 	NGNTextureData* GetTextureDataByIndex(uint32_t texDataIndex) { return &g_textureDataFreeList[texDataIndex]; }
 
-	// FUNCTION: TOY2 0x004BB5E0
+	// FUNCTION: TOY2 0x004BB5E0 [PROVISIONAL]
 	void RetrieveTextureData(
 		int32_t texDataIndex, uint32_t* bitmapWidthOut, uint32_t* bitmapHeightOut, uint32_t* textureWidth, uint32_t* textureHeight, uint32_t** textureData)
 	{
@@ -1480,7 +1480,7 @@ namespace NGNLoader
 		}
 	}
 
-	// FUNCTION: TOY2 0x004BB6C0
+	// FUNCTION: TOY2 0x004BB6C0 [PROVISIONAL]
 	HBITMAP GetBmpHandle(int32_t index)
 	{
 		if (index)
@@ -1489,7 +1489,7 @@ namespace NGNLoader
 			return 0;
 	}
 
-	// FUNCTION: TOY2 0x004BB690
+	// FUNCTION: TOY2 0x004BB690 [PROVISIONAL]
 	int32_t CopyToDDSurfaceByIndex(int32_t texIndex, LPDIRECTDRAWSURFACE4 ddSurface)
 	{
 		if (texIndex)
@@ -1501,7 +1501,7 @@ namespace NGNLoader
 
 namespace Nu3D
 {
-	// FUNCTION: TOY2 0x004CAB80
+	// FUNCTION: TOY2 0x004CAB80 [PROVISIONAL]
 	int32_t Creature::SetNodeVisible(Creature* creature, int32_t nodeIndex, int32_t visible)
 	{
 		int32_t wasVisible = -1;
@@ -1519,7 +1519,7 @@ namespace Nu3D
 		return wasVisible;
 	}
 
-	// FUNCTION: TOY2 0x004CE570
+	// FUNCTION: TOY2 0x004CE570 [MATCHED]
 	void Creature::SetNodeVisibleByIndex(int32_t creatureIndex, int32_t nodeIndex, int32_t visible)
 	{
 		if (creatureIndex >= 0 && creatureIndex < NGNLoader::g_ngnImage->creatureCount)
@@ -1532,7 +1532,7 @@ namespace Nu3D
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C9F50
+	// FUNCTION: TOY2 0x004C9F50 [MATCHED]
 	void Creature::Destroy(Creature* creature)
 	{
 		if (creature->matrixList1)
@@ -1576,7 +1576,7 @@ namespace Nu3D
 		free(creature);
 	}
 
-	// FUNCTION: TOY2 0x004CA0C0
+	// FUNCTION: TOY2 0x004CA0C0 [PROVISIONAL]
 	void CopyNormalsFromNearestVertex(Creature* creature, int32_t nodeIndex, Vertex* vertex)
 	{
 		float closestDistanceSquared = 3.402823466e+38F;

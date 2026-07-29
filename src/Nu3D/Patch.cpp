@@ -17,7 +17,7 @@ namespace Nu3D
 		}
 	}
 
-	// FUNCTION: TOY2 0x004B2ED0
+	// FUNCTION: TOY2 0x004B2ED0 [PROVISIONAL]
 	BOOL Patch::PatchVertices::CreateVertexBuffer(PatchVertices* patchVertices, int32_t flags)
 	{
 		patchVertices->bufferFlags = 0;
@@ -90,7 +90,7 @@ namespace Nu3D
 		return result == DD_OK;
 	}
 
-	// FUNCTION: TOY2 0x004B3050
+	// FUNCTION: TOY2 0x004B3050 [PROVISIONAL]
 	BOOL Patch::PatchVertices::UpdateVertexBuffer(PatchVertices* patchVertices)
 	{
 		HRESULT result = -1;

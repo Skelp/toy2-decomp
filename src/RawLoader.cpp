@@ -69,7 +69,7 @@ namespace RawLoader
 		}
 	}
 
-	// FUNCTION: TOY2 0x0047B170
+	// FUNCTION: TOY2 0x0047B170 [PROVISIONAL]
 	void DecompressBuffer(uint8_t* inBuffer, uint8_t* outBuffer)
 	{
 		// Decompression is based on RNC ProPack Method 2. Normally these files
@@ -435,7 +435,7 @@ namespace RawLoader
 		} while (exitFlag);
 	}
 
-	// FUNCTION: TOY2 0x00452310
+	// FUNCTION: TOY2 0x00452310 [PROVISIONAL]
 	void LoadPacketData(char* fileName)
 	{
 		uint8_t* buffer;

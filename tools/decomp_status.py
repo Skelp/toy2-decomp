@@ -74,7 +74,18 @@ def read_tool_artifacts(path: Path) -> dict[int, str]:
 
 
 _SYMBOL_MARKER = re.compile(r"(?:\((?:OFFSET|DATA|UNK)\)|<OFFSET\d*>)")
-_IMMEDIATE_OPERAND = re.compile(r"(?:^|[, ])0x[0-9a-fA-F]+$")
+_IMMEDIATE_OPERAND = re.compile(r"^(?:[-+])?0x[0-9a-fA-F]+$")
+
+
+def _instruction_parts(text: str) -> tuple[str, list[str]]:
+	parts = text.split(None, 1)
+	opcode = parts[0].lower() if parts else ""
+	operands = [] if len(parts) == 1 else [item.strip() for item in parts[1].split(",")]
+	return opcode, operands
+
+
+def _symbol_operand(value: str) -> bool:
+	return bool(_SYMBOL_MARKER.search(value) or _IMMEDIATE_OPERAND.fullmatch(value))
 
 
 def is_symbol_only_diff(status: MatchStatus) -> bool:
@@ -98,15 +109,22 @@ def is_symbol_only_diff(status: MatchStatus) -> bool:
 			for original_row, recompiled_row in zip(original, recompiled):
 				original_text = original_row[1].split("\t", 1)[0].strip()
 				recompiled_text = recompiled_row[1].split("\t", 1)[0].strip()
-				original_symbol = _SYMBOL_MARKER.search(original_text)
-				recompiled_symbol = _SYMBOL_MARKER.search(recompiled_text)
-				if not (
-					(original_symbol and recompiled_symbol)
-					or (original_symbol and _IMMEDIATE_OPERAND.search(recompiled_text))
-					or (recompiled_symbol and _IMMEDIATE_OPERAND.search(original_text))
-				):
+				original_opcode, original_operands = _instruction_parts(original_text)
+				recompiled_opcode, recompiled_operands = _instruction_parts(recompiled_text)
+				if original_opcode != recompiled_opcode or len(original_operands) != len(recompiled_operands):
 					return False
-				if original_text.split(None, 1)[0] != recompiled_text.split(None, 1)[0]:
+				different = [
+					index
+					for index, operands in enumerate(zip(original_operands, recompiled_operands))
+					if operands[0] != operands[1]
+				]
+				if len(different) != 1:
+					return False
+				index = different[0]
+				if not (
+					_symbol_operand(original_operands[index])
+					and _symbol_operand(recompiled_operands[index])
+				):
 					return False
 				changed = True
 	return changed

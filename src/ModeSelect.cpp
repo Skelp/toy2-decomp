@@ -165,7 +165,7 @@ namespace ModeSelect
 
 namespace ModeSelect
 {
-	// FUNCTION: TOY2 0x004ACD90
+	// FUNCTION: TOY2 0x004ACD90 [PROVISIONAL]
 	void MarkCompatibleBitDepthDevices()
 	{
 		using namespace DrawingDevice;
@@ -197,7 +197,7 @@ namespace ModeSelect
 		}
 	}
 
-	// FUNCTION: TOY2 0x004ACBE0
+	// FUNCTION: TOY2 0x004ACBE0 [PROVISIONAL]
 	int32_t SelectPrimaryDevice(uint8_t selectionFlags)
 	{
 		using namespace DrawingDevice;
@@ -345,7 +345,7 @@ namespace ModeSelect
 	// FUNCTION: TOY2 0x004AC390 [MATCHED]
 	void SetForceFullscreen_T(int32_t forceFullscreen) { SetForceFullscreen(forceFullscreen); }
 
-	// FUNCTION: TOY2 0x004AC9C0
+	// FUNCTION: TOY2 0x004AC9C0 [PROVISIONAL]
 	HRESULT CALLBACK EnumDisplayModes(LPDDSURFACEDESC2 lpDDSurfaceDesc2, LPVOID lpContext)
 	{
 		using namespace DrawingDevice;
@@ -461,7 +461,7 @@ namespace ModeSelect
 		return D3DENUMRET_OK;
 	}
 
-	// FUNCTION: TOY2 0x004AC760
+	// FUNCTION: TOY2 0x004AC760 [PROVISIONAL]
 	HRESULT CALLBACK D3DDeviceEnumCallback(
 		GUID* lpGuid, LPSTR lpDeviceDescription, LPSTR lpDeviceName, LPD3DDEVICEDESC lpD3DHWDeviceDesc, LPD3DDEVICEDESC lpD3DHELDeviceDesc, LPVOID lpContext)
 	{
@@ -552,7 +552,7 @@ namespace ModeSelect
 		return D3DENUMRET_OK;
 	}
 
-	// FUNCTION: TOY2 0x004AC540
+	// FUNCTION: TOY2 0x004AC540 [PROVISIONAL]
 	BOOL WINAPI DDrawEnumCallbackExA(GUID* lpGUID, LPSTR lpDriverName, LPSTR lpDriverDescription, LPVOID lpContext, HMONITOR hm)
 	{
 		using namespace DrawingDevice;
@@ -646,7 +646,7 @@ namespace ModeSelect
 		return DDrawEnumCallbackExA(lpGUID, lpDriverDescription, lpDriverName, 0, 0);
 	}
 
-	// FUNCTION: TOY2 0x004AC4D0
+	// FUNCTION: TOY2 0x004AC4D0 [PROVISIONAL]
 	int32_t EnumerateDrivers(DeviceFilterCallback_t callback)
 	{
 		typedef HRESULT(WINAPI * DirectDrawEnumerateExA_t)(LPDDENUMCALLBACKEXA lpCallback, LPVOID lpContext, DWORD dwFlags);
@@ -687,7 +687,7 @@ namespace ModeSelect
 		return TextOutA(hdc, x, y, buffer, strlen(buffer));
 	}
 
-	// FUNCTION: TOY2 0x00433410
+	// FUNCTION: TOY2 0x00433410 [PROVISIONAL]
 	COLORREF ApplyTextStyle(HDC hdc, HFONT hfont, COLORREF textColor, int32_t styleOp)
 	{
 		COLORREF result;
@@ -720,7 +720,7 @@ namespace ModeSelect
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x00432AD0
+	// FUNCTION: TOY2 0x00432AD0 [PROVISIONAL]
 	LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
 		if (msg > WM_CLOSE)
@@ -1074,7 +1074,7 @@ namespace ModeSelect
 		return DefWindowProcA(hWnd, msg, wParam, lParam);
 	}
 
-	// FUNCTION: TOY2 0x00431CA0 [MATCHED]
+	// FUNCTION: TOY2 0x00431CA0 [EFFECTIVE]
 	int32_t SelectDDAppByIndex(int32_t index)
 	{
 		int32_t result = 0;
@@ -1099,7 +1099,7 @@ namespace ModeSelect
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x00431CE0
+	// FUNCTION: TOY2 0x00431CE0 [PROVISIONAL]
 	int32_t SelectDeviceByIndex(int32_t index)
 	{
 		int32_t result = 0;
@@ -1134,7 +1134,7 @@ namespace ModeSelect
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x00431DA0
+	// FUNCTION: TOY2 0x00431DA0 [PROVISIONAL]
 	int32_t SelectDisplayModeByIndex(int32_t index)
 	{
 		int32_t result = 0;
@@ -1168,7 +1168,7 @@ namespace ModeSelect
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x00431D40
+	// FUNCTION: TOY2 0x00431D40 [PROVISIONAL]
 	int32_t FindFirstHardwareDevice()
 	{
 		int32_t result = 0;
@@ -1206,7 +1206,7 @@ namespace ModeSelect
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x00431E00
+	// FUNCTION: TOY2 0x00431E00 [PROVISIONAL]
 	int32_t SelectSuitableDisplayMode()
 	{
 		int32_t result = 0;
@@ -1230,7 +1230,7 @@ namespace ModeSelect
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x00432020
+	// FUNCTION: TOY2 0x00432020 [PROVISIONAL]
 	void Run()
 	{
 		// $TODO: I'd like to clean/unwrap the labels in this method when I have some spare time

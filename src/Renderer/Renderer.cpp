@@ -32,7 +32,7 @@ namespace Nu3D
 
 namespace Renderer
 {
-	// FUNCTION: TOY2 0x0049D390
+	// FUNCTION: TOY2 0x0049D390 [PROVISIONAL]
 	void DrawBitmapText(const char* text, int32_t screenY, int32_t screenX, uint32_t red, uint32_t green, uint32_t blue, uint32_t flags)
 	{
 		int32_t textLength = 0;
@@ -246,7 +246,7 @@ namespace Renderer
 		// GLOBAL: TOY2 0x00559C64
 		int32_t g_registeredLightCount;
 
-		// FUNCTION: TOY2 0x0044F200
+		// FUNCTION: TOY2 0x0044F200 [PROVISIONAL]
 		void RegisterLight(int32_t x, int32_t y, int32_t z, int32_t red, int32_t green, int32_t blue, int32_t scaleOffset)
 		{
 			if (g_registeredLightCount >= 8)
@@ -289,7 +289,7 @@ namespace Renderer
 			g_registeredLightCount = lightIndex + 1;
 		}
 
-		// FUNCTION: TOY2 0x0044F420 [MATCHED]
+		// FUNCTION: TOY2 0x0044F420 [EFFECTIVE]
 		void CullAndQueue()
 		{
 			if (g_registeredLightCount > 0)
@@ -337,7 +337,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x0044F580
+		// FUNCTION: TOY2 0x0044F580 [PROVISIONAL]
 		void RenderSlot(int32_t slotIndex)
 		{
 			Vector3F position = {
@@ -525,7 +525,7 @@ namespace Renderer
 		g_secondaryRenderDistanceSquared = secondaryDistance * secondaryDistance;
 	}
 
-	// FUNCTION: TOY2 0x004CDD10
+	// FUNCTION: TOY2 0x004CDD10 [MATCHED]
 	void SetViewportPresetByDetail(int32_t detail)
 	{
 		if (detail <= 2)
@@ -545,7 +545,7 @@ namespace Renderer
 		Nu3D::Scene::g_secondaryNearClip = g_viewportPresets[detail].secondaryNearClip;
 	}
 
-	// FUNCTION: TOY2 0x004CDD80
+	// FUNCTION: TOY2 0x004CDD80 [MATCHED]
 	void SetViewportPreset() { SetViewportPresetByDetail(Toy2::g_toyCfgData.detail); }
 
 	// GLOBAL: TOY2 0x0094FCD4
@@ -779,7 +779,7 @@ namespace Renderer
 	// FUNCTION: TOY2 0x004B2CE0 [MATCHED]
 	void DisableFog() { g_fogEnabled = 0; }
 
-	// FUNCTION: TOY2 0x004B2CF0
+	// FUNCTION: TOY2 0x004B2CF0 [MATCHED]
 	void ConfigureFog(float start, float end, RGBA color)
 	{
 		g_fogEnabled = 1;
@@ -788,7 +788,7 @@ namespace Renderer
 		g_fogColor = ApplyGammaCorrection(color).value;
 	}
 
-	// FUNCTION: TOY2 0x004B2D20
+	// FUNCTION: TOY2 0x004B2D20 [MATCHED]
 	void SetFogEnable(int32_t enable)
 	{
 		if (g_fogEnabled)
@@ -800,7 +800,7 @@ namespace Renderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004B6320
+	// FUNCTION: TOY2 0x004B6320 [PROVISIONAL]
 	void SetRenderState(int32_t newStateFlags)
 	{
 		if (g_isSoftwareRendering)
@@ -949,7 +949,7 @@ namespace Renderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004B6660
+	// FUNCTION: TOY2 0x004B6660 [PROVISIONAL]
 	void SetTextureStageState(int32_t newState, DWORD textureStage)
 	{
 		uint32_t stateFlagsToDisable = g_renderStateCache[textureStage + 1] & (newState ^ g_renderStateCache[textureStage + 1]);
@@ -995,7 +995,7 @@ namespace Renderer
 		g_renderStateCache[textureStage + 1] = newState;
 	}
 
-	// FUNCTION: TOY2 0x004B6760
+	// FUNCTION: TOY2 0x004B6760 [MATCHED]
 	int32_t SetupMaterialRenderState(Nu3D::Material* material, int32_t stateFlags)
 	{
 		int32_t textureStage = 0;
@@ -1064,7 +1064,7 @@ namespace Renderer
 		Renderer::Sprite::g_spriteBuffer3DCount = 2000;
 	}
 
-	// FUNCTION: TOY2 0x004B9710
+	// FUNCTION: TOY2 0x004B9710 [PROVISIONAL]
 	void InitResources()
 	{
 		g_vertexColorModBlue = 4096;
@@ -1165,7 +1165,7 @@ namespace Renderer
 		DECOMP_PRINT(("Finished Renderer::InitResources\n"));
 	}
 
-	// FUNCTION: TOY2 0x004B37F0
+	// FUNCTION: TOY2 0x004B37F0 [MATCHED]
 	void Cleanup()
 	{
 		while (Nu3D::g_patchListHead != NULL)
@@ -1184,7 +1184,7 @@ namespace Renderer
 		g_rendererValid = 0;
 	}
 
-	// FUNCTION: TOY2 0x004B3630
+	// FUNCTION: TOY2 0x004B3630 [PROVISIONAL]
 	void Init()
 	{
 		if (g_rendererValid)
@@ -1237,7 +1237,7 @@ namespace Renderer
 		g_virtualScreenHeight = 256.0;
 	}
 
-	// FUNCTION: TOY2 0x00490860 [MATCHED]
+	// FUNCTION: TOY2 0x00490860 [EFFECTIVE]
 	void DoFrameDelay(int32_t isGameplayFrame)
 	{
 		int32_t hrt = Nu3D::GetHighResolutionTime();
@@ -1336,7 +1336,7 @@ namespace Renderer
 		g_lastFrameTimestamp = Nu3D::GetHighResolutionTime();
 	}
 
-	// FUNCTION: TOY2 0x004C2080
+	// FUNCTION: TOY2 0x004C2080 [PROVISIONAL]
 	int32_t ConvertRGBATo16Bit(RGBA color)
 	{
 		if (SoftwareRenderer::g_pixelFormatMode == 0)
@@ -1345,7 +1345,7 @@ namespace Renderer
 		return ((uint16_t)(color.g & 0xF8) << 3) + ((uint16_t)(color.b & 0xF8) << 8) + (uint16_t)(color.r >> 3);
 	}
 
-	// FUNCTION: TOY2 0x004B37B0
+	// FUNCTION: TOY2 0x004B37B0 [PROVISIONAL]
 	RGBA ApplyGammaCorrection(RGBA color)
 	{
 		color.b = g_gammaLUT[color.b];
@@ -1355,7 +1355,7 @@ namespace Renderer
 		return color;
 	}
 
-	// FUNCTION: TOY2 0x004B2C80
+	// FUNCTION: TOY2 0x004B2C80 [PROVISIONAL]
 	void ClearScreen(RGBA clearColor, int32_t clearFlags)
 	{
 		RGBA color = ApplyGammaCorrection(clearColor);
@@ -1371,7 +1371,7 @@ namespace Renderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004B2D80
+	// FUNCTION: TOY2 0x004B2D80 [PROVISIONAL]
 	void ApplyFogSettings()
 	{
 		if (g_fogEnabled)
@@ -1407,7 +1407,7 @@ namespace Renderer
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004B2DE0
+	// FUNCTION: TOY2 0x004B2DE0 [PROVISIONAL]
 	void EndScene(int32_t presentFrame)
 	{
 		DrawingDevice::EndScene();
@@ -1443,7 +1443,7 @@ namespace Renderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004CE5B0
+	// FUNCTION: TOY2 0x004CE5B0 [MATCHED]
 	void ShowBlackFrames()
 	{
 		RGBA black;
@@ -1460,7 +1460,7 @@ namespace Renderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004AFD30
+	// FUNCTION: TOY2 0x004AFD30 [PROVISIONAL]
 	void BlitBitmapWithWrapping(
 		Nu3D::BmpDataNode* bitmap, int32_t sourceX, int32_t sourceY, int32_t width, int32_t height, int32_t wrapX, int32_t wrapY, int32_t destX, int32_t destY)
 	{
@@ -1529,7 +1529,7 @@ namespace Renderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004CE510
+	// FUNCTION: TOY2 0x004CE510 [MATCHED]
 	void BlitTextureByIndex(
 		uint32_t textureIndex, int32_t destX, int32_t destY, int32_t width, int32_t height, int32_t wrapX, int32_t wrapY, int32_t sourceX, int32_t sourceY)
 	{
@@ -1544,7 +1544,7 @@ namespace Renderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x0049B260
+	// FUNCTION: TOY2 0x0049B260 [MATCHED]
 	void BlitTextureByIndexOffset(uint32_t textureIndex,
 		int32_t destX,
 		int32_t destY,
@@ -1556,7 +1556,7 @@ namespace Renderer
 		int32_t sourceOffsetY)
 	{ BlitTextureByIndex(textureIndex, destX, destY, width, height, wrapX, wrapY, destX + sourceOffsetX, destY + sourceOffsetY); }
 
-	// FUNCTION: TOY2 0x00401B60
+	// FUNCTION: TOY2 0x00401B60 [MATCHED]
 	void DrawBlackBorderBox(int32_t xPos, int32_t yPos, int32_t width, int32_t height, uint32_t red, uint32_t green, uint32_t blue)
 	{
 		Sprite::DrawScaled(xPos, yPos, 6, 1, 0, 0, 0, 0x60, 0x2000, height);
@@ -1566,7 +1566,7 @@ namespace Renderer
 		Sprite::DrawScaled(xPos + 2, yPos + 1, 6, 1, red, green, blue, 0, width - 0x4000, height - 0x2000);
 	}
 
-	// FUNCTION: TOY2 0x00401FB0
+	// FUNCTION: TOY2 0x00401FB0 [PROVISIONAL]
 	void DrawString(int32_t yPos, const char* text, uint32_t red, uint32_t green, uint32_t blue, int32_t fullWidthLayout)
 	{
 		int32_t centerX = fullWidthLayout != 0 ? 256 : 160;
@@ -1586,7 +1586,7 @@ namespace Renderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x0049B630
+	// FUNCTION: TOY2 0x0049B630 [PROVISIONAL]
 	void DrawChar(int32_t xPos, int32_t yPos, uint8_t character, uint32_t red, uint32_t green, uint32_t blue, int32_t fullWidthLayout)
 	{
 		if (character == '@')
@@ -1642,7 +1642,7 @@ namespace Renderer
 			Sprite::DrawScaledFixed((int16_t)xPos, (int16_t)yPos, 20, character, red, green, blue, 255, 0x800, 0x800);
 	}
 
-	// FUNCTION: TOY2 0x0049B580
+	// FUNCTION: TOY2 0x0049B580 [PROVISIONAL]
 	void DrawMainMenuText(int16_t yPos, char* text, int32_t fadeAlpha)
 	{
 		char* charPtr = text;
@@ -1683,7 +1683,7 @@ namespace Renderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x0044DD80
+	// FUNCTION: TOY2 0x0044DD80 [PROVISIONAL]
 	void DrawTintOverlay()
 	{
 		Vector2F uvTopLeft;
@@ -1861,7 +1861,7 @@ namespace Renderer
 			*capsOut = Renderer::g_deviceBlendShadeCaps;
 	}
 
-	// FUNCTION: TOY2 0x0048F410
+	// FUNCTION: TOY2 0x0048F410 [PROVISIONAL]
 	void RenderParallaxBackground(int32_t forceRender)
 	{
 		if (g_drawParallaxTexture)
@@ -1957,7 +1957,7 @@ namespace Nu3D
 {
 	using namespace Renderer;
 
-	// FUNCTION: TOY2 0x004B84E0
+	// FUNCTION: TOY2 0x004B84E0 [PROVISIONAL]
 	InstanceData* InstanceData::AllocFromMatrix(const D3DMATRIX* matrix, int32_t renderFlags)
 	{
 		if (! g_instanceDataFreeCount)
@@ -1985,7 +1985,7 @@ namespace Nu3D
 		return instanceData;
 	}
 
-	// FUNCTION: TOY2 0x004B8840
+	// FUNCTION: TOY2 0x004B8840 [PROVISIONAL]
 	InstanceData* InstanceData::AllocFromNodeMatrices(const D3DMATRIX* matrices, int32_t* nodeIndices, int32_t count, int32_t* flags, int32_t renderFlags)
 	{
 		if (! g_instanceDataFreeCount)
@@ -2076,7 +2076,7 @@ namespace Renderer
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004B86F0
+	// FUNCTION: TOY2 0x004B86F0 [PROVISIONAL]
 	void RenderEntry::InsertIntoBucket(RenderEntry* entry)
 	{
 		Vector3F cameraPosition;
@@ -2120,7 +2120,7 @@ namespace Renderer
 			Nu3D::g_maxBucketDepth = depth;
 	}
 
-	// FUNCTION: TOY2 0x004B87F0
+	// FUNCTION: TOY2 0x004B87F0 [MATCHED]
 	void RenderPatchList(Nu3D::Patch* patch, const D3DMATRIX* matrices, int32_t* flags, int32_t renderFlags)
 	{
 		renderFlags |= g_additionalRenderFlags;
@@ -2139,7 +2139,7 @@ namespace Renderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004B8940
+	// FUNCTION: TOY2 0x004B8940 [MATCHED]
 	void ProcessPatch(Nu3D::InstanceData* instanceData, Nu3D::Patch* patch)
 	{
 		Nu3D::Material* material = Nu3D::Material::GetFreeByIndex(patch->materialId);
@@ -2161,7 +2161,7 @@ namespace Renderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004B89B0
+	// FUNCTION: TOY2 0x004B89B0 [PROVISIONAL]
 	RenderEntry* RenderEntry::AllocPatch(Nu3D::Material* material, Nu3D::Patch* patch, Nu3D::InstanceData* instanceData)
 	{
 		if (g_renderEntryFreeCount)
@@ -2224,7 +2224,7 @@ namespace Renderer
 		g_drawingTransparentBuckets = 0;
 	}
 
-	// FUNCTION: TOY2 0x004B5CF0
+	// FUNCTION: TOY2 0x004B5CF0 [PROVISIONAL]
 	void FlushPrimitives()
 	{
 		int32_t vertexCount = 0;
@@ -2288,14 +2288,14 @@ namespace Renderer
 		g_primitiveBufferFreeCount = 3000;
 	}
 
-	// FUNCTION: TOY2 0x004B5E20
+	// FUNCTION: TOY2 0x004B5E20 [MATCHED]
 	void DrawPrimitive(void* vertices, DWORD vertexCount)
 	{
 		if (vertexCount != 0)
 			DrawingDevice::DrawPrimitive(D3DPT_TRIANGLELIST, D3DFVF_0x1C4, vertices, vertexCount, 0x10);
 	}
 
-	// FUNCTION: TOY2 0x004B6A50
+	// FUNCTION: TOY2 0x004B6A50 [PROVISIONAL]
 	void FlushRenderQueues()
 	{
 		if (g_drawMaterialBuckets)
@@ -2314,7 +2314,7 @@ namespace Renderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004B8BF0
+	// FUNCTION: TOY2 0x004B8BF0 [PROVISIONAL]
 	RGBA ModulateColorByAlpha(RGBA color, int32_t flags)
 	{
 		uint8_t blue;
@@ -2358,7 +2358,7 @@ namespace Renderer
 		return color;
 	}
 
-	// FUNCTION: TOY2 0x004C27D0
+	// FUNCTION: TOY2 0x004C27D0 [MATCHED]
 	void BindMaterial(Nu3D::Material* material, int32_t force)
 	{
 		if (g_boundMaterial != material || force != 0)
@@ -2392,7 +2392,7 @@ namespace Renderer
 		}
 	}
 
-	// FUNCTION: TOY2 0x004B8450
+	// FUNCTION: TOY2 0x004B8450 [MATCHED]
 	void UnbindMaterial() { BindMaterial(0, 0); }
 
 	// FUNCTION: TOY2 0x004C2870 [MATCHED]
@@ -2430,7 +2430,7 @@ namespace DevDraw
 	// GLOBAL: TOY2 0x00732FBC
 	int32_t g_vertexCount;
 
-	// FUNCTION: TOY2 0x004907E0
+	// FUNCTION: TOY2 0x004907E0 [MATCHED]
 	int16_t DrawSlots()
 	{
 		switch (D3DApp::g_renderMode)
@@ -2472,7 +2472,7 @@ namespace DevDraw
 	// buffer pointer is re-read from the global before each use (the string
 	// building and the COM calls clobber the holding register), so no local
 	// caches it.
-	// FUNCTION: TOY2 0x00490470
+	// FUNCTION: TOY2 0x00490470 [PROVISIONAL]
 	int16_t FlushDrawBufferSlot(int16_t slot)
 	{
 		Renderer::InitRenderState(0);
@@ -2529,7 +2529,7 @@ namespace DevDraw
 	// re-read from the global before each use (no local cache, so the reloads
 	// match retail). The render state is set to 0x400 before the draw and
 	// reset to 0 after it.
-	// FUNCTION: TOY2 0x004905C0
+	// FUNCTION: TOY2 0x004905C0 [PROVISIONAL]
 	int16_t FlushTransparentDrawBufferSlot(int16_t slot)
 	{
 		LPDIRECT3DDEVICE3 d3dDevice = DrawingDevice::GetD3DDevice();

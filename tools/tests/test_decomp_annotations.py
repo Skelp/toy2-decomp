@@ -6,6 +6,16 @@ from tools.decomp_annotations import active_source_lines, read_source_annotation
 
 
 class ActiveSourceTests(unittest.TestCase):
+    def test_reads_verification_tag(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "tagged.cpp").write_text(
+                "// FUNCTION: TOY2 0x00401000 [EFFECTIVE]\nvoid f() {}\n",
+                encoding="utf-8",
+            )
+            annotation = read_source_annotations(root)[0]
+            self.assertEqual(annotation.tag, "effective")
+
     def test_ignores_if_zero_and_keeps_else(self):
         source = """// FUNCTION: TOY2 0x401000
 #if 0

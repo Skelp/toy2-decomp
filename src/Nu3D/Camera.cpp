@@ -126,7 +126,7 @@ namespace Nu3D
 			g_tintBlend = -1;
 		}
 
-		// FUNCTION: TOY2 0x0044DF90 [MATCHED]
+		// FUNCTION: TOY2 0x0044DF90 [EFFECTIVE]
 		void InitViewMatrixGlobals()
 		{
 			memset(g_viewHeightHistory, 0, sizeof(g_viewHeightHistory));
@@ -141,7 +141,7 @@ namespace Nu3D
 			g_viewMotionState = 0;
 		}
 
-		// FUNCTION: TOY2 0x004A1BE0
+		// FUNCTION: TOY2 0x004A1BE0 [PROVISIONAL]
 		int32_t FadeToTargetTint()
 		{
 			int32_t fadeStep = Renderer::g_frameDelta * g_targetTintFadeSpeed / 2;
@@ -246,7 +246,7 @@ namespace Nu3D
 		// FUNCTION: TOY2 0x004CE030 [MATCHED]
 		void SetSkewPhase(int32_t phaseDelta) { g_cameraSkewPhase += phaseDelta; }
 
-		// FUNCTION: TOY2 0x004CE050 [MATCHED]
+		// FUNCTION: TOY2 0x004CE050 [PROVISIONAL]
 		void ApplyTransformToCamera(ActiveCameraTransform* camera)
 		{
 			if (! g_currentCamera)
@@ -339,7 +339,7 @@ namespace Nu3D
 				free(camera);
 		}
 
-		// FUNCTION: TOY2 0x004BA420
+		// FUNCTION: TOY2 0x004BA420 [PROVISIONAL]
 		void CalculateFrustumPlanes(CameraData* camera)
 		{
 			Vector3F right;
@@ -475,7 +475,7 @@ namespace Nu3D
 			Viewport::g_frustumPlaneCount = 8;
 		}
 
-		// FUNCTION: TOY2 0x004BACF0
+		// FUNCTION: TOY2 0x004BACF0 [PROVISIONAL]
 		int32_t ClipViewToPortal(D3DMATRIX* cameraTransform, Portal::AreaPortal* portal)
 		{
 			Vector3F cameraPosition;
@@ -577,7 +577,7 @@ namespace Nu3D
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x004BBAB0
+		// FUNCTION: TOY2 0x004BBAB0 [PROVISIONAL]
 		void ApplyCameraTransforms(const CameraData* camera)
 		{
 			g_activeCamera = *camera;
@@ -626,7 +626,7 @@ namespace Nu3D
 		// FUNCTION: TOY2 0x004BBCB0 [MATCHED]
 		void SetEffectMode(int32_t effectMode) { g_effectMode = effectMode; }
 
-		// FUNCTION: TOY2 0x004BC080
+		// FUNCTION: TOY2 0x004BC080 [PROVISIONAL]
 		void UnprojectPointsFromCamera(Vector3F* output, const Vector3F* input, int32_t count)
 		{
 			const Vector3F* end = input + count;

@@ -235,7 +235,7 @@ namespace Nu3D
 {
 	namespace Collision
 	{
-		// FUNCTION: TOY2 0x00481140
+		// FUNCTION: TOY2 0x00481140 [PROVISIONAL]
 		int16_t IsPointInTriangle(int32_t pointX,
 			int32_t pointY,
 			int32_t pointZ,
@@ -295,7 +295,7 @@ namespace Nu3D
 			return side1 <= 0 && side2 <= 0 && side3 <= 0;
 		}
 
-		// FUNCTION: TOY2 0x004882F0
+		// FUNCTION: TOY2 0x004882F0 [PROVISIONAL]
 		int32_t RaycastAgainstEdges(int32_t* nearestFraction,
 			int32_t* startDistance,
 			int32_t* endDistance,
@@ -406,7 +406,7 @@ namespace Toy2
 {
 	namespace Shadow
 	{
-		// FUNCTION: TOY2 0x00485680
+		// FUNCTION: TOY2 0x00485680 [PROVISIONAL]
 		void QueueStretched(int32_t x, int32_t groundY, int32_t z, int32_t size, int32_t sourceY)
 		{
 			int32_t opacity = (sourceY - groundY) / 0x400 + 0x40;
@@ -446,7 +446,7 @@ namespace Toy2
 			Renderer::Shadows::g_shadowProjections[shadowIndex].opacity = projectionOpacity;
 		}
 
-		// FUNCTION: TOY2 0x004857E0
+		// FUNCTION: TOY2 0x004857E0 [PROVISIONAL]
 		void QueueStretchedForBuzz(int32_t x, int32_t groundY, int32_t z, int32_t size)
 		{
 			int32_t opacity = (g_buzzActor.posAngles.pos.y - groundY) / 0x400 + 0x40;

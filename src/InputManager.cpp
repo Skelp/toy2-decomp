@@ -177,7 +177,7 @@ namespace InputManager
 		{ INPUT_SPIN, INPUT_JUMP, INPUT_FIRE },
 	};
 
-	// FUNCTION: TOY2 0x00415120
+	// FUNCTION: TOY2 0x00415120 [MATCHED]
 	int32_t GetPressedInput()
 	{
 		for (int32_t inputCode = 0; inputCode < 256; inputCode++)
@@ -195,7 +195,7 @@ namespace InputManager
 		return g_joystickDirectionFlags ? TOY_INPUT_DIRECTIONPAD : TOY_INPUT_UNKNOWN;
 	}
 
-	// FUNCTION: TOY2 0x004152A0
+	// FUNCTION: TOY2 0x004152A0 [MATCHED]
 	char* GetGameControlName(int32_t inputCode)
 	{
 		for (int32_t i = 0; g_inputMapping[i].name; i++)
@@ -210,7 +210,7 @@ namespace InputManager
 
 namespace InputManager
 {
-	// FUNCTION: TOY2 0x00414EA0
+	// FUNCTION: TOY2 0x00414EA0 [PROVISIONAL]
 	BOOL WINAPI EnumDevices(LPCDIDEVICEINSTANCEA deviceInstance, LPVOID context)
 	{
 		GUID* lpContext = (GUID*)context;
@@ -222,7 +222,7 @@ namespace InputManager
 		return ! check;
 	}
 
-	// FUNCTION: TOY2 0x004152E0
+	// FUNCTION: TOY2 0x004152E0 [PROVISIONAL]
 	void Init()
 	{
 		LPDIRECTINPUTDEVICE devices[4];
@@ -285,7 +285,7 @@ namespace InputManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x004157E0
+	// FUNCTION: TOY2 0x004157E0 [PROVISIONAL]
 	uint8_t IsKeyPressed(int32_t inputCode)
 	{
 		uint8_t currentState = g_inputStates[inputCode];
@@ -297,7 +297,7 @@ namespace InputManager
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x00415800
+	// FUNCTION: TOY2 0x00415800 [PROVISIONAL]
 	int32_t FindKeyPressed()
 	{
 		for (int32_t inputCode = 1; inputCode < 256; inputCode++)
@@ -314,7 +314,7 @@ namespace InputManager
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x00415860
+	// FUNCTION: TOY2 0x00415860 [MATCHED]
 	int32_t FindKeyReleased()
 	{
 		for (int32_t inputCode = 1; inputCode < 256; inputCode++)
@@ -333,7 +333,7 @@ namespace InputManager
 	// FUNCTION: TOY2 0x00498620 [MATCHED]
 	int32_t GetCurButtonsPressed() { return g_curButtonsPressed; }
 
-	// FUNCTION: TOY2 0x0049EBA0
+	// FUNCTION: TOY2 0x0049EBA0 [PROVISIONAL]
 	void UpdateDirectionInputState()
 	{
 		uint32_t cameraType = SaveManager::g_save0Data.cameraType & SaveManager::CAMERA_MASK;
@@ -348,7 +348,7 @@ namespace InputManager
 			g_directionInputState |= INPUT_SPIN;
 	}
 
-	// FUNCTION: TOY2 0x00414AF0
+	// FUNCTION: TOY2 0x00414AF0 [PROVISIONAL]
 	void UpdateInputState()
 	{
 		int32_t hasDirectionalInput = 0;
@@ -552,7 +552,7 @@ namespace InputManager
 		g_curButtonsPressed = g_buttonsPressed;
 	}
 
-	// FUNCTION: TOY2 0x00415460
+	// FUNCTION: TOY2 0x00415460 [PROVISIONAL]
 	void Cleanup()
 	{
 		if (g_directInput)
