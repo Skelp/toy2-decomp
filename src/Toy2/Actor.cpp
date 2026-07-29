@@ -1343,8 +1343,51 @@ namespace Toy2
 
 		// STUB: TOY2 0x00406220
 		void Zurg3(Actor::Toy2Actor::ActorBehaviourContext* context) {}
-		// STUB: TOY2 0x004064A0
-		void ZgCar(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+
+		// GLOBAL: TOY2 0x004E02F4
+		uint16_t* g_zgCarMovementData;
+
+		// FUNCTION: TOY2 0x004064A0 [EFFECTIVE]
+		void ZgCar(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			if (actor->previousActorPhase == 0)
+				actor->previousActorPhase = actor->actorPhase;
+
+			if (actor->previousActorPhase != actor->actorPhase && actor->actorPhase < 101)
+			{
+				actor->previousActorPhase = actor->actorPhase;
+				if (actor->primaryAnimIdx != 1)
+				{
+					actor->movementCommandTimer = 0;
+					actor->movementData = g_zgCarMovementData + 62;
+				}
+			}
+
+			if (g_framePulseOutputs.eightTick != 0 && actor->creatureRam->speedNoTarget == 0xFF)
+				AudioManager::PlaySoundEffect(0x42, &actor->pos);
+
+			if (context->localForwardSpeed > 0)
+			{
+				AudioManager::g_dynamicSoundFrequencies[0] = context->localForwardSpeed << 2;
+				AudioManager::PlaySoundEffect(0x41, &actor->pos);
+			}
+
+			if ((actor->actorFlags & Actor::ACTOR_FLAG_TARGETABLE) == Actor::ACTOR_FLAG_TARGETABLE && actor->hitpoints >= 0
+				&& context->localForwardSpeed > 0x100 && g_framePulseOutputs.fourTick != 0)
+			{
+				Nu3D::Particles::SpawnFromPreset(actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle + 0x7A0) & 0xFFF] * 3 >> 2),
+					actor->pos.y - 0x1000,
+					actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x460) & 0xFFF] * 3 >> 2),
+					0x27,
+					2);
+				Nu3D::Particles::SpawnFromPreset(actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x7A0) & 0xFFF] * 3 >> 2),
+					actor->pos.y - 0x1000,
+					actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x3A0) & 0xFFF] * 3 >> 2),
+					0x27,
+					2);
+			}
+		}
 		// STUB: TOY2 0x00406620
 		void ZPod(Actor::Toy2Actor::ActorBehaviourContext* context) {}
 		// FUNCTION: TOY2 0x00406960 [MATCHED]
