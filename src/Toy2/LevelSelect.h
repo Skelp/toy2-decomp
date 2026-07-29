@@ -30,6 +30,7 @@ namespace Toy2
 
 		void ResetCursor();
 		void TurnTowardLookDir(LevelSelectCamera* levelSelectCam, int32_t turnRate);
+		void ApplyWallRepulsion(LevelSelectCamera* levelSelectCam, Vector3I* velocity, int32_t recordType);
 		int32_t Tick();
 
 		STATIC_ASSERT(sizeof(LevelSelectCamera) == 0x28);

@@ -192,8 +192,52 @@ namespace Toy2
 			levelSelectCam->angles.pitch = pitch;
 		}
 
-		// STUB: TOY2 0x00438790
-		void ApplyWallRepulsion(LevelSelectCamera* levelSelectCam, Vector3I* velocity, int32_t recordType) {}
+		// FUNCTION: TOY2 0x00438790
+		void ApplyWallRepulsion(LevelSelectCamera* levelSelectCam, Vector3I* velocity, int32_t recordType)
+		{
+			Levels::RecordData* wallRecords = Levels::g_recordData[recordType];
+			int32_t recordIndex = 0;
+			Vector3I wallOffset;
+			wallOffset.y = 0;
+
+			while (recordIndex < wallRecords->recordCount)
+			{
+				Vector3I* wall = &wallRecords->data[recordIndex];
+				int32_t cameraY = levelSelectCam->pos.y / 32;
+
+				if (cameraY < wall[0].y && cameraY > wall[1].y)
+				{
+					int32_t wallDeltaZ = (wall[1].z - wall[0].z) >> 2;
+					int32_t wallDeltaX = (wall[1].x - wall[0].x) >> 2;
+					int32_t wallRadiusSquared = wallDeltaZ * wallDeltaZ + wallDeltaX * wallDeltaX;
+					wallOffset.x = levelSelectCam->pos.x / 32 - wall[0].x;
+					wallOffset.z = levelSelectCam->pos.z / 32 - wall[0].z;
+					int32_t offsetX = wallOffset.x >> 2;
+					int32_t offsetZ = wallOffset.z >> 2;
+					int32_t distanceSquared = offsetZ * offsetZ + offsetX * offsetX;
+
+					if (distanceSquared < wallRadiusSquared)
+					{
+						while (abs(wallOffset.x) > 0x4000 || abs(wallOffset.z) > 0x4000)
+						{
+							wallOffset.x >>= 1;
+							wallOffset.z >>= 1;
+						}
+
+						Nu3D::Math::NormalizeToFixedPoint(&wallOffset, &wallOffset);
+						int32_t repulsion = 0x800 - distanceSquared * 0x800 / wallRadiusSquared;
+						if (repulsion > 0x180)
+							repulsion = 0x180;
+
+						velocity->x += wallOffset.x * repulsion >> 12;
+						velocity->z += wallOffset.z * repulsion >> 12;
+					}
+				}
+
+				recordIndex += 2;
+				wallRecords = Levels::g_recordData[recordType];
+			}
+		}
 
 		// STUB: TOY2 0x00494130
 		void DrawArrows() {}

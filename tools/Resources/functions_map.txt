@@ -244,7 +244,7 @@
 0x004381F0 Toy2::ScreenDispatcher
 0x00438520 Toy2::ShowStaticScreen
 0x00438650 Toy2::LevelSelect::TurnTowardLookDir
-0x00438790 Toy2::LevelSelect::Method2
+0x00438790 Toy2::LevelSelect::ApplyWallRepulsion
 0x00438910 Nu3D::FollowWaypointPath
 0x00438A50 Toy2::LevelSelect::Tick
 0x004398B0 Toy2::PostGameRecap::Tick
