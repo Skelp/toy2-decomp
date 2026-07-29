@@ -19,6 +19,30 @@
 
 namespace Toy2
 {
+	extern int32_t g_hudActorAnimationFrame;
+
+	namespace ElevatorHop
+	{
+		enum GunsPState
+		{
+			GUNS_P_STATE_ACTIVE = 2,
+		};
+
+		enum GunsPActorFlags
+		{
+			GUNS_P_ACTOR_FLAG_VERTICAL_TARGET = 0x10,
+		};
+
+		extern int32_t g_gunsPVisualToggle;
+		extern int32_t g_gunsPAttackTimer;
+		extern int32_t g_gunsPShotIndex;
+		extern GunsPState g_gunsPState;
+		extern int32_t g_elevatorMotionPhase;
+		extern int32_t g_gunsPPhaseTimer;
+		extern int32_t g_previousGunsPPhase;
+		extern int32_t g_gunsPShotDelays[6];
+	}
+
 	namespace Dialogue
 	{
 		// STUB: TOY2 0x004027F0
@@ -1330,10 +1354,138 @@ namespace Toy2
 	}
 }
 
+// GLOBAL: TOY2 0x0052B7E0
+int32_t Toy2::g_hudActorAnimationFrame;
+
+// GLOBAL: TOY2 0x0052FC20
+int32_t Toy2::ElevatorHop::g_gunsPVisualToggle;
+
+// GLOBAL: TOY2 0x0052FC34
+int32_t Toy2::ElevatorHop::g_elevatorMotionPhase;
+
+// GLOBAL: TOY2 0x0052FC40
+int32_t Toy2::ElevatorHop::g_gunsPAttackTimer;
+
+// GLOBAL: TOY2 0x0052FC48
+int32_t Toy2::ElevatorHop::g_gunsPShotIndex;
+
+// GLOBAL: TOY2 0x0052FC4C
+Toy2::ElevatorHop::GunsPState Toy2::ElevatorHop::g_gunsPState;
+
+// GLOBAL: TOY2 0x0052FCE0
+int32_t Toy2::ElevatorHop::g_gunsPPhaseTimer;
+
+// GLOBAL: TOY2 0x0052FCF8
+int32_t Toy2::ElevatorHop::g_previousGunsPPhase;
+
+// GLOBAL: TOY2 0x004F3780
+int32_t Toy2::ElevatorHop::g_gunsPShotDelays[6] = { 400, 40, 40, 40, 40, 200 };
+
 namespace Toy2
 {
 	namespace CreatureBehaviour
 	{
+		// FUNCTION: TOY2 0x00425700 [PROVISIONAL]
+		void GunsP(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			ElevatorHop::g_gunsPVisualToggle = (ElevatorHop::g_gunsPVisualToggle - 1) & 1;
+			int32_t tintEnabled = 0;
+
+			if (actor->actorPhase != ElevatorHop::g_previousGunsPPhase)
+			{
+				ElevatorHop::g_previousGunsPPhase = actor->actorPhase;
+				ElevatorHop::g_gunsPPhaseTimer = 60;
+				actor->creatureRam->defenseMode = 4;
+				AudioManager::PlaySoundEffect(0x8A, &actor->pos);
+			}
+
+			if (ElevatorHop::g_gunsPState > 1)
+			{
+				ElevatorHop::g_gunsPPhaseTimer -= Renderer::g_frameDelta;
+				if (ElevatorHop::g_gunsPPhaseTimer < 0)
+				{
+					ElevatorHop::g_gunsPPhaseTimer = tintEnabled;
+					actor->creatureRam->defenseMode = 7;
+				}
+				else if (ElevatorHop::g_gunsPVisualToggle != tintEnabled)
+				{
+					tintEnabled = 1;
+					actor->actorTint.r = 0x2000;
+					actor->actorTint.g = 0x2000;
+					actor->actorTint.b = 0x2000;
+				}
+			}
+			actor->useTint = tintEnabled;
+
+			if (ElevatorHop::g_gunsPState != ElevatorHop::GUNS_P_STATE_ACTIVE)
+				return;
+
+			ElevatorHop::g_gunsPAttackTimer -= Renderer::g_frameDelta;
+			if (ElevatorHop::g_gunsPAttackTimer < 0)
+			{
+				ElevatorHop::g_gunsPShotIndex++;
+				if (ElevatorHop::g_gunsPShotIndex >= 6)
+					ElevatorHop::g_gunsPShotIndex = 0;
+				ElevatorHop::g_gunsPAttackTimer = ElevatorHop::g_gunsPShotDelays[ElevatorHop::g_gunsPShotIndex];
+
+				if (g_buzzActor.posAngles.pos.y > -0x1C2509)
+				{
+					Vector4I particlePosition;
+					particlePosition.x = 0;
+					particlePosition.y = -500;
+					particlePosition.z = -200;
+					Actor::ResolveBoneAttachmentPos(&particlePosition, actor, 0);
+
+					if (ElevatorHop::g_gunsPShotIndex == 0)
+					{
+						Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnInstance(
+							particlePosition.x, particlePosition.y, particlePosition.z, 0, -2, 0, actor->yawAngle << 2, 0, *g_randDatBufferPtr++ - 0x80, 0x59);
+						particle->pitchAngle = 0;
+						AudioManager::PlaySoundEffect(0x8B, &actor->pos);
+					}
+					else
+					{
+						int32_t sine = Numerics::g_sinCosLUT[actor->yawAngle] >> 2;
+						int32_t cosine = Numerics::g_sinCosLUT[(actor->yawAngle + 0x400) & 0xFFF] >> 2;
+						Nu3D::Particles::SpawnInstance(particlePosition.x, particlePosition.y, particlePosition.z, sine, -0x400, cosine, 0x40, 0, 0, 0x77);
+						AudioManager::PlaySoundEffect(0x89, &actor->pos);
+					}
+				}
+			}
+
+			if (ElevatorHop::g_elevatorMotionPhase <= 0x400 && Actor::IsInsideBounds(&actor->pos, -0x7A00, 0x7A00, -0x7A00, 0x7A00) == 0)
+			{
+				actor->actorFlags &= ~ElevatorHop::GUNS_P_ACTOR_FLAG_VERTICAL_TARGET;
+				actor->motionTargetPos.y = actor->boundary.y;
+				if (actor->primaryAnimIdx == 2)
+				{
+					AudioManager::PlaySoundEffect(0x88, &actor->pos);
+					Actor::SetAnimation(actor, 1, 1);
+				}
+			}
+			else
+			{
+				actor->actorFlags |= ElevatorHop::GUNS_P_ACTOR_FLAG_VERTICAL_TARGET;
+				actor->motionTargetPos.y = actor->boundary.y - 0x6000;
+				if (actor->primaryAnimIdx == 1)
+				{
+					AudioManager::PlaySoundEffect(0x88, &actor->pos);
+					Actor::SetAnimation(actor, 2, 2);
+				}
+			}
+
+			g_hudActorAnimationFrame = actor->actorPhase * 54 / 30;
+			if (g_buzzActor.posAngles.pos.y > -0x1C2509)
+			{
+				HUD::g_slideTimers[HUD::SLIDE_BOSS_STATUS] = 90;
+				if (ElevatorHop::g_gunsPPhaseTimer == 0)
+					actor->creatureRam->defenseMode = 7;
+				else
+					actor->creatureRam->defenseMode = 4;
+			}
+		}
+
 		// FUNCTION: TOY2 0x004259B0 [MATCHED]
 		void Mouse(Actor::Toy2Actor::ActorBehaviourContext* context)
 		{
