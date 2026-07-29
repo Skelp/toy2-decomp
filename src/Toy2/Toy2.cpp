@@ -61,6 +61,43 @@ namespace Toy2
 		void UpdateAIMovement(Toy2Actor* actor);
 	}
 
+	namespace CreatureBehaviour
+	{
+		void Zurg3(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void TinMan(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void Sheep(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void RCCar(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void LawnMower(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void Army(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void ZgCar(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void ZKite(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void LTyke(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void ZPod(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void Drill(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void Mouse(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void BPlane(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void Box(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void Dino(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void ZBoat(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void Chick(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void GunsP(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void Clown(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void Martian(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void Rabid(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void Buzzard(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void Ducks(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void GunsLLevel11(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void GunsL(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void FatBloke(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void BBuggy(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void Pilot(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void SmithLevel14(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void Smith(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void Luggage(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void ProsPLevel13(Actor::Toy2Actor::ActorBehaviourContext* context);
+		void ProsP(Actor::Toy2Actor::ActorBehaviourContext* context);
+	}
+
 	namespace ElevatorHop
 	{
 		void TransformMouseActors();
@@ -985,8 +1022,201 @@ namespace Toy2
 	{
 		const uint16_t ACTOR_FLAG_IGNORE_RESPAWN_VISIBILITY = 0x40;
 
-		// STUB: TOY2 0x00406CD0
-		void InitActor(Actor::Toy2Actor* actor, int32_t param) {}
+		// FUNCTION: TOY2 0x00406CD0 [PROVISIONAL]
+		void InitActor(Actor::Toy2Actor* actor, int32_t fullInit)
+		{
+			RawLoader::CreatureListRam* creature = actor->creatureRam;
+			actor->creatureId = creature->creatureId;
+			actor->pos.x = creature->pos.x << 5;
+			actor->pos.y = creature->pos.y << 5;
+			actor->pos.z = creature->pos.z << 5;
+			actor->movementData = Actor::g_movementDataByControl[creature->movCtrl];
+			actor->actorPhase = creature->entCtrl.actorPhase;
+
+			int16_t actorFlags;
+			if (fullInit == 0)
+			{
+				actorFlags = actor->actorFlags & Actor::ACTOR_FLAG_BOSS;
+				if (actorFlags != 0)
+					actorFlags = creature->entCtrl.actorFlags + Actor::ACTOR_FLAG_BOSS;
+				else
+					actorFlags = creature->entCtrl.actorFlags;
+			}
+			else
+			{
+				actorFlags = creature->entCtrl.actorFlags;
+			}
+
+			int32_t actorX = actor->pos.x;
+			int32_t actorZ = actor->pos.z;
+			actor->actorFlags = actorFlags;
+
+			actor->respawnDelay = creature->entCtrl.respawnDelay;
+			int32_t actorY = actor->pos.y;
+			actor->boundary.x = actorX;
+			actor->motionTargetPos.x = actorX;
+			actor->boundary.y = actorY;
+			actor->boundary.z = actorZ;
+			actor->motionTargetPos.y = actorY;
+			actor->motionTargetPos.z = actorZ;
+			if (actor->respawnDelay == 100)
+				actor->respawnDelay = 0x708;
+
+			actor->pitchAngle = 0;
+			actor->yawAngle = creature->initialFacingAngle << 4;
+			actor->rollAngle = 0;
+			actor->targetYaw = actor->yawAngle;
+			actor->velX = 0;
+			actor->gravityVel = 0;
+			actor->velForward = 0;
+			actor->animationFramePosition = 0;
+			actor->primaryAnimIdx = 0;
+			actor->secondaryAnimIdx = -1;
+			actor->animationFrameSequence = Actor::g_animationFrameSequences[1];
+			actor->previousActorPhase = 0;
+			actor->unkWord15 = 0;
+			actor->movementCommandTimer = 0;
+			actor->damageCooldownTimer = 0;
+			actor->movementCommandValue = INT_MIN;
+			actor->lastValidYPosition = actor->pos.y;
+
+			if (fullInit == 0)
+				return;
+
+			actor->visibilityDistance = 0x500;
+			switch (creature->creatureId)
+			{
+				case 1:
+				case 9:
+				case 16:
+				case 21:
+				case 29:
+				case 30:
+				case 34:
+				case 35:
+				case 36:
+				case 37:
+				case 39:
+				case 42:
+				case 49:
+				case 54:
+				case 55:
+				case 57:
+				case 62:
+					break;
+				case 4:
+					actor->actorBehaviour = CreatureBehaviour::Zurg3;
+					return;
+				case 5:
+					actor->actorBehaviour = CreatureBehaviour::TinMan;
+					break;
+				case 6:
+					actor->actorBehaviour = CreatureBehaviour::Sheep;
+					break;
+				case 8:
+					actor->actorBehaviour = CreatureBehaviour::RCCar;
+					break;
+				case 12:
+					actor->actorBehaviour = CreatureBehaviour::LawnMower;
+					break;
+				case 13:
+					actor->actorBehaviour = CreatureBehaviour::Army;
+					return;
+				case 14:
+					actor->actorBehaviour = CreatureBehaviour::ZgCar;
+					break;
+				case 15:
+					actor->actorBehaviour = CreatureBehaviour::ZKite;
+					return;
+				case 19:
+					actor->actorBehaviour = CreatureBehaviour::LTyke;
+					return;
+				case 20:
+					actor->actorBehaviour = CreatureBehaviour::ZPod;
+					return;
+				case 22:
+					actor->actorBehaviour = CreatureBehaviour::Drill;
+					break;
+				case 23:
+					actor->actorBehaviour = CreatureBehaviour::Mouse;
+					return;
+				case 24:
+					actor->actorBehaviour = CreatureBehaviour::BPlane;
+					actor->actorPhase = 0;
+					actor->respawnDelay = 10000;
+					return;
+				case 25:
+					actor->actorBehaviour = CreatureBehaviour::Box;
+					return;
+				case 26:
+					actor->actorBehaviour = CreatureBehaviour::Dino;
+					break;
+				case 27:
+					actor->actorBehaviour = CreatureBehaviour::ZBoat;
+					break;
+				case 28:
+					actor->actorBehaviour = CreatureBehaviour::Chick;
+					return;
+				case 31:
+					actor->actorBehaviour = CreatureBehaviour::GunsP;
+					break;
+				case 32:
+					actor->actorBehaviour = CreatureBehaviour::Clown;
+					break;
+				case 38:
+					actor->actorBehaviour = CreatureBehaviour::Martian;
+					return;
+				case 40:
+					actor->actorBehaviour = CreatureBehaviour::Rabid;
+					return;
+				case 41:
+					actor->actorBehaviour = CreatureBehaviour::Buzzard;
+					return;
+				case 43:
+					actor->actorBehaviour = CreatureBehaviour::Ducks;
+					return;
+				case 45:
+					if (g_levelFileIndex == 11)
+						actor->actorBehaviour = CreatureBehaviour::GunsLLevel11;
+					else
+						actor->actorBehaviour = CreatureBehaviour::GunsL;
+					break;
+				case 46:
+					actor->actorBehaviour = CreatureBehaviour::FatBloke;
+					return;
+				case 47:
+					actor->actorBehaviour = CreatureBehaviour::BBuggy;
+					break;
+				case 48:
+					actor->visibilityDistance = 0xED8;
+					return;
+				case 50:
+				case 51:
+				case 52:
+				case 53:
+					actor->actorBehaviour = CreatureBehaviour::Pilot;
+					return;
+				case 58:
+					if (g_levelFileIndex == 14)
+						actor->actorBehaviour = CreatureBehaviour::SmithLevel14;
+					else
+						actor->actorBehaviour = CreatureBehaviour::Smith;
+					return;
+				case 59:
+					actor->actorBehaviour = CreatureBehaviour::Luggage;
+					return;
+				case 61:
+					if (g_levelFileIndex == 13)
+						actor->actorBehaviour = CreatureBehaviour::ProsPLevel13;
+					else
+						actor->actorBehaviour = CreatureBehaviour::ProsP;
+					break;
+				default:
+					return;
+			}
+
+			actor->visibilityDistance = 0x708;
+		}
 
 		// FUNCTION: TOY2 0x00407440 [PROVISIONAL]
 		void ActorCollisionCheck()

@@ -25,6 +25,13 @@ namespace Toy2
 {
 	namespace CreatureBehaviour
 	{
+		// STUB: TOY2 0x00418610
+		void Army(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// STUB: TOY2 0x004189C0
+		void ZKite(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// STUB: TOY2 0x00418CE0
+		void LawnMower(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+
 		// FUNCTION: TOY2 0x00418720 [PROVISIONAL]
 		void RCCarLevel2(Actor::Toy2Actor::ActorBehaviourContext* context)
 		{

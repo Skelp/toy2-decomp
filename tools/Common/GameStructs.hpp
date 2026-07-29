@@ -280,7 +280,7 @@ struct Toy2BuzzActor
 struct EntityControl
 {
 	uint8_t actorPhase;
-	uint8_t unkByte;
+	uint8_t respawnDelay;
 	uint16_t actorFlags;
 };
 
@@ -328,7 +328,7 @@ struct Toy2Actor
 	int16_t secondaryAnimIdx;
 	int32_t unkVar7;
 	int32_t unkVar8;
-	int32_t unkVar9;
+	int32_t movementCommandValue;
 	Vector3I16 unkVector;
 	int16_t unkVar10;
 	int32_t unkVar12;

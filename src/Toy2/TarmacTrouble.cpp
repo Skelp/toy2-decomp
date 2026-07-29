@@ -373,3 +373,15 @@ namespace Toy2
 		void Interactions() {}
 	}
 }
+
+namespace Toy2
+{
+	namespace CreatureBehaviour
+	{
+		// STUB: TOY2 0x0042D3E0
+		void SmithLevel14(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+
+		// STUB: TOY2 0x0042D620
+		void Luggage(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+	}
+}

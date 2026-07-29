@@ -654,6 +654,86 @@ namespace Toy2
 		// GLOBAL: TOY2 0x004DF7C8
 		uint16_t g_defeatMovementScript[] = { 0x16, 0xFFE0, 0xFFE0, 4, 0xFFFF, 1 };
 
+		// GLOBAL: TOY2 0x004DF728
+		uint16_t g_movementControl0Script[] = { 0x000D, 0x0000, 0x0002, 0x0016, 0xFFE0, 0xFFE0, 0x0004, 0xFFFF, 0x0001, 0x0000 };
+
+		// GLOBAL: TOY2 0x004DF73C
+		uint16_t g_movementControl1Script[] = {
+			0x0016,
+			0xFFE0,
+			0xFFE0,
+			0x000D,
+			0x0000,
+			0x0002,
+			0x0011,
+			0x0008,
+			0x0021,
+			0x0001,
+			0x003C,
+			0x0004,
+			0x0005,
+			0x0000,
+			0x0019,
+			0x0001,
+			0x0001,
+			0x000A,
+			0x0004,
+			0x000D,
+			0x0001,
+			0x0004,
+			0x0001,
+			0x0016,
+			0x0004,
+			0x000D,
+			0x0001,
+			0x0005,
+			0x0018,
+			0xF800,
+			0x0017,
+			0x000E,
+			0x0007,
+			0x000D,
+			0x0001,
+			0x0006,
+			0x0001,
+			0x000C,
+			0x0004,
+			0xFFFF,
+			0x0025,
+			0x001B,
+			0x0019,
+			0x0001,
+			0x0001,
+			0x000A,
+			0x0004,
+			0x000D,
+			0x0001,
+			0x0004,
+			0x0001,
+			0x0016,
+			0x0004,
+			0x000D,
+			0x0001,
+			0x0001,
+			0x0018,
+			0xF800,
+			0x0017,
+			0x000E,
+			0x0007,
+			0x000D,
+			0x0001,
+			0x0006,
+			0x0001,
+			0x000C,
+			0x0004,
+			0xFFFF,
+			0x0041,
+			0x0000,
+		};
+
+		// GLOBAL: TOY2 0x004E02C4
+		uint16_t* g_movementDataByControl[2] = { g_movementControl0Script, g_movementControl1Script };
+
 		// GLOBAL: TOY2 0x004E02CC
 		uint16_t* g_defeatMovementData = g_defeatMovementScript;
 
@@ -1260,6 +1340,17 @@ namespace Toy2
 	{
 		void RCCarLevel1(Actor::Toy2Actor::ActorBehaviourContext* context);
 		void RCCarLevel2(Actor::Toy2Actor::ActorBehaviourContext* context);
+
+		// STUB: TOY2 0x00406220
+		void Zurg3(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// STUB: TOY2 0x004064A0
+		void ZgCar(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// STUB: TOY2 0x00406620
+		void ZPod(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// STUB: TOY2 0x00406960
+		void BPlane(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// STUB: TOY2 0x00406A90
+		void FatBloke(Actor::Toy2Actor::ActorBehaviourContext* context) {}
 
 		// GLOBAL: TOY2 0x004E0318
 		uint16_t* g_boxMovementData;

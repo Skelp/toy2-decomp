@@ -251,14 +251,14 @@ namespace Loader
 				ImGui::TextDisabled("Entity Control");
 
 				int32_t entActorPhase = cr->entCtrl.actorPhase;
-				int32_t entUnkByte = cr->entCtrl.unkByte;
+				int32_t respawnDelay = cr->entCtrl.respawnDelay;
 				int32_t entFlags = cr->entCtrl.actorFlags;
 
 				if ( ImGui::InputInt("Ent Actor Phase", &entActorPhase) )
 					cr->entCtrl.actorPhase = static_cast<uint8_t>(entActorPhase);
 
-				if ( ImGui::InputInt("Ent Unk Byte", &entUnkByte) )
-					cr->entCtrl.unkByte = static_cast<uint8_t>(entUnkByte);
+				if ( ImGui::InputInt("Respawn Delay", &respawnDelay) )
+					cr->entCtrl.respawnDelay = static_cast<uint8_t>(respawnDelay);
 
 				if ( ImGui::InputInt("Ent Actor Flags", &entFlags) )
 					cr->entCtrl.actorFlags = static_cast<uint16_t>(entFlags);
@@ -317,7 +317,7 @@ namespace Loader
 
 			ImGui::InputInt("Unk Var 7", &curActor->unkVar7);
 			ImGui::InputInt("Unk Var 8", &curActor->unkVar8);
-			ImGui::InputInt("Unk Var 9", &curActor->unkVar9);
+			ImGui::InputInt("Movement Command Value", &curActor->movementCommandValue);
 			ImGui::InputInt("Unk Var 12", &curActor->unkVar12);
 			ImGui::InputInt("Unk Var 13", &curActor->unkVar13);
 			ImGui::InputInt("Unk Var 14", &curActor->unkVar14);

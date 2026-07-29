@@ -245,6 +245,9 @@ namespace Toy2
 {
 	namespace CreatureBehaviour
 	{
+		// STUB: TOY2 0x0042BE60
+		void ProsPLevel13(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+
 		// FUNCTION: TOY2 0x0042C150 [MATCHED]
 		void Pilot(Actor::Toy2Actor::ActorBehaviourContext* context)
 		{

@@ -15,7 +15,7 @@ namespace RawLoader
 		struct EntityControl
 		{
 			uint8_t actorPhase;
-			uint8_t unkByte;
+			uint8_t respawnDelay;
 			uint16_t actorFlags;
 		};
 

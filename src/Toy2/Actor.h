@@ -69,7 +69,7 @@ namespace Toy2
 			int16_t secondaryAnimIdx;
 			int32_t animationFramePosition;
 			int32_t secondaryAnimationFramePosition;
-			int32_t unkVar9;
+			int32_t movementCommandValue;
 			RGB16 actorTint;
 			int16_t actorAlpha;
 			int16_t scaleX;
@@ -111,6 +111,7 @@ namespace Toy2
 
 		extern Toy2Actor g_creatureActors[64];
 		extern uint8_t* g_animationFrameSequences[26];
+		extern uint16_t* g_movementDataByControl[2];
 		extern Toy2Actor* g_renderActors[66];
 
 		extern Toy2Actor* g_lastKilledActor;

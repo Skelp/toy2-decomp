@@ -22,6 +22,9 @@ namespace Toy2
 {
 	namespace CreatureBehaviour
 	{
+		// STUB: TOY2 0x0041B780
+		void Drill(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+
 		// FUNCTION: TOY2 0x0041BB80 [MATCHED]
 		void LTyke(Actor::Toy2Actor::ActorBehaviourContext* context)
 		{

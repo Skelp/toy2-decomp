@@ -24,6 +24,9 @@ namespace Toy2
 {
 	namespace CreatureBehaviour
 	{
+		// STUB: TOY2 0x0041DDB0
+		void Clown(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+
 		// FUNCTION: TOY2 0x0041DEC0 [MATCHED]
 		void Ducks(Actor::Toy2Actor::ActorBehaviourContext* context)
 		{

@@ -7,6 +7,21 @@
 
 namespace Toy2
 {
+	namespace CreatureBehaviour
+	{
+		// STUB: TOY2 0x0042F310
+		void Smith(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+
+		// STUB: TOY2 0x0042F530
+		void GunsL(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+
+		// STUB: TOY2 0x0042F7B0
+		void ProsP(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+	}
+}
+
+namespace Toy2
+{
 	namespace FinalShowdown
 	{
 		// GLOBAL: TOY2 0x0052FFF0

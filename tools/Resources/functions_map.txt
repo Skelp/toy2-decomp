@@ -173,7 +173,7 @@
 0x00425B60 Toy2::ElevatorHop::Init
 0x00425EB0 Toy2::ElevatorHop::SpawnFanParticle
 0x00425F60 Toy2::ElevatorHop::Interactions
-0x004282D0 Toy2::CreatureBehaviour::GunsL::Level11
+0x004282D0 Toy2::CreatureBehaviour::GunsLLevel11
 0x00428650 Toy2::CreatureBehaviour::Rabid
 0x00428700 Toy2::AlsPenthouse::Method10
 0x00428890 Toy2::AlsPenthouse::Method2
@@ -194,7 +194,7 @@
 0x0042B2D0 Toy2::EvilEmperorZurg::BuzzRespawn
 0x0042B300 Toy2::EvilEmperorZurg::Init
 0x0042B3A0 Toy2::EvilEmperorZurg::Interactions
-0x0042BE60 Toy2::CreatureBehaviour::ProsP::Level13
+0x0042BE60 Toy2::CreatureBehaviour::ProsPLevel13
 0x0042C150 Toy2::CreatureBehaviour::Pilot
 0x0042C200 Toy2::Path::SamplePoint
 0x0042C2B0 Toy2::Platform::InitPathPlatform
@@ -203,7 +203,7 @@
 0x0042C8A0 Toy2::AirportInfiltration::InitHiddenCollectibles
 0x0042C930 Toy2::AirportInfiltration::Init
 0x0042CA60 Toy2::AirportInfiltration::Interactions
-0x0042D3E0 Toy2::CreatureBehaviour::Smith::Level14
+0x0042D3E0 Toy2::CreatureBehaviour::SmithLevel14
 0x0042D620 Toy2::CreatureBehaviour::Luggage
 0x0042D710 Toy2::TarmacTrouble::PressLightPuzzleButton
 0x0042D8B0 Toy2::TarmacTrouble::UpdateBottomPuzzleLights

@@ -241,6 +241,9 @@ namespace Toy2
 {
 	namespace CreatureBehaviour
 	{
+		// STUB: TOY2 0x00416AB0
+		void TinMan(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+
 		// FUNCTION: TOY2 0x00416A60 [MATCHED]
 		void Sheep(Actor::Toy2Actor::ActorBehaviourContext* context)
 		{
