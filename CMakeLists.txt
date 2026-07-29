@@ -71,6 +71,7 @@ set(TOY2_SOURCES
 
     src/SoftwareRenderer.cpp
     src/SoftwareRenderer.h
+    src/SoftwareRendererDefaultPalette.inc
 
     src/SaveManager.cpp
     src/SaveManager.h

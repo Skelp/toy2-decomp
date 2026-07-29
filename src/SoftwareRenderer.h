@@ -72,6 +72,22 @@ namespace SoftwareRenderer
 	extern int32_t g_zoomExtentV;
 	extern int32_t g_zoomExtentH;
 	extern int32_t g_bitsPerPixel;
+	extern uint32_t g_redMask;
+	extern uint32_t g_greenMask;
+	extern uint32_t g_blueMask;
+	extern int32_t g_redShift;
+	extern int32_t g_greenShift;
+	extern int32_t g_blueShift;
+	extern int32_t g_softwareRendererBufferBlockCount;
+	extern int32_t g_backBufferPitchBytes;
+	extern int32_t g_backBufferPitchPixels;
+	extern int32_t g_pendingBackBufferClears;
+	extern int32_t g_softWindowScaleX;
+	extern int32_t g_softWindowScaleY;
+	extern int32_t g_unusedSoftwareRendererConfigA;
+	extern int32_t g_unusedSoftwareRendererConfigB;
+	extern int32_t g_unusedSoftwareRendererConfigC;
+	extern int32_t g_unusedSoftwareRendererConfigD;
 	extern float g_topOffsetF;
 	extern float g_leftOffsetF;
 	extern float g_spanScaleV;
@@ -114,6 +130,12 @@ namespace SoftwareRenderer
 	extern uint8_t g_renderBufferB[];
 	extern float g_cameraNearZ;
 	extern float g_cameraFarZ;
+	struct SoftwareRenderDispatchTable;
+	extern SoftwareRenderDispatchTable* g_softwareRenderDispatch;
+	extern SoftwareRenderDispatchTable g_softwareRenderDispatch555;
+	extern SoftwareRenderDispatchTable g_softwareRenderDispatch565;
+	extern SoftwareRenderDispatchTable g_softwareRenderDispatchPalettized;
+	extern uint8_t g_defaultSoftwarePalette[768];
 
 	void SwapRenderBuffer();
 	void SetLevelFileIndex(int32_t index);
@@ -130,6 +152,7 @@ namespace SoftwareRenderer
 	void PresentFrame();
 	void LockBackBuffer();
 	void UnlockBackBuffer();
+	void BuildColourRampTables();
 	void SetCameraNearFarZ(float nearZ, float farZ);
 	void UnpackColourChannels(uint32_t colour, int32_t* red, int32_t* green, int32_t* blue);
 	void UnpackColourToFloats(uint32_t colour, float* red, float* green, float* blue, uint32_t* alphaMask);

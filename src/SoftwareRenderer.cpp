@@ -55,11 +55,11 @@ namespace SoftwareRenderer
 	int32_t g_displayMaxX;
 
 	// Active base of the 4096 software-render depth buckets.
-	// GLOBAL: TOY2 0x00504D34
-	SoftwareRenderItem** g_softwareRenderBuckets;
-
 	// GLOBAL: TOY2 0x0087E50C
 	SoftwareRenderItem* g_softwareRenderBucketStorage[4096];
+
+	// GLOBAL: TOY2 0x00504D34
+	SoftwareRenderItem** g_softwareRenderBuckets = g_softwareRenderBucketStorage;
 
 	// GLOBAL: TOY2 0x00839280
 	int32_t g_softwareRenderItemCount;
@@ -389,6 +389,48 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00882910
 	int32_t g_bitsPerPixel;
 
+	// GLOBAL: TOY2 0x00731EFC
+	uint32_t g_redMask;
+
+	// GLOBAL: TOY2 0x00830BCC
+	uint32_t g_greenMask;
+
+	// GLOBAL: TOY2 0x00731EF8
+	uint32_t g_blueMask;
+
+	// GLOBAL: TOY2 0x00732FB4
+	int32_t g_redShift;
+
+	// GLOBAL: TOY2 0x00731F20
+	int32_t g_greenShift;
+
+	// GLOBAL: TOY2 0x00731F14
+	int32_t g_blueShift;
+
+	// GLOBAL: TOY2 0x0084D0E8
+	int32_t g_softwareRendererBufferBlockCount;
+
+	// GLOBAL: TOY2 0x00882900
+	int32_t g_backBufferPitchBytes;
+
+	// GLOBAL: TOY2 0x00882908
+	int32_t g_softWindowScaleX;
+
+	// GLOBAL: TOY2 0x0088290C
+	int32_t g_softWindowScaleY;
+
+	// GLOBAL: TOY2 0x0088273C
+	int32_t g_unusedSoftwareRendererConfigA;
+
+	// GLOBAL: TOY2 0x0083917C
+	int32_t g_unusedSoftwareRendererConfigB;
+
+	// GLOBAL: TOY2 0x0084D0F4
+	int32_t g_unusedSoftwareRendererConfigC;
+
+	// GLOBAL: TOY2 0x00500C00
+	int32_t g_unusedSoftwareRendererConfigD;
+
 	// Back-buffer surface state used by the software frame drain. The surface
 	// pointer is the retail `d3dappi.lpBackBuffer` member. The locked pointer is
 	// valid only between Lock and Unlock. The pitch is in pixels.
@@ -427,9 +469,120 @@ namespace SoftwareRenderer
 		SoftwareRenderCallback defaultCallback[4];
 		SoftwareRenderCallback flag80;
 	};
+	STATIC_ASSERT(sizeof(SoftwareRenderDispatchTable) == 0x34);
+
+	// STUB: TOY2 0x0045DB80
+	void UnkRenderAPI1(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x0046D2C0
+	void UnkRenderAPI2(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x0045D110
+	void UnkRenderAPI3(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x0045C6B0
+	void UnkRenderAPI4(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00454D30
+	void UnkRenderAPI5(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x004560E0
+	void UnkRenderAPI6(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00457440
+	void UnkRenderAPI7(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00458770
+	void UnkRenderAPI8(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x0045BBC0
+	void UnkRenderAPI9(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00459AB0
+	void UnkRenderAPI10(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x0045A5C0
+	void UnkRenderAPI11(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x0045B0B0
+	void UnkRenderAPI12(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x0045E390
+	void UnkRenderAPI13(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00461D20
+	void UnkRenderAPI14(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00468E90
+	void UnkRenderAPI15(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00468430
+	void UnkRenderAPI16(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00467080
+	void UnkRenderAPI17(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00469900
+	void UnkRenderAPI18(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x0046AC60
+	void UnkRenderAPI19(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x0046BF90
+	void UnkRenderAPI20(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00463090
+	void UnkRenderAPI21(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00463B80
+	void UnkRenderAPI22(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00464690
+	void UnkRenderAPI23(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00465180
+	void UnkRenderAPI24(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x0046D7B0
+	void UnkRenderAPI25(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00471520
+	void UnkRenderAPI26(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x004776C0
+	void UnkRenderAPI27(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00476D00
+	void UnkRenderAPI28(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00476340
+	void UnkRenderAPI29(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00471B30
+	void UnkRenderAPI30(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00472E70
+	void UnkRenderAPI31(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00474190
+	void UnkRenderAPI32(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00474C80
+	void UnkRenderAPI33(SoftwareRenderItem* item) {}
+	// STUB: TOY2 0x00477EB0
+	void UnkRenderAPI34(SoftwareRenderItem* item) {}
+
+	// GLOBAL: TOY2 0x004FC880
+	uint8_t g_defaultSoftwarePalette[768] = {
+#include "SoftwareRendererDefaultPalette.inc"
+	};
+
+	// GLOBAL: TOY2 0x004FCB80
+	SoftwareRenderDispatchTable g_softwareRenderDispatch555 = {
+		UnkRenderAPI1,
+		UnkRenderAPI2,
+		UnkRenderAPI3,
+		UnkRenderAPI4,
+		{ UnkRenderAPI5, UnkRenderAPI6, UnkRenderAPI7, UnkRenderAPI8 },
+		{ UnkRenderAPI9, UnkRenderAPI10, UnkRenderAPI11, UnkRenderAPI12 },
+		UnkRenderAPI13,
+	};
+
+	// GLOBAL: TOY2 0x004FCBB8
+	SoftwareRenderDispatchTable g_softwareRenderDispatch565 = {
+		UnkRenderAPI14,
+		UnkRenderAPI2,
+		UnkRenderAPI15,
+		UnkRenderAPI16,
+		{ UnkRenderAPI17, UnkRenderAPI18, UnkRenderAPI19, UnkRenderAPI20 },
+		{ UnkRenderAPI21, UnkRenderAPI22, UnkRenderAPI23, UnkRenderAPI24 },
+		UnkRenderAPI25,
+	};
+
+	// GLOBAL: TOY2 0x004FCBF0
+	SoftwareRenderDispatchTable g_softwareRenderDispatchPalettized = {
+		UnkRenderAPI26,
+		UnkRenderAPI27,
+		UnkRenderAPI28,
+		UnkRenderAPI29,
+		{ UnkRenderAPI30, UnkRenderAPI31, UnkRenderAPI31, UnkRenderAPI31 },
+		{ UnkRenderAPI32, UnkRenderAPI33, UnkRenderAPI33, UnkRenderAPI33 },
+		UnkRenderAPI34,
+	};
 
 	// GLOBAL: TOY2 0x00704E68
 	SoftwareRenderDispatchTable* g_softwareRenderDispatch;
+
+	// STUB: TOY2 0x0047C8B0
+	void BuildColourRampTables() {}
 
 	// Render-buffer double-buffering state. SwapRenderBuffer toggles
 	// g_currentRenderBuffer between the two contiguous render buffers

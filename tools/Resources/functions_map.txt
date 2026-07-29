@@ -407,7 +407,8 @@
 0x0047B170 RawLoader::DecompressBuffer
 0x0047C800 SoftwareRenderer::LockBackBuffer
 0x0047C870 SoftwareRenderer::UnlockBackBuffer
-0x0047C8B0 SoftwareRenderer::UnkFunc1
+0x0047C8B0 SoftwareRenderer::BuildColourRampTables
+0x0047CBA0 Toy2::InitSoftWindow
 0x0047CC90 Toy2::InitSoftwareRenderer
 0x0047D0F0 SoftwareRenderer::Destroy
 0x0047D120 SoftwareRenderer::ClearBackBufferOnce
