@@ -53,6 +53,28 @@ Run `progress` to check annotation coverage. Its percentage is intentionally
 different from reccmp accuracy. It measures how much of the function map has a
 source annotation. It does not measure how closely the machine code matches.
 
+## Source organization
+
+Place each function in the translation unit that owns its subsystem. Retail
+path strings provide the strongest ownership evidence. Namespaces, shared
+state, callers, callees, and address clusters provide supporting evidence.
+Later Nu3D source can support a placement, but it cannot prove one by itself.
+
+Keep level-specific game code in the matching file under `src/Toy2/`. Keep
+shared game code in an established core file. Do not split a file only because
+it is long or contains several namespace blocks. Preserve each function and
+global address annotation when you move a definition.
+
+Move a large constant initializer to a named `.inc` file beside its owning
+`.cpp` file. A large string has at least 160 payload bytes, excluding its final
+null byte. A large non-string array has at least 32 elements and at least 256
+initialized bytes. Use one `.inc` file for each named constant.
+
+Keep the declaration, type, linkage, address annotation, and initializer braces
+in the `.cpp` file. Put only the initializer tokens in the `.inc` file. Add the
+`.inc` file to the owning target's CMake source list. Keep smaller constants in
+the `.cpp` file unless source evidence gives a different structure.
+
 ## Submission checklist
 
 - Format touched C/C++ files using the repository `.clang-format`.
@@ -69,6 +91,10 @@ source annotation. It does not measure how closely the machine code matches.
   to the legacy baseline.
 - Keep the change focused. Do not mix generated files or unrelated cleanup
   into a function reconstruction.
+- Check each moved definition against the source-organization evidence. Do not
+  use file size alone as evidence for a new translation unit.
+- Check new large constants against the `.inc` thresholds in "Source
+  organization."
 - Verify that `git status` does not contain game media or local analysis files.
 
 Compiler warnings already exist in partially reconstructed code. Avoid new

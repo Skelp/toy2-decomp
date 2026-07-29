@@ -261,6 +261,26 @@ organization clearly supports it. A useful session-sized scope is one function
 or a tightly coupled group with the required header or layout changes. Avoid
 mixing unrelated easy functions from several TUs.
 
+Treat a source-file move as a reconstruction claim. Use retail path strings as
+the strongest ownership evidence. Then use a coherent namespace, shared state,
+call relationships, and contiguous address clusters. Use later Nu3D source only
+as supporting evidence. Keep level-specific code in the matching file under
+`src/Toy2/` when these sources agree. Keep shared game code in an established
+core TU. Do not split a file because of its line count or namespace-block count
+alone. Multiple namespaces can belong in one TU when they share proven
+ownership. Preserve every address annotation when you move a definition.
+
+Keep large constant initializers out of `.cpp` files. A string is large when
+its decoded payload contains at least 160 bytes, excluding its terminating null
+byte. A non-string array is large when it contains at least 32 elements and its
+initialized object contains at least 256 bytes. Put each large initializer in
+one named `.inc` file beside its owning `.cpp` file. Keep the declaration,
+address annotation, type, linkage, and initializer braces in the `.cpp` file.
+The `.inc` file must contain initializer tokens only. List the `.inc` file in
+the owning target's CMake source list. Keep short text, small lookup tables, and
+arrays of a few string pointers in source unless stronger source evidence says
+otherwise.
+
 When multiple candidates remain, choose the one with the best evidence and the
 fewest unresolved dependencies. Accuracy percentage is only a tie-breaker. A
 short near-match can be useful when its diff exposes a shared type problem. A
