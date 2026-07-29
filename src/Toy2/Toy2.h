@@ -96,18 +96,6 @@ namespace Toy2
 		uint32_t words[3];
 	};
 
-	namespace ElevatorHop
-	{
-		extern int32_t g_link18PathPointIndex;
-		extern int32_t g_link19PathPointIndex;
-		extern int32_t g_link20PathPointIndex;
-		extern Vector3I g_fanParticleVelocityFactors[5];
-
-		void UpdatePathLinks();
-		void SpawnFanParticle(const Vector3I* position, int32_t fanIndex, int32_t velocityScale);
-		void TransformMouseActors();
-	}
-
 	void LoadLevelGraphics(int32_t levelFileIndex);
 	void InitialiseLevelVariables(int32_t levelIndex);
 	void HandleLevelInteractions(int32_t levelIndex);

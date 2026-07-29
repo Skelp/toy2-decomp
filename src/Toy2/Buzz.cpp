@@ -4,6 +4,7 @@
 #include "Toy2/Collision.h"
 #include "Toy2/Collectables.h"
 #include "Toy2/Levels.h"
+#include "Toy2/LevelLogic.h"
 #include "Toy2/Toy2.h"
 #include "AudioManager/AudioManager.h"
 #include "InputManager.h"
@@ -18,66 +19,6 @@
 
 namespace Toy2
 {
-	namespace EvilEmperorZurg
-	{
-		// GLOBAL: TOY2 0x0052FE00
-		int32_t g_previousPhase;
-
-		// GLOBAL: TOY2 0x0052FE04
-		int32_t g_damageFlashTimer;
-
-		// GLOBAL: TOY2 0x0052FE08
-		int32_t g_voiceTimer;
-
-		// GLOBAL: TOY2 0x0052FE20
-		int32_t g_introSoundTimer;
-
-		// GLOBAL: TOY2 0x0052FE24
-		int32_t g_encounterState;
-
-		// GLOBAL: TOY2 0x0052FE28
-		int32_t g_damageFlashToggle;
-
-		// GLOBAL: TOY2 0x0052FE30
-		int32_t g_attackTimer;
-
-		// GLOBAL: TOY2 0x0052FE34
-		int32_t g_attackVariant;
-
-		// FUNCTION: TOY2 0x0042B2D0 [MATCHED]
-		void BuzzRespawn()
-		{
-			g_buzzActor.respawnPos.x = -0x1DA7C;
-			g_buzzActor.respawnPos.y = -0x12BD0;
-			g_buzzActor.respawnPos.z = 0xF699;
-			g_buzzActor.respawnYawAngle = 0x400;
-		}
-
-		// FUNCTION: TOY2 0x0042B300 [MATCHED]
-		void Init()
-		{
-			Toy2::MoveableObject::InitTable(0);
-			Collectables::Init(0, 0);
-
-			Actor::Toy2Actor* zurg = &Actor::g_creatureActors[0];
-			g_previousPhase = zurg->actorPhase;
-			zurg->actorFlags |= Actor::ACTOR_FLAG_BOSS;
-			zurg->pos.y -= 0x28000;
-			zurg->motionTargetPos.y = zurg->pos.y;
-			g_voiceTimer = 300;
-			int32_t startZ = zurg->pos.z + 0x10000;
-			g_introSoundTimer = 0x78;
-			g_encounterState = 0;
-			g_damageFlashToggle = 0;
-			g_damageFlashTimer = 0;
-			g_attackTimer = 0x104;
-			g_attackVariant = 0;
-			zurg->yawAngle = 0xC00;
-			zurg->pos.z = startZ;
-			zurg->creatureRam->rotSpeed = 0;
-		}
-	}
-
 	// GLOBAL: TOY2 0x005281A4
 	int32_t g_pendingFootingType;
 

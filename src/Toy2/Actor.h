@@ -106,6 +106,7 @@ namespace Toy2
 		extern int32_t g_unk52EF88;
 
 		void InitCreatureRam();
+		void UpdatePrimaryAnimation(Toy2Actor* actor);
 		void StepCreatureAnimFrame(Toy2Actor* actor);
 		void SetAnimation(Toy2Actor* actor, int16_t animationIndex, int32_t frameSequenceIndex);
 		void Kill(Toy2Actor* actor, uint8_t killFlags);
@@ -133,5 +134,12 @@ namespace Toy2
 		STATIC_ASSERT(offsetof(Toy2Actor, deathEffectOffset) == 0x84);
 		STATIC_ASSERT(offsetof(Toy2Actor, previousActorPhase) == 0x8A);
 		STATIC_ASSERT(sizeof(Toy2Actor::ActorBehaviourContext) == 0xC);
+	}
+
+	namespace CreatureBehaviour
+	{
+		extern int32_t g_rcCarRearWheelRotation;
+		extern int32_t g_rcCarFrontWheelRotation;
+		void SetRCCarNodeAngle(Actor::Toy2Actor* actor, int32_t nodeIndex, int32_t pitch, int32_t yaw, int32_t roll);
 	}
 }

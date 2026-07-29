@@ -88,6 +88,23 @@ set(TOY2_SOURCES
     # Toy2
     src/Toy2/LevelSelect.cpp
     src/Toy2/LevelSelect.h
+    src/Toy2/LevelLogic.h
+    src/Toy2/Particles.h
+    src/Toy2/AndysHouse.cpp
+    src/Toy2/AndysNeighborhood.cpp
+    src/Toy2/BombsAway.cpp
+    src/Toy2/ConstructionYard.cpp
+    src/Toy2/AlleysAndGullies.cpp
+    src/Toy2/SlimeTime.cpp
+    src/Toy2/AlsToyBarn.cpp
+    src/Toy2/AlsSpaceLand.cpp
+    src/Toy2/BarnEncounter.cpp
+    src/Toy2/ElevatorHop.cpp
+    src/Toy2/AlsPenthouse.cpp
+    src/Toy2/EvilEmperorZurg.cpp
+    src/Toy2/AirportInfiltration.cpp
+    src/Toy2/TarmacTrouble.cpp
+    src/Toy2/FinalShowdown.cpp
     src/Toy2/Toy2.cpp
     src/Toy2/Toy2.h
     src/D3DApp/d3dapp.cpp
