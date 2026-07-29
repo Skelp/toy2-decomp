@@ -28,16 +28,28 @@ namespace Toy2
 			SMITH_STATE_DEFEATED = 3,
 		};
 
+		enum ProspectorState
+		{
+			PROSPECTOR_STATE_ACTIVE = 2,
+			PROSPECTOR_STATE_DEFEATED = 3,
+		};
+
 		extern int32_t g_defeatedBossIndex;
 		extern int32_t g_gunslingerState;
+		extern int32_t g_prospectorState;
 		extern int32_t g_smithState;
+		extern int32_t g_prospectorAttackTimer;
 		extern int32_t g_smithPhaseTimer;
+		extern int32_t g_prospectorPhaseTimer;
 		extern int32_t g_gunslingerPhaseTimer;
 		extern int32_t g_previousSmithPhase;
+		extern int32_t g_previousProspectorPhase;
 		extern int32_t g_previousGunslingerPhase;
 		extern int32_t g_smithTintToggle;
+		extern int32_t g_prospectorTintToggle;
 		extern int32_t g_gunslingerTintToggle;
 		extern int32_t g_smithEffectTimer;
+		extern int32_t g_prospectorEffectTimer;
 		extern int32_t g_defeatedBossCount;
 	}
 
@@ -242,8 +254,115 @@ namespace Toy2
 			}
 		}
 
-		// STUB: TOY2 0x0042F7B0
-		void ProsP(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// FUNCTION: TOY2 0x0042F7B0 [PROVISIONAL]
+		void ProsP(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			FinalShowdown::g_prospectorTintToggle = (FinalShowdown::g_prospectorTintToggle - 1) & 1;
+
+			if (actor->actorPhase != FinalShowdown::g_previousProspectorPhase)
+			{
+				FinalShowdown::g_previousProspectorPhase = actor->actorPhase;
+				FinalShowdown::g_prospectorPhaseTimer = 60;
+				actor->creatureRam->defenseMode = 4;
+
+				int32_t soundIndex = *g_randDatBufferPtr++ & 3;
+				if (soundIndex == 3)
+					soundIndex = 0;
+				AudioManager::Preset::PlayOneShotSound2(soundIndex + 0xC4, actor);
+			}
+
+			if (FinalShowdown::g_prospectorState == FinalShowdown::PROSPECTOR_STATE_ACTIVE)
+			{
+				FinalShowdown::g_prospectorAttackTimer -= Renderer::g_frameDelta;
+				if (FinalShowdown::g_prospectorAttackTimer < 0)
+				{
+					FinalShowdown::g_prospectorAttackTimer = *g_randDatBufferPtr++ * 2 + 400;
+					int32_t soundIndex = *g_randDatBufferPtr++ % 6;
+					if (soundIndex == 0)
+						soundIndex = -4;
+					AudioManager::Preset::PlayOneShotSound(soundIndex + 199, actor);
+				}
+
+				FinalShowdown::g_prospectorPhaseTimer -= Renderer::g_frameDelta;
+				if (FinalShowdown::g_prospectorPhaseTimer < 0)
+				{
+					FinalShowdown::g_prospectorPhaseTimer = 0;
+					actor->creatureRam->defenseMode = 6;
+				}
+				else if (FinalShowdown::g_prospectorTintToggle != 0)
+				{
+					actor->useTint = 1;
+					actor->actorTint.r = 0x2000;
+					actor->actorTint.g = 0x2000;
+					actor->actorTint.b = 0x2000;
+				}
+				else
+				{
+					actor->useTint = 0;
+				}
+			}
+			else
+			{
+				actor->useTint = 0;
+			}
+
+			if ((context->targetFlags & 1) != 0 && Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &actor->pos, 300) != 0
+				&& actor->primaryAnimIdx == 4)
+			{
+				actor->reservedArea[1] = 0xD0;
+				actor->reservedArea[2] = 0xD0;
+				Actor::SetAnimation(actor, 3, 9);
+				actor->creatureRam->speedTarget = 0;
+				FinalShowdown::g_prospectorEffectTimer = 0x2C;
+				if (AudioManager::IsActorSoundPlaying(actor) == 0)
+					AudioManager::Preset::PlayOneShotSound2(0xC2, actor);
+			}
+
+			if (actor->primaryAnimIdx == 3 && (actor->animationFramePosition & (int32_t)0xFFFF0000) > 0x150000)
+			{
+				actor->movementCommandTimer = 0;
+				actor->movementData = g_prospectorMovementData + 16;
+				actor->creatureRam->speedTarget = 0x10;
+				actor->actorFlags &= ~(Actor::ACTOR_FLAG_TRACKS_TARGET | Actor::ACTOR_FLAG_TARGETS_BUZZ);
+			}
+
+			if (FinalShowdown::g_prospectorEffectTimer != 0)
+			{
+				FinalShowdown::g_prospectorEffectTimer -= Renderer::g_frameDelta;
+				if (FinalShowdown::g_prospectorEffectTimer <= 0)
+				{
+					int32_t yawAngle = actor->yawAngle;
+					Nu3D::Particles::SpawnInstance(actor->pos.x + (Numerics::g_sinCosLUT[(yawAngle + 0x400) & 0xFFF] >> 3),
+						actor->pos.y - 0x800,
+						actor->pos.z + (Numerics::g_sinCosLUT[(yawAngle - 0x800) & 0xFFF] >> 3),
+						Numerics::g_sinCosLUT[yawAngle] >> 2,
+						0,
+						Numerics::g_sinCosLUT[(yawAngle + 0x400) & 0xFFF] >> 2,
+						0,
+						(0x7FF - yawAngle) & 0xFFF,
+						0,
+						0x68);
+					FinalShowdown::g_prospectorEffectTimer = 0;
+					AudioManager::PlaySoundEffect(0xA6, &actor->pos);
+				}
+			}
+
+			if (actor->actorPhase < 10 && FinalShowdown::g_prospectorState == FinalShowdown::PROSPECTOR_STATE_ACTIVE)
+			{
+				actor->movementData = g_prospectorMovementData + 45;
+				actor->creatureRam->defenseMode = 4;
+				actor->actorFlags &= ~(Actor::ACTOR_FLAG_TARGETS_BUZZ | Actor::ACTOR_FLAG_DAMAGES_BUZZ);
+				actor->movementCommandTimer = 0;
+				AudioManager::PlaySoundEffect(-2, &actor->pos);
+				FinalShowdown::g_defeatedBossCount++;
+				FinalShowdown::g_prospectorState = FinalShowdown::PROSPECTOR_STATE_DEFEATED;
+				if (FinalShowdown::g_defeatedBossCount == 3)
+					FinalShowdown::g_defeatedBossIndex = 2;
+				FinalShowdown::g_prospectorEffectTimer = 0;
+				actor->creatureRam->speedTarget = 0x10;
+			}
+		}
 	}
 }
 

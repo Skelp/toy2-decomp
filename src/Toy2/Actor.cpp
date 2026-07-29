@@ -1483,6 +1483,8 @@ namespace Toy2
 		uint16_t* g_gunslingerMovementData;
 		// GLOBAL: TOY2 0x004E0360
 		uint16_t* g_smithMovementData;
+		// GLOBAL: TOY2 0x004E0368
+		uint16_t* g_prospectorMovementData;
 
 		// GLOBAL: TOY2 0x0050A544
 		int32_t g_rcCarRearWheelRotation;
