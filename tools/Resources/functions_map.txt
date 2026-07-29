@@ -43,7 +43,7 @@
 0x004092F0 D3DApp::EnumDisplayModes
 0x00409360 D3DApp::ProfileWndProc
 0x004093A0 D3DApp::BuildProfileMachine
-0x0040BAE0 SoftwareRenderer::ClearRenderSurfaces
+0x0040BAE0 D3DApp::ClearBuffers
 0x0040C130 D3DApp::SetErrorString
 0x0040CAC0 D3DApp::ProcessWndProc
 0x0040CD80 D3DApp::ShowBackBuffer

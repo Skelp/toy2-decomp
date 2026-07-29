@@ -1,5 +1,4 @@
 #include "Toy2/D3DApp.h"
-#include "SoftwareRenderer.h"
 #include "Logger.h"
 #include <cstdarg>
 #include <cstdio>
@@ -60,6 +59,52 @@ namespace D3DApp
 
 namespace D3DApp
 {
+	// FUNCTION: TOY2 0x0040BAE0 [MATCHED]
+	BOOL ClearBuffers()
+	{
+		if (g_renderMode == RENDERMODE_SOFTWARE && g_pcStruct.mode->rgbBitCount == 8)
+			return TRUE;
+
+		DDSURFACEDESC ddsd;
+		RECT dst;
+		DDBLTFX ddbltfx;
+		HRESULT result;
+
+		if (d3dappi.lpFrontBuffer)
+		{
+			memset(&ddsd, 0, sizeof(ddsd));
+			ddsd.dwSize = sizeof(ddsd);
+			result = d3dappi.lpFrontBuffer->GetSurfaceDesc(&ddsd);
+			if (result < 0)
+				Logger::LogDDError("D3DAppIGetSurfDesc(&ddsd, d3dappi.lpFrontBuffer)", result);
+
+			memset(&ddbltfx, 0, sizeof(ddbltfx));
+			ddbltfx.dwSize = sizeof(ddbltfx);
+			SetRect(&dst, 0, 0, ddsd.dwWidth, ddsd.dwHeight);
+			result = d3dappi.lpFrontBuffer->Blt(&dst, 0, 0, DDBLT_COLORFILL | DDBLT_WAIT, &ddbltfx);
+			if (result < 0)
+				Logger::LogDDError("d3dappi.lpFrontBuffer->Blt(&dst, 0, 0, 0x00000400l | 0x01000000l, &ddbltfx)", result);
+		}
+
+		if (d3dappi.lpBackBuffer)
+		{
+			memset(&ddsd, 0, sizeof(ddsd));
+			ddsd.dwSize = sizeof(ddsd);
+			result = d3dappi.lpBackBuffer->GetSurfaceDesc(&ddsd);
+			if (result < 0)
+				Logger::LogDDError("D3DAppIGetSurfDesc(&ddsd, d3dappi.lpBackBuffer)", result);
+
+			memset(&ddbltfx, 0, sizeof(ddbltfx));
+			ddbltfx.dwSize = sizeof(ddbltfx);
+			SetRect(&dst, 0, 0, ddsd.dwWidth, ddsd.dwHeight);
+			result = d3dappi.lpBackBuffer->Blt(&dst, 0, 0, DDBLT_COLORFILL | DDBLT_WAIT, &ddbltfx);
+			if (result < 0)
+				Logger::LogDDError("d3dappi.lpBackBuffer->Blt(&dst, 0, 0, 0x00000400l | 0x01000000l, &ddbltfx)", result);
+		}
+
+		return TRUE;
+	}
+
 	// FUNCTION: TOY2 0x0040C130 [PROVISIONAL]
 	void SetErrorString(char* format, ...)
 	{
@@ -104,7 +149,7 @@ namespace D3DApp
 				g_surfacesLost = 1;
 				d3dappi.lpFrontBuffer->Restore();
 				d3dappi.lpBackBuffer->Restore();
-				SoftwareRenderer::ClearRenderSurfaces();
+				ClearBuffers();
 			}
 			else if (g_lastError != DD_OK)
 			{
@@ -131,7 +176,7 @@ namespace D3DApp
 					g_surfacesLost = 1;
 					d3dappi.lpFrontBuffer->Restore();
 					d3dappi.lpBackBuffer->Restore();
-					SoftwareRenderer::ClearRenderSurfaces();
+					ClearBuffers();
 				}
 				else if (g_lastError != DD_OK)
 				{

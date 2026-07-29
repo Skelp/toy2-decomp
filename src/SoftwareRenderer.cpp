@@ -612,9 +612,6 @@ namespace SoftwareRenderer
 	// FUNCTION: TOY2 0x004C1E60 [MATCHED]
 	void InitialisePrimarySurface_T() { InitialisePrimarySurface(); }
 
-	// STUB: TOY2 0x0040BAE0
-	void ClearRenderSurfaces() {}
-
 	// FUNCTION: TOY2 0x0047D0F0 [MATCHED]
 	void Destroy()
 	{
