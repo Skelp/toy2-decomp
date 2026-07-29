@@ -43,6 +43,31 @@
 
 namespace Toy2
 {
+	namespace Buzz
+	{
+		// STUB: TOY2 0x00433D50
+		void Init(Toy2BuzzActor* buzz, int32_t levelIndex) {}
+	}
+
+	namespace Gadget
+	{
+		// STUB: TOY2 0x004A2080
+		void InitLevelUnlockGeometry() {}
+	}
+
+	namespace Level
+	{
+		// STUB: TOY2 0x00414550
+		void FixupRecordCoordinates() {}
+	}
+
+	namespace Lighting
+	{
+		void InitBuzzLight();
+	}
+
+	extern int32_t g_hudActorAnimationFrame;
+
 	namespace MoveableObject
 	{
 		// GLOBAL: TOY2 0x0053C65C
@@ -1153,7 +1178,7 @@ namespace Toy2
 		// FUNCTION: TOY2 0x0042C810 [PROVISIONAL]
 		void SpawnFanParticle(const Vector3I* position, int32_t fanIndex)
 		{
-			if ((fanIndex == 4 ? g_sevenTickPulse : g_sixteenTickPulse) != 0)
+			if ((fanIndex == 4 ? g_framePulseOutputs.sevenTick : g_framePulseOutputs.sixteenTick) != 0)
 			{
 				Nu3D::Particles::ParticleInstance* particle =
 					Nu3D::Particles::SpawnFromPreset(position->x, position->y, position->z, fanIndex == 4 ? 0x4F : 0x4E, 2);
@@ -1161,7 +1186,7 @@ namespace Toy2
 				particle->velY = g_fanParticleVelocities[fanIndex].y;
 				particle->velZ = g_fanParticleVelocities[fanIndex].z;
 				particle->rotSpeed = -0x100;
-				particle->groundAlignRot = 0xFFF - g_thirtyTwoTickPhase * 0x40;
+				particle->groundAlignRot = 0xFFF - g_framePulsePhases.thirtyTwoTick * 0x40;
 			}
 		}
 
@@ -2019,25 +2044,14 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0052AD94
 	int32_t g_demoMode;
 
-	// GLOBAL: TOY2 0x0052F1C4
-	uint8_t g_fourTickPulse;
-	// GLOBAL: TOY2 0x0052F1C7
-	uint8_t g_sevenTickPulse;
-
-	// GLOBAL: TOY2 0x0052F1C9
-	uint8_t g_sixteenTickPulse;
-
-	// GLOBAL: TOY2 0x0052F1C2
-	uint8_t g_twoTickPulseCount;
+	// GLOBAL: TOY2 0x0052F1C0
+	FramePulseOutputs g_framePulseOutputs;
 
 	// GLOBAL: TOY2 0x0052AD68
 	uint16_t g_framePhase;
 
-	// GLOBAL: TOY2 0x0052AD61
-	uint8_t g_sixteenTickPhase;
-
-	// GLOBAL: TOY2 0x0052AD62
-	uint8_t g_thirtyTwoTickPhase;
+	// GLOBAL: TOY2 0x0052AD58
+	FramePulsePhases g_framePulsePhases;
 
 	// GLOBAL: TOY2 0x0055A0E0
 	int32_t g_hasStaticBackdrop;
@@ -2065,6 +2079,51 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x0052AD7C
 	int32_t g_demoPathWriteIdx;
+
+	// GLOBAL: TOY2 0x0052AD6A
+	int16_t g_unusedLevelState[9];
+
+	// GLOBAL: TOY2 0x0052ADB0
+	int16_t g_pauseMenuState;
+
+	// GLOBAL: TOY2 0x0052B7E4
+	int16_t g_pauseMenuSelection;
+
+	// GLOBAL: TOY2 0x0050A0B0
+	int32_t g_idleVoicePreset;
+
+	// GLOBAL: TOY2 0x0050A0BC
+	int32_t g_idleVoiceCooldown;
+
+	// GLOBAL: TOY2 0x00830C90
+	int32_t g_gadgetRespawnTimer;
+
+	// GLOBAL: TOY2 0x00830D20
+	uint8_t g_environmentTintGreen;
+
+	// GLOBAL: TOY2 0x00830D2C
+	uint8_t g_environmentTintRed;
+
+	// GLOBAL: TOY2 0x00830D2D
+	uint8_t g_environmentTintBlue;
+
+	// GLOBAL: TOY2 0x00830D38
+	int32_t g_cameraIdleTimer;
+
+	// GLOBAL: TOY2 0x00830D44
+	int32_t g_levelInteractionTimer;
+
+	// GLOBAL: TOY2 0x00830D4C
+	int32_t g_specialPickupCount;
+
+	// GLOBAL: TOY2 0x00830E24
+	uint32_t g_savedUnlocks;
+
+	// GLOBAL: TOY2 0x00830E2C
+	Nu3D::Particles::ParticleInstance* g_laserAimParticle;
+
+	// GLOBAL: TOY2 0x00830E38
+	int32_t g_previousLevelObjectiveProgress;
 
 	// GLOBAL: TOY2 0x00882920
 	int32_t g_gravityBootsTimer;
@@ -2529,8 +2588,132 @@ namespace Toy2
 		return (g_levelTokenTarget[levelCount] + collected * 0x100) * 0x100 + levelCount;
 	}
 
-	// STUB: TOY2 0x00414720
-	int32_t EnterLevel(int32_t levelIndex) { return 0; }
+	// FUNCTION: TOY2 0x00414720 [PROVISIONAL]
+	int32_t EnterLevel(int32_t levelIndex)
+	{
+		Nu3D::Camera::g_cameraTintBlue = 0;
+		Nu3D::Camera::g_cameraTintGreen = 0;
+		Nu3D::Camera::g_cameraTintRed = 0;
+		Renderer::SetVirtualRatioTo54();
+
+		int32_t demoMode = g_demoMode;
+		if (demoMode == 0 || demoMode == 123)
+			LoadLevelGraphics(g_levelFileIndex);
+		else
+			LoadLevelGraphics(0);
+		SoftwareRenderer::g_backdropScrollOverride.x = 0;
+		SoftwareRenderer::g_backdropScrollOverride.y = 0;
+
+		Nu3D::Camera::SetTint(0x80, 0x80, 0x80, 12);
+		int32_t fadeTimer = 28;
+		do
+		{
+			fadeTimer -= Renderer::g_frameDelta;
+			if (fadeTimer <= 0)
+				fadeTimer = 0;
+			Nu3D::Camera::FadeToTargetTint();
+			if (demoMode == 0)
+				Renderer::Sprite::DrawScaled(0x60, 200, 0x80, 1, 0xFF, 0xFF, 0xFF, 0xFF, 0x800, 0x800);
+			Nullsub3();
+			MainMenu::RenderMenu();
+		} while (fadeTimer != 0);
+
+		Levels::InitLevelPlay(levelIndex);
+		int32_t introResult = ShowLevelIntroScreen(g_levelFileIndex, g_demoMode);
+		Level::FixupRecordCoordinates();
+
+		g_framePulseOutputs.words[0] = 0;
+		g_framePulseOutputs.words[1] = 0;
+		g_framePulseOutputs.words[2] = 0;
+		g_framePulsePhases.words[0] = 0;
+
+		memset(AudioManager::g_soundSequenceSlots, 0, sizeof(AudioManager::g_soundSequenceSlots));
+		g_framePulsePhases.words[1] = 0;
+
+		HUD::g_slideAngles[0] = 0x400;
+		HUD::g_slideAngles[1] = 0x400;
+		HUD::g_slideAngles[2] = 0x400;
+		g_levelTransition = 0;
+		g_levelTransitionTimer = 0;
+		g_isPaused = 0;
+		g_pauseMenuBlinkTimer = 0;
+		g_pauseMenuSelection = 0;
+		g_pauseMenuState = 0;
+		AudioManager::g_maxLeftVolume = 0;
+		AudioManager::g_maxRightVolume = 0;
+		AudioManager::g_maxVolume = 0;
+		Nu3D::Camera::g_targetTintBlue = 0;
+		Nu3D::Camera::g_targetTintGreen = 0;
+		Nu3D::Camera::g_targetTintRed = 0;
+		Nu3D::Camera::g_targetTintFadeSpeed = 0;
+		g_randDatBufferPtr = g_randDatBuffer;
+		g_hudActorAnimationFrame = 54;
+		g_framePulsePhases.words[2] = 0;
+
+		HUD::g_slideAngles[3] = 0;
+		HUD::g_slideAngles[4] = 0;
+		HUD::g_slideAngles[5] = 0;
+		HUD::g_slideAngles[6] = 0;
+		HUD::g_slideAngles[7] = 0;
+		HUD::g_slideAngles[8] = 0;
+		HUD::g_slideAngles[9] = 0;
+		HUD::g_slideAngles[10] = 0;
+
+		HUD::g_slideTimers[0] = 180;
+		HUD::g_slideTimers[1] = 180;
+		HUD::g_slideTimers[2] = 180;
+		HUD::g_slideTimers[3] = 0;
+		HUD::g_slideTimers[4] = 0;
+		HUD::g_slideTimers[5] = 0;
+		HUD::g_slideTimers[6] = 0;
+		HUD::g_slideTimers[7] = 0;
+		HUD::g_slideTimers[8] = 0;
+		HUD::g_slideTimers[9] = 0;
+		HUD::g_slideTimers[10] = 0;
+
+		Buzz::Init(&g_buzzActor, levelIndex);
+		Lighting::InitBuzzLight();
+		Camera::InitGameplayCamera(&Camera::g_gameplayCamera, &g_buzzActor);
+		Nu3D::Particles::Init();
+		ResetGadgets();
+
+		Actor::g_renderActors[0] = 0;
+		g_levelObjectiveProgress = 0;
+		g_previousLevelObjectiveProgress = 0;
+		g_specialPickupCount = -1;
+		g_idleVoiceCooldown = 900;
+		g_idleVoicePreset = 206;
+		g_environmentTintBlue = 0x80;
+		g_environmentTintGreen = 0x80;
+		g_environmentTintRed = 0x80;
+		HUD::g_challengeState = 0;
+		AndysHouse::g_raceCheckpointPassCount = 0;
+
+		InitialiseLevelVariables(levelIndex);
+		Gadget::InitLevelUnlockGeometry();
+
+		SaveManager::g_curLevelTokenData = g_levelTokenBits[g_levelFileIndex];
+		g_savedUnlocks = SaveManager::g_save0Data.unlocks;
+		g_framePhase = 0;
+		g_unusedLevelState[0] = 0;
+		g_unusedLevelState[1] = 0;
+		g_unusedLevelState[2] = 0;
+		g_unusedLevelState[3] = 0;
+		g_unusedLevelState[4] = 0;
+		g_unusedLevelState[5] = 0;
+		g_unusedLevelState[6] = 0;
+		g_unusedLevelState[7] = 0;
+		g_unusedLevelState[8] = 0;
+		g_levelInteractionTimer = 0;
+		g_cameraIdleTimer = 0;
+		g_gadgetRespawnTimer = 0;
+		g_laserAimParticle = (Nu3D::Particles::ParticleInstance*)-1;
+
+		if (g_levelFileIndex > 0 && g_levelFileIndex < 16 && g_levelIndex < 15 && g_levelFileIndex % 3 != 0)
+			AudioManager::PlayMusicLooping(g_levelIndex);
+
+		return introResult;
+	}
 
 	// FUNCTION: TOY2 0x004A3770 [MATCHED]
 	void LoadPathBin()
@@ -4086,14 +4269,14 @@ void Toy2::ElevatorHop::SpawnFanParticle(const Vector3I* position, int32_t fanIn
 		AudioManager::PlaySoundEffect(0x8C, position);
 	}
 
-	if ((fanIndex == 4 ? g_sevenTickPulse : g_sixteenTickPulse) != 0)
+	if ((fanIndex == 4 ? g_framePulseOutputs.sevenTick : g_framePulseOutputs.sixteenTick) != 0)
 	{
 		Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(position->x, position->y, position->z, fanIndex == 4 ? 0x4F : 0x4E, 2);
 		particle->velX = g_fanParticleVelocityFactors[fanIndex].x * velocityScale;
 		particle->velY = g_fanParticleVelocityFactors[fanIndex].y * velocityScale;
 		particle->velZ = g_fanParticleVelocityFactors[fanIndex].z * velocityScale;
 		particle->rotSpeed = -0x100;
-		particle->groundAlignRot = 0xFFF - g_thirtyTwoTickPhase * 0x40;
+		particle->groundAlignRot = 0xFFF - g_framePulsePhases.thirtyTwoTick * 0x40;
 	}
 }
 

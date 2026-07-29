@@ -155,7 +155,7 @@ namespace Toy2
 		// FUNCTION: TOY2 0x0049FB40 [PROVISIONAL]
 		void UpdateAmbientEmitters()
 		{
-			if (g_sixteenTickPulse != 0 && g_recordData[58] != 0)
+			if (g_framePulseOutputs.sixteenTick != 0 && g_recordData[58] != 0)
 			{
 				int32_t emitterIndex = g_ambientEmitterScanIndex;
 				if (emitterIndex < g_recordData[58]->recordCount)

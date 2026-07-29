@@ -51,6 +51,46 @@ namespace Toy2
 		extern int32_t g_challengeState;
 	}
 
+	union FramePulseOutputs
+	{
+		struct
+		{
+			uint8_t twoTickPhase;
+			uint8_t frameDelta;
+			uint8_t twoTickCount;
+			uint8_t threeTick;
+			uint8_t fourTick;
+			uint8_t fiveTick;
+			uint8_t sixTick;
+			uint8_t sevenTick;
+			uint8_t eightTick;
+			uint8_t sixteenTick;
+			uint8_t thirtyTwoTick;
+			uint8_t sixtyFourTick;
+		};
+		uint32_t words[3];
+	};
+
+	union FramePulsePhases
+	{
+		struct
+		{
+			uint8_t unusedTwoTick;
+			uint8_t unusedThreeTick;
+			uint8_t twoTick;
+			uint8_t threeTick;
+			uint8_t fourTick;
+			uint8_t fiveTick;
+			uint8_t sixTick;
+			uint8_t sevenTick;
+			uint8_t eightTick;
+			uint8_t sixteenTick;
+			uint8_t thirtyTwoTick;
+			uint8_t sixtyFourTick;
+		};
+		uint32_t words[3];
+	};
+
 	namespace ElevatorHop
 	{
 		extern int32_t g_link18PathPointIndex;
@@ -136,13 +176,9 @@ namespace Toy2
 	extern int32_t g_saveLoaded;
 	extern int32_t g_showBlackFrames;
 	extern int32_t g_demoMode;
-	extern uint8_t g_twoTickPulseCount;
-	extern uint8_t g_fourTickPulse;
-	extern uint8_t g_sevenTickPulse;
-	extern uint8_t g_sixteenTickPulse;
+	extern FramePulseOutputs g_framePulseOutputs;
+	extern FramePulsePhases g_framePulsePhases;
 	extern uint16_t g_framePhase;
-	extern uint8_t g_sixteenTickPhase;
-	extern uint8_t g_thirtyTwoTickPhase;
 	extern int32_t g_hasStaticBackdrop;
 	extern int32_t g_nextBackdropId;
 	extern int16_t g_levelIndex;
@@ -155,4 +191,6 @@ namespace Toy2
 	extern uint8_t g_levelTokenBits[16];
 
 	STATIC_ASSERT(sizeof(ToyCfg) == 0x18);
+	STATIC_ASSERT(sizeof(FramePulseOutputs) == 0xC);
+	STATIC_ASSERT(sizeof(FramePulsePhases) == 0xC);
 }

@@ -1075,7 +1075,7 @@ namespace Toy2
 				g_spinCooldownTimer -= Renderer::g_frameDelta;
 				if (g_spinCooldownTimer < 0)
 					g_spinCooldownTimer = 0;
-				if (g_twoTickPulseCount != 0 && g_spinCooldownTimer > 20)
+				if (g_framePulseOutputs.twoTickCount != 0 && g_spinCooldownTimer > 20)
 				{
 					Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(
 						buzz->posAngles.pos.x, buzz->posAngles.pos.y, buzz->posAngles.pos.z, (*g_randDatBufferPtr++ & 1) + 0x16, 2);
@@ -1130,7 +1130,7 @@ namespace Toy2
 			if (updatedSpinHoverTime <= -120)
 			{
 				AudioManager::PlaySoundEffect(0x26, &buzz->posAngles.pos);
-				if (g_twoTickPulseCount != 0)
+				if (g_framePulseOutputs.twoTickCount != 0)
 				{
 					Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(
 						buzz->posAngles.pos.x, buzz->posAngles.pos.y - 0x3000, buzz->posAngles.pos.z, (*g_randDatBufferPtr++ & 1) + 0x14, 2);
@@ -1323,7 +1323,7 @@ namespace Toy2
 			if (g_buzzActor.cosmicShieldTimer < 0x80)
 			{
 				scale = (Numerics::g_sinCosLUT[g_buzzActor.cosmicShieldTimer * 8] >> 2) * 3;
-				if (g_sixteenTickPhase < 8)
+				if (g_framePulsePhases.sixteenTick < 8)
 					playSound = 0;
 			}
 			else
@@ -1338,7 +1338,8 @@ namespace Toy2
 				AudioManager::PlaySoundEffect(0x4D, &g_buzzActor.posAngles.pos);
 			}
 
-			Renderer::BlitTextureByIndexOffset(0x10, 0x80, 0xC0, 0x40, 0x40, g_sixteenTickPhase * 4, g_thirtyTwoTickPhase * 2, 0, -0x40);
+			Renderer::BlitTextureByIndexOffset(
+				0x10, 0x80, 0xC0, 0x40, 0x40, g_framePulsePhases.sixteenTick * 4, g_framePulsePhases.thirtyTwoTick * 2, 0, -0x40);
 		}
 
 		// FUNCTION: TOY2 0x004A5540 [PROVISIONAL]

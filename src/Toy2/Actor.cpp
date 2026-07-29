@@ -1240,7 +1240,7 @@ namespace Toy2
 				SetRCCarNodeAngle(actor, 3, g_rcCarRearWheelRotation, 0, 0);
 			}
 
-			if (g_fourTickPulse != 0 && (animationIndex == 1 || abs(context->localStrafeSpeed) > 0x200))
+			if (g_framePulseOutputs.fourTick != 0 && (animationIndex == 1 || abs(context->localStrafeSpeed) > 0x200))
 			{
 				Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(
 					actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle + 0x680) & 0xFFF] >> 1),
@@ -1319,7 +1319,7 @@ namespace Toy2
 				SetRCCarNodeAngle(actor, 3, g_rcCarRearWheelRotation, 0, 0);
 			}
 
-			if (g_fourTickPulse != 0 && (animationIndex == 1 || abs(context->localStrafeSpeed) > 0x200))
+			if (g_framePulseOutputs.fourTick != 0 && (animationIndex == 1 || abs(context->localStrafeSpeed) > 0x200))
 			{
 				Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(
 					actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle + 0x680) & 0xFFF] >> 1),

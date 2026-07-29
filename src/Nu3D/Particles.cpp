@@ -443,7 +443,7 @@ namespace Nu3D
 			const int32_t drainCenterZ = 0x99;
 			int32_t bounced = 0;
 
-			if (particle->lifetime > 4 && Toy2::g_fourTickPulse != 0)
+			if (particle->lifetime > 4 && Toy2::g_framePulseOutputs.fourTick != 0)
 			{
 				SpawnFromPreset(particle->pos.x - particle->velX * Renderer::g_frameDelta,
 					particle->pos.y,
@@ -545,7 +545,7 @@ namespace Nu3D
 				particle->lifetime = 0;
 			}
 
-			if (particle->lifetime > 4 && Toy2::g_fourTickPulse != 0)
+			if (particle->lifetime > 4 && Toy2::g_framePulseOutputs.fourTick != 0)
 			{
 				SpawnFromPreset(particle->pos.x - particle->velX * Renderer::g_frameDelta,
 					particle->pos.y,
