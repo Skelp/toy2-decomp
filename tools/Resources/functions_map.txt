@@ -173,7 +173,7 @@
 0x0042C200 Toy2::Path::SamplePoint
 0x0042C2B0 Toy2::Platform::InitPathPlatform
 0x0042C3E0 Toy2::AirportInfiltration::Method2
-0x0042C810 Toy2::AirportInfiltration::Method1
+0x0042C810 Toy2::AirportInfiltration::SpawnFanParticle
 0x0042C8A0 Toy2::AirportInfiltration::InitHiddenCollectibles
 0x0042C930 Toy2::AirportInfiltration::Init
 0x0042CA60 Toy2::AirportInfiltration::Interactions

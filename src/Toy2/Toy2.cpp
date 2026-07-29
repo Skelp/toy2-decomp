@@ -25,6 +25,7 @@
 #include "Nu3D/Viewport.h"
 #include "Nu3D/Camera.h"
 #include "Nu3D/Math.h"
+#include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
 #include "AudioManager/AudioManager.h"
 #include "NGNLoader/NGNLoader.h"
@@ -475,6 +476,15 @@ namespace Toy2
 
 	namespace AirportInfiltration
 	{
+		// GLOBAL: TOY2 0x004F4668
+		Vector3I g_fanParticleVelocities[5] = {
+			{ 0, 0, 0x500 },
+			{ 0x500, 0, 0 },
+			{ 0, 0, -0x500 },
+			{ -0x500, 0, 0 },
+			{ 0, 0, -0x500 },
+		};
+
 		// GLOBAL: TOY2 0x004F46A4
 		MoveableObject::InitEntry g_moveableObjectInitTable[] = {
 			{ 8, 11, 0 },
@@ -524,6 +534,21 @@ namespace Toy2
 		STATIC_ASSERT(offsetof(State, pilotDialogueState) == 0x30);
 		STATIC_ASSERT(offsetof(State, previousPilotPhase) == 0x50);
 		STATIC_ASSERT(offsetof(State, prospectorCooldown) == 0x58);
+
+		// FUNCTION: TOY2 0x0042C810 [PROVISIONAL]
+		void SpawnFanParticle(const Vector3I* position, int32_t fanIndex)
+		{
+			if ((fanIndex == 4 ? g_sevenTickPulse : g_sixteenTickPulse) != 0)
+			{
+				Nu3D::Particles::ParticleInstance* particle =
+					Nu3D::Particles::SpawnFromPreset(position->x, position->y, position->z, fanIndex == 4 ? 0x4F : 0x4E, 2);
+				particle->velX = g_fanParticleVelocities[fanIndex].x;
+				particle->velY = g_fanParticleVelocities[fanIndex].y;
+				particle->velZ = g_fanParticleVelocities[fanIndex].z;
+				particle->rotSpeed = -0x100;
+				particle->groundAlignRot = 0xFFF - g_thirtyTwoTickPhase * 0x40;
+			}
+		}
 
 		// FUNCTION: TOY2 0x0042C8A0 [MATCHED]
 		void InitHiddenCollectibles()
@@ -948,6 +973,8 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x0052F1C4
 	uint8_t g_fourTickPulse;
+	// GLOBAL: TOY2 0x0052F1C7
+	uint8_t g_sevenTickPulse;
 
 	// GLOBAL: TOY2 0x0052F1C9
 	uint8_t g_sixteenTickPulse;
