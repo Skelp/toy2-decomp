@@ -1347,8 +1347,44 @@ namespace Toy2
 		void ZgCar(Actor::Toy2Actor::ActorBehaviourContext* context) {}
 		// STUB: TOY2 0x00406620
 		void ZPod(Actor::Toy2Actor::ActorBehaviourContext* context) {}
-		// STUB: TOY2 0x00406960
-		void BPlane(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// FUNCTION: TOY2 0x00406960 [MATCHED]
+		void BPlane(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			if (actor->hitpoints >= 0)
+				AudioManager::PlaySoundEffect(0x5D, &actor->pos);
+
+			if ((actor->actorFlags & Actor::ACTOR_FLAG_INTERACTION_REQUESTED) != 0 && actor->actorPhase == 1)
+				Actor::HandleDamage(actor, (actor->yawAngle - 0x800) & 0xFFF, Actor::DAMAGE_SPIN);
+
+			if (actor->previousActorPhase != 0)
+			{
+				actor->previousActorPhase = 0;
+				Actor::Toy2Actor* anchorActor;
+				if ((actor - 1)->creatureId == 25)
+					anchorActor = actor - 1;
+				else
+					anchorActor = actor - 2;
+
+				actor->boundary.y = anchorActor->pos.y - 0x5000;
+				actor->pos.x = anchorActor->pos.x;
+				actor->pos.y = anchorActor->pos.y;
+				actor->pos.z = anchorActor->pos.z;
+				actor->motionTargetPos.x = anchorActor->pos.x;
+				actor->motionTargetPos.y = anchorActor->pos.y - 0x5000;
+				actor->motionTargetPos.z = anchorActor->pos.z;
+			}
+
+			if (g_framePulseOutputs.eightTick != 0 && (actor->actorFlags & Actor::ACTOR_FLAG_TARGETABLE) != 0)
+			{
+				Vector4I particlePosition;
+				particlePosition.x = 0;
+				particlePosition.y = -200;
+				particlePosition.z = 400;
+				Actor::ResolveBoneAttachmentPos(&particlePosition, actor, 0);
+				Nu3D::Particles::SpawnFromPreset(particlePosition.x, particlePosition.y, particlePosition.z, 0x58, 3);
+			}
+		}
 		// STUB: TOY2 0x00406A90
 		void FatBloke(Actor::Toy2Actor::ActorBehaviourContext* context) {}
 
