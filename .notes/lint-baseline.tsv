@@ -36,8 +36,6 @@ src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNo
 0x004c1540	unknown-symbol	UnkFunc22	83cdc1e9d721	src/SoftwareRenderer.cpp
 0x00407150	address-named-symbol	g_unk52ADD8	3a50af5af798	src/Toy2/Actor.cpp
 0x00407150	unknown-symbol	g_unk52ADD8	3a50af5af798	src/Toy2/Actor.cpp
-0x00407150	address-named-symbol	g_unk50A54C	dce86ed1f490	src/Toy2/Actor.cpp
-0x00407150	unknown-symbol	g_unk50A54C	dce86ed1f490	src/Toy2/Actor.cpp
 0x00407150	address-named-symbol	g_unk52EF48	6e12511dee10	src/Toy2/Actor.cpp
 0x00407150	unknown-symbol	g_unk52EF48	6e12511dee10	src/Toy2/Actor.cpp
 0x00407150	address-named-symbol	g_unk52EF88	67f6287a4070	src/Toy2/Actor.cpp
@@ -47,7 +45,6 @@ src/Toy2/Actor.h	placeholder-field	unkVar9	439d5d04a3fa	src/Toy2/Actor.h
 src/Toy2/Actor.h	placeholder-field	unkVar10	31f6ac62c669	src/Toy2/Actor.h
 src/Toy2/Actor.h	placeholder-field	unkVar12	d0e8cda92968	src/Toy2/Actor.h
 src/Toy2/Actor.h	placeholder-field	unkVar13	0e749acae57b	src/Toy2/Actor.h
-src/Toy2/Actor.h	placeholder-field	unkVar34	a583a3fdd72c	src/Toy2/Actor.h
 src/Toy2/Buzz.h	placeholder-field	unkVar7	c4e96513da34	src/Toy2/Buzz.h
 src/Toy2/Buzz.h	placeholder-field	unkVar8	214a98fbd5fd	src/Toy2/Buzz.h
 src/Toy2/Buzz.h	placeholder-field	unkVar51	56907e0b478c	src/Toy2/Buzz.h

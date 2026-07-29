@@ -19,6 +19,12 @@ namespace Toy2
 			ACTOR_FLAG_CULLED = 0x2000,
 		};
 
+		enum KillFlags
+		{
+			KILL_EFFECTS = 0x1,
+			KILL_REMOVE_ACTOR = 0x2,
+		};
+
 		struct Toy2Actor
 		{
 			struct ActorBehaviourContext
@@ -69,7 +75,7 @@ namespace Toy2
 			int16_t damageCooldownTimer;
 			int16_t actorPhase;
 			uint16_t* movementData;
-			int32_t unkVar34;
+			Vector3I16* deathEffectOffset;
 			int16_t unkShort3;
 			int16_t previousActorPhase;
 			int16_t unkWord15;
@@ -85,9 +91,10 @@ namespace Toy2
 		extern uint8_t* g_animationFrameSequences[26];
 		extern Toy2Actor* g_renderActors[66];
 
+		extern Toy2Actor* g_lastKilledActor;
+
 		// Actor-system state reset by InitCreatureRam. Roles are not yet confirmed;
 		// the consuming functions (Game::UpdateActors et al.) are unreconstructed.
-		extern int32_t g_unk50A54C;
 		extern int32_t g_unk52ADD8[0x80];
 		extern int32_t g_unk52EF48;
 		extern int32_t g_unk52EF88;
@@ -113,6 +120,7 @@ namespace Toy2
 		STATIC_ASSERT(offsetof(Toy2Actor, movementCommandTimer) == 0x78);
 		STATIC_ASSERT(offsetof(Toy2Actor, respawnDelay) == 0x7A);
 		STATIC_ASSERT(offsetof(Toy2Actor, actorPhase) == 0x7E);
+		STATIC_ASSERT(offsetof(Toy2Actor, deathEffectOffset) == 0x84);
 		STATIC_ASSERT(offsetof(Toy2Actor, previousActorPhase) == 0x8A);
 		STATIC_ASSERT(sizeof(Toy2Actor::ActorBehaviourContext) == 0xC);
 	}

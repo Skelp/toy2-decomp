@@ -2,6 +2,7 @@
 #include "Toy2/Animation.h"
 #include "Toy2/Buzz.h"
 #include "Toy2/Collectables.h"
+#include "Toy2/Collision.h"
 #include "Toy2/Toy2.h"
 #include "AudioManager/AudioManager.h"
 #include "CharacterLoader.h"
@@ -64,6 +65,12 @@ namespace Toy2
 
 			Lighting::SpawnLight(x, y, z, 0x604000, 0x10, x);
 		}
+
+		// STUB: TOY2 0x00410540
+		void SpawnBurstRingAtPoint(Actor::Toy2Actor* actor, int32_t red, int32_t green, int32_t blue, int32_t radius) {}
+
+		// STUB: TOY2 0x004106C0
+		void SpawnBurstRingAtActor(Actor::Toy2Actor* actor, int32_t red, int32_t green, int32_t blue, int32_t radius) {}
 	}
 
 	namespace Lighting
@@ -98,8 +105,193 @@ namespace Toy2
 
 	namespace Actor
 	{
-		// STUB: TOY2 0x00405D20
-		void Kill(Toy2Actor* actor, uint8_t killFlags) {}
+		// FUNCTION: TOY2 0x00405D20 [PROVISIONAL]
+		void Kill(Toy2Actor* actor, uint8_t killFlags)
+		{
+			if ((killFlags & KILL_EFFECTS) != 0)
+			{
+				if ((actor->actorFlags & ACTOR_FLAG_BOSS) == 0)
+				{
+					Nu3D::Particles::ParticleInstance* marker =
+						Nu3D::Particles::SpawnInstance(actor->pos.x, actor->pos.y - 0x1000, actor->pos.z, 0, -0x800, 0, 0x80, 0, 0, 0x3D);
+					marker->groundHeightY = Nu3D::Collision::GetGroundHeight(&marker->groundProbe, 0);
+					if (marker->groundHeightY == INT_MIN)
+					{
+						marker->groundHeightY = marker->pos.y;
+					}
+				}
+
+				actor->actorFlags |= ACTOR_FLAG_BOSS;
+				actor->reservedArea[1] = 0xE0;
+				actor->reservedArea[2] = 0xE0;
+				actor->velX = 0;
+				actor->velForward = 0;
+				actor->gravityVel = -0x400;
+
+				int32_t effectCount = 0;
+				switch (actor->creatureId)
+				{
+					case 3:
+					case 0xE:
+						actor->primaryAnimIdx = 2;
+						actor->animationFrameSequence = g_animationFrameSequences[1];
+						effectCount = 3;
+						actor->hitpoints = -0x5E;
+						actor->animationFramePosition = *actor->animationFrameSequence << 16;
+						break;
+					case 4:
+						actor->primaryAnimIdx = 2;
+						actor->animationFrameSequence = g_animationFrameSequences[7];
+						effectCount = 3;
+						actor->hitpoints = -0x3E;
+						actor->animationFramePosition = *actor->animationFrameSequence << 16;
+						break;
+					case 0xF:
+						actor->hitpoints = -1;
+						Particles::SpawnBurstRingAtPoint(actor, 0x20, 0x20, 0x20, 0x2000);
+						AudioManager::PlaySoundEffect(-2, &actor->pos);
+						break;
+					case 0x10:
+					case 0x19:
+						actor->hitpoints = -1;
+						effectCount = 6;
+						AudioManager::PlaySoundEffect(-2, &actor->pos);
+						break;
+					case 0x14:
+						actor->primaryAnimIdx = 1;
+						actor->animationFrameSequence = g_animationFrameSequences[0x14];
+						effectCount = 3;
+						actor->hitpoints = -0x46;
+						actor->animationFramePosition = *actor->animationFrameSequence << 16;
+						break;
+					case 0x15:
+						Particles::SpawnBurstRingAtActor(actor, 0x60, 0x70, 0x80, 0x3000);
+						actor->hitpoints = -8;
+						break;
+					case 0x16:
+						actor->hitpoints = -1;
+						Particles::SpawnBurstRingAtPoint(actor, 0x80, 0, 0, 0x5000);
+						AudioManager::PlaySoundEffect(-2, &actor->pos);
+						break;
+					case 0x18:
+						actor->gravityVel = -0xB00;
+						actor->primaryAnimIdx = 2;
+						actor->animationFrameSequence = g_animationFrameSequences[1];
+						effectCount = 3;
+						actor->hitpoints = -0x5E;
+						actor->animationFramePosition = *actor->animationFrameSequence << 16;
+						actor->respawnDelay = 10000;
+						break;
+					case 0x1B:
+						actor->hitpoints = -1;
+						effectCount = 4;
+						break;
+					case 0x1F:
+						actor->hitpoints = -1;
+						Particles::SpawnBurstRingAtPoint(actor, 0, 0, 0x80, 0x3000);
+						AudioManager::PlaySoundEffect(-2, &actor->pos);
+						break;
+					case 0x20:
+						actor->hitpoints = -1;
+						Particles::SpawnBurstRingAtPoint(actor, 0, 0x80, 0, 0x3000);
+						AudioManager::PlaySoundEffect(-2, &actor->pos);
+						break;
+					case 0x21:
+					case 0x2E:
+						actor->hitpoints = -1;
+						effectCount = -5;
+						break;
+					case 0x29:
+						actor->hitpoints = -1;
+						effectCount = -5;
+						AudioManager::PlaySoundEffect(0x59, &actor->pos);
+						break;
+					case 0x30:
+						actor->hitpoints = -1;
+						Particles::SpawnBurstRingAtPoint(actor, 0x80, 0, 0, 0);
+						AudioManager::PlaySoundEffect(-2, &actor->pos);
+						break;
+					case 0x36:
+						actor->hitpoints = -1;
+						Particles::SpawnBurstRingAtPoint(actor, 0, 0, 0x80, 0x5000);
+						effectCount = 6;
+						AudioManager::PlaySoundEffect(-2, &actor->pos);
+						break;
+					default:
+						actor->hitpoints = -1;
+						break;
+				}
+
+				if (effectCount != 0)
+				{
+					Vector3I16* effectOffset = actor->deathEffectOffset;
+					int32_t effectX = actor->pos.x + effectOffset->x;
+					int32_t effectY = actor->pos.y + effectOffset->y;
+					int32_t effectZ = actor->pos.z + effectOffset->z;
+					if (effectCount > 0)
+					{
+						do
+						{
+							Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(effectX, effectY, effectZ, 0x23, 0xE);
+							particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+							effectCount--;
+						} while (effectCount != 0);
+						Lighting::SpawnLight(effectX, effectY, effectZ, 0xF08000, 0x20, (int32_t)actor);
+						AudioManager::PlaySoundEffect(0xA, &actor->pos);
+					}
+					else
+					{
+						int32_t particleCount = -effectCount;
+						for (int32_t particleIndex = 0; particleIndex < particleCount; particleIndex++)
+						{
+							Nu3D::Particles::ParticleInstance* particle =
+								Nu3D::Particles::SpawnFromPreset(effectX, effectY, effectZ, 0x63, (particleIndex & 1) * 10 + 4);
+							particle->velY -= 0x100;
+							particle->lifetime = (*g_randDatBufferPtr++ & 0x1F) + 0x78;
+							int32_t colour = (*g_randDatBufferPtr++ & 0x7F) + 0x40;
+							particle->colourR = colour;
+							particle->colourG = colour;
+							particle->colourB = colour;
+							if ((*g_randDatBufferPtr++ & 1) != 0)
+							{
+								particle->rotSpeed = (*g_randDatBufferPtr++ & 0x3F) + 0x40;
+							}
+							else
+							{
+								particle->rotSpeed = -0x40 - (*g_randDatBufferPtr++ & 0x3F);
+							}
+							Nu3D::Particles::SpawnFromPreset(effectX, effectY, effectZ, 0x11, 4);
+						}
+						AudioManager::PlaySoundEffect(0xA, &actor->pos);
+					}
+				}
+			}
+
+			if ((killFlags & KILL_REMOVE_ACTOR) != 0)
+			{
+				g_lastKilledActor = actor;
+				if (actor->respawnDelay == 0)
+				{
+					actor->creatureId = 0;
+				}
+				actor->actorFlags &= ~3;
+				actor->actorPhase = 0;
+				actor->unkVar13_ = 0;
+
+				int32_t actorIndex = 0;
+				while (g_activeActors[actorIndex] != actor)
+				{
+					actorIndex++;
+				}
+				int32_t lastActorIndex = actorIndex;
+				while (g_activeActors[lastActorIndex + 1] != 0)
+				{
+					lastActorIndex++;
+				}
+				g_activeActors[actorIndex] = g_activeActors[lastActorIndex];
+				g_activeActors[lastActorIndex] = 0;
+			}
+		}
 
 		// STUB: TOY2 0x0043C1C0
 		void ResolveBoneAttachmentPos(Vector4I* position, Toy2Actor* actor, int32_t boneIndex) {}
@@ -126,7 +318,7 @@ namespace Toy2
 		Toy2Actor* g_renderActors[66];
 
 		// GLOBAL: TOY2 0x0050A54C
-		int32_t g_unk50A54C;
+		Toy2Actor* g_lastKilledActor;
 
 		// GLOBAL: TOY2 0x0052ADD8
 		int32_t g_unk52ADD8[0x80];
@@ -142,7 +334,7 @@ namespace Toy2
 		{
 			memset(g_creatureActors, 0, sizeof(g_creatureActors));
 			memset(g_unk52ADD8, 0, sizeof(g_unk52ADD8));
-			g_unk50A54C = -1;
+			g_lastKilledActor = (Toy2Actor*)-1;
 			g_activeActors[0] = 0;
 			g_unk52EF48 = 0;
 			g_unk52EF88 = 0;

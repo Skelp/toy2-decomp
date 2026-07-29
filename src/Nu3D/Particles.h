@@ -2,6 +2,8 @@
 
 #include "Numerics.h"
 
+#include <stddef.h>
+
 namespace Toy2
 {
 	namespace Actor
@@ -48,8 +50,15 @@ namespace Nu3D
 
 		struct ParticleInstance
 		{
-			Vector3I pos;
-			int32_t velX;
+			union
+			{
+				PosAndAngles groundProbe;
+				struct
+				{
+					Vector3I pos;
+					int32_t velX;
+				};
+			};
 			union
 			{
 				int32_t velY;
@@ -106,6 +115,9 @@ namespace Nu3D
 		ParticleInstance* SpawnFromPreset(int32_t x, int32_t y, int32_t z, int32_t typeId, int32_t presetIndex);
 
 		STATIC_ASSERT(sizeof(ParticleInstance) == 0x3C);
+		STATIC_ASSERT(offsetof(ParticleInstance, groundProbe) == 0x0);
+		STATIC_ASSERT(offsetof(ParticleInstance, pos) == 0x0);
+		STATIC_ASSERT(offsetof(ParticleInstance, velX) == 0xC);
 		STATIC_ASSERT(sizeof(ParticleType) == 0x10);
 		STATIC_ASSERT(sizeof(ParticlePreset) == 0x18);
 	}
