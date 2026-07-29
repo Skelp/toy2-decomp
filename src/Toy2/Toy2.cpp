@@ -391,18 +391,72 @@ namespace Toy2
 		void Interactions() {}
 	}
 
+	namespace Path
+	{
+		// STUB: TOY2 0x0042C200
+		void SamplePoint(int32_t pathRecordType, int32_t pathPosition, Vector4I* position) {}
+	}
+
 	namespace Platform
 	{
-		// STUB: TOY2 0x0042C2B0
+		struct PathPlatformState
+		{
+			int32_t pathPosition;
+			int32_t speed;
+			int32_t previousX;
+			int32_t previousZ;
+			int32_t platformIndex;
+			int32_t pathRecordType;
+			int16_t facingAngle;
+			int16_t emitParticles;
+			int16_t primaryLinkIndex;
+			int16_t secondaryLinkIndex;
+		};
+
+		// GLOBAL: TOY2 0x0052FE48
+		PathPlatformState g_pathPlatforms[5];
+
+		STATIC_ASSERT(sizeof(PathPlatformState) == 0x20);
+		STATIC_ASSERT(offsetof(PathPlatformState, platformIndex) == 0x10);
+		STATIC_ASSERT(offsetof(PathPlatformState, facingAngle) == 0x18);
+		STATIC_ASSERT(offsetof(PathPlatformState, primaryLinkIndex) == 0x1C);
+
+		// FUNCTION: TOY2 0x0042C2B0 [MATCHED]
 		void InitPathPlatform(int32_t pathIndex,
 			int32_t platformIndex,
 			int32_t pathRecordType,
 			int32_t primaryLinkIndex,
 			int32_t secondaryLinkIndex,
-			int32_t speed,
+			int32_t speedLimit,
 			int32_t pathPosition,
 			int32_t facingAngle)
-		{}
+		{
+			g_pathPlatforms[pathIndex].pathPosition = pathPosition;
+			g_pathPlatforms[pathIndex].speed = 0;
+			g_pathPlatforms[pathIndex].platformIndex = platformIndex;
+			g_pathPlatforms[pathIndex].pathRecordType = pathRecordType;
+			g_pathPlatforms[pathIndex].primaryLinkIndex = (int16_t)primaryLinkIndex;
+			g_pathPlatforms[pathIndex].secondaryLinkIndex = (int16_t)secondaryLinkIndex;
+			g_pathPlatforms[pathIndex].facingAngle = (int16_t)facingAngle;
+			g_pathPlatforms[pathIndex].emitParticles = 1;
+			g_pathPlatforms[pathIndex].previousX = INT_MAX;
+			g_pathPlatforms[pathIndex].previousZ = INT_MAX;
+
+			Vector4I position;
+			Path::SamplePoint(g_pathPlatforms[pathIndex].pathRecordType, g_pathPlatforms[pathIndex].pathPosition, &position);
+			SetOrigin(g_pathPlatforms[pathIndex].platformIndex, position.x << 5, position.y << 5, position.z << 5);
+			if (g_pathPlatforms[pathIndex].secondaryLinkIndex != 0)
+			{
+				Nu3D::Link::SetPositionRawAndCommit(g_pathPlatforms[pathIndex].secondaryLinkIndex, position.x, position.y, position.z);
+			}
+			Nu3D::Link::SetPositionRawAndCommit(g_pathPlatforms[pathIndex].primaryLinkIndex, position.x, position.y, position.z);
+			SetRotationAngles(platformIndex, 0, (int16_t)facingAngle, 0);
+			Nu3D::Link::SetRotationRelative8bit(primaryLinkIndex, 0, facingAngle, 0);
+			if (secondaryLinkIndex != 0)
+			{
+				Nu3D::Link::SetRotationRelative8bit(secondaryLinkIndex, 0, facingAngle, 0);
+			}
+		}
 	}
 
 	namespace AirportInfiltration
