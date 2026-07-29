@@ -5,23 +5,7 @@ set -euo pipefail
 compiler="$1"
 shift
 
-object_path=""
-for argument in "$@"; do
-    case "$argument" in
-        /Fo*|-Fo*) object_path="${argument:3}" ;;
-    esac
-done
-
-arguments=()
-for argument in "$@"; do
-    case "$argument" in
-        /Fd*|-Fd*)
-            if [[ -n "$object_path" ]]; then
-                argument="/Fd${object_path}.pdb"
-            fi
-            ;;
-    esac
-    arguments+=("$argument")
-done
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+mapfile -d '' -t arguments < <(python "$script_dir/vc6_compile.py" "$@")
 
 exec "$compiler" "${arguments[@]}"
