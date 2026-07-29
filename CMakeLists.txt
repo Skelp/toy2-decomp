@@ -96,6 +96,7 @@ set(TOY2_SOURCES
     src/D3DApp/d3dcalls.cpp
     src/D3DApp/ddcalls.cpp
     src/D3DApp/misc.cpp
+    src/D3DApp/texture.cpp
     src/Toy2/Direct6.cpp
     src/Toy2/Direct6.h
     src/Toy2/Win95.cpp

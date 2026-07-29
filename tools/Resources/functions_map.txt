@@ -44,6 +44,7 @@
 0x00409360 ProfileWndProc
 0x004093A0 ExamineMachine
 0x00409AE0 GetVidMem
+0x00409C80 D3DAppIReleaseAllTextures
 0x0040A350 D3DRestart
 0x0040B290 D3DAppIGetSurfDesc
 0x0040B2C0 D3DAppICreateBuffers
@@ -72,6 +73,7 @@
 0x0040D2C0 D3DAppLastErrorString
 0x0040D2D0 D3DAppDestroy
 0x0040D490 D3DAppErrorToString
+0x0040F740 D3DAppICreateFontSurfaces
 0x0040FAC0 Nu3D::Particles::Init
 0x0040FAE0 Nu3D::Particles::SpawnInstance
 0x0040FDF0 Nu3D::Particles::SpawnFromPreset
@@ -222,6 +224,7 @@
 0x00430BF0 Toy2::Ini::ParseDefText
 0x00430E90 Toy2::ReadIniFile
 0x004316C0 _WinMain@16
+0x004318E0 Nullsub8
 0x004318F0 LogErrorNotSet
 0x00431900 Logger::LogDDError
 0x004319E0 SoftwareRenderer::BuildPaletteLightingTable

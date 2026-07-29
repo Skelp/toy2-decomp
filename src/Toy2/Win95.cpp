@@ -15,6 +15,9 @@ int32_t g_sysParamsInfo;
 // GLOBAL: TOY2 0x00534488
 WindowData g_windowData;
 
+// FUNCTION: TOY2 0x004318E0 [MATCHED]
+void Nullsub8() {}
+
 // $FUNC DEBUG
 void AllocateConsole()
 {

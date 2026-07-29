@@ -6,6 +6,9 @@
 #include <cstdarg>
 #include <cstdio>
 
+// STUB: TOY2 0x0040F740
+BOOL D3DAppICreateFontSurfaces() { return TRUE; }
+
 // FUNCTION: TOY2 0x0040BEC0 [MATCHED]
 void D3DAppISetDefaults()
 {

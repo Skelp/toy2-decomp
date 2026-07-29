@@ -4,6 +4,10 @@
 
 #include <stddef.h>
 
+#define ATTEMPT(expression) \
+	if (! (expression))     \
+	goto exit_with_error
+
 struct D3DAppMode
 {
 	int32_t w;
@@ -15,11 +19,13 @@ struct D3DAppMode
 struct D3DAppInfo
 {
 	HWND hwnd;
-	uint8_t pad0[768];
+	uint8_t pad0[256];
+	D3DTEXTUREHANDLE TextureHandle[64];
+	uint8_t pad1[256];
 	LPDIRECTDRAWSURFACE3 lpTextureSurf[64];
-	uint8_t pad1[1288];
+	uint8_t pad2[1288];
 	D3DMATERIALHANDLE lpGroundMatHandle;
-	uint8_t pad2[50984];
+	uint8_t pad3[50984];
 	int32_t unkInt1;
 	int32_t unkInt2;
 	int32_t unkInt3;
@@ -31,13 +37,14 @@ struct D3DAppInfo
 	LPDIRECT3DDEVICE2 lpD3DDevice;
 	LPDIRECT3DVIEWPORT2 lpD3DViewport;
 	LPDIRECTDRAW2 lpDD;
-	int32_t bIsPrimary;
+	uint8_t bIsPrimary;
+	uint8_t pad4[3];
 	LPDIRECTDRAWSURFACE3 lpFrontBuffer;
 	LPDIRECTDRAWSURFACE3 lpBackBuffer;
 	LPDIRECTDRAWSURFACE3 lpZBuffer;
 	uint8_t bBackBufferInVideo;
 	uint8_t bZBufferInVideo;
-	uint8_t pad3[2];
+	uint8_t pad5[2];
 	D3DAppMode windowsDisplay;
 	SIZE szClient;
 	POINT pClientOnPrimary;
@@ -69,8 +76,14 @@ extern HRESULT LastError;
 extern char LastErrorString[256];
 extern uint16_t g_surfacesLost;
 extern RECT g_frontBufferRects[30];
+extern HFONT g_d3dAppFont;
+
+BOOL D3DAppIReleaseAllTextures();
+BOOL D3DAppICreateFontSurfaces();
+BOOL D3DAppCreate(DWORD flags, HWND hwnd, D3DAppInfo** d3dApp);
 
 STATIC_ASSERT(sizeof(D3DAppMode) == 0x10);
+STATIC_ASSERT(offsetof(D3DAppInfo, TextureHandle) == 0x104);
 STATIC_ASSERT(offsetof(D3DAppInfo, lpTextureSurf) == 0x304);
 STATIC_ASSERT(offsetof(D3DAppInfo, lpGroundMatHandle) == 0x90C);
 STATIC_ASSERT(sizeof(D3DAppInfo) == 0xD0A0);

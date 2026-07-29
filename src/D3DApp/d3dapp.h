@@ -50,7 +50,8 @@ extern "C"
 	BOOL D3DAppPause(BOOL pause);
 	BOOL D3DAppICreateSurface(LPDDSURFACEDESC surfaceDesc, LPDIRECTDRAWSURFACE3* surface);
 	HRESULT D3DAppLastError();
-	int32_t D3DAppWindowProc(WPARAM* wParamPtr, LPARAM* lParamPtr, HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+	BOOL D3DAppDestroy();
+	int32_t D3DAppWindowProc(WPARAM* stopProcessing, LPARAM* result, HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 	char* D3DAppErrorToString(HRESULT error);
 }
 

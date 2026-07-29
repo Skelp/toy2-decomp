@@ -43,8 +43,8 @@ struct WindowData
 	int32_t unkInt7;
 	int32_t wndIsExiting;
 	int32_t unkInt8;
-	LPDIRECTDRAWSURFACE3 unusedDDSurface;
-	LPDIRECTDRAWSURFACE3 unusedDDSurface2;
+	LPDIRECTDRAWSURFACE3 fontSurface;
+	LPDIRECTDRAWSURFACE3 fontMaskSurface;
 };
 
 extern WindowData g_windowData;
@@ -56,6 +56,7 @@ int32_t PostQuitMessage();
 LRESULT WINAPI NormalWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 void SysParmsOnExit();
 void LogErrorNotSet();
+void Nullsub8();
 
 STATIC_ASSERT(sizeof(RenderStateCache) == 0x38);
 STATIC_ASSERT(sizeof(WindowData) == 0xC8);
