@@ -393,8 +393,22 @@ namespace Toy2
 
 	namespace Path
 	{
-		// STUB: TOY2 0x0042C200
-		void SamplePoint(int32_t pathRecordType, int32_t pathPosition, Vector4I* position) {}
+		// FUNCTION: TOY2 0x0042C200 [PROVISIONAL]
+		void SamplePoint(int32_t pathRecordType, int32_t pathPosition, Vector4I* position)
+		{
+			int32_t pointIndex = pathPosition / 0x1000;
+			int32_t fraction = pathPosition & 0xFFF;
+
+			position->x =
+				(Levels::g_recordData[pathRecordType]->data[pointIndex + 1].x - Levels::g_recordData[pathRecordType]->data[pointIndex].x) * fraction / 0x1000
+				+ Levels::g_recordData[pathRecordType]->data[pointIndex].x;
+			position->y =
+				(Levels::g_recordData[pathRecordType]->data[pointIndex + 1].y - Levels::g_recordData[pathRecordType]->data[pointIndex].y) * fraction / 0x1000
+				+ Levels::g_recordData[pathRecordType]->data[pointIndex].y;
+			position->z =
+				(Levels::g_recordData[pathRecordType]->data[pointIndex + 1].z - Levels::g_recordData[pathRecordType]->data[pointIndex].z) * fraction / 0x1000
+				+ Levels::g_recordData[pathRecordType]->data[pointIndex].z;
+		}
 	}
 
 	namespace Platform
