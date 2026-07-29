@@ -8,6 +8,28 @@
 	if (! (expression))     \
 	goto exit_with_error
 
+struct InterfaceDevice;
+
+extern "C"
+{
+	HRESULT D3DAppIGetSurfDesc(LPDDSURFACEDESC surfaceDesc, LPDIRECTDRAWSURFACE3 surface);
+	BOOL D3DAppICreateBuffers(HWND hwnd, int width, int height, int bpp, BOOL fullscreen, BOOL hardware);
+	BOOL D3DAppICheckForPalettized();
+	BOOL D3DAppICreateZBuffer(int width, int height);
+	BOOL D3DAppISetCoopLevel(HWND hwnd, BOOL fullscreen);
+	BOOL D3DAppIRestoreDispMode();
+	BOOL D3DAppIRememberWindowsMode();
+	BOOL D3DAppIClearBuffers();
+	BOOL D3DAppISetRenderState();
+	HRESULT CALLBACK CreateD3DEnumTextureFormatsCallback(LPDDSURFACEDESC surfaceDesc, InterfaceDevice* d3dDevice);
+	void D3DAppISetDefaults();
+	void D3DAppISetClientSize(HWND hwnd, int width, int height, BOOL returnFromFullscreen);
+	void D3DAppIGetClientWin(HWND hwnd);
+	void D3DAppISetErrorString(char* format, ...);
+	BOOL D3DAppICreateSurface(LPDDSURFACEDESC surfaceDesc, LPDIRECTDRAWSURFACE3* surface);
+	void __cdecl dpf(char* format, ...);
+}
+
 struct D3DAppMode
 {
 	int32_t w;
