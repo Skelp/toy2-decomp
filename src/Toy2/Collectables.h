@@ -12,6 +12,11 @@ namespace Toy2
 
 	namespace Collectables
 	{
+		enum PickupFlags
+		{
+			PICKUP_FLAG_PERSISTENT = 0x80,
+		};
+
 		struct PickupRecord
 		{
 			Vector3I position;

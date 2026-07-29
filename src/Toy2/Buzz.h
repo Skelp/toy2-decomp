@@ -176,7 +176,9 @@ namespace Toy2
 	extern int32_t g_poweredLaserCharge;
 	extern int32_t g_aimTargetLocked;
 	extern int32_t g_rocketBootsTimer;
+	extern int32_t g_environmentEffectType;
 	extern int32_t g_environmentSurfaceY;
+	extern int32_t g_previousBuzzEnvironmentY;
 	extern Buzz::GadgetPickup* g_activeRocketBootsPickup;
 	extern int32_t g_savedRocketBootsPickupY;
 	extern Buzz::GadgetPickup* g_activeCosmicShieldPickup;

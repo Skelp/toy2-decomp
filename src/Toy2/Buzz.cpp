@@ -99,8 +99,14 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0053C5E0
 	int32_t g_rocketBootsTimer;
 
+	// GLOBAL: TOY2 0x0053C5E8
+	int32_t g_environmentEffectType;
+
 	// GLOBAL: TOY2 0x0053C628
 	int32_t g_environmentSurfaceY;
+
+	// GLOBAL: TOY2 0x00830D30
+	int32_t g_previousBuzzEnvironmentY;
 
 	// GLOBAL: TOY2 0x0053C5E4
 	int32_t g_poleRecordOffset;
