@@ -12,6 +12,19 @@ struct DisplayMode
 	DWORD bpp;
 };
 
+struct D3DTextureFormat
+{
+	int32_t isPalettized;
+	int32_t hasAlphaPixels;
+	int16_t indexBPP;
+	int16_t rgbBPP;
+	int16_t redBPP;
+	int16_t blueBPP;
+	int16_t greenBPP;
+	int16_t alphaBPP;
+	DDSURFACEDESC surfaceDesc;
+};
+
 struct InterfaceDevice
 {
 	int32_t valid;
@@ -24,7 +37,9 @@ struct InterfaceDevice
 	GUID guid;
 	char baseName[64];
 	char description[64];
-	uint8_t pad0[1800];
+	int32_t textureFormatCount;
+	D3DTextureFormat textureFormats[14];
+	uint8_t pad0[4];
 	D3DDEVICEDESC hwDeviceDesc;
 };
 
@@ -88,6 +103,7 @@ int32_t SortDisplayModes(const void* modeA, const void* modeB);
 LRESULT WINAPI ProfileWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 STATIC_ASSERT(sizeof(DisplayMode) == 0xC);
+STATIC_ASSERT(sizeof(D3DTextureFormat) == 0x80);
 STATIC_ASSERT(sizeof(InterfaceDevice) == 0x8B0);
 STATIC_ASSERT(sizeof(ExamineDevice) == 0x3C74);
 STATIC_ASSERT(sizeof(PCProfile) == 0xF1EC);

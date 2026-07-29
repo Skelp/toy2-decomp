@@ -93,6 +93,7 @@ set(TOY2_SOURCES
     src/D3DApp/d3dapp.cpp
     src/D3DApp/d3dapp.h
     src/D3DApp/d3dappi.h
+    src/D3DApp/d3dcalls.cpp
     src/D3DApp/ddcalls.cpp
     src/D3DApp/misc.cpp
     src/Toy2/Direct6.cpp

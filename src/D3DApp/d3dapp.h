@@ -2,6 +2,8 @@
 
 #include "D3DApp/d3dappi.h"
 
+struct InterfaceDevice;
+
 extern "C"
 {
 	HRESULT D3DAppIGetSurfDesc(LPDDSURFACEDESC surfaceDesc, LPDIRECTDRAWSURFACE surface);
@@ -9,6 +11,8 @@ extern "C"
 	BOOL D3DAppIRestoreDispMode();
 	BOOL D3DAppIRememberWindowsMode();
 	BOOL D3DAppIClearBuffers();
+	BOOL D3DAppISetRenderState();
+	HRESULT CALLBACK CreateD3DEnumTextureFormatsCallback(LPDDSURFACEDESC surfaceDesc, InterfaceDevice* d3dDevice);
 	void D3DAppISetDefaults();
 	void D3DAppISetClientSize(HWND hwnd, int width, int height, BOOL returnFromFullscreen);
 	void D3DAppIGetClientWin(HWND hwnd);
