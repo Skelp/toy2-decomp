@@ -2,12 +2,106 @@
 #include "D3DApp/d3dappi.h"
 #include "Logger.h"
 #include "Toy2/Direct6.h"
+#include "Toy2/Win95.h"
 
 #include <cstdarg>
 #include <cstdio>
 
-// STUB: TOY2 0x0040F740
-BOOL D3DAppICreateFontSurfaces() { return TRUE; }
+// FUNCTION: TOY2 0x0040F740 [PROVISIONAL]
+BOOL D3DAppICreateFontSurfaces()
+{
+	char modeText[] = "000x000x00 (MONO) 0000";
+	char statsText[] = "000.00 fps 00000000.00 tps 0000.00 mppps";
+
+	if (g_windowData.fontMaskSurface)
+	{
+		g_windowData.fontMaskSurface->Release();
+		g_windowData.fontMaskSurface = NULL;
+	}
+	if (g_windowData.fontSurface)
+	{
+		g_windowData.fontSurface->Release();
+		g_windowData.fontSurface = NULL;
+	}
+	if (g_d3dAppFont)
+	{
+		DeleteObject(g_d3dAppFont);
+		g_d3dAppFont = NULL;
+	}
+
+	HDC deviceContext = GetDC(g_windowData.mainHwnd);
+	g_d3dAppFont = NULL;
+	if (deviceContext)
+	{
+		char faceName[64];
+		LoadStringA(g_windowData.hInstance, 104, faceName, sizeof(faceName));
+		memset(&g_d3dAppLogFont, 0, sizeof(g_d3dAppLogFont));
+		g_d3dAppLogFont.lfHeight = -MulDiv(7, GetDeviceCaps(deviceContext, LOGPIXELSY), 72);
+		g_d3dAppLogFont.lfWeight = FW_NORMAL;
+		g_d3dAppLogFont.lfItalic = FALSE;
+		strcpy(g_d3dAppLogFont.lfFaceName, faceName);
+		g_d3dAppFont = CreateFontIndirectA(&g_d3dAppLogFont);
+	}
+
+	deviceContext = GetDC(NULL);
+	SelectObject(deviceContext, g_d3dAppFont);
+	GetTextExtentPointA(deviceContext, statsText, strlen(statsText), &g_d3dAppStatsTextSize);
+	GetTextExtentPointA(deviceContext, modeText, strlen(modeText), &g_d3dAppModeTextSize);
+	ReleaseDC(NULL, deviceContext);
+
+	DDSURFACEDESC surfaceDesc;
+	memset(&surfaceDesc, 0, sizeof(surfaceDesc));
+	surfaceDesc.dwSize = sizeof(surfaceDesc);
+	surfaceDesc.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH;
+	surfaceDesc.dwHeight = g_d3dAppStatsTextSize.cy;
+	surfaceDesc.dwWidth = g_d3dAppStatsTextSize.cx;
+	surfaceDesc.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN;
+	if (d3dappi.bOnlySystemMemory)
+		surfaceDesc.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
+
+	LPDIRECTDRAWSURFACE tempSurface;
+	HRESULT result = d3dappi.lpDD->CreateSurface(&surfaceDesc, &tempSurface, NULL);
+	if (result < 0)
+		Logger::LogDDError("lpDD->CreateSurface(desc, &tempsurf, punk)", result);
+	result = tempSurface->QueryInterface(IID_IDirectDrawSurface3, (void**)&g_windowData.fontSurface);
+	if (result < 0)
+		Logger::LogDDError("tempsurf->QueryInterface(IID_IDirectDrawSurface3,(void**) surf)", result);
+	if (tempSurface)
+		tempSurface->Release();
+
+	{
+		DDCOLORKEY colorKey;
+		colorKey.dwColorSpaceLowValue = 0;
+		colorKey.dwColorSpaceHighValue = 0;
+		g_windowData.fontSurface->SetColorKey(DDCKEY_SRCBLT, &colorKey);
+	}
+
+	memset(&surfaceDesc, 0, sizeof(surfaceDesc));
+	surfaceDesc.dwSize = sizeof(surfaceDesc);
+	surfaceDesc.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH;
+	surfaceDesc.dwHeight = g_d3dAppModeTextSize.cy;
+	surfaceDesc.dwWidth = g_d3dAppModeTextSize.cx;
+	surfaceDesc.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN;
+	if (d3dappi.bOnlySystemMemory)
+		surfaceDesc.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
+
+	result = d3dappi.lpDD->CreateSurface(&surfaceDesc, &tempSurface, NULL);
+	if (result < 0)
+		Logger::LogDDError("lpDD->CreateSurface(desc, &tempsurf, punk)", result);
+	result = tempSurface->QueryInterface(IID_IDirectDrawSurface3, (void**)&g_windowData.fontMaskSurface);
+	if (result < 0)
+		Logger::LogDDError("tempsurf->QueryInterface(IID_IDirectDrawSurface3,(void**) surf)", result);
+	if (tempSurface)
+		tempSurface->Release();
+
+	{
+		DDCOLORKEY colorKey;
+		colorKey.dwColorSpaceLowValue = 0;
+		colorKey.dwColorSpaceHighValue = 0;
+		g_windowData.fontMaskSurface->SetColorKey(DDCKEY_SRCBLT, &colorKey);
+	}
+	return TRUE;
+}
 
 // FUNCTION: TOY2 0x0040BEC0 [MATCHED]
 void D3DAppISetDefaults()

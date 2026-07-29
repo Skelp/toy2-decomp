@@ -64,8 +64,17 @@ uint16_t g_surfacesLost;
 // GLOBAL: TOY2 0x0051ABF0
 RECT g_frontBufferRects[30];
 
+// GLOBAL: TOY2 0x0050A720
+LOGFONT g_d3dAppLogFont;
+
 // GLOBAL: TOY2 0x0050A75C
 HFONT g_d3dAppFont;
+
+// GLOBAL: TOY2 0x0050A760
+SIZE g_d3dAppStatsTextSize;
+
+// GLOBAL: TOY2 0x0050A768
+SIZE g_d3dAppModeTextSize;
 
 // FUNCTION: TOY2 0x0040C1F0 [PROVISIONAL]
 BOOL D3DAppCreate(DWORD flags, HWND hwnd, D3DAppInfo** d3dApp)
