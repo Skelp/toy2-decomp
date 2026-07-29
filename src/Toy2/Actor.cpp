@@ -292,4 +292,26 @@ namespace Toy2
 			}
 		}
 	}
+
+	namespace CreatureBehaviour
+	{
+		// STUB: TOY2 0x00416F30
+		void RCCarLevel1(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+
+		// STUB: TOY2 0x00418720
+		void RCCarLevel2(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+
+		// FUNCTION: TOY2 0x00406A60 [MATCHED]
+		void RCCar(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			if (g_levelFileIndex == 1)
+			{
+				RCCarLevel1(context);
+			}
+			if (g_levelFileIndex == 2)
+			{
+				RCCarLevel2(context);
+			}
+		}
+	}
 }

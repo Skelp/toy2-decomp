@@ -97,13 +97,13 @@
 0x00415860 InputManager::FindKeyReleased
 0x00416A60 Toy2::CreatureBehaviour::Sheep
 0x00416AB0 Toy2::CreatureBehaviour::TinMan
-0x00416F30 Toy2::CreatureBehaviour::RCCar::Level1
+0x00416F30 Toy2::CreatureBehaviour::RCCarLevel1
 0x004171D0 Toy2::AndysHouse::Init
 0x00417380 Toy2::AndysHouse::Method2
 0x00417510 Toy2::AndysHouse::Method1
 0x00417680 Toy2::AndysHouse::Interactions
 0x00418610 Toy2::CreatureBehaviour::Army
-0x00418720 Toy2::CreatureBehaviour::RCCar::Level2
+0x00418720 Toy2::CreatureBehaviour::RCCarLevel2
 0x004189C0 Toy2::CreatureBehaviour::ZKite
 0x00418CE0 Toy2::CreatureBehaviour::LawnMower
 0x00418E50 Toy2::AndysNeighborhood::Init
