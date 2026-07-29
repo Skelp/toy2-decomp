@@ -25,39 +25,35 @@ namespace Toy2
 		};
 
 		// GLOBAL: TOY2 0x004F04D0
-		extern const char g_laserAttackInstructions[] =
-			"if you press the fire button you can attack with your laser. if you press the spin button you can attack with your spin attack. hold down the "
-			"button "
-			"to charge up the attack. your spin attack can deflect objects that are fired at you.";
+		extern const char g_laserAttackInstructions[] = {
+#include "LaserAttackInstructions.inc"
+		};
 		// GLOBAL: TOY2 0x004F05BC
 		extern const char g_swingBarInstructions[] =
 			"if you jump at a horizontal bar you will swing around it. press jump when you have left the bar to jump farther and higher.";
 		// GLOBAL: TOY2 0x004F0638
-		extern const char g_cameraInstructions[] =
-			"you can change camera mode using the pause menu. active camera will always try and turn to view buzz from behind. passive camera will not turn. "
-			"the "
-			"camera left and right buttons turn the ^camera^ in ^passive^ mode and turn ^buzz^ in ^active^ mode.";
+		extern const char g_cameraInstructions[] = {
+#include "CameraInstructions.inc"
+		};
 		// GLOBAL: TOY2 0x004F0730
 		extern const char g_pushInstructions[] = "if you see the ^push^ icon you can run into the object and push it out of the way. ";
 		// GLOBAL: TOY2 0x004F0784
 		extern const char g_extendedJumpInstructions[] =
 			"if you press the jump button once and then press it again you can do an extended jump. try it to reach the open drawer.";
 		// GLOBAL: TOY2 0x004F07FC
-		extern const char g_poleInstructions[] =
-			"you can grab onto poles. when you are holding on you can push up and down to move up and down the pole. you can press left and right to turn on "
-			"the "
-			"pole. press jump to let go of the pole.";
+		extern const char g_poleInstructions[] = {
+#include "PoleInstructions.inc"
+		};
 		// GLOBAL: TOY2 0x004F08B8
 		extern const char g_zipLineInstructions[] = "you can jump onto zip lines to slide down them. press jump to let go of the line.";
 		// GLOBAL: TOY2 0x004F090C
-		extern const char g_visorInstructions[] =
-			"you can target your laser by using your visor view. press the visor toggle button to activate the view. then press the target lock button to swap "
-			"between visible targets, then press fire to use your laser. use it to shoot the catches holding up the side of the crib.";
+		extern const char g_visorInstructions[] = {
+#include "VisorInstructions.inc"
+		};
 		// GLOBAL: TOY2 0x004F0A18
-		extern const char g_stompInstructions[] =
-			"you can foot ^stomp^ where you see the ^stomp^ icon by pressing jump and then pressing ^spin^ while you are in the air. this will activate "
-			"switches "
-			"and catapults and will also act as an attack.";
+		extern const char g_stompInstructions[] = {
+#include "StompInstructions.inc"
+		};
 
 		// GLOBAL: TOY2 0x004F0EDC
 		int16_t g_tokenLinkIds[] = { 0x39, 0x3A, 0x3B, 0x3C, 0x30, 0 };

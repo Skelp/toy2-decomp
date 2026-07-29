@@ -67,9 +67,9 @@ namespace Toy2
 		};
 
 		// GLOBAL: TOY2 0x004F4B08
-		extern const char g_lightPuzzleInstructions[] =
-			"use the ^buttons^ to change the bottom row of lights to match the top row of lights. the puzzle will reset if you take more than ^3^ tries. if "
-			"you complete the puzzle the helicopter will move down so that you can reach the pizza planet ^token^.";
+		extern const char g_lightPuzzleInstructions[] = {
+#include "LightPuzzleInstructions.inc"
+		};
 
 		// GLOBAL: TOY2 0x004F4C40
 		extern const Collectables::TokenDialogueValue g_tokenDialogueValues[] = {

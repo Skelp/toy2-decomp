@@ -90,6 +90,13 @@ set(TOY2_SOURCES
     src/Toy2/LevelSelect.h
     src/Toy2/LevelLogic.h
     src/Toy2/Particles.h
+    src/Toy2/CreditsText.inc
+    src/Toy2/LaserAttackInstructions.inc
+    src/Toy2/CameraInstructions.inc
+    src/Toy2/PoleInstructions.inc
+    src/Toy2/VisorInstructions.inc
+    src/Toy2/StompInstructions.inc
+    src/Toy2/LightPuzzleInstructions.inc
     src/Toy2/AndysHouse.cpp
     src/Toy2/AndysNeighborhood.cpp
     src/Toy2/BombsAway.cpp
