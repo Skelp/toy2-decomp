@@ -61,7 +61,7 @@ namespace Toy2
 
 			Actor::Toy2Actor* zurg = &Actor::g_creatureActors[0];
 			g_previousPhase = zurg->actorPhase;
-			zurg->actorFlags |= 0x800;
+			zurg->actorFlags |= Actor::ACTOR_FLAG_BOSS;
 			zurg->pos.y -= 0x28000;
 			zurg->motionTargetPos.y = zurg->pos.y;
 			g_voiceTimer = 300;
