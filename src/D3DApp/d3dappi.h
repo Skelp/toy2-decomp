@@ -42,12 +42,18 @@ struct D3DAppInfo
 {
 	HWND hwnd;
 	int32_t TextureStatus[64];
+	int32_t TextureType[64];
 	D3DTEXTUREHANDLE TextureHandle[64];
-	uint8_t pad1[256];
 	LPDIRECTDRAWSURFACE3 lpTextureSurf[64];
-	uint8_t pad2[1288];
+	LPDIRECT3DTEXTURE2 lpTexture[64];
+	uint8_t pad1[512];
+	LPDIRECT3DMATERIAL2 lpTextureMat[64];
+	D3DMATERIALHANDLE lpTextureMatHandle[64];
+	LPDIRECT3DMATERIAL2 lpSkyMat;
+	LPDIRECT3DMATERIAL2 lpGroundMat;
 	D3DMATERIALHANDLE lpGroundMatHandle;
-	uint8_t pad3[50984];
+	D3DMATERIALHANDLE lpSkyMatHandle;
+	uint8_t pad2[50980];
 	int32_t unkInt1;
 	int32_t unkInt2;
 	int32_t unkInt3;
@@ -99,7 +105,7 @@ extern char LastErrorString[256];
 extern uint16_t g_surfacesLost;
 extern RECT g_frontBufferRects[30];
 extern HFONT g_d3dAppFont;
-extern D3DTEXTUREHANDLE g_masterTextureHandles[64];
+extern int32_t g_masterTextureTypes[64];
 extern int32_t g_masterTextureStatus[64];
 extern LPVOID g_masterTextureData[64];
 extern LPVOID g_textureData[64];
@@ -119,7 +125,14 @@ namespace Toy2
 
 STATIC_ASSERT(sizeof(D3DAppMode) == 0x10);
 STATIC_ASSERT(offsetof(D3DAppInfo, TextureStatus) == 0x4);
-STATIC_ASSERT(offsetof(D3DAppInfo, TextureHandle) == 0x104);
+STATIC_ASSERT(offsetof(D3DAppInfo, TextureType) == 0x104);
+STATIC_ASSERT(offsetof(D3DAppInfo, TextureHandle) == 0x204);
 STATIC_ASSERT(offsetof(D3DAppInfo, lpTextureSurf) == 0x304);
+STATIC_ASSERT(offsetof(D3DAppInfo, lpTexture) == 0x404);
+STATIC_ASSERT(offsetof(D3DAppInfo, lpTextureMat) == 0x704);
+STATIC_ASSERT(offsetof(D3DAppInfo, lpTextureMatHandle) == 0x804);
+STATIC_ASSERT(offsetof(D3DAppInfo, lpSkyMat) == 0x904);
+STATIC_ASSERT(offsetof(D3DAppInfo, lpGroundMat) == 0x908);
 STATIC_ASSERT(offsetof(D3DAppInfo, lpGroundMatHandle) == 0x90C);
+STATIC_ASSERT(offsetof(D3DAppInfo, lpSkyMatHandle) == 0x910);
 STATIC_ASSERT(sizeof(D3DAppInfo) == 0xD0A0);

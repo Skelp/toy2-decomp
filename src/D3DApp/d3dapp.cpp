@@ -675,13 +675,13 @@ BOOL D3DAppDestroy()
 
 	if (g_renderMode == RENDERMODE_D3D)
 	{
-		D3DTEXTUREHANDLE* textureHandle = d3dappi.TextureHandle;
+		int32_t* textureType = d3dappi.TextureType;
 		int32_t textureCount = 64;
 		do
 		{
-			if (*textureHandle && *textureHandle != 4)
-				*textureHandle = 5;
-			++textureHandle;
+			if (*textureType && *textureType != 4)
+				*textureType = 5;
+			++textureType;
 			--textureCount;
 		} while (textureCount);
 		D3DAppIReleaseAllTextures();

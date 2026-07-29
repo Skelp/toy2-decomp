@@ -65,7 +65,7 @@ int32_t D3DRestart()
 			break;
 	}
 
-	memcpy(d3dappi.TextureHandle, g_masterTextureHandles, sizeof(d3dappi.TextureHandle));
+	memcpy(d3dappi.TextureType, g_masterTextureTypes, sizeof(d3dappi.TextureType));
 	memcpy(d3dappi.TextureStatus, g_masterTextureStatus, sizeof(d3dappi.TextureStatus));
 	memcpy(g_textureData, g_masterTextureData, sizeof(g_textureData));
 	memcpy(g_textureFlags, g_masterTextureFlags, sizeof(g_textureFlags));
@@ -73,8 +73,8 @@ int32_t D3DRestart()
 
 	for (int32_t textureIndex = 0; textureIndex < 64; ++textureIndex)
 	{
-		if (d3dappi.TextureHandle[textureIndex] == 4)
-			d3dappi.TextureHandle[textureIndex] = 1;
+		if (d3dappi.TextureType[textureIndex] == 4)
+			d3dappi.TextureType[textureIndex] = 1;
 	}
 
 	D3DAppIReleaseAllTextures();
@@ -84,8 +84,139 @@ int32_t D3DRestart()
 
 namespace Toy2
 {
-	// STUB: TOY2 0x00498140
-	int16_t InitDirect3DMaterials() { return 1; }
+	// GLOBAL: TOY2 0x004F73B4
+	int32_t g_skyColorRed = 118;
+
+	// GLOBAL: TOY2 0x004F73B8
+	int32_t g_skyColorGreen = 175;
+
+	// GLOBAL: TOY2 0x004F73BC
+	int32_t g_skyColorBlue = 158;
+
+	// GLOBAL: TOY2 0x004F73C0
+	int32_t g_groundColorRed = 72;
+
+	// GLOBAL: TOY2 0x004F73C4
+	int32_t g_groundColorGreen = 56;
+
+	// GLOBAL: TOY2 0x004F73C8
+	int32_t g_groundColorBlue = 40;
+
+	// FUNCTION: TOY2 0x00498140 [PROVISIONAL]
+	int16_t InitDirect3DMaterials()
+	{
+		if (g_renderMode != RENDERMODE_D3D)
+			return 1;
+
+		if (d3dappi.lpSkyMat)
+		{
+			d3dappi.lpSkyMat->Release();
+			d3dappi.lpSkyMat = NULL;
+		}
+
+		HRESULT result = d3dappi.lpD3D->CreateMaterial(&d3dappi.lpSkyMat, NULL);
+		if (result < 0)
+			Logger::LogDDError("d3dappi.lpD3D->CreateMaterial(&d3dappi.lpSkyMat, 0)", result);
+
+		D3DMATERIAL mat;
+		memset(&mat, 0, sizeof(mat));
+		mat.dwSize = sizeof(mat);
+		mat.diffuse.r = g_skyColorRed * (1.0f / 255.0f);
+		mat.diffuse.g = g_skyColorGreen * (1.0f / 255.0f);
+		mat.diffuse.b = g_skyColorBlue * (1.0f / 255.0f);
+		mat.ambient.r = 0.0f;
+		mat.ambient.g = 0.0f;
+		mat.ambient.b = 0.0f;
+		mat.specular.r = 0.0f;
+		mat.specular.g = 0.0f;
+		mat.specular.b = 0.0f;
+		mat.emissive.r = 20.0f;
+		mat.emissive.g = 20.0f;
+		mat.emissive.b = 20.0f;
+		mat.power = 0.0f;
+		mat.dwRampSize = 1;
+		d3dappi.lpSkyMat->SetMaterial(&mat);
+		d3dappi.lpSkyMat->GetHandle(d3dappi.lpD3DDevice, &d3dappi.lpSkyMatHandle);
+
+		if (d3dappi.lpGroundMat)
+		{
+			d3dappi.lpGroundMat->Release();
+			d3dappi.lpGroundMat = NULL;
+		}
+
+		result = d3dappi.lpD3D->CreateMaterial(&d3dappi.lpGroundMat, NULL);
+		if (result < 0)
+			Logger::LogDDError("d3dappi.lpD3D->CreateMaterial(&d3dappi.lpGroundMat, 0)", result);
+
+		memset(&mat, 0, sizeof(mat));
+		mat.dwSize = sizeof(mat);
+		mat.diffuse.r = g_groundColorRed * (1.0f / 255.0f);
+		mat.diffuse.g = g_groundColorGreen * (1.0f / 255.0f);
+		mat.diffuse.b = g_groundColorBlue * (1.0f / 255.0f);
+		mat.ambient.r = 0.0f;
+		mat.ambient.g = 0.0f;
+		mat.ambient.b = 0.0f;
+		mat.specular.r = 0.0f;
+		mat.specular.g = 0.0f;
+		mat.specular.b = 0.0f;
+		mat.emissive.r = 20.0f;
+		mat.emissive.g = 20.0f;
+		mat.emissive.b = 20.0f;
+		mat.power = 0.0f;
+		mat.dwRampSize = 1;
+		d3dappi.lpGroundMat->SetMaterial(&mat);
+		d3dappi.lpGroundMat->GetHandle(d3dappi.lpD3DDevice, &d3dappi.lpGroundMatHandle);
+
+		for (int32_t i = 0; i < 64; ++i)
+		{
+			if (d3dappi.lpTextureMat[i])
+			{
+				d3dappi.lpTextureMat[i]->Release();
+				d3dappi.lpTextureMat[i] = NULL;
+			}
+
+			if (d3dappi.TextureType[i] == 3)
+			{
+				if (d3dappi.lpTextureMat[i])
+				{
+					d3dappi.lpTextureMat[i]->Release();
+					d3dappi.lpTextureMat[i] = NULL;
+				}
+
+				result = d3dappi.lpD3D->CreateMaterial(&d3dappi.lpTextureMat[i], NULL);
+				if (result < 0)
+					Logger::LogDDError("d3dappi.lpD3D->CreateMaterial(&(d3dappi.lpTextureMat[i]), 0)", result);
+
+				memset(&mat, 0, sizeof(mat));
+				mat.dwSize = sizeof(mat);
+				mat.diffuse.r = 10.0f;
+				mat.diffuse.g = 10.0f;
+				mat.diffuse.b = 10.0f;
+				mat.ambient.r = 10.0f;
+				mat.ambient.g = 10.0f;
+				mat.ambient.b = 10.0f;
+				mat.specular.r = 10.0f;
+				mat.specular.g = 10.0f;
+				mat.specular.b = 10.0f;
+				mat.emissive.r = 10.0f;
+				mat.emissive.g = 10.0f;
+				mat.emissive.b = 10.0f;
+				mat.power = 20.0f;
+				mat.hTexture = d3dappi.TextureHandle[i];
+				mat.dwRampSize = 256;
+
+				result = d3dappi.lpTextureMat[i]->SetMaterial(&mat);
+				if (result < 0)
+					Logger::LogDDError("d3dappi.lpTextureMat[i]->SetMaterial(&mat)", result);
+
+				result = d3dappi.lpTextureMat[i]->GetHandle(d3dappi.lpD3DDevice, &d3dappi.lpTextureMatHandle[i]);
+				if (result < 0)
+					Logger::LogDDError("d3dappi.lpTextureMat[i]->GetHandle(d3dappi.lpD3DDevice, &(d3dappi.lpTextureMatHandle[i]))", result);
+			}
+		}
+
+		return 1;
+	}
 }
 // FUNCTION: TOY2 0x004093A0 [PROVISIONAL]
 int32_t ExamineMachine()

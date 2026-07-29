@@ -1,7 +1,7 @@
 #include "D3DApp/d3dappi.h"
 
 // GLOBAL: TOY2 0x0051A840
-D3DTEXTUREHANDLE g_masterTextureHandles[64];
+int32_t g_masterTextureTypes[64];
 
 // GLOBAL: TOY2 0x0051AACC
 int32_t g_masterTextureStatus[64];
