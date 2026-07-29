@@ -65,8 +65,42 @@ namespace Toy2
 		}
 		// STUB: TOY2 0x004189C0
 		void ZKite(Actor::Toy2Actor::ActorBehaviourContext* context) {}
-		// STUB: TOY2 0x00418CE0
-		void LawnMower(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// FUNCTION: TOY2 0x00418CE0 [PROVISIONAL]
+		void LawnMower(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			AudioManager::PlaySoundEffect(0x4B, &actor->pos);
+			if ((actor->actorFlags & Actor::ACTOR_FLAG_TARGETABLE) != 0)
+			{
+				if (g_framePulseOutputs.sixteenTick != 0)
+				{
+					Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(actor->pos.x, actor->pos.y, actor->pos.z, 0x31, 2);
+					particle->groundAlignRot = *g_randDatBufferPtr++ << 4;
+				}
+
+				int32_t particleX;
+				int32_t particleZ;
+				particleX = actor->pos.x + Numerics::g_sinCosLUT[(actor->yawAngle - 0x800) & 0xFFF];
+				particleZ = actor->pos.z + Numerics::g_sinCosLUT[(actor->yawAngle - 0x400) & 0xFFF];
+				for (int32_t particleIndex = 0; particleIndex < g_framePulseOutputs.twoTickCount; particleIndex++)
+				{
+					int32_t particleAngle = (actor->yawAngle + 0x500 + *g_randDatBufferPtr++ * 6) & 0xFFF;
+					int32_t randomValue = *g_randDatBufferPtr;
+					g_randDatBufferPtr += 3;
+					Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnInstance(particleX,
+						actor->pos.y,
+						particleZ,
+						Numerics::g_sinCosLUT[particleAngle] >> 4,
+						randomValue - 0xC00,
+						Numerics::g_sinCosLUT[(particleAngle + 0x400) & 0xFFF] >> 4,
+						0x100,
+						randomValue << 4,
+						randomValue * 2 - 0x100,
+						0x32);
+					particle->colourG = (*g_randDatBufferPtr++ >> 2) + 0x40;
+				}
+			}
+		}
 
 		// FUNCTION: TOY2 0x00418720 [PROVISIONAL]
 		void RCCarLevel2(Actor::Toy2Actor::ActorBehaviourContext* context)
