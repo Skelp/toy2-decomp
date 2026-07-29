@@ -2,7 +2,8 @@
 #include "DrawingDevice.h"
 #include "Logger.h"
 #include "FileUtils.h"
-#include "Toy2/D3DApp.h"
+#include "Toy2/Direct6.h"
+#include "Toy2/Win95.h"
 #include "Toy2/Toy2.h"
 
 #include <directx6/ddraw.h>
@@ -363,7 +364,7 @@ namespace ModeSelect
 			if ((deviceRenderBitDepth & 256) == 0)
 				return D3DENUMRET_OK;
 
-			if (D3DApp::g_no32bitColors)
+			if (g_no32bitColors)
 				return D3DENUMRET_OK;
 		}
 		else if (rgbBitCount == 24)
@@ -371,7 +372,7 @@ namespace ModeSelect
 			if ((deviceRenderBitDepth & 512) == 0)
 				return D3DENUMRET_OK;
 
-			if (D3DApp::g_no32bitColors)
+			if (g_no32bitColors)
 				return D3DENUMRET_OK;
 		}
 		else if (rgbBitCount == 16)
@@ -385,7 +386,7 @@ namespace ModeSelect
 		}
 		else if (rgbBitCount > 16)
 		{
-			if (D3DApp::g_no32bitColors)
+			if (g_no32bitColors)
 				return D3DENUMRET_OK;
 		}
 
@@ -642,9 +643,7 @@ namespace ModeSelect
 
 	// FUNCTION: TOY2 0x004ACBC0 [MATCHED]
 	BOOL WINAPI DDrawEnumCallback(GUID* lpGUID, LPSTR lpDriverDescription, LPSTR lpDriverName, LPVOID lpContext)
-	{
-		return DDrawEnumCallbackExA(lpGUID, lpDriverDescription, lpDriverName, 0, 0);
-	}
+	{ return DDrawEnumCallbackExA(lpGUID, lpDriverDescription, lpDriverName, 0, 0); }
 
 	// FUNCTION: TOY2 0x004AC4D0 [PROVISIONAL]
 	int32_t EnumerateDrivers(DeviceFilterCallback_t callback)
@@ -1241,7 +1240,7 @@ namespace ModeSelect
 		wndClass.lpfnWndProc = WndProc;
 		wndClass.cbClsExtra = 0;
 		wndClass.cbWndExtra = 0;
-		wndClass.hInstance = D3DApp::g_windowData.hInstance;
+		wndClass.hInstance = g_windowData.hInstance;
 		wndClass.hIcon = LoadIconA(0, IDI_WINLOGO);
 		wndClass.hCursor = LoadCursorA(0, IDC_ARROW);
 		wndClass.hbrBackground = 0;
@@ -1267,7 +1266,7 @@ namespace ModeSelect
 			CW_USEDEFAULT,
 			0,
 			0,
-			D3DApp::g_windowData.hInstance,
+			g_windowData.hInstance,
 			0);
 
 		if (! g_hWnd)
@@ -1280,7 +1279,7 @@ namespace ModeSelect
 
 		strcat(imagePath, "pcbits\\rezsel.bmp");
 
-		HANDLE loadedImage = LoadImageA(D3DApp::g_windowData.hInstance, imagePath, 0, 0, 0, LR_CREATEDIBSECTION | LR_LOADFROMFILE);
+		HANDLE loadedImage = LoadImageA(g_windowData.hInstance, imagePath, 0, 0, 0, LR_CREATEDIBSECTION | LR_LOADFROMFILE);
 
 		if (loadedImage)
 		{

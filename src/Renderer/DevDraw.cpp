@@ -1,0 +1,162 @@
+#include "Renderer/Renderer.h"
+#include "SoftwareRenderer.h"
+#include "DrawingDevice.h"
+#include "Nu3D/BmpDataNode.h"
+#include "Nu3D/Math.h"
+#include "Toy2/Toy2.h"
+#include "Toy2/Direct6.h"
+#include "Logger.h"
+
+namespace DevDraw
+{
+	// GLOBAL: TOY2 0x00732FBC
+	int32_t g_vertexCount;
+
+	// FUNCTION: TOY2 0x004907E0 [MATCHED]
+	int16_t DrawSlots()
+	{
+		switch (g_renderMode)
+		{
+			case 1:
+				if (SoftwareRenderer::g_skipOddSoftwareFrames != 1 || (Renderer::g_frameDelta & 1) == 0)
+				{
+					SoftwareRenderer::RenderSoftwareFrame(SoftwareRenderer::g_displayMaxX, 0);
+				}
+				SoftwareRenderer::g_softwareRenderItemCount = 0;
+				Nu3D::MemSet32Util(SoftwareRenderer::g_softwareRenderBuckets, 0x1000, 0);
+				break;
+			case 2: {
+				int16_t i;
+				for (i = 0; i < 0x40; i++)
+				{
+					FlushDrawBufferSlot(i);
+				}
+				for (i = 0; i < 0x40; i++)
+				{
+					FlushTransparentDrawBufferSlot(i);
+				}
+				return 1;
+			}
+			default:
+				break;
+		}
+		return 1;
+	}
+
+	// Flushes one slot of the opaque indexed draw buffer: binds the slot's
+	// texture, issues an indexed triangle-list DrawIndexedPrimitive,
+	// accumulates the vertex count, and resets the slot's vertex and index
+	// counts. The texture name is built as "LOADTEXT_texXX" where XX is the
+	// zero-padded slot index.
+	//
+	// The slot parameter stays in a 16-bit register (for the current-slot word
+	// store) while a sign-extended copy drives the array indexing. The draw
+	// buffer pointer is re-read from the global before each use (the string
+	// building and the COM calls clobber the holding register), so no local
+	// caches it.
+	// FUNCTION: TOY2 0x00490470 [MATCHED]
+	int16_t FlushDrawBufferSlot(int16_t slot)
+	{
+		Renderer::InitRenderState(0);
+
+		LPDIRECT3DDEVICE3 d3dDevice = DrawingDevice::GetD3DDevice();
+		int32_t slotIndex = slot;
+
+		if (Toy2::drawb->VerticeCount[slotIndex] != 0)
+		{
+			char textureName[15] = "LOADTEXT_tex00";
+			textureName[12] = (char)('0' + slotIndex / 10);
+			textureName[13] = (char)('0' + slotIndex % 10);
+
+			Nu3D::BmpDataNode* bmpDataNode = Nu3D::GetBmpDataNodeByName_T(textureName);
+			d3dDevice->SetTexture(0, Nu3D::GetTexture(bmpDataNode));
+
+			HRESULT error = d3dDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST,
+				D3DFVF_0x1C4,
+				Toy2::drawb->Vertice[slotIndex],
+				Toy2::drawb->VerticeCount[slotIndex],
+				Toy2::drawb->Index[slotIndex],
+				Toy2::drawb->IndexCount[slotIndex],
+				8);
+
+			if (error < 0)
+			{
+				Logger::LogDDError(
+					"dev->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, ( 0x004 | 0x040 | 0x080 | 0x100 ), (LPVOID) (drawb->Vertice[i]), "
+					"drawb->VerticeCount[i], (LPWORD) & (drawb->Index[i]), drawb->IndexCount[i], 0x00000008l)",
+					error);
+			}
+
+			Toy2::g_currentDrawSlot = slot;
+			g_vertexCount += Toy2::drawb->VerticeCount[slotIndex];
+		}
+
+		Toy2::drawb->IndexCount[slotIndex] = 0;
+		Toy2::drawb->VerticeCount[slotIndex] = 0;
+
+		return 1;
+	}
+
+	// Flushes one slot of the transparent indexed draw buffer: binds the
+	// slot's texture, issues an indexed triangle-list DrawIndexedPrimitive,
+	// accumulates the vertex count, resets the render state, and clears the
+	// slot's vertex and index counts. The texture name is built as
+	// "LOADTEXT_texXX" where XX is the zero-padded slot index.
+	//
+	// Only slots 0..31 are valid (the transparent pool is half the opaque
+	// pool's 64 slots).
+	//
+	// The slot parameter stays in a 16-bit register (BX) while a sign-extended
+	// copy (slotIndex) drives the array indexing. The draw buffer pointer is
+	// re-read from the global before each use (no local cache, so the reloads
+	// match retail). The render state is set to 0x400 before the draw and
+	// reset to 0 after it.
+	// FUNCTION: TOY2 0x004905C0 [MATCHED]
+	int16_t FlushTransparentDrawBufferSlot(int16_t slot)
+	{
+		LPDIRECT3DDEVICE3 d3dDevice = DrawingDevice::GetD3DDevice();
+		Renderer::InitRenderState(0x400);
+
+		if (slot < 0x20)
+		{
+			int32_t slotIndex = slot;
+
+			if (Toy2::drawtranb->VerticeCount[slotIndex] != 0)
+			{
+				char textureName[15] = "LOADTEXT_tex00";
+				textureName[12] = (char)('0' + slotIndex / 10);
+				textureName[13] = (char)('0' + slotIndex % 10);
+
+				Nu3D::BmpDataNode* bmpDataNode = Nu3D::GetBmpDataNodeByName_T(textureName);
+				d3dDevice->SetTexture(0, Nu3D::GetTexture(bmpDataNode));
+
+				HRESULT error = d3dDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST,
+					D3DFVF_0x1C4,
+					Toy2::drawtranb->Vertice[slotIndex],
+					Toy2::drawtranb->VerticeCount[slotIndex],
+					Toy2::drawtranb->Index[slotIndex],
+					Toy2::drawtranb->IndexCount[slotIndex],
+					8);
+
+				if (error < 0)
+				{
+					Logger::LogDDError(
+						"dev->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, ( 0x004 | 0x040 | 0x080 | 0x100 ), (LPVOID) (drawtranb->Vertice[i]), "
+						"drawtranb->VerticeCount[i], (LPWORD) & (drawtranb->Index[i]), drawtranb->IndexCount[i], 0x00000008l)",
+						error);
+				}
+
+				Toy2::g_currentDrawSlot = slot;
+				g_vertexCount += Toy2::drawtranb->VerticeCount[slotIndex];
+			}
+		}
+
+		Renderer::InitRenderState(0);
+
+		Toy2::drawtranb->IndexCount[slot] = 0;
+		Toy2::drawtranb->VerticeCount[slot] = 0;
+
+		return 1;
+	}
+
+}

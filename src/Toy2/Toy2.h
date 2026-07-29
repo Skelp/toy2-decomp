@@ -5,6 +5,11 @@
 
 namespace Toy2
 {
+	namespace Graphics
+	{
+		int32_t RemoveDetailLevel();
+	}
+
 	namespace MoveableObject
 	{
 		struct State
@@ -134,6 +139,7 @@ namespace Toy2
 	void ResetGadgets();
 	void ProcessMiscEvents();
 	void ProcessMiscEventsEx();
+	void RunModeSelect();
 	void RenderGame(int32_t fullRender);
 	void PlayLevelMusic();
 	void AdvanceFramePhase();
@@ -173,6 +179,7 @@ namespace Toy2
 	extern int32_t g_mainMenuState;
 	extern int32_t g_attractModeTimer;
 	extern int32_t g_returnedToTitle;
+	extern int32_t g_modeSelectFinished;
 	extern int32_t g_saveLoaded;
 	extern int32_t g_showBlackFrames;
 	extern int32_t g_demoMode;

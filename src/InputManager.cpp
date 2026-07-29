@@ -1,5 +1,5 @@
 #include "InputManager.h"
-#include "Toy2/D3DApp.h"
+#include "Toy2/Win95.h"
 #include "SaveManager.h"
 #include "Nu3D/Nu3D.h"
 
@@ -240,12 +240,12 @@ namespace InputManager
 
 		g_dInputDeviceCount = 0;
 
-		if (! DirectInputCreateA(D3DApp::g_windowData.hInstance, 0x0500, &g_directInput, 0))
+		if (! DirectInputCreateA(g_windowData.hInstance, 0x0500, &g_directInput, 0))
 		{
 			// clang-format off
 			if (! g_directInput->CreateDevice(GUID_SysKeyboard, &g_directInputDevice, 0) 
 				&& ! g_directInputDevice->SetDataFormat(&c_dfDIKeyboard)
-				&& ! g_directInputDevice->SetCooperativeLevel(D3DApp::g_windowData.mainHwnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE) && ! g_directInputDevice->Acquire())
+				&& ! g_directInputDevice->SetCooperativeLevel(g_windowData.mainHwnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE) && ! g_directInputDevice->Acquire())
 			{
 				g_directInputSuccess = 1;
 			}
@@ -266,7 +266,7 @@ namespace InputManager
 
 							if (! devices[deviceIdx]->QueryInterface(IID_IDirectInputDevice2A, (LPVOID*)curDevice)
 								&& ! (*curDevice)->SetDataFormat(&c_dfDIJoystick) 
-								&& ! (*curDevice)->SetCooperativeLevel(D3DApp::g_windowData.mainHwnd, DISCL_FOREGROUND | DISCL_EXCLUSIVE)
+								&& ! (*curDevice)->SetCooperativeLevel(g_windowData.mainHwnd, DISCL_FOREGROUND | DISCL_EXCLUSIVE)
 								&& ! (*curDevice)->Acquire())
 							{
 								g_isInputDeviceValid[deviceIdx] = 1;

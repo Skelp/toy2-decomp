@@ -1,5 +1,7 @@
 #include "Toy2/Toy2.h"
-#include "Toy2/D3DApp.h"
+#include "D3DApp/d3dapp.h"
+#include "Toy2/Direct6.h"
+#include "Toy2/Win95.h"
 #include "Logger.h"
 #include "FileUtils.h"
 #include "InputManager.h"
@@ -3425,12 +3427,12 @@ namespace Toy2
 	// FUNCTION: TOY2 0x00490730 [MATCHED]
 	void CheckForQuit()
 	{
-		if (D3DApp::g_windowData.wndIsExiting != 0)
+		if (g_windowData.wndIsExiting != 0)
 		{
 			Logger::Log("CheckForQuit : Starting shutdown now...\n");
-			DestroyWindow(D3DApp::g_windowData.mainHwnd);
+			DestroyWindow(g_windowData.mainHwnd);
 
-			switch (D3DApp::g_renderMode)
+			switch (g_renderMode)
 			{
 				case RENDERMODE_SOFTWARE:
 					SoftwareRenderer::Destroy();
@@ -3441,10 +3443,10 @@ namespace Toy2
 			}
 
 			CleanupManagers();
-			D3DApp::PostQuitMessage();
+			PostQuitMessage();
 			CoUninitialize();
 
-			D3DApp::g_windowData.mainHwnd = 0;
+			g_windowData.mainHwnd = 0;
 
 			Logger::Log("CheckForQuit : Code shutdown.\n");
 
@@ -3459,7 +3461,7 @@ namespace Toy2
 				Logger::Log("Managed to clear SCREENSAVERRUNNING\n");
 			}
 
-			exit(D3DApp::g_windowData.wndEventMsg.wParam);
+			exit(g_windowData.wndEventMsg.wParam);
 		}
 	}
 
@@ -3523,7 +3525,7 @@ namespace Toy2
 			else
 			{
 				Renderer::SetIsSoftwareRendering(1);
-				while (Toy2::Graphics::RemoveDetailLevel()) {};
+				while (Graphics::RemoveDetailLevel()) {};
 			}
 
 			if (! primaryDevice->isHardwareAccelerated && primaryDevice->canRenderWindowedOnPrimary)
@@ -3535,13 +3537,12 @@ namespace Toy2
 				adjustedRect.bottom = 240;
 
 				AdjustWindowRect(&adjustedRect, 0, 0);
-				SetWindowPos(D3DApp::g_windowData.mainHwnd, 0, 0, 0, adjustedRect.right, adjustedRect.bottom, 2);
+				SetWindowPos(g_windowData.mainHwnd, 0, 0, 0, adjustedRect.right, adjustedRect.bottom, 2);
 			}
 
-			ShowWindow(D3DApp::g_windowData.mainHwnd, SW_SHOWMAXIMIZED);
+			ShowWindow(g_windowData.mainHwnd, SW_SHOWMAXIMIZED);
 
-			if (DrawingDevice::CD3DFramework::Build(
-					D3DApp::g_windowData.mainHwnd, &ddApp->guid, primaryDevice, primaryDevice->primaryDisplayMode, fullscreenExclusive)
+			if (DrawingDevice::CD3DFramework::Build(g_windowData.mainHwnd, &ddApp->guid, primaryDevice, primaryDevice->primaryDisplayMode, fullscreenExclusive)
 				>= 0)
 				g_modeSelectFinished = 1;
 		}
@@ -4063,29 +4064,29 @@ namespace Toy2
 		Nu3D::Font::SetTextCursor(0, (int32_t)Nu3D::g_scaledFontAscent);
 		DevDraw::g_vertexCount = 0;
 
-		D3DApp::g_windowData.wndIsExiting = g_wndIsExitingUnused;
+		g_windowData.wndIsExiting = g_wndIsExitingUnused;
 
 		if (g_wndIsExitingUnused)
 		{
 			Logger::Log("CheckForQuit : Starting shutdown now...\n");
 
-			DestroyWindow(D3DApp::g_windowData.mainHwnd);
+			DestroyWindow(g_windowData.mainHwnd);
 
-			if (D3DApp::g_renderMode == RENDERMODE_SOFTWARE)
+			if (g_renderMode == RENDERMODE_SOFTWARE)
 			{
 				SoftwareRenderer::Destroy();
 			}
-			else if (D3DApp::g_renderMode == RENDERMODE_D3D)
+			else if (g_renderMode == RENDERMODE_D3D)
 			{
 				Logger::Log("QUIT : Destroying Direct3D renderer.\n");
 			}
 
 			CleanupManagers();
-			D3DApp::PostQuitMessage();
+			PostQuitMessage();
 
 			CoUninitialize();
 
-			D3DApp::g_windowData.mainHwnd = 0;
+			g_windowData.mainHwnd = 0;
 
 			Logger::Log("CheckForQuit : Code shutdown.\n");
 
@@ -4096,12 +4097,12 @@ namespace Toy2
 			else
 				Logger::Log("Failed to clear SCREENSAVERRUNNING\n");
 
-			exit(D3DApp::g_windowData.wndEventMsg.wParam);
+			exit(g_windowData.wndEventMsg.wParam);
 		}
 
-		D3DApp::ProcessWndEvents();
+		ProcessWndEvents();
 
-		if (D3DApp::g_windowData.wndIsExiting)
+		if (g_windowData.wndIsExiting)
 		{
 			DrawingDevice::g_drawingDevice->RestoreToGDISurface(1);
 			Logger::GetErrorHandler("C:\\projects\\toy2\\toy2.cpp", 4670)("");
@@ -4143,12 +4144,12 @@ namespace Toy2
 
 		SoftwareRenderer::g_backBufferClearComplete = 0;
 
-		if (D3DApp::g_renderMode == RENDERMODE_SOFTWARE)
+		if (g_renderMode == RENDERMODE_SOFTWARE)
 		{
 			SoftwareRenderer::UnkFunc2();
 			SoftwareRenderer::UpdateBackdropScroll();
 		}
-		else if (D3DApp::g_renderMode == RENDERMODE_D3D)
+		else if (g_renderMode == RENDERMODE_D3D)
 		{
 			UpdateD3DState();
 		}
@@ -4157,8 +4158,8 @@ namespace Toy2
 	// FUNCTION: TOY2 0x00498550 [MATCHED]
 	void ProcessMiscEvents()
 	{
-		D3DApp::ProcessWndEvents();
-		if (D3DApp::g_windowData.wndIsExiting)
+		ProcessWndEvents();
+		if (g_windowData.wndIsExiting)
 		{
 			DrawingDevice::RestoreToGDISurface(1);
 			Logger::GetErrorHandler("C:\\projects\\toy2\\toy2.cpp", 0x123E)(&SaveManager::g_emptyString);
@@ -4239,26 +4240,26 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, char* cmdLine, int3
 
 	Toy2::g_unused0 = 0;
 
-	memset(&D3DApp::d3dappi, 0, sizeof(D3DApp::d3dappi));
+	memset(&d3dappi, 0, sizeof(d3dappi));
 
-	D3DApp::g_no32bitColors = 1;
+	g_no32bitColors = 1;
 
 	FileUtils::ValidateInstall();
 
 	Toy2::g_levelFileIndex = 1;
 
-	memset(&D3DApp::g_windowData, 0, sizeof(D3DApp::g_windowData));
+	memset(&g_windowData, 0, sizeof(g_windowData));
 
-	D3DApp::g_windowData.hInstance = hInstance;
-	D3DApp::g_windowData.hPrev = hPrev;
-	D3DApp::g_windowData.lpCmdLine = cmdLine;
-	D3DApp::g_windowData.nShowCmd = cmdShow;
+	g_windowData.hInstance = hInstance;
+	g_windowData.hPrev = hPrev;
+	g_windowData.lpCmdLine = cmdLine;
+	g_windowData.nShowCmd = cmdShow;
 
-	D3DApp::g_windowData.unkInt8 = 0;
-	D3DApp::g_windowData.unkInt3 = 1;
-	D3DApp::g_windowData.unkInt4 = 1;
-	D3DApp::g_windowData.unkInt5 = 1;
-	D3DApp::g_windowData.wndIsExiting = 0;
+	g_windowData.unkInt8 = 0;
+	g_windowData.unkInt3 = 1;
+	g_windowData.unkInt4 = 1;
+	g_windowData.unkInt5 = 1;
+	g_windowData.wndIsExiting = 0;
 
 	Toy2::OneInit();
 
@@ -4269,11 +4270,11 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, char* cmdLine, int3
 	Toy2::g_unused2 = 0;
 
 	Toy2::ReadCfg();
-	D3DApp::BuildProfileMachine();
-	D3DApp::BuildWindow();
+	ExamineMachine();
+	BuildWindow();
 	Toy2::ShowModeSelect();
 
-	switch (D3DApp::g_renderMode)
+	switch (g_renderMode)
 	{
 		case RENDERMODE_SOFTWARE:
 			Toy2::InitSoftwareRenderer();
@@ -4311,7 +4312,7 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, char* cmdLine, int3
 
 	Toy2::Run(tokenCount, &currentToken);
 
-	D3DApp::g_windowData.wndIsExiting = 1;
+	g_windowData.wndIsExiting = 1;
 
 	Toy2::CheckForQuit();
 

@@ -1,4 +1,5 @@
 #include "Logger.h"
+#include "D3DApp/d3dapp.h"
 
 #include <cstdio>
 #include <cstdarg>
@@ -61,56 +62,10 @@ namespace Logger
 		exit(-1);
 	}
 
-	// FUNCTION: TOY2 0x004A66A0 [MODIFIED] [PROVISIONAL]
-	void Log(char* format, ...)
-	{
-		char buffer[1024];
-
-		va_list argList;
-		va_start(argList, format);
-
-		memset(buffer, 0, sizeof(buffer));
-		vsprintf(buffer, format, argList);
-
-		printf("%s", buffer); // Addition
-
-		if (g_logsEnabled)
-		{
-			if (g_logFileExists)
-			{
-				g_logFileExists = 0;
-				remove("toy2.log");
-			}
-
-			FILE* file = fopen("toy2.log", "at");
-
-			if (file)
-			{
-				fprintf(file, buffer);
-				fclose(file);
-			}
-		}
-	}
-
-	// FUNCTION: TOY2 0x004A6730 [MATCHED]
-	void LogLn(char* format, ...)
-	{
-		char buffer[1024];
-
-		va_list argList;
-		va_start(argList, format);
-
-		memset(buffer, 0, sizeof(buffer));
-		vsprintf(buffer, format, argList);
-		lstrcatA(buffer, "\r\n");
-
-		Log(buffer);
-	}
-
 	// FUNCTION: TOY2 0x004ADFD0 [MATCHED]
 	void LogD3DError(int32_t errorCode)
 	{
-		char* message = D3DAppErrorToString(errorCode);
+		char* message = D3DErrorToString(errorCode);
 		OutputDebugStringA(message);
 		OutputDebugStringA("\n");
 	}
@@ -121,7 +76,7 @@ namespace Logger
 		char buffer[2048];
 
 		memset(buffer, 0, sizeof(buffer));
-		char* errorToMsg = ErrorToMessage(error);
+		char* errorToMsg = D3DAppErrorToString(error);
 		sprintf(buffer, "ERROR - %s\nERROR - %s\n", message, errorToMsg);
 
 		LogLn(buffer);
@@ -138,9 +93,6 @@ namespace Logger
 		OutputDebugStringA(buffer);
 	}
 
-	// STUB: TOY2 0x0040D490;
-	char* ErrorToMessage(HRESULT error) { return "Unimplemented"; }
+	// STUB: TOY2 0x004ADFF0
+	char* D3DErrorToString(int32_t error) { return "Unimplemented"; }
 }
-
-// STUB: TOY2 0x004ADFF0
-char* D3DAppErrorToString(int32_t error) { return "Unimplemented"; }

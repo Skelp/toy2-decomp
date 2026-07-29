@@ -2,10 +2,15 @@
 #include "Renderer/Renderer.h"
 #include "DrawingDevice.h"
 #include "NGNLoader/NGNLoader.h"
-#include "NGNLoader/ObjectLoad.h"
+#include "Nu3D/ObjLoad.h"
 
 namespace Nu3D
 {
+	// The later Nu3D source names this lifecycle hook NuMtlClose.
+	// The Toy Story 2 retail function has an empty body.
+	// FUNCTION: TOY2 0x004C2990 [MATCHED]
+	void Material::Close() {}
+
 	// GLOBAL: TOY2 0x00A4CC98
 	Material g_materialFreeList[3000];
 

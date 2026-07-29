@@ -5,7 +5,7 @@
 #include "Numerics.h"
 #include "Random.h"
 #include "Renderer/Renderer.h"
-#include "Toy2/D3DApp.h"
+#include "Toy2/Win95.h"
 #include "Toy2/Toy2.h"
 #include <math.h>
 #include <cstring>
@@ -568,7 +568,7 @@ namespace AudioManager
 			DirectSoundCreate(g_deviceGuids[1], &g_directSound, NULL);
 			if (g_directSound != NULL)
 			{
-				g_directSound->SetCooperativeLevel(D3DApp::g_windowData.mainHwnd, DSSCL_EXCLUSIVE);
+				g_directSound->SetCooperativeLevel(g_windowData.mainHwnd, DSSCL_EXCLUSIVE);
 				g_audioInitialized = 1;
 				if (IsStreamActive())
 				{

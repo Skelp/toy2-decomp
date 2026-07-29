@@ -24,7 +24,7 @@
 #include "Nu3D/Camera.h"
 #include "Nu3D/Light.h"
 #include "SaveManager.h"
-#include "Toy2/D3DApp.h"
+#include "Toy2/Direct6.h"
 #include "Toy2/Weather.h"
 
 namespace Toy2
@@ -323,7 +323,7 @@ namespace Toy2
 			Levels::g_unused3 = 512;
 			Levels::g_unused4 = 512;
 
-			if (D3DApp::g_renderMode == RENDERMODE_SOFTWARE || D3DApp::g_renderMode == RENDERMODE_D3D)
+			if (g_renderMode == RENDERMODE_SOFTWARE || g_renderMode == RENDERMODE_D3D)
 			{
 				l_cullBandWidth = 1664;
 				g_type63CullDistance = 1664;

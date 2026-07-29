@@ -10,6 +10,7 @@ namespace NGNLoader
 	extern NGNTextureData g_textureDataFreeList[2000];
 	extern Vector3F g_vertexScaleVector;
 	extern Nu3D::Material* g_tex14Materials[3];
+	extern char* g_curFileName;
 
 	void SetNewImage(char* fileName);
 	void Init();
@@ -17,7 +18,10 @@ namespace NGNLoader
 	void BuildTex14(int32_t unused);
 	void BuildGrid(int32_t gridWidth, int32_t gridHeight, int32_t type, NGNImage* ngnImage);
 	void BuildScalerEntries(NGNImage* ngnImage);
+	void ParseTextures(FILE* stream, NGNImage* ngnImage);
+	uint32_t ParseCreatures(FILE* stream, NGNImage* ngnImage);
 	void DestroyPools(NGNImage* ngnImage);
+	Nu3D::Creature* ExtractCreatureData(FILE* stream);
 	int32_t ExtractAnimations(FILE* stream, Nu3D::Creature* creature, uint32_t dataSize);
 	int32_t ExtractShapePatch(FILE* stream, Nu3D::Creature* creature);
 	int32_t GetTextureDataIndex(uint32_t textureIndex);
@@ -32,4 +36,5 @@ namespace NGNLoader
 	HBITMAP GetBmpHandle(int32_t index);
 	int32_t CopyToDDSurfaceByIndex(int32_t texIndex, LPDIRECTDRAWSURFACE4 ddSurface);
 	uint32_t GetOrAllocateTexture(NGNTextureParams* texParams);
+	Nu3D::BmpDataNode* LoadTextureContents(FILE* stream, const char* rawTexStr, int32_t flags);
 }

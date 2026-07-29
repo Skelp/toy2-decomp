@@ -52,7 +52,6 @@ set(TOY2_SOURCES
     src/Logger.h
 
     src/FileUtils.h
-    src/FileUtils.cpp
 
     src/Nullsub.cpp
     src/Nullsub.h
@@ -91,9 +90,15 @@ set(TOY2_SOURCES
     src/Toy2/LevelSelect.h
     src/Toy2/Toy2.cpp
     src/Toy2/Toy2.h
-    src/Toy2/D3DApp.cpp
-    src/Toy2/D3DApp.h
-    src/Toy2/D3DAppTypes.h
+    src/D3DApp/d3dapp.cpp
+    src/D3DApp/d3dapp.h
+    src/D3DApp/d3dappi.h
+    src/D3DApp/ddcalls.cpp
+    src/D3DApp/misc.cpp
+    src/Toy2/Direct6.cpp
+    src/Toy2/Direct6.h
+    src/Toy2/Win95.cpp
+    src/Toy2/Win95.h
     src/Toy2/Buzz.cpp
     src/Toy2/Buzz.h
     src/Toy2/Actor.cpp
@@ -139,6 +144,7 @@ set(TOY2_SOURCES
     src/Nu3D/Font.h
     src/Nu3D/Font.cpp
     src/Nu3D/FMV.cpp
+    src/Nu3D/HObjLoad.cpp
     src/Nu3D/DrawSurface.h
     src/Nu3D/DrawSurface.cpp
     src/Nu3D/Light.cpp
@@ -149,10 +155,18 @@ set(TOY2_SOURCES
     src/Nu3D/Particles.cpp
     src/Nu3D/Math.cpp
     src/Nu3D/Math.h
+    src/Nu3D/NuMtx.cpp
+    src/Nu3D/NuPlane.cpp
+    src/Nu3D/NuVec.cpp
+    src/Nu3D/ObjCore.cpp
+    src/Nu3D/ObjLoad.cpp
+    src/Nu3D/ObjLoad.h
+    src/Nu3D/World.cpp
 
     # Renderer
     src/Renderer/Renderer.h
     src/Renderer/Renderer.cpp
+    src/Renderer/DevDraw.cpp
     src/Renderer/RenderType.h
     src/Renderer/Sprite.h
     src/Renderer/Sprite.cpp
@@ -169,8 +183,6 @@ set(TOY2_SOURCES
     src/NGNLoader/NGNLoader.cpp
     src/NGNLoader/NGNLoader.h
     src/NGNLoader/NGNTypes.h
-    src/NGNLoader/ObjectLoad.cpp
-    src/NGNLoader/ObjectLoad.h
 
     # AudioManager
     src/AudioManager/AudioManager.cpp

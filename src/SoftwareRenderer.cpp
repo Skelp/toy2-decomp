@@ -3,7 +3,8 @@
 #include "Renderer/Renderer.h"
 #include "Toy2/MainMenu.h"
 #include "Toy2/Toy2.h"
-#include "Toy2/D3DApp.h"
+#include "D3DApp/d3dapp.h"
+#include "Toy2/Direct6.h"
 #include "Toy2/Weather.h"
 #include "Nu3D/BmpDataNode.h"
 #include "Nu3D/Camera.h"
@@ -11,11 +12,6 @@
 #include "Logger.h"
 #include <stdlib.h>
 #include <math.h>
-
-namespace D3DApp
-{
-	BOOL ShowBackBuffer();
-}
 
 namespace SoftwareRenderer
 {
@@ -1155,7 +1151,7 @@ namespace SoftwareRenderer
 		HRESULT result;
 		do
 		{
-			result = D3DApp::d3dappi.lpBackBuffer->Lock(NULL, &surfaceDesc, 0, NULL);
+			result = d3dappi.lpBackBuffer->Lock(NULL, &surfaceDesc, 0, NULL);
 		} while (result == DDERR_WASSTILLDRAWING);
 
 		if (result == DD_OK)
@@ -1165,17 +1161,17 @@ namespace SoftwareRenderer
 		}
 
 		g_lockedBackBuffer = NULL;
-		Logger::Log("SOFT : ERROR - Failed to lock back buffer - %s.\n", Logger::ErrorToMessage(result));
+		Logger::Log("SOFT : ERROR - Failed to lock back buffer - %s.\n", D3DAppErrorToString(result));
 	}
 
 	// FUNCTION: TOY2 0x0047C870 [MATCHED]
 	void UnlockBackBuffer()
 	{
-		HRESULT result = D3DApp::d3dappi.lpBackBuffer->Unlock(NULL);
+		HRESULT result = d3dappi.lpBackBuffer->Unlock(NULL);
 		g_lockedBackBuffer = NULL;
 		if (result != DD_OK)
 		{
-			Logger::Log("SOFT : ERROR - Failed to unlock back buffer - %s.\n", Logger::ErrorToMessage(result));
+			Logger::Log("SOFT : ERROR - Failed to unlock back buffer - %s.\n", D3DAppErrorToString(result));
 		}
 	}
 
@@ -3368,17 +3364,17 @@ namespace SoftwareRenderer
 	// FUNCTION: TOY2 0x00470BF0 [MATCHED]
 	void SetPaletteOnAPI()
 	{
-		HRESULT result = D3DApp::d3dappi.lpDD->CreatePalette(0x44, (LPPALETTEENTRY)g_paletteEntries, &g_lpPalette, NULL);
+		HRESULT result = d3dappi.lpDD->CreatePalette(0x44, (LPPALETTEENTRY)g_paletteEntries, &g_lpPalette, NULL);
 		if (result < 0)
 		{
 			Logger::LogDDError("d3dappi.lpDD->CreatePalette(0x00000004l|0x00000040l,&pal[0],&SonicRPalette,0)", result);
 		}
-		result = D3DApp::d3dappi.lpFrontBuffer->SetPalette(g_lpPalette);
+		result = d3dappi.lpFrontBuffer->SetPalette(g_lpPalette);
 		if (result < 0)
 		{
 			Logger::LogDDError("d3dappi.lpFrontBuffer->SetPalette(SonicRPalette)", result);
 		}
-		result = D3DApp::d3dappi.lpBackBuffer->SetPalette(g_lpPalette);
+		result = d3dappi.lpBackBuffer->SetPalette(g_lpPalette);
 		if (result < 0)
 		{
 			Logger::LogDDError("d3dappi.lpBackBuffer->SetPalette(SonicRPalette)", result);
@@ -3891,7 +3887,7 @@ namespace SoftwareRenderer
 		HRESULT result;
 		do
 		{
-			result = D3DApp::d3dappi.lpBackBuffer->Lock(NULL, &surfaceDesc, 0, NULL);
+			result = d3dappi.lpBackBuffer->Lock(NULL, &surfaceDesc, 0, NULL);
 		} while (result == DDERR_WASSTILLDRAWING);
 
 		if (result == DD_OK)
@@ -3901,10 +3897,10 @@ namespace SoftwareRenderer
 		else
 		{
 			g_lockedBackBuffer = NULL;
-			Logger::Log("SOFT : ERROR - Failed to lock back buffer - %s.\n", Logger::ErrorToMessage(result));
+			Logger::Log("SOFT : ERROR - Failed to lock back buffer - %s.\n", D3DAppErrorToString(result));
 		}
 
-		if (Nu3D::Camera::g_cameraTintBlue != 0x80 && D3DApp::g_renderMode == RENDERMODE_SOFTWARE && g_bitsPerPixel != 8)
+		if (Nu3D::Camera::g_cameraTintBlue != 0x80 && g_renderMode == RENDERMODE_SOFTWARE && g_bitsPerPixel != 8)
 		{
 			int32_t rowSkip = (g_backBufferPitchPixels - Toy2::g_destRectWidth) / 2;
 			int32_t rowWidth = Toy2::g_destRectWidth / 2;
@@ -4000,13 +3996,13 @@ namespace SoftwareRenderer
 			}
 		}
 
-		result = D3DApp::d3dappi.lpBackBuffer->Unlock(NULL);
+		result = d3dappi.lpBackBuffer->Unlock(NULL);
 		g_lockedBackBuffer = NULL;
 		if (result != DD_OK)
 		{
-			Logger::Log("SOFT : ERROR - Failed to unlock back buffer - %s.\n", Logger::ErrorToMessage(result));
+			Logger::Log("SOFT : ERROR - Failed to unlock back buffer - %s.\n", D3DAppErrorToString(result));
 		}
-		D3DApp::ShowBackBuffer();
+		D3DAppShowBackBuffer();
 	}
 
 	// Queues a transformed triangle for sorted (back-to-front) transparency

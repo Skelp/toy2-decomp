@@ -1,4 +1,4 @@
-#include "NGNLoader/ObjectLoad.h"
+#include "Nu3D/ObjLoad.h"
 #include "NGNLoader/NGNLoader.h"
 #include "Renderer/Renderer.h"
 #include "Logger.h"
