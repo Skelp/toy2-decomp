@@ -1,6 +1,7 @@
 #include "Toy2/Toy2.h"
 #include "Toy2/LevelLogic.h"
 #include "Toy2/Actor.h"
+#include "Toy2/Particles.h"
 #include "AudioManager/AudioManager.h"
 #include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
@@ -25,8 +26,43 @@ namespace Toy2
 {
 	namespace CreatureBehaviour
 	{
-		// STUB: TOY2 0x00418610
-		void Army(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// FUNCTION: TOY2 0x00418610 [PROVISIONAL]
+		void Army(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			if (actor->actorPhase == 0x66)
+			{
+				if (g_framePulseOutputs.thirtyTwoTick != 0 && (*g_randDatBufferPtr++ & 3) == 0)
+				{
+					AudioManager::PlaySoundEffect(0x48, &actor->pos);
+				}
+
+				if ((actor->actorFlags & Actor::ACTOR_FLAG_INTERACTION_REQUESTED) != 0)
+				{
+					g_levelObjectiveProgress++;
+					Particles::SpawnCollectSparkle(actor->pos.x, actor->pos.y - 0x2000, actor->pos.z, 0x32);
+					Actor::Kill(actor, Actor::KILL_REMOVE_ACTOR);
+					AudioManager::PlaySoundEffect(0x49, &actor->pos);
+				}
+
+				actor->previousActorPhase -= (int16_t)Renderer::g_frameDelta;
+				if (actor->previousActorPhase <= 0)
+				{
+					actor->previousActorPhase = (*g_randDatBufferPtr++ & 0x7F) + 0x80;
+					if ((actor->actorFlags & Actor::ACTOR_FLAG_TARGETABLE) != 0)
+					{
+						uint8_t* randomData = g_randDatBufferPtr;
+						int32_t velocityZ = *randomData++ - 0x80;
+						randomData += 2;
+						g_randDatBufferPtr = randomData;
+						int32_t velocityX = velocityZ * 4;
+						Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnInstance(
+							actor->pos.x, actor->pos.y - 0x1000, actor->pos.z, velocityX, -0xC00, velocityZ, 0x60, 0, velocityX, 0x79);
+						AudioManager::PlaySoundEffect(0x60, &particle->pos);
+					}
+				}
+			}
+		}
 		// STUB: TOY2 0x004189C0
 		void ZKite(Actor::Toy2Actor::ActorBehaviourContext* context) {}
 		// STUB: TOY2 0x00418CE0
