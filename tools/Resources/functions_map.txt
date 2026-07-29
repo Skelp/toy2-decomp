@@ -65,7 +65,9 @@
 0x0040CD60 D3DAppGetRenderState
 0x0040CD80 D3DAppShowBackBuffer
 0x0040CF10 D3DAppClearBackBuffer
+0x0040CFB0 D3DAppCheckForLostSurfaces
 0x0040D0D0 D3DAppPause
+0x0040D230 D3DAppICreateSurface
 0x0040D2B0 D3DAppLastError
 0x0040D2C0 D3DAppLastErrorString
 0x0040D2D0 D3DAppDestroy

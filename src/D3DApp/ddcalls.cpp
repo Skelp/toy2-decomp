@@ -1,4 +1,5 @@
 #include "D3DApp/d3dapp.h"
+#include "D3DApp/d3dappi.h"
 #include "Logger.h"
 #include "Toy2/Direct6.h"
 

@@ -140,6 +140,13 @@ namespace Toy2
 	void ProcessMiscEvents();
 	void ProcessMiscEventsEx();
 	void RunModeSelect();
+	void OneInit();
+	void CheckForQuit();
+	int32_t ReadCfg();
+	int32_t ShowModeSelect();
+	void InitSoftwareRenderer();
+	void InitDirect3DRenderer();
+	int32_t Run(int32_t argc, char** argv);
 	void RenderGame(int32_t fullRender);
 	void PlayLevelMusic();
 	void AdvanceFramePhase();
@@ -179,6 +186,9 @@ namespace Toy2
 	extern int32_t g_mainMenuState;
 	extern int32_t g_attractModeTimer;
 	extern int32_t g_returnedToTitle;
+	extern int32_t g_unused0;
+	extern int32_t g_unused1;
+	extern int32_t g_unused2;
 	extern int32_t g_modeSelectFinished;
 	extern int32_t g_saveLoaded;
 	extern int32_t g_showBlackFrames;

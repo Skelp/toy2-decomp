@@ -4,6 +4,7 @@
 #include "Toy2/MainMenu.h"
 #include "Toy2/Toy2.h"
 #include "D3DApp/d3dapp.h"
+#include "D3DApp/d3dappi.h"
 #include "Toy2/Direct6.h"
 #include "Toy2/Weather.h"
 #include "Nu3D/BmpDataNode.h"

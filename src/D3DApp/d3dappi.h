@@ -1,9 +1,8 @@
 #pragma once
 
-#include "Common.h"
+#include "D3DApp/d3dapp.h"
 
-#include <directx6/d3d.h>
-#include <directx6/ddraw.h>
+#include <stddef.h>
 
 struct D3DAppMode
 {
@@ -13,32 +12,14 @@ struct D3DAppMode
 	BOOL bThisDriverCanDo;
 };
 
-struct D3DAppRenderState
-{
-	BOOL bZBufferOn;
-	BOOL bPerspCorrect;
-	D3DSHADEMODE ShadeMode;
-	D3DTEXTUREFILTER TextureFilter;
-	D3DTEXTUREBLEND TextureBlend;
-	D3DFILLMODE FillMode;
-	BOOL bDithering;
-	BOOL bSpecular;
-	BOOL bAntialiasing;
-	BOOL bFogEnabled;
-	D3DCOLOR FogColor;
-	D3DFOGMODE FogMode;
-	D3DVALUE FogStart;
-	D3DVALUE FogEnd;
-};
-
 struct D3DAppInfo
 {
 	HWND hwnd;
 	uint8_t pad0[768];
-	LPDIRECTDRAWSURFACE lpTextureSurf[15];
-	LPDIRECT3DTEXTURE2 lpTexture[15];
-	uint8_t pad1[136];
-	uint8_t pad2[52276];
+	LPDIRECTDRAWSURFACE3 lpTextureSurf[64];
+	uint8_t pad1[1288];
+	D3DMATERIALHANDLE lpGroundMatHandle;
+	uint8_t pad2[50984];
 	int32_t unkInt1;
 	int32_t unkInt2;
 	int32_t unkInt3;
@@ -90,5 +71,6 @@ extern uint16_t g_surfacesLost;
 extern RECT g_frontBufferRects[30];
 
 STATIC_ASSERT(sizeof(D3DAppMode) == 0x10);
-STATIC_ASSERT(sizeof(D3DAppRenderState) == 0x38);
+STATIC_ASSERT(offsetof(D3DAppInfo, lpTextureSurf) == 0x304);
+STATIC_ASSERT(offsetof(D3DAppInfo, lpGroundMatHandle) == 0x90C);
 STATIC_ASSERT(sizeof(D3DAppInfo) == 0xD0A0);
