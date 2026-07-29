@@ -2,6 +2,7 @@
 #include "Nu3D/Math.h"
 #include "Nu3D/Primitive.h"
 #include "NGNLoader/NGNLoader.h"
+#include "Toy2/Levels.h"
 
 namespace Nu3D
 {
@@ -296,7 +297,37 @@ namespace Nu3D
 			image->links[destinationLinkId].dynamicScaler->shapeId = image->links[sourceLinkId].dynamicScaler->shapeId;
 		}
 
-		// STUB: TOY2 0x00438910
-		void FollowWaypointPath(int32_t linkId, int32_t pathTableIdx, int32_t* progress) {}
+		// FUNCTION: TOY2 0x00438910
+		void FollowWaypointPath(int32_t linkId, int32_t pathTableIdx, int32_t* progress)
+		{
+			*progress += 0x40;
+			if ((*progress >> 8) > Toy2::Levels::g_recordData[pathTableIdx]->recordCount - 5)
+				*progress = 0;
+
+			Toy2::Levels::RecordData* path = Toy2::Levels::g_recordData[pathTableIdx];
+			int32_t waypointIndex = *progress >> 8;
+			int32_t blend = *progress & 0xFF;
+			int32_t inverseBlend = 0xFF - blend;
+
+			int32_t pathX = (path->data[waypointIndex].x * inverseBlend + path->data[waypointIndex + 1].x * blend) / 8;
+			int32_t pathY = (path->data[waypointIndex].y * inverseBlend + path->data[waypointIndex + 1].y * blend) / 8;
+			int32_t pathZ = (path->data[waypointIndex].z * inverseBlend + path->data[waypointIndex + 1].z * blend) / 8;
+
+			Vector3I currentPosition;
+			GetCurrentPosFixed(linkId, &currentPosition);
+
+			Vector3I rotation;
+			GetRotation8Bit(linkId, &rotation);
+
+			int32_t targetRotation = Math::CartesianToFixedAngle(pathZ - currentPosition.z, currentPosition.x - pathX);
+			int32_t rotationDelta = (rotation.y - targetRotation - 0x800) & 0xFFF;
+			if (rotationDelta <= 0x800)
+				rotation.y -= rotationDelta >> 2;
+			else
+				rotation.y += (0x1000 - rotationDelta) >> 2;
+
+			SetRotationAbsolute8bit(linkId, 0, rotation.y, 0);
+			SetPositionRawAndCommit(linkId, pathX >> 5, pathY >> 5, pathZ >> 5);
+		}
 	}
 }
