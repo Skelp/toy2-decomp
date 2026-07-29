@@ -7,7 +7,35 @@ namespace Toy2
 {
 	namespace MoveableObject
 	{
-		void InitTable(int32_t);
+		struct State
+		{
+			Vector3I position;
+			int32_t directionX;
+			int32_t directionZ;
+			int16_t verticalVelocity;
+			int16_t swingState;
+			int16_t pathProgress;
+			int16_t segmentLength;
+			int16_t facingAngle;
+			int16_t currentPathPoint;
+			int16_t targetPathPoint;
+			int16_t pathRecordType;
+			int16_t platformIndex;
+			int16_t linkIndex;
+		};
+
+		struct InitEntry
+		{
+			int16_t linkIndex;
+			int16_t platformIndex;
+			int16_t pathRecordType;
+		};
+
+		void ComputeSegment(int32_t pathRecordType, State* object);
+		void InitTable(const InitEntry* initTable);
+
+		STATIC_ASSERT(sizeof(State) == 0x28);
+		STATIC_ASSERT(sizeof(InitEntry) == 0x6);
 	}
 
 	namespace HUD

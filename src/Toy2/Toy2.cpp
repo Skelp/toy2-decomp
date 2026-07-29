@@ -16,11 +16,14 @@
 #include "Toy2/Levels.h"
 #include "Toy2/MainMenu.h"
 #include "Toy2/Actor.h"
+#include "Toy2/Collision.h"
 
 #include "Nu3D/Font.h"
 #include "Nu3D/FMV.h"
+#include "Nu3D/Link.h"
 #include "Nu3D/Viewport.h"
 #include "Nu3D/Camera.h"
+#include "Nu3D/Math.h"
 #include "Renderer/Renderer.h"
 #include "AudioManager/AudioManager.h"
 #include "NGNLoader/NGNLoader.h"
@@ -29,6 +32,7 @@
 #include <STDIO.H>
 #include <STRING.H>
 #include <DINPUT.H>
+#include <MATH.H>
 
 #include <Numerics.h>
 
@@ -36,8 +40,83 @@ namespace Toy2
 {
 	namespace MoveableObject
 	{
-		// STUB: TOY2 0x004335D0
-		void InitTable(int32_t) {}
+		// GLOBAL: TOY2 0x0053C65C
+		int32_t g_objectCount;
+
+		// GLOBAL: TOY2 0x0053C670
+		int32_t g_contactSoundCooldown;
+
+		// GLOBAL: TOY2 0x0053C680
+		State g_objects[10];
+
+		// FUNCTION: TOY2 0x004334D0
+		void ComputeSegment(int32_t pathRecordType, State* object)
+		{
+			Levels::RecordData* path = Levels::g_recordData[pathRecordType];
+			int32_t pathPoint = object->currentPathPoint;
+			int32_t deltaX = path->data[pathPoint + 1].x - path->data[pathPoint].x;
+			int32_t deltaZ = path->data[pathPoint + 1].z - path->data[pathPoint].z;
+
+			object->facingAngle = (int16_t)(Nu3D::Math::CartesianToFixedAngle(deltaX, deltaZ) & 0xFFF);
+
+			Vector3I direction;
+			direction.x = deltaX;
+			direction.y = 0;
+			direction.z = deltaZ;
+			Nu3D::Math::NormalizeToFixedPoint(&direction, &direction);
+
+			object->directionX = direction.x;
+			object->segmentLength = (int16_t)sqrt((float)(deltaX * deltaX + deltaZ * deltaZ));
+			object->directionZ = direction.z;
+			object->swingState = 0;
+
+			if (object->targetPathPoint < Levels::g_recordData[object->pathRecordType]->recordCount - 2
+				&& path->data[pathPoint + 1].x == path->data[pathPoint + 2].x && path->data[pathPoint + 1].z == path->data[pathPoint + 2].z)
+			{
+				object->swingState = object->segmentLength / 2;
+			}
+		}
+
+		// FUNCTION: TOY2 0x004335D0
+		void InitTable(const InitEntry* initTable)
+		{
+			memset(g_objects, 0, sizeof(g_objects));
+			g_contactSoundCooldown = 0;
+			g_objectCount = 0;
+			State* object = g_objects;
+
+			if (initTable != 0 && initTable->linkIndex != -1)
+			{
+				do
+				{
+					int32_t startPathPoint = g_levelFileIndex == 11 && initTable->pathRecordType == 29 ? 2 : 0;
+
+					object->linkIndex = initTable->linkIndex;
+					object->platformIndex = initTable->platformIndex;
+					object->pathRecordType = initTable->pathRecordType;
+
+					Levels::RecordData* path = Levels::g_recordData[object->pathRecordType];
+					object->position.x = path->data[startPathPoint].x << 5;
+					object->position.y = path->data[startPathPoint].y << 5;
+					object->position.z = path->data[startPathPoint].z << 5;
+					object->currentPathPoint = (int16_t)startPathPoint;
+					object->targetPathPoint = 0;
+
+					ComputeSegment(object->pathRecordType, object);
+					object->pathProgress = 0;
+
+					if (object->linkIndex >= 0)
+					{
+						Nu3D::Link::SetPositionRawAndCommit(object->linkIndex, object->position.x >> 5, object->position.y >> 5, object->position.z >> 5);
+					}
+
+					Platform::SetOrigin(object->platformIndex, object->position.x, object->position.y, object->position.z);
+					++g_objectCount;
+					++object;
+					++initTable;
+				} while (initTable->linkIndex != -1);
+			}
+		}
 	}
 
 	// GLOBAL: TOY2 0x004F5F54
