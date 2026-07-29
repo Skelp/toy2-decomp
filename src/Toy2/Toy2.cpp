@@ -3890,3 +3890,21 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, char* cmdLine, int3
 
 	return 0;
 }
+
+// FUNCTION: TOY2 0x00425A80 [PROVISIONAL]
+void Toy2::ElevatorHop::TransformMouseActors()
+{
+	for (int32_t actorIndex = 1; actorIndex < 6; actorIndex++)
+	{
+		Actor::Toy2Actor* actor = &Actor::g_creatureActors[actorIndex];
+		int32_t* boundaryZ = &actor->boundary.z;
+		if (actor->creatureRam->latSpeedNoTarget <= 0x7F)
+		{
+			int32_t relativeZ = actor->pos.z - *boundaryZ;
+			actor->pos.z = *boundaryZ - actor->boundary.y + actor->pos.y;
+			actor->pos.y = actor->boundary.y + relativeZ;
+		}
+	}
+
+	Actor::g_creatureActors[3].rollAngle = 0x800;
+}

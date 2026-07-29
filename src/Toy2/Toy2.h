@@ -51,6 +51,11 @@ namespace Toy2
 		extern int32_t g_challengeState;
 	}
 
+	namespace ElevatorHop
+	{
+		void TransformMouseActors();
+	}
+
 	void LoadLevelGraphics(int32_t levelFileIndex);
 	void InitialiseLevelVariables(int32_t levelIndex);
 	void HandleLevelInteractions(int32_t levelIndex);

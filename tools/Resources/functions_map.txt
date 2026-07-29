@@ -142,7 +142,7 @@
 0x00425680 Toy2::ElevatorHop::Method2
 0x00425700 Toy2::CreatureBehaviour::GunsP
 0x004259B0 Toy2::CreatureBehaviour::Mouse
-0x00425A80 Toy2::ElevatorHop::InitMouse
+0x00425A80 Toy2::ElevatorHop::TransformMouseActors
 0x00425AD0 Nu3D::Particles::ReflectWallsSquareArena
 0x00425B60 Toy2::ElevatorHop::Init
 0x00425EB0 Toy2::ElevatorHop::Method1
