@@ -26,7 +26,8 @@ namespace Toy2
 		{
 			ACTOR_FLAG_TARGETABLE = 0x1,
 			ACTOR_FLAG_ACTIVE = 0x2,
-			ACTOR_FLAG_DISABLED = 0x80,
+			ACTOR_FLAG_COLLIDABLE = 0x80,
+			ACTOR_FLAG_DAMAGES_BUZZ = 0x100,
 			ACTOR_FLAG_INTERACTION_REQUESTED = 0x200,
 			ACTOR_FLAG_BOSS = 0x800,
 			ACTOR_FLAG_RC_CAR = 0x1000,
@@ -37,6 +38,13 @@ namespace Toy2
 		{
 			KILL_EFFECTS = 0x1,
 			KILL_REMOVE_ACTOR = 0x2,
+		};
+
+		enum DamageType
+		{
+			DAMAGE_NONE = 0,
+			DAMAGE_SPIN = 1,
+			DAMAGE_GROUND_SLAM = 5,
 		};
 
 		struct Toy2Actor

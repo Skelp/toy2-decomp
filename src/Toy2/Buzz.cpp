@@ -535,8 +535,6 @@ namespace Toy2
 		const int32_t SURFACE_DAMAGE_GROUP = 0;
 		const int32_t SURFACE_DEATH_GROUP = 4;
 		const int32_t SLIPPERY_SURFACE_QUALITY = 13;
-		const uint32_t DAMAGE_NORMAL = 2;
-		const uint32_t DAMAGE_FORCE_DEATH = 4;
 		const uint32_t ACTION_STATE_GROUND_SLAM = 0x40;
 		const uint32_t CLEAR_ACTION_STATE_GUN_FIRE = 0xFF7F;
 		const uint32_t ACTION_STATE_SPIN_HOVER = 0x2;

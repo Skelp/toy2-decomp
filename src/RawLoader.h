@@ -5,6 +5,11 @@
 
 namespace RawLoader
 {
+	enum CreatureDefenseMode
+	{
+		CREATURE_DEFENSE_SPECIAL_ATTACK_DAMAGE = 0x2,
+	};
+
 	struct CreatureListRam
 	{
 		struct EntityControl

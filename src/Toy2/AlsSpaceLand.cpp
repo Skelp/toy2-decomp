@@ -118,7 +118,7 @@ namespace Toy2
 			g_environmentEffectType = 0;
 			g_spaceshipTokenPickup = tokenPickup;
 			tokenPickup->facingAngle &= Collectables::PICKUP_FLAG_PERSISTENT;
-			Actor::g_creatureActors[1].actorFlags |= Actor::ACTOR_FLAG_DISABLED;
+			Actor::g_creatureActors[1].actorFlags |= Actor::ACTOR_FLAG_COLLIDABLE;
 			memset(g_rotatingLinkStates, 0, sizeof(g_rotatingLinkStates));
 
 			g_challengePathProgress = 0;

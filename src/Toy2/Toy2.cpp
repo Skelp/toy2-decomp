@@ -968,8 +968,81 @@ namespace Toy2
 		// STUB: TOY2 0x00406CD0
 		void InitActor(Actor::Toy2Actor* actor, int32_t param) {}
 
-		// STUB: TOY2 0x00407440
-		void ActorCollisionCheck() {}
+		// FUNCTION: TOY2 0x00407440 [PROVISIONAL]
+		void ActorCollisionCheck()
+		{
+			int32_t attackType = Actor::DAMAGE_NONE;
+			int32_t buzzRadius = 150;
+			if (g_spinCooldownTimer > 20 || g_spinHoverTimer <= -120)
+			{
+				attackType = Actor::DAMAGE_SPIN;
+				buzzRadius = 400;
+			}
+
+			if (g_groundSlamTimer > 0)
+				attackType = Actor::DAMAGE_GROUND_SLAM;
+			if (g_groundSlamTimer < -30)
+			{
+				attackType = Actor::DAMAGE_GROUND_SLAM;
+				buzzRadius = 400;
+			}
+
+			int32_t buzzX = g_buzzActor.posAngles.pos.x;
+			int32_t buzzY = g_buzzActor.posAngles.pos.y - 0x1CC0;
+			int32_t buzzZ = g_buzzActor.posAngles.pos.z;
+
+			Actor::Toy2Actor** actorSlot = Actor::g_activeActors;
+			Actor::Toy2Actor* actor = *actorSlot;
+			while (actor != 0)
+			{
+				int32_t deltaX = (actor->boundingOffset.x - buzzX + actor->pos.x) >> 5;
+				int32_t deltaY = (actor->boundingOffset.y - buzzY + actor->pos.y) >> 5;
+				int32_t deltaZ = (actor->boundingOffset.z - buzzZ + actor->pos.z) >> 5;
+				int32_t combinedRadius = actor->boundingSphereRadius + buzzRadius;
+
+				if (deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ < combinedRadius * combinedRadius && actor->damageCooldownTimer >= 0)
+				{
+					int32_t yawSin = Numerics::g_sinCosLUT[(actor->yawAngle - 0x800) & 0xFFF] >> 2;
+					int32_t yawCos = Numerics::g_sinCosLUT[(actor->yawAngle - 0x400) & 0xFFF] >> 2;
+					Actor::ActorCollisionVolume* volume = &actor->collisionVolumes[actor->primaryAnimIdx];
+
+					int32_t collisionX = ((volume->offset.x * yawCos + volume->offset.z * yawSin) >> 12) - buzzX + actor->pos.x;
+					int32_t collisionZ = ((volume->offset.z * yawCos - volume->offset.x * yawSin) >> 12) - buzzZ + actor->pos.z;
+					int32_t scaledX = (((yawSin * collisionZ + yawCos * collisionX) >> 12) * volume->scale.z) >> 13;
+					int32_t scaledZ = (((yawCos * collisionZ - yawSin * collisionX) >> 12) * volume->scale.x) >> 13;
+					int32_t scaledY = ((volume->offset.y - buzzY + actor->pos.y) * volume->scale.y) >> 13;
+					combinedRadius = volume->radius + buzzRadius;
+
+					if (scaledX * scaledX + scaledY * scaledY + scaledZ * scaledZ < combinedRadius * combinedRadius
+						&& (actor->actorFlags & Actor::ACTOR_FLAG_COLLIDABLE) != 0)
+					{
+						uint32_t attackAngle =
+							Nu3D::Math::CartesianToFixedAngle(g_buzzActor.posAngles.pos.x - actor->pos.x, g_buzzActor.posAngles.pos.z - actor->pos.z);
+						actor->actorFlags |= Actor::ACTOR_FLAG_INTERACTION_REQUESTED;
+
+						int32_t actorDamageType = attackType;
+						if (attackType == Actor::DAMAGE_NONE || (actor->creatureRam->defenseMode & RawLoader::CREATURE_DEFENSE_SPECIAL_ATTACK_DAMAGE) == 0
+							|| (attackType == Actor::DAMAGE_GROUND_SLAM && scaledY < 0))
+						{
+							actorDamageType = Actor::DAMAGE_NONE;
+						}
+
+						uint32_t buzzDamageFlags;
+						if ((actor->actorFlags & Actor::ACTOR_FLAG_DAMAGES_BUZZ) != 0 && attackType == Actor::DAMAGE_NONE)
+							buzzDamageFlags = Buzz::DAMAGE_KNOCKBACK | Buzz::DAMAGE_NORMAL;
+						else if (actor->actorPhase == 0x66 || actorDamageType != Actor::DAMAGE_NONE)
+							buzzDamageFlags = 0;
+						else
+							buzzDamageFlags = Buzz::DAMAGE_KNOCKBACK;
+
+						Actor::HandleDamage(actor, attackAngle + 0x800, actorDamageType);
+						Buzz::HandleDamage(attackAngle & 0xFFF, buzzDamageFlags);
+					}
+				}
+
+				actor = *++actorSlot;
+			}
+		}
 
 		// STUB: TOY2 0x004086F0
 		void UpdateActors() {}

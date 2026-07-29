@@ -6,8 +6,19 @@
 
 namespace Toy2
 {
+	extern int32_t g_spinCooldownTimer;
+	extern int32_t g_spinHoverTimer;
+	extern int32_t g_groundSlamTimer;
+
 	namespace Buzz
 	{
+		enum DamageFlags
+		{
+			DAMAGE_KNOCKBACK = 0x1,
+			DAMAGE_NORMAL = 0x2,
+			DAMAGE_FORCE_DEATH = 0x4,
+		};
+
 		enum ActorFlags
 		{
 			ACTOR_FLAG_DAMAGE_REACTION = 0x2,
