@@ -41,7 +41,6 @@ src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNo
 0x00407150	address-named-symbol	g_unk52EF88	67f6287a4070	src/Toy2/Actor.cpp
 0x00407150	unknown-symbol	g_unk52EF88	67f6287a4070	src/Toy2/Actor.cpp
 src/Toy2/Actor.h	placeholder-field	unkVar9	439d5d04a3fa	src/Toy2/Actor.h
-src/Toy2/Actor.h	placeholder-field	unkVar10	31f6ac62c669	src/Toy2/Actor.h
 src/Toy2/Buzz.h	placeholder-field	unkVar7	c4e96513da34	src/Toy2/Buzz.h
 src/Toy2/Buzz.h	placeholder-field	unkVar8	214a98fbd5fd	src/Toy2/Buzz.h
 src/Toy2/Buzz.h	placeholder-field	unkVar12	d0e8cda92968	src/Toy2/Buzz.h

@@ -49,7 +49,7 @@ namespace Toy2
 			int32_t secondaryAnimationFramePosition;
 			int32_t unkVar9;
 			RGB16 actorTint;
-			int16_t unkVar10;
+			int16_t actorAlpha;
 			int16_t scaleX;
 			int16_t scaleY;
 			int16_t scaleZ;
@@ -116,6 +116,7 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(Toy2Actor) == 0x9C);
 		STATIC_ASSERT(offsetof(Toy2Actor, animationFramePosition) == 0x18);
 		STATIC_ASSERT(offsetof(Toy2Actor, secondaryAnimationFramePosition) == 0x1C);
+		STATIC_ASSERT(offsetof(Toy2Actor, actorAlpha) == 0x2A);
 		STATIC_ASSERT(offsetof(Toy2Actor, scaleX) == 0x2C);
 		STATIC_ASSERT(offsetof(Toy2Actor, scalePivotHeight) == 0x32);
 		STATIC_ASSERT(offsetof(Toy2Actor, areaIndex) == 0x6C);
