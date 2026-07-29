@@ -53,6 +53,13 @@ namespace Toy2
 
 	namespace ElevatorHop
 	{
+		extern int32_t g_link18PathPointIndex;
+		extern int32_t g_link19PathPointIndex;
+		extern int32_t g_link20PathPointIndex;
+		extern Vector3I g_fanParticleVelocityFactors[5];
+
+		void UpdatePathLinks();
+		void SpawnFanParticle(const Vector3I* position, int32_t fanIndex, int32_t velocityScale);
 		void TransformMouseActors();
 	}
 

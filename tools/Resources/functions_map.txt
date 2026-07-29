@@ -139,13 +139,13 @@
 0x00423200 Toy2::AlsSpaceLand::Interactions
 0x00424390 Toy2::BarnEncounter::Init
 0x00424490 Toy2::BarnEncounter::Interactions
-0x00425680 Toy2::ElevatorHop::Method2
+0x00425680 Toy2::ElevatorHop::UpdatePathLinks
 0x00425700 Toy2::CreatureBehaviour::GunsP
 0x004259B0 Toy2::CreatureBehaviour::Mouse
 0x00425A80 Toy2::ElevatorHop::TransformMouseActors
 0x00425AD0 Nu3D::Particles::ReflectWallsSquareArena
 0x00425B60 Toy2::ElevatorHop::Init
-0x00425EB0 Toy2::ElevatorHop::Method1
+0x00425EB0 Toy2::ElevatorHop::SpawnFanParticle
 0x00425F60 Toy2::ElevatorHop::Interactions
 0x004282D0 Toy2::CreatureBehaviour::GunsL::Level11
 0x00428650 Toy2::CreatureBehaviour::Rabid

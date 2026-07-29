@@ -3891,6 +3891,61 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, char* cmdLine, int3
 	return 0;
 }
 
+// GLOBAL: TOY2 0x0052FC30
+int32_t Toy2::ElevatorHop::g_link19PathPointIndex;
+
+// GLOBAL: TOY2 0x0052FC50
+int32_t Toy2::ElevatorHop::g_link18PathPointIndex;
+
+// GLOBAL: TOY2 0x0052FCD8
+int32_t Toy2::ElevatorHop::g_link20PathPointIndex;
+
+// GLOBAL: TOY2 0x004F37EC
+Vector3I Toy2::ElevatorHop::g_fanParticleVelocityFactors[5] = {
+	{ 0, 0, 0x100 },
+	{ 0x100, 0, 0 },
+	{ 0, -0x100, -0x100 },
+	{ -0x100, 0, 0 },
+	{ 0, -0x100, 0 },
+};
+
+// FUNCTION: TOY2 0x00425680 [MATCHED]
+void Toy2::ElevatorHop::UpdatePathLinks()
+{
+	Nu3D::Link::SetPositionRawAndCommit(18,
+		Levels::g_recordData[9]->data[g_link18PathPointIndex].x,
+		Levels::g_recordData[9]->data[g_link18PathPointIndex].y,
+		Levels::g_recordData[9]->data[g_link18PathPointIndex].z);
+	Nu3D::Link::SetPositionRawAndCommit(19,
+		Levels::g_recordData[9]->data[g_link19PathPointIndex + 3].x,
+		Levels::g_recordData[9]->data[g_link19PathPointIndex + 3].y,
+		Levels::g_recordData[9]->data[g_link19PathPointIndex + 3].z);
+	Nu3D::Link::SetPositionRawAndCommit(20,
+		Levels::g_recordData[9]->data[g_link20PathPointIndex + 6].x,
+		Levels::g_recordData[9]->data[g_link20PathPointIndex + 6].y,
+		Levels::g_recordData[9]->data[g_link20PathPointIndex + 6].z);
+}
+
+// FUNCTION: TOY2 0x00425EB0 [PROVISIONAL]
+void Toy2::ElevatorHop::SpawnFanParticle(const Vector3I* position, int32_t fanIndex, int32_t velocityScale)
+{
+	if (fanIndex == 4)
+	{
+		AudioManager::g_dynamicSoundFrequencies[0] = 0x1400;
+		AudioManager::PlaySoundEffect(0x8C, position);
+	}
+
+	if ((fanIndex == 4 ? g_sevenTickPulse : g_sixteenTickPulse) != 0)
+	{
+		Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(position->x, position->y, position->z, fanIndex == 4 ? 0x4F : 0x4E, 2);
+		particle->velX = g_fanParticleVelocityFactors[fanIndex].x * velocityScale;
+		particle->velY = g_fanParticleVelocityFactors[fanIndex].y * velocityScale;
+		particle->velZ = g_fanParticleVelocityFactors[fanIndex].z * velocityScale;
+		particle->rotSpeed = -0x100;
+		particle->groundAlignRot = 0xFFF - g_thirtyTwoTickPhase * 0x40;
+	}
+}
+
 // FUNCTION: TOY2 0x00425A80 [PROVISIONAL]
 void Toy2::ElevatorHop::TransformMouseActors()
 {
