@@ -7,11 +7,14 @@ and the rule it implies. Match your diff against a symptom first, then open
 only that one section, by its bracketed ID:
 
 - **FIX-nn** in `codegen-rules.md` — a source change reproduces retail.
-- **CAP-nn** in `codegen-caps.md` — no source form fixes it. Stop and accept it.
+- **CAP-nn** in `codegen-caps.md` — a legacy mismatch observation to audit.
 - **TOOL-nn** in `reccmp-mechanics.md` — reccmp, annotation, or importer behavior.
 
-When you hit a CAP, record the address in `caps-registry.tsv` so no later
-session re-derives the same conclusion.
+Do not add an address to `caps-registry.tsv`. That file is a legacy audit
+queue. A CAP does not prove that a mismatch is correct, and it does not hide a
+candidate. Store tested source forms with `tools/decomp experiment`. Only the
+narrow symbol-rendering cases in `tools/Resources/tool_artifacts.tsv` qualify
+as verified tool artifacts.
 
 **Before you name a structure, a field, or a global, read
 `original-names.md`.** The retail binary quotes the developers' own expressions

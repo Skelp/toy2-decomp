@@ -107,12 +107,12 @@ class ScoreTests(unittest.TestCase):
         candidates.score(debt)
         self.assertGreater(debt.rank, clean.rank)
 
-    def test_a_capped_function_sinks_below_every_uncapped_one(self):
+    def test_a_legacy_cap_is_prioritized_for_audit(self):
         capped = make(0x401000, "N::A", size=64, state="STUB", cap="CAP-14")
         plain = make(0x402000, "N::B", size=5000, state="FUNCTION", match=0.5)
         candidates.score(capped)
         candidates.score(plain)
-        self.assertLess(capped.rank, plain.rank)
+        self.assertGreater(capped.rank, plain.rank)
 
     def test_an_already_matching_stub_sinks(self):
         empty = make(0x401000, "N::A", size=16, state="STUB", match=1.0)
@@ -167,8 +167,8 @@ class SelectTests(unittest.TestCase):
     def test_debt_only_keeps_just_the_lint_failures(self):
         self.assertEqual(self.choose(debt_only=True), ["N::Debt"])
 
-    def test_a_capped_function_is_hidden_by_default(self):
-        self.assertNotIn("N::Capped", self.choose())
+    def test_a_legacy_cap_is_visible_by_default(self):
+        self.assertIn("N::Capped", self.choose())
         self.assertIn("N::Capped", self.choose(exclude_capped=False))
 
     def test_the_namespace_filter_restricts_the_list(self):
@@ -178,7 +178,10 @@ class SelectTests(unittest.TestCase):
         )
 
     def test_stubs_only_keeps_only_stubs(self):
-        self.assertEqual(sorted(self.choose(stubs_only=True)), ["N::Stub", "Other::Stub"])
+        self.assertEqual(
+            sorted(self.choose(stubs_only=True)),
+            ["N::Capped", "N::Stub", "Other::Stub"],
+        )
 
     def test_leaves_only_keeps_small_unannotated_functions(self):
         self.assertEqual(self.choose(leaves_only=True), ["N::Fresh"])
@@ -190,7 +193,7 @@ class SelectTests(unittest.TestCase):
         self.assertNotIn("N::Big", self.choose(max_size=100))
 
     def test_the_best_candidate_sorts_first(self):
-        self.assertEqual(self.choose()[0], "N::Stub")
+        self.assertEqual(self.choose()[0], "N::Capped")
 
 
 if __name__ == "__main__":

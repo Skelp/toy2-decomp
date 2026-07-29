@@ -1,0 +1,12 @@
+# Permanent tool-only comparison artifacts.
+#
+# A row is valid only when tools/decomp validate confirms that each changed
+# instruction differs only in the rendered data symbol. Register, frame, stack,
+# control-flow, and instruction-order differences are not tool artifacts.
+#
+# address	artifact-id	last-score	verified-date	note
+0x004A4910	TOOL-SYMBOL	95.45	2026-07-28	one-past particle-array bound uses a different adjacent data label
+0x004A4D60	TOOL-SYMBOL	98.33	2026-07-28	one-past particle-array bound uses a different adjacent data label
+0x004A4E60	TOOL-SYMBOL	96.00	2026-07-28	one-past particle-array bound uses a different adjacent data label
+0x004A62A0	TOOL-SYMBOL	98.00	2026-07-28	one-past particle-array bound uses a different adjacent data label
+0x004DBB80	TOOL-SYMBOL	94.74	2026-07-28	time-scale constant uses a different nearby data label

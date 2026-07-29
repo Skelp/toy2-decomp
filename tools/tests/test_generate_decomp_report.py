@@ -11,18 +11,16 @@ SPEC.loader.exec_module(REPORT)
 
 
 class ReportMetricTests(unittest.TestCase):
-    def test_top_cards_only_show_quality_and_byte_relative_progress(self):
+    def test_top_cards_show_change_gate_and_verified_progress(self):
         template = (SCRIPT.parent / "decomp-report-template.html").read_text(
             encoding="utf-8"
         )
         cards = template[template.index("const cards = [") : template.index(
             "];", template.index("const cards = [")
         )]
-        self.assertIn('"Source quality gate"', cards)
-        self.assertIn('"Byte-relative progress"', cards)
-        self.assertIn(
-            '"Byte-relative progress (excluding regalloc mismatches)"', cards
-        )
+        self.assertIn('"Change gate"', cards)
+        self.assertIn('"Verified functions"', cards)
+        self.assertIn('"Verified bytes"', cards)
         self.assertNotIn('"Project progress"', cards)
         self.assertNotIn('"Project coverage"', cards)
         self.assertNotIn('"Project accuracy"', cards)
@@ -83,18 +81,35 @@ class ReportMetricTests(unittest.TestCase):
         self.assertEqual(metrics["project_effective_bytes"], 16)
         self.assertAlmostEqual(metrics["project_byte_progress"], 100 / 6)
         self.assertAlmostEqual(metrics["project_effective_byte_progress"], 100 / 3)
-        self.assertTrue(metrics["quality_gate_passed"])
+        self.assertTrue(metrics["change_gate_passed"])
+        self.assertEqual(metrics["verified_functions"], 0)
+        self.assertEqual(metrics["provisional_functions"], 1)
         self.assertEqual(metrics["runtime_compared"], 1)
         self.assertEqual(metrics["runtime_accuracy"], 100.0)
         game = next(item for item in result["entities"] if item["address"] == "0x401000")
         self.assertEqual(game["quality_errors"], 1)
         self.assertEqual(game["quality_warnings"], 1)
+        self.assertEqual(game["verification"], "provisional")
         self.assertEqual(game["original_size"], 16)
         missing = next(item for item in result["entities"] if item["address"] == "0x401020")
         self.assertEqual(missing["name"], "Missing")
         self.assertEqual(missing["category"], "project")
         self.assertEqual(missing["status"], "unmatched")
         self.assertEqual(missing["original_size"], 24)
+
+    def test_lint_owner_addresses_are_canonicalized(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source"
+            source.mkdir()
+            (source / "test.cpp").write_text(
+                "// FUNCTION: TOY2 0x00401000\n"
+                "void Test() { int *g_unk401000 = 0; }\n",
+                encoding="utf-8",
+            )
+            quality, _ = REPORT.read_lint_quality(source)
+            self.assertIn("0x401000", quality)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("configure", "build", "compare", "lint", "report", "progress", "run", "shell", "help")]
+    [ValidateSet("configure", "build", "compare", "score", "candidates", "audit", "baseline", "validate", "lint", "report", "progress", "run", "shell", "help")]
     [string] $Command = "help",
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -72,6 +72,17 @@ function Ensure-Build {
     }
 }
 
+function Write-ComparisonReport([string] $Output) {
+    Ensure-Build
+    Push-Location (Join-Path $Root "build")
+    try {
+        & reccmp-reccmp --target TOY2 --silent --no-color --json $Output | Out-Null
+        Assert-LastExit "Comparing binaries"
+    } finally {
+        Pop-Location
+    }
+}
+
 function New-DecompReport([string] $Output = "build\decomp-report.html") {
     Ensure-Build
     $ReportJson = Join-Path $Root "build\decomp-report-data.json"
@@ -113,7 +124,12 @@ Usage: tools/decomp.ps1 <command> [arguments]
 Commands:
   configure         Configure the VC6 SP3 build with NMake
   build             Build toy2.exe/patcher.dll and register the output
+  baseline          Build and save the pre-edit comparison
   compare [args]    Run reccmp against the reference and recompiled EXEs
+  score <addr>...   Show exact/effective/tool/provisional verdicts
+  candidates [args] Rank reconstruction candidates
+  audit [args]      Review provisional and legacy CAP functions
+  validate [args]   Build and reject comparison or source-quality regressions
   lint [args]       Check reconstructed source plausibility
   report [file]     Generate the self-contained HTML decompilation dashboard
   progress [scope]  Show annotation progress, optionally for a namespace
@@ -132,6 +148,14 @@ if ($Command -eq "lint") {
     Assert-LastExit "Checking source plausibility"
     exit 0
 }
+if ($Command -in @("candidates", "audit")) {
+    $CandidateArgs = @()
+    if ($Command -eq "audit") { $CandidateArgs += "--audit" }
+    $CandidateArgs += $CommandArgs
+    & python (Join-Path $Root "tools\decomp_candidates.py") @CandidateArgs
+    Assert-LastExit "Ranking decompilation candidates"
+    exit 0
+}
 Import-VC6Environment
 
 switch ($Command) {
@@ -146,6 +170,55 @@ switch ($Command) {
         } finally {
             Pop-Location
         }
+    }
+    "score" {
+        if ($CommandArgs.Count -eq 0) { throw "Usage: tools/decomp.ps1 score <address>..." }
+        $Report = Join-Path $Root "build\decomp-score-report.json"
+        Write-ComparisonReport $Report
+        & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") score $Report @CommandArgs
+        Assert-LastExit "Classifying comparison results"
+    }
+    "baseline" {
+        Build-Project
+        $Report = Join-Path $Root "build\decomp-baseline-report.json"
+        Write-ComparisonReport $Report
+        & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") metadata `
+            (Join-Path $Root "build\decomp-baseline-meta.json")
+        Assert-LastExit "Recording baseline metadata"
+    }
+    "validate" {
+        $Baseline = Join-Path $Root "build\decomp-baseline-report.json"
+        if (-not (Test-Path $Baseline)) { throw "No baseline exists. Run tools/decomp.ps1 baseline before you edit." }
+        Build-Project
+        $Current = Join-Path $Root "build\decomp-current-report.json"
+        Write-ComparisonReport $Current
+        $Targets = @()
+        $AllowTargetRegression = $false
+        for ($Index = 0; $Index -lt $CommandArgs.Count; $Index++) {
+            if ($CommandArgs[$Index] -eq "--target" -and $Index + 1 -lt $CommandArgs.Count) {
+                $Index++
+                $Targets += $CommandArgs[$Index]
+            } elseif ($CommandArgs[$Index] -eq "--allow-target-regression") {
+                $AllowTargetRegression = $true
+            } else {
+                throw "Unknown validate argument: $($CommandArgs[$Index])"
+            }
+        }
+        if ($Targets.Count -eq 0) { throw "Validate needs at least one --target address." }
+        $VerifyArgs = @("validate", $Baseline, $Current) + $Targets
+        if ($AllowTargetRegression) { $VerifyArgs += "--allow-target-regression" }
+        & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") @VerifyArgs
+        Assert-LastExit "Validating comparison results"
+        $ChangedSources = @(& git diff --name-only --diff-filter=ACM) + @(& git diff --cached --name-only --diff-filter=ACM)
+        $ChangedSources = @($ChangedSources | Sort-Object -Unique | Where-Object { $_ -match '\.(c|cc|cpp|cxx|h|hh|hpp|hxx)$' })
+        if ($ChangedSources.Count -gt 0) {
+            & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_lint.py") --warnings-as-errors @ChangedSources
+            Assert-LastExit "Validating changed source plausibility"
+        } else {
+            Write-Host "lint: no changed C/C++ source files"
+        }
+        & git diff --check
+        Assert-LastExit "Checking the working tree diff"
     }
     "report" {
         if ($CommandArgs.Count -gt 1) {

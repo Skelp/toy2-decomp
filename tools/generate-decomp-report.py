@@ -13,6 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from decomp_annotations import canonical_address, read_source_annotations
 import decomp_lint
+from decomp_status import MatchStatus, is_symbol_only_diff, read_tool_artifacts, verification_status
 
 SUMMARY_RE = {
     "implemented": re.compile(r"Implemented:\s+[\d.]+%\s+\((\d+)\s*/\s*(\d+)\)"),
@@ -80,7 +81,8 @@ def read_lint_quality(source_root: Path) -> tuple[dict[str, list[dict]], dict[st
     by_address: dict[str, list[dict]] = {}
     for finding in findings:
         if finding.owner_address and not finding.suppressed:
-            by_address.setdefault(finding.owner_address, []).append(finding.to_json())
+            address = canonical_address(finding.owner_address)
+            by_address.setdefault(address, []).append(finding.to_json())
     summary = {
         "quality_errors": sum(item.severity == "error" and not item.suppressed for item in findings),
         "quality_warnings": sum(item.severity == "warning" and not item.suppressed for item in findings),
@@ -146,9 +148,11 @@ def enrich_report(
     summary: dict[str, float | int],
     quality: dict[str, list[dict]] | None = None,
     function_sizes: dict[str, int] | None = None,
+    tool_artifacts: dict[int, str] | None = None,
 ) -> dict:
     quality = quality or {}
     function_sizes = function_sizes or {}
+    tool_artifacts = tool_artifacts or {}
     entities_by_address: dict[str, dict] = {}
     known_sources = sorted({item["source"] for item in annotations.values()})
     basename_index: dict[str, list[str]] = {}
@@ -167,7 +171,7 @@ def enrich_report(
         entity["source"] = source or ("[unmapped]/project" if is_project else "[linked-runtime]/unknown")
         entity["category"] = "project" if is_project else "runtime"
         entity["annotation"] = annotation["kind"] if annotation else "report-only"
-        entity["status"] = (
+        entity["binary_status"] = (
             "stub"
             if entity.get("stub")
             else "effective"
@@ -181,6 +185,20 @@ def enrich_report(
         entity["quality"] = quality.get(address, [])
         entity["quality_errors"] = sum(item["severity"] == "error" for item in entity["quality"])
         entity["quality_warnings"] = sum(item["severity"] == "warning" for item in entity["quality"])
+        match_status = MatchStatus(
+            matching=float(entity.get("matching", 0)),
+            effective=bool(entity.get("effective")),
+            name=str(entity.get("name", "")),
+            diff=entity.get("diff"),
+        )
+        tool_artifact = int(address, 16) in tool_artifacts and is_symbol_only_diff(match_status)
+        entity["tool_artifact"] = tool_artifacts.get(int(address, 16)) if tool_artifact else None
+        entity["verification"] = verification_status(
+            match_status,
+            tool_artifact=tool_artifact,
+            source_clean=not entity["quality_errors"] and not entity["quality_warnings"],
+        )
+        entity["status"] = entity["binary_status"]
         entity["original_size"] = function_sizes.get(address)
         entities_by_address[address] = entity
 
@@ -199,6 +217,8 @@ def enrich_report(
             "annotation": annotation["kind"],
             "stub": is_stub,
             "status": "stub" if is_stub else "unmatched",
+            "binary_status": "stub" if is_stub else "unmatched",
+            "verification": "stub" if is_stub else "unmatched",
             "diff": None,
             "quality": quality.get(address, []),
             "quality_errors": sum(item["severity"] == "error" for item in quality.get(address, [])),
@@ -220,6 +240,8 @@ def enrich_report(
                 "annotation": "unmatched",
                 "stub": False,
                 "status": "unmatched",
+                "binary_status": "unmatched",
+                "verification": "unmatched",
                 "diff": None,
                 "quality": quality.get(address, []),
                 "quality_errors": sum(item["severity"] == "error" for item in quality.get(address, [])),
@@ -283,6 +305,11 @@ def enrich_report(
         for item in project_entities
         if not item.get("stub") and item["status"] != "unmatched"
     )
+    verified_project = [
+        item for item in project_entities
+        if item.get("verification") in ("exact", "effective", "tool")
+    ]
+    verified_bytes = sum(int(item.get("original_size") or 0) for item in verified_project)
     summary.update(
         {
             "exact": sum(item["status"] == "exact" for item in comparable),
@@ -323,8 +350,20 @@ def enrich_report(
                 if project_original_bytes
                 else 0.0
             ),
-            "quality_gate_passed": summary.get("quality_new_errors", 0) == 0
+            "change_gate_passed": summary.get("quality_new_errors", 0) == 0
             and summary.get("quality_stale_baseline", 0) == 0,
+            "verified_functions": len(verified_project),
+            "verified_function_progress": (
+                len(verified_project) / len(mapped_addresses) * 100 if mapped_addresses else 0.0
+            ),
+            "verified_bytes": verified_bytes,
+            "verified_byte_progress": (
+                verified_bytes / project_original_bytes * 100 if project_original_bytes else 0.0
+            ),
+            "provisional_functions": sum(
+                item.get("verification") == "provisional" for item in project_entities
+            ),
+            "tool_artifacts": sum(item.get("verification") == "tool" for item in project_entities),
             "runtime_compared": len(runtime_compared),
             "runtime_effective_score": runtime_effective_score,
             "runtime_accuracy": (
@@ -373,7 +412,12 @@ def main() -> int:
     summary = parse_summary(args.summary, report.get("data", []))
     quality, quality_summary = read_lint_quality(args.source_root)
     summary.update(quality_summary)
-    payload = enrich_report(report, annotations, names, summary, quality, function_sizes)
+    tool_artifacts = read_tool_artifacts(
+        Path(__file__).resolve().parents[1] / "tools" / "Resources" / "tool_artifacts.tsv"
+    )
+    payload = enrich_report(
+        report, annotations, names, summary, quality, function_sizes, tool_artifacts
+    )
     template = args.template.read_text(encoding="utf-8")
     marker = "__DECOMP_REPORT_DATA__"
     if template.count(marker) != 1:

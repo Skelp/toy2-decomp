@@ -68,7 +68,12 @@ Both expose the same workflow:
 | Command | Purpose |
 | --- | --- |
 | `build` | Compile `toy2.exe` and `patcher.dll` with VC6 SP3 |
+| `baseline` | Build and save the pre-edit comparison state |
 | `compare` | Run detailed reccmp machine-code comparison |
+| `score` | Classify functions as exact, effective, tool artifact, or provisional |
+| `candidates` | Rank functions by reconstruction evidence |
+| `audit` | Review provisional functions and legacy CAP claims |
+| `validate` | Reject comparison and source-quality regressions |
 | `report` | Generate `build/decomp-report.html` |
 | `progress [namespace]` | Count source annotations against the function map |
 | `run` | Launch `build/toy2.exe`. Requires an already configured runtime environment |

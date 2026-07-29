@@ -1,12 +1,10 @@
-# Known non-source-fixable comparison caps.
+# Legacy mismatch audit queue.
 #
-# One row per retail function whose residual diff a cap in codegen-caps.md
-# explains. A row means the reconstruction is already correct and the remaining
-# percentage is a toolchain artifact. `tools/decomp candidates` sinks these, so
-# no later session offers them again as fresh work.
+# These rows preserve old CAP claims for audit. They do not prove correctness.
+# Tools must not hide or suppress a function because it is in this file.
 #
-# Add a row only after you have tested at least two credible source forms and
-# the diff did not move. Cite the cap ID from codegen-index.md.
+# Permanent tool-only artifacts are in tools/Resources/tool_artifacts.tsv.
+# Do not add new rows to this file.
 #
 # address	cap-id	score	date	note
 0x004A3980	CAP-14	30.18	2026-07-26	table-loaded pointer stays in EAX, retail moves it to ECX
@@ -42,11 +40,6 @@
 0x0047D540	CAP-09	35.56	2026-07-28	32-bit rectangular fill: retail uses an EBP frame and saves the inner count with PUSH and POP. The build uses an FPO frame and keeps the row state in registers. Destination, dword width, height, byte padding, fill value, and scalar nested loops agree.
 0x0047D4E0	CAP-09	13.04	2026-07-28	perspective divide table: retail uses an EBP frame and keeps the descending divisor as a scaled array index. The build uses an FPO frame and strength-reduces the loop to a reverse pointer. Half-scale, 12-bit fixed scale, divisors 32767 through 1, table stores, and return value agree. For and do-loop forms produced the same code.
 0x004C0100	CAP-12	83.14	2026-07-28	triangle and quad viewport reject: retail places the shared reject return between the quad and triangle paths. The build places the accept and reject returns after both paths. Vertex loads, clip conversions, four plane tests, short-circuit order, supported counts, and return values agree. Early-reject and positive-intersection forms scored the same.
-0x004DBB80	CAP-23	94.74	2026-07-28	FMV seek: instruction bytes match. reccmp resolves the 10000000 time-scale constant through different nearby data labels.
-0x00414320	CAP-23	99.38	2026-07-28	level intro sprite slide: instruction bytes match. reccmp labels the retail sine-table displacement as an anonymous offset and the build displacement as g_sinCosLUT[1024].
-0x004A4E60	CAP-23	96.00	2026-07-28	rocket boots deactivation: instruction bytes match. reccmp labels the one-past particle-array bound through different adjacent data symbols.
-0x004A4D60	CAP-23	98.33	2026-07-28	rocket boots activation: instruction bytes match. reccmp labels the one-past particle-array bound through different adjacent data symbols.
-0x004A4910	CAP-23	95.45	2026-07-28	disc ammo refresh: instruction bytes match. reccmp labels the one-past particle-array bound through different adjacent data symbols.
 0x0042B090	CAP-03	82.03	2026-07-28	arena particle bounce: retail keeps the floor value in EBX and the shadow count in CX. The build uses volatile registers and spills the typed shadow index. Control flow, field access, calls, and side effects agree. Three natural forms were tested.
 0x004946A0	CAP-24	56.00	2026-07-28	tiled sprite UVs: retail retains width and height on the x87 stack; build spills and reorders the four expressions; 4 credible forms tested
 0x00494820	CAP-24	57.14	2026-07-28	virtual-width twin of 0x004946A0; same x87 evaluation and spill difference
@@ -55,7 +48,6 @@
 0x004A26F0	CAP-12	89.32	2026-07-28	periodic actor hint: retail keeps the challenge-state return inline, while the build sends it to the common tail epilogue and shifts final alignment padding. Actor-state guards, timer update, random reset, signed preset loads, and 3D sound call agree; nested, split-guard, and combined-condition forms tested
 0x004A0DB0	CAP-25	89.36	2026-07-28	Pizza Planet token activation: retail reserves 16 FPO bytes and the build reserves 12. All body instructions, calls, branches, fields, and results agree; direct height expression and named height local produce the same smaller frame
 0x004025C0	CAP-26	54.55	2026-07-28	token dialogue table loader: retail anchors the destination cursor on dialogueRecordIndex, while the build anchors it on subtitle. The zero fill, serialized source walk, sentinel, four typed field stores, and 10-entry bound agree. A raw negative-index copy can force the retail anchor but is not credible source
-0x004A62A0	CAP-23	98.00	2026-07-28	gadget update: instruction bytes match. reccmp resolves the one-past particle-array bound through different adjacent data symbols. The rocket-boots timer, environment-surface gravity limit, sound, particle shutdown, pickup restore, and gadget calls agree
 0x004A5170	CAP-25	98.47	2026-07-28	cosmic shield update: retail reserves 16 FPO bytes and the build reserves 12. All body instructions, calls, branches, fields, animation phases, and results agree. The extra retail slot has no supported source-level role
 0x00434EB0	CAP-21	85.80	2026-07-28	spin hover update: retail keeps the previous timer in ECX and the updated timer in EAX through the negative hover phase; the build reverses those scratch roles and schedules the timer store and particle position loads differently. Cooldown, input/action guards, charge frequency, hover transition, particles, sounds, facing lock, cancellation, and timers agree. Four natural direct-global and scoped-local forms tested; best score 85.80%
 0x00434990	CAP-09	46.18	2026-07-28	gun fire update: retail reserves 36 FPO bytes and the build reserves 28. The build also assigns the fire state, aim angles, and random angle to different registers. Input edges, charge and repeat timing, powered laser consumption, disc and grapple dispatch, beam reflection, sounds, and all state updates agree. Three structured and shared-dispatch forms were tested

@@ -10,8 +10,8 @@ no Ghidra call and no reccmp run:
   the owning translation unit.
 - `build/decomp-report-data.json` supplies the current match percent when a
   comparison is available.
-- `.notes/caps-registry.tsv` supplies the known non-source-fixable caps, so a
-  capped function is not offered again as if it were fresh work.
+- `.notes/caps-registry.tsv` supplies legacy mismatch claims for the audit queue.
+- `tools/Resources/tool_artifacts.tsv` supplies the narrow tool-only allowlist.
 - `tools/decomp_lint.py` supplies the source-plausibility errors, so a function
   that matches the machine code but still states byte offsets is still offered
   as work. A 100% match is not the finish line.
@@ -19,14 +19,13 @@ no Ghidra call and no reccmp run:
 The ranking follows the candidate rubric in `AGENTS.md`: a marked `STUB`
 first, then a small unannotated function in a namespace that already has
 reconstructed siblings, then a larger unannotated function, then an
-implemented function below a match that no cap explains.
+implemented function that still needs verification.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
-import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -38,9 +37,15 @@ MAP_PATH = ROOT / "tools" / "Resources" / "functions_map.txt"
 SOURCE_ROOT = ROOT / "src"
 REPORT_JSON = ROOT / "build" / "decomp-report-data.json"
 CAPS_REGISTRY = ROOT / ".notes" / "caps-registry.tsv"
+TOOL_ARTIFACTS = ROOT / "tools" / "Resources" / "tool_artifacts.tsv"
 
 sys.path.insert(0, str(ROOT))
 from tools.decomp_annotations import read_source_annotations  # noqa: E402
+from tools.decomp_status import (  # noqa: E402
+    is_symbol_only_diff,
+    read_match_statuses,
+    read_tool_artifacts,
+)
 
 # A leaf-sized function is small enough that one decompilation shows the whole
 # body. The threshold is a heuristic on the gap to the next map address.
@@ -56,6 +61,8 @@ class Candidate:
     state: str = "NOT_STARTED"
     source: str = ""
     match: float | None = None
+    effective: bool = False
+    tool_artifact: str = ""
     cap: str = ""
     siblings: int = 0
     namespace: str = ""
@@ -70,7 +77,10 @@ class Candidate:
 
     @property
     def match_text(self) -> str:
-        return "-" if self.match is None else f"{self.match * 100:.1f}%"
+        if self.match is None:
+            return "-"
+        suffix = "*" if self.effective else ""
+        return f"{self.match * 100:.1f}%{suffix}"
 
 
 def parse_map(path: Path = MAP_PATH) -> list[tuple[int, str]]:
@@ -100,23 +110,10 @@ def read_annotation_states() -> dict[int, tuple[str, str]]:
 
 
 def read_match_percentages(path: Path = REPORT_JSON) -> dict[int, float]:
-    if not path.exists():
-        return {}
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return {}
-    matches: dict[int, float] = {}
-    for entry in payload.get("data", []):
-        address = entry.get("address")
-        matching = entry.get("matching")
-        if address is None or matching is None:
-            continue
-        try:
-            matches[int(str(address), 16)] = float(matching)
-        except ValueError:
-            continue
-    return matches
+    return {
+        address: status.matching
+        for address, status in read_match_statuses(path).items()
+    }
 
 
 def read_caps(path: Path = CAPS_REGISTRY) -> dict[int, str]:
@@ -173,8 +170,9 @@ def read_lint_errors() -> dict[int, int]:
 def build_candidates() -> list[Candidate]:
     entries = parse_map()
     states = read_annotation_states()
-    matches = read_match_percentages()
+    matches = read_match_statuses(REPORT_JSON)
     caps = read_caps()
+    tool_artifacts = read_tool_artifacts(TOOL_ARTIFACTS)
     lint_findings = read_lint_findings()
 
     reconstructed_per_namespace: dict[str, int] = {}
@@ -195,7 +193,13 @@ def build_candidates() -> list[Candidate]:
                 size=max(following - address, 0),
                 state=state,
                 source=source,
-                match=matches.get(address),
+                match=matches[address].matching if address in matches else None,
+                effective=matches[address].effective if address in matches else False,
+                tool_artifact=(
+                    tool_artifacts.get(address, "")
+                    if address in matches and is_symbol_only_diff(matches[address])
+                    else ""
+                ),
                 cap=caps.get(address, ""),
                 siblings=reconstructed_per_namespace.get(namespace, 0),
                 namespace=namespace,
@@ -211,14 +215,15 @@ def score(candidate: Candidate) -> None:
 
     A higher rank is a better next target. The weights follow the rubric
     order, so a `STUB` always outranks an unannotated function of the same
-    size, and a capped function always sinks.
+    size. A legacy CAP claim raises the audit priority. A mechanically verified
+    tool artifact sinks because it does not describe a code difference.
     """
 
     rank = 0.0
     reasons: list[str] = []
 
     if candidate.state == "STUB":
-        if candidate.match is not None and candidate.match >= 0.999:
+        if candidate.match == 1.0 or candidate.effective:
             # An empty stub body that already matches means retail is also
             # trivially empty. There is nothing left to reconstruct.
             rank -= 150.0
@@ -231,8 +236,8 @@ def score(candidate: Candidate) -> None:
         reasons.append("unannotated")
     else:
         rank += 10.0
-        if candidate.match is not None and candidate.match < 0.999:
-            reasons.append("implemented below a match")
+        if candidate.match is not None and candidate.match != 1.0 and not candidate.effective:
+            reasons.append("implemented but provisional")
 
     # A function that matches the machine code but still states byte offsets is
     # unfinished work, whatever its percentage says. Rank it as real work.
@@ -268,8 +273,12 @@ def score(candidate: Candidate) -> None:
         reasons.append("no namespace in map")
 
     if candidate.cap:
+        rank += 35.0
+        reasons.append(f"legacy CAP claim needs audit: {candidate.cap}")
+
+    if candidate.tool_artifact:
         rank -= 200.0
-        reasons.append(f"capped: {candidate.cap}")
+        reasons.append(f"tool-only artifact: {candidate.tool_artifact}")
 
     candidate.rank = rank
     candidate.reasons = reasons
@@ -297,19 +306,26 @@ def select(
         if near_only and not (
             candidate.state == "FUNCTION"
             and candidate.match is not None
-            and candidate.match < 0.999
+            and candidate.match != 1.0
+            and not candidate.effective
+            and not candidate.tool_artifact
         ):
             continue
         if max_size is not None and candidate.size > max_size:
             continue
-        if exclude_capped and candidate.cap:
+        if exclude_capped and candidate.tool_artifact:
             continue
         if debt_only and not (candidate.lint_errors or candidate.lint_warnings):
             continue
         if not (stubs_only or leaves_only or near_only or debt_only) and candidate.state == "FUNCTION":
             # A fully matched function is finished work only when its source also
             # reads like source. Lint errors keep it in the list.
-            if (candidate.match is None or candidate.match >= 0.999) and not (
+            if (
+                candidate.match is None
+                or candidate.match == 1.0
+                or candidate.effective
+                or candidate.tool_artifact
+            ) and not (
                 candidate.lint_errors or candidate.lint_warnings
             ):
                 continue
@@ -354,7 +370,23 @@ def main() -> int:
     parser.add_argument(
         "--near",
         action="store_true",
-        help="only implemented functions that are still below a match",
+        help="only provisional implemented functions; effective matches are excluded",
+    )
+    parser.add_argument(
+        "--audit",
+        action="store_true",
+        help="alias for --near; rank provisional functions for audit",
+    )
+    parser.add_argument(
+        "--legacy-caps",
+        action="store_true",
+        help="with --audit, keep only old CAP claims that need a new audit",
+    )
+    parser.add_argument(
+        "--score-below",
+        type=float,
+        metavar="PERCENT",
+        help="keep only functions below this raw similarity percentage",
     )
     parser.add_argument(
         "--debt",
@@ -365,7 +397,7 @@ def main() -> int:
     parser.add_argument(
         "--include-capped",
         action="store_true",
-        help="keep functions listed in .notes/caps-registry.tsv",
+        help="deprecated alias: include verified tool-only artifacts",
     )
     parser.add_argument("--limit", type=int, default=20, help="rows to print (0 = all)")
     parser.add_argument("--why", action="store_true", help="print the rank and its evidence")
@@ -381,11 +413,18 @@ def main() -> int:
         namespace=args.namespace,
         stubs_only=args.stubs,
         leaves_only=args.leaves,
-        near_only=args.near,
+        near_only=args.near or args.audit,
         max_size=args.max_size,
         exclude_capped=not args.include_capped,
         debt_only=args.debt,
     )
+    if args.legacy_caps:
+        chosen = [item for item in chosen if item.cap]
+    if args.score_below is not None:
+        chosen = [
+            item for item in chosen
+            if item.match is not None and item.match * 100 < args.score_below
+        ]
 
     if args.json:
         json.dump(
@@ -396,6 +435,8 @@ def main() -> int:
                     "state": item.state,
                     "size": item.size,
                     "match": item.match,
+                    "effective": item.effective,
+                    "tool_artifact": item.tool_artifact,
                     "source": item.source,
                     "cap": item.cap,
                     "siblings": item.siblings,

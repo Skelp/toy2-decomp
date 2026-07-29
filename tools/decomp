@@ -54,28 +54,128 @@ score() {
         return 2
     fi
     ensure_build
-    local address verdict
-    for address in "$@"; do
-        # reccmp prints "<name> is only N% similar ..." for a partial match,
-        # a bare "OK!" banner for an exact match, and an ERROR line when the
-        # address is not paired. Normalize all three to one line per address.
-        # `grep` exits non-zero when nothing matches, so tolerate that here
-        # rather than let `set -e` abort the whole loop.
-        verdict=$(
-            cd build \
-                && { reccmp-reccmp --target TOY2 --no-color --verbose "$address" 2>/dev/null || true; } \
-                | { grep -E "is only|OK!|Failed to find" || true; } \
-                | sed -e 's/, diff above$//' -e 's/^.*OK!.*$/100.00% (exact match)/' \
-                | tail -1
-        )
-        printf '%s  %s\n' "$address" "${verdict:-no verdict line (is the address a function start?)}"
-    done
+    write_comparison_report decomp-score-report.json
+    python tools/decomp_verify.py score build/decomp-score-report.json "$@"
 }
 
 ensure_build() {
     if [[ ! -f build/reccmp-build.yml || ! -f build/toy2.exe || ! -f build/toy2.pdb ]]; then
         build
     fi
+}
+
+write_comparison_report() {
+    local output_name="$1"
+    (
+        cd build
+        reccmp-reccmp --target TOY2 --silent --no-color --json "$output_name"
+    ) >/dev/null
+}
+
+baseline() {
+    build
+    write_comparison_report decomp-baseline-report.json
+    python tools/decomp_verify.py metadata build/decomp-baseline-meta.json
+    echo "Wrote build/decomp-baseline-report.json for $(git rev-parse --short HEAD)."
+}
+
+validate() {
+    local allow_target_regression=0
+    local targets=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --target)
+                [[ $# -ge 2 ]] || { echo "error: --target needs an address" >&2; return 2; }
+                targets+=("$2")
+                shift 2
+                ;;
+            --allow-target-regression)
+                allow_target_regression=1
+                shift
+                ;;
+            *)
+                echo "error: unknown validate argument: $1" >&2
+                return 2
+                ;;
+        esac
+    done
+    if [[ ${#targets[@]} -eq 0 ]]; then
+        echo "error: validate needs at least one --target address" >&2
+        return 2
+    fi
+    if [[ ! -f build/decomp-baseline-report.json ]]; then
+        echo "error: run tools/decomp baseline before you edit source" >&2
+        return 2
+    fi
+
+    build
+    write_comparison_report decomp-current-report.json
+    local verify_args=(
+        validate
+        build/decomp-baseline-report.json
+        build/decomp-current-report.json
+        "${targets[@]}"
+    )
+    if [[ $allow_target_regression -eq 1 ]]; then
+        verify_args+=(--allow-target-regression)
+    fi
+    python tools/decomp_verify.py "${verify_args[@]}"
+    local changed_sources=()
+    while IFS= read -r path; do
+        [[ -n "$path" ]] && changed_sources+=("$path")
+    done < <(
+        { git diff --name-only --diff-filter=ACM; git diff --cached --name-only --diff-filter=ACM; } |
+            sort -u | grep -E '\.(c|cc|cpp|cxx|h|hh|hpp|hxx)$' || true
+    )
+    if [[ ${#changed_sources[@]} -gt 0 ]]; then
+        python tools/decomp_lint.py --warnings-as-errors "${changed_sources[@]}"
+    else
+        echo "lint: no changed C/C++ source files"
+    fi
+    python tools/ghidra_sync.py check
+    git diff --check
+}
+
+experiment() {
+    local action="${1:-}"
+    local address="${2:-}"
+    if [[ -z "$action" || -z "$address" ]]; then
+        echo "Usage: tools/decomp experiment start|try|report <address> [label]" >&2
+        return 2
+    fi
+    local directory="build/decomp-experiments/${address}"
+    case "$action" in
+        start)
+            mkdir -p "$directory"
+            baseline
+            git diff --binary > "$directory/baseline.patch"
+            cp build/decomp-baseline-meta.json "$directory/compiler-context.json"
+            echo "Started experiment $address in $directory."
+            ;;
+        try)
+            local label="${3:-}"
+            if [[ ! "$label" =~ ^[A-Za-z0-9._-]+$ ]]; then
+                echo "error: give the trial a label with letters, numbers, dot, dash, or underscore" >&2
+                return 2
+            fi
+            mkdir -p "$directory"
+            build_game
+            write_comparison_report "decomp-experiment-${address}-${label}.json"
+            git diff --binary > "$directory/${label}.patch"
+            (cd build && reccmp-reccmp --target TOY2 --no-color --verbose "$address") \
+                > "$directory/${label}.diff.txt"
+            cp "build/decomp-experiment-${address}-${label}.json" "$directory/${label}.report.json"
+            python tools/decomp_verify.py classify "$directory/${label}.report.json" "$address" \
+                | tee "$directory/${label}.summary.txt"
+            ;;
+        report)
+            find "$directory" -maxdepth 1 -name '*.summary.txt' -print -exec sed -n '1,4p' {} \;
+            ;;
+        *)
+            echo "error: experiment action must be start, try, or report" >&2
+            return 2
+            ;;
+    esac
 }
 
 report() {
@@ -126,6 +226,10 @@ Commands:
   bc <addr>         Build toy2.exe, then compare one address verbosely
   candidates [ns]   Rank reconstruction candidates (no Ghidra, no reccmp run)
   evidence <addr>   Collect bounded evidence for one target in a single call
+  audit [args]      Rank provisional functions for source and binary audit
+  baseline          Save a fresh parent-state comparison before source edits
+  validate [args]   Build and reject verification or score regressions
+  experiment [...] Record labeled source-form comparison trials
   lint [files]      Check reconstructed source for decompiler residue
   names             Re-extract .notes/original-names.md from the retail binary
   report [file]     Generate the self-contained HTML decompilation dashboard
@@ -142,6 +246,7 @@ they are fast and safe to run first:
   tools/decomp candidates Nu3D --leaves --why
   tools/decomp evidence 0x00403640
   tools/decomp evidence 0x00403640 --disasm
+  tools/decomp audit --legacy-caps --limit 20
 
 `score` avoids the assembly diff when you only need the percentage:
   tools/decomp score 0x00403640 0x004B99F0
@@ -192,6 +297,9 @@ case "$command" in
     candidates)
         exec python tools/decomp_candidates.py "$@"
         ;;
+    audit)
+        exec python tools/decomp_candidates.py --audit "$@"
+        ;;
     evidence)
         exec python tools/decomp_evidence.py "$@"
         ;;
@@ -221,6 +329,15 @@ case "$command" in
         fi
         build_game
         (cd build && reccmp-reccmp --target TOY2 --verbose "$1")
+        ;;
+    baseline)
+        baseline "$@"
+        ;;
+    validate)
+        validate "$@"
+        ;;
+    experiment)
+        experiment "$@"
         ;;
     report)
         report "$@"

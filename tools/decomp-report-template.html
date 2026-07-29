@@ -300,7 +300,7 @@
     const originalSize = entity => Math.max(1, Number(entity.original_size || 0));
     const effectiveAccuracy = entity => entity.effective ? 1 : Number(entity.matching || 0);
     const topGroup = source => source.startsWith("[") ? source.split("/")[0] : (source.includes("/") ? source.split("/")[0] : "Core");
-    const statusLabel = status => ({ exact:"Exact", effective:"Effective", partial:"Partial", zero:"Zero", unmatched:"Unmatched", stub:"Stub" }[status] || status);
+    const statusLabel = status => ({ exact:"Exact", effective:"Effective", tool:"Tool artifact", provisional:"Provisional", partial:"Partial", zero:"Zero", unmatched:"Unmatched", stub:"Stub" }[status] || status);
     const qualityLabel = entity => entity.quality_errors ? `${entity.quality_errors} error${entity.quality_errors === 1 ? "" : "s"}` : entity.quality_warnings ? `${entity.quality_warnings} note${entity.quality_warnings === 1 ? "" : "s"}` : "Clean";
     const colorFor = entity => {
       if (entity.stub) return "var(--purple)";
@@ -323,9 +323,9 @@
 
     function renderMetrics() {
       const cards = [
-        ["Source quality gate", metrics.quality_gate_passed ? "PASS" : "FAIL", `${metrics.quality_new_errors} new · ${metrics.quality_errors} legacy errors · ${metrics.quality_warnings} warnings · ${metrics.quality_stale_baseline} stale baseline entries`, metrics.quality_gate_passed ? "var(--cyan)" : "var(--red)"],
-        ["Byte-relative progress", pct(metrics.project_byte_progress), `${bytes(Math.round(metrics.project_matched_bytes))} matched / ${bytes(metrics.project_original_bytes)} original project code`, "var(--green)"],
-        ["Byte-relative progress (excluding regalloc mismatches)", pct(metrics.project_effective_byte_progress), `${bytes(Math.round(metrics.project_effective_bytes))} matched / ${bytes(metrics.project_original_bytes)} original project code`, "var(--purple)"]
+        ["Change gate", metrics.change_gate_passed ? "PASS" : "FAIL", `${metrics.quality_new_errors} new errors · ${metrics.quality_errors} known errors · ${metrics.quality_warnings} known warnings · ${metrics.quality_stale_baseline} stale baseline entries`, metrics.change_gate_passed ? "var(--cyan)" : "var(--red)"],
+        ["Verified functions", pct(metrics.verified_function_progress), `${metrics.verified_functions} verified · ${metrics.provisional_functions} provisional · ${metrics.tool_artifacts} tool artifacts`, "var(--green)"],
+        ["Verified bytes", pct(metrics.verified_byte_progress), `${bytes(metrics.verified_bytes)} verified / ${bytes(metrics.project_original_bytes)} mapped project code`, "var(--purple)"]
       ];
       const host = $("metrics");
       cards.forEach(([label, value, detail, accent]) => {
@@ -495,7 +495,7 @@
         const row = element("tr"); const score = entity.status === "unmatched" ? "—" : pct(effectiveAccuracy(entity) * 100); const color = colorFor(entity);
         const scoreNode = element("span", "score-pill", score); scoreNode.style.setProperty("--score", color);
         const scoreCell = element("td"); scoreCell.append(scoreNode);
-        row.append(element("td", "mono", entity.address), element("td", "mono", entity.recomp || "—"), element("td", "name-cell", entity.name), scoreCell, element("td", "mono", qualityLabel(entity)), element("td", "source-cell mono", entity.source), element("td", "mono", statusLabel(entity.status)));
+        row.append(element("td", "mono", entity.address), element("td", "mono", entity.recomp || "—"), element("td", "name-cell", entity.name), scoreCell, element("td", "mono", qualityLabel(entity)), element("td", "source-cell mono", entity.source), element("td", "mono", statusLabel(entity.verification)));
         row.addEventListener("click", () => openEntity(entity)); body.append(row);
       });
     }
@@ -508,7 +508,7 @@
 
     function openEntity(entity) {
       $("dialog-title").textContent = entity.name;
-      $("dialog-meta").textContent = `${entity.address} → ${entity.recomp || "not paired"} · ${entity.source} · ${entity.status === "unmatched" ? "unmatched" : pct(effectiveAccuracy(entity) * 100)}`;
+      $("dialog-meta").textContent = `${entity.address} → ${entity.recomp || "not paired"} · ${entity.source} · ${statusLabel(entity.verification)} · ${entity.status === "unmatched" ? "unmatched" : pct(effectiveAccuracy(entity) * 100)}`;
       const body = $("diff-body"); body.replaceChildren();
       if (entity.quality && entity.quality.length) {
         const quality = element("section", "diff-group");

@@ -8,8 +8,8 @@ must also keep the ability to compare it with the supported retail executable.
 1. Fork and clone the repository with normal Git history.
 2. Follow either the [Windows setup](docs/windows-decomp.md) or
    [Linux setup](docs/linux-decomp.md).
-3. Confirm that the unmodified branch builds and that `compare` produces a
-   report before you change source.
+3. Run `tools/decomp baseline` before you change source. This command builds
+   the project and saves the full comparison state.
 
 The SHA-256 identifies the supported reference. Filenames, timestamps, and
 disc labels do not suffice. Setup refuses a different executable.
@@ -31,14 +31,15 @@ annotations make progress data ambiguous. Fix them before you submit.
 Use this feedback loop:
 
 ```text
-build → compare → inspect the per-function diff → adjust source
+inspect evidence → write natural source → build → compare → explain the diff
 ```
 
 On Linux:
 
 ```sh
-tools/decomp build
+tools/decomp baseline
 tools/decomp compare --verbose 0x00401230
+tools/decomp score 0x00401230
 tools/decomp report
 ```
 
@@ -51,7 +52,9 @@ source annotation. It does not measure how closely the machine code matches.
 ## Submission checklist
 
 - Format touched C/C++ files using the repository `.clang-format`.
-- Build `toy2.exe` and `patcher.dll` successfully.
+- Run `tools/decomp validate --target <address>` for each changed function.
+  Use `--allow-target-regression` only when the source model improves and the
+  lower score is intentional.
 - Run reccmp. Describe relevant accuracy changes in the pull request.
 - Open `build/decomp-report.html` when a change affects multiple functions.
 - When a change affects startup, loading, rendering, or other runtime behavior,
@@ -71,6 +74,12 @@ The source linter checks data models and names that the machine-code comparison
 cannot check. See [the lint rule catalog](.notes/lint-rules.md). A reviewed old
 finding stays visible as legacy debt. If your change removes that finding,
 remove its stale row from `.notes/lint-baseline.tsv`.
+
+An exact machine-code match is not verified when the function has source lint
+debt. reccmp-effective matches are distinct from exact matches. A partial
+match stays provisional unless the verifier confirms a narrow data-symbol
+rendering artifact. Legacy CAP notes do not waive a mismatch. Review them with
+`tools/decomp audit --legacy-caps`.
 
 The `toy2decomp` executable always compiles retail behavior for reccmp.
 `patcher.dll` enables runtime convenience changes only when `APPLY_FIXES`
