@@ -27,6 +27,22 @@ class ReportMetricTests(unittest.TestCase):
         self.assertNotIn('"Project coverage"', cards)
         self.assertNotIn('"Project accuracy"', cards)
 
+    def test_treemap_renders_the_byte_weighted_hierarchy_recursively(self):
+        template = (SCRIPT.parent / "decomp-report-template.html").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("function buildTreemapHierarchy()", template)
+        self.assertIn(
+            "renderTreemapNode(child, child, branch, visualDepth + 1)", template
+        )
+        self.assertIn(
+            "layout(focus.children, 0, 0, host.clientWidth, host.clientHeight)",
+            template,
+        )
+        self.assertIn("function worstAspect(row, shortSide)", template)
+        self.assertNotIn("tree-mosaic", template)
+        self.assertNotIn("tree-dot", template)
+
     def test_function_map_provides_original_address_spans(self):
         import tempfile
 

@@ -71,14 +71,25 @@
     .crumb:last-child { color: var(--text); font-weight: 700; }
     .crumb-sep { color: #486070; }
     #treemap { position: relative; height: min(58vw, 570px); min-height: 390px; border-radius: 12px; overflow: hidden; background: #07131c; border: 1px solid #1a3344; }
-    .tree-node { position: absolute; padding: 0; border: 2px solid #07131c; border-radius: 7px; overflow: hidden; background: var(--node-color); cursor: pointer; text-align: left; transition: filter .15s ease, transform .15s ease; }
-    .tree-node:hover { filter: brightness(1.18); z-index: 4; transform: translateY(-1px); }
-    .tree-node:focus-visible { outline: 2px solid white; outline-offset: -4px; z-index: 5; }
+    .tree-node { position: absolute; padding: 0; border: 0; border-radius: 4px; overflow: hidden; background: var(--node-color); text-align: left; }
+    .tree-branch { background: #111827; }
+    .tree-leaf { cursor: pointer; background: linear-gradient(145deg, color-mix(in srgb, var(--node-color) 88%, white), color-mix(in srgb, var(--node-color) 82%, #071018)); box-shadow: inset 0 0 0 1px rgb(7 16 24 / 72%); transition: filter .15s ease, transform .15s ease; }
+    .tree-leaf:hover { filter: brightness(1.18); z-index: 2; transform: translateY(-1px); }
+    .tree-leaf:focus-visible, .tree-branch-label:focus-visible { outline: 2px solid white; outline-offset: -3px; z-index: 6; }
+    .tree-branch::after { content: ""; position: absolute; z-index: 4; inset: 0; border: 1px solid #253247; border-radius: 4px; pointer-events: none; }
+    .tree-group::after { border-width: 2px; }
+    .tree-branch-label { position: absolute; z-index: 5; max-width: calc(100% - 8px); min-width: 18px; min-height: 18px; padding: 4px 6px; border: 1px solid color-mix(in srgb, var(--node-color) 65%, white); border-radius: 5px; overflow: hidden; color: white; background: rgb(5 14 21 / 88%); box-shadow: 0 2px 8px rgb(0 0 0 / 48%); cursor: pointer; text-align: left; text-shadow: 0 1px 3px rgb(0 0 0 / 70%); }
+    .tree-branch-label:hover { background: rgb(17 35 47 / 96%); }
+    .tree-branch-label .tree-name, .tree-branch-label .tree-meta { display: block; }
+    .tree-branch-label .tree-name { font-size: 11px; }
+    .tree-branch-label .tree-meta { margin-top: 2px; }
+    .tree-branch-label.tree-compact { width: 18px; height: 18px; min-width: 0; min-height: 0; padding: 0; background: var(--node-color); }
+    .tree-branch-label.tree-compact > span { display: none; }
     .tree-label { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; padding: 10px; background: linear-gradient(180deg, rgb(0 0 0 / 5%), rgb(0 0 0 / 36%)); text-shadow: 0 1px 3px rgb(0 0 0 / 70%); pointer-events: none; }
+    .tree-label.tree-name-only { justify-content: flex-start; }
+    .tree-label.tree-hidden { display: none; }
     .tree-name { font-weight: 750; font-size: clamp(10px, 1vw, 14px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .tree-meta { color: rgb(255 255 255 / 78%); font: 10px ui-monospace, monospace; }
-    .tree-mosaic { position: absolute; inset: 34px 8px 26px; display: grid; grid-template-columns: repeat(auto-fill, minmax(5px, 1fr)); grid-auto-rows: minmax(5px, 1fr); gap: 2px; opacity: .72; pointer-events: none; }
-    .tree-dot { min-height: 4px; border-radius: 1px; background: var(--dot); }
     .tree-leaf .tree-label { padding: 7px; }
     .tree-leaf .tree-name { font-size: 10px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
@@ -192,7 +203,7 @@
         <div class="panel-head">
           <div>
             <h2 class="panel-title">Project treemap</h2>
-            <p class="panel-copy">Area represents bytes in the original executable. Analyzed extents take priority; mapped fallback spans can include alignment. Color represents machine-code accuracy.</p>
+            <p class="panel-copy">Groups contain source files, and source files contain functions. Area at every level represents bytes in the original executable. Analyzed extents take priority; mapped fallback spans can include alignment. Color represents machine-code accuracy.</p>
           </div>
           <div class="legend" aria-label="Accuracy legend">
             <span><i class="swatch" style="--swatch:var(--green)"></i> exact</span>
@@ -359,34 +370,116 @@
       };
     }
 
-    // Balanced binary treemap: deterministic, compact, and dependency-free.
-    function layout(items, x, y, width, height, depth = 0) {
-      if (!items.length) return [];
-      if (items.length === 1) return [{ ...items[0], x, y, width, height }];
-      const ordered = [...items].sort((a, b) => b.weight - a.weight || a.name.localeCompare(b.name));
-      const total = ordered.reduce((sum, item) => sum + item.weight, 0);
-      let running = 0, split = 1, best = Infinity;
-      for (let index = 1; index < ordered.length; index++) {
-        running += ordered[index - 1].weight;
-        const distance = Math.abs(total / 2 - running);
-        if (distance < best) { best = distance; split = index; }
+    function buildTreemapHierarchy() {
+      const groups = [...groupedFunctions()].map(([name, members]) => {
+        const files = new Map();
+        members.forEach(item => {
+          if (!files.has(item.source)) files.set(item.source, []);
+          files.get(item.source).push(item);
+        });
+        const children = [...files].map(([fileName, fileMembers]) => ({
+          name: fileName,
+          group: name,
+          members: fileMembers,
+          weight: fileMembers.reduce((sum, item) => sum + originalSize(item), 0),
+          kind: "file",
+          children: fileMembers.map(entity => ({
+            name: entity.name,
+            members: [entity],
+            weight: originalSize(entity),
+            kind: "function",
+            entity
+          }))
+        }));
+        return {
+          name,
+          members,
+          weight: members.reduce((sum, item) => sum + originalSize(item), 0),
+          kind: "group",
+          children
+        };
+      });
+      return {
+        name: "Project",
+        members: groups.flatMap(group => group.members),
+        weight: groups.reduce((sum, group) => sum + group.weight, 0),
+        kind: "root",
+        children: groups
+      };
+    }
+
+    // Squarified treemap: keep tiles compact while preserving byte-relative area.
+    function layout(items, x, y, width, height) {
+      const total = items.reduce((sum, item) => sum + item.weight, 0);
+      if (!total || width <= 0 || height <= 0) return [];
+      const scale = width * height / total;
+      const scaled = [...items]
+        .filter(item => item.weight > 0)
+        .sort((a, b) => b.weight - a.weight || a.name.localeCompare(b.name))
+        .map(item => [item, item.weight * scale]);
+
+      function worstAspect(row, shortSide) {
+        const sum = row.reduce((value, pair) => value + pair[1], 0);
+        if (!sum || shortSide <= 0) return Infinity;
+        const areas = row.map(pair => pair[1]);
+        const smallest = Math.min(...areas), largest = Math.max(...areas);
+        if (smallest <= 0) return Infinity;
+        return Math.max(shortSide * shortSide * largest / (sum * sum), sum * sum / (shortSide * shortSide * smallest));
       }
-      const first = ordered.slice(0, split), second = ordered.slice(split);
-      const firstWeight = first.reduce((sum, item) => sum + item.weight, 0);
-      const ratio = firstWeight / total;
-      const horizontal = width >= height;
-      if (horizontal) {
-        const firstWidth = width * ratio;
-        return [...layout(first, x, y, firstWidth, height, depth + 1), ...layout(second, x + firstWidth, y, width - firstWidth, height, depth + 1)];
+
+      function placeRow(row, box) {
+        const sum = row.reduce((value, pair) => value + pair[1], 0);
+        if (box.width <= box.height) {
+          const rowHeight = box.width ? sum / box.width : 0;
+          let rowX = box.x;
+          const rects = row.map(([item, area]) => {
+            const rectWidth = rowHeight ? area / rowHeight : 0;
+            const rect = { ...item, x: rowX, y: box.y, width: rectWidth, height: rowHeight };
+            rowX += rectWidth;
+            return rect;
+          });
+          return { rects, box: { x: box.x, y: box.y + rowHeight, width: box.width, height: box.height - rowHeight } };
+        }
+        const rowWidth = box.height ? sum / box.height : 0;
+        let rowY = box.y;
+        const rects = row.map(([item, area]) => {
+          const rectHeight = rowWidth ? area / rowWidth : 0;
+          const rect = { ...item, x: box.x, y: rowY, width: rowWidth, height: rectHeight };
+          rowY += rectHeight;
+          return rect;
+        });
+        return { rects, box: { x: box.x + rowWidth, y: box.y, width: box.width - rowWidth, height: box.height } };
       }
-      const firstHeight = height * ratio;
-      return [...layout(first, x, y, width, firstHeight, depth + 1), ...layout(second, x, y + firstHeight, width, height - firstHeight, depth + 1)];
+
+      let box = { x, y, width, height };
+      let index = 0;
+      const rects = [];
+      while (index < scaled.length) {
+        const shortSide = Math.min(box.width, box.height);
+        let row = [scaled[index++]];
+        while (index < scaled.length) {
+          const trial = row.concat([scaled[index]]);
+          if (worstAspect(trial, shortSide) <= worstAspect(row, shortSide)) row.push(scaled[index++]);
+          else break;
+        }
+        const result = placeRow(row, box);
+        rects.push(...result.rects);
+        box = result.box;
+      }
+      return rects;
+    }
+
+    function setTreemapFocus(group = null, file = null) {
+      state.group = group;
+      state.file = file;
+      renderTreemap();
+      renderExplorer();
     }
 
     function renderTreemapNav() {
       const nav = $("treemap-nav"); nav.replaceChildren();
-      const parts = [{ label: "Project", action: () => { state.group = null; state.file = null; renderTreemap(); } }];
-      if (state.group) parts.push({ label: state.group, action: () => { state.file = null; renderTreemap(); } });
+      const parts = [{ label: "Project", action: () => setTreemapFocus() }];
+      if (state.group) parts.push({ label: state.group, action: () => setTreemapFocus(state.group) });
       if (state.file) parts.push({ label: state.file.split("/").pop(), action: () => {} });
       parts.forEach((part, index) => {
         if (index) nav.append(element("span", "crumb-sep", "/"));
@@ -394,43 +487,69 @@
       });
     }
 
+    function setTreemapBounds(node, rect) {
+      node.style.left = `${rect.x}px`;
+      node.style.top = `${rect.y}px`;
+      node.style.width = `${rect.width}px`;
+      node.style.height = `${rect.height}px`;
+    }
+
+    function treemapDescription(item, stats) {
+      return `${item.name}\n${bytes(stats.bytes)} original size · ${stats.count} function${stats.count === 1 ? "" : "s"} · ${pct(stats.accuracy * 100)} effective accuracy`;
+    }
+
+    function renderTreemapNode(item, rect, parent, visualDepth) {
+      const stats = aggregate(item.members);
+      if (item.kind === "function") {
+        const button = element("button", "tree-node tree-leaf");
+        button.type = "button";
+        setTreemapBounds(button, rect);
+        button.style.setProperty("--node-color", colorFor(item.entity));
+        button.title = treemapDescription(item, stats);
+        button.setAttribute("aria-label", treemapDescription(item, stats).replace("\n", ". "));
+        const label = element("span", "tree-label");
+        const name = element("span", "tree-name", item.name);
+        const meta = element("span", "tree-meta", `${bytes(stats.bytes)} · ${item.entity.status === "unmatched" ? "unmatched" : pct(effectiveAccuracy(item.entity) * 100)}`);
+        label.append(name, meta);
+        if (rect.width < 86 || rect.height < 26) label.classList.add("tree-hidden");
+        else if (rect.width < 120 || rect.height < 44) { label.classList.add("tree-name-only"); meta.remove(); }
+        button.append(label);
+        button.addEventListener("click", () => openEntity(item.entity));
+        parent.append(button);
+        return;
+      }
+
+      const branch = element("div", `tree-node tree-branch tree-${item.kind}`);
+      setTreemapBounds(branch, rect);
+      branch.style.setProperty("--node-color", numericColor(stats.accuracy));
+      parent.append(branch);
+      layout(item.children, 0, 0, rect.width, rect.height).forEach(child => renderTreemapNode(child, child, branch, visualDepth + 1));
+
+      const label = element("button", "tree-branch-label");
+      label.type = "button";
+      label.style.top = `${Math.min(4 + visualDepth * 34, Math.max(2, rect.height - 20))}px`;
+      label.style.left = "4px";
+      label.style.setProperty("--node-color", numericColor(stats.accuracy));
+      label.title = treemapDescription(item, stats);
+      label.setAttribute("aria-label", `${item.kind === "group" ? "Focus source group" : "Focus source file"}: ${treemapDescription(item, stats).replace("\n", ". ")}`);
+      label.append(element("span", "tree-name", item.name.split("/").pop()));
+      if (rect.width >= 150 && rect.height >= 52) label.append(element("span", "tree-meta", `${bytes(stats.bytes)} · ${stats.count} fn · ${pct(stats.accuracy * 100)}`));
+      if (rect.width < 60 || rect.height < 24) label.classList.add("tree-compact");
+      label.addEventListener("click", () => {
+        if (item.kind === "group") setTreemapFocus(item.name);
+        else setTreemapFocus(item.group, item.name);
+      });
+      branch.append(label);
+    }
+
     function renderTreemap() {
       renderTreemapNav();
       const host = $("treemap"); host.replaceChildren();
-      let items;
-      if (!state.group) {
-        items = [...groupedFunctions()].map(([name, members]) => ({ name, members, weight: members.reduce((sum, item) => sum + originalSize(item), 0), kind: "group" }));
-      } else if (!state.file) {
-        const members = groupedFunctions().get(state.group) || [];
-        const files = new Map();
-        members.forEach(item => { if (!files.has(item.source)) files.set(item.source, []); files.get(item.source).push(item); });
-        items = [...files].map(([name, fileMembers]) => ({ name, members: fileMembers, weight: fileMembers.reduce((sum, item) => sum + originalSize(item), 0), kind: "file" }));
-      } else {
-        items = entities.filter(item => !item.stub && item.source === state.file).map(item => ({ name: item.name, members: [item], weight: originalSize(item), kind: "function", entity: item }));
-      }
-      const rects = layout(items, 0, 0, 100, 100);
-      rects.forEach(item => {
-        const stats = aggregate(item.members);
-        const button = element("button", `tree-node ${item.kind === "function" ? "tree-leaf" : ""}`);
-        button.type = "button";
-        button.style.left = `${item.x}%`; button.style.top = `${item.y}%`; button.style.width = `${item.width}%`; button.style.height = `${item.height}%`;
-        button.style.setProperty("--node-color", item.kind === "function" ? colorFor(item.entity) : numericColor(stats.accuracy));
-        button.title = `${item.name}\n${bytes(stats.bytes)} original size · ${stats.count} function${stats.count === 1 ? "" : "s"} · ${pct(stats.accuracy * 100)} effective accuracy`;
-        const label = element("span", "tree-label");
-        label.append(element("span", "tree-name", item.name.split("/").pop()), element("span", "tree-meta", item.kind === "function" ? `${bytes(stats.bytes)} · ${item.entity.status === "unmatched" ? "unmatched" : pct(effectiveAccuracy(item.entity) * 100)}` : `${bytes(stats.bytes)} · ${stats.count} fn · ${pct(stats.accuracy * 100)}`));
-        button.append(label);
-        if (item.kind !== "function" && item.width > 12 && item.height > 12) {
-          const mosaic = element("span", "tree-mosaic");
-          item.members.slice(0, 300).forEach(member => { const dot = element("i", "tree-dot"); dot.style.setProperty("--dot", colorFor(member)); mosaic.append(dot); });
-          button.append(mosaic);
-        }
-        button.addEventListener("click", () => {
-          if (item.kind === "group") { state.group = item.name; state.file = null; renderTreemap(); }
-          else if (item.kind === "file") { state.file = item.name; renderTreemap(); }
-          else openEntity(item.entity);
-        });
-        host.append(button);
-      });
+      const root = buildTreemapHierarchy();
+      const group = state.group ? root.children.find(item => item.name === state.group) : null;
+      const file = state.file && group ? group.children.find(item => item.name === state.file) : null;
+      const focus = file || group || root;
+      layout(focus.children, 0, 0, host.clientWidth, host.clientHeight).forEach(item => renderTreemapNode(item, item, host, 0));
     }
 
     function renderHistogram() {
@@ -466,7 +585,7 @@
           const top = element("div", "file-card-top"); top.append(element("div", "file-name", group.name), element("div", "file-score", pct(group.accuracy * 100)));
           const bar = element("div", "file-bar"); const fill = element("div"); fill.style.setProperty("--width", `${group.accuracy * 100}%`); bar.append(fill);
           card.append(top, bar, element("div", "file-meta", `${group.count} functions · ${group.exact} exact/effective · ${group.unmatched} unmatched`));
-          const activate = () => { state.group = group.name; state.file = null; renderTreemap(); renderExplorer(); $("treemap").scrollIntoView({ behavior: "smooth", block: "center" }); };
+          const activate = () => { setTreemapFocus(group.name); $("treemap").scrollIntoView({ behavior: "smooth", block: "center" }); };
           card.addEventListener("click", activate); card.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") activate(); });
           host.append(card);
         });
@@ -551,6 +670,11 @@
     $("generated").textContent = `Generated ${new Date(report.generated * 1000).toLocaleString()}`;
     $("report-meta").textContent = `${metrics.project_total} mapped project functions · ${metrics.report_entities} reccmp entities · runtime separated`;
     renderMetrics(); renderTreemap(); renderHistogram(); renderGroupCards(); bindControls(); renderExplorer();
+    let treemapResizeFrame = 0;
+    new ResizeObserver(() => {
+      cancelAnimationFrame(treemapResizeFrame);
+      treemapResizeFrame = requestAnimationFrame(renderTreemap);
+    }).observe($("treemap"));
   })();
   </script>
 </body>
