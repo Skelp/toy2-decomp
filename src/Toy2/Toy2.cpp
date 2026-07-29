@@ -353,7 +353,7 @@ namespace Toy2
 			{
 				Actor::g_creatureActors[actorIndex].respawnDelay = 10000;
 				Actor::g_creatureActors[actorIndex].actorPhase = 0;
-				Actor::g_creatureActors[actorIndex].unkVar13_ = 0;
+				Actor::g_creatureActors[actorIndex].scalePivotHeight = 0;
 				Actor::g_creatureActors[actorIndex].creatureRam->boundHalfX = Actor::g_creatureActors[6].creatureRam->boundHalfX;
 				Actor::g_creatureActors[actorIndex].creatureRam->boundHalfZ = Actor::g_creatureActors[6].creatureRam->boundHalfZ;
 			}

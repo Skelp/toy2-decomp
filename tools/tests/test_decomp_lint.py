@@ -212,6 +212,15 @@ class PointerModelTests(unittest.TestCase):
 
 
 class AnnotationTests(unittest.TestCase):
+    def test_global_does_not_inherit_the_previous_function(self):
+        source = (
+            "// FUNCTION: TOY2 0x00401000 [PROVISIONAL]\n"
+            "void f() { use(); }\n"
+            "// GLOBAL: TOY2 0x00500000\n"
+            "int32_t g_unk500000;\n"
+        )
+        self.assertNotIn("unknown-symbol", rules(source))
+
     def test_empty_function_must_be_a_stub(self):
         source = "// FUNCTION: TOY2 0x00401000\nvoid f() {}\n"
         self.assertEqual(severities(source).get("unfinished-function"), "error")

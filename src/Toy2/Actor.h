@@ -46,14 +46,14 @@ namespace Toy2
 			int16_t creatureId;
 			int16_t secondaryAnimIdx;
 			int32_t animationFramePosition;
-			int32_t unkVar8;
+			int32_t secondaryAnimationFramePosition;
 			int32_t unkVar9;
 			RGB16 actorTint;
 			int16_t unkVar10;
-			int16_t unkVar12;
-			int16_t unkVar12_;
-			int16_t unkVar13;
-			int16_t unkVar13_;
+			int16_t scaleX;
+			int16_t scaleY;
+			int16_t scaleZ;
+			int16_t scalePivotHeight;
 			int32_t useTint;
 			Vector3I16 boundingOffset;
 			int16_t boundingSphereRadius;
@@ -115,6 +115,9 @@ namespace Toy2
 
 		STATIC_ASSERT(sizeof(Toy2Actor) == 0x9C);
 		STATIC_ASSERT(offsetof(Toy2Actor, animationFramePosition) == 0x18);
+		STATIC_ASSERT(offsetof(Toy2Actor, secondaryAnimationFramePosition) == 0x1C);
+		STATIC_ASSERT(offsetof(Toy2Actor, scaleX) == 0x2C);
+		STATIC_ASSERT(offsetof(Toy2Actor, scalePivotHeight) == 0x32);
 		STATIC_ASSERT(offsetof(Toy2Actor, areaIndex) == 0x6C);
 		STATIC_ASSERT(offsetof(Toy2Actor, animationFrameSequence) == 0x74);
 		STATIC_ASSERT(offsetof(Toy2Actor, movementCommandTimer) == 0x78);

@@ -31,7 +31,7 @@ BASELINE_PATH = ROOT / ".notes" / "lint-baseline.tsv"
 
 SOURCE_SUFFIXES = (".c", ".cpp", ".h", ".hpp")
 ANNOTATION_RE = re.compile(
-    r"//\s*(FUNCTION|STUB|LIBRARY):\s*TOY2\s+(0x[0-9A-Fa-f]+)([^\n]*)"
+    r"//\s*(FUNCTION|STUB|LIBRARY|GLOBAL):\s*TOY2\s+(0x[0-9A-Fa-f]+)([^\n]*)"
 )
 ALLOW_RE = re.compile(
     r"//\s*decomp-lint:\s*allow\[([a-z0-9-]+)\]\s+reason:\s*(.{12,})\s*$",

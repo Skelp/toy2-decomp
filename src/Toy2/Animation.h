@@ -59,6 +59,7 @@ namespace Toy2
 		// The first index selects one of 64 actors. The second index selects one of 32 nodes.
 		extern Vector3I g_nodeAngles[64][32];
 		extern RotationScratch g_keyframeRotation;
+		extern int32_t g_singleNodeIndex;
 
 		// Pointer to the NULL-terminated list of actors currently being animated
 		// (set by AnimateActors, read by Actor::FindInActorList). NULL when idle.
