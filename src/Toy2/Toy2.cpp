@@ -46,8 +46,26 @@
 
 #include <Numerics.h>
 
+namespace Nu3D
+{
+	namespace Camera
+	{
+		int32_t LineOfSightCheck(const Vector3I* cameraPosition, const Toy2::Actor::Toy2Actor* actor);
+	}
+}
+
 namespace Toy2
 {
+	namespace Actor
+	{
+		void UpdateAIMovement(Toy2Actor* actor);
+	}
+
+	namespace ElevatorHop
+	{
+		void TransformMouseActors();
+	}
+
 	namespace Cutscene
 	{
 		// STUB: TOY2 0x00402A10
@@ -965,6 +983,8 @@ namespace Toy2
 
 	namespace Game
 	{
+		const uint16_t ACTOR_FLAG_IGNORE_RESPAWN_VISIBILITY = 0x40;
+
 		// STUB: TOY2 0x00406CD0
 		void InitActor(Actor::Toy2Actor* actor, int32_t param) {}
 
@@ -1044,8 +1064,128 @@ namespace Toy2
 			}
 		}
 
-		// STUB: TOY2 0x004086F0
-		void UpdateActors() {}
+		// FUNCTION: TOY2 0x004086F0 [PROVISIONAL]
+		void UpdateActors()
+		{
+			int32_t activeActorCount = 0;
+			int32_t cameraDistanceSquared[64];
+			for (int32_t actorIndex = 0; actorIndex < 64; actorIndex++)
+			{
+				Actor::Toy2Actor* actor = &Actor::g_creatureActors[actorIndex];
+				uint16_t actorFlags = actor->actorFlags;
+				actor->actorFlags = actorFlags & ~Actor::ACTOR_FLAG_ACTIVE;
+				if (actor->creatureId <= 0)
+					continue;
+
+				if (actor->actorPhase > 0)
+				{
+					int32_t activationDistance = (actor->visibilityDistance * 362 >> 9) + (actor->boundingSphereRadius >> 3);
+					int32_t deltaX = (Camera::g_renderCameraTransform.pos.x - actor->boundingOffset.x - actor->pos.x) >> 8;
+					int32_t deltaY = (Camera::g_renderCameraTransform.pos.y - actor->boundingOffset.y - actor->pos.y) >> 8;
+					int32_t deltaZ = (Camera::g_renderCameraTransform.pos.z - actor->boundingOffset.z - actor->pos.z) >> 8;
+					int32_t distanceSquared;
+					if (g_levelFileIndex == 6 || actor->actorPhase == 0xCA)
+						distanceSquared = 10;
+					else
+						distanceSquared = deltaZ * deltaZ + deltaY * deltaY + deltaX * deltaX;
+
+					if (distanceSquared < activationDistance * activationDistance)
+					{
+						Actor::g_activeActors[activeActorCount] = actor;
+						cameraDistanceSquared[activeActorCount] = distanceSquared;
+						activeActorCount++;
+					}
+				}
+				else
+				{
+					if (actor->respawnDelay == 0)
+					{
+						if ((actorFlags & ACTOR_FLAG_IGNORE_RESPAWN_VISIBILITY) != 0
+							|| Nu3D::Camera::LineOfSightCheck(&Camera::g_renderCameraTransform.pos, actor) == 0)
+						{
+							InitActor(actor, 0);
+						}
+					}
+					else if (actor->respawnDelay < 5000 && Actor::g_lastKilledActor != actor)
+					{
+						actor->respawnDelay -= (int16_t)Renderer::g_frameDelta;
+						if (actor->respawnDelay < 0)
+							actor->respawnDelay = 0;
+					}
+				}
+			}
+
+			Actor::g_activeActors[activeActorCount] = 0;
+			cameraDistanceSquared[activeActorCount] = -1;
+			Camera::CullActors(&Camera::g_renderCameraTransform.pos);
+			if (g_levelFileIndex == 10)
+				ElevatorHop::TransformMouseActors();
+
+			Actor::Toy2Actor* const excludedActor = (Actor::Toy2Actor*)-1;
+			for (int32_t activeIndex = 0; Actor::g_activeActors[activeIndex] != 0; activeIndex++)
+			{
+				Actor::Toy2Actor* actor = Actor::g_activeActors[activeIndex];
+				int32_t activeDistance = (actor->boundingSphereRadius >> 3) + 400;
+				if (((actor->actorFlags & Actor::ACTOR_FLAG_TARGETABLE) == 0 && cameraDistanceSquared[activeIndex] >= activeDistance * activeDistance)
+					|| (actor->actorFlags & Actor::ACTOR_FLAG_CULLED) != 0)
+				{
+					Actor::g_activeActors[activeIndex] = excludedActor;
+				}
+				else
+				{
+					actor->actorFlags |= Actor::ACTOR_FLAG_ACTIVE;
+				}
+			}
+
+			activeActorCount = 0;
+			for (Actor::Toy2Actor** compactSlot = Actor::g_activeActors; *compactSlot != 0; compactSlot++)
+			{
+				if (*compactSlot != excludedActor)
+					Actor::g_activeActors[activeActorCount++] = *compactSlot;
+			}
+			Actor::g_activeActors[activeActorCount] = 0;
+
+			Actor::Toy2Actor** actorSlot = Actor::g_activeActors;
+			while (*actorSlot != 0)
+			{
+				Actor::Toy2Actor* actor = *actorSlot;
+				Actor::UpdateAIMovement(actor);
+				if (actor->hitpoints > 0)
+				{
+					actor->hitpoints -= (int16_t)Renderer::g_frameDelta;
+					if (actor->hitpoints <= 0)
+					{
+						actor->hitpoints = 0;
+						Actor::Kill(actor, Actor::KILL_EFFECTS);
+					}
+				}
+
+				if (actor->hitpoints < 0)
+				{
+					if (g_framePulseOutputs.fourTick != 0 && actor->hitpoints < -1)
+					{
+						Actor::ActorCollisionVolume* volume = actor->collisionVolumes;
+						int32_t effectX = (*g_randDatBufferPtr++ - 0x80) * 0x20 + volume->offset.x + actor->pos.x;
+						int32_t effectY = (*g_randDatBufferPtr++ - 0x80) * 0x20 + volume->offset.y + actor->pos.y;
+						int32_t effectZ = (*g_randDatBufferPtr++ - 0x80) * 0x20 + volume->offset.z + actor->pos.z;
+						Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(effectX, effectY, effectZ, 0x25, 1);
+						particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+					}
+
+					actor->hitpoints += (int16_t)Renderer::g_frameDelta;
+					if (actor->hitpoints >= 0)
+					{
+						actor->hitpoints = 0;
+						Actor::Kill(actor, Actor::KILL_REMOVE_ACTOR);
+						actorSlot--;
+					}
+				}
+				actorSlot++;
+			}
+
+			if (g_levelFileIndex == 10)
+				ElevatorHop::TransformMouseActors();
+		}
 
 		// STUB: TOY2 0x0049F4B0
 		void MenuLoop() {}

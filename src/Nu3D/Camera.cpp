@@ -10,6 +10,14 @@
 #include <MATH.H>
 #include <STDLIB.H>
 
+namespace Toy2
+{
+	namespace Actor
+	{
+		struct Toy2Actor;
+	}
+}
+
 namespace Nu3D
 {
 	namespace Camera
@@ -37,6 +45,9 @@ namespace Nu3D
 
 		// GLOBAL: TOY2 0x00557A9C
 		int16_t g_tintBlend;
+
+		// STUB: TOY2 0x00448F00
+		int32_t LineOfSightCheck(const Vector3I* cameraPosition, const Toy2::Actor::Toy2Actor* actor) { return 0; }
 
 		// GLOBAL: TOY2 0x00E4D880
 		CameraData g_activeCamera;

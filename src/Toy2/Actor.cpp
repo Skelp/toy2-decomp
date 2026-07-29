@@ -625,6 +625,9 @@ namespace Toy2
 
 	namespace Actor
 	{
+		// STUB: TOY2 0x004076F0
+		void UpdateAIMovement(Toy2Actor* actor) {}
+
 		enum DamageActorFlags
 		{
 			ACTOR_FLAG_BALLISTIC_MOTION = 0x400,
