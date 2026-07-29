@@ -9,6 +9,7 @@
 #include "Random.h"
 #include "Renderer/Renderer.h"
 
+#include <limits.h>
 #include <string.h>
 
 namespace Toy2
@@ -26,7 +27,21 @@ namespace Toy2
 
 	namespace Lighting
 	{
+		struct DynamicLight
+		{
+			Vector3I position;
+			int32_t lifetime;
+			int32_t sourceId;
+			RGBColor3B colour;
+		};
+
+		extern DynamicLight g_dynamicLights[6];
 		void SpawnLight(int32_t x, int32_t y, int32_t z, int32_t colour, int32_t lifetime, int32_t sourceId);
+
+		STATIC_ASSERT(sizeof(DynamicLight) == 0x18);
+		STATIC_ASSERT(offsetof(DynamicLight, lifetime) == 0xC);
+		STATIC_ASSERT(offsetof(DynamicLight, sourceId) == 0x10);
+		STATIC_ASSERT(offsetof(DynamicLight, colour) == 0x14);
 	}
 
 	namespace Particles
@@ -51,12 +66,42 @@ namespace Toy2
 
 	namespace Lighting
 	{
-		// STUB: TOY2 0x0049EE50
-		void SpawnLight(int32_t x, int32_t y, int32_t z, int32_t colour, int32_t lifetime, int32_t sourceId) {}
+		// GLOBAL: TOY2 0x00830D60
+		DynamicLight g_dynamicLights[6];
+
+		// FUNCTION: TOY2 0x0049EE50 [PROVISIONAL]
+		void SpawnLight(int32_t x, int32_t y, int32_t z, int32_t colour, int32_t lifetime, int32_t sourceId)
+		{
+			int32_t shortestLifetime = INT_MAX;
+			int32_t lightIndex = x;
+			for (int32_t candidateIndex = 2; candidateIndex < 6; candidateIndex++)
+			{
+				if (g_dynamicLights[candidateIndex].lifetime < shortestLifetime)
+				{
+					shortestLifetime = g_dynamicLights[candidateIndex].lifetime;
+					lightIndex = candidateIndex;
+				}
+			}
+
+			g_dynamicLights[lightIndex].position.x = x;
+			g_dynamicLights[lightIndex].position.y = y;
+			g_dynamicLights[lightIndex].position.z = z;
+			g_dynamicLights[lightIndex].colour.b = (uint8_t)colour;
+			g_dynamicLights[lightIndex].colour.g = (uint8_t)(colour >> 8);
+			g_dynamicLights[lightIndex].colour.r = (uint8_t)(colour >> 16);
+			g_dynamicLights[lightIndex].sourceId = sourceId;
+			g_dynamicLights[lightIndex].lifetime = lifetime;
+		}
 	}
 
 	namespace Actor
 	{
+		// STUB: TOY2 0x00405D20
+		void Kill(Toy2Actor* actor, uint8_t killFlags) {}
+
+		// STUB: TOY2 0x0043C1C0
+		void ResolveBoneAttachmentPos(Vector4I* position, Toy2Actor* actor, int32_t boneIndex) {}
+
 		// GLOBAL: TOY2 0x0052F1D0
 		Toy2Actor* g_activeActors[65];
 
@@ -89,12 +134,6 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x0052EF88
 		int32_t g_unk52EF88;
-
-		// STUB: TOY2 0x00405D20
-		void Kill(Toy2Actor* actor, uint8_t killFlags) {}
-
-		// STUB: TOY2 0x0043C1C0
-		void ResolveBoneAttachmentPos(Vector4I* position, Toy2Actor* actor, int32_t boneIndex) {}
 
 		// FUNCTION: TOY2 0x00407150 [PROVISIONAL]
 		void InitCreatureRam()
