@@ -33,6 +33,7 @@
 #include <STDIO.H>
 #include <STRING.H>
 #include <DINPUT.H>
+#include <LIMITS.H>
 #include <MATH.H>
 
 #include <Numerics.h>
@@ -421,31 +422,67 @@ namespace Toy2
 		int32_t g_hiddenCollectiblesVisible;
 		// GLOBAL: TOY2 0x0052FEE8
 		int32_t g_prospectorState;
-		// GLOBAL: TOY2 0x0052FF14
-		int32_t g_prospectorTurnAngle;
-		// GLOBAL: TOY2 0x0052FF1C
-		int32_t g_pilotDialogueState;
-		// GLOBAL: TOY2 0x0052FF20
-		int32_t g_platform3Rotation;
-		// GLOBAL: TOY2 0x0052FF24
-		int32_t g_platform4Rotation;
-		// GLOBAL: TOY2 0x0052FF2C
-		int32_t g_prospectorTimer;
-		// GLOBAL: TOY2 0x0052FF30
-		int32_t g_prospectorActionTimer;
-		// GLOBAL: TOY2 0x0052FF34
-		int32_t g_oddFanRotation;
-		// GLOBAL: TOY2 0x0052FF38
-		int32_t g_evenFanRotation;
-		// GLOBAL: TOY2 0x0052FF3C
-		int32_t g_previousPilotPhase;
-		// GLOBAL: TOY2 0x0052FF40
-		int32_t g_prospectorTargetAngle;
-		// GLOBAL: TOY2 0x0052FF44
-		int32_t g_prospectorCooldown;
 
-		// STUB: TOY2 0x0042C8A0
-		void InitHiddenCollectibles() {}
+		struct HiddenCollectibleState
+		{
+			int32_t* verticalPosition;
+			int32_t savedVerticalPosition;
+		};
+
+		struct State
+		{
+			HiddenCollectibleState hiddenCollectibles[5];
+			int32_t prospectorTurnAngle;
+			int32_t fanBlend;
+			int32_t pilotDialogueState;
+			int32_t platform3Rotation;
+			int32_t platform4Rotation;
+			int32_t fanPhase;
+			int32_t prospectorTimer;
+			int32_t prospectorActionTimer;
+			int32_t oddFanRotation;
+			int32_t evenFanRotation;
+			int32_t previousPilotPhase;
+			int32_t prospectorTargetAngle;
+			int32_t prospectorCooldown;
+		};
+
+		// GLOBAL: TOY2 0x0052FEEC
+		State g_state;
+
+		STATIC_ASSERT(sizeof(HiddenCollectibleState) == 0x8);
+		STATIC_ASSERT(sizeof(State) == 0x5C);
+		STATIC_ASSERT(offsetof(State, prospectorTurnAngle) == 0x28);
+		STATIC_ASSERT(offsetof(State, pilotDialogueState) == 0x30);
+		STATIC_ASSERT(offsetof(State, previousPilotPhase) == 0x50);
+		STATIC_ASSERT(offsetof(State, prospectorCooldown) == 0x58);
+
+		// FUNCTION: TOY2 0x0042C8A0 [MATCHED]
+		void InitHiddenCollectibles()
+		{
+			Levels::RecordData* pickupRecords = Levels::g_recordData[63];
+			Collectables::PickupRecord* pickup = reinterpret_cast<Collectables::PickupRecord*>(pickupRecords + 1);
+			for (int32_t pickupIndex = 0; pickupIndex < pickupRecords->recordCount; pickup++, pickupIndex++)
+			{
+				if (pickup->objectIndex == 56)
+					g_state.hiddenCollectibles[0].verticalPosition = &pickup->position.y;
+				if (pickup->objectIndex == 57)
+					g_state.hiddenCollectibles[1].verticalPosition = &pickup->position.y;
+				if (pickup->objectIndex == 58)
+					g_state.hiddenCollectibles[2].verticalPosition = &pickup->position.y;
+				if (pickup->objectIndex == 59)
+					g_state.hiddenCollectibles[3].verticalPosition = &pickup->position.y;
+				if (pickup->objectIndex == 60)
+					g_state.hiddenCollectibles[4].verticalPosition = &pickup->position.y;
+			}
+
+			for (int32_t hiddenIndex = 0; hiddenIndex < 5; hiddenIndex++)
+			{
+				g_state.hiddenCollectibles[hiddenIndex].savedVerticalPosition = *g_state.hiddenCollectibles[hiddenIndex].verticalPosition;
+				*g_state.hiddenCollectibles[hiddenIndex].verticalPosition = INT_MIN;
+				Nu3D::Link::SetScaleFromFixedOffsets(hiddenIndex + 56, 0, 0, 0);
+			}
+		}
 
 		// FUNCTION: TOY2 0x0042C930 [MATCHED]
 		void Init()
@@ -455,15 +492,15 @@ namespace Toy2
 			Collectables::Activate(3, 1);
 			InitHiddenCollectibles();
 
-			g_platform4Rotation = 0;
-			g_platform3Rotation = 0;
+			g_state.platform4Rotation = 0;
+			g_state.platform3Rotation = 0;
 			Platform::SetRotationAngles(4, 0, -0x400, 0);
-			g_oddFanRotation = 0;
-			g_evenFanRotation = 0;
-			g_prospectorTargetAngle = -0x200;
-			g_prospectorTurnAngle = 0x200;
+			g_state.oddFanRotation = 0;
+			g_state.evenFanRotation = 0;
+			g_state.prospectorTargetAngle = -0x200;
+			g_state.prospectorTurnAngle = 0x200;
 			g_slammedPlatformRotation = 0;
-			g_prospectorActionTimer = 200;
+			g_state.prospectorActionTimer = 200;
 
 			Platform::InitPathPlatform(0, 8, 2, 21, 20, 125, 0, 0x400);
 			Platform::InitPathPlatform(1, 10, 4, 25, 24, 125, 0, 0x400);
@@ -474,11 +511,11 @@ namespace Toy2
 			int32_t previousPilotPhase = Actor::g_creatureActors[32].actorPhase;
 			RawLoader::CreatureListRam* pilotRam = Actor::g_creatureActors[32].creatureRam;
 			g_hiddenCollectiblesVisible = 1;
-			g_pilotDialogueState = 0;
-			g_prospectorCooldown = 0;
-			g_prospectorTimer = 0;
+			g_state.pilotDialogueState = 0;
+			g_state.prospectorCooldown = 0;
+			g_state.prospectorTimer = 0;
 			g_prospectorState = 0;
-			g_previousPilotPhase = previousPilotPhase;
+			g_state.previousPilotPhase = previousPilotPhase;
 			pilotRam->boundHalfX = 90;
 		}
 
