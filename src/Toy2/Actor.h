@@ -26,6 +26,8 @@ namespace Toy2
 		{
 			ACTOR_FLAG_TARGETABLE = 0x1,
 			ACTOR_FLAG_ACTIVE = 0x2,
+			ACTOR_FLAG_TRACKS_TARGET = 0x4,
+			ACTOR_FLAG_TARGETS_BUZZ = 0x8,
 			ACTOR_FLAG_COLLIDABLE = 0x80,
 			ACTOR_FLAG_DAMAGES_BUZZ = 0x100,
 			ACTOR_FLAG_INTERACTION_REQUESTED = 0x200,
@@ -157,6 +159,7 @@ namespace Toy2
 
 	namespace CreatureBehaviour
 	{
+		extern uint16_t* g_smithMovementData;
 		extern int32_t g_rcCarRearWheelRotation;
 		extern int32_t g_rcCarFrontWheelRotation;
 		void SetRCCarNodeAngle(Actor::Toy2Actor* actor, int32_t nodeIndex, int32_t pitch, int32_t yaw, int32_t roll);

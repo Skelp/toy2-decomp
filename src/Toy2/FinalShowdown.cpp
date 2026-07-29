@@ -2,15 +2,122 @@
 #include "Toy2/LevelLogic.h"
 #include "Nullsub.h"
 #include "Toy2/Actor.h"
+#include "Toy2/Buzz.h"
 #include "Toy2/Collectables.h"
+#include "AudioManager/AudioManager.h"
 #include "Nu3D/Link.h"
+#include "Nu3D/Math.h"
+#include "Nu3D/Particles.h"
+#include "Renderer/Renderer.h"
 
 namespace Toy2
 {
+	namespace FinalShowdown
+	{
+		enum SmithState
+		{
+			SMITH_STATE_ACTIVE = 2,
+			SMITH_STATE_DEFEATED = 3,
+		};
+
+		extern int32_t g_defeatedBossIndex;
+		extern int32_t g_smithState;
+		extern int32_t g_smithPhaseTimer;
+		extern int32_t g_previousSmithPhase;
+		extern int32_t g_smithTintToggle;
+		extern int32_t g_smithEffectTimer;
+		extern int32_t g_defeatedBossCount;
+	}
+
 	namespace CreatureBehaviour
 	{
-		// STUB: TOY2 0x0042F310
-		void Smith(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// FUNCTION: TOY2 0x0042F310 [PROVISIONAL]
+		void Smith(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			FinalShowdown::g_smithTintToggle = (FinalShowdown::g_smithTintToggle - 1) & 1;
+			Actor::Toy2Actor* actor = context->actor;
+
+			if (actor->actorPhase != FinalShowdown::g_previousSmithPhase)
+			{
+				FinalShowdown::g_previousSmithPhase = actor->actorPhase;
+				FinalShowdown::g_smithPhaseTimer = 60;
+				actor->creatureRam->defenseMode = 4;
+			}
+
+			if (FinalShowdown::g_smithState == FinalShowdown::SMITH_STATE_ACTIVE)
+			{
+				FinalShowdown::g_smithPhaseTimer -= Renderer::g_frameDelta;
+				if (FinalShowdown::g_smithPhaseTimer < 0)
+				{
+					FinalShowdown::g_smithPhaseTimer = 0;
+					actor->creatureRam->defenseMode = 6;
+				}
+				else if (FinalShowdown::g_smithTintToggle != 0)
+				{
+					actor->useTint = 1;
+					actor->actorTint.r = 0x2000;
+					actor->actorTint.g = 0x2000;
+					actor->actorTint.b = 0x2000;
+				}
+				else
+				{
+					actor->useTint = 0;
+				}
+			}
+			else
+			{
+				actor->useTint = 0;
+			}
+
+			if ((context->targetFlags & 1) != 0 && Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &actor->pos, 300) != 0
+				&& actor->primaryAnimIdx == 1)
+			{
+				Actor::SetAnimation(actor, 3, 0x18);
+				actor->creatureRam->speedTarget = 0;
+				FinalShowdown::g_smithEffectTimer = 0x3F;
+			}
+
+			if (actor->primaryAnimIdx == 3 && (actor->animationFramePosition & (int32_t)0xFFFF0000) > 0x2E0000)
+			{
+				actor->movementCommandTimer = 0;
+				actor->movementData = g_smithMovementData + 16;
+				actor->creatureRam->speedTarget = 0x10;
+				actor->actorFlags &= ~(Actor::ACTOR_FLAG_TRACKS_TARGET | Actor::ACTOR_FLAG_TARGETS_BUZZ);
+			}
+
+			if (FinalShowdown::g_smithEffectTimer != 0)
+			{
+				FinalShowdown::g_smithEffectTimer -= Renderer::g_frameDelta;
+				if (FinalShowdown::g_smithEffectTimer <= 0)
+				{
+					Vector4I effectPosition;
+					effectPosition.x = 0xB4;
+					effectPosition.y = -0x96;
+					effectPosition.z = -0x32;
+					Actor::ResolveBoneAttachmentPos(&effectPosition, actor, 4);
+					Nu3D::Particles::ParticleInstance* particle =
+						Nu3D::Particles::SpawnInstance(effectPosition.x, effectPosition.y, effectPosition.z, 0, -2, 0, actor->yawAngle << 2, 0, 0, 0x66);
+					particle->discPitchAngle = -1;
+					FinalShowdown::g_smithEffectTimer = 0;
+					AudioManager::PlaySoundEffect(0xA7, &actor->pos);
+				}
+			}
+
+			if (actor->actorPhase < 10 && FinalShowdown::g_smithState == FinalShowdown::SMITH_STATE_ACTIVE)
+			{
+				actor->movementData = g_smithMovementData + 45;
+				actor->creatureRam->defenseMode = 4;
+				actor->actorFlags &= ~(Actor::ACTOR_FLAG_TARGETS_BUZZ | Actor::ACTOR_FLAG_DAMAGES_BUZZ);
+				actor->movementCommandTimer = 0;
+				AudioManager::PlaySoundEffect(-2, &actor->pos);
+				FinalShowdown::g_defeatedBossCount++;
+				FinalShowdown::g_smithState = FinalShowdown::SMITH_STATE_DEFEATED;
+				if (FinalShowdown::g_defeatedBossCount == 3)
+					FinalShowdown::g_defeatedBossIndex = 0;
+				FinalShowdown::g_smithEffectTimer = 0;
+				actor->creatureRam->speedTarget = 0x10;
+			}
+		}
 
 		// STUB: TOY2 0x0042F530
 		void GunsL(Actor::Toy2Actor::ActorBehaviourContext* context) {}

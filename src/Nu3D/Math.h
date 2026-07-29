@@ -33,6 +33,7 @@ namespace Nu3D
 			int32_t tolerance);
 		void CrossProduct3D(const Vector3I* left, const Vector3I* right, Vector3I* output);
 		int32_t IsWithinDistanceXZ(const Vector3I* left, const Vector3I* right, int32_t radius);
+		int32_t IsWithinDistance(const Vector3I* left, const Vector3I* right, int32_t radius);
 		float Abs(float value);
 		void TransformPointByMatrix(Vector3F* result, const Vector3F* sourceVector, const D3DMATRIX* matrix);
 		void ProjectPoint(Vector3F* result, const Vector3F* sourceVector, const D3DMATRIX* matrix);
