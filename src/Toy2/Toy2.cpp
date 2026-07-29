@@ -724,6 +724,12 @@ namespace Toy2
 	// GLOBAL: TOY2 0x00529E48
 	int16_t g_pauseMenuBlinkTimer;
 
+	// GLOBAL: TOY2 0x00830CB0
+	Nu3D::Camera::ActiveCameraTransform g_pauseCameraTarget;
+
+	// GLOBAL: TOY2 0x00830CC8
+	int32_t g_pauseCheatTimer;
+
 	// GLOBAL: TOY2 0x0052F0D7
 	uint8_t g_levelTokenBits[16];
 
@@ -803,13 +809,104 @@ namespace Toy2
 		}
 	}
 
+	// STUB: TOY2 0x0049FD40
+	void RenderHUD() {}
+
 	namespace Game
 	{
 		// STUB: TOY2 0x00406CD0
 		void InitActor(Actor::Toy2Actor* actor, int32_t param) {}
 
-		// STUB: TOY2 0x0049E330
-		void PauseLoop() {}
+		// STUB: TOY2 0x0049F4B0
+		void MenuLoop() {}
+
+		// FUNCTION: TOY2 0x0049E330 [PROVISIONAL]
+		void PauseLoop()
+		{
+			if (g_pauseMenuBlinkTimer < 100)
+				g_pauseMenuBlinkTimer = ((uint8_t)Renderer::g_frameDelta + (uint8_t)g_pauseMenuBlinkTimer) & 0x3F;
+
+			if (g_attractModeTimer >= 0)
+			{
+				if (g_returnedToTitle == 0 && InputManager::g_curButtonsPressed != 0)
+					g_attractModeInputTimer = g_attractModeTimer * 2;
+
+				g_attractModeInputTimer -= Renderer::g_frameDelta;
+				if (g_attractModeInputTimer <= 0 || (InputManager::g_curButtonsPressed & INPUT_SECRET_MENU) != 0)
+				{
+					g_isPaused = 0;
+					g_levelTransition = 4;
+					g_levelTransitionTimer = 0x2E;
+					Nu3D::Camera::SetTint(0, 0, 0, 6);
+				}
+			}
+
+			Vector3I cameraTarget;
+			Vector3I movement;
+			int32_t yawDelta;
+			if (g_pauseCheatTimer <= 0xE10)
+			{
+				g_pauseCheatTimer -= Renderer::g_frameDelta;
+
+			check_orbit_camera:
+				if (g_pauseCheatTimer <= 0 && (g_gameplayStateFlags & 1) == 0 && Camera::g_scriptedCameraState == 0)
+				{
+					cameraTarget.x = g_buzzActor.posAngles.pos.x;
+					cameraTarget.y = g_buzzActor.posAngles.pos.y - 0x4000;
+					cameraTarget.z = g_buzzActor.posAngles.pos.z;
+
+					Camera::g_renderCameraTransform.angles.yaw = (Camera::g_renderCameraTransform.angles.yaw + Renderer::g_frameDelta * 8) & 0xFFF;
+					int32_t yaw = (int16_t)Camera::g_renderCameraTransform.angles.yaw;
+					movement.x = -Numerics::g_sinCosLUT[yaw] * 2;
+					movement.y = 0;
+					movement.z = -Numerics::g_sinCosLUT[(yaw + 0x400) & 0xFFF] * 2;
+					g_pauseCheatTimer = 0;
+					Collision::SweepAndSlide(&cameraTarget, &movement, 0x8000, 0, 0x100);
+					cameraTarget.x += movement.x;
+					cameraTarget.y += movement.y;
+					cameraTarget.z += movement.z;
+					goto smooth_camera;
+				}
+			}
+			else
+			{
+				if (InputManager::g_curButtonsPressed == (INPUT_CAMERA_RIGHT | INPUT_VISOR_TOGGLE))
+				{
+					g_pauseCheatTimer -= Renderer::g_frameDelta;
+					if (g_pauseCheatTimer <= 0xE10)
+					{
+						if (g_buzzActor.coinsCollected == 7)
+							g_buzzActor.lives = 9;
+						else if (g_buzzActor.coinsCollected == 5)
+							g_buzzActor.health = 14;
+						g_pauseCheatTimer = 0;
+					}
+					goto check_orbit_camera;
+				}
+				else
+				{
+					g_pauseCheatTimer = 0xEC4;
+				}
+			}
+
+			cameraTarget = g_pauseCameraTarget.pos;
+			Camera::g_renderCameraTransform.angles.yaw &= 0xFFF;
+			yawDelta = (Camera::g_renderCameraTransform.angles.yaw - g_pauseCameraTarget.angles.yaw) & 0xFFF;
+			if (yawDelta > 0x800)
+				yawDelta -= 0x1000;
+			Camera::g_renderCameraTransform.angles.yaw -= Renderer::g_frameDelta * yawDelta / 16;
+
+		smooth_camera:
+			Camera::g_renderCameraTransform.pos.x -= (Camera::g_renderCameraTransform.pos.x - cameraTarget.x) * Renderer::g_frameDelta / 16;
+			Camera::g_renderCameraTransform.pos.y -= (Camera::g_renderCameraTransform.pos.y - cameraTarget.y) * Renderer::g_frameDelta / 16;
+			Camera::g_renderCameraTransform.pos.z -= (Camera::g_renderCameraTransform.pos.z - cameraTarget.z) * Renderer::g_frameDelta / 16;
+
+			Nu3D::Camera::ApplyTransformToCamera(&Camera::g_renderCameraTransform);
+			RenderHUD();
+			Nullsub3();
+			RenderGame(1);
+			MenuLoop();
+		}
 
 		// STUB: TOY2 0x0049DFE0
 		void MainLoop() {}
