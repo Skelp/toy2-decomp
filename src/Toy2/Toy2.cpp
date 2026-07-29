@@ -834,8 +834,159 @@ namespace Toy2
 
 	namespace ElevatorHop
 	{
-		// STUB: TOY2 0x00425B60
-		void Init() {}
+		enum GunsPState
+		{
+			GUNS_P_STATE_ACTIVE = 2,
+		};
+		extern int32_t g_gunsPVisualToggle;
+		extern int32_t g_gunsPAttackTimer;
+		extern int32_t g_gunsPShotIndex;
+		extern GunsPState g_gunsPState;
+		extern int32_t g_elevatorMotionPhase;
+		extern int32_t g_gunsPPhaseTimer;
+		extern int32_t g_previousGunsPPhase;
+
+		// GLOBAL: TOY2 0x004F3314
+		extern const char g_elevatorInstructions[] = "if you line up the ^wire^ you will open the ^door^ and activate the ^elevators^.";
+		// GLOBAL: TOY2 0x004F3368
+		extern const char g_controlRoomFanInstructions[] = "the switch in the control room will activate this ^shortcut^ fan.";
+		// GLOBAL: TOY2 0x004F33AC
+		extern const char g_elevatorShaftFanInstructions[] = "the switch at the top of the elevator shaft will activate this ^shortcut^ fan.";
+
+		// GLOBAL: TOY2 0x004F3614
+		int16_t g_firstElevatorPlatformIds[] = { 1, 2, 3, 6, 7, 8, 9, 10, -1 };
+		// GLOBAL: TOY2 0x004F3628
+		int16_t g_secondElevatorPlatformIds[] = { 0, 11, 12, 13, 14, 15, 16, 17, -1 };
+		// GLOBAL: TOY2 0x004F3688
+		int16_t g_firstElevatorMotionScript[] = {
+			8, 1, 9, 1, 8, 2, 4, 3, 0, 0x12, 9, 2, 8, 1, 9, 1, 3, 0x7F, 0x60, 8, 1, 9, 1, 8, 2, 1, 0, 0, 0, 0x12, 9, 2, 8, 1, 9, 1, 3, 0x7F, 0x20, 0, 0x27, 0
+		};
+		// GLOBAL: TOY2 0x004F36DC
+		int16_t g_secondElevatorMotionScript[] = { 8,
+			0x100,
+			9,
+			0x100,
+			8,
+			0x200,
+			4,
+			3,
+			1,
+			0xC,
+			9,
+			0x200,
+			8,
+			0x100,
+			9,
+			0x100,
+			3,
+			0x7F,
+			0x20,
+			8,
+			0x100,
+			9,
+			0x100,
+			8,
+			0x200,
+			1,
+			0,
+			0,
+			0,
+			0xC,
+			9,
+			0x200,
+			8,
+			0x100,
+			9,
+			0x100,
+			3,
+			0x7F,
+			0x20,
+			0,
+			0x27,
+			0 };
+		// GLOBAL: TOY2 0x004F3798
+		int16_t g_tokenLinkIds[] = { 0x6B, 0x6C, 0x6E, 0x6A, 0x6D, 0 };
+		// GLOBAL: TOY2 0x004F37A4
+		extern const Collectables::TokenDialogueValue g_tokenDialogueValues[] = { { 0x70 },
+			{ 0x22 },
+			{ reinterpret_cast<int32_t>(g_elevatorInstructions) },
+			{ 0 },
+			{ 0x71 },
+			{ 0x23 },
+			{ reinterpret_cast<int32_t>(g_controlRoomFanInstructions) },
+			{ 0 },
+			{ 0x72 },
+			{ 0x24 },
+			{ reinterpret_cast<int32_t>(g_elevatorShaftFanInstructions) },
+			{ 0 },
+			{ -1 } };
+
+		// GLOBAL: TOY2 0x0052FC10
+		Collectables::PickupRecord* g_challengeTokenPickup;
+		// GLOBAL: TOY2 0x0052FC14
+		int32_t g_elevatorFlags;
+		// GLOBAL: TOY2 0x0052FC18
+		int32_t g_elevatorPauseDuration;
+		// GLOBAL: TOY2 0x0052FC1C
+		int32_t g_unusedElevatorState1;
+		// GLOBAL: TOY2 0x0052FC24
+		int32_t g_elevatorTriggerState;
+		// GLOBAL: TOY2 0x0052FC28
+		int32_t g_lowerFanPulseAngle;
+		// GLOBAL: TOY2 0x0052FC2C
+		int32_t g_sideDebrisTimer;
+		// GLOBAL: TOY2 0x0052FC38
+		int32_t g_lowerFanSpeed;
+		// GLOBAL: TOY2 0x0052FC3C
+		int32_t g_completionLinkScale;
+		// GLOBAL: TOY2 0x0052FC44
+		int32_t g_challengeTokenMoveTimer;
+		// GLOBAL: TOY2 0x0052FC54
+		int32_t g_lowerFanRotation;
+		// GLOBAL: TOY2 0x0052FC58
+		int32_t g_sideDebrisIndex;
+		// GLOBAL: TOY2 0x0052FC60
+		int32_t g_fallingDebrisTimer;
+		// GLOBAL: TOY2 0x0052FC64
+		int32_t g_flyingDebrisTimer;
+		// GLOBAL: TOY2 0x0052FC68
+		int32_t g_steamParticleAngle;
+		// GLOBAL: TOY2 0x0052FC6C
+		int32_t g_upperFanRotation;
+		// GLOBAL: TOY2 0x0052FC70
+		int32_t g_fallingDebrisIndex;
+		// GLOBAL: TOY2 0x0052FC74
+		int32_t g_flyingDebrisIndex;
+		// GLOBAL: TOY2 0x0052FC78
+		int32_t g_secondElevatorPlatformOriginY[9];
+		// GLOBAL: TOY2 0x0052FCA0
+		int32_t g_firstElevatorPlatformOriginY[9];
+		// GLOBAL: TOY2 0x0052FCC8
+		int32_t g_unusedElevatorState2;
+		// GLOBAL: TOY2 0x0052FCCC
+		int32_t g_firstElevatorMotionTimer;
+		// GLOBAL: TOY2 0x0052FCD0
+		int32_t g_steamSequenceTimer;
+		// GLOBAL: TOY2 0x0052FCD4
+		int32_t g_secondElevatorMotionTimer;
+		// GLOBAL: TOY2 0x0052FCDC
+		int32_t g_challengeTokenPathProgress;
+		// GLOBAL: TOY2 0x0052FCE4
+		int32_t g_secondElevatorMotionBlend;
+		// GLOBAL: TOY2 0x0052FCE8
+		int32_t g_firstElevatorMotionBlend;
+		// GLOBAL: TOY2 0x0052FCEC
+		int32_t g_steamSequenceIndex;
+		// GLOBAL: TOY2 0x0052FCF0
+		int16_t* g_secondElevatorMotionCursor;
+		// GLOBAL: TOY2 0x0052FCF4
+		int16_t* g_firstElevatorMotionCursor;
+		// GLOBAL: TOY2 0x0052FCFC
+		int32_t g_elevatorMotionCycle;
+		// GLOBAL: TOY2 0x0052FD00
+		int32_t g_upperFanMotionAngle;
+
+		void Init();
 
 		// STUB: TOY2 0x00425F60
 		void Interactions() {}
@@ -3962,4 +4113,100 @@ void Toy2::ElevatorHop::TransformMouseActors()
 	}
 
 	Actor::g_creatureActors[3].rollAngle = 0x800;
+}
+
+// FUNCTION: TOY2 0x00425B60 [PROVISIONAL]
+void Toy2::ElevatorHop::Init()
+{
+	Levels::g_recordData[9]->data[2].y = -0x6A54;
+	Levels::g_recordData[9]->data[5].y = -0x6A54;
+	Levels::g_recordData[9]->data[8].y = -0x6A54;
+
+	Nu3D::Link::SetPositionRawAndCommit(0x6E, Levels::g_recordData[14]->data[0].x, Levels::g_recordData[14]->data[0].y, Levels::g_recordData[14]->data[0].z);
+	MoveableObject::InitTable(0);
+	Collectables::Init(g_tokenLinkIds, 0x73);
+	Collectables::Activate(3, 1);
+	Collectables::LoadTokenTable(g_tokenDialogueValues);
+
+	g_challengeTokenPickup = reinterpret_cast<Collectables::PickupRecord*>(Collectables::g_tokenStates[2].verticalPosition - 1);
+	g_challengeTokenPathProgress = 0;
+	g_challengeTokenMoveTimer = 0;
+
+	Platform::AddFlags(0, 0x100);
+	Platform::AddFlags(1, 0x100);
+	Platform::AddFlags(2, 0x100);
+	Platform::AddFlags(3, 0x100);
+	Platform::AddFlags(6, 0x100);
+	Platform::AddFlags(7, 0x100);
+	Platform::AddFlags(8, 0x100);
+	Platform::AddFlags(9, 0x100);
+	Platform::AddFlags(10, 0x100);
+	Platform::AddFlags(11, 0x100);
+	Platform::AddFlags(12, 0x100);
+	Platform::AddFlags(13, 0x100);
+	Platform::AddFlags(14, 0x100);
+	Platform::AddFlags(15, 0x100);
+	Platform::AddFlags(16, 0x100);
+	Platform::AddFlags(17, 0x100);
+
+	Vector3I origin;
+	int32_t index;
+	for (index = 0; g_firstElevatorPlatformIds[index] != -1; index++)
+	{
+		Platform::GetOrigin(g_firstElevatorPlatformIds[index], &origin);
+		g_firstElevatorPlatformOriginY[index] = origin.y;
+	}
+	for (index = 0; g_secondElevatorPlatformIds[index] != -1; index++)
+	{
+		Platform::GetOrigin(g_secondElevatorPlatformIds[index], &origin);
+		g_secondElevatorPlatformOriginY[index] = origin.y;
+	}
+
+	g_unusedElevatorState2 = 0;
+	g_unusedElevatorState1 = 0;
+	g_lowerFanPulseAngle = 0;
+	g_lowerFanSpeed = 0;
+	g_upperFanMotionAngle = 0;
+	g_lowerFanRotation = 0;
+	g_upperFanRotation = 0;
+	g_elevatorMotionPhase = 0;
+	g_sideDebrisTimer = 0;
+	g_sideDebrisIndex = 0;
+	g_flyingDebrisTimer = 0;
+	g_flyingDebrisIndex = 0;
+	g_fallingDebrisTimer = 0;
+	g_fallingDebrisIndex = 0;
+	g_gunsPState = static_cast<GunsPState>(0);
+	g_elevatorMotionCycle = 0x3000;
+	g_elevatorPauseDuration = 0x7FFF;
+	g_gunsPAttackTimer = 400;
+	g_gunsPShotIndex = 5;
+	g_gunsPVisualToggle = 0;
+	g_gunsPPhaseTimer = 0;
+	g_previousGunsPPhase = Actor::g_creatureActors[8].actorPhase;
+	g_steamParticleAngle = 0;
+	g_steamSequenceIndex = 0;
+	g_steamSequenceTimer = 0;
+	g_elevatorFlags = 0;
+	g_link18PathPointIndex = 0;
+	g_link19PathPointIndex = 2;
+	g_link20PathPointIndex = 0;
+	g_elevatorTriggerState = 1;
+
+	UpdatePathLinks();
+	Nu3D::Link::SetScaleFromFixedOffsets(0x47, 0x1000, 0x1000, 0x1000);
+	Nu3D::Link::SetScaleFromFixedOffsets(0x46, 0, 0, 0);
+	Nu3D::Link::SetScaleFromFixedOffsets(0x49, 0x1000, 0x1000, 0x1000);
+	Nu3D::Link::SetScaleFromFixedOffsets(0x48, 0, 0, 0);
+	Nu3D::Link::SetScaleFromFixedOffsets(0x4F, 0x1000, 0x1000, 0x1000);
+	Nu3D::Link::SetScaleFromFixedOffsets(0x4E, 0, 0, 0);
+
+	g_firstElevatorMotionTimer = 0;
+	g_firstElevatorMotionBlend = 0;
+	g_secondElevatorMotionTimer = 0;
+	g_secondElevatorMotionBlend = 0;
+	g_completionLinkScale = 0x1000;
+	g_firstElevatorMotionCursor = g_firstElevatorMotionScript;
+	g_secondElevatorMotionCursor = g_secondElevatorMotionScript;
+	Actor::g_creatureActors[8].pos.x += 0x10000;
 }
