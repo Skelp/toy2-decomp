@@ -20,6 +20,73 @@ PCProfile PC;
 
 // GLOBAL: TOY2 0x00534554
 int16_t g_renderMode;
+
+// FUNCTION: TOY2 0x00409AE0 [MATCHED]
+void GetVidMem()
+{
+	if (PC.softwareRenderMode || g_checkAvailableMem == 1)
+		return;
+
+	Logger::Log("GetVidMem : Checking size of hardware VRAM.\n");
+
+	DDSCAPS caps;
+	DWORD total;
+	DWORD free;
+	caps.dwCaps = DDSCAPS_TEXTURE;
+	HRESULT result = d3dappi.lpDD->GetAvailableVidMem(&caps, &total, &free);
+	if (result < 0)
+		Logger::LogDDError("d3dappi.lpDD->GetAvailableVidMem(&caps, &total, &free)", result);
+	Logger::Log("GetVidMem : Total TEXTURE video memory is %d, free memory is %d.\n", total, free);
+
+	caps.dwCaps = DDSCAPS_PRIMARYSURFACE;
+	result = d3dappi.lpDD->GetAvailableVidMem(&caps, &total, &free);
+	if (result < 0)
+		Logger::LogDDError("d3dappi.lpDD->GetAvailableVidMem(&caps, &total, &free)", result);
+	Logger::Log("GetVidMem : Total PRIMARY video memory is %d, free memory is %d.\n", total, free);
+}
+
+// STUB: TOY2 0x00409E30
+int32_t D3DInit(char* commandLine) { return TRUE; }
+
+// FUNCTION: TOY2 0x0040A350 [MATCHED]
+int32_t D3DRestart()
+{
+	Logger::Log("D3DRESTART : Starting mode %dx%d.\n", PC.Mode->w, PC.Mode->h);
+	D3DInit(g_windowData.lpCmdLine);
+	Logger::Log("%s\n", g_renderMode == RENDERMODE_D3D ? "RENDER_D3D" : "RENDER_SOFT");
+
+	switch (g_renderMode)
+	{
+		case RENDERMODE_SOFTWARE:
+			Toy2::InitSoftwareRenderer();
+			break;
+		case RENDERMODE_D3D:
+			Toy2::InitDirect3DRenderer();
+			break;
+	}
+
+	memcpy(d3dappi.TextureHandle, g_masterTextureHandles, sizeof(d3dappi.TextureHandle));
+	memcpy(d3dappi.TextureStatus, g_masterTextureStatus, sizeof(d3dappi.TextureStatus));
+	memcpy(g_textureData, g_masterTextureData, sizeof(g_textureData));
+	memcpy(g_textureFlags, g_masterTextureFlags, sizeof(g_textureFlags));
+	memcpy(g_texturePaletteState, g_masterTexturePaletteState, sizeof(g_texturePaletteState));
+
+	for (int32_t textureIndex = 0; textureIndex < 64; ++textureIndex)
+	{
+		if (d3dappi.TextureHandle[textureIndex] == 4)
+			d3dappi.TextureHandle[textureIndex] = 1;
+	}
+
+	D3DAppIReleaseAllTextures();
+	Toy2::InitDirect3DMaterials();
+	return TRUE;
+}
+
+namespace Toy2
+{
+	// STUB: TOY2 0x00498140
+	int16_t InitDirect3DMaterials() { return 1; }
+}
 // FUNCTION: TOY2 0x004093A0 [PROVISIONAL]
 int32_t ExamineMachine()
 {

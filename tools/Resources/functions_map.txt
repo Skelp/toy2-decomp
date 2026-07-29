@@ -45,6 +45,7 @@
 0x004093A0 ExamineMachine
 0x00409AE0 GetVidMem
 0x00409C80 D3DAppIReleaseAllTextures
+0x00409E30 D3DInit
 0x0040A350 D3DRestart
 0x0040B290 D3DAppIGetSurfDesc
 0x0040B2C0 D3DAppICreateBuffers
@@ -515,6 +516,7 @@
 0x004946A0 Renderer::Sprite::DrawTiledFixed
 0x00494820 Renderer::Sprite::DrawTile
 0x004949B0 Renderer::Sprite::DrawClipped
+0x00498140 Toy2::InitDirect3DMaterials
 0x00498470 SaveManager::SetLightShadowEffects
 0x00498550 Toy2::ProcessMiscEvents
 0x00498620 InputManager::GetCurButtonsPressed

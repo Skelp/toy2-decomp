@@ -95,6 +95,9 @@ extern PCProfile PC;
 extern int16_t g_renderMode;
 
 int32_t ExamineMachine();
+void GetVidMem();
+int32_t D3DInit(char* commandLine);
+int32_t D3DRestart();
 int32_t WINAPI ExamineDDEnumCallback(LPGUID guid, LPSTR driverDesc, LPSTR driverName, LPVOID lpContext);
 HRESULT WINAPI ExamineDDModesEnumCallback(LPDDSURFACEDESC surfaceDesc, LPVOID context);
 HRESULT WINAPI
