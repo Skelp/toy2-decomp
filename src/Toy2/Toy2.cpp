@@ -50,7 +50,7 @@ namespace Nu3D
 {
 	namespace Camera
 	{
-		int32_t LineOfSightCheck(const Vector3I* cameraPosition, const Toy2::Actor::Toy2Actor* actor);
+		int32_t IsActorSpawnVisible(const Vector3I* cameraPosition, const Toy2::Actor::Toy2Actor* actor);
 	}
 }
 
@@ -1101,7 +1101,7 @@ namespace Toy2
 					if (actor->respawnDelay == 0)
 					{
 						if ((actorFlags & ACTOR_FLAG_IGNORE_RESPAWN_VISIBILITY) != 0
-							|| Nu3D::Camera::LineOfSightCheck(&Camera::g_renderCameraTransform.pos, actor) == 0)
+							|| Nu3D::Camera::IsActorSpawnVisible(&Camera::g_renderCameraTransform.pos, actor) == 0)
 						{
 							InitActor(actor, 0);
 						}

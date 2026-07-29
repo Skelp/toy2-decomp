@@ -3,25 +3,26 @@
 #include "Nu3D/Portal.h"
 #include "Nu3D/Scene.h"
 #include "Nu3D/Viewport.h"
+#include "CharacterLoader.h"
 #include "DrawingDevice.h"
 #include "Renderer/Renderer.h"
 #include "SoftwareRenderer.h"
+#include "Toy2/Actor.h"
 #include <FLOAT.H>
 #include <MATH.H>
 #include <STDLIB.H>
 
 namespace Toy2
 {
-	namespace Actor
-	{
-		struct Toy2Actor;
-	}
+	extern int32_t g_destRectHalfWidth;
 }
 
 namespace Nu3D
 {
 	namespace Camera
 	{
+		static __forceinline int32_t ShiftFixedTowardZero(int32_t value, int32_t bits) { return (value + ((value >> 31) & ((1 << bits) - 1))) >> bits; }
+
 		// GLOBAL: TOY2 0x0054DE9C
 		int16_t g_cameraTintBlue;
 
@@ -46,8 +47,46 @@ namespace Nu3D
 		// GLOBAL: TOY2 0x00557A9C
 		int16_t g_tintBlend;
 
-		// STUB: TOY2 0x00448F00
-		int32_t LineOfSightCheck(const Vector3I* cameraPosition, const Toy2::Actor::Toy2Actor* actor) { return 0; }
+		// GLOBAL: TOY2 0x0054C100
+		Matrix3x3I16 g_fixedViewRotation;
+
+		// FUNCTION: TOY2 0x00448F00 [PROVISIONAL]
+		int32_t IsActorSpawnVisible(const Vector3I* cameraPosition, const Toy2::Actor::Toy2Actor* actor)
+		{
+			int32_t deltaX;
+			int32_t deltaY;
+			int32_t deltaZ;
+			int32_t depth;
+			int32_t horizontal;
+			int32_t vertical;
+			int32_t radius;
+			int32_t viewBoundary;
+
+			if (CharacterLoader::g_characterAnimationData[actor->creatureId]->modelId != 0)
+			{
+				deltaY = actor->creatureRam->pos.y * 32 + actor->boundingOffset.y - cameraPosition->y;
+				deltaZ = actor->creatureRam->pos.z * 32 - cameraPosition->z;
+				deltaX = actor->creatureRam->pos.x * 32 - cameraPosition->x;
+				radius = actor->boundingSphereRadius;
+				depth = ShiftFixedTowardZero(g_fixedViewRotation.m22 * deltaZ + g_fixedViewRotation.m21 * deltaY + g_fixedViewRotation.m20 * deltaX, 17);
+
+				if (depth > -radius)
+				{
+					horizontal =
+						ShiftFixedTowardZero(g_fixedViewRotation.m02 * deltaZ + g_fixedViewRotation.m01 * deltaY + g_fixedViewRotation.m00 * deltaX, 17);
+					viewBoundary = (depth << 8) / Toy2::g_destRectHalfWidth;
+					if (viewBoundary > abs(horizontal) - radius)
+					{
+						vertical =
+							ShiftFixedTowardZero(g_fixedViewRotation.m12 * deltaZ + g_fixedViewRotation.m11 * deltaY + g_fixedViewRotation.m10 * deltaX, 17);
+						if (viewBoundary > abs(vertical) - radius)
+							return 1;
+					}
+				}
+			}
+
+			return 0;
+		}
 
 		// GLOBAL: TOY2 0x00E4D880
 		CameraData g_activeCamera;
