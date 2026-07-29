@@ -2,20 +2,25 @@
 #include "Toy2/LevelLogic.h"
 #include "Toy2/Collision.h"
 #include "Toy2/Actor.h"
+#include "Toy2/Buzz.h"
 #include "Toy2/Collectables.h"
 #include "Toy2/Levels.h"
 #include "Toy2/Particles.h"
 #include "RawLoader.h"
 #include "AudioManager/AudioManager.h"
 #include "Nu3D/Link.h"
+#include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
 #include "Random.h"
+#include "Numerics.h"
 
 #include <limits.h>
 
 namespace Toy2
 {
+	extern int32_t g_hudActorAnimationFrame;
+
 	namespace Path
 	{
 		// FUNCTION: TOY2 0x0042C200 [PROVISIONAL]
@@ -100,6 +105,12 @@ namespace Toy2
 
 	namespace AirportInfiltration
 	{
+		enum ProspectorState
+		{
+			PROSPECTOR_STATE_ACTIVE = 2,
+			PROSPECTOR_STATE_DEFEATED = 3,
+		};
+
 		// GLOBAL: TOY2 0x004F4668
 		Vector3I g_fanParticleVelocities[5] = {
 			{ 0, 0, 0x500 },
@@ -123,7 +134,7 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0052FE40
 		int32_t g_hiddenCollectiblesVisible;
 		// GLOBAL: TOY2 0x0052FEE8
-		int32_t g_prospectorState;
+		int32_t g_prospectorEffectTimer;
 
 		struct HiddenCollectibleState
 		{
@@ -136,17 +147,17 @@ namespace Toy2
 			HiddenCollectibleState hiddenCollectibles[5];
 			int32_t prospectorTurnAngle;
 			int32_t fanBlend;
-			int32_t pilotDialogueState;
+			int32_t prospectorState;
 			int32_t platform3Rotation;
 			int32_t platform4Rotation;
 			int32_t fanPhase;
-			int32_t prospectorTimer;
-			int32_t prospectorActionTimer;
+			int32_t prospectorTintToggle;
+			int32_t prospectorAttackTimer;
 			int32_t oddFanRotation;
 			int32_t evenFanRotation;
-			int32_t previousPilotPhase;
+			int32_t previousProspectorPhase;
 			int32_t prospectorTargetAngle;
-			int32_t prospectorCooldown;
+			int32_t prospectorPhaseTimer;
 		};
 
 		// GLOBAL: TOY2 0x0052FEEC
@@ -155,9 +166,9 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(HiddenCollectibleState) == 0x8);
 		STATIC_ASSERT(sizeof(State) == 0x5C);
 		STATIC_ASSERT(offsetof(State, prospectorTurnAngle) == 0x28);
-		STATIC_ASSERT(offsetof(State, pilotDialogueState) == 0x30);
-		STATIC_ASSERT(offsetof(State, previousPilotPhase) == 0x50);
-		STATIC_ASSERT(offsetof(State, prospectorCooldown) == 0x58);
+		STATIC_ASSERT(offsetof(State, prospectorState) == 0x30);
+		STATIC_ASSERT(offsetof(State, previousProspectorPhase) == 0x50);
+		STATIC_ASSERT(offsetof(State, prospectorPhaseTimer) == 0x58);
 
 		// FUNCTION: TOY2 0x0042C810 [PROVISIONAL]
 		void SpawnFanParticle(const Vector3I* position, int32_t fanIndex)
@@ -217,7 +228,7 @@ namespace Toy2
 			g_state.prospectorTargetAngle = -0x200;
 			g_state.prospectorTurnAngle = 0x200;
 			g_slammedPlatformRotation = 0;
-			g_state.prospectorActionTimer = 200;
+			g_state.prospectorAttackTimer = 200;
 
 			Platform::InitPathPlatform(0, 8, 2, 21, 20, 125, 0, 0x400);
 			Platform::InitPathPlatform(1, 10, 4, 25, 24, 125, 0, 0x400);
@@ -225,15 +236,15 @@ namespace Toy2
 			Platform::InitPathPlatform(3, 5, 7, 15, 14, 125, 0, -0xC00);
 			Platform::InitPathPlatform(4, 1, 5, 11, 10, 125, 0, -0x638);
 
-			int32_t previousPilotPhase = Actor::g_creatureActors[32].actorPhase;
-			RawLoader::CreatureListRam* pilotRam = Actor::g_creatureActors[32].creatureRam;
+			int32_t previousProspectorPhase = Actor::g_creatureActors[32].actorPhase;
+			RawLoader::CreatureListRam* prospectorRam = Actor::g_creatureActors[32].creatureRam;
 			g_hiddenCollectiblesVisible = 1;
-			g_state.pilotDialogueState = 0;
-			g_state.prospectorCooldown = 0;
-			g_state.prospectorTimer = 0;
-			g_prospectorState = 0;
-			g_state.previousPilotPhase = previousPilotPhase;
-			pilotRam->boundHalfX = 90;
+			g_state.prospectorState = 0;
+			g_state.prospectorPhaseTimer = 0;
+			g_state.prospectorTintToggle = 0;
+			g_prospectorEffectTimer = 0;
+			g_state.previousProspectorPhase = previousProspectorPhase;
+			prospectorRam->boundHalfX = 90;
 		}
 
 		// STUB: TOY2 0x0042CA60
@@ -245,8 +256,116 @@ namespace Toy2
 {
 	namespace CreatureBehaviour
 	{
-		// STUB: TOY2 0x0042BE60
-		void ProsPLevel13(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// FUNCTION: TOY2 0x0042BE60 [PROVISIONAL]
+		void ProsPLevel13(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			AirportInfiltration::g_state.prospectorTintToggle = (AirportInfiltration::g_state.prospectorTintToggle - 1) & 1;
+
+			if (actor->actorPhase != AirportInfiltration::g_state.previousProspectorPhase)
+			{
+				AirportInfiltration::g_state.previousProspectorPhase = actor->actorPhase;
+				AirportInfiltration::g_state.prospectorPhaseTimer = 60;
+				actor->creatureRam->defenseMode = 4;
+
+				int32_t soundIndex = *g_randDatBufferPtr++ & 3;
+				if (soundIndex == 3)
+					soundIndex = 0;
+				AudioManager::Preset::PlayOneShotSound2(soundIndex + 0xC4, actor);
+			}
+
+			if (AirportInfiltration::g_state.prospectorState == AirportInfiltration::PROSPECTOR_STATE_ACTIVE)
+			{
+				AirportInfiltration::g_state.prospectorAttackTimer -= Renderer::g_frameDelta;
+				if (AirportInfiltration::g_state.prospectorAttackTimer < 0)
+				{
+					AirportInfiltration::g_state.prospectorAttackTimer = *g_randDatBufferPtr++ * 2 + 400;
+					AudioManager::Preset::PlayOneShotSound2(0xC3, actor);
+				}
+
+				AirportInfiltration::g_state.prospectorPhaseTimer -= Renderer::g_frameDelta;
+				if (AirportInfiltration::g_state.prospectorPhaseTimer < 0)
+				{
+					AirportInfiltration::g_state.prospectorPhaseTimer = 0;
+					actor->creatureRam->defenseMode = 6;
+				}
+				else if (AirportInfiltration::g_state.prospectorTintToggle != 0)
+				{
+					actor->useTint = 1;
+					actor->actorTint.r = 0x2000;
+					actor->actorTint.g = 0x2000;
+					actor->actorTint.b = 0x2000;
+				}
+				else
+				{
+					actor->useTint = 0;
+				}
+			}
+			else
+			{
+				actor->useTint = 0;
+			}
+
+			if ((context->targetFlags & 1) != 0 && Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &actor->pos, 200) != 0
+				&& actor->primaryAnimIdx == 4)
+			{
+				actor->reservedArea[1] = 0xD0;
+				actor->reservedArea[2] = 0xD0;
+				Actor::SetAnimation(actor, 3, 9);
+				actor->creatureRam->speedTarget = 0;
+				AirportInfiltration::g_prospectorEffectTimer = 0x2C;
+				if (AudioManager::IsActorSoundPlaying(actor) == 0)
+					AudioManager::Preset::PlayOneShotSound2(0xC2, actor);
+			}
+
+			if (actor->primaryAnimIdx == 3 && (actor->animationFramePosition & (int32_t)0xFFFF0000) > 0x150000)
+			{
+				actor->movementCommandTimer = 0;
+				actor->movementData = g_prospectorMovementData + 16;
+				actor->creatureRam->speedTarget = 0x10;
+				actor->actorFlags &= ~(Actor::ACTOR_FLAG_TRACKS_TARGET | Actor::ACTOR_FLAG_TARGETS_BUZZ);
+			}
+
+			if (AirportInfiltration::g_prospectorEffectTimer != 0)
+			{
+				AirportInfiltration::g_prospectorEffectTimer -= Renderer::g_frameDelta;
+				if (AirportInfiltration::g_prospectorEffectTimer <= 0)
+				{
+					int32_t yawAngle = actor->yawAngle;
+					Nu3D::Particles::SpawnInstance(actor->pos.x + (Numerics::g_sinCosLUT[(yawAngle + 0x400) & 0xFFF] >> 3),
+						actor->pos.y - 0x800,
+						actor->pos.z + (Numerics::g_sinCosLUT[(yawAngle - 0x800) & 0xFFF] >> 3),
+						Numerics::g_sinCosLUT[yawAngle] >> 2,
+						0,
+						Numerics::g_sinCosLUT[(yawAngle + 0x400) & 0xFFF] >> 2,
+						0,
+						(0x7FF - yawAngle) & 0xFFF,
+						0,
+						0x68);
+					AudioManager::PlaySoundEffect(0xA6, &actor->pos);
+					AirportInfiltration::g_prospectorEffectTimer = 0;
+				}
+			}
+
+			if (AirportInfiltration::g_state.prospectorState == AirportInfiltration::PROSPECTOR_STATE_ACTIVE)
+			{
+				HUD::g_slideTimers[HUD::SLIDE_BOSS_STATUS] = 90;
+				g_hudActorAnimationFrame = (actor->actorPhase - 9) * 54 / 20;
+			}
+
+			if (actor->actorPhase < 10 && AirportInfiltration::g_state.prospectorState == AirportInfiltration::PROSPECTOR_STATE_ACTIVE)
+			{
+				actor->movementData = g_prospectorMovementData + 45;
+				actor->creatureRam->defenseMode = 4;
+				actor->actorFlags &= ~(Actor::ACTOR_FLAG_TARGETS_BUZZ | Actor::ACTOR_FLAG_DAMAGES_BUZZ);
+				actor->movementCommandTimer = 0;
+				AudioManager::PlaySoundEffect(-2, &actor->pos);
+				AirportInfiltration::g_state.prospectorState = AirportInfiltration::PROSPECTOR_STATE_DEFEATED;
+				g_hudActorAnimationFrame = 0;
+				AirportInfiltration::g_prospectorEffectTimer = 0;
+				actor->creatureRam->speedTarget = 0;
+			}
+		}
 
 		// FUNCTION: TOY2 0x0042C150 [MATCHED]
 		void Pilot(Actor::Toy2Actor::ActorBehaviourContext* context)
