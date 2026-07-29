@@ -24,10 +24,35 @@ namespace Toy2
 		void InitActor(Actor::Toy2Actor* actor, int32_t param);
 	}
 
+	namespace Lighting
+	{
+		void SpawnLight(int32_t x, int32_t y, int32_t z, int32_t colour, int32_t lifetime, int32_t sourceId);
+	}
+
 	namespace Particles
 	{
-		// STUB: TOY2 0x00410410
-		void SpawnCollectSparkle(int32_t x, int32_t y, int32_t z, int32_t particleSpread) {}
+		// FUNCTION: TOY2 0x00410410 [PROVISIONAL]
+		void SpawnCollectSparkle(int32_t x, int32_t y, int32_t z, int32_t particleSpread)
+		{
+			particleSpread *= 2;
+			for (int32_t particleIndex = 0; particleIndex < 5; particleIndex++)
+			{
+				int32_t positionOffset = particleSpread * ((*g_randDatBufferPtr & 0x3F) - 0x20);
+				g_randDatBufferPtr += 3;
+				Nu3D::Particles::ParticleInstance* particle =
+					Nu3D::Particles::SpawnFromPreset(x + positionOffset, y + positionOffset, z + positionOffset, 0x29, 0xF);
+				particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+				particle->lifetime = (*g_randDatBufferPtr++ & 0xF) * 2 + 0x18;
+			}
+
+			Lighting::SpawnLight(x, y, z, 0x604000, 0x10, x);
+		}
+	}
+
+	namespace Lighting
+	{
+		// STUB: TOY2 0x0049EE50
+		void SpawnLight(int32_t x, int32_t y, int32_t z, int32_t colour, int32_t lifetime, int32_t sourceId) {}
 	}
 
 	namespace Actor
