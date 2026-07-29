@@ -5,6 +5,12 @@
 
 namespace Toy2
 {
+	enum GameplayStateFlags
+	{
+		GAMEPLAY_STATE_CUTSCENE_ACTIVE = 0x1,
+		GAMEPLAY_STATE_LOCK_FACING_DURING_TRANSITION = 0x2,
+	};
+
 	namespace Graphics
 	{
 		int32_t RemoveDetailLevel();

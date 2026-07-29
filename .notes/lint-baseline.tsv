@@ -75,8 +75,6 @@ src/Toy2/Buzz.h	placeholder-field	unkVar22	0b31940ecb22	src/Toy2/Buzz.h
 0x00403450	unknown-symbol	g_unk50A534	6d96f039018d	src/Toy2/Camera.cpp
 0x00403450	address-named-symbol	g_unk50A4E0	07bc0b895b63	src/Toy2/Camera.cpp
 0x00403450	unknown-symbol	g_unk50A4E0	07bc0b895b63	src/Toy2/Camera.cpp
-0x00403450	address-named-symbol	g_unk50A148	b6955a44523f	src/Toy2/Camera.cpp
-0x00403450	unknown-symbol	g_unk50A148	b6955a44523f	src/Toy2/Camera.cpp
 0x00438a50	opaque-state-slot	startRecord->data[1]	29bb2dac2fd9	src/Toy2/LevelSelect.cpp
 0x00438a50	opaque-state-slot	soundRecord->data[1]	58dbde0cf034	src/Toy2/LevelSelect.cpp
 0x00438a50	opaque-state-slot	targetRecord->data[0]	277f94d56b17	src/Toy2/LevelSelect.cpp

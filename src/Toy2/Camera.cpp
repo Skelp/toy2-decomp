@@ -19,8 +19,145 @@ namespace Toy2
 {
 	namespace Camera
 	{
-		// STUB: TOY2 0x00405860
-		void UpdateActiveTransform() {}
+		// GLOBAL: TOY2 0x0052B814
+		int16_t g_cameraTransitionState;
+
+		// STUB: TOY2 0x004045E0
+		void GameplayMode(GameplayCamera* camera) {}
+
+		// STUB: TOY2 0x004038E0
+		void VisorMode(GameplayCamera* camera) {}
+
+		// FUNCTION: TOY2 0x00405860 [PROVISIONAL]
+		void UpdateActiveTransform()
+		{
+			switch (g_cameraTransitionState)
+			{
+				case 1:
+					if (Nu3D::Camera::g_cameraTintBlue == 0)
+					{
+						Nu3D::Camera::SetTint(0x80, 0x80, 0x80, 0x10);
+						g_gameplayStateFlags |= GAMEPLAY_STATE_CUTSCENE_ACTIVE;
+						g_cameraTransitionState = 0;
+					}
+					break;
+
+				case 2:
+					Nu3D::Camera::SetTint(0, 0, 0, 0x10);
+					g_cameraTransitionState = 1;
+					if ((g_gameplayStateFlags & GAMEPLAY_STATE_LOCK_FACING_DURING_TRANSITION) != 0)
+						g_buzzActor.actorFlags |= Buzz::ACTOR_FLAG_LOCK_FACING;
+					break;
+
+				case 3:
+					if (Nu3D::Camera::g_cameraTintBlue == 0)
+					{
+						Nu3D::Camera::SetTint(0x80, 0x80, 0x80, 0x10);
+						g_gameplayStateFlags &= ~GAMEPLAY_STATE_CUTSCENE_ACTIVE;
+						g_cameraTransitionState = 0;
+						if ((g_gameplayStateFlags & GAMEPLAY_STATE_LOCK_FACING_DURING_TRANSITION) != 0)
+							g_buzzActor.actorFlags &= ~Buzz::ACTOR_FLAG_LOCK_FACING;
+					}
+					break;
+
+				case 4:
+					Nu3D::Camera::SetTint(0, 0, 0, 0x10);
+					g_cameraTransitionState = 3;
+					break;
+			}
+
+			if ((g_gameplayStateFlags & GAMEPLAY_STATE_CUTSCENE_ACTIVE) == 0)
+			{
+				if (g_cutsceneTransitionTimer > 0)
+				{
+					g_cutsceneTransitionTimer -= Renderer::g_frameDelta;
+					if (g_cutsceneTransitionTimer <= 0)
+						g_cutsceneTransitionTimer = 0;
+				}
+
+				if (g_scriptedCameraState == 0)
+					GameplayMode(&g_gameplayCamera);
+				else
+					VisorMode(&g_gameplayCamera);
+
+				if (g_cutsceneInputLockTimer > 0)
+				{
+					g_renderCameraTransform.pos.x =
+						g_gameplayCamera.pos.x + ((g_renderCameraTransform.pos.x - g_gameplayCamera.pos.x) * g_cutsceneInputLockTimer >> 6);
+					g_renderCameraTransform.pos.y =
+						g_gameplayCamera.pos.y + ((g_renderCameraTransform.pos.y - g_gameplayCamera.pos.y) * g_cutsceneInputLockTimer >> 6);
+					g_renderCameraTransform.pos.z =
+						g_gameplayCamera.pos.z + ((g_renderCameraTransform.pos.z - g_gameplayCamera.pos.z) * g_cutsceneInputLockTimer >> 6);
+
+					int32_t pitchDelta = (g_renderCameraTransform.angles.pitch - g_gameplayCamera.target.visorAimAngles.pitch) & 0xFFF;
+					if (pitchDelta >= 0x800)
+						pitchDelta -= 0x1000;
+					int32_t yawDelta = (g_renderCameraTransform.angles.yaw - g_gameplayCamera.target.visorAimAngles.yaw) & 0xFFF;
+					if (yawDelta >= 0x800)
+						yawDelta -= 0x1000;
+					int32_t rollDelta = (g_renderCameraTransform.roll - g_gameplayCamera.angles.pitch) & 0xFFF;
+					if (rollDelta >= 0x800)
+						rollDelta -= 0x1000;
+
+					g_renderCameraTransform.angles.pitch =
+						(uint16_t)(g_gameplayCamera.target.visorAimAngles.pitch + (pitchDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
+					g_renderCameraTransform.angles.yaw =
+						(uint16_t)(g_gameplayCamera.target.visorAimAngles.yaw + (yawDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
+					g_renderCameraTransform.roll = (int16_t)(g_gameplayCamera.angles.pitch + (rollDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
+					g_cutsceneInputLockTimer -= Renderer::g_frameDelta;
+					return;
+				}
+
+				g_renderCameraTransform.pos = g_gameplayCamera.pos;
+				g_renderCameraTransform.angles.pitch = g_gameplayCamera.target.visorAimAngles.pitch;
+				g_renderCameraTransform.angles.yaw = g_gameplayCamera.target.visorAimAngles.yaw;
+				g_renderCameraTransform.roll = g_gameplayCamera.angles.pitch;
+				return;
+			}
+			else
+			{
+				if (g_cutsceneTransitionTimer < 0x18)
+				{
+					g_cutsceneTransitionTimer += Renderer::g_frameDelta;
+					if (g_cutsceneTransitionTimer >= 0x18)
+						g_cutsceneTransitionTimer = 0x18;
+				}
+
+				GameplayMode(&g_gameplayCamera);
+				SmoothToTarget(&g_cutsceneCamera);
+
+				if (g_cutsceneInputLockTimer > 0)
+				{
+					g_renderCameraTransform.pos.x =
+						g_cutsceneCamera.pos.x + ((g_renderCameraTransform.pos.x - g_cutsceneCamera.pos.x) * g_cutsceneInputLockTimer >> 6);
+					g_renderCameraTransform.pos.y =
+						g_cutsceneCamera.pos.y + ((g_renderCameraTransform.pos.y - g_cutsceneCamera.pos.y) * g_cutsceneInputLockTimer >> 6);
+					g_renderCameraTransform.pos.z =
+						g_cutsceneCamera.pos.z + ((g_renderCameraTransform.pos.z - g_cutsceneCamera.pos.z) * g_cutsceneInputLockTimer >> 6);
+
+					int32_t pitchDelta = (g_renderCameraTransform.angles.pitch - g_cutsceneCamera.angles.pitch) & 0xFFF;
+					if (pitchDelta >= 0x800)
+						pitchDelta -= 0x1000;
+					int32_t yawDelta = (g_renderCameraTransform.angles.yaw - g_cutsceneCamera.angles.yaw) & 0xFFF;
+					if (yawDelta >= 0x800)
+						yawDelta -= 0x1000;
+					int32_t rollDelta = (g_renderCameraTransform.roll - g_cutsceneCamera.roll) & 0xFFF;
+					if (rollDelta >= 0x800)
+						rollDelta -= 0x1000;
+
+					g_renderCameraTransform.angles.pitch = (uint16_t)(g_cutsceneCamera.angles.pitch + (pitchDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
+					g_renderCameraTransform.angles.yaw = (uint16_t)(g_cutsceneCamera.angles.yaw + (yawDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
+					g_renderCameraTransform.roll = (int16_t)(g_cutsceneCamera.roll + (rollDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
+					g_cutsceneInputLockTimer -= Renderer::g_frameDelta;
+					return;
+				}
+
+				g_renderCameraTransform.pos = g_cutsceneCamera.pos;
+				g_renderCameraTransform.angles = g_cutsceneCamera.angles;
+				g_renderCameraTransform.roll = g_cutsceneCamera.roll;
+				return;
+			}
+		}
 
 		// GLOBAL: TOY2 0x0052F3A0
 		GameplayCamera g_gameplayCamera;
@@ -68,7 +205,7 @@ namespace Toy2
 		int32_t g_cutsceneMoveSpeed;
 
 		// GLOBAL: TOY2 0x0050A148
-		int32_t g_unk50A148;
+		int32_t g_cutsceneTransitionTimer;
 
 		// GLOBAL: TOY2 0x0050A294
 		const int32_t* g_cutsceneCommandCursor;
@@ -226,7 +363,7 @@ namespace Toy2
 			g_cutsceneSegmentProgress = 0;
 			g_cutsceneMoveSpeed = 0;
 			g_nextCutsceneMoveSpeed = 0;
-			g_unk50A148 = 0;
+			g_cutsceneTransitionTimer = 0;
 			g_cutsceneFocusPathPoint = 0;
 			g_cutsceneCameraPathPoint = 0;
 
