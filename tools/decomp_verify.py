@@ -399,14 +399,21 @@ def audit_status(report: Path, source_root: Path, ledger: Path) -> dict:
     for address, scopes in required.items():
         row = records.get(address, [])
         state = row[12] if len(row) > 12 else "pending"
+        origin = row[5] if len(row) > 5 else ""
         uncertainty = row[6] if len(row) > 6 else ""
         trigger = row[7] if len(row) > 7 else ""
+        tested_scores = row[8] if len(row) > 8 else ""
         if (
             state != "audited"
+            or origin in ("", "initial-audit")
             or not uncertainty
             or uncertainty == "binary or source model is not verified"
+            or len(uncertainty.split()) < 8
             or not trigger
             or trigger == "recheck ABI, layout, control flow, and natural source forms"
+            or len(trigger.split()) < 8
+            or not re.search(r"\b(?:if|when)\b", trigger, re.IGNORECASE)
+            or tested_scores in ("", "-")
         ):
             pending[address] = scopes
     return {

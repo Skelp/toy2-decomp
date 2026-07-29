@@ -212,6 +212,34 @@ class VerifyRegressionTests(unittest.TestCase):
             self.assertEqual(result["required"], 1)
             self.assertEqual(result["pending"], 1)
 
+    def test_audit_status_rejects_an_unmeasured_compiler_excuse(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src"
+            source.mkdir()
+            (root / ".notes").mkdir()
+            (root / ".notes" / "caps-registry.tsv").write_text("", encoding="utf-8")
+            (source / "test.cpp").write_text(
+                "// FUNCTION: TOY2 0x00401000 [PROVISIONAL]\nvoid Test() {}\n",
+                encoding="utf-8",
+            )
+            report = self.write_report(directory, "report.json", 0.4)
+            ledger = root / "audit.tsv"
+            ledger.write_text(
+                "0x00401000\tprovisional\tpartial\t40.00\tclean\tmanual-audit\t"
+                "the remaining mismatch is probably a compiler quirk\t"
+                "try again later\t-\t-\t-\t-\taudited\tsub-50\n",
+                encoding="utf-8",
+            )
+            old_root = VERIFY.ROOT
+            VERIFY.ROOT = root
+            try:
+                result = VERIFY.audit_status(report, source, ledger)
+            finally:
+                VERIFY.ROOT = old_root
+            self.assertEqual(result["required"], 1)
+            self.assertEqual(result["pending"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
