@@ -51,23 +51,19 @@ tools/decomp baseline              # saved comparison and build identity
 ## 3. Select a target — budget: 3 tool calls
 
 ```sh
-tools/decomp candidates --debt --why          # existing debt first, if any
-tools/decomp candidates --limit 15 --why      # otherwise the ranked list
+tools/decomp audit --status                   # show the required audit scope
+tools/decomp candidates --limit 15 --why      # show required pending audits
+tools/decomp candidates --new-work --why      # use only for same-session verification
 tools/decomp evidence 0x004XXXXX              # the single best candidate
 ```
 
-**Clear the debt before starting new work.** Run `tools/decomp candidates
---debt` first. Any row it prints is a function that matches the retail machine
-code but still states byte offsets where a name belongs, so it is unfinished
-regardless of its percentage. Finish that list before you reconstruct anything
-new: the offsets are already pinned by the match, so a wrong structure shows up
-immediately as a percentage drop, which makes this the cheapest and safest work
-available.
+**Complete the required audits before new work.** During the freeze, the
+default list contains pending former CAP, sub-50 percent, and verified-code
+debt audits. Use `--new-work` only if the function can become exact, effective,
+or tool-equivalent in the same session.
 
-**Take the debt in the order `.notes/refactor-debt.md` gives, not the order
-`--debt` prints.** The tool ranks by error count, so it puts the largest,
-design-heaviest item first. That file starts with the single-decision fixes
-instead. Read it and follow its sequence.
+For a source-debt audit, use the order in `.notes/refactor-debt.md`. The file
+starts with the smallest supported fixes.
 
 `candidates` implements the rubric in `AGENTS.md`: `STUB` first, then a small
 unannotated function with reconstructed siblings, then a larger one, then an
@@ -76,6 +72,10 @@ as real work even at 100%. It gives legacy CAP claims a higher audit rank. It
 hides only verifier-confirmed rows from `tools/Resources/tool_artifacts.tsv`.
 Useful filters are `--debt`, `--stubs`, `--leaves`, `--near`, `--max-size N`,
 and `<namespace>`.
+
+After an audit, replace the placeholder uncertainty and revisit trigger. Set
+`audit-state` to `audited`. Then run `tools/decomp audit --refresh-ledger`.
+The refresh preserves manual evidence and updates the measured state.
 
 `evidence` returns the map neighbors, the annotation state and owning TU, the
 decompilation, the callers, the callees, the referenced **strings**, and the

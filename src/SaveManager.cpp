@@ -22,7 +22,7 @@ namespace SaveManager
 	// GLOBAL: TOY2 0x00528160
 	char g_emptyString;
 
-	// FUNCTION: TOY2 0x00415180 [PROVISIONAL]
+	// FUNCTION: TOY2 0x00415180 [MATCHED]
 	void AddInputEntry(int32_t inputCode, int32_t controlId)
 	{
 		int32_t writeIndex = 0;
@@ -33,7 +33,8 @@ namespace SaveManager
 			{
 				if (writeIndex != readIndex)
 				{
-					g_save99Data.saveStructs[writeIndex] = g_save99Data.saveStructs[readIndex];
+					g_save99Data.saveStructs[writeIndex].dInputCode = g_save99Data.saveStructs[readIndex].dInputCode;
+					g_save99Data.saveStructs[writeIndex].gameControlId = g_save99Data.saveStructs[readIndex].gameControlId;
 
 					g_save99Data.saveStructs[readIndex].dInputCode = -1;
 					g_save99Data.saveStructs[readIndex].gameControlId = 0;

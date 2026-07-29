@@ -83,6 +83,20 @@ class ReadCapsTests(unittest.TestCase):
     def test_absent_registry_yields_no_caps(self):
         self.assertEqual(candidates.read_caps(Path("/nonexistent/caps.tsv")), {})
 
+    def test_audit_ledger_reads_state_and_freeze_scope(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "audit.tsv"
+            path.write_text(
+                "# address\tstatus\n"
+                "0x00401000\tprovisional\tpartial\t40\tclean\taudit\tuncertain\ttrigger\t"
+                "-\t-\t-\t-\tpending\tsub-50\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                candidates.read_audit_ledger(path),
+                {0x401000: ("pending", "sub-50")},
+            )
+
 
 class ScoreTests(unittest.TestCase):
     def test_a_stub_outranks_an_unannotated_function_of_the_same_size(self):

@@ -86,6 +86,12 @@ match stays provisional unless the verifier confirms a narrow data-symbol
 rendering artifact. Legacy CAP notes do not waive a mismatch. Review them with
 `tools/decomp audit --legacy-caps`.
 
+During the initial audit freeze, run `tools/decomp audit --status`. The command
+lists each required audit that still has placeholder evidence. Refresh measured
+scores with `tools/decomp audit --refresh-ledger`. The refresh preserves manual
+audit conclusions. Remove the freeze file only after `tools/decomp audit
+--status --check` succeeds.
+
 The `toy2decomp` executable always compiles retail behavior for reccmp.
 `patcher.dll` enables runtime convenience changes only when `APPLY_FIXES`
 guards them. Do not define that macro globally or for the comparison

@@ -653,6 +653,7 @@
 0x004ABA70 DrawingDevice::GetD3D
 0x004ABA80 DrawingDevice::GetD3DDevice
 0x004ABA90 DrawingDevice::BeginScene
+0x004ABAB0 DrawingDevice::PresentFrameAndRestore
 0x004ABAD0 DrawingDevice::EndScene
 0x004ABAE0 DrawingDevice::GetViewport
 0x004ABAF0 DrawingDevice::ClearScreen
@@ -664,6 +665,7 @@
 0x004ABC40 DrawingDevice::LockPrimarySurface
 0x004ABC60 DrawingDevice::UnlockPrimarySurface
 0x004ABCA0 DrawingDevice::CopySurfaceDesc
+0x004ABD30 DrawingDevice::RestoreLostSurfaces
 0x004ABD40 DrawingDevice::PresentFrame
 0x004ABD50 DrawingDevice::RestoreToGDISurface
 0x004ABD80 DrawingDevice::GetDestRect
@@ -741,7 +743,9 @@
 0x004AF420 CD3DFramework::CreateZBuffer
 0x004AF4E0 CD3DFramework::CreateD3DDevice
 0x004AF550 CD3DFramework::CreateAndSetViewport
+0x004AF5F0 CD3DFramework::PresentFrame
 0x004AF640 DrawingDevice::CD3DFramework::RestoreToGDISurface
+0x004AF680 CD3DFramework::RestoreLostSurfaces
 0x004AFA20 CD3DFramework::GetSlotSurfaceByIndex
 0x004AFA60 CD3DFramework::GetSlotSurfaceCaps
 0x004AFAA0 CD3DFramework::GetSlotTexSize

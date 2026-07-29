@@ -1,4 +1,5 @@
 import importlib.util
+import csv
 import json
 import tempfile
 import unittest
@@ -134,6 +135,82 @@ class VerifyRegressionTests(unittest.TestCase):
             report = self.write_report(directory, "report.json", 0.7)
             problems = VERIFY.check_annotations(report, root)
             self.assertTrue(any("requires provisional" in item for item in problems))
+
+    def test_unmatched_function_requires_provisional_tag(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "src"
+            root.mkdir()
+            (root / "test.cpp").write_text(
+                "// FUNCTION: TOY2 0x00401000 [MATCHED]\nvoid Test() {}\n",
+                encoding="utf-8",
+            )
+            report = Path(directory) / "report.json"
+            report.write_text('{"data": []}', encoding="utf-8")
+            problems = VERIFY.check_annotations(report, root)
+            self.assertTrue(any("requires provisional" in item for item in problems))
+
+    def test_ledger_refresh_preserves_a_manual_audit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src"
+            source.mkdir()
+            (root / ".notes").mkdir()
+            (root / ".notes" / "caps-registry.tsv").write_text("", encoding="utf-8")
+            (source / "test.cpp").write_text(
+                "// FUNCTION: TOY2 0x00401000 [PROVISIONAL]\nvoid Test() {}\n",
+                encoding="utf-8",
+            )
+            report = self.write_report(directory, "report.json", 0.4)
+            ledger = root / "audit.tsv"
+            ledger.write_text(
+                "0x00401000\tprovisional\tpartial\t30.00\tclean\tmanual-audit\t"
+                "the ABI is known but the branch model is not\t"
+                "revisit when caller evidence identifies the branch role\t40.00\t-\t-\t-\t"
+                "audited\tsub-50\n",
+                encoding="utf-8",
+            )
+            old_root = VERIFY.ROOT
+            VERIFY.ROOT = root
+            try:
+                VERIFY.write_audit_ledger(report, source, ledger)
+            finally:
+                VERIFY.ROOT = old_root
+            with ledger.open(encoding="utf-8", newline="") as handle:
+                row = next(row for row in csv.reader(handle, delimiter="\t") if row and not row[0].startswith("#"))
+            self.assertEqual(row[3], "40.00")
+            self.assertEqual(row[5], "manual-audit")
+            self.assertEqual(row[6], "the ABI is known but the branch model is not")
+            self.assertEqual(row[12], "audited")
+            self.assertEqual(row[13], "sub-50")
+
+    def test_audit_status_rejects_placeholder_classification(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src"
+            source.mkdir()
+            (root / ".notes").mkdir()
+            (root / ".notes" / "caps-registry.tsv").write_text("", encoding="utf-8")
+            (source / "test.cpp").write_text(
+                "// FUNCTION: TOY2 0x00401000 [PROVISIONAL]\nvoid Test() {}\n",
+                encoding="utf-8",
+            )
+            report = self.write_report(directory, "report.json", 0.4)
+            ledger = root / "audit.tsv"
+            ledger.write_text(
+                "0x00401000\tprovisional\tpartial\t40.00\tclean\tinitial-audit\t"
+                "binary or source model is not verified\t"
+                "recheck ABI, layout, control flow, and natural source forms\t-\t-\t-\t-\t"
+                "pending\tsub-50\n",
+                encoding="utf-8",
+            )
+            old_root = VERIFY.ROOT
+            VERIFY.ROOT = root
+            try:
+                result = VERIFY.audit_status(report, source, ledger)
+            finally:
+                VERIFY.ROOT = old_root
+            self.assertEqual(result["required"], 1)
+            self.assertEqual(result["pending"], 1)
 
 
 if __name__ == "__main__":

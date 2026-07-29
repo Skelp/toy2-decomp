@@ -471,6 +471,36 @@ namespace DrawingDevice
 		return 0x82000006;
 	}
 
+	// FUNCTION: TOY2 0x004AF5F0 [MATCHED]
+	HRESULT CD3DFramework::PresentFrame()
+	{
+		if (! m_pddsFrontBuffer)
+			return 0x8200000E;
+
+		if (! m_pddsBackBuffer)
+			return m_pddsFrontBuffer->IsLost();
+
+		if (m_bIsFullscreen)
+			return m_pddsFrontBuffer->Flip(0, 1);
+
+		return m_pddsFrontBuffer->Blt(&m_rcScreenRect, m_pddsBackBuffer, &m_rcViewportRect, 0x1000000, 0);
+	}
+
+	// FUNCTION: TOY2 0x004AF680 [MATCHED]
+	int32_t CD3DFramework::RestoreLostSurfaces()
+	{
+		if (m_pddsFrontBuffer && m_pddsFrontBuffer->IsLost())
+			m_pddsFrontBuffer->Restore();
+
+		if (m_pddsBackBuffer && m_pddsBackBuffer->IsLost())
+			m_pddsBackBuffer->Restore();
+
+		if (m_pddsZBuffer && m_pddsZBuffer->IsLost())
+			m_pddsZBuffer->Restore();
+
+		return 0;
+	}
+
 	// FUNCTION: TOY2 0x004AF640 [MATCHED]
 	int32_t CD3DFramework::RestoreToGDISurface(int32_t refreshWindow)
 	{
@@ -526,7 +556,7 @@ namespace DrawingDevice
 	}
 
 	// FUNCTION: TOY2 0x004AFAA0 [PROVISIONAL]
-	int32_t CD3DFramework::GetSlotTexSize(int32_t index, int32_t* widthOut, int32_t* heightOut)
+	int32_t CD3DFramework::GetSlotTexSize(uint32_t index, int32_t* widthOut, int32_t* heightOut)
 	{
 		if (index > 8)
 			return 0x8200000F;
@@ -657,7 +687,7 @@ namespace DrawingDevice
 	int32_t GetSlotSurfaceCaps(int32_t index, uint32_t* capsOut) { return g_drawingDevice->GetSlotSurfaceCaps(index, capsOut); }
 
 	// FUNCTION: TOY2 0x004ABE70 [MATCHED]
-	int32_t GetSlotTexSize(int32_t index, int32_t* widthOut, int32_t* heightOut) { return g_drawingDevice->GetSlotTexSize(index, widthOut, heightOut); }
+	int32_t GetSlotTexSize(uint32_t index, int32_t* widthOut, int32_t* heightOut) { return g_drawingDevice->GetSlotTexSize(index, widthOut, heightOut); }
 
 	// FUNCTION: TOY2 0x004ABB30 [MATCHED]
 	int32_t SetViewport(LPD3DVIEWPORT2 viewport)
@@ -729,22 +759,17 @@ namespace DrawingDevice
 		}
 	}
 
-	// FUNCTION: TOY2 0x004ACFC0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004ACFC0 [MATCHED]
 	HRESULT GetChosenDevice(DDAppDevice::App** outApp, DDAppDevice** outDevice)
 	{
-		DDAppDevice::App* primaryApp = g_primaryDDApp;
-
 		if (! g_primaryDDApp)
 			return 0x81000001;
 
 		if (outApp)
-		{
 			*outApp = g_primaryDDApp;
-			primaryApp = g_primaryDDApp;
-		}
 
 		if (outDevice)
-			*outDevice = primaryApp->primaryDevice;
+			*outDevice = g_primaryDDApp->primaryDevice;
 
 		return 0;
 	}
@@ -806,23 +831,17 @@ namespace DrawingDevice
 			return -1;
 	}
 
-	// FUNCTION: TOY2 0x004ABD40 [PROVISIONAL]
-	HRESULT PresentFrame()
+	// FUNCTION: TOY2 0x004ABD40 [MATCHED]
+	HRESULT PresentFrame() { return g_drawingDevice->PresentFrame(); }
+
+	// FUNCTION: TOY2 0x004ABD30 [MATCHED]
+	int32_t RestoreLostSurfaces() { return g_drawingDevice->RestoreLostSurfaces(); }
+
+	// FUNCTION: TOY2 0x004ABAB0 [MATCHED]
+	void PresentFrameAndRestore()
 	{
-		LPDIRECTDRAWSURFACE4 frontBuffer = g_drawingDevice->m_pddsFrontBuffer;
-
-		if (! frontBuffer)
-			return 0x8200000E;
-
-		LPDIRECTDRAWSURFACE4 backBuffer = g_drawingDevice->m_pddsBackBuffer;
-
-		if (! backBuffer)
-			return frontBuffer->IsLost();
-
-		if (g_drawingDevice->m_bIsFullscreen)
-			return frontBuffer->Flip(0, 1);
-
-		return frontBuffer->Blt(&g_drawingDevice->m_rcScreenRect, backBuffer, &g_drawingDevice->m_rcViewportRect, 0x1000000, 0);
+		if (PresentFrame() == DDERR_SURFACELOST)
+			RestoreLostSurfaces();
 	}
 
 	// FUNCTION: TOY2 0x004ABD50 [MATCHED]
@@ -911,7 +930,7 @@ namespace HardwareDevice
 	// FUNCTION: TOY2 0x004AC0D0 [MATCHED]
 	HRESULT OptimizeVertexBuffer(LPDIRECT3DVERTEXBUFFER buffer, LPDIRECT3DDEVICE3 device, DWORD flags) { return buffer->Optimize(device, flags); }
 
-	// FUNCTION: TOY2 0x004AC030 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004AC030 [MATCHED]
 	HRESULT ProcessVerticesOnBuffer(LPDIRECT3DVERTEXBUFFER destBuffer,
 		DWORD dwVertexOp,
 		DWORD dwDestIndex,
@@ -919,5 +938,9 @@ namespace HardwareDevice
 		LPDIRECT3DVERTEXBUFFER srcBuffer,
 		DWORD dwSrcIndex,
 		DWORD dwFlags)
-	{ return destBuffer->ProcessVertices(dwVertexOp, dwDestIndex, dwCount, srcBuffer, dwSrcIndex, DrawingDevice::g_drawingDevice->m_pd3dDevice, dwFlags); }
+	{
+		DWORD flags = dwFlags;
+		LPDIRECT3DDEVICE3 device = DrawingDevice::g_drawingDevice->m_pd3dDevice;
+		return destBuffer->ProcessVertices(dwVertexOp, dwDestIndex, dwCount, srcBuffer, dwSrcIndex, device, flags);
+	}
 }

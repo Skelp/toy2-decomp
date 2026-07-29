@@ -1355,20 +1355,19 @@ namespace Renderer
 		return color;
 	}
 
-	// FUNCTION: TOY2 0x004B2C80 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004B2C80 [EFFECTIVE]
 	void ClearScreen(RGBA clearColor, int32_t clearFlags)
 	{
 		RGBA color = ApplyGammaCorrection(clearColor);
 
-		if (g_isSoftwareRendering)
-		{
-			uint16_t clearColor = Renderer::ConvertRGBATo16Bit(color);
-			SoftwareRenderer::g_softwareClearColor = (clearColor << 16) | clearColor;
-		}
-		else
+		if (! g_isSoftwareRendering)
 		{
 			DrawingDevice::ClearScreen(clearFlags, color.value);
+			return;
 		}
+
+		uint16_t convertedColor = Renderer::ConvertRGBATo16Bit(color);
+		SoftwareRenderer::g_softwareClearColor = (convertedColor << 16) | convertedColor;
 	}
 
 	// FUNCTION: TOY2 0x004B2D80 [PROVISIONAL]
@@ -1407,7 +1406,7 @@ namespace Renderer
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004B2DE0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004B2DE0 [MATCHED]
 	void EndScene(int32_t presentFrame)
 	{
 		DrawingDevice::EndScene();
@@ -1415,31 +1414,9 @@ namespace Renderer
 		if (presentFrame)
 		{
 			if (g_isSoftwareRendering)
-			{
 				SoftwareRenderer::PresentFrame();
-			}
-			else if (DrawingDevice::PresentFrame() == DDERR_SURFACELOST)
-			{
-				DrawingDevice::CD3DFramework* device = DrawingDevice::g_drawingDevice;
-
-				LPDIRECTDRAWSURFACE4 frontBuffer = DrawingDevice::g_drawingDevice->m_pddsFrontBuffer;
-
-				if (frontBuffer && frontBuffer->IsLost())
-					device->m_pddsFrontBuffer->Restore();
-
-				LPDIRECTDRAWSURFACE4 backBuffer = device->m_pddsBackBuffer;
-
-				if (backBuffer && backBuffer->IsLost())
-					device->m_pddsBackBuffer->Restore();
-
-				LPDIRECTDRAWSURFACE4 zBuffer = device->m_pddsZBuffer;
-
-				if (zBuffer)
-				{
-					if (zBuffer->IsLost())
-						device->m_pddsZBuffer->Restore();
-				}
-			}
+			else
+				DrawingDevice::PresentFrameAndRestore();
 		}
 	}
 
@@ -2472,7 +2449,7 @@ namespace DevDraw
 	// buffer pointer is re-read from the global before each use (the string
 	// building and the COM calls clobber the holding register), so no local
 	// caches it.
-	// FUNCTION: TOY2 0x00490470 [PROVISIONAL]
+	// FUNCTION: TOY2 0x00490470 [MATCHED]
 	int16_t FlushDrawBufferSlot(int16_t slot)
 	{
 		Renderer::InitRenderState(0);
@@ -2480,7 +2457,7 @@ namespace DevDraw
 		LPDIRECT3DDEVICE3 d3dDevice = DrawingDevice::GetD3DDevice();
 		int32_t slotIndex = slot;
 
-		if (Toy2::g_drawBuffer->VerticeCount[slotIndex] != 0)
+		if (Toy2::drawb->VerticeCount[slotIndex] != 0)
 		{
 			char textureName[15] = "LOADTEXT_tex00";
 			textureName[12] = (char)('0' + slotIndex / 10);
@@ -2491,10 +2468,10 @@ namespace DevDraw
 
 			HRESULT error = d3dDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST,
 				D3DFVF_0x1C4,
-				Toy2::g_drawBuffer->Vertice[slotIndex],
-				Toy2::g_drawBuffer->VerticeCount[slotIndex],
-				Toy2::g_drawBuffer->Index[slotIndex],
-				Toy2::g_drawBuffer->IndexCount[slotIndex],
+				Toy2::drawb->Vertice[slotIndex],
+				Toy2::drawb->VerticeCount[slotIndex],
+				Toy2::drawb->Index[slotIndex],
+				Toy2::drawb->IndexCount[slotIndex],
 				8);
 
 			if (error < 0)
@@ -2506,11 +2483,11 @@ namespace DevDraw
 			}
 
 			Toy2::g_currentDrawSlot = slot;
-			g_vertexCount += Toy2::g_drawBuffer->VerticeCount[slotIndex];
+			g_vertexCount += Toy2::drawb->VerticeCount[slotIndex];
 		}
 
-		Toy2::g_drawBuffer->IndexCount[slotIndex] = 0;
-		Toy2::g_drawBuffer->VerticeCount[slotIndex] = 0;
+		Toy2::drawb->IndexCount[slotIndex] = 0;
+		Toy2::drawb->VerticeCount[slotIndex] = 0;
 
 		return 1;
 	}
@@ -2529,7 +2506,7 @@ namespace DevDraw
 	// re-read from the global before each use (no local cache, so the reloads
 	// match retail). The render state is set to 0x400 before the draw and
 	// reset to 0 after it.
-	// FUNCTION: TOY2 0x004905C0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004905C0 [MATCHED]
 	int16_t FlushTransparentDrawBufferSlot(int16_t slot)
 	{
 		LPDIRECT3DDEVICE3 d3dDevice = DrawingDevice::GetD3DDevice();
@@ -2539,7 +2516,7 @@ namespace DevDraw
 		{
 			int32_t slotIndex = slot;
 
-			if (Toy2::g_transparentDrawBuffer->VerticeCount[slotIndex] != 0)
+			if (Toy2::drawtranb->VerticeCount[slotIndex] != 0)
 			{
 				char textureName[15] = "LOADTEXT_tex00";
 				textureName[12] = (char)('0' + slotIndex / 10);
@@ -2550,10 +2527,10 @@ namespace DevDraw
 
 				HRESULT error = d3dDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST,
 					D3DFVF_0x1C4,
-					Toy2::g_transparentDrawBuffer->Vertice[slotIndex],
-					Toy2::g_transparentDrawBuffer->VerticeCount[slotIndex],
-					Toy2::g_transparentDrawBuffer->Index[slotIndex],
-					Toy2::g_transparentDrawBuffer->IndexCount[slotIndex],
+					Toy2::drawtranb->Vertice[slotIndex],
+					Toy2::drawtranb->VerticeCount[slotIndex],
+					Toy2::drawtranb->Index[slotIndex],
+					Toy2::drawtranb->IndexCount[slotIndex],
 					8);
 
 				if (error < 0)
@@ -2565,14 +2542,14 @@ namespace DevDraw
 				}
 
 				Toy2::g_currentDrawSlot = slot;
-				g_vertexCount += Toy2::g_transparentDrawBuffer->VerticeCount[slotIndex];
+				g_vertexCount += Toy2::drawtranb->VerticeCount[slotIndex];
 			}
 		}
 
 		Renderer::InitRenderState(0);
 
-		Toy2::g_transparentDrawBuffer->IndexCount[slot] = 0;
-		Toy2::g_transparentDrawBuffer->VerticeCount[slot] = 0;
+		Toy2::drawtranb->IndexCount[slot] = 0;
+		Toy2::drawtranb->VerticeCount[slot] = 0;
 
 		return 1;
 	}

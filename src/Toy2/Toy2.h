@@ -110,8 +110,8 @@ namespace Toy2
 	extern int32_t g_screenClipLeft;
 	extern int32_t g_screenClipTop;
 	extern int32_t g_softWindowHeight;
-	extern DevDraw::DrawBuffer* g_drawBuffer;
-	extern DevDraw::TransparentDrawBuffer* g_transparentDrawBuffer;
+	extern DevDraw::DrawBuffer* drawb;
+	extern DevDraw::TransparentDrawBuffer* drawtranb;
 	extern int16_t g_currentDrawSlot;
 	extern int32_t g_destRectHalfWidth;
 	extern int32_t g_unusedD3DFrameFlag;

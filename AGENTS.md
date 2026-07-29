@@ -132,6 +132,8 @@ list.
 tools/decomp candidates              # ranked targets; no Ghidra, no reccmp run
 tools/decomp candidates Nu3D --stubs --why
 tools/decomp audit --legacy-caps --why # review old mismatch claims
+tools/decomp audit --status             # show freeze-audit completion
+tools/decomp audit --refresh-ledger     # refresh scores and preserve audit notes
 tools/decomp evidence 0x00401230     # one bounded evidence bundle
 tools/decomp evidence 0x00401230 --disasm
 tools/decomp build
@@ -151,6 +153,14 @@ tools/decomp sync
 tools/decomp report
 tools/decomp validate --target 0x00401230 --staged
 ```
+
+During the audit freeze, `tools/decomp candidates` shows only required pending
+audits. Run `tools/decomp audit --status` to measure the remaining scope. A
+placeholder uncertainty or a general revisit instruction does not complete an
+audit. Use `tools/decomp audit --refresh-ledger` after a fresh report. This
+command updates scores and source debt, but preserves manual audit evidence.
+Remove `tools/Resources/audit-freeze.txt` only when `tools/decomp audit --status
+--check` succeeds.
 
 Start selection with `candidates` and evidence with `evidence`. Both read only
 committed files and the build report, so they are fast. Do not hand-roll map

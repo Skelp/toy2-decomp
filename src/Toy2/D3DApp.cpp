@@ -17,7 +17,7 @@ namespace D3DApp
 	int32_t g_no32bitColors = 0;
 
 	// GLOBAL: TOY2 0x0051B0B8
-	D3DAppInfo g_d3dAppI;
+	D3DAppInfo d3dappi;
 
 	// GLOBAL: TOY2 0x0050B650
 	PC g_pcStruct;
@@ -441,7 +441,7 @@ namespace D3DApp
 			HWND window = CreateWindowExA(WS_EX_TOPMOST, "Toy2", "Toy2", WS_POPUP, CW_USEDEFAULT, CW_USEDEFAULT, 640, 480, 0, 0, g_windowData.hInstance, 0);
 
 			g_windowData.mainHwnd = window;
-			g_d3dAppI.hwnd = window;
+			d3dappi.hwnd = window;
 
 			if (window)
 			{
@@ -858,7 +858,7 @@ namespace D3DApp
 				switch (msg)
 				{
 					case WM_NCPAINT:
-						if (g_pcStruct.fullscreenMode && ! g_d3dAppI.bPaused)
+						if (g_pcStruct.fullscreenMode && ! d3dappi.bPaused)
 						{
 							result = 1;
 							*lParamPtr = 0;
@@ -867,7 +867,7 @@ namespace D3DApp
 						}
 						break;
 					case WM_SETCURSOR:
-						if (g_pcStruct.fullscreenMode && ! g_d3dAppI.bPaused)
+						if (g_pcStruct.fullscreenMode && ! d3dappi.bPaused)
 						{
 							result = 1;
 							*lParamPtr = 1;
@@ -888,8 +888,8 @@ namespace D3DApp
 						}
 						else
 						{
-							minMaxInfo->ptMaxTrackSize.x = g_d3dAppI.windowsDisplay.w;
-							minMaxInfo->ptMaxTrackSize.y = g_d3dAppI.windowsDisplay.h;
+							minMaxInfo->ptMaxTrackSize.x = d3dappi.windowsDisplay.w;
+							minMaxInfo->ptMaxTrackSize.y = d3dappi.windowsDisplay.h;
 						}
 
 						*lParamPtr = 0;
@@ -902,7 +902,7 @@ namespace D3DApp
 
 		if (msg == WM_ACTIVATEAPP)
 		{
-			g_d3dAppI.bAppActive = 1;
+			d3dappi.bAppActive = 1;
 			*wParamPtr = 1;
 			return 1;
 		}
@@ -911,10 +911,10 @@ namespace D3DApp
 			switch (msg)
 			{
 				case WM_MOVE:
-					g_d3dAppI.pClientOnPrimary.y = 0;
-					g_d3dAppI.pClientOnPrimary.x = 0;
+					d3dappi.pClientOnPrimary.y = 0;
+					d3dappi.pClientOnPrimary.x = 0;
 
-					ClientToScreen(hWnd, &g_d3dAppI.pClientOnPrimary);
+					ClientToScreen(hWnd, &d3dappi.pClientOnPrimary);
 
 					result = 1;
 					break;
@@ -928,10 +928,10 @@ namespace D3DApp
 					break;
 
 				case WM_ACTIVATE:
-					if (! g_usesPalette || ! g_backBufferSupportsAlpha || ! g_d3dAppI.lpFrontBuffer)
+					if (! g_usesPalette || ! g_backBufferSupportsAlpha || ! d3dappi.lpFrontBuffer)
 						return 1;
 
-					g_d3dAppI.lpFrontBuffer->SetPalette(g_lpPalette);
+					d3dappi.lpFrontBuffer->SetPalette(g_lpPalette);
 
 					result = 1;
 					break;

@@ -22,7 +22,6 @@ NORMATIVE_INPUTS = (
     ".notes/lint-baseline.tsv",
     ".notes/lint-rules.md",
     "tools/Resources/audit-ledger.tsv",
-    "tools/Resources/audit-freeze.txt",
     "tools/Resources/tool_artifacts.tsv",
 )
 

@@ -112,8 +112,19 @@ def validate_metadata(metadata_path: Path, baseline_path: Path) -> list[str]:
     expected_report = saved.get("baseline_report_sha256")
     if not expected_report or expected_report != file_hash(baseline_path):
         problems.append("baseline report does not match its saved metadata")
+    baseline_head = saved.get("git_head")
+    if not baseline_head:
+        problems.append("baseline git_head does not match the current build context")
+    else:
+        ancestor = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", baseline_head, current["git_head"]],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+        )
+        if ancestor.returncode != 0:
+            problems.append("baseline git_head is not an ancestor of the current build context")
     for key in (
-        "git_head",
         "build_rules_sha256",
         "compiler_driver_sha256",
         "compiler_backend_sha256",
@@ -149,7 +160,7 @@ def expected_annotation_tags(report: Path, source_root: Path) -> dict[int, str]:
         verification = verification_status(
             status, tool_artifact=tool, source_clean=address not in debt
         )
-        expected[address] = VERIFICATION_TAG[verification]
+        expected[address] = VERIFICATION_TAG.get(verification, "provisional")
     return expected
 
 
@@ -276,6 +287,12 @@ def write_audit_ledger(report: Path, source_root: Path, output: Path) -> None:
             for row in csv.reader(handle, delimiter="\t"):
                 if row and not row[0].startswith("#"):
                     legacy[int(row[0], 16)] = row
+    existing = {}
+    if output.exists():
+        with output.open(encoding="utf-8", newline="") as handle:
+            for row in csv.reader(handle, delimiter="\t"):
+                if row and not row[0].startswith("#"):
+                    existing[int(row[0], 16)] = row
     rows = []
     for annotation in read_source_annotations(source_root):
         if annotation.kind != "function":
@@ -289,6 +306,32 @@ def write_audit_ledger(report: Path, source_root: Path, output: Path) -> None:
         if verification != "provisional":
             continue
         old = legacy.get(address, [])
+        previous = existing.get(address, [])
+        origin = previous[5] if len(previous) > 5 else (
+            old[1] if len(old) > 1 else "initial-audit"
+        )
+        uncertainty = previous[6] if len(previous) > 6 else (
+            old[4] if len(old) > 4 else "binary or source model is not verified"
+        )
+        trigger = previous[7] if len(previous) > 7 else ""
+        if not trigger or trigger == "recheck ABI, layout, control flow, and natural source forms":
+            if old:
+                trigger = (
+                    "revisit if new caller, type, or source-form evidence explains the "
+                    f"recorded {old[1]} mismatch"
+                )
+            else:
+                trigger = "recheck ABI, layout, control flow, and natural source forms"
+        scopes = []
+        if address in legacy:
+            scopes.append("former-cap")
+        if status is not None and status.matching < 0.5:
+            scopes.append("sub-50")
+        if status is not None and (status.matching == 1.0 or status.effective or tool) and address in debt:
+            scopes.append("verified-debt")
+        audit_state = previous[12] if len(previous) > 12 else (
+            "audited" if old and uncertainty != "binary or source model is not verified" else "pending"
+        )
         rows.append(
             (
                 f"0x{address:08X}",
@@ -296,13 +339,15 @@ def write_audit_ledger(report: Path, source_root: Path, output: Path) -> None:
                 "unmatched" if status is None else status.binary_status,
                 "-" if status is None else f"{status.matching * 100:.2f}",
                 ",".join(sorted(set(debt.get(address, [])))) or "clean",
-                old[1] if len(old) > 1 else "initial-audit",
-                old[4] if len(old) > 4 else "binary or source model is not verified",
-                "recheck ABI, layout, control flow, and natural source forms",
-                old[2] if len(old) > 2 else "-",
-                "-",
-                "-",
-                "-",
+                origin,
+                uncertainty,
+                trigger,
+                previous[8] if len(previous) > 8 else (old[2] if len(old) > 2 else "-"),
+                previous[9] if len(previous) > 9 else "-",
+                previous[10] if len(previous) > 10 else "-",
+                previous[11] if len(previous) > 11 else "-",
+                audit_state,
+                ",".join(scopes) or "-",
             )
         )
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -313,9 +358,66 @@ def write_audit_ledger(report: Path, source_root: Path, output: Path) -> None:
                 "# address", "status", "binary", "raw-score", "source-debt",
                 "origin", "uncertainty", "revisit-trigger", "tested-scores",
                 "before-score", "after-score", "eliminated-source-defect",
+                "audit-state", "freeze-scope",
             )
         )
         writer.writerows(sorted(rows))
+
+
+def audit_status(report: Path, source_root: Path, ledger: Path) -> dict:
+    statuses = read_match_statuses(report)
+    debt = read_source_debt(source_root)
+    legacy_path = ROOT / ".notes" / "caps-registry.tsv"
+    legacy = set()
+    if legacy_path.exists():
+        with legacy_path.open(encoding="utf-8", newline="") as handle:
+            for row in csv.reader(handle, delimiter="\t"):
+                if row and not row[0].startswith("#"):
+                    legacy.add(int(row[0], 16))
+    records = {}
+    if ledger.exists():
+        with ledger.open(encoding="utf-8", newline="") as handle:
+            for row in csv.reader(handle, delimiter="\t"):
+                if row and not row[0].startswith("#"):
+                    records[int(row[0], 16)] = row
+    required = {}
+    for annotation in read_source_annotations(source_root):
+        if annotation.kind != "function":
+            continue
+        address = int(annotation.address, 16)
+        status = statuses.get(address)
+        scopes = []
+        if address in legacy:
+            scopes.append("former-cap")
+        if status is not None and status.matching < 0.5:
+            scopes.append("sub-50")
+        if status is not None and (status.matching == 1.0 or status.effective) and address in debt:
+            scopes.append("verified-debt")
+        if scopes:
+            required[address] = scopes
+    pending = {}
+    for address, scopes in required.items():
+        row = records.get(address, [])
+        state = row[12] if len(row) > 12 else "pending"
+        uncertainty = row[6] if len(row) > 6 else ""
+        trigger = row[7] if len(row) > 7 else ""
+        if (
+            state != "audited"
+            or not uncertainty
+            or uncertainty == "binary or source model is not verified"
+            or not trigger
+            or trigger == "recheck ABI, layout, control flow, and natural source forms"
+        ):
+            pending[address] = scopes
+    return {
+        "required": len(required),
+        "audited": len(required) - len(pending),
+        "pending": len(pending),
+        "pending_functions": [
+            {"address": f"0x{address:08X}", "scope": scopes}
+            for address, scopes in sorted(pending.items())
+        ],
+    }
 
 
 def readability_audit_problems(
@@ -527,6 +629,12 @@ def main() -> int:
     ledger_parser.add_argument("output", type=Path, nargs="?", default=AUDIT_LEDGER)
     ledger_parser.add_argument("--source-root", type=Path, default=ROOT / "src")
 
+    audit_status_parser = subparsers.add_parser("audit-status")
+    audit_status_parser.add_argument("report", type=Path)
+    audit_status_parser.add_argument("--source-root", type=Path, default=ROOT / "src")
+    audit_status_parser.add_argument("--audit-ledger", type=Path, default=AUDIT_LEDGER)
+    audit_status_parser.add_argument("--check", action="store_true")
+
     args = parser.parse_args()
     if args.command == "metadata":
         write_metadata(args.output, args.report)
@@ -549,6 +657,10 @@ def main() -> int:
     if args.command == "ledger":
         write_audit_ledger(args.report, args.source_root, args.output)
         return 0
+    if args.command == "audit-status":
+        result = audit_status(args.report, args.source_root, args.audit_ledger)
+        print(json.dumps(result, indent=2))
+        return 1 if args.check and result["pending"] else 0
     return validate(
         args.baseline,
         args.current,

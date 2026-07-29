@@ -227,7 +227,7 @@ Commands:
   bc <addr>         Build toy2.exe, then compare one address verbosely
   candidates [ns]   Rank reconstruction candidates (no Ghidra, no reccmp run)
   evidence <addr>   Collect bounded evidence for one target in a single call
-  audit [args]      Rank provisional functions for source and binary audit
+  audit [args]      Rank audits, show completion, or refresh the audit ledger
   baseline          Save a fresh parent-state comparison before source edits
   validate [args]   Build and reject verification or score regressions
   experiment [...] Record labeled source-form comparison trials
@@ -242,12 +242,13 @@ Commands:
 
 `candidates` and `evidence` read only committed files plus the build report, so
 they are fast and safe to run first:
-  tools/decomp candidates --debt --why        # matched but still states offsets
+  tools/decomp candidates --limit 15 --why    # pending freeze audits
   tools/decomp candidates --stubs --limit 10
   tools/decomp candidates Nu3D --leaves --why
   tools/decomp evidence 0x00403640
   tools/decomp evidence 0x00403640 --disasm
   tools/decomp audit --legacy-caps --limit 20
+  tools/decomp audit --status
 
 `score` avoids the assembly diff when you only need the percentage:
   tools/decomp score 0x00403640 0x004B99F0
@@ -299,6 +300,15 @@ case "$command" in
         exec python tools/decomp_candidates.py "$@"
         ;;
     audit)
+        if [[ ${1:-} == "--status" ]]; then
+            shift
+            exec python tools/decomp_verify.py audit-status \
+                build/decomp-report-data.json "$@"
+        elif [[ ${1:-} == "--refresh-ledger" ]]; then
+            shift
+            exec python tools/decomp_verify.py ledger \
+                build/decomp-report-data.json tools/Resources/audit-ledger.tsv "$@"
+        fi
         exec python tools/decomp_candidates.py --audit "$@"
         ;;
     evidence)

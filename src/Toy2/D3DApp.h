@@ -15,7 +15,7 @@ namespace D3DApp
 
 	extern char* g_lpCmdLine;
 
-	extern D3DAppInfo g_d3dAppI;
+	extern D3DAppInfo d3dappi;
 	extern PC g_pcStruct;
 	extern WindowData g_windowData;
 	extern int16_t g_renderMode;

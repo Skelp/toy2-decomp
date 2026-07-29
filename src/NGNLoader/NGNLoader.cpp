@@ -305,19 +305,14 @@ namespace NGNLoader
 	Nu3D::Portal::PortalState* AllocAreaPortal(NGNImage* ngnImage)
 	{
 		int32_t entryCount = ngnImage->portalEntryCount;
+		if (entryCount < ngnImage->areaPortalCount && ngnImage->portalStatePool)
+		{
+			Nu3D::Portal::PortalState* newAlloc = &ngnImage->portalStatePool[entryCount];
+			ngnImage->portalEntryCount = entryCount + 1;
+			return newAlloc;
+		}
 
-		if (entryCount >= ngnImage->areaPortalCount)
-			return 0;
-
-		Nu3D::Portal::PortalState* pool = ngnImage->portalStatePool;
-
-		if (! pool)
-			return 0;
-
-		Nu3D::Portal::PortalState* newAlloc = &pool[entryCount];
-		ngnImage->portalEntryCount = entryCount + 1;
-
-		return newAlloc;
+		return 0;
 	}
 
 	// FUNCTION: TOY2 0x004BC1B0 [MATCHED]

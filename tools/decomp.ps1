@@ -128,7 +128,7 @@ Commands:
   compare [args]    Run reccmp against the reference and recompiled EXEs
   score <addr>...   Show exact/effective/tool/provisional verdicts
   candidates [args] Rank reconstruction candidates
-  audit [args]      Review provisional and legacy CAP functions
+  audit [args]      Review audits, show completion, or refresh the ledger
   validate [args]   Build and reject comparison or source-quality regressions
   experiment [args] Store and compare one source-form experiment
   lint [args]       Check reconstructed source plausibility
@@ -150,6 +150,20 @@ if ($Command -eq "lint") {
     exit 0
 }
 if ($Command -in @("candidates", "audit")) {
+    if ($Command -eq "audit" -and $CommandArgs.Count -gt 0 -and $CommandArgs[0] -eq "--status") {
+        $StatusArgs = @("audit-status", (Join-Path $Root "build\decomp-report-data.json"))
+        if ($CommandArgs.Count -gt 1) { $StatusArgs += $CommandArgs[1..($CommandArgs.Count - 1)] }
+        & python (Join-Path $Root "tools\decomp_verify.py") @StatusArgs
+        Assert-LastExit "Checking audit completion"
+        exit 0
+    }
+    if ($Command -eq "audit" -and $CommandArgs.Count -gt 0 -and $CommandArgs[0] -eq "--refresh-ledger") {
+        & python (Join-Path $Root "tools\decomp_verify.py") ledger `
+            (Join-Path $Root "build\decomp-report-data.json") `
+            (Join-Path $Root "tools\Resources\audit-ledger.tsv")
+        Assert-LastExit "Refreshing the audit ledger"
+        exit 0
+    }
     $CandidateArgs = @()
     if ($Command -eq "audit") { $CandidateArgs += "--audit" }
     $CandidateArgs += $CommandArgs

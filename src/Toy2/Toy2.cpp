@@ -600,10 +600,10 @@ namespace Toy2
 	int32_t g_softWindowHeight;
 
 	// GLOBAL: TOY2 0x00500A10
-	DevDraw::DrawBuffer* g_drawBuffer;
+	DevDraw::DrawBuffer* drawb;
 
 	// GLOBAL: TOY2 0x00500A14
-	DevDraw::TransparentDrawBuffer* g_transparentDrawBuffer;
+	DevDraw::TransparentDrawBuffer* drawtranb;
 
 	// GLOBAL: TOY2 0x00500A28
 	int16_t g_currentDrawSlot;
@@ -2404,7 +2404,7 @@ namespace Toy2
 	// frame zero in EBX. The only residual is instruction scheduling of the
 	// SHL/SAR/DEC block against the E4/halfWidth stores, which reccmp treats
 	// as a behavior-neutral effective match.
-	// FUNCTION: TOY2 0x00490BF0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x00490BF0 [EFFECTIVE]
 	int16_t UpdateD3DState()
 	{
 		g_unusedD3DFrameFlag = 0;
@@ -2432,7 +2432,7 @@ namespace Toy2
 		SoftwareRenderer::g_softwareRenderBuckets = SoftwareRenderer::g_softwareRenderBucketStorage;
 		SoftwareRenderer::g_displayMaxX = 0x3ff;
 
-		g_drawBuffer->VerticePoolCount = 0;
+		drawb->VerticePoolCount = 0;
 
 		g_unusedD3DFrameStartTime = timeGetTime();
 
@@ -2621,7 +2621,7 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, char* cmdLine, int3
 
 	Toy2::g_unused0 = 0;
 
-	memset(&D3DApp::g_d3dAppI, 0, sizeof(D3DApp::g_d3dAppI));
+	memset(&D3DApp::d3dappi, 0, sizeof(D3DApp::d3dappi));
 
 	D3DApp::g_no32bitColors = 1;
 

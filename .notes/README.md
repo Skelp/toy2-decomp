@@ -35,6 +35,11 @@ every file at the start of a session.
 8. `caps-registry.tsv` — the legacy audit queue. Its rows do not prove a
    compiler quirk and do not suppress candidates.
 
+`tools/Resources/audit-ledger.tsv` stores provisional audit results. The
+`audit-state` field stays `pending` until an audit records a specific
+uncertainty and revisit trigger. The ledger refresh command preserves these
+manual fields.
+
 ## Writing a new note
 
 - Add one line to `codegen-index.md`, and at most one section to the matching

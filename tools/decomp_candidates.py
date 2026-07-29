@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -39,6 +40,7 @@ REPORT_JSON = ROOT / "build" / "decomp-report-data.json"
 CAPS_REGISTRY = ROOT / ".notes" / "caps-registry.tsv"
 TOOL_ARTIFACTS = ROOT / "tools" / "Resources" / "tool_artifacts.tsv"
 AUDIT_FREEZE = ROOT / "tools" / "Resources" / "audit-freeze.txt"
+AUDIT_LEDGER = ROOT / "tools" / "Resources" / "audit-ledger.tsv"
 
 sys.path.insert(0, str(ROOT))
 from tools.decomp_annotations import read_source_annotations  # noqa: E402
@@ -69,6 +71,8 @@ class Candidate:
     namespace: str = ""
     lint_errors: int = 0
     lint_warnings: int = 0
+    audit_state: str = ""
+    audit_scope: str = ""
     reasons: list[str] = field(default_factory=list)
     rank: float = 0.0
 
@@ -133,6 +137,21 @@ def read_caps(path: Path = CAPS_REGISTRY) -> dict[int, str]:
     return caps
 
 
+def read_audit_ledger(path: Path = AUDIT_LEDGER) -> dict[int, tuple[str, str]]:
+    if not path.exists():
+        return {}
+    records = {}
+    with path.open(encoding="utf-8", newline="") as handle:
+        for row in csv.reader(handle, delimiter="\t"):
+            if not row or row[0].lstrip().startswith("#"):
+                continue
+            records[int(row[0].strip(), 16)] = (
+                row[12].strip() if len(row) > 12 else "pending",
+                row[13].strip() if len(row) > 13 else "-",
+            )
+    return records
+
+
 def namespace_of(name: str) -> str:
     return name.rsplit("::", 1)[0] if "::" in name else ""
 
@@ -175,6 +194,7 @@ def build_candidates() -> list[Candidate]:
     caps = read_caps()
     tool_artifacts = read_tool_artifacts(TOOL_ARTIFACTS)
     lint_findings = read_lint_findings()
+    audit_ledger = read_audit_ledger()
 
     reconstructed_per_namespace: dict[str, int] = {}
     for address, name in entries:
@@ -206,6 +226,8 @@ def build_candidates() -> list[Candidate]:
                 namespace=namespace,
                 lint_errors=lint_findings.get(address, (0, 0))[0],
                 lint_warnings=lint_findings.get(address, (0, 0))[1],
+                audit_state=audit_ledger.get(address, ("", ""))[0],
+                audit_scope=audit_ledger.get(address, ("", ""))[1],
             )
         )
     return candidates
@@ -276,6 +298,10 @@ def score(candidate: Candidate) -> None:
     if candidate.cap:
         rank += 35.0
         reasons.append(f"legacy CAP claim needs audit: {candidate.cap}")
+
+    if candidate.audit_state == "pending" and candidate.audit_scope != "-":
+        rank += 80.0
+        reasons.append(f"pending freeze audit: {candidate.audit_scope}")
 
     if candidate.tool_artifact:
         rank -= 200.0
@@ -424,12 +450,23 @@ def main() -> int:
         and not args.new_work
         and not (args.stubs or args.leaves or args.near or args.audit or args.debt or args.quality)
     )
+    freeze_queue = AUDIT_FREEZE.exists() and not args.new_work and (
+        audit_default
+        or (
+            args.audit
+            and not args.legacy_caps
+            and args.score_below is None
+            and not args.debt
+            and not args.quality
+            and not args.near
+        )
+    )
     chosen = select(
         build_candidates(),
         namespace=args.namespace,
         stubs_only=args.stubs,
         leaves_only=args.leaves,
-        near_only=args.near or args.audit or audit_default,
+        near_only=args.near or (args.audit and not (args.debt or args.quality)),
         max_size=args.max_size,
         exclude_capped=not args.include_capped,
         debt_only=args.debt or args.quality,
@@ -440,6 +477,11 @@ def main() -> int:
         chosen = [
             item for item in chosen
             if item.match is not None and item.match * 100 < args.score_below
+        ]
+    if freeze_queue:
+        chosen = [
+            item for item in chosen
+            if item.audit_state == "pending" and item.audit_scope != "-"
         ]
 
     if args.json:
@@ -458,6 +500,8 @@ def main() -> int:
                     "siblings": item.siblings,
                     "lint_errors": item.lint_errors,
                     "lint_warnings": item.lint_warnings,
+                    "audit_state": item.audit_state,
+                    "audit_scope": item.audit_scope,
                     "rank": item.rank,
                     "reasons": item.reasons,
                 }

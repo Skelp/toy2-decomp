@@ -49,8 +49,8 @@ namespace Nu3D
 	void PrecisionSleep(int32_t delayMs);
 	void MemSet32Util(void* buffer, int32_t count, uint32_t value);
 
-	void SetUseAsDiffuseModulation(int32_t option);
-	void SetDefaultPrimFlags(int32_t option);
+	int32_t SetUseAsDiffuseModulation(int32_t option);
+	int32_t SetDefaultPrimFlags(int32_t option);
 	int32_t CopyShapeVertex(int32_t index, Vertex* output);
 	void CopyNormalsFromNearestVertex(Creature* creature, int32_t nodeIndex, Vertex* vertex);
 

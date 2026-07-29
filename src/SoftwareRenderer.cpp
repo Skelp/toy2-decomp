@@ -1155,7 +1155,7 @@ namespace SoftwareRenderer
 		HRESULT result;
 		do
 		{
-			result = D3DApp::g_d3dAppI.lpBackBuffer->Lock(NULL, &surfaceDesc, 0, NULL);
+			result = D3DApp::d3dappi.lpBackBuffer->Lock(NULL, &surfaceDesc, 0, NULL);
 		} while (result == DDERR_WASSTILLDRAWING);
 
 		if (result == DD_OK)
@@ -1168,10 +1168,10 @@ namespace SoftwareRenderer
 		Logger::Log("SOFT : ERROR - Failed to lock back buffer - %s.\n", Logger::ErrorToMessage(result));
 	}
 
-	// FUNCTION: TOY2 0x0047C870 [PROVISIONAL]
+	// FUNCTION: TOY2 0x0047C870 [MATCHED]
 	void UnlockBackBuffer()
 	{
-		HRESULT result = D3DApp::g_d3dAppI.lpBackBuffer->Unlock(NULL);
+		HRESULT result = D3DApp::d3dappi.lpBackBuffer->Unlock(NULL);
 		g_lockedBackBuffer = NULL;
 		if (result != DD_OK)
 		{
@@ -3365,20 +3365,20 @@ namespace SoftwareRenderer
 		g_sortedRenderFlushPhase++;
 	}
 
-	// FUNCTION: TOY2 0x00470BF0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x00470BF0 [MATCHED]
 	void SetPaletteOnAPI()
 	{
-		HRESULT result = D3DApp::g_d3dAppI.lpDD->CreatePalette(0x44, (LPPALETTEENTRY)g_paletteEntries, &g_lpPalette, NULL);
+		HRESULT result = D3DApp::d3dappi.lpDD->CreatePalette(0x44, (LPPALETTEENTRY)g_paletteEntries, &g_lpPalette, NULL);
 		if (result < 0)
 		{
 			Logger::LogDDError("d3dappi.lpDD->CreatePalette(0x00000004l|0x00000040l,&pal[0],&SonicRPalette,0)", result);
 		}
-		result = D3DApp::g_d3dAppI.lpFrontBuffer->SetPalette(g_lpPalette);
+		result = D3DApp::d3dappi.lpFrontBuffer->SetPalette(g_lpPalette);
 		if (result < 0)
 		{
 			Logger::LogDDError("d3dappi.lpFrontBuffer->SetPalette(SonicRPalette)", result);
 		}
-		result = D3DApp::g_d3dAppI.lpBackBuffer->SetPalette(g_lpPalette);
+		result = D3DApp::d3dappi.lpBackBuffer->SetPalette(g_lpPalette);
 		if (result < 0)
 		{
 			Logger::LogDDError("d3dappi.lpBackBuffer->SetPalette(SonicRPalette)", result);
@@ -3891,7 +3891,7 @@ namespace SoftwareRenderer
 		HRESULT result;
 		do
 		{
-			result = D3DApp::g_d3dAppI.lpBackBuffer->Lock(NULL, &surfaceDesc, 0, NULL);
+			result = D3DApp::d3dappi.lpBackBuffer->Lock(NULL, &surfaceDesc, 0, NULL);
 		} while (result == DDERR_WASSTILLDRAWING);
 
 		if (result == DD_OK)
@@ -4000,7 +4000,7 @@ namespace SoftwareRenderer
 			}
 		}
 
-		result = D3DApp::g_d3dAppI.lpBackBuffer->Unlock(NULL);
+		result = D3DApp::d3dappi.lpBackBuffer->Unlock(NULL);
 		g_lockedBackBuffer = NULL;
 		if (result != DD_OK)
 		{
