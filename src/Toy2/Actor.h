@@ -70,7 +70,7 @@ namespace Toy2
 			uint16_t* movementData;
 			int32_t unkVar34;
 			int16_t unkShort3;
-			int16_t unkShort4;
+			int16_t previousActorPhase;
 			int16_t unkWord15;
 			int16_t unkWord16;
 			int32_t lastValidYPosition;
@@ -108,6 +108,8 @@ namespace Toy2
 		STATIC_ASSERT(offsetof(Toy2Actor, animationFramePosition) == 0x18);
 		STATIC_ASSERT(offsetof(Toy2Actor, areaIndex) == 0x6C);
 		STATIC_ASSERT(offsetof(Toy2Actor, animationFrameSequence) == 0x74);
+		STATIC_ASSERT(offsetof(Toy2Actor, actorPhase) == 0x7E);
+		STATIC_ASSERT(offsetof(Toy2Actor, previousActorPhase) == 0x8A);
 		STATIC_ASSERT(sizeof(Toy2Actor::ActorBehaviourContext) == 0xC);
 	}
 }

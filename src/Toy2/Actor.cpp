@@ -304,6 +304,30 @@ namespace Toy2
 
 	namespace CreatureBehaviour
 	{
+		// FUNCTION: TOY2 0x00406C70 [MATCHED]
+		void Buzzard(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			if (actor->previousActorPhase != actor->actorPhase)
+			{
+				if (actor->previousActorPhase != 0)
+				{
+					AudioManager::PlaySoundEffect(0x58, &actor->pos);
+				}
+				actor->previousActorPhase = actor->actorPhase;
+			}
+
+			AudioManager::PlaySoundEffect(0x57, &actor->pos);
+			if ((context->targetFlags & 1) != 0)
+			{
+				actor->primaryAnimIdx = 1;
+			}
+			else
+			{
+				actor->primaryAnimIdx = 0;
+			}
+		}
+
 		// FUNCTION: TOY2 0x00416A60 [MATCHED]
 		void Sheep(Actor::Toy2Actor::ActorBehaviourContext* context)
 		{
