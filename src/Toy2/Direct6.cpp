@@ -689,3 +689,61 @@ LRESULT WINAPI ProfileWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 	return DefWindowProcA(hWnd, msg, wParam, lParam);
 }
+
+namespace Toy2
+{
+	// FUNCTION: TOY2 0x00412B50 [PROVISIONAL]
+	void RunModeSelect()
+	{
+		if (! g_modeSelectFinished)
+		{
+			atexit(DrawingDevice::Quit);
+			ModeSelect::SetForceFullscreen_T(0);
+
+			if (ModeSelect::EnumerateDrivers_T(ModeSelect::DeviceFilterCallback) < 0)
+				Logger::GetErrorHandler("C:\\projects\\toy2\\direct6.cpp", 103)("Unable to enumerate a suitable device");
+
+			ModeSelect::Show();
+
+			DrawingDevice::DDAppDevice* primaryDevice;
+			DrawingDevice::DDAppDevice::App* ddApp;
+
+			if (DrawingDevice::GetChosenDevice_T(&ddApp, &primaryDevice))
+				Logger::GetErrorHandler("C:\\projects\\toy2\\direct6.cpp", 111)("Unable to create D3D device\r\n try a lower resolution or screen depth");
+
+			int32_t canDoWindowed = primaryDevice->canRenderWindowedOnPrimary;
+			int32_t fullscreenExclusive = (ModeSelect::g_unusedFlag1 != 0 ? 2 : 0) | (canDoWindowed == 0) | (ModeSelect::g_unusedFlag2 != 0 ? 4 : 0);
+
+			if (! canDoWindowed)
+				Logger::g_showMsgBoxOnThrow = 1;
+
+			if (primaryDevice->isHardwareAccelerated)
+			{
+				Renderer::SetIsSoftwareRendering(0);
+			}
+			else
+			{
+				Renderer::SetIsSoftwareRendering(1);
+				while (Graphics::RemoveDetailLevel()) {};
+			}
+
+			if (! primaryDevice->isHardwareAccelerated && primaryDevice->canRenderWindowedOnPrimary)
+			{
+				RECT adjustedRect;
+				adjustedRect.top = 0;
+				adjustedRect.left = 0;
+				adjustedRect.right = 320;
+				adjustedRect.bottom = 240;
+
+				AdjustWindowRect(&adjustedRect, 0, 0);
+				SetWindowPos(g_windowData.mainHwnd, 0, 0, 0, adjustedRect.right, adjustedRect.bottom, 2);
+			}
+
+			ShowWindow(g_windowData.mainHwnd, SW_SHOWMAXIMIZED);
+
+			if (DrawingDevice::CD3DFramework::Build(g_windowData.mainHwnd, &ddApp->guid, primaryDevice, primaryDevice->primaryDisplayMode, fullscreenExclusive)
+				>= 0)
+				g_modeSelectFinished = 1;
+		}
+	}
+}
