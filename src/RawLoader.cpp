@@ -3,9 +3,12 @@
 #include "Toy2/Toy2.h"
 #include "FileUtils.h"
 #include "Logger.h"
+#include "NGNLoader/NGNLoader.h"
 #include "Toy2/Actor.h"
 
 #include <WINDOWS.H>
+#include <STDIO.H>
+#include <STRING.H>
 
 namespace RawLoader
 {
@@ -47,6 +50,24 @@ namespace RawLoader
 
 	// GLOBAL: TOY2 0x004F7408
 	uint8_t g_unusedBuffer5[12] = { 32, 0, 255, 32, 0, 0, 0, 0, 0, 164, 0, 201 };
+
+	// FUNCTION: TOY2 0x00450010 [MATCHED]
+	void LoadRawAndNGN(char* fileName)
+	{
+		LoadPacketData(fileName);
+		FileUtils::AppendRegPathToBuffer();
+
+		char filePath[256];
+		sprintf(filePath, "%s%s", FileUtils::g_fileNameBuffer, fileName);
+
+		char* rawExtension = strstr(filePath, ".raw");
+		if (rawExtension != 0)
+		{
+			strcpy(rawExtension, ".ngn");
+			NGNLoader::SetNewImage(filePath);
+			NGNLoader::DetectBackdropTextures();
+		}
+	}
 
 	// FUNCTION: TOY2 0x0047B170
 	void DecompressBuffer(uint8_t* inBuffer, uint8_t* outBuffer)
