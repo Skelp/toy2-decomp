@@ -1,6 +1,7 @@
 #include "Toy2/LevelSelect.h"
 #include "Toy2/Toy2.h"
 #include "Toy2/Levels.h"
+#include "NGNLoader/NGNLoader.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/Sprite.h"
 #include "InputManager.h"
@@ -127,6 +128,50 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00830C5C
 		float g_arrowZoomProgress;
 
+		struct ArrowScreenRect
+		{
+			float left;
+			float top;
+			float right;
+			float bottom;
+		};
+
+		// GLOBAL: TOY2 0x00500AB0
+		Vector2F g_arrowTextureBounds[14] = {
+			{ 0.0f, 0.0f },
+			{ 0.99609375f, 0.25f },
+			{ 0.0f, 0.578125f },
+			{ 0.28515625f, 0.89453125f },
+			{ 0.296875f, 0.578125f },
+			{ 0.58203125f, 0.88671875f },
+			{ 0.6015625f, 0.578125f },
+			{ 0.88671875f, 0.88671875f },
+			{ 0.0f, 0.265625f },
+			{ 0.99609375f, 0.5625f },
+			{ 0.90625f, 0.578125f },
+			{ 0.9296875f, 0.6015625f },
+			{ 0.90625f, 0.62109375f },
+			{ 0.9296875f, 0.64453125f },
+		};
+
+		// GLOBAL: TOY2 0x00500B20
+		ArrowScreenRect g_arrowScreenRects[14] = {
+			{ 0.0f, 0.0f, 255.0f, 64.0f },
+			{ 0.0f, 64.0f, 72.0f, 146.0f },
+			{ 0.0f, 146.0f, 72.0f, 226.0f },
+			{ 0.0f, 226.0f, 72.0f, 305.0f },
+			{ 0.0f, 306.0f, 255.0f, 382.0f },
+			{ 72.0f, 64.0f, 78.0f, 70.0f },
+			{ 72.0f, 299.0f, 78.0f, 305.0f },
+			{ 256.0f, 0.0f, 511.0f, 64.0f },
+			{ 440.0f, 64.0f, 511.0f, 146.0f },
+			{ 440.0f, 146.0f, 511.0f, 226.0f },
+			{ 440.0f, 226.0f, 511.0f, 305.0f },
+			{ 256.0f, 306.0f, 511.0f, 382.0f },
+			{ 434.0f, 64.0f, 440.0f, 70.0f },
+			{ 434.0f, 299.0f, 440.0f, 305.0f },
+		};
+
 		// GLOBAL: TOY2 0x004F6878
 		char* g_jumpToSelectTxt = "jump to select";
 
@@ -239,8 +284,63 @@ namespace Toy2
 			}
 		}
 
-		// STUB: TOY2 0x00494130
-		void DrawArrows() {}
+		// FUNCTION: TOY2 0x00494130
+		void DrawArrows()
+		{
+			RGBA color;
+			color.value = 0xFFFFFFFF;
+			float* screenCoordinate = &g_arrowScreenRects[0].left;
+			float zoomProgress = (float)Renderer::g_frameDelta + g_arrowZoomProgress;
+			if (55.0f < zoomProgress)
+				g_arrowZoomProgress = 55.0f;
+			else
+				g_arrowZoomProgress = zoomProgress;
+
+			float zoomOffset = g_arrowZoomProgress + g_arrowZoomProgress;
+			int32_t textureIndex = NGNLoader::GetTextureDataIndex(32);
+			Vector2F* textureBounds = g_arrowTextureBounds;
+			float yScale = 1.0f / (384.0f - zoomOffset);
+			float xScale = 1.0f / (512.0f - zoomOffset);
+			int32_t arrowIndex;
+
+			for (arrowIndex = 0; arrowIndex < 7; ++arrowIndex)
+			{
+				float left = *screenCoordinate++;
+				float top = *screenCoordinate++;
+				float width = *screenCoordinate++ - left + 1.0f;
+				float height = *screenCoordinate++ - top + 1.0f;
+				Renderer::Sprite::Queue2DSprite((left - g_arrowZoomProgress) * xScale,
+					(top - g_arrowZoomProgress) * yScale,
+					xScale * width,
+					yScale * height,
+					textureBounds,
+					textureBounds + 1,
+					textureIndex,
+					color,
+					Renderer::RENDER_ZWRITE | Renderer::RENDER_CULL_NONE | Renderer::RENDER_ALPHA_DEFAULT);
+				textureBounds += 2;
+			}
+
+			textureIndex = NGNLoader::GetTextureDataIndex(33);
+			textureBounds = g_arrowTextureBounds;
+			for (arrowIndex = 0; arrowIndex < 7; ++arrowIndex)
+			{
+				float left = *screenCoordinate++;
+				float top = *screenCoordinate++;
+				float width = *screenCoordinate++ - left + 1.0f;
+				float height = *screenCoordinate++ - top + 1.0f;
+				Renderer::Sprite::Queue2DSprite((left - g_arrowZoomProgress) * xScale,
+					(top - g_arrowZoomProgress) * yScale,
+					xScale * width,
+					yScale * height,
+					textureBounds,
+					textureBounds + 1,
+					textureIndex,
+					color,
+					Renderer::RENDER_ZWRITE | Renderer::RENDER_CULL_NONE | Renderer::RENDER_ALPHA_DEFAULT);
+				textureBounds += 2;
+			}
+		}
 
 		// FUNCTION: TOY2 0x00438A50
 		int32_t Tick()
