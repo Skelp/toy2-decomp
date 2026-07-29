@@ -4,6 +4,7 @@
 #include "Toy2/MainMenu.h"
 #include "Toy2/Toy2.h"
 #include "Toy2/D3DApp.h"
+#include "Toy2/Weather.h"
 #include "Nu3D/BmpDataNode.h"
 #include "Nu3D/Camera.h"
 #include "Nu3D/Math.h"
@@ -907,16 +908,13 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x0048FB70
 	void UnkFunc2() {}
 
-	// GLOBAL: TOY2 0x00547EE2
-	int16_t g_backdropCameraYaw;
-
 	// FUNCTION: TOY2 0x00490290 [PROVISIONAL]
 	int16_t UpdateBackdropScroll()
 	{
 		volatile int32_t clampedVisibleHeight;
 		int32_t hasStaticBackdrop = Toy2::g_hasStaticBackdrop;
 		int32_t* backdropWidth = hasStaticBackdrop ? &g_staticBackdropWidth : &g_backdropWidth;
-		int32_t cameraYaw = g_backdropCameraYaw;
+		int32_t cameraYaw = Toy2::Sector::g_viewRotation.y;
 		int32_t textureColumn;
 
 		if (g_backdropTextureColumn == -1)
