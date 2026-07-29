@@ -68,6 +68,9 @@ namespace Toy2
 		// STUB: TOY2 0x00405D20
 		void Kill(Toy2Actor* actor, uint8_t killFlags) {}
 
+		// STUB: TOY2 0x0043C1C0
+		void ResolveBoneAttachmentPos(Vector4I* position, Toy2Actor* actor, int32_t boneIndex) {}
+
 		// FUNCTION: TOY2 0x00407150 [PROVISIONAL]
 		void InitCreatureRam()
 		{
@@ -431,6 +434,26 @@ namespace Toy2
 				Particles::SpawnCollectSparkle(actor->pos.x, actor->pos.y - 0x2000, actor->pos.z, 0x32);
 				AudioManager::PlaySoundEffect(0xA2, &actor->pos);
 				Actor::Kill(actor, 2);
+			}
+		}
+
+		// FUNCTION: TOY2 0x0041DF70 [EFFECTIVE]
+		void ZBoat(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			actor->previousActorPhase -= (int16_t)Renderer::g_frameDelta;
+			if (actor->previousActorPhase < 0)
+			{
+				actor->previousActorPhase = 200;
+				Vector4I particlePosition;
+				particlePosition.x = 0;
+				particlePosition.y = -500;
+				particlePosition.z = -300;
+				Actor::ResolveBoneAttachmentPos(&particlePosition, actor, 0);
+
+				int32_t sine = Numerics::g_sinCosLUT[actor->yawAngle] >> 2;
+				int32_t cosine = Numerics::g_sinCosLUT[(actor->yawAngle + 0x400) & 0xFFF] >> 2;
+				Nu3D::Particles::SpawnInstance(particlePosition.x, particlePosition.y, particlePosition.z, sine, -0xC00, cosine, 0x80, 0, 0, 0x5C);
 			}
 		}
 

@@ -103,6 +103,7 @@ namespace Toy2
 		void GetCreatureList(uint8_t* creatureIdList);
 		int32_t FindInActorList(Toy2Actor* actor);
 		void SetNodeAngle(Toy2Actor* actor, int32_t nodeIndex, float x, float y, float z);
+		void ResolveBoneAttachmentPos(Vector4I* position, Toy2Actor* actor, int32_t boneIndex);
 
 		STATIC_ASSERT(sizeof(Toy2Actor) == 0x9C);
 		STATIC_ASSERT(offsetof(Toy2Actor, animationFramePosition) == 0x18);
