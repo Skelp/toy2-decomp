@@ -51,8 +51,107 @@ namespace Toy2
 
 	namespace Level
 	{
-		// STUB: TOY2 0x00414550
-		void FixupRecordCoordinates() {}
+		enum RecordType
+		{
+			RECORD_AMBIENT_EMITTER = 58,
+			RECORD_SWING = 60,
+			RECORD_POLE = 61,
+			RECORD_ZIPLINE = 62
+		};
+
+		struct PoleRecord
+		{
+			Vector3I position;
+			int32_t type;
+			int32_t height;
+			int32_t reserved;
+		};
+
+		STATIC_ASSERT(sizeof(PoleRecord) == 0x18);
+
+		// FUNCTION: TOY2 0x00414550 [PROVISIONAL]
+		void FixupRecordCoordinates()
+		{
+			Levels::g_alternateAmbientEmitterStart = 0;
+			Levels::g_ambientEmitterScanIndex = 0;
+
+			Levels::RecordData* ambientEmitters = Levels::g_recordData[RECORD_AMBIENT_EMITTER];
+			if (ambientEmitters != 0)
+			{
+				Vector3I* output = ambientEmitters->data;
+				Vector3I* source = output;
+				int32_t emitterIndex = 0;
+				int32_t emitterCount = ambientEmitters->recordCount;
+				while (emitterIndex < emitterCount)
+				{
+					if (output->x == 0 && output->y == 0 && output->z == 0)
+					{
+						Levels::g_alternateAmbientEmitterStart = emitterIndex;
+						++source;
+						--Levels::g_recordData[RECORD_AMBIENT_EMITTER]->recordCount;
+						++emitterIndex;
+					}
+
+					output->x = source->x << 5;
+					output->y = source->y << 5;
+					output->z = source->z << 5;
+					++output;
+					++source;
+					++emitterIndex;
+				}
+			}
+
+			Levels::RecordData* coordinateRecords = Levels::g_recordData[RECORD_SWING];
+			if (coordinateRecords != 0)
+			{
+				int32_t* coordinate = &coordinateRecords->data->x;
+				for (int32_t i = 0; i < Levels::g_recordData[RECORD_SWING]->recordCount * 3; ++i)
+				{
+					*coordinate <<= 5;
+					++coordinate;
+				}
+			}
+
+			Levels::RecordData* pairedRecords = Levels::g_recordData[RECORD_POLE];
+			if (pairedRecords != 0)
+			{
+				Vector3I* source = pairedRecords->data;
+				PoleRecord* output = reinterpret_cast<PoleRecord*>(source);
+				int32_t poleType = 0;
+				int32_t outputCount = pairedRecords->recordCount;
+
+				for (int32_t pairIndex = 0; pairIndex < (int32_t)((uint32_t)Levels::g_recordData[RECORD_POLE]->recordCount >> 1); ++pairIndex)
+				{
+					while (abs(source->x) == abs(source->y) && abs(source->y) == abs(source->z))
+					{
+						poleType = abs(source->x) / 50;
+						++source;
+						--outputCount;
+					}
+
+					output->position.x = source[0].x << 5;
+					output->position.y = source[0].y << 5;
+					output->position.z = source[0].z << 5;
+					output->type = poleType;
+					output->height = output->position.y - (source[1].y << 5);
+					source += 2;
+					++output;
+				}
+
+				Levels::g_recordData[RECORD_POLE]->recordCount = (uint16_t)outputCount;
+			}
+
+			coordinateRecords = Levels::g_recordData[RECORD_ZIPLINE];
+			if (coordinateRecords != 0)
+			{
+				int32_t* coordinate = &coordinateRecords->data->x;
+				for (int32_t i = 0; i < Levels::g_recordData[RECORD_ZIPLINE]->recordCount * 3; ++i)
+				{
+					*coordinate <<= 5;
+					++coordinate;
+				}
+			}
+		}
 	}
 
 	namespace Lighting
