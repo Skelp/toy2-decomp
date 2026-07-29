@@ -390,10 +390,97 @@ namespace Toy2
 		void Interactions() {}
 	}
 
+	namespace Platform
+	{
+		// STUB: TOY2 0x0042C2B0
+		void InitPathPlatform(int32_t pathIndex,
+			int32_t platformIndex,
+			int32_t pathRecordType,
+			int32_t primaryLinkIndex,
+			int32_t secondaryLinkIndex,
+			int32_t speed,
+			int32_t pathPosition,
+			int32_t facingAngle)
+		{}
+	}
+
 	namespace AirportInfiltration
 	{
-		// STUB: TOY2 0x0042C930
-		void Init() {}
+		// GLOBAL: TOY2 0x004F46A4
+		MoveableObject::InitEntry g_moveableObjectInitTable[] = {
+			{ 8, 11, 0 },
+			{ -1, 0, 0 },
+		};
+
+		// GLOBAL: TOY2 0x004F46C0
+		int16_t g_tokenLinkIds[5] = { 49, 50, 52, 48, 51 };
+
+		// GLOBAL: TOY2 0x0052FE38
+		int32_t g_slammedPlatformRotation;
+		// GLOBAL: TOY2 0x0052FE40
+		int32_t g_hiddenCollectiblesVisible;
+		// GLOBAL: TOY2 0x0052FEE8
+		int32_t g_prospectorState;
+		// GLOBAL: TOY2 0x0052FF14
+		int32_t g_prospectorTurnAngle;
+		// GLOBAL: TOY2 0x0052FF1C
+		int32_t g_pilotDialogueState;
+		// GLOBAL: TOY2 0x0052FF20
+		int32_t g_platform3Rotation;
+		// GLOBAL: TOY2 0x0052FF24
+		int32_t g_platform4Rotation;
+		// GLOBAL: TOY2 0x0052FF2C
+		int32_t g_prospectorTimer;
+		// GLOBAL: TOY2 0x0052FF30
+		int32_t g_prospectorActionTimer;
+		// GLOBAL: TOY2 0x0052FF34
+		int32_t g_oddFanRotation;
+		// GLOBAL: TOY2 0x0052FF38
+		int32_t g_evenFanRotation;
+		// GLOBAL: TOY2 0x0052FF3C
+		int32_t g_previousPilotPhase;
+		// GLOBAL: TOY2 0x0052FF40
+		int32_t g_prospectorTargetAngle;
+		// GLOBAL: TOY2 0x0052FF44
+		int32_t g_prospectorCooldown;
+
+		// STUB: TOY2 0x0042C8A0
+		void InitHiddenCollectibles() {}
+
+		// FUNCTION: TOY2 0x0042C930 [MATCHED]
+		void Init()
+		{
+			MoveableObject::InitTable(g_moveableObjectInitTable);
+			Collectables::Init(g_tokenLinkIds, 0x40);
+			Collectables::Activate(3, 1);
+			InitHiddenCollectibles();
+
+			g_platform4Rotation = 0;
+			g_platform3Rotation = 0;
+			Platform::SetRotationAngles(4, 0, -0x400, 0);
+			g_oddFanRotation = 0;
+			g_evenFanRotation = 0;
+			g_prospectorTargetAngle = -0x200;
+			g_prospectorTurnAngle = 0x200;
+			g_slammedPlatformRotation = 0;
+			g_prospectorActionTimer = 200;
+
+			Platform::InitPathPlatform(0, 8, 2, 21, 20, 125, 0, 0x400);
+			Platform::InitPathPlatform(1, 10, 4, 25, 24, 125, 0, 0x400);
+			Platform::InitPathPlatform(2, 2, 6, 13, 12, 125, 0x8000, -0x400);
+			Platform::InitPathPlatform(3, 5, 7, 15, 14, 125, 0, -0xC00);
+			Platform::InitPathPlatform(4, 1, 5, 11, 10, 125, 0, -0x638);
+
+			int32_t previousPilotPhase = Actor::g_creatureActors[32].actorPhase;
+			RawLoader::CreatureListRam* pilotRam = Actor::g_creatureActors[32].creatureRam;
+			g_hiddenCollectiblesVisible = 1;
+			g_pilotDialogueState = 0;
+			g_prospectorCooldown = 0;
+			g_prospectorTimer = 0;
+			g_prospectorState = 0;
+			g_previousPilotPhase = previousPilotPhase;
+			pilotRam->boundHalfX = 90;
+		}
 
 		// STUB: TOY2 0x0042CA60
 		void Interactions() {}
