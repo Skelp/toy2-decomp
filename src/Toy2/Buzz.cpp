@@ -1557,11 +1557,90 @@ namespace Toy2
 	{
 		enum SegmentCollisionFlags
 		{
+			SEGMENT_COLLISION_ACTOR = 2,
 			SEGMENT_COLLISION_CONTINUES = 4,
 		};
 
-		// STUB: TOY2 0x004A5870
-		int32_t SweepSegmentVsActors(Vector3I* position, Vector3I* movement, int32_t damageType) { return 0; }
+		// FUNCTION: TOY2 0x004A5870 [PROVISIONAL]
+		int32_t SweepSegmentVsActors(Vector3I* position, Vector3I* movement, int32_t damageType)
+		{
+			int32_t collisionFlags = 0;
+			Actor::Toy2Actor* hitActor = 0;
+			Actor::Toy2Actor** actorSlot = Actor::g_activeActors;
+			Actor::Toy2Actor* actor = *actorSlot;
+			while (actor != 0)
+			{
+				if ((actor->creatureRam->defenseMode & 4) != 0 && actor->damageCooldownTimer >= 0 && actor->hitpoints >= 0)
+				{
+					Vector3I end = {
+						position->x + movement->x,
+						position->y + movement->y,
+						position->z + movement->z,
+					};
+					Actor::ActorCollisionVolume* volume = &actor->collisionVolumes[actor->primaryAnimIdx];
+					int32_t backwardSine = Numerics::g_sinCosLUT[(actor->yawAngle - 0x800) & 0xFFF] >> 2;
+					int32_t cosine = Numerics::g_sinCosLUT[(actor->yawAngle - 0x400) & 0xFFF] >> 2;
+
+					int32_t centerX = ((volume->offset.x * cosine + volume->offset.z * backwardSine) >> 12) + actor->pos.x;
+					int32_t centerY = volume->offset.y + actor->pos.y;
+					int32_t centerZ = ((volume->offset.z * cosine - volume->offset.x * backwardSine) >> 12) + actor->pos.z;
+
+					int32_t startDeltaX = centerX - position->x;
+					int32_t startDeltaZ = centerZ - position->z;
+					int32_t scaledStartX = (((startDeltaX * cosine + startDeltaZ * backwardSine) >> 12) * volume->scale.x) >> 8;
+					int32_t scaledStartY = ((centerY - position->y) * volume->scale.y) >> 8;
+					int32_t scaledStartZ = (((startDeltaZ * cosine - startDeltaX * backwardSine) >> 12) * volume->scale.z) >> 8;
+
+					int32_t endDeltaX = centerX - end.x;
+					int32_t endDeltaZ = centerZ - end.z;
+					int32_t scaledEndX = (((endDeltaX * cosine + endDeltaZ * backwardSine) >> 12) * volume->scale.x) >> 8;
+					int32_t scaledEndY = ((centerY - end.y) * volume->scale.y) >> 8;
+					int32_t scaledEndZ = (((endDeltaZ * cosine - endDeltaX * backwardSine) >> 12) * volume->scale.z) >> 8;
+
+					int32_t segmentX = (scaledStartX - scaledEndX) >> 5;
+					int32_t segmentY = (scaledStartY - scaledEndY) >> 5;
+					int32_t segmentZ = (scaledStartZ - scaledEndZ) >> 5;
+					Vector3I segmentDirection = { segmentX, segmentY, segmentZ };
+					Nu3D::Math::NormalizeToFixedPoint(&segmentDirection, &segmentDirection);
+
+					int32_t projectedDistance =
+						(segmentDirection.x * (scaledStartX >> 5) + segmentDirection.y * (scaledStartY >> 5) + segmentDirection.z * (scaledStartZ >> 5)) >> 12;
+					int32_t segmentLength = (segmentDirection.x * segmentX + segmentDirection.y * segmentY + segmentDirection.z * segmentZ) >> 12;
+					if (projectedDistance > 0 && projectedDistance <= segmentLength)
+					{
+						int32_t closestX = (scaledStartX >> 5) - ((projectedDistance * segmentDirection.x) >> 12);
+						int32_t closestY = (scaledStartY >> 5) - ((projectedDistance * segmentDirection.y) >> 12);
+						int32_t closestZ = (scaledStartZ >> 5) - ((projectedDistance * segmentDirection.z) >> 12);
+						int32_t closestDistanceSquared = closestX * closestX + closestY * closestY + closestZ * closestZ;
+						int32_t radiusSquared = volume->radius * volume->radius;
+						if (closestDistanceSquared < radiusSquared)
+						{
+							int32_t hitDistance = projectedDistance - (int32_t)sqrt((double)(radiusSquared - closestDistanceSquared));
+							int32_t localHitX = ((hitDistance * segmentDirection.x) >> 4) / volume->scale.x;
+							int32_t localHitY = (hitDistance * segmentDirection.y * 2) / volume->scale.y;
+							int32_t localHitZ = ((hitDistance * segmentDirection.z) >> 4) / volume->scale.z;
+							movement->x = (localHitX * cosine - localHitZ * backwardSine) >> 7;
+							movement->y = localHitY;
+							movement->z = (localHitZ * cosine + localHitX * backwardSine) >> 7;
+							collisionFlags = SEGMENT_COLLISION_ACTOR;
+							hitActor = actor;
+						}
+					}
+				}
+				actor = *++actorSlot;
+			}
+
+			if (collisionFlags != 0 && damageType != 0)
+			{
+				if (damageType == 1)
+					Actor::HandleDamage(hitActor, (int16_t)g_buzzActor.posAngles.angles.yaw, 2);
+				else
+					Actor::HandleDamage(hitActor, (int16_t)g_buzzActor.posAngles.angles.yaw, 3);
+				if ((hitActor->creatureRam->defenseMode & 1) == 0)
+					return SEGMENT_COLLISION_CONTINUES;
+			}
+			return collisionFlags;
+		}
 	}
 
 	// FUNCTION: TOY2 0x004A5D30 [PROVISIONAL]

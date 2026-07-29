@@ -625,6 +625,9 @@ namespace Toy2
 
 	namespace Actor
 	{
+		// STUB: TOY2 0x00408A60
+		void HandleDamage(Toy2Actor* actor, int32_t attackAngle, int32_t damageType) {}
+
 		// FUNCTION: TOY2 0x00405D20 [PROVISIONAL]
 		void Kill(Toy2Actor* actor, uint8_t killFlags)
 		{

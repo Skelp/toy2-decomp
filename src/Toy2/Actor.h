@@ -127,6 +127,7 @@ namespace Toy2
 		int32_t FindInActorList(Toy2Actor* actor);
 		void SetNodeAngle(Toy2Actor* actor, int32_t nodeIndex, int32_t pitch, int32_t yaw, int32_t roll);
 		void ResolveBoneAttachmentPos(Vector4I* position, Toy2Actor* actor, int32_t boneIndex);
+		void HandleDamage(Toy2Actor* actor, int32_t attackAngle, int32_t damageType);
 
 		STATIC_ASSERT(sizeof(Toy2Actor) == 0x9C);
 		STATIC_ASSERT(sizeof(ActorCollisionVolume) == 0x10);
