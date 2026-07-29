@@ -1329,3 +1329,38 @@ namespace Toy2
 		}
 	}
 }
+
+namespace Toy2
+{
+	namespace CreatureBehaviour
+	{
+		// FUNCTION: TOY2 0x004259B0 [MATCHED]
+		void Mouse(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			if (actor->actorPhase == 0x66)
+			{
+				actor->previousActorPhase -= (int16_t)Renderer::g_frameDelta;
+				if (actor->previousActorPhase <= 0)
+				{
+					actor->previousActorPhase = (*g_randDatBufferPtr++ & 0x7F) + 0x5A;
+					AudioManager::PlaySoundEffect(0x8E, &actor->pos);
+				}
+			}
+
+			if (actor->creatureRam->latSpeedNoTarget <= 0x7F)
+			{
+				actor->pitchAngle = 0xC00;
+				actor->rollAngle = 0x800;
+			}
+
+			if ((actor->actorFlags & Actor::ACTOR_FLAG_INTERACTION_REQUESTED) != 0 && actor->actorPhase == 0x66)
+			{
+				g_levelObjectiveProgress++;
+				Particles::SpawnCollectSparkle(actor->pos.x, actor->pos.y - 0x2000, actor->pos.z, 0x32);
+				AudioManager::PlaySoundEffect(0x8E, &actor->pos);
+				Actor::Kill(actor, 2);
+			}
+		}
+	}
+}
