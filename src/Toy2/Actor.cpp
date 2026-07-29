@@ -10,6 +10,7 @@
 #include "Renderer/Renderer.h"
 
 #include <limits.h>
+#include <stdlib.h>
 #include <string.h>
 
 namespace Toy2
@@ -374,6 +375,12 @@ namespace Toy2
 		// GLOBAL: TOY2 0x004E0318
 		uint16_t* g_boxMovementData;
 
+		// GLOBAL: TOY2 0x0050A544
+		int32_t g_rcCarRearWheelRotation;
+
+		// GLOBAL: TOY2 0x0050A548
+		int32_t g_rcCarFrontWheelRotation;
+
 		// FUNCTION: TOY2 0x004068E0 [EFFECTIVE]
 		void Box(Actor::Toy2Actor::ActorBehaviourContext* context)
 		{
@@ -521,8 +528,87 @@ namespace Toy2
 			}
 		}
 
-		// STUB: TOY2 0x00416F30
-		void RCCarLevel1(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// STUB: TOY2 0x0043C070
+		void SetRCCarNodeAngle(Actor::Toy2Actor* actor, int32_t nodeIndex, int32_t pitch, int32_t yaw, int32_t roll) {}
+
+		// FUNCTION: TOY2 0x00416F30 [PROVISIONAL]
+		void RCCarLevel1(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			int32_t animationIndex = 0;
+			Actor::Toy2Actor* actor = context->actor;
+			int32_t frameSequenceIndex = 2;
+			actor->actorFlags |= Actor::ACTOR_FLAG_RC_CAR;
+
+			if (context->localForwardSpeed > 0)
+			{
+				AudioManager::g_dynamicSoundFrequencies[2] = context->localForwardSpeed * 4 + 0x800;
+				AudioManager::PlaySoundEffect(0x37, &actor->pos);
+			}
+
+			if (HUD::g_challengeState >= 2)
+			{
+				if (context->localForwardSpeed < actor->creatureRam->speedTarget * 8)
+				{
+					animationIndex = 1;
+					frameSequenceIndex = 0xB;
+				}
+
+				if (abs(context->localStrafeSpeed) > context->localForwardSpeed)
+				{
+					animationIndex = context->localStrafeSpeed < 0 ? 2 : 3;
+					frameSequenceIndex = 0xC;
+				}
+
+				if (animationIndex != actor->primaryAnimIdx
+					&& (animationIndex != 0 || actor->primaryAnimIdx != 1 || (actor->animationFramePosition & (int32_t)0xFFFF0000) >= 0xE0000))
+				{
+					Actor::SetAnimation(actor, (int16_t)animationIndex, frameSequenceIndex);
+				}
+			}
+
+			if ((actor->actorFlags & Actor::ACTOR_FLAG_TARGETABLE) == 0)
+			{
+				return;
+			}
+
+			Actor::UpdatePrimaryAnimation(actor);
+			if (context->localForwardSpeed > 0)
+			{
+				g_rcCarFrontWheelRotation = (g_rcCarFrontWheelRotation + (context->localForwardSpeed * Renderer::g_frameDelta >> 3)) & 0xFFF;
+				SetRCCarNodeAngle(actor, 0, g_rcCarFrontWheelRotation, 0, 0);
+				SetRCCarNodeAngle(actor, 1, g_rcCarFrontWheelRotation, 0, 0);
+
+				if (animationIndex == 1 || abs(context->localStrafeSpeed) > 0x200)
+				{
+					g_rcCarRearWheelRotation = (g_rcCarRearWheelRotation + Renderer::g_frameDelta * 0xA0) & 0xFFF;
+				}
+				else
+				{
+					g_rcCarRearWheelRotation = (g_rcCarRearWheelRotation + (context->localForwardSpeed * Renderer::g_frameDelta >> 3)) & 0xFFF;
+				}
+				SetRCCarNodeAngle(actor, 2, g_rcCarRearWheelRotation, 0, 0);
+				SetRCCarNodeAngle(actor, 3, g_rcCarRearWheelRotation, 0, 0);
+			}
+
+			if (g_fourTickPulse != 0 && (animationIndex == 1 || abs(context->localStrafeSpeed) > 0x200))
+			{
+				Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(
+					actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle + 0x680) & 0xFFF] >> 1),
+					actor->pos.y - 0x800,
+					actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x580) & 0xFFF] >> 1),
+					0x2A,
+					0xA);
+				particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+
+				particle = Nu3D::Particles::SpawnFromPreset(actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x680) & 0xFFF] >> 1),
+					actor->pos.y - 0x800,
+					actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x280) & 0xFFF] >> 1),
+					0x2A,
+					0xA);
+				particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+				AudioManager::PlaySoundEffect(0x36, &actor->pos);
+			}
+		}
 
 		// STUB: TOY2 0x00418720
 		void RCCarLevel2(Actor::Toy2Actor::ActorBehaviourContext* context) {}

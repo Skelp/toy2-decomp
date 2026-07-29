@@ -257,7 +257,7 @@
 0x0043B0C0 CharacterLoader::LoadCharacterData
 0x0043B9B0 CharacterLoader::Start
 0x0043BA80 Toy2::Animation::EvaluateClip
-0x0043C070 Toy2::CreatureBehaviour::RCCar::Method1
+0x0043C070 Toy2::CreatureBehaviour::SetRCCarNodeAngle
 0x0043C0E0 Toy2::Animation::TransformByBone
 0x0043C1C0 Toy2::Actor::ResolveBoneAttachmentPos
 0x0043C700 CharacterLoader::InitGlobals
