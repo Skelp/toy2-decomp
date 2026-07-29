@@ -6,7 +6,10 @@ struct InterfaceDevice;
 
 extern "C"
 {
-	HRESULT D3DAppIGetSurfDesc(LPDDSURFACEDESC surfaceDesc, LPDIRECTDRAWSURFACE surface);
+	HRESULT D3DAppIGetSurfDesc(LPDDSURFACEDESC surfaceDesc, LPDIRECTDRAWSURFACE3 surface);
+	BOOL D3DAppICreateBuffers(HWND hwnd, int width, int height, int bpp, BOOL fullscreen, BOOL hardware);
+	BOOL D3DAppICheckForPalettized();
+	BOOL D3DAppICreateZBuffer(int width, int height);
 	BOOL D3DAppISetCoopLevel(HWND hwnd, BOOL fullscreen);
 	BOOL D3DAppIRestoreDispMode();
 	BOOL D3DAppIRememberWindowsMode();
