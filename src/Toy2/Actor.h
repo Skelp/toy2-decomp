@@ -159,6 +159,7 @@ namespace Toy2
 
 	namespace CreatureBehaviour
 	{
+		extern uint16_t* g_gunslingerMovementData;
 		extern uint16_t* g_smithMovementData;
 		extern int32_t g_rcCarRearWheelRotation;
 		extern int32_t g_rcCarFrontWheelRotation;

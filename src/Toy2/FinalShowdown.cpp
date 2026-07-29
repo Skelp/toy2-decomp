@@ -9,11 +9,19 @@
 #include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
+#include "Random.h"
+#include "Numerics.h"
 
 namespace Toy2
 {
 	namespace FinalShowdown
 	{
+		enum GunslingerState
+		{
+			GUNSLINGER_STATE_ACTIVE = 2,
+			GUNSLINGER_STATE_DEFEATED = 3,
+		};
+
 		enum SmithState
 		{
 			SMITH_STATE_ACTIVE = 2,
@@ -21,10 +29,14 @@ namespace Toy2
 		};
 
 		extern int32_t g_defeatedBossIndex;
+		extern int32_t g_gunslingerState;
 		extern int32_t g_smithState;
 		extern int32_t g_smithPhaseTimer;
+		extern int32_t g_gunslingerPhaseTimer;
 		extern int32_t g_previousSmithPhase;
+		extern int32_t g_previousGunslingerPhase;
 		extern int32_t g_smithTintToggle;
+		extern int32_t g_gunslingerTintToggle;
 		extern int32_t g_smithEffectTimer;
 		extern int32_t g_defeatedBossCount;
 	}
@@ -119,8 +131,116 @@ namespace Toy2
 			}
 		}
 
-		// STUB: TOY2 0x0042F530
-		void GunsL(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// FUNCTION: TOY2 0x0042F530 [PROVISIONAL]
+		void GunsL(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			FinalShowdown::g_gunslingerTintToggle = (FinalShowdown::g_gunslingerTintToggle - 1) & 1;
+
+			if (actor->actorPhase != FinalShowdown::g_previousGunslingerPhase)
+			{
+				FinalShowdown::g_previousGunslingerPhase = actor->actorPhase;
+				FinalShowdown::g_gunslingerPhaseTimer = 60;
+				actor->creatureRam->defenseMode = 4;
+				AudioManager::PlaySoundEffect(0xC1, &actor->pos);
+			}
+
+			if (FinalShowdown::g_gunslingerState == FinalShowdown::GUNSLINGER_STATE_ACTIVE)
+			{
+				FinalShowdown::g_gunslingerPhaseTimer -= Renderer::g_frameDelta;
+				if (FinalShowdown::g_gunslingerPhaseTimer < 0)
+				{
+					FinalShowdown::g_gunslingerPhaseTimer = 0;
+					actor->creatureRam->defenseMode = 7;
+				}
+				else if (FinalShowdown::g_gunslingerTintToggle != 0)
+				{
+					actor->useTint = 1;
+					actor->actorTint.r = 0x2000;
+					actor->actorTint.g = 0x2000;
+					actor->actorTint.b = 0x2000;
+				}
+				else
+				{
+					actor->useTint = 0;
+				}
+			}
+			else
+			{
+				actor->useTint = 0;
+			}
+
+			if (actor->previousActorPhase != 0)
+			{
+				int32_t fireProjectile = 0;
+				Vector4I projectilePosition;
+				if (actor->previousActorPhase > 20)
+				{
+					projectilePosition.x = 0;
+					projectilePosition.y = 0;
+					projectilePosition.z = 0;
+					Actor::ResolveBoneAttachmentPos(&projectilePosition, actor, 15);
+					fireProjectile = 1;
+					actor->previousActorPhase = 10;
+				}
+
+				actor->previousActorPhase -= (int16_t)Renderer::g_frameDelta;
+				if (actor->previousActorPhase <= 0)
+				{
+					projectilePosition.x = 0;
+					projectilePosition.y = 0;
+					projectilePosition.z = 0;
+					Actor::ResolveBoneAttachmentPos(&projectilePosition, actor, 16);
+					actor->previousActorPhase = 0;
+					fireProjectile = 1;
+				}
+
+				if (fireProjectile != 0)
+				{
+					AudioManager::PlaySoundEffect(0x56, &actor->pos);
+					int32_t projectileAngle =
+						Nu3D::Math::CartesianToFixedAngle(
+							g_buzzActor.posAngles.pos.x - projectilePosition.x, g_buzzActor.posAngles.pos.z - projectilePosition.z)
+						& 0xFFF;
+					if (((projectileAngle - actor->yawAngle + 0x100) & 0xFFF) > 0x200)
+						projectileAngle = actor->yawAngle;
+
+					Nu3D::Particles::SpawnInstance(projectilePosition.x,
+						projectilePosition.y,
+						projectilePosition.z,
+						Numerics::g_sinCosLUT[projectileAngle] >> 2,
+						0x200,
+						Numerics::g_sinCosLUT[(projectileAngle + 0x400) & 0xFFF] >> 2,
+						0,
+						0,
+						0,
+						0x61);
+
+					if ((actor->actorFlags & Actor::ACTOR_FLAG_TARGETABLE) != 0)
+					{
+						for (int32_t particleCount = 5; particleCount != 0; particleCount--)
+						{
+							Nu3D::Particles::ParticleInstance* particle =
+								Nu3D::Particles::SpawnFromPreset(projectilePosition.x, projectilePosition.y, projectilePosition.z, 0x64, 0xF);
+							particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+						}
+					}
+				}
+			}
+
+			if (actor->actorPhase < 10 && FinalShowdown::g_gunslingerState == FinalShowdown::GUNSLINGER_STATE_ACTIVE)
+			{
+				actor->movementData = g_gunslingerMovementData + 52;
+				actor->creatureRam->defenseMode = 4;
+				actor->actorFlags &= ~Actor::ACTOR_FLAG_DAMAGES_BUZZ;
+				AudioManager::PlaySoundEffect(-2, &actor->pos);
+				FinalShowdown::g_defeatedBossCount++;
+				FinalShowdown::g_gunslingerState = FinalShowdown::GUNSLINGER_STATE_DEFEATED;
+				if (FinalShowdown::g_defeatedBossCount == 3)
+					FinalShowdown::g_defeatedBossIndex = 1;
+				actor->movementCommandTimer = 0;
+			}
+		}
 
 		// STUB: TOY2 0x0042F7B0
 		void ProsP(Actor::Toy2Actor::ActorBehaviourContext* context) {}
