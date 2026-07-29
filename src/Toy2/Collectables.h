@@ -17,6 +17,11 @@ namespace Toy2
 			PICKUP_FLAG_PERSISTENT = 0x80,
 		};
 
+		enum TokenCollectionState
+		{
+			TOKEN_COLLECTION_STATE_CUTSCENE = 9,
+		};
+
 		struct PickupRecord
 		{
 			Vector3I position;
@@ -64,6 +69,7 @@ namespace Toy2
 		void LoadTokenTable(const TokenDialogueValue* values);
 		void Activate(int32_t tokenIndex, int32_t skipCutscene);
 		void Deactivate(int32_t tokenIndex);
+		void Interactions();
 		void CosmicShield(Buzz::GadgetPickup* pickup);
 		int32_t ShowTokenSparkle(int32_t linkId);
 

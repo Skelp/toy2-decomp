@@ -48,6 +48,12 @@
 
 namespace Toy2
 {
+	namespace Cutscene
+	{
+		// STUB: TOY2 0x00402A10
+		void Update() {}
+	}
+
 	namespace Gadget
 	{
 		// STUB: TOY2 0x004A2080
@@ -162,6 +168,7 @@ namespace Toy2
 	namespace Lighting
 	{
 		void InitBuzzLight();
+		void UpdateBuzzLight();
 	}
 
 	extern int32_t g_hudActorAnimationFrame;
@@ -655,6 +662,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0052AD7C
 	int32_t g_demoPathWriteIdx;
 
+	// GLOBAL: TOY2 0x0052AD84
+	int32_t g_demoExitInput;
+
 	// GLOBAL: TOY2 0x0052AD6A
 	int16_t g_unusedLevelState[9];
 
@@ -812,10 +822,19 @@ namespace Toy2
 	// STUB: TOY2 0x0049FD40
 	void RenderHUD() {}
 
+	// STUB: TOY2 0x004A2960
+	void UpdateFrameTimers() {}
+
 	namespace Game
 	{
 		// STUB: TOY2 0x00406CD0
 		void InitActor(Actor::Toy2Actor* actor, int32_t param) {}
+
+		// STUB: TOY2 0x00407440
+		void ActorCollisionCheck() {}
+
+		// STUB: TOY2 0x004086F0
+		void UpdateActors() {}
 
 		// STUB: TOY2 0x0049F4B0
 		void MenuLoop() {}
@@ -908,8 +927,143 @@ namespace Toy2
 			MenuLoop();
 		}
 
-		// STUB: TOY2 0x0049DFE0
-		void MainLoop() {}
+		// FUNCTION: TOY2 0x0049DFE0 [PROVISIONAL]
+		void MainLoop()
+		{
+			{
+				int16_t input = InputManager::g_curButtonsPressed;
+				int32_t demoMode = g_demoMode;
+
+				if (demoMode == 2)
+				{
+					if (input == InputManager::g_prevButtonsPressed)
+					{
+						g_demoInputRunLength++;
+					}
+					else
+					{
+						g_demoInputBuffer[g_demoPathWriteIdx] = InputManager::g_prevButtonsPressed;
+						g_demoInputBuffer[g_demoPathWriteIdx + 1] = (int16_t)g_demoInputRunLength;
+						g_demoPathWriteIdx += 2;
+						g_demoInputRunLength = 0;
+						if (g_demoPathWriteIdx >= 0x800)
+							g_demoPathWriteIdx = 0x7FE;
+					}
+				}
+
+				if (g_attractModeTimer >= 0)
+				{
+					if (g_returnedToTitle == 0 && input != 0)
+						g_attractModeInputTimer = g_attractModeTimer * 2;
+
+					g_attractModeInputTimer -= Renderer::g_frameDelta;
+					if (g_attractModeInputTimer <= 0)
+					{
+						input |= INPUT_SECRET_MENU;
+						InputManager::g_curButtonsPressed = input;
+					}
+				}
+
+				if (demoMode == 1)
+				{
+					g_demoExitInput = input;
+					g_demoInputRunLength--;
+					if (g_demoInputRunLength < 0)
+					{
+						g_demoInputRunLength = g_demoInputBuffer[g_demoPathWriteIdx + 3];
+						g_demoPathWriteIdx += 2;
+					}
+					input = g_demoInputBuffer[g_demoPathWriteIdx];
+					InputManager::g_curButtonsPressed = input;
+				}
+
+				InputManager::g_directionInputState3Frames = InputManager::g_directionInputState2Frames;
+				InputManager::g_directionInputState2Frames = InputManager::g_prevDirectionInputState;
+				InputManager::g_prevDirectionInputState = InputManager::g_directionInputState;
+				if (demoMode == 1)
+				{
+					InputManager::g_directionInputState = input;
+				}
+				else
+				{
+					InputManager::UpdateDirectionInputState();
+				}
+
+				if ((g_buzzActor.actorFlags & Buzz::ACTOR_FLAG_LOCK_FACING) != 0 || (g_levelTransition == 0 && g_levelTransitionTimer > 60))
+					InputManager::g_directionInputState &= INPUT_SECRET_MENU | INPUT_MENU | INPUT_CAMERA_LEFT | INPUT_CAMERA_RIGHT;
+			}
+
+			Shadow::ResetShadowCount();
+			Cutscene::Update();
+			Buzz::HandleGameplay(&g_buzzActor);
+			Camera::UpdateActiveTransform();
+			Nu3D::Camera::ApplyTransformToCamera(&Camera::g_renderCameraTransform);
+			UpdateActors();
+			Buzz::UpdateRespawnAnchor();
+			Collectables::Interactions();
+			Buzz::TickGadgets();
+			Buzz::CheckParticleCollisions();
+			if (g_buzzActor.health >= 0)
+				ActorCollisionCheck();
+			HandleLevelInteractions(g_levelFileIndex);
+			Lighting::UpdateBuzzLight();
+			g_buzzActor.unusedFrameState = 0;
+			Buzz::UpdateAnimationState();
+			AdvanceFramePhase();
+			Buzz::UpdateContactEffects();
+			Levels::UpdateAmbientEmitters();
+			Nu3D::Particles::Update();
+
+			if (g_demoMode == 0 && g_attractModeTimer >= 0 && (InputManager::g_curButtonsPressed & INPUT_SECRET_MENU) != 0 && g_levelTransition == 0)
+			{
+				g_levelTransition = 4;
+				g_levelTransitionTimer = 0x2E;
+				Nu3D::Camera::SetTint(0, 0, 0, 6);
+			}
+
+			if (g_demoMode != 0 && (InputManager::g_curButtonsPressed & INPUT_MENU) != 0 && g_levelTransition == 0)
+			{
+				g_levelTransition = 3;
+				g_levelTransitionTimer = 0x2E;
+				Nu3D::Camera::SetTint(0, 0, 0, 6);
+			}
+
+			if (g_demoMode != 0 && g_demoExitInput != 0 && g_levelTransition == 0)
+			{
+				g_levelTransition = 4;
+				g_levelTransitionTimer = 0x2E;
+				Nu3D::Camera::SetTint(0, 0, 0, 6);
+			}
+
+			if ((InputManager::g_curButtonsPressed & INPUT_MENU) != 0 && (InputManager::g_prevButtonsPressed & INPUT_MENU) == 0 && g_demoMode == 0
+				&& Collectables::g_tokenCollectionState != Collectables::TOKEN_COLLECTION_STATE_CUTSCENE)
+				goto open_pause_menu;
+
+			if (g_demoMode != 0 || InputManager::g_directionalInputCount != 3)
+				goto finish_frame;
+
+		open_pause_menu:
+			if (Nu3D::Camera::g_targetTintFadeSpeed == 0 && Nu3D::Camera::g_cameraTintRed != 0)
+			{
+				AudioManager::StopAndWait();
+				AudioManager::FlushSoundVoices();
+				g_pauseMenuBlinkTimer = 0;
+				g_isPaused = 1;
+				g_pauseMenuSelection = 0;
+				g_pauseMenuState = 0;
+				g_quitToTitleFlag = 0;
+				AudioManager::PlaySoundEffect(0x3D, 0);
+				g_pauseCameraTarget = Camera::g_renderCameraTransform;
+				g_pauseCheatTimer = 0xEC4;
+			}
+
+		finish_frame:
+			UpdateFrameTimers();
+			RenderHUD();
+			Actor::PopulateActiveActors();
+			Nullsub3();
+			RenderGame(1);
+		}
 	}
 
 	namespace PostGameRecap

@@ -20,6 +20,21 @@
 
 namespace Toy2
 {
+	namespace Buzz
+	{
+		// STUB: TOY2 0x004011D0
+		void UpdateAnimationState() {}
+
+		// STUB: TOY2 0x004100F0
+		void CheckParticleCollisions() {}
+
+		// STUB: TOY2 0x00436220
+		void HandleGameplay(Toy2BuzzActor* buzz) {}
+
+		// STUB: TOY2 0x004A2D80
+		void UpdateContactEffects() {}
+	}
+
 	// GLOBAL: TOY2 0x005281A4
 	int32_t g_pendingFootingType;
 

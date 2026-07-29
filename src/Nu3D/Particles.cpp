@@ -15,6 +15,9 @@ namespace Nu3D
 {
 	namespace Particles
 	{
+		// STUB: TOY2 0x00410F40
+		void Update() {}
+
 		// GLOBAL: TOY2 0x004EC948
 		ParticlePreset g_particlePresets[29] = {
 			{ 0x00A00032, 0x8020000B, 0x00180C07, 0x00320001, 0x00B00032, 0x000B, (int16_t)0x8020 },

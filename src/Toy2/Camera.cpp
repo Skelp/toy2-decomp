@@ -19,6 +19,9 @@ namespace Toy2
 {
 	namespace Camera
 	{
+		// STUB: TOY2 0x00405860
+		void UpdateActiveTransform() {}
+
 		// GLOBAL: TOY2 0x0052F3A0
 		GameplayCamera g_gameplayCamera;
 

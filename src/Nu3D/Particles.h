@@ -102,6 +102,7 @@ namespace Nu3D
 		void ReflectWallsSquareArena(ParticleInstance* particle);
 		void UpdateArenaBounce(ParticleInstance* particle);
 		void UpdateDrainTrail(ParticleInstance* particle);
+		void Update();
 		ParticleInstance* SpawnInstance(int32_t x,
 			int32_t y,
 			int32_t z,

@@ -571,7 +571,7 @@
 0x004A0C80 Toy2::Collectables::Init
 0x004A0DB0 Toy2::Collectables::Activate
 0x004A0E60 Toy2::Collectables::Deactivate
-0x004A0F80 Toy2::Collectibles::Interactions
+0x004A0F80 Toy2::Collectables::Interactions
 0x004A1A50 Toy2::InitialiseLevelVariables
 0x004A1B00 Toy2::HandleLevelInteractions
 0x004A1BB0 Nu3D::Camera::SetTint

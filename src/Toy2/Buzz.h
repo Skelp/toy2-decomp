@@ -92,7 +92,7 @@ namespace Toy2
 			int16_t visibilityDistance;
 			int32_t unkVar22;
 			int16_t facingAngle;
-			int16_t unkVar23;
+			int16_t unusedFrameState;
 			Vector3I respawnPos;
 			int32_t respawnYawAngle;
 			Vector3I motionTargetPos;
@@ -142,6 +142,10 @@ namespace Toy2
 		void TickGrapple();
 		void TickBeamShots();
 		void TickGadgets();
+		void HandleGameplay(Toy2BuzzActor* buzz);
+		void CheckParticleCollisions();
+		void UpdateAnimationState();
+		void UpdateContactEffects();
 		void Launch(int32_t verticalVelocity, int16_t airborneMode);
 		void UpdateHorizontalMovement(Toy2BuzzActor* buzz, MovementRates* movementRates, int32_t forwardInput);
 		void UpdateRespawnAnchor();

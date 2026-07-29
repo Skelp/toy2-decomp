@@ -13,6 +13,9 @@ namespace Toy2
 {
 	namespace Collectables
 	{
+		// STUB: TOY2 0x004A0F80
+		void Interactions() {}
+
 		// GLOBAL: TOY2 0x00830CAC
 		int32_t g_exitLevelAfterToken;
 
