@@ -92,6 +92,7 @@ namespace Nu3D
 		extern uint8_t g_targetTintGreen;
 		extern uint8_t g_targetTintRed;
 		extern uint8_t g_targetTintFadeSpeed;
+		extern int16_t g_tintBlend;
 
 		void SetTint(uint8_t blue, uint8_t green, uint8_t red, uint8_t fadeSpeed);
 		void InitViewMatrixGlobals();
