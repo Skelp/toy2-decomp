@@ -162,6 +162,159 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0053C828
 	uint32_t g_actionStateFlags;
 
+	// GLOBAL: TOY2 0x0053C658
+	int32_t g_movementInputLockTimer;
+
+	// GLOBAL: TOY2 0x0053C600
+	int32_t g_ziplineCooldown;
+
+	// GLOBAL: TOY2 0x0053C610
+	int32_t g_ziplineRecordIndex;
+
+	// GLOBAL: TOY2 0x0053C624
+	int32_t g_forcedFacingAngle;
+
+	// GLOBAL: TOY2 0x0053C830
+	int32_t g_damageBlinkCounter;
+
+	// GLOBAL: TOY2 0x0053C634
+	uint32_t g_animationEventFlags;
+
+	// GLOBAL: TOY2 0x0053C60C
+	int32_t g_surfaceEffectState;
+
+	// GLOBAL: TOY2 0x0053C810
+	int32_t g_previousVerticalVelocity;
+
+	// GLOBAL: TOY2 0x0053C62C
+	int32_t g_outOfBoundsLifeGranted;
+
+	// GLOBAL: TOY2 0x0050A098
+	int32_t g_idleAnimationState;
+
+	// GLOBAL: TOY2 0x0053C678
+	int32_t g_facingInterpolationTimer;
+
+	// GLOBAL: TOY2 0x0053C5D0
+	int32_t g_targetFacingAngle;
+
+	// GLOBAL: TOY2 0x0053C674
+	int32_t g_jumpStartY;
+
+	// GLOBAL: TOY2 0x0053C664
+	int32_t g_idleAnimationTimer;
+
+	// GLOBAL: TOY2 0x0053C5DC
+	int32_t g_movementLockTimer;
+
+	namespace Buzz
+	{
+		struct StartPosition
+		{
+			Vector3I position;
+			int16_t yawAngle;
+			int16_t reserved;
+		};
+
+		// GLOBAL: TOY2 0x004F59A4
+		extern const StartPosition g_startPositions[17] = {
+			{ { 0, 0, 0 }, 0, 0 },
+			{ { 194774, 60044, -361401 }, 0, 0 },
+			{ { -466652, 433, -32144 }, 0x500, 0 },
+			{ { -47074, 97, -185901 }, 0, 0 },
+			{ { 411295, 11, 30702 }, 0xC52, 0 },
+			{ { 204615, 75, 114100 }, 0xB82, 0 },
+			{ { 264357, -1082, 2748 }, 0xC00, 0 },
+			{ { -128033, 76, -332419 }, 0, 0 },
+			{ { -4082, 40, 315274 }, 0x7FF, 0 },
+			{ { 16532, 70, -141912 }, 0xFE2, 0 },
+			{ { -291, -32978, -646 }, 0x400, 0 },
+			{ { -262581, 174040, 253369 }, 0x6D7, 0 },
+			{ { -121468, -76752, 63129 }, 0x418, 0 },
+			{ { 27126, -94, 240599 }, 0xBFC, 0 },
+			{ { -320338, 76, 983296 }, 0x791, 0 },
+			{ { -36601, 69, -5416 }, 0xBFA, 0 },
+			{ { 0, -561600, -844800 }, 0, 0 },
+		};
+
+		STATIC_ASSERT(sizeof(StartPosition) == 0x10);
+
+		// FUNCTION: TOY2 0x00433D50 [PROVISIONAL]
+		void Init(Toy2BuzzActor* buzz, int32_t levelIndex)
+		{
+			int32_t lives = buzz->lives;
+			int32_t health = buzz->health;
+			memset(buzz, 0, sizeof(*buzz));
+
+			const StartPosition* start = &g_startPositions[levelIndex];
+			const int32_t* startPosition = &start->position.x;
+			buzz->posAngles.pos.x = *startPosition++;
+			buzz->posAngles.pos.y = *startPosition++;
+			buzz->posAngles.pos.z = *startPosition;
+			int32_t groundY = UpdateFloorHeight(buzz) - 0x100;
+			int16_t yawAngle = start->yawAngle;
+
+			buzz->motionTargetPos.x = buzz->posAngles.pos.x;
+			buzz->posAngles.pos.y = groundY;
+			buzz->motionTargetPos.y = groundY;
+			buzz->motionTargetPos.z = buzz->posAngles.pos.z;
+			buzz->respawnPos.y = groundY;
+			buzz->respawnPos.x = buzz->posAngles.pos.x;
+			buzz->respawnYawAngle = yawAngle;
+			buzz->posAngles.angles.yaw = yawAngle;
+			buzz->facingAngle = yawAngle;
+			buzz->surfaceClampY = (int32_t)0x80000000;
+			buzz->lives = lives;
+			buzz->health = health;
+			buzz->respawnPos.z = buzz->posAngles.pos.z;
+			buzz->isOnWalkableFloor = 0;
+			buzz->primaryAnimIdx = -1;
+			buzz->secondaryAnimIdx = -1;
+			buzz->visibilityDistance = 0x500;
+
+			g_ledgeClimbTimer = 0;
+			g_airborneTimer = 0;
+			g_poleClimbState = 0;
+			g_movementInputLockTimer = 0;
+			g_poleRecordOffset = 0;
+			g_turnRecoveryTimer = 0;
+			g_ziplineState = 0;
+			g_ziplineCooldown = 0;
+			g_ziplineRecordIndex = 0;
+			g_spinHoverTimer = 0;
+			g_spinCooldownTimer = 0;
+			g_groundSlamTimer = 0;
+			g_actionStateFlags = 0;
+			g_gunFireTimer = 0;
+			g_gunChargeTimer = 0;
+			g_forcedFacingActive = 0;
+			g_forcedFacingAngle = 0;
+			g_swingTimer = 0;
+			g_damageRegistered = 0;
+			g_damageBlinkCounter = 0;
+			g_footingType = -1;
+			g_pendingFootingType = -1;
+			g_animationEventFlags = 0;
+			g_surfaceEffectState = 0;
+			g_previousVerticalVelocity = 0;
+			g_environmentSurfaceY = 0;
+			g_environmentEffectType = 0;
+			g_outOfBoundsLifeGranted = 0;
+			g_poweredLaserCharge = 0;
+			g_spinCancelRequested = 0;
+			g_slipperySurfaceState = 0;
+			InputManager::g_directionInputState2Frames = 0;
+			InputManager::g_directionInputState3Frames = 0;
+			g_idleAnimationState = 0;
+			g_facingInterpolationTimer = 0;
+			g_targetFacingAngle = 0;
+			g_jumpStartY = buzz->posAngles.pos.y;
+			g_jumpHeightControlActive = 0;
+			g_idleAnimationTimer = 0;
+			g_movementLockTimer = 0;
+		}
+	}
+
 	// GLOBAL: TOY2 0x00882924
 	Buzz::GadgetPickup* g_activeRocketBootsPickup;
 

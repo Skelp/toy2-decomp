@@ -43,12 +43,6 @@
 
 namespace Toy2
 {
-	namespace Buzz
-	{
-		// STUB: TOY2 0x00433D50
-		void Init(Toy2BuzzActor* buzz, int32_t levelIndex) {}
-	}
-
 	namespace Gadget
 	{
 		// STUB: TOY2 0x004A2080

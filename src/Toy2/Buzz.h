@@ -138,6 +138,7 @@ namespace Toy2
 		};
 
 		void Respawn();
+		void Init(Toy2BuzzActor* buzz, int32_t levelIndex);
 		void RefreshDiscAmmo();
 		void ResetGravityBoots();
 		void ActivateRocketBoots(GadgetPickup* pickup);
