@@ -60,6 +60,7 @@ namespace Toy2
 
 		enum ZiplineState
 		{
+			ZIPLINE_APPROACHING = 1,
 			ZIPLINE_RIDING = 2,
 		};
 
@@ -191,6 +192,7 @@ namespace Toy2
 		void HandleCollisions(Toy2BuzzActor* buzz, MovementVelocity* movement, uint8_t* contactState, int32_t queryIndex);
 		int32_t TickGroundSlam(Toy2BuzzActor* buzz);
 		void TickSpinHover(Toy2BuzzActor* buzz);
+		int32_t HandleZipline(Toy2BuzzActor* buzz);
 		void TickCosmicShield();
 		void TickGrapple();
 		void TickBeamShots();

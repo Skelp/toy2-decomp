@@ -533,6 +533,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0053C5D4
 	int32_t g_turnRecoveryTimer;
 
+	// GLOBAL: TOY2 0x0053C5D8
+	int32_t g_ziplineEndProgress;
+
 	// GLOBAL: TOY2 0x0053C5E0
 	int32_t g_rocketBootsTimer;
 
@@ -542,8 +545,17 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0053C5F0
 	Vector3I g_swingAnchorPosition;
 
+	// GLOBAL: TOY2 0x0053C604
+	int32_t g_ziplineTargetYOrSpeed;
+
+	// GLOBAL: TOY2 0x0053C614
+	int32_t g_ziplineProgress;
+
 	// GLOBAL: TOY2 0x0053C628
 	int32_t g_environmentSurfaceY;
+
+	// GLOBAL: TOY2 0x0053C638
+	Vector3I g_ziplineDirection;
 
 	// GLOBAL: TOY2 0x00830D30
 	int32_t g_previousBuzzEnvironmentY;
@@ -2428,6 +2440,172 @@ namespace Toy2
 			buzz->posAngles.angles.yaw &= 0xFFF;
 			buzz->facingAngle = buzz->posAngles.angles.yaw;
 			return MOVEMENT_LOCK_VERTICAL;
+		}
+
+		struct ZiplineRecord
+		{
+			Vector3I start;
+			Vector3I end;
+		};
+		STATIC_ASSERT(sizeof(ZiplineRecord) == 0x18);
+
+		// FUNCTION: TOY2 0x004359D0 [PROVISIONAL]
+		int32_t HandleZipline(Toy2BuzzActor* buzz)
+		{
+			if (Levels::g_recordData[62] == 0 || g_damageRegistered != 0)
+				return 0;
+
+			if (g_ziplineCooldown > 0)
+			{
+				g_ziplineCooldown -= Renderer::g_frameDelta;
+				if (g_ziplineCooldown < 0)
+					g_ziplineCooldown = 0;
+			}
+
+			if ((g_actionStateFlags & LEDGE_CLIMB_BLOCKING_ACTIONS) == 0 && g_ziplineCooldown == 0 && (Levels::g_recordData[62]->recordCount & 0xFFFE) != 0)
+			{
+				ZiplineRecord* zipline = reinterpret_cast<ZiplineRecord*>(Levels::g_recordData[62]->data);
+				for (int32_t ziplineIndex = 0; ziplineIndex < Levels::g_recordData[62]->recordCount / 2; ziplineIndex++, zipline++)
+				{
+					int32_t directionX = zipline->end.x - zipline->start.x;
+					int32_t buzzX = buzz->posAngles.pos.x;
+					if (directionX < 0)
+					{
+						if ((uint32_t)(buzzX - zipline->end.x + 0x800) > (uint32_t)(0x1000 - directionX))
+							continue;
+					}
+					else if ((uint32_t)(buzzX - zipline->start.x + 0x800) > (uint32_t)(directionX + 0x1000))
+					{
+						continue;
+					}
+
+					int32_t directionZ = zipline->end.z - zipline->start.z;
+					int32_t buzzZ = buzz->posAngles.pos.z;
+					if (directionZ < 0)
+					{
+						if ((uint32_t)(buzzZ - zipline->end.z + 0x800) > (uint32_t)(0x1000 - directionZ))
+							continue;
+					}
+					else if ((uint32_t)(buzzZ - zipline->start.z + 0x800) > (uint32_t)(directionZ + 0x1000))
+					{
+						continue;
+					}
+
+					int32_t directionY = zipline->end.y - zipline->start.y;
+					if (directionY < 0)
+					{
+						if ((uint32_t)(buzz->posAngles.pos.y - zipline->end.y + 0x1000) > (uint32_t)(0x4E00 - directionY))
+							continue;
+					}
+					else if ((uint32_t)(buzz->posAngles.pos.y - zipline->start.y + 0x1000) > (uint32_t)(directionY + 0x4E00))
+					{
+						continue;
+					}
+
+					directionX >>= 5;
+					directionY >>= 5;
+					directionZ >>= 5;
+					int32_t offsetX = (buzzX - zipline->start.x) >> 5;
+					int32_t offsetZ = (buzzZ - zipline->start.z) >> 5;
+					int32_t dominantOffset;
+					int32_t dominantDirection;
+					if (abs(offsetX) < abs(offsetZ))
+					{
+						dominantOffset = offsetZ;
+						dominantDirection = directionZ;
+					}
+					else
+					{
+						dominantOffset = offsetX;
+						dominantDirection = directionX;
+					}
+
+					int32_t verticalOffset = dominantOffset * directionY / dominantDirection;
+					int32_t projectedX = ((zipline->start.x - buzzX) >> 5) + dominantOffset * directionX / dominantDirection;
+					int32_t projectedZ = ((zipline->start.z - buzzZ) >> 5) + dominantOffset * directionZ / dominantDirection;
+					if (projectedX * projectedX + projectedZ * projectedZ >= 0x2000)
+						continue;
+
+					int32_t heightDelta = (verticalOffset + 0x1F0) * 0x20 - buzz->posAngles.pos.y + zipline->start.y;
+					if (heightDelta <= -0x1000 || heightDelta >= 0x3E00)
+						continue;
+
+					g_ziplineState = ZIPLINE_APPROACHING;
+					g_ziplineRecordIndex = ziplineIndex * 2;
+					g_ziplineTargetYOrSpeed = verticalOffset * 0x20 + zipline->start.y;
+					g_ziplineDirection.x = directionX;
+					g_ziplineDirection.y = directionY;
+					g_ziplineDirection.z = directionZ;
+					Nu3D::Math::NormalizeToFixedPoint(&g_ziplineDirection, &g_ziplineDirection);
+					g_ziplineEndProgress = (int32_t)sqrt((double)(directionX * directionX + directionY * directionY + directionZ * directionZ));
+					g_ziplineProgress = (int32_t)sqrt((double)(projectedX * projectedX + verticalOffset * verticalOffset + projectedZ * projectedZ));
+					if (g_ziplineEndProgress - g_ziplineProgress >= 200)
+						break;
+					g_ziplineState = 0;
+				}
+			}
+
+			if (g_ziplineState == ZIPLINE_APPROACHING)
+			{
+				if (g_ziplineTargetYOrSpeed - buzz->posAngles.pos.y + 0x3E00 < 0)
+				{
+					g_ziplineState = ZIPLINE_RIDING;
+					g_ziplineTargetYOrSpeed = 0;
+					g_movementInputLockTimer = 10;
+				}
+				else
+				{
+					buzz->velocity.lateral = 0;
+					buzz->velocity.forward = 0;
+				}
+			}
+
+			if (g_ziplineState != ZIPLINE_RIDING)
+				return 0;
+
+			AudioManager::PlaySoundEffect(0x23, &buzz->posAngles.pos);
+			ZiplineRecord* zipline = reinterpret_cast<ZiplineRecord*>(&Levels::g_recordData[62]->data[g_ziplineRecordIndex]);
+			g_ziplineTargetYOrSpeed += Renderer::g_frameDelta;
+			if (g_ziplineTargetYOrSpeed > 0x30)
+				g_ziplineTargetYOrSpeed = 0x30;
+
+			buzz->posAngles.pos.x = (g_ziplineProgress * g_ziplineDirection.x >> 7) + zipline->start.x;
+			buzz->posAngles.pos.y = (g_ziplineProgress * g_ziplineDirection.y >> 7) + 0x3E00 + zipline->start.y;
+			buzz->posAngles.pos.z = (g_ziplineProgress * g_ziplineDirection.z >> 7) + zipline->start.z;
+			buzz->velocity.lateral = 0;
+			buzz->velocity.vertical = 0;
+			buzz->velocity.forward = 0;
+
+			int32_t ziplineAngle = Nu3D::Math::CartesianToFixedAngle(g_ziplineDirection.x, g_ziplineDirection.z);
+			int32_t facingDelta = (buzz->posAngles.angles.yaw - ziplineAngle) & 0xFFF;
+			if (facingDelta >= 0x800)
+				facingDelta -= 0x1000;
+			buzz->posAngles.angles.yaw -= (((facingDelta >> 3) * Renderer::g_frameDelta) / 2);
+			buzz->posAngles.angles.yaw &= 0xFFF;
+			buzz->facingAngle = buzz->posAngles.angles.yaw;
+
+			g_ziplineProgress += g_ziplineTargetYOrSpeed * Renderer::g_frameDelta;
+			if (g_ziplineProgress < g_ziplineEndProgress
+				&& ((InputManager::g_directionInputState & INPUT_JUMP) == 0 || (InputManager::g_prevDirectionInputState & INPUT_JUMP) != 0
+					|| g_movementInputLockTimer != 0))
+			{
+				return MOVEMENT_LOCK_VERTICAL;
+			}
+
+			g_ziplineState = 0;
+			g_ziplineCooldown = 30;
+			int32_t yaw = buzz->posAngles.angles.yaw;
+			buzz->velocity.lateral = (Numerics::g_sinCosLUT[yaw & 0xFFF] >> 5) * g_ziplineTargetYOrSpeed;
+			buzz->velocity.forward = (Numerics::g_sinCosLUT[(yaw + 0x400) & 0xFFF] >> 5) * g_ziplineTargetYOrSpeed;
+			buzz->velocity.vertical = -0x5C0;
+			buzz->airborneMode = 1;
+			g_jumpHeightControlActive = 0;
+			buzz->collisionFlags = 0;
+			buzz->specialAirState = 0;
+			buzz->animationState = ANIMATION_STATE_LANDING;
+			if ((InputManager::g_directionInputState & INPUT_JUMP) != 0)
+				AudioManager::Preset::PlayOneShotSound2(0x19, buzz);
+			return MOVEMENT_LOCK_LATERAL;
 		}
 
 		// FUNCTION: TOY2 0x00435F30 [PROVISIONAL]
