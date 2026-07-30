@@ -10,6 +10,17 @@ namespace Toy2
 	extern int32_t g_ledgeClimbTimer;
 	extern int32_t g_poleClimbState;
 
+	namespace Levels
+	{
+		void BuildLevelPath(int32_t level, char* output, const char* suffix);
+	}
+
+	namespace Terrain
+	{
+		// STUB: TOY2 0x00489980
+		int32_t LoadAll(char*, int32_t, uint8_t**) { return 0; }
+	}
+
 	namespace Collision
 	{
 		struct SurfaceCollisionResult
@@ -23,9 +34,61 @@ namespace Toy2
 			Vector3I16 surfaceVelocity;
 			int32_t contactTimer;
 			int16_t platformIndex;
-			uint8_t reserved2[4];
+			uint8_t reserved2[2];
+			int16_t collisionDistance;
 			uint16_t surfaceType;
 		};
+
+		struct PackedCollisionFace
+		{
+			int16_t boundsMinX;
+			int16_t boundsExtentX;
+			int8_t boundsMinYBlock;
+			int8_t boundsExtentYBlock;
+			int8_t boundsMinZBlock;
+			int8_t boundsExtentZBlock;
+			Vector3I16 vertex0;
+			Vector3I16 vertex1Offset;
+			Vector3I16 vertex2Offset;
+			Vector3I16 vertex3Offset;
+			uint8_t reserved[12];
+		};
+
+		struct CollisionTreeGroup
+		{
+			int16_t marker;
+			int16_t faceCount;
+			int16_t boundsMinX;
+			int16_t boundsExtentX;
+			int16_t boundsMinZ;
+			int16_t boundsExtentZ;
+		};
+
+		struct CollisionGridCell
+		{
+			int16_t meshListStart;
+			int16_t meshCount;
+			int32_t boundsMinX;
+			int32_t boundsMinZ;
+			int32_t boundsExtentX;
+			int32_t boundsExtentZ;
+		};
+
+		struct CollisionMeshRecord
+		{
+			Vector3I origin;
+			int32_t platformIdx;
+			CollisionTreeGroup* collisionTree;
+			Vector3I boundsMin;
+			Vector3I boundsExt;
+			int16_t typeFlags;
+			uint16_t flags;
+			int32_t boundingSqRadius;
+		};
+
+		const int16_t COLLISION_MESH_STATIC_A = 6;
+		const int16_t COLLISION_MESH_STATIC_B = 7;
+		const uint16_t COLLISION_MESH_EXCLUDE_FROM_GRID = 0x400;
 
 		STATIC_ASSERT(sizeof(SurfaceCollisionResult) == sizeof(CollisionQueryResult));
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, normal) == 0x08);
@@ -33,6 +96,11 @@ namespace Toy2
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, movement) == 0x18);
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, surfaceVelocity) == 0x1E);
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, contactTimer) == 0x24);
+		STATIC_ASSERT(offsetof(SurfaceCollisionResult, collisionDistance) == 0x2C);
+		STATIC_ASSERT(sizeof(PackedCollisionFace) == 0x2C);
+		STATIC_ASSERT(sizeof(CollisionTreeGroup) == 0x0C);
+		STATIC_ASSERT(sizeof(CollisionGridCell) == 0x14);
+		STATIC_ASSERT(sizeof(CollisionMeshRecord) == sizeof(CollisionMeshInstance));
 
 		// GLOBAL: TOY2 0x00729178
 		CollisionQueryResult g_collisionQueryResults[2];
@@ -42,6 +110,33 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x007295A8
 		CollisionMeshInstance g_collisionMeshInstances[300];
+
+		// GLOBAL: TOY2 0x007270A0
+		CollisionGridCell g_collisionGrid[257];
+
+		// GLOBAL: TOY2 0x0072D2B0
+		int16_t g_collisionGridMeshIndices[600];
+
+		// GLOBAL: TOY2 0x007290E0
+		int32_t g_boundedCollisionMeshCount;
+
+		// GLOBAL: TOY2 0x007290EC
+		int32_t g_collisionMeshCount;
+
+		// GLOBAL: TOY2 0x00729120
+		int32_t g_activeCollisionGridCellCount;
+
+		// GLOBAL: TOY2 0x00729124
+		int32_t g_collisionWorldMaxX;
+
+		// GLOBAL: TOY2 0x00729110
+		int32_t g_activePlatformIndex;
+
+		// GLOBAL: TOY2 0x00728718
+		int32_t g_previousPlatformIndex;
+
+		// GLOBAL: TOY2 0x0072D2A4
+		int16_t g_motionScriptEntryCount;
 
 		// GLOBAL: TOY2 0x00729130
 		int16_t g_groundCollisionMeshIndex;
@@ -67,8 +162,309 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00554FA0
 		MathScratchVector g_mathScratch[64];
 
-		// STUB: TOY2 0x00489C30
-		void BuildCollisionWorld(int32_t level, uint8_t** buffer, int32_t terrainNum) {}
+		// FUNCTION: TOY2 0x00489C30 [PROVISIONAL]
+		void BuildCollisionWorld(int32_t level, uint8_t** buffer, int32_t terrainNum)
+		{
+			const int32_t maxMeshCount = 300;
+			const int32_t gridWidth = 5;
+			const int32_t gridCellCount = gridWidth * gridWidth;
+			const int32_t alwaysCheckedCell = 255;
+			const int32_t movingMeshCell = 256;
+			const int32_t coordinateScale = 32;
+			const int32_t blockScale = 64;
+			const int32_t infinity = 0x7FFFFFFF;
+			const int32_t negativeInfinity = (int32_t)0x80000000;
+			int32_t cellIndex;
+			int32_t meshIndex;
+
+			g_surfaceVelocityBlend = 0x1000;
+			g_activePlatformIndex = -1;
+			g_previousPlatformIndex = -1;
+			g_motionScriptEntryCount = 0;
+			g_boundedCollisionMeshCount = 0;
+			g_groundPlatformIndex = -1;
+
+			for (cellIndex = 0; cellIndex < 257; cellIndex++)
+				g_collisionGrid[cellIndex].meshCount = 0;
+
+			for (int32_t platformIndex = 0; platformIndex < 32; platformIndex++)
+			{
+				Platform::PlatformState& platform = Platform::g_platformStates[platformIndex];
+				platform.collisionMeshIndex = -1;
+				platform.rotationAnglesFixed.x = 0;
+				platform.rotationAnglesFixed.y = 0;
+				platform.rotationAnglesFixed.z = 0;
+				platform.angularVelocity.x = 0;
+				platform.angularVelocity.y = 0;
+				platform.angularVelocity.z = 0;
+				platform.remainingRotation.x = 0;
+				platform.remainingRotation.y = 0;
+				platform.remainingRotation.z = 0;
+				platform.velocity.x = 0;
+				platform.velocity.y = 0;
+				platform.velocity.z = 0;
+				platform.remainingTranslation.x = 0;
+				platform.remainingTranslation.y = 0;
+				platform.remainingTranslation.z = 0;
+				platform.flags = 0;
+				platform.motionMode = 0;
+			}
+
+			const char* terrainSuffix;
+			if (terrainNum == 1)
+				terrainSuffix = "terr1";
+			else if (terrainNum == 2)
+				terrainSuffix = "terr2";
+			else if (terrainNum == 3)
+				terrainSuffix = "terr3";
+			else
+				terrainSuffix = "terrain";
+
+			char filename[64];
+			Levels::BuildLevelPath(level, filename, terrainSuffix);
+			g_collisionMeshCount = Terrain::LoadAll(filename, 0, buffer);
+			g_collisionWorldMaxX = negativeInfinity;
+
+			for (meshIndex = 0; meshIndex < maxMeshCount; meshIndex++)
+			{
+				CollisionMeshRecord& mesh = reinterpret_cast<CollisionMeshRecord*>(g_collisionMeshInstances)[meshIndex];
+				if (mesh.typeFlags != COLLISION_MESH_STATIC_A && mesh.typeFlags != COLLISION_MESH_STATIC_B && mesh.typeFlags != COLLISION_MESH_MOVING)
+					continue;
+
+				int32_t minX = infinity;
+				int32_t maxX = negativeInfinity;
+				int32_t minY = infinity;
+				int32_t maxY = negativeInfinity;
+				int32_t minZ = infinity;
+				int32_t maxZ = negativeInfinity;
+				int32_t boundingSqRadius = 0;
+				CollisionTreeGroup* group = mesh.collisionTree;
+
+				while (group->marker >= 0)
+				{
+					PackedCollisionFace* face = reinterpret_cast<PackedCollisionFace*>(group + 1);
+					for (int32_t faceIndex = 0; faceIndex < group->faceCount; faceIndex++, face++)
+					{
+						int32_t faceMinX = face->boundsMinX;
+						int32_t faceMaxX = faceMinX + face->boundsExtentX;
+						int32_t faceMinY = face->boundsMinYBlock * blockScale + face->vertex0.y;
+						int32_t faceMaxY = (face->boundsExtentYBlock * blockScale + face->boundsMinYBlock) * blockScale + face->vertex0.y;
+						int32_t faceMinZ = face->boundsMinZBlock * blockScale + face->vertex0.z;
+						int32_t faceMaxZ = (face->boundsExtentZBlock * blockScale + face->boundsMinZBlock) * blockScale + face->vertex0.z;
+
+						if (faceMinX < minX)
+							minX = faceMinX;
+						if (faceMaxX > maxX)
+							maxX = faceMaxX;
+						if (faceMinY < minY)
+							minY = faceMinY;
+						if (faceMaxY > maxY)
+							maxY = faceMaxY;
+						if (faceMinZ < minZ)
+							minZ = faceMinZ;
+						if (faceMaxZ > maxZ)
+							maxZ = faceMaxZ;
+
+						int32_t vertexX = face->vertex0.y;
+						int32_t worldX = mesh.origin.x + vertexX * coordinateScale;
+						if (worldX > g_collisionWorldMaxX)
+							g_collisionWorldMaxX = worldX;
+						int32_t distance = face->vertex0.x * face->vertex0.x + vertexX * vertexX + face->vertex0.z * face->vertex0.z;
+						if (distance > boundingSqRadius)
+							boundingSqRadius = distance;
+
+						int32_t vertexY = face->vertex0.x + face->vertex1Offset.x;
+						vertexX = face->vertex0.y + face->vertex1Offset.y;
+						int32_t vertexZ = face->vertex0.z + face->vertex1Offset.z;
+						worldX = mesh.origin.x + vertexX * coordinateScale;
+						if (worldX > g_collisionWorldMaxX)
+							g_collisionWorldMaxX = worldX;
+						distance = vertexY * vertexY + vertexX * vertexX + vertexZ * vertexZ;
+						if (distance > boundingSqRadius)
+							boundingSqRadius = distance;
+
+						vertexY = face->vertex0.x + face->vertex2Offset.x;
+						vertexX = face->vertex0.y + face->vertex2Offset.y;
+						vertexZ = face->vertex0.z + face->vertex2Offset.z;
+						worldX = mesh.origin.x + vertexX * coordinateScale;
+						if (worldX > g_collisionWorldMaxX)
+							g_collisionWorldMaxX = worldX;
+						distance = vertexY * vertexY + vertexX * vertexX + vertexZ * vertexZ;
+						if (distance > boundingSqRadius)
+							boundingSqRadius = distance;
+
+						vertexY = face->vertex0.x + face->vertex3Offset.x;
+						vertexX = face->vertex0.y + face->vertex3Offset.y;
+						vertexZ = face->vertex0.z + face->vertex3Offset.z;
+						worldX = mesh.origin.x + vertexX * coordinateScale;
+						if (worldX > g_collisionWorldMaxX)
+							g_collisionWorldMaxX = worldX;
+						distance = vertexY * vertexY + vertexX * vertexX + vertexZ * vertexZ;
+						if (distance > boundingSqRadius)
+							boundingSqRadius = distance;
+					}
+					group = reinterpret_cast<CollisionTreeGroup*>(face);
+				}
+
+				mesh.boundingSqRadius = boundingSqRadius;
+				mesh.boundsMin.x = mesh.origin.x + minX * coordinateScale;
+				mesh.boundsMin.y = mesh.origin.y + minY * coordinateScale;
+				mesh.boundsMin.z = mesh.origin.z + minZ * coordinateScale;
+				mesh.boundsExt.x = mesh.origin.x + maxX * coordinateScale - mesh.boundsMin.x;
+				mesh.boundsExt.y = mesh.origin.y + maxY * coordinateScale - mesh.boundsMin.y;
+				mesh.boundsExt.z = mesh.origin.z + maxZ * coordinateScale - mesh.boundsMin.z;
+				g_boundedCollisionMeshCount++;
+			}
+
+			int32_t worldMinX = infinity;
+			int32_t worldMaxX = negativeInfinity;
+			int32_t worldMinZ = infinity;
+			int32_t worldMaxZ = negativeInfinity;
+			for (meshIndex = 0; meshIndex < maxMeshCount; meshIndex++)
+			{
+				CollisionMeshRecord& mesh = reinterpret_cast<CollisionMeshRecord*>(g_collisionMeshInstances)[meshIndex];
+				if ((mesh.typeFlags != COLLISION_MESH_STATIC_A && mesh.typeFlags != COLLISION_MESH_STATIC_B)
+					|| (mesh.flags & COLLISION_MESH_EXCLUDE_FROM_GRID) != 0)
+					continue;
+
+				for (CollisionTreeGroup* group = mesh.collisionTree; group->marker >= 0;)
+				{
+					int32_t minX = mesh.origin.x + group->boundsMinX * coordinateScale;
+					int32_t maxX = mesh.origin.x + (group->boundsMinX + group->boundsExtentX) * coordinateScale;
+					int32_t minZ = mesh.origin.z + group->boundsMinZ * coordinateScale;
+					int32_t maxZ = mesh.origin.z + (group->boundsMinZ + group->boundsExtentZ) * coordinateScale;
+					if (minX < worldMinX)
+						worldMinX = minX;
+					if (maxX > worldMaxX)
+						worldMaxX = maxX;
+					if (minZ < worldMinZ)
+						worldMinZ = minZ;
+					if (maxZ > worldMaxZ)
+						worldMaxZ = maxZ;
+					PackedCollisionFace* faces = reinterpret_cast<PackedCollisionFace*>(group + 1);
+					group = reinterpret_cast<CollisionTreeGroup*>(faces + group->faceCount);
+				}
+			}
+
+			int16_t meshGridCells[2048];
+			int32_t meshMinX[2048];
+			int32_t meshMaxX[2048];
+			int32_t meshMinZ[2048];
+			int32_t meshMaxZ[2048];
+			int32_t movingMeshCount = 0;
+			int32_t meshListCount = 0;
+			g_collisionGrid[movingMeshCell].meshListStart = 0;
+
+			for (meshIndex = 0; meshIndex < maxMeshCount; meshIndex++)
+			{
+				CollisionMeshRecord& mesh = reinterpret_cast<CollisionMeshRecord*>(g_collisionMeshInstances)[meshIndex];
+				if ((mesh.typeFlags == COLLISION_MESH_STATIC_A || mesh.typeFlags == COLLISION_MESH_STATIC_B)
+					&& (mesh.flags & COLLISION_MESH_EXCLUDE_FROM_GRID) == 0)
+				{
+					meshMinX[meshIndex] = infinity;
+					meshMaxX[meshIndex] = negativeInfinity;
+					meshMinZ[meshIndex] = infinity;
+					meshMaxZ[meshIndex] = negativeInfinity;
+
+					for (CollisionTreeGroup* group = mesh.collisionTree; group->marker >= 0;)
+					{
+						int32_t minX = mesh.origin.x + group->boundsMinX * coordinateScale;
+						int32_t maxX = mesh.origin.x + (group->boundsMinX + group->boundsExtentX) * coordinateScale;
+						int32_t minZ = mesh.origin.z + group->boundsMinZ * coordinateScale;
+						int32_t maxZ = mesh.origin.z + (group->boundsMinZ + group->boundsExtentZ) * coordinateScale;
+						if (minX < meshMinX[meshIndex])
+							meshMinX[meshIndex] = minX;
+						if (maxX > meshMaxX[meshIndex])
+							meshMaxX[meshIndex] = maxX;
+						if (minZ < meshMinZ[meshIndex])
+							meshMinZ[meshIndex] = minZ;
+						if (maxZ > meshMaxZ[meshIndex])
+							meshMaxZ[meshIndex] = maxZ;
+						PackedCollisionFace* faces = reinterpret_cast<PackedCollisionFace*>(group + 1);
+						group = reinterpret_cast<CollisionTreeGroup*>(faces + group->faceCount);
+					}
+
+					int32_t gridX = (((meshMinX[meshIndex] + meshMaxX[meshIndex]) / 2 - worldMinX) * gridWidth) / (worldMaxX - worldMinX);
+					if (gridX < 0)
+						gridX = 0;
+					else if (gridX > gridWidth - 1)
+						gridX = gridWidth - 1;
+
+					int32_t gridZ = (((meshMinZ[meshIndex] + meshMaxZ[meshIndex]) / 2 - worldMinZ) * gridWidth) / (worldMaxZ - worldMinZ);
+					if (gridZ < 0)
+						meshGridCells[meshIndex] = (int16_t)gridX;
+					else
+					{
+						if (gridZ > gridWidth - 1)
+							gridZ = gridWidth - 1;
+						meshGridCells[meshIndex] = (int16_t)(gridX + gridZ * gridWidth);
+					}
+				}
+				else if (mesh.typeFlags == COLLISION_MESH_MOVING && (mesh.flags & COLLISION_MESH_EXCLUDE_FROM_GRID) == 0)
+				{
+					g_collisionGridMeshIndices[meshListCount++] = (int16_t)meshIndex;
+					g_collisionGrid[movingMeshCell].meshCount++;
+					movingMeshCount++;
+				}
+			}
+
+			g_collisionGrid[alwaysCheckedCell].meshListStart = (int16_t)movingMeshCount;
+			for (meshIndex = 0; meshIndex < maxMeshCount; meshIndex++)
+			{
+				if ((reinterpret_cast<CollisionMeshRecord*>(g_collisionMeshInstances)[meshIndex].flags & COLLISION_MESH_EXCLUDE_FROM_GRID) != 0)
+				{
+					g_collisionGridMeshIndices[meshListCount++] = (int16_t)meshIndex;
+					g_collisionGrid[alwaysCheckedCell].meshCount++;
+				}
+			}
+
+			g_activeCollisionGridCellCount = 0;
+			for (cellIndex = 0; cellIndex < gridCellCount; cellIndex++)
+			{
+				CollisionGridCell& cell = g_collisionGrid[cellIndex];
+				cell.meshListStart = (int16_t)meshListCount;
+				int32_t minX = infinity;
+				int32_t maxX = negativeInfinity;
+				int32_t minZ = infinity;
+				int32_t maxZ = negativeInfinity;
+
+				for (meshIndex = 0; meshIndex < maxMeshCount; meshIndex++)
+				{
+					CollisionMeshRecord& mesh = reinterpret_cast<CollisionMeshRecord*>(g_collisionMeshInstances)[meshIndex];
+					if (meshGridCells[meshIndex] == cellIndex && (mesh.typeFlags == COLLISION_MESH_STATIC_A || mesh.typeFlags == COLLISION_MESH_STATIC_B)
+						&& (mesh.flags & COLLISION_MESH_EXCLUDE_FROM_GRID) == 0)
+					{
+						if (meshMinX[meshIndex] < minX)
+							minX = meshMinX[meshIndex];
+						if (meshMaxX[meshIndex] > maxX)
+							maxX = meshMaxX[meshIndex];
+						if (meshMinZ[meshIndex] < minZ)
+							minZ = meshMinZ[meshIndex];
+						if (meshMaxZ[meshIndex] > maxZ)
+							maxZ = meshMaxZ[meshIndex];
+						cell.meshCount++;
+						g_collisionGridMeshIndices[meshListCount++] = (int16_t)meshIndex;
+					}
+				}
+
+				if (cell.meshCount != 0)
+				{
+					cell.boundsMinX = minX;
+					cell.boundsMinZ = minZ;
+					cell.boundsExtentX = maxX - minX;
+					cell.boundsExtentZ = maxZ - minZ;
+					g_activeCollisionGridCellCount++;
+				}
+			}
+
+			for (int32_t queryIndex = 0; queryIndex < 2; queryIndex++)
+			{
+				g_collisionQueryResults[queryIndex].face = 0;
+				g_collisionQueryResults[queryIndex].contactFlags = 0;
+				reinterpret_cast<SurfaceCollisionResult*>(g_collisionQueryResults)[queryIndex].contactTimer = 0;
+				reinterpret_cast<SurfaceCollisionResult*>(g_collisionQueryResults)[queryIndex].collisionDistance = 0xFA0;
+			}
+		}
 
 		// FUNCTION: TOY2 0x004878A0 [MATCHED]
 		void MarkPlatformAsMoving(int32_t platformIndex)
