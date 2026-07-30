@@ -191,6 +191,8 @@ set(TOY2_SOURCES
     src/Nu3D/Camera.h
     src/Nu3D/Particles.h
     src/Nu3D/Particles.cpp
+    src/Nu3D/ParticlePresets.inc
+    src/Nu3D/ParticleTypes.inc
     src/Nu3D/Math.cpp
     src/Nu3D/Math.h
     src/Nu3D/NuMtx.cpp
