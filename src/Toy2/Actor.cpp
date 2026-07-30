@@ -1338,6 +1338,14 @@ namespace Toy2
 
 	namespace CreatureBehaviour
 	{
+		union BeamVector
+		{
+			Vector3I vector;
+			Vector4I beam;
+		};
+
+		STATIC_ASSERT(sizeof(BeamVector) == 0x10);
+
 		void RCCarLevel1(Actor::Toy2Actor::ActorBehaviourContext* context);
 		void RCCarLevel2(Actor::Toy2Actor::ActorBehaviourContext* context);
 
@@ -1471,8 +1479,77 @@ namespace Toy2
 					2);
 			}
 		}
-		// STUB: TOY2 0x00406620
-		void ZPod(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// FUNCTION: TOY2 0x00406620 [PROVISIONAL]
+		void ZPod(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			int32_t localStrafeSpeed = context->localStrafeSpeed;
+			if (localStrafeSpeed > 0x200)
+				localStrafeSpeed = 0x200;
+			else if (localStrafeSpeed < -0x200)
+				localStrafeSpeed = -0x200;
+
+			actor->rollAngle -= (int16_t)((actor->rollAngle + localStrafeSpeed) * Renderer::g_frameDelta / 16);
+
+			if (actor->hitpoints >= 0)
+				AudioManager::PlaySoundEffect(0x5B, &actor->pos);
+
+			if ((context->targetFlags & 1) != 0)
+			{
+				actor->previousActorPhase -= (int16_t)Renderer::g_frameDelta;
+				if (actor->previousActorPhase < 0)
+				{
+					actor->previousActorPhase = 0x168;
+					int32_t movementAngle = actor->yawAngle + 0x200;
+					if (*g_randDatBufferPtr++ < 0x80)
+						movementAngle -= 0x400;
+					actor->velX = Numerics::g_sinCosLUT[movementAngle] >> 4;
+					actor->velForward = Numerics::g_sinCosLUT[(movementAngle + 0x400) & 0xFFF] >> 4;
+				}
+
+				if (actor->previousActorPhase <= 0x118 && actor->previousActorPhase >= 0x64)
+				{
+					BeamVector beamPosition;
+					beamPosition.beam.x = 0;
+					beamPosition.beam.y = 0;
+					beamPosition.beam.z = -100;
+					Actor::ResolveBoneAttachmentPos(&beamPosition.beam, actor, 0);
+
+					BeamVector beamDirection;
+					beamDirection.vector.y = 96000;
+					beamDirection.vector.x = Numerics::g_sinCosLUT[(uint16_t)actor->yawAngle & 0xFFF] << 2;
+					beamDirection.vector.z = Numerics::g_sinCosLUT[((uint16_t)actor->yawAngle + 0x400) & 0xFFF] << 2;
+					Collision::SweepAndSlide(&beamPosition.vector, &beamDirection.vector, 0x8000, 0, 0x100);
+					Renderer::Beam::QueueBeam(9, 0x20, 400, &beamPosition.beam, &beamDirection.beam, 0, 0x80, 0);
+
+					beamPosition.vector.x += beamDirection.vector.x;
+					beamPosition.vector.y += beamDirection.vector.y;
+					beamPosition.vector.z += beamDirection.vector.z;
+					AudioManager::PlaySoundEffect(0x5C, &beamPosition.vector);
+
+					for (int32_t particleIndex = 0; particleIndex < g_framePulseOutputs.twoTickCount; particleIndex++)
+						Nu3D::Particles::SpawnFromPreset(beamPosition.vector.x, beamPosition.vector.y, beamPosition.vector.z, 4, 4);
+
+					if (g_framePulseOutputs.fourTick != 0)
+						Nu3D::Particles::SpawnFromPreset(beamPosition.vector.x, beamPosition.vector.y, beamPosition.vector.z, 0x46, 2);
+
+					if (g_framePulseOutputs.thirtyTwoTick != 0)
+						Lighting::SpawnLight(beamPosition.vector.x, beamPosition.vector.y, beamPosition.vector.z, 0xC000, 0x10, -2);
+
+					Renderer::LensFlare::RegisterLight(beamPosition.vector.x, beamPosition.vector.y, beamPosition.vector.z, 0, 0x80, 0, 0x20);
+					if (Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &beamPosition.vector, 0x19) != 0)
+					{
+						uint32_t direction = Nu3D::Math::CartesianToFixedAngle(
+							g_buzzActor.posAngles.pos.x - beamPosition.vector.x, g_buzzActor.posAngles.pos.z - beamPosition.vector.z);
+						Buzz::HandleDamage(direction, 3);
+					}
+				}
+			}
+			else
+			{
+				actor->previousActorPhase = 0x168;
+			}
+		}
 		// FUNCTION: TOY2 0x00406960 [MATCHED]
 		void BPlane(Actor::Toy2Actor::ActorBehaviourContext* context)
 		{
