@@ -1170,7 +1170,7 @@ namespace Toy2
 
 			const char* datFileName;
 			void* bufferPtr;
-			int32_t charLoaderFlag = 0;
+			int32_t loadedCharacterBoneCount = 0;
 
 			memset(fileNameBuffer, 0, sizeof(fileNameBuffer));
 
@@ -1389,7 +1389,7 @@ namespace Toy2
 			{
 				uint8_t creatureIdList[128];
 				Actor::GetCreatureList(creatureIdList);
-				CharacterLoader::Start(&charLoaderFlag, &dataBuffer, creatureIdList);
+				CharacterLoader::Start(&loadedCharacterBoneCount, &dataBuffer, creatureIdList);
 			}
 
 			g_levelLoadArena = dataBuffer;

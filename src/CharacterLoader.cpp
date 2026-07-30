@@ -104,6 +104,12 @@ namespace CharacterLoader
 	// GLOBAL: TOY2 0x0053EAC8
 	ActorBounds g_actorBounds[128];
 
+	// GLOBAL: TOY2 0x0054DD88
+	ActorBounds g_buzzActorBounds;
+
+	// GLOBAL: TOY2 0x00559DF0
+	int32_t g_characterBoneLimitExceeded;
+
 	// GLOBAL: TOY2 0x00547188
 	uint8_t* g_animationDataBySlot[512];
 
@@ -202,8 +208,229 @@ namespace Toy2
 namespace CharacterLoader
 {
 
-	// STUB: TOY2 0x0043B0C0
-	void LoadCharacterData(int32_t* loadedByteCount, uint8_t** dataBuffer, uint8_t* creatureList) {}
+	// FUNCTION: TOY2 0x0043B0C0 [PROVISIONAL]
+	void LoadCharacterData(int32_t* loadedBoneCount, uint8_t** dataBuffer, uint8_t* creatureList)
+	{
+		uint8_t creatureId = *creatureList;
+		if (creatureId != 0xFF)
+		{
+			do
+			{
+				uint32_t creatureType = creatureId;
+				switch (creatureType)
+				{
+					case 0:
+						Load("chars\\buzz", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 1:
+						Load("chars\\woody", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 2:
+						Load("chars\\buzzint", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 3:
+						Load("chars\\zurg1", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 4:
+						Load("chars\\zurg3", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 5:
+						Load("chars\\tinman", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 6:
+						Load("chars\\sheep", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 7:
+						Load("chars\\bopeep", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 8:
+						Load("chars\\rc", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 9:
+						Load("chars\\mrpot", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 10:
+						Load("chars\\hamm", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 11:
+						Load("chars\\cotbit", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 12:
+						Load("chars2\\lawn", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 13:
+						Load("chars\\army", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 14:
+						Load("chars2\\zgcar", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 15:
+						Load("chars2\\zkite", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 16:
+						Load("chars2\\slime", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 17:
+						Load("chars2\\paint", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 18:
+						Load("chars2\\ftyke", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 19:
+						Load("chars2\\ltyke", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 20:
+						Load("chars2\\zpod", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 21:
+						Load("chars2\\shiny", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 22:
+						Load("chars2\\drill", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 23:
+						Load("chars2\\mouse", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 24:
+						Load("chars3\\bplane", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 25:
+						Load("chars3\\box", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 26:
+						Load("chars3\\dino", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 27:
+						Load("chars2\\zboat", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 28:
+						Load("chars3\\chick", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 29:
+						Load("chars3\\hoola", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 30:
+						Load("chars3\\lock", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 31:
+						Load("chars3\\gunsp", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 32:
+						Load("chars3\\clown", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 33:
+						Load("chars3\\rattle", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 34:
+						Load("chars3\\mum", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 35:
+						Load("chars3\\roost", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 36:
+						Load("chars4\\mother", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 37:
+						Load("chars4\\fsauce", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 38:
+						Load("chars4\\martian", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 39:
+						Load("chars4\\jessie", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 40:
+						Load("chars6\\rabid", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 41:
+						Load("chars3\\buzzard", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 42:
+						Load("chars4\\bullseye", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 43:
+						Load("chars4\\ducks", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 44:
+						Load("chars4\\slinky", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 45:
+						Load("chars4\\gunsl", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 46:
+						Load("chars4\\fatbloke", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 47:
+						Load("chars5\\bbuggy", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 48:
+						Load("chars5\\bi", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 49:
+						Load("chars4\\rocky", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 50:
+						Load("chars4\\george", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 51:
+						Load("chars4\\mildred", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 52:
+						Load("chars4\\karen", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 53:
+						Load("chars4\\pilot", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 54:
+						Load("chars5\\zpod", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 55:
+						Load("chars5\\bub", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 56:
+						LoadBuzzLight("chars5\\buzl", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 57:
+						Load("chars5\\zemp", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 58:
+						Load("chars5\\smith", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 59:
+						Load("chars5\\luggage", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 60:
+						Load("chars6\\lugman", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 61:
+						Load("chars6\\prosp", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+					case 62:
+						Load("chars6\\rex", loadedBoneCount, dataBuffer, creatureId, &g_collisionVolumes[creatureId], &g_actorBounds[creatureId]);
+						break;
+				}
+				creatureId = creatureList[1];
+				creatureList++;
+			} while (creatureId != 0xFF);
+		}
+
+		g_buzzActorBounds = g_actorBounds[0];
+
+		for (Toy2::Actor::Toy2Actor* actor = Toy2::Actor::g_creatureActors; &actor->creatureId < &Toy2::Actor::g_creatureActors[64].creatureId; actor++)
+		{
+			if (actor->creatureId > 0)
+			{
+				actor->collisionVolumes = g_collisionVolumes[actor->creatureId];
+				actor->boundingOffset.x = g_actorBounds[actor->creatureId].offset.x;
+				actor->boundingOffset.y = g_actorBounds[actor->creatureId].offset.y;
+				actor->boundingOffset.z = g_actorBounds[actor->creatureId].offset.z;
+				actor->boundingSphereRadius = g_actorBounds[actor->creatureId].radius;
+			}
+		}
+
+		if (*loadedBoneCount > 300)
+			g_characterBoneLimitExceeded = 1;
+	}
 
 	// STUB: TOY2 0x0043C750
 	void LoadSecondSection(int32_t baseBoneIndex) {}
@@ -454,7 +681,7 @@ namespace CharacterLoader
 	}
 
 	// FUNCTION: TOY2 0x0043B9B0 [PROVISIONAL]
-	void Start(int32_t* loadedByteCount, uint8_t** dataBuffer, uint8_t* creatureList)
+	void Start(int32_t* loadedBoneCount, uint8_t** dataBuffer, uint8_t* creatureList)
 	{
 		Toy2::Animation::g_singleNodeIndex = -1;
 		Nullsub9();
@@ -476,7 +703,7 @@ namespace CharacterLoader
 			g_actorBounds[creatureId].radius = 500;
 		}
 
-		LoadCharacterData(loadedByteCount, dataBuffer, creatureList);
+		LoadCharacterData(loadedBoneCount, dataBuffer, creatureList);
 	}
 
 	// FUNCTION: TOY2 0x0043C700 [MATCHED]

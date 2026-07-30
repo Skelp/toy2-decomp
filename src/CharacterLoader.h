@@ -94,7 +94,7 @@ namespace CharacterLoader
 	extern ActorBounds g_actorBounds[128];
 	extern uint8_t* g_animationDataBySlot[512];
 
-	void Start(int32_t* loadedByteCount, uint8_t** dataBuffer, uint8_t* creatureList);
+	void Start(int32_t* loadedBoneCount, uint8_t** dataBuffer, uint8_t* creatureList);
 	void LoadFirstSection(CharacterAnimationData* animationData, int8_t collectBoneRemaps);
 	void Load(const char* filename,
 		int32_t* loadedBoneCount,
