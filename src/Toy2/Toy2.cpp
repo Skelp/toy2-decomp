@@ -1804,6 +1804,28 @@ namespace Toy2
 		}
 	}
 
+	namespace Portal
+	{
+		// STUB: TOY2 0x0043FEF0
+		void UpdateActiveSector() {}
+
+		// FUNCTION: TOY2 0x00440260 [MATCHED]
+		void UpdateActiveSectorAt(int32_t x, int32_t y, int32_t z)
+		{
+			int32_t previousX = g_buzzActor.posAngles.pos.x;
+			int32_t previousY = g_buzzActor.posAngles.pos.y;
+			int32_t previousZ = g_buzzActor.posAngles.pos.z;
+
+			g_buzzActor.posAngles.pos.x = x;
+			g_buzzActor.posAngles.pos.y = y;
+			g_buzzActor.posAngles.pos.z = z;
+			UpdateActiveSector();
+			g_buzzActor.posAngles.pos.x = previousX;
+			g_buzzActor.posAngles.pos.y = previousY;
+			g_buzzActor.posAngles.pos.z = previousZ;
+		}
+	}
+
 	// STUB: TOY2 0x00440F70
 	void RenderGame(int32_t fullRender) {}
 

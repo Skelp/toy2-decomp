@@ -16,6 +16,12 @@ namespace Toy2
 		int32_t RemoveDetailLevel();
 	}
 
+	namespace Portal
+	{
+		void UpdateActiveSector();
+		void UpdateActiveSectorAt(int32_t x, int32_t y, int32_t z);
+	}
+
 	namespace MoveableObject
 	{
 		struct State
