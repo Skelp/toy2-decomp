@@ -487,6 +487,69 @@ namespace Toy2
 			AudioManager::PlaySoundEffect(0x92, cannonPosition);
 		}
 
+		// FUNCTION: TOY2 0x004295B0 [PROVISIONAL]
+		void UpdateCannonTarget(int32_t sectorIndex, int32_t cannonLinkId, int32_t companionLinkId, uint32_t targetMask)
+		{
+			Vector3I cannonPosition;
+			Nu3D::Link::GetCurrentPosFixed(cannonLinkId, &cannonPosition);
+			if (Sector::g_currentSectorIndex != sectorIndex || Nu3D::Math::IsWithinDistance(&cannonPosition, &g_buzzActor.posAngles.pos, 0x480) == 0)
+				return;
+
+			if (Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &cannonPosition, 0x32) != 0)
+			{
+				int32_t damageAngle =
+					Nu3D::Math::CartesianToFixedAngle(g_buzzActor.posAngles.pos.x - cannonPosition.x, g_buzzActor.posAngles.pos.z - cannonPosition.z);
+				if ((g_groundSlamTargetMask & targetMask) != 0)
+					Buzz::HandleDamage(damageAngle, 1);
+				else
+					Buzz::HandleDamage(damageAngle, 3);
+			}
+
+			if ((g_groundSlamTargetMask & targetMask) != 0)
+			{
+				if (g_framePulseOutputs.sevenTick != 0)
+				{
+					Nu3D::Particles::ParticleInstance* particle =
+						Nu3D::Particles::SpawnFromPreset(cannonPosition.x, cannonPosition.y - 0x2000, cannonPosition.z, 0x11, 0x1A);
+					particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+				}
+				return;
+			}
+
+			Vector3I cannonRotation;
+			cannonRotation.x = g_buzzActor.posAngles.pos.x - cannonPosition.x;
+			cannonRotation.z = g_buzzActor.posAngles.pos.z - cannonPosition.z;
+			cannonRotation.y = cannonPosition.y;
+			while (abs(cannonRotation.x) > 0x4000 || abs(cannonRotation.z) > 0x4000)
+			{
+				cannonRotation.x >>= 1;
+				cannonRotation.z >>= 1;
+			}
+
+			int32_t targetAngle = Nu3D::Math::CartesianToFixedAngle(-cannonRotation.z, cannonRotation.x);
+			Nu3D::Link::GetRotation8Bit(cannonLinkId, &cannonRotation);
+			int32_t angleDelta = (targetAngle - cannonRotation.y) & 0xFFF;
+			if (angleDelta < 0x800)
+			{
+				if (angleDelta < Renderer::g_frameDelta * 8)
+					cannonRotation.y += angleDelta;
+				else
+					cannonRotation.y += Renderer::g_frameDelta * 8;
+			}
+			else if (0x1000 - angleDelta < Renderer::g_frameDelta * 8)
+			{
+				cannonRotation.y += angleDelta - 0x1000;
+			}
+			else
+			{
+				cannonRotation.y -= Renderer::g_frameDelta * 8;
+			}
+
+			Nu3D::Link::SetRotationRelative8bit(cannonLinkId, 0, cannonRotation.y, 0);
+			Nu3D::Link::SetRotationRelative8bit(companionLinkId, 0, cannonRotation.y, 0);
+			FireCannonProjectile(&cannonPosition, cannonRotation.y);
+		}
+
 		// FUNCTION: TOY2 0x00428890 [PROVISIONAL]
 		void UpdateObjectGroups(uint32_t requestedMask)
 		{
