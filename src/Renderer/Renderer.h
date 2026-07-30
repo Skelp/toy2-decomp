@@ -247,6 +247,7 @@ namespace Renderer
 		STATIC_ASSERT(offsetof(Element, red) == 0x06);
 	}
 
+	void DrawFallingParticles();
 	void DrawLensFlares();
 
 	void InitRenderState(int32_t newStage);

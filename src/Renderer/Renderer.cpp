@@ -12,7 +12,9 @@
 #include "Nu3D/Primitive.h"
 #include "Nu3D/Scene.h"
 #include "Renderer/Sprite.h"
+#include "Renderer/SpriteSheets.h"
 #include "Toy2/Toy2.h"
+#include "Toy2/Weather.h"
 #include "Renderer/Glue.h"
 #include "Toy2/Camera.h"
 #include "Toy2/Collision.h"
@@ -381,6 +383,53 @@ namespace Renderer
 				element++;
 				remainingElements--;
 			} while (remainingElements != 0);
+		}
+	}
+
+	// FUNCTION: TOY2 0x0044F010 [PROVISIONAL]
+	void DrawFallingParticles()
+	{
+		uint32_t bitmapWidth = 0xFF;
+		uint32_t bitmapHeight = 0xFF;
+		if (Toy2::Weather::g_precipitationParticles != 0)
+		{
+			SpriteSheet* sheet = g_spriteSheets[Toy2::Weather::g_precipitationSpriteSheetIndex];
+			if (sheet != 0)
+			{
+				RGBA color = { 0x40, 0x40, 0x40, 0xFF };
+				int32_t textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
+				if (textureDataIndex != 0)
+					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
+
+				Vector2F uvTopLeft;
+				uvTopLeft.x = (float)sheet->tiles[0].x / (int32_t)bitmapWidth;
+				float bitmapHeightFloat = (float)(int32_t)bitmapHeight;
+				uvTopLeft.y = (float)sheet->tiles[0].y / bitmapHeightFloat;
+				Vector2F uvBottomRight;
+				uvBottomRight.x = ((float)sheet->tileWidth + sheet->tiles[0].x) / (int32_t)bitmapWidth;
+				uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[0].y) / bitmapHeightFloat;
+
+				for (int32_t particleIndex = 0; particleIndex < 64; particleIndex++)
+				{
+					Toy2::Weather::PrecipitationParticle* particle = &Toy2::Weather::g_precipitationParticles[particleIndex];
+					if (particle->terminalY != 0)
+					{
+						Vector3F position;
+						position.x = (float)(particle->position.x >> 5);
+						position.y = (float)(particle->position.y >> 5);
+						position.z = (float)(particle->position.z >> 5);
+						Sprite::QueueBillboardSprite(&position,
+							0,
+							30.0f,
+							200.0f,
+							&uvTopLeft,
+							&uvBottomRight,
+							textureDataIndex,
+							color,
+							RENDER_CULL_NONE | RENDER_ZWRITE | RENDER_ALPHA_CUSTOM);
+					}
+				}
+			}
 		}
 	}
 
