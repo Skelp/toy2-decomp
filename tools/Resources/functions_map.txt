@@ -403,7 +403,7 @@
 0x00474C80 SoftwareRenderer::UnkRenderAPI33
 0x00476340 SoftwareRenderer::UnkRenderAPI29
 0x00476D00 SoftwareRenderer::UnkRenderAPI28
-0x004776C0 SoftwareRenderer::UnkRenderAPI27
+0x004776C0 SoftwareRenderer::RasterizeSolidQuad8
 0x00477EB0 SoftwareRenderer::UnkRenderAPI34
 0x0047B170 RawLoader::DecompressBuffer
 0x0047C800 SoftwareRenderer::LockBackBuffer

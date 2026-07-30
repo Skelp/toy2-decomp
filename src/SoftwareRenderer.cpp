@@ -721,7 +721,6 @@ namespace SoftwareRenderer
 		} while (scanlineCount != 0);
 	}
 
-#undef RASTERIZE_SOLID_EDGE
 	// STUB: TOY2 0x0045D110
 	void UnkRenderAPI3(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x0045C6B0
@@ -1008,8 +1007,80 @@ namespace SoftwareRenderer
 			height--;
 		} while (height != 0);
 	}
-	// STUB: TOY2 0x004776C0
-	void UnkRenderAPI27(const PointI* point0, const PointI* point1, const PointI* point2, const PointI* point3, uint32_t colourPair) {}
+	// FUNCTION: TOY2 0x004776C0 [PROVISIONAL]
+	void RasterizeSolidQuad8(const PointI* point0, const PointI* point1, const PointI* point2, const PointI* point3, uint32_t colourPair)
+	{
+		int32_t bottomY = point0->y;
+		int32_t topY = bottomY;
+		if (point1->y < topY)
+			topY = point1->y;
+		else if (point1->y > bottomY)
+			bottomY = point1->y;
+
+		if (point2->y < topY)
+			topY = point2->y;
+		else if (point2->y > bottomY)
+			bottomY = point2->y;
+
+		if (point3->y < topY)
+			topY = point3->y;
+		else if (point3->y > bottomY)
+			bottomY = point3->y;
+
+		if (topY < Toy2::g_screenClipTop)
+			topY = Toy2::g_screenClipTop;
+		if (bottomY > Toy2::g_screenClipBottom)
+			bottomY = Toy2::g_screenClipBottom;
+
+		int32_t scanlineCount = bottomY - topY + 1;
+		ScanlineScratch* scanline = &g_scanlineScratch[topY];
+		ClearScanlineFlags(scanline, scanlineCount);
+
+		RASTERIZE_SOLID_EDGE(point0, point1, edge01Done8);
+		RASTERIZE_SOLID_EDGE(point1, point2, edge12Done8);
+		RASTERIZE_SOLID_EDGE(point2, point3, edge23Done8);
+		RASTERIZE_SOLID_EDGE(point3, point0, edge30Done8);
+
+		uint8_t* rowStart = (uint8_t*)g_lockedBackBuffer + g_backBufferPitchPixels * topY + Toy2::g_screenClipLeft;
+		do
+		{
+			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
+			{
+				int32_t leftX = scanline->leftXFixed >> 10;
+				int32_t rightX = scanline->rightXFixed >> 10;
+				if (leftX != rightX)
+				{
+					if (leftX < Toy2::g_screenClipLeft)
+						leftX = Toy2::g_screenClipLeft;
+					if (rightX > Toy2::g_screenClipRight)
+						rightX = Toy2::g_screenClipRight;
+
+					uint8_t* pixel = rowStart + leftX - Toy2::g_screenClipLeft;
+					int32_t pixelCount = rightX - leftX + 1;
+					if (((uint32_t)pixel & 3) != 0)
+					{
+						*pixel++ = (uint8_t)colourPair;
+						pixelCount--;
+					}
+					if (pixelCount > 3)
+					{
+						Nu3D::MemSet32Util(pixel, pixelCount / 4, colourPair);
+						int32_t filledPixels = pixelCount & ~3;
+						pixelCount -= filledPixels;
+						pixel += filledPixels;
+					}
+					if (pixelCount != 0)
+						*pixel = (uint8_t)colourPair;
+				}
+			}
+
+			scanline++;
+			scanlineCount--;
+			rowStart += g_backBufferPitchPixels;
+		} while (scanlineCount != 0);
+	}
+
+#undef RASTERIZE_SOLID_EDGE
 	// STUB: TOY2 0x00476D00
 	void UnkRenderAPI28(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x00476340
@@ -1055,7 +1126,7 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x004FCBF0
 	SoftwareRenderDispatchTable g_softwareRenderDispatchPalettized = {
 		RasterizeTexturedRect8,
-		UnkRenderAPI27,
+		RasterizeSolidQuad8,
 		UnkRenderAPI28,
 		UnkRenderAPI29,
 		{ UnkRenderAPI30, UnkRenderAPI31, UnkRenderAPI31, UnkRenderAPI31 },
