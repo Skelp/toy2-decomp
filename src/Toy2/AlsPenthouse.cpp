@@ -461,6 +461,102 @@ namespace Toy2
 			}
 			AudioManager::PlaySoundEffect(-2, &position);
 		}
+	}
+
+	namespace Camera
+	{
+		extern Vector3I g_cutsceneFocusPosition;
+		extern Vector3I g_cutsceneCameraPosition;
+	}
+
+	namespace AlsPenthouse
+	{
+
+		struct GroundSlamTargetTrigger
+		{
+			uint8_t platformId;
+			uint8_t triggerLinkId;
+			uint8_t flashLinkId;
+			uint8_t ambientEmitterIndex;
+		};
+		enum GroundSlamTargetTriggerCursor
+		{
+			TRIGGER_CURSOR_PLATFORM = -2,
+			TRIGGER_CURSOR_LINK = -1,
+			TRIGGER_CURSOR_FLASH_LINK = 0,
+			TRIGGER_CURSOR_AMBIENT_EMITTER = 1,
+		};
+
+		// GLOBAL: TOY2 0x004F3FB4
+		GroundSlamTargetTrigger g_groundSlamTargetTriggers[6] = {
+			{ 2, 11, 48, 9 },
+			{ 17, 56, 48, 7 },
+			{ 18, 57, 83, 8 },
+			{ 5, 5, 48, 4 },
+			{ 11, 7, 48, 6 },
+			{ 10, 6, 48, 5 },
+		};
+
+		// FUNCTION: TOY2 0x00429910 [PROVISIONAL]
+		void UpdateGroundSlamTargets()
+		{
+			uint8_t* trigger = &g_groundSlamTargetTriggers[0].flashLinkId;
+			int32_t* targetLinkIds = g_groundSlamTargetLinkIds;
+			int32_t* targetTimer = g_groundSlamTargetTimers;
+			do
+			{
+				if (*targetTimer == 0)
+				{
+					Vector3I triggerPosition;
+					Nu3D::Link::GetCurrentPosFixed(trigger[TRIGGER_CURSOR_LINK], &triggerPosition);
+					if (Nu3D::Math::IsWithinDistance(&triggerPosition, &g_buzzActor.posAngles.pos, 0x460) != 0)
+					{
+						if (Nu3D::Math::IsWithinDistance(&triggerPosition, &g_buzzActor.posAngles.pos, 0x3E0) != 0)
+						{
+							if ((g_groundSlamTargetMask & 0x200) == 0 && g_groundSlamTargetFlashPhase > 0x300)
+							{
+								g_groundSlamTargetMask |= 0x200;
+								Nu3D::Link::SetPositionRawAndCommit(
+									trigger[TRIGGER_CURSOR_FLASH_LINK], triggerPosition.x >> 5, triggerPosition.y >> 5, triggerPosition.z >> 5);
+								Nu3D::Link::SetScaleFromFixedOffsets(trigger[TRIGGER_CURSOR_LINK], 0, 0, 0);
+								Nu3D::Link::SetScaleFromFixedOffsets(trigger[TRIGGER_CURSOR_FLASH_LINK], 0x1000, 0x1000, 0x1000);
+							}
+							else if ((g_groundSlamTargetMask & 0x200) != 0 && g_groundSlamTargetFlashPhase < 0x300)
+							{
+								g_groundSlamTargetMask &= ~0x200;
+								Nu3D::Link::SetScaleFromFixedOffsets(trigger[TRIGGER_CURSOR_LINK], 0x1000, 0x1000, 0x1000);
+								Nu3D::Link::SetScaleFromFixedOffsets(trigger[TRIGGER_CURSOR_FLASH_LINK], 0, 0, 0);
+							}
+						}
+						else if ((g_groundSlamTargetMask & 0x200) != 0)
+						{
+							g_groundSlamTargetMask &= ~0x200;
+							Nu3D::Link::SetScaleFromFixedOffsets(trigger[TRIGGER_CURSOR_LINK], 0x1000, 0x1000, 0x1000);
+							Nu3D::Link::SetScaleFromFixedOffsets(trigger[TRIGGER_CURSOR_FLASH_LINK], 0, 0, 0);
+						}
+					}
+
+					if (g_groundSlamTimer == -40 && (Platform::GetFlags(trigger[TRIGGER_CURSOR_PLATFORM]) & 3) == 2)
+					{
+						Nu3D::Link::SetScaleFromFixedOffsets(trigger[TRIGGER_CURSOR_LINK], 0x1000, 0x800, 0x1000);
+						Platform::GetOrigin(trigger[TRIGGER_CURSOR_PLATFORM], &triggerPosition);
+						triggerPosition.y += 0xE10;
+						Platform::SetOrigin(trigger[TRIGGER_CURSOR_PLATFORM], triggerPosition.x, triggerPosition.y, triggerPosition.z);
+						*targetTimer = 60;
+						Nu3D::Link::GetCurrentPosFixed(*targetLinkIds, &triggerPosition);
+						Camera::BeginScriptedCutsceneAtPoint(&triggerPosition, 0xB4, 0x20);
+						Camera::g_cutsceneFocusPosition.y -= 0x2000;
+						Camera::g_cutsceneCameraPosition.y -= 0x4000;
+						Nu3D::Link::SetScaleFromFixedOffsets(trigger[TRIGGER_CURSOR_FLASH_LINK], 0, 0, 0);
+						Levels::DeactivateAmbientEmitter(trigger[TRIGGER_CURSOR_AMBIENT_EMITTER], 1);
+					}
+				}
+
+				targetTimer++;
+				trigger += sizeof(GroundSlamTargetTrigger);
+				targetLinkIds += 4;
+			} while ((int32_t)targetTimer < (int32_t)(g_groundSlamTargetTimers + 6));
+		}
 
 		// FUNCTION: TOY2 0x00428700 [MATCHED]
 		void FireCannonProjectile(const Vector3I* cannonPosition, int32_t yawAngle)
@@ -964,6 +1060,7 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(ObjectGroup) == 0xE);
 		STATIC_ASSERT(sizeof(TrainPathTransition) == 0x8);
 		STATIC_ASSERT(sizeof(RaisedPlatformLink) == 0x2);
+		STATIC_ASSERT(sizeof(GroundSlamTargetTrigger) == 0x4);
 		STATIC_ASSERT(sizeof(MoveableObjectInitTable) == 0x14);
 	}
 }

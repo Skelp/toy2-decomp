@@ -184,7 +184,7 @@
 0x004293D0 Toy2::AlsPenthouse::UpdateObjectReplacement
 0x004295B0 Toy2::AlsPenthouse::UpdateCannonTarget
 0x00429800 Toy2::AlsPenthouse::CompleteGroundSlamTarget
-0x00429910 Toy2::AlsPenthouse::Method3
+0x00429910 Toy2::AlsPenthouse::UpdateGroundSlamTargets
 0x00429CE0 Toy2::AlsPenthouse::InitHiddenCollectibles
 0x00429D70 Toy2::AlsPenthouse::Init
 0x00429FB0 Toy2::AlsPenthouse::UpdateFloatingPlatform
