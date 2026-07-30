@@ -30,6 +30,8 @@ namespace Renderer
 		extern ShadowInstance g_shadowInstances[MAX_SHADOWS];
 		extern ShadowProjection g_shadowProjections[MAX_SHADOWS];
 
+		void DrawAll();
+
 		STATIC_ASSERT(sizeof(ShadowInstance) == 0x10);
 		STATIC_ASSERT(sizeof(ShadowProjection) == 0x8);
 	}
