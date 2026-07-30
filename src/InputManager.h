@@ -18,6 +18,14 @@ namespace InputManager
 		uint16_t spinMask;
 	};
 
+	struct KeyboardGlyphMapping
+	{
+		int16_t scanCode;
+		int16_t glyphIndex;
+		uint8_t character;
+		uint8_t reserved;
+	};
+
 	extern int16_t g_curButtonsPressed;
 	extern int16_t g_prevButtonsPressed;
 	extern int16_t g_directionInputState;
@@ -32,6 +40,7 @@ namespace InputManager
 	void Init();
 	int32_t GetPressedInput();
 	char* GetGameControlName(int32_t inputCode);
+	int16_t KeyNameToScancode(uint8_t keyName);
 	uint8_t IsKeyPressed(int32_t inputCode);
 	int32_t FindKeyPressed();
 	int32_t FindKeyReleased();
@@ -42,4 +51,5 @@ namespace InputManager
 
 	STATIC_ASSERT(sizeof(InputMapping) == 0x8);
 	STATIC_ASSERT(sizeof(DirectionInputMapping) == 0x6);
+	STATIC_ASSERT(sizeof(KeyboardGlyphMapping) == 0x6);
 }

@@ -117,7 +117,7 @@
 0x004152A0 InputManager::GetGameControlName
 0x004152E0 InputManager::Init
 0x00415460 InputManager::Cleanup
-0x00415640 Toy2::Input::KeyNameToScancode
+0x00415640 InputManager::KeyNameToScancode
 0x004157E0 InputManager::IsKeyPressed
 0x00415800 InputManager::FindKeyPressed
 0x00415860 InputManager::FindKeyReleased

@@ -165,6 +165,11 @@ namespace InputManager
 	};
 	// clang-format on
 
+	// GLOBAL: TOY2 0x004EFCE0
+	KeyboardGlyphMapping g_keyboardGlyphMappings[] = {
+#include "InputManagerKeyGlyphMappings.inc"
+	};
+
 	// GLOBAL: TOY2 0x00503860
 	DirectionInputMapping g_directionInputMappings[] = {
 		{ INPUT_FIRE, INPUT_JUMP, INPUT_SPIN },
@@ -205,6 +210,41 @@ namespace InputManager
 		}
 
 		return NULL;
+	}
+
+	// FUNCTION: TOY2 0x00415640 [MATCHED]
+	int16_t KeyNameToScancode(uint8_t keyName)
+	{
+		int32_t i = 0;
+		switch (keyName)
+		{
+			case '[':
+				return DIK_LSHIFT;
+			case '@':
+				return DIK_LCONTROL;
+			case '%':
+				return DIK_TAB;
+			case '#':
+				return DIK_SPACE;
+			case '+':
+				return DIK_RETURN;
+			case '<':
+				return DIK_LEFT;
+			case '>':
+				return DIK_RIGHT;
+			case '^':
+				return DIK_UP;
+			case 'v':
+				return DIK_DOWN;
+		}
+
+		for (; g_keyboardGlyphMappings[i].scanCode != -1; i++)
+		{
+			if (g_keyboardGlyphMappings[i].character == keyName)
+				return g_keyboardGlyphMappings[i].scanCode;
+		}
+
+		return -1;
 	}
 }
 
