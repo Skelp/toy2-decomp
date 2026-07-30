@@ -2,9 +2,13 @@
 #include "Toy2/Buzz.h"
 #include "Toy2/Camera.h"
 #include "Toy2/Collision.h"
+#include "Toy2/Dialogue.h"
 #include "Toy2/Levels.h"
 #include "Toy2/Toy2.h"
+#include "AudioManager/AudioManager.h"
+#include "Nu3D/Camera.h"
 #include "Nu3D/Link.h"
+#include "Nu3D/Particles.h"
 
 #include <limits.h>
 #include <string.h>
@@ -87,6 +91,9 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x0050A150
 		TokenDialogueEntry g_tokenDialogueEntries[10];
+
+		// GLOBAL: TOY2 0x004DF69C
+		extern const int32_t g_tokenCutsceneScript[] = { 1, -1, 0, 4, 2, 3, -1, 10, 7, -1, 8, -1 };
 
 		// GLOBAL: TOY2 0x005546B8
 		PickupTable g_pickupTable;
@@ -206,6 +213,89 @@ namespace Toy2
 				destination->facingAngle = values++->number;
 				destination++;
 			} while (destination < &g_tokenDialogueEntries[10]);
+		}
+
+		// FUNCTION: TOY2 0x00402610 [TOOL]
+		void Token(int32_t tokenId)
+		{
+			if (Nu3D::Camera::g_viewHistoryInitialized != 0)
+				return;
+
+			if (Camera::g_scriptedCameraState != 0)
+			{
+				if (Camera::g_cameraMarkerParticle != (Nu3D::Particles::ParticleInstance*)-1)
+				{
+					Camera::g_cameraMarkerParticle->lifetime = 1;
+					Camera::g_cameraMarkerParticle = (Nu3D::Particles::ParticleInstance*)-1;
+				}
+				if (Camera::g_targetMarkerParticle != (Nu3D::Particles::ParticleInstance*)-1)
+				{
+					Camera::g_targetMarkerParticle->lifetime = 1;
+					Camera::g_targetMarkerParticle = (Nu3D::Particles::ParticleInstance*)-1;
+				}
+
+				g_buzzActor.actorFlags |= 1;
+				int32_t cameraY = g_buzzActor.posAngles.pos.y - 0x3000;
+				Camera::g_gameplayCamera.roll = g_buzzActor.posAngles.angles.yaw;
+				g_buzzActor.facingAngle = g_buzzActor.posAngles.angles.yaw;
+				Camera::g_gameplayCamera.angles.yaw = 0x4B0;
+				Camera::g_gameplayCamera.pos.y = cameraY;
+				Camera::g_gameplayCamera.target.visorAimAngles.pitch = 0;
+				Camera::g_gameplayCamera.lookAt.x = Camera::g_gameplayCamera.pos.x;
+				Camera::g_gameplayCamera.modeTransitionState = 0;
+				Camera::g_scriptedCameraState = 0;
+
+				Nu3D::Link::SetScaleFromFixedOffsets(0x2D, 0, 0, 0);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x2E, 0, 0, 0);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x2F, 0, 0, 0);
+			}
+
+			int32_t entryIndex = 0;
+			for (; entryIndex < 10; entryIndex++)
+			{
+				if (g_tokenDialogueEntries[entryIndex].tokenId == tokenId)
+					break;
+			}
+
+			g_gameplayStateFlags |= GAMEPLAY_STATE_CUTSCENE_ACTIVE;
+			Nu3D::Camera::g_viewHistoryInitialized = 1;
+			Camera::g_cutsceneElapsedTime = 0;
+			Camera::g_cutsceneCommandCursor = g_tokenCutsceneScript;
+			Camera::g_cutsceneWaitTimer = 0;
+			Camera::g_cutsceneSegmentProgress = 0;
+			Camera::g_cutsceneMoveSpeed = 0;
+			Camera::g_nextCutsceneMoveSpeed = 0;
+			Camera::g_cutsceneSegmentDuration = 0;
+			Camera::g_cutsceneFocusPathPoint = 0;
+			Camera::g_cutsceneCameraPathPoint = 0;
+			Camera::g_cutsceneRecordType = g_tokenDialogueEntries[entryIndex].dialogueRecordIndex;
+
+			char* subtitle = g_tokenDialogueEntries[entryIndex].subtitle;
+			if (subtitle != 0)
+			{
+				Dialogue::WrapSubtitleText(subtitle);
+				Dialogue::g_subtitleActive = 1;
+				for (int32_t i = 0; i < 36; i++)
+					Dialogue::g_subtitleCells.pairs[i] = 0x00200020;
+				Dialogue::g_subtitleTextCursor = Dialogue::g_wrappedSubtitleText;
+				Dialogue::g_subtitleColumn = 0;
+				Dialogue::g_subtitleRowStart = 0;
+				Dialogue::g_subtitleVisibleStart = -72;
+				Dialogue::g_subtitleColour = 0x00808080;
+				Dialogue::g_subtitleCharacterDelay = 2;
+				Dialogue::g_subtitleCharacterStyle = 0;
+				Dialogue::g_subtitleBoxScale = 0;
+				Dialogue::g_subtitlePageState = 0;
+				AudioManager::PlaySoundEffect(0x1D, 0);
+			}
+			else
+			{
+				Dialogue::g_subtitleActive = 0;
+			}
+
+			g_buzzActor.posAngles.angles.yaw = (uint16_t)g_tokenDialogueEntries[entryIndex].facingAngle;
+			g_buzzActor.facingAngle = g_buzzActor.posAngles.angles.yaw;
+			Camera::g_gameplayCamera.roll = g_buzzActor.posAngles.angles.yaw;
 		}
 
 		// FUNCTION: TOY2 0x004A0DB0 [PROVISIONAL]

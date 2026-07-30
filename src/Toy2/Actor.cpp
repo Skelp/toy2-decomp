@@ -4,6 +4,7 @@
 #include "Toy2/Camera.h"
 #include "Toy2/Collectables.h"
 #include "Toy2/Collision.h"
+#include "Toy2/Dialogue.h"
 #include "Toy2/Levels.h"
 #include "Toy2/Toy2.h"
 #include "AudioManager/AudioManager.h"
@@ -25,42 +26,6 @@ namespace Toy2
 
 	namespace Dialogue
 	{
-		struct CutsceneScript
-		{
-			int32_t selectRecordCommand;
-			int32_t recordType;
-			int32_t moveBuzzCommand;
-			int32_t buzzActorIndex;
-			int32_t buzzPathPoint;
-			int32_t moveActorCommand;
-			int32_t actorIndex;
-			int32_t actorPathPoint;
-			int32_t faceBuzzCommand;
-			int32_t facingBuzzActorIndex;
-			int32_t buzzFacingAngle;
-			int32_t faceActorCommand;
-			int32_t facingActorIndex;
-			int32_t actorFacingAngle;
-		};
-
-		struct DialogueRecords
-		{
-			uint16_t recordCount;
-			uint16_t recordType;
-			Vector3I buzzPosition;
-			Vector3I actorPosition;
-		};
-
-		union SubtitleCells
-		{
-			uint16_t characters[72];
-			uint32_t pairs[36];
-		};
-
-		STATIC_ASSERT(sizeof(DialogueRecords) == 0x1C);
-		STATIC_ASSERT(offsetof(DialogueRecords, buzzPosition) == 0x4);
-		STATIC_ASSERT(offsetof(DialogueRecords, actorPosition) == 0x10);
-
 		// GLOBAL: TOY2 0x004DF6CC
 		CutsceneScript g_dialogueCutsceneScript = { 0, 0, 1, -1, 0, 1, 0, 1, 2, -1, 0, 2, 0, 0 };
 
