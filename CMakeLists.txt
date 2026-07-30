@@ -139,6 +139,7 @@ set(TOY2_SOURCES
     src/Toy2/BuzzAnimationStates.inc
     src/Toy2/Actor.cpp
     src/Toy2/Actor.h
+    src/Toy2/Lighting.h
     src/Toy2/Levels.cpp
     src/Toy2/Levels.h
     src/Toy2/Collision.h

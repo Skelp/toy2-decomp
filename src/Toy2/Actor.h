@@ -132,7 +132,15 @@ namespace Toy2
 		void PopulateActiveActors();
 		void HitType1Particles(int32_t x, int32_t y, int32_t z);
 		void CollectQuestReward(int32_t actorIndex, int32_t dialogueRecordIndex, int32_t actorFacingAngle, int32_t cameraFacingAngle, int32_t tokenIndex);
+		void ItemReturnReward(int32_t actorIndex,
+			int32_t dialogueRecordIndex,
+			char* missingItemSubtitle,
+			char* itemReturnedSubtitle,
+			char* usageHintSubtitle,
+			int32_t actorFacingAngle,
+			int32_t cameraFacingAngle);
 		void PlayPeriodicHintSound(int32_t actorIndex, int32_t soundPresetIndex);
+		void RotatingHint(int32_t actorIndex, int32_t dialogueRecordIndex, char** subtitles);
 		void GetCreatureList(uint8_t* creatureIdList);
 		int32_t FindInActorList(Toy2Actor* actor);
 		void SetNodeAngle(Toy2Actor* actor, int32_t nodeIndex, int32_t pitch, int32_t yaw, int32_t roll);

@@ -7,6 +7,23 @@
 
 namespace Toy2
 {
+	struct ZoneRenderData
+	{
+		uint8_t visibilityDepth;
+		uint8_t isProcessed;
+		uint16_t portalRecordIndex;
+		int16_t minX;
+		int16_t minY;
+		int16_t maxX;
+		int16_t maxY;
+		uint8_t reservedC[4];
+		int16_t primaryInstanceBytes;
+		int16_t secondaryInstanceBytes;
+		uint8_t reserved14[32];
+	};
+
+	extern ZoneRenderData g_zoneRenderData[20];
+
 	namespace Levels
 	{
 		struct RecordData
@@ -181,4 +198,8 @@ namespace Toy2
 		STATIC_ASSERT(offsetof(PortalRecord, normal) == 0xA);
 		STATIC_ASSERT(offsetof(PortalRecord, vertices) == 0x10);
 	}
+
+	STATIC_ASSERT(sizeof(ZoneRenderData) == 0x34);
+	STATIC_ASSERT(offsetof(ZoneRenderData, primaryInstanceBytes) == 0x10);
+	STATIC_ASSERT(offsetof(ZoneRenderData, secondaryInstanceBytes) == 0x12);
 }

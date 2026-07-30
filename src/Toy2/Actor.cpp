@@ -1,4 +1,5 @@
 #include "Toy2/Actor.h"
+#include "Toy2/Lighting.h"
 #include "Toy2/Animation.h"
 #include "Toy2/Buzz.h"
 #include "Toy2/Camera.h"
@@ -409,23 +410,6 @@ namespace Toy2
 
 	namespace Lighting
 	{
-		struct DynamicLight
-		{
-			Vector3I position;
-			int32_t lifetime;
-			int32_t sourceId;
-			RGBColor3B colour;
-		};
-
-		struct LightingState
-		{
-			DynamicLight dynamicLights[6];
-			Vector3I blendedPosition;
-			int32_t reservedBlendState[2];
-			RGBColor3B blendedColour;
-			uint8_t reserved[0x18];
-		};
-
 		struct BuzzLightPreset
 		{
 			Vector3I positionOffset;
@@ -433,17 +417,6 @@ namespace Toy2
 			int32_t colour;
 		};
 
-		extern LightingState g_lightingState;
-		void SpawnLight(int32_t x, int32_t y, int32_t z, int32_t colour, int32_t lifetime, int32_t sourceId);
-		void UpdateBuzzLight();
-
-		STATIC_ASSERT(sizeof(DynamicLight) == 0x18);
-		STATIC_ASSERT(offsetof(DynamicLight, lifetime) == 0xC);
-		STATIC_ASSERT(offsetof(DynamicLight, sourceId) == 0x10);
-		STATIC_ASSERT(offsetof(DynamicLight, colour) == 0x14);
-		STATIC_ASSERT(sizeof(LightingState) == 0xC0);
-		STATIC_ASSERT(offsetof(LightingState, blendedPosition) == 0x90);
-		STATIC_ASSERT(offsetof(LightingState, blendedColour) == 0xA4);
 		STATIC_ASSERT(sizeof(BuzzLightPreset) == 0x14);
 	}
 
@@ -755,6 +728,19 @@ namespace Toy2
 
 	namespace Actor
 	{
+		// STUB: TOY2 0x004A2480
+		void ItemReturnReward(int32_t actorIndex,
+			int32_t dialogueRecordIndex,
+			char* missingItemSubtitle,
+			char* itemReturnedSubtitle,
+			char* usageHintSubtitle,
+			int32_t actorFacingAngle,
+			int32_t cameraFacingAngle)
+		{}
+
+		// STUB: TOY2 0x004A1E60
+		void RotatingHint(int32_t actorIndex, int32_t dialogueRecordIndex, char** subtitles) {}
+
 		// STUB: TOY2 0x004076F0
 		void UpdateAIMovement(Toy2Actor* actor) {}
 

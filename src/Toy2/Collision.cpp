@@ -1015,6 +1015,16 @@ namespace Toy2
 
 	namespace Platform
 	{
+		// STUB: TOY2 0x0049EC00
+		int32_t StepTiltPhysics(int32_t platformIndex,
+			int32_t linkId,
+			int32_t angularVelocity,
+			int32_t motionMode,
+			int32_t minimumAngle,
+			int32_t maximumAngle,
+			int32_t angularDivisor)
+		{ return 0; }
+
 		// GLOBAL: TOY2 0x0072872C
 		PlatformState g_platformStates[32];
 

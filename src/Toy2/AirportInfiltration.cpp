@@ -3,12 +3,16 @@
 #include "Toy2/Collision.h"
 #include "Toy2/Actor.h"
 #include "Toy2/Buzz.h"
+#include "Toy2/Camera.h"
 #include "Toy2/Collectables.h"
 #include "Toy2/Levels.h"
+#include "Toy2/Lighting.h"
 #include "Toy2/Particles.h"
+#include "Toy2/Weather.h"
 #include "RawLoader.h"
 #include "AudioManager/AudioManager.h"
 #include "Nu3D/Link.h"
+#include "Nu3D/Camera.h"
 #include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
@@ -107,8 +111,12 @@ namespace Toy2
 	{
 		enum ProspectorState
 		{
+			PROSPECTOR_STATE_IDLE = 0,
+			PROSPECTOR_STATE_DIALOGUE = 1,
 			PROSPECTOR_STATE_ACTIVE = 2,
 			PROSPECTOR_STATE_DEFEATED = 3,
+			PROSPECTOR_STATE_TOKEN_DELAY_END = 120,
+			PROSPECTOR_STATE_TOKEN_AWARDED = 200,
 		};
 
 		// GLOBAL: TOY2 0x004F4668
@@ -128,9 +136,19 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x004F46C0
 		int16_t g_tokenLinkIds[5] = { 49, 50, 52, 48, 51 };
+		// GLOBAL: TOY2 0x004F46AC
+		char* g_rotatingHintSubtitles[5] = {
+			"^hamm^ is on the shelf at the end of the x-ray room.",
+			"the ^little tike pilot^ has lost his passengers. he is in the repair hangar.",
+			"^rocky gilbraltor^ has a ^challenge^ for you. he is on the floor of the conveyor belt room.",
+			"you can get to the ^token^ on top of the broken plane using the ^hover boots^. mr. potato head has them near the stack of luggage.",
+			"the ^prospector^ boss is on the conveyor belt at the top of the luggage stack. you need the ^hover boots^ to reach him.",
+		};
 
 		// GLOBAL: TOY2 0x0052FE38
 		int32_t g_slammedPlatformRotation;
+		// GLOBAL: TOY2 0x0052FE3C
+		int32_t g_slammedPlatformLinkId;
 		// GLOBAL: TOY2 0x0052FE40
 		int32_t g_hiddenCollectiblesVisible;
 		// GLOBAL: TOY2 0x0052FEE8
@@ -247,8 +265,292 @@ namespace Toy2
 			prospectorRam->boundHalfX = 90;
 		}
 
-		// STUB: TOY2 0x0042CA60
-		void Interactions() {}
+		// STUB: TOY2 0x0042C3E0
+		void Method2(int32_t pathIndex, int32_t speedLimit) {}
+
+		// FUNCTION: TOY2 0x0042CA60 [PROVISIONAL]
+		void Interactions()
+		{
+			if (Sector::g_currentSectorIndex == 2 || Sector::g_currentSectorIndex == 4 || Sector::g_currentSectorIndex == 5)
+			{
+				g_state.platform3Rotation = Platform::StepTiltPhysics(3, 4, g_state.platform3Rotation, 2, -0xE0, 0xE0, 0x80);
+				Platform::CommitRotationToLink(3, 6);
+				g_state.platform4Rotation = Platform::StepTiltPhysics(4, 5, g_state.platform4Rotation, 2, -0xE0, 0xE0, 0x80);
+				Platform::CommitRotationToLink(4, 7);
+			}
+
+			if (g_zoneRenderData[4].visibilityDepth != 0)
+			{
+				g_state.fanPhase = (g_state.fanPhase + Renderer::g_frameDelta * 6) & 0xFFF;
+				if (g_state.fanPhase > 0x800)
+				{
+					if (g_state.fanBlend > 0)
+						g_state.fanBlend -= 2;
+				}
+				else if (g_state.fanBlend < 0x80)
+				{
+					g_state.fanBlend += 2;
+				}
+
+				g_state.evenFanRotation -= g_state.fanBlend * Renderer::g_frameDelta * 3;
+				g_state.oddFanRotation -= (0x80 - g_state.fanBlend) * Renderer::g_frameDelta * 3;
+				Nu3D::Link::SetRotationRelative8bit(0, 0, 0, g_state.evenFanRotation);
+				Nu3D::Link::SetRotationRelative8bit(1, 0, 0, g_state.oddFanRotation);
+				Nu3D::Link::SetRotationRelative8bit(2, 0, 0, g_state.evenFanRotation);
+				Nu3D::Link::SetRotationRelative8bit(3, 0, 0, g_state.oddFanRotation);
+
+				if (Sector::g_currentSectorIndex == 4)
+				{
+					Levels::RecordData* fanRecords = Levels::g_recordData[1];
+					for (int32_t fanRecordIndex = 0; fanRecordIndex < fanRecords->recordCount; fanRecordIndex += 2)
+					{
+						Vector3I* fanEndpoints = &fanRecords->data[fanRecordIndex];
+						g_state.fanBlend = 0x80 - g_state.fanBlend;
+						if (g_state.fanBlend > 0x20)
+						{
+							Vector3I particlePosition = {
+								fanEndpoints[0].x << 5,
+								fanEndpoints[0].y << 5,
+								fanEndpoints[0].z << 5,
+							};
+							if (g_state.fanBlend > 0x40 || g_state.fanPhase < 0xA00)
+								SpawnFanParticle(&particlePosition, 3);
+
+							int32_t fanStartX = fanEndpoints[0].x / 8;
+							int32_t buzzOffsetX = fanStartX - g_buzzActor.posAngles.pos.x / 0x100;
+							int32_t buzzOffsetY = fanEndpoints[0].y / 8 - g_buzzActor.posAngles.pos.y / 0x100;
+							int32_t buzzOffsetZ = fanEndpoints[0].z / 8 - g_buzzActor.posAngles.pos.z / 0x100;
+							int32_t fanLength = fanStartX - fanEndpoints[1].x / 8 - 0x20;
+							if (buzzOffsetZ * buzzOffsetZ + buzzOffsetY * buzzOffsetY < 0x10000 && buzzOffsetX > 0 && buzzOffsetX < fanLength)
+							{
+								Collision::ApplySurfaceVelocity(0, g_state.fanBlend * buzzOffsetX * 0x20 / fanLength - g_state.fanBlend * 0x20, 0, 0);
+							}
+						}
+					}
+				}
+			}
+
+			int32_t platformFlags = Platform::GetFlags(0);
+			if (g_groundSlamTimer != 0 && (platformFlags & Platform::PLATFORM_FLAG_BUZZ_CONTACT) == Platform::PLATFORM_FLAG_BUZZ_CONTACT)
+			{
+				g_groundSlamTimer = 0;
+				Buzz::Launch(-0xC00, 2);
+				Levels::DeactivateAmbientEmitter(0, 1);
+				AudioManager::PlaySoundEffect(0x1C, &g_buzzActor.posAngles.pos);
+				g_slammedPlatformRotation = -0x200;
+				g_slammedPlatformLinkId = 9;
+			}
+
+			platformFlags = Platform::GetFlags(14);
+			if (g_groundSlamTimer != 0 && (platformFlags & Platform::PLATFORM_FLAG_BUZZ_CONTACT) == Platform::PLATFORM_FLAG_BUZZ_CONTACT)
+			{
+				g_groundSlamTimer = 0;
+				Buzz::Launch(-0xC00, 2);
+				AudioManager::PlaySoundEffect(0x1C, &g_buzzActor.posAngles.pos);
+				Levels::DeactivateAmbientEmitter(1, 1);
+				g_slammedPlatformRotation = -0x200;
+				g_slammedPlatformLinkId = 28;
+			}
+
+			Renderer::BlitTextureByIndexOffset(5, 0, 0, 0x40, 0x40, 0, (-g_framePulsePhases.sixtyFourTick - 1) & 0x3F, 0, 0x40);
+
+			if (g_slammedPlatformRotation != 0)
+			{
+				g_slammedPlatformRotation += Renderer::g_frameDelta * 0x20;
+				if (g_slammedPlatformRotation > 0)
+					g_slammedPlatformRotation = 0;
+
+				Vector3I linkRotation;
+				Nu3D::Link::GetRotation8Bit(g_slammedPlatformLinkId, &linkRotation);
+				Nu3D::Link::SetRotationAbsolute8bit(g_slammedPlatformLinkId, 0, linkRotation.y, g_slammedPlatformRotation);
+			}
+
+			Method2(0, 125);
+			Method2(1, 125);
+			Method2(2, 125);
+			Method2(3, 125);
+			Method2(4, 125);
+
+			if (Sector::g_currentSectorIndex != 3 && g_hiddenCollectiblesVisible != 0)
+			{
+				for (int32_t hiddenLinkIndex = 16; hiddenLinkIndex < 20; hiddenLinkIndex++)
+					Nu3D::Link::SetScaleFromFixedOffsets(hiddenLinkIndex, 0, 0, 0);
+				g_hiddenCollectiblesVisible = 0;
+			}
+			if (Sector::g_currentSectorIndex == 3 && g_hiddenCollectiblesVisible == 0)
+			{
+				for (int32_t hiddenLinkIndex = 16; hiddenLinkIndex < 20; hiddenLinkIndex++)
+					Nu3D::Link::SetScaleFromFixedOffsets(hiddenLinkIndex, 0x1000, 0x1000, 0x1000);
+				g_hiddenCollectiblesVisible = 1;
+			}
+
+			if (g_footingType == 0x20)
+				Collision::ApplySurfaceVelocity(0, 0, 0, 0x400);
+			if (g_footingType == 0x21)
+				Collision::ApplySurfaceVelocity(0, 0x400, 0, 0);
+			if (g_footingType == 0x22)
+				Collision::ApplySurfaceVelocity(0, -0x200, 0, 0x376);
+			if (g_footingType == 0x23)
+				Collision::ApplySurfaceVelocity(0, -0x292, 0, -0x310);
+			if (g_footingType == 0x24)
+				Collision::ApplySurfaceVelocity(0, -0x400, 0, 0);
+
+			Actor::ItemReturnReward(8,
+				0x1F,
+				"mmm.. mumpf! mmmmu mo mmmme ^hover boots^ mmmm mub ^mouth^ mmmum mi mo mmmump!",
+				"wow! thanks buzz! in return for finding my ^mouth^ i will let you use the ^hover boots^. you can float higher by holding down the ^jump^ "
+				"button and you can float lower by letting go of the ^jump^ button.",
+				"with the ^hover boots^ you can float higher by holding down the ^jump^ button and you can float lower by letting go of the ^jump^ button.",
+				-1,
+				0xE00);
+			Actor::CollectQuestReward(6, 0x1D, -1, 0, 0);
+			Actor::RotatingHint(0x21, 0x22, g_rotatingHintSubtitles);
+
+			Actor::Toy2Actor* pilot = &Actor::g_creatureActors[7];
+			if ((pilot->actorFlags & Actor::ACTOR_FLAG_INTERACTION_REQUESTED) != 0)
+			{
+				pilot->actorFlags &= ~Actor::ACTOR_FLAG_INTERACTION_REQUESTED;
+				if (g_levelObjectiveProgress >= 0)
+				{
+					if (g_levelObjectiveProgress == 5)
+					{
+						Dialogue::Begin(7, 0x21, "thanks for finding my ^little tike passengers^ buzz! here is a pizza planet ^token^!", -1, 0, 1);
+						g_levelObjectiveProgress = -1;
+					}
+					else
+					{
+						Dialogue::Begin(7,
+							0x21,
+							"hi buzz! if you can find ^five little tike passengers^ for my next flight i will give you a pizza planet ^token^.",
+							-1,
+							0,
+							-1);
+					}
+				}
+			}
+
+			Actor::PlayPeriodicHintSound(5, 0xB5);
+			Actor::Toy2Actor* challengeActor = &Actor::g_creatureActors[5];
+			if ((challengeActor->actorFlags & Actor::ACTOR_FLAG_INTERACTION_REQUESTED) != 0)
+			{
+				challengeActor->actorFlags &= ~Actor::ACTOR_FLAG_INTERACTION_REQUESTED;
+				if (HUD::g_challengeState == HUD::CHALLENGE_STATE_INACTIVE)
+				{
+					AudioManager::PlaySoundEffect(0xB6, &challengeActor->pos);
+					Dialogue::Begin(
+						5, 0x1E, "hi buzz! if you can bring me ^five^ weights before you run out of time, i will give you a pizza planet ^token^.", -1, 0, -1);
+					g_specialPickupCount = 0;
+					HUD::g_challengeState = HUD::CHALLENGE_STATE_WAITING_FOR_CAMERA;
+					for (int32_t hiddenIndex = 0; hiddenIndex < 5; hiddenIndex++)
+					{
+						*g_state.hiddenCollectibles[hiddenIndex].verticalPosition = g_state.hiddenCollectibles[hiddenIndex].savedVerticalPosition;
+						Nu3D::Link::SetScaleFromFixedOffsets(hiddenIndex + 56, 0x1000, 0x1000, 0x1000);
+					}
+				}
+				else if (g_specialPickupCount < 5)
+				{
+					Dialogue::Begin(5, 0x1E, "quick! you need to find more weights!", -1, 0, -1);
+				}
+				else if (HUD::g_challengeState != HUD::CHALLENGE_STATE_COMPLETE)
+				{
+					AudioManager::PlaySoundEffect(0xB7, &challengeActor->pos);
+					Dialogue::Begin(5, 0x1E, "well done! you have found all of my weights! here is your pizza planet ^token^!", -1, 0, 2);
+					HUD::g_challengeState = HUD::CHALLENGE_STATE_COMPLETE;
+				}
+			}
+
+			if (HUD::g_challengeState == HUD::CHALLENGE_STATE_WAITING_FOR_CAMERA && Nu3D::Camera::g_viewHistoryInitialized == 0)
+			{
+				HUD::g_challengeState = HUD::CHALLENGE_STATE_ACTIVE;
+				AndysHouse::g_raceCheckpointPassCount = 160;
+			}
+			if (HUD::g_challengeState == HUD::CHALLENGE_STATE_ACTIVE)
+			{
+				if (g_framePulseOutputs.sixtyFourTick != 0)
+					AndysHouse::g_raceCheckpointPassCount--;
+				if (AndysHouse::g_raceCheckpointPassCount < 100)
+				{
+					AndysHouse::g_raceCheckpointPassCount = 100;
+					HUD::g_challengeState = HUD::CHALLENGE_STATE_INACTIVE;
+					for (int32_t hiddenIndex = 0; hiddenIndex < 5; hiddenIndex++)
+					{
+						*g_state.hiddenCollectibles[hiddenIndex].verticalPosition = INT_MIN;
+						Nu3D::Link::SetScaleFromFixedOffsets(hiddenIndex + 56, 0, 0, 0);
+					}
+				}
+			}
+
+			Actor::Toy2Actor* prospector = &Actor::g_creatureActors[32];
+			if (g_state.prospectorState == PROSPECTOR_STATE_IDLE && Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &prospector->pos, 300) != 0
+				&& g_buzzActor.posAngles.pos.y < -0x3660E && g_buzzActor.collisionFlags != 0)
+			{
+				g_state.prospectorState = PROSPECTOR_STATE_DIALOGUE;
+				Dialogue::Begin(32, 0x20, "ha ha ha ha ... defeat the ^prospector^ boss to get a pizza planet ^token^!", -1, 0, -1);
+			}
+
+			if (g_state.prospectorState == PROSPECTOR_STATE_DIALOGUE && Nu3D::Camera::g_viewHistoryInitialized == 0)
+			{
+				prospector->movementData = CreatureBehaviour::g_prospectorMovementData + 14;
+				g_levelInteractionTimer = 180;
+				g_state.prospectorState = PROSPECTOR_STATE_ACTIVE;
+				prospector->movementCommandTimer = 0;
+				prospector->creatureRam->initialFacingAngle = 0;
+			}
+			if (g_state.prospectorState > PROSPECTOR_STATE_ACTIVE)
+			{
+				if (g_state.prospectorState < PROSPECTOR_STATE_TOKEN_DELAY_END)
+					g_state.prospectorState += Renderer::g_frameDelta;
+				else if (g_state.prospectorState != PROSPECTOR_STATE_TOKEN_AWARDED)
+				{
+					Collectables::Activate(4, 0);
+					g_state.prospectorState = PROSPECTOR_STATE_TOKEN_AWARDED;
+				}
+			}
+
+			Levels::RecordData* flareRecords = Levels::g_recordData[10];
+			int32_t nearestDistanceSquared = INT_MAX;
+			int32_t nearestFlareIndex = 0;
+			for (int32_t flareIndex = 0; flareIndex < flareRecords->recordCount; flareIndex++)
+			{
+				Vector3I* flare = &flareRecords->data[flareIndex];
+				int32_t cameraOffsetY = (Camera::g_renderCameraTransform.pos.y - flare->y * 0x20) >> 8;
+				int32_t cameraOffsetZ = (Camera::g_renderCameraTransform.pos.z - flare->z * 0x20) >> 8;
+				int32_t cameraOffsetX = (Camera::g_renderCameraTransform.pos.x - flare->x * 0x20) >> 8;
+				if (cameraOffsetX * cameraOffsetX + cameraOffsetY * cameraOffsetY + cameraOffsetZ * cameraOffsetZ < 1000000)
+				{
+					Renderer::LensFlare::RegisterLight(flare->x * 0x20, flare->y * 0x20, flare->z * 0x20, 0x30, 0x40, 0x50, 0x40);
+					int32_t buzzOffsetZ = (g_buzzActor.posAngles.pos.z - flare->z * 0x20) >> 8;
+					int32_t buzzOffsetY = (g_buzzActor.posAngles.pos.y - flare->y * 0x20 - 0x2000) >> 8;
+					int32_t buzzOffsetX = (g_buzzActor.posAngles.pos.x - flare->x * 0x20) >> 8;
+					int32_t distanceSquared = buzzOffsetX * buzzOffsetX + buzzOffsetZ * buzzOffsetZ + buzzOffsetY * buzzOffsetY;
+					if (distanceSquared < nearestDistanceSquared)
+					{
+						nearestDistanceSquared = distanceSquared;
+						nearestFlareIndex = flareIndex;
+					}
+				}
+			}
+
+			if (nearestDistanceSquared < 0x10000)
+			{
+				Vector3I* nearestFlare = &flareRecords->data[nearestFlareIndex];
+				Lighting::DynamicLight* light = &Lighting::g_lightingState.dynamicLights[1];
+				light->sourceId = reinterpret_cast<int32_t>(nearestFlare);
+				light->position.x = nearestFlare->x << 5;
+				light->position.y = nearestFlare->y << 5;
+				light->colour.r = 0x6F;
+				light->position.z = nearestFlare->z << 5;
+				light->colour.g = 0x7F;
+				light->colour.b = 0x8F;
+				light->lifetime = 1;
+			}
+			else
+			{
+				Lighting::g_lightingState.dynamicLights[1].lifetime = 0;
+			}
+
+			PlayLevelMusic();
+		}
 	}
 }
 

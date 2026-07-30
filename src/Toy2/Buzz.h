@@ -10,6 +10,7 @@ namespace Toy2
 	extern int32_t g_spinCooldownTimer;
 	extern int32_t g_spinHoverTimer;
 	extern int32_t g_groundSlamTimer;
+	extern int32_t g_footingType;
 
 	namespace Buzz
 	{

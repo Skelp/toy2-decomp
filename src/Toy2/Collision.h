@@ -79,6 +79,7 @@ namespace Toy2
 		int32_t SweepAndSlide(Vector3I* position, Vector3I* movement, int32_t collisionThreshold, int16_t* collisionAngles, int32_t radius);
 		void GatherTrianglesAtXZ(const Vector3I* position);
 		void ResolveGroundCeiling(PosAndAngles* position, int32_t radius);
+		void ApplySurfaceVelocity(int32_t queryIndex, int32_t x, int32_t y, int32_t z);
 
 		STATIC_ASSERT(sizeof(CollisionMeshInstance) == 0x34);
 		STATIC_ASSERT(sizeof(CollisionQueryResult) == 0x30);
@@ -131,6 +132,13 @@ namespace Toy2
 		void SetRotationAngles(int32_t platformIndex, int16_t x, int16_t y, int16_t z);
 		void GetRotationAngles(int32_t platformIndex, Vector3I* angles);
 		void CommitRotationToLink(int32_t platformIndex, int32_t linkId);
+		int32_t StepTiltPhysics(int32_t platformIndex,
+			int32_t linkId,
+			int32_t angularVelocity,
+			int32_t motionMode,
+			int32_t minimumAngle,
+			int32_t maximumAngle,
+			int32_t angularDivisor);
 		int32_t HadBuzzContactThisFrame(int32_t platformIndex);
 
 		extern PlatformState g_platformStates[32];

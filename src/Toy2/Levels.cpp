@@ -29,31 +29,12 @@
 
 namespace Toy2
 {
-	struct ZoneRenderData
-	{
-		uint8_t visibilityDepth;
-		uint8_t isProcessed;
-		uint16_t portalRecordIndex;
-		int16_t minX;
-		int16_t minY;
-		int16_t maxX;
-		int16_t maxY;
-		uint8_t reservedC[4];
-		int16_t primaryInstanceBytes;
-		int16_t secondaryInstanceBytes;
-		uint8_t reserved14[32];
-	};
-
 	// GLOBAL: TOY2 0x00547ED8
 	int32_t g_zonedInstanceCount;
 	// GLOBAL: TOY2 0x0054D940
 	ZoneRenderData g_zoneRenderData[20];
 	// GLOBAL: TOY2 0x005574FC
 	int32_t g_zoneCount;
-
-	STATIC_ASSERT(sizeof(ZoneRenderData) == 0x34);
-	STATIC_ASSERT(offsetof(ZoneRenderData, primaryInstanceBytes) == 0x10);
-	STATIC_ASSERT(offsetof(ZoneRenderData, secondaryInstanceBytes) == 0x12);
 
 	// FUNCTION: TOY2 0x0043E5A0 [PROVISIONAL]
 	void InitZoneData()

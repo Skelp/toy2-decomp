@@ -59,6 +59,14 @@ namespace Toy2
 
 	namespace HUD
 	{
+		enum ChallengeState
+		{
+			CHALLENGE_STATE_INACTIVE = 0,
+			CHALLENGE_STATE_WAITING_FOR_CAMERA = 1,
+			CHALLENGE_STATE_ACTIVE = 2,
+			CHALLENGE_STATE_COMPLETE = 3,
+		};
+
 		enum SlideSlot
 		{
 			SLIDE_COINS = 2,
@@ -206,6 +214,8 @@ namespace Toy2
 	extern int16_t g_levelTransitionTimer;
 	extern int16_t g_levelTransition;
 	extern int32_t g_levelObjectiveProgress;
+	extern int32_t g_levelInteractionTimer;
+	extern int32_t g_specialPickupCount;
 	extern uint16_t g_gameplayStateFlags;
 	extern int32_t g_idleVoicePreset;
 	extern int32_t g_idleVoiceCooldown;
