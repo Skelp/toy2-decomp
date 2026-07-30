@@ -2807,6 +2807,167 @@ namespace SoftwareRenderer
 		} while (scanlineCount != 0);
 	}
 
+	// FUNCTION: TOY2 0x00474190 [PROVISIONAL]
+	void RasterizeTexturedPolygon8(SoftwareRenderItem* item)
+	{
+		int32_t bottomY = item->vertices[0].y;
+		int32_t topY = bottomY;
+		if (item->vertices[1].y < topY)
+			topY = item->vertices[1].y;
+		else if (item->vertices[1].y > bottomY)
+			bottomY = item->vertices[1].y;
+
+		if (item->vertices[2].y < topY)
+			topY = item->vertices[2].y;
+		else if (item->vertices[2].y > bottomY)
+			bottomY = item->vertices[2].y;
+
+		if (item->renderFlags & SOFTWARE_RENDER_QUAD)
+		{
+			if (item->vertices[3].y < topY)
+				topY = item->vertices[3].y;
+			else if (item->vertices[3].y > bottomY)
+				bottomY = item->vertices[3].y;
+		}
+
+		if (topY < Toy2::g_screenClipTop)
+			topY = Toy2::g_screenClipTop;
+		if (bottomY > Toy2::g_screenClipBottom)
+			bottomY = Toy2::g_screenClipBottom;
+
+		int32_t scanlineCount = bottomY - topY + 1;
+		ScanlineScratch* scanline = &g_scanlineScratch[topY];
+		ClearScanlineFlags(scanline, scanlineCount);
+
+		RASTERIZE_TEXTURED_EDGE(&item->vertices[0], &item->vertices[1], edge01DoneTextured8);
+		RASTERIZE_TEXTURED_EDGE(&item->vertices[1], &item->vertices[2], edge12DoneTextured8);
+		if ((item->renderFlags & SOFTWARE_RENDER_QUAD) == 0)
+		{
+			RASTERIZE_TEXTURED_EDGE(&item->vertices[2], &item->vertices[0], edge20DoneTextured8);
+		}
+		else
+		{
+			RASTERIZE_TEXTURED_EDGE(&item->vertices[2], &item->vertices[3], edge23DoneTextured8);
+			RASTERIZE_TEXTURED_EDGE(&item->vertices[3], &item->vertices[0], edge30DoneTextured8);
+		}
+
+		uint8_t* texture = (uint8_t*)g_softwareTextureData[item->textureIndex];
+		uint8_t* rowStart = (uint8_t*)g_lockedBackBuffer + g_backBufferPitchPixels * topY + Toy2::g_screenClipLeft;
+		if (item->renderFlags & SOFTWARE_RENDER_COLOUR_KEY)
+		{
+			do
+			{
+				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
+				{
+					int32_t leftX = scanline->leftXFixed >> 10;
+					int32_t rightX = scanline->rightXFixed >> 10;
+					if (leftX == rightX)
+					{
+						uint8_t texel = texture[(scanline->leftInterpolants[0] >> 16) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
+						if (texel != 0)
+							rowStart[leftX - Toy2::g_screenClipLeft] = texel;
+					}
+					else
+					{
+						int32_t width = rightX - leftX;
+						int32_t u = scanline->leftInterpolants[0];
+						int32_t v = scanline->leftInterpolants[1];
+						int32_t uStep = (scanline->rightInterpolants[0] - u) / width;
+						int32_t vStep = (scanline->rightInterpolants[1] - v) / width;
+						int32_t pixelCount = width;
+						uint8_t* pixel;
+						if (leftX < Toy2::g_screenClipLeft)
+						{
+							int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
+							u += clippedPixels * uStep;
+							v += clippedPixels * vStep;
+							pixelCount = Toy2::g_softWindowWidth;
+							pixel = rowStart;
+							if (rightX <= Toy2::g_screenClipRight)
+								pixelCount = rightX - Toy2::g_screenClipLeft + 1;
+						}
+						else
+						{
+							if (rightX > Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_screenClipRight - leftX;
+							pixelCount++;
+							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
+						}
+
+						do
+						{
+							uint8_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+							if (texel != 0)
+								*pixel = texel;
+							u += uStep;
+							v += vStep;
+							pixelCount--;
+							pixel++;
+						} while (pixelCount > 0);
+					}
+				}
+				rowStart += g_backBufferPitchPixels;
+				scanline++;
+				scanlineCount--;
+			} while (scanlineCount != 0);
+			return;
+		}
+
+		do
+		{
+			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
+			{
+				int32_t leftX = scanline->leftXFixed >> 10;
+				int32_t rightX = scanline->rightXFixed >> 10;
+				if (leftX == rightX)
+				{
+					rowStart[leftX - Toy2::g_screenClipLeft] =
+						texture[(scanline->leftInterpolants[0] >> 16) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
+				}
+				else
+				{
+					int32_t width = rightX - leftX;
+					int32_t u = scanline->leftInterpolants[0];
+					int32_t v = scanline->leftInterpolants[1];
+					int32_t uStep = (scanline->rightInterpolants[0] - u) / width;
+					int32_t vStep = (scanline->rightInterpolants[1] - v) / width;
+					int32_t pixelCount;
+					uint8_t* pixel;
+					if (leftX < Toy2::g_screenClipLeft)
+					{
+						int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
+						u += clippedPixels * uStep;
+						v += clippedPixels * vStep;
+						pixelCount = Toy2::g_softWindowWidth;
+						pixel = rowStart;
+						if (rightX <= Toy2::g_screenClipRight)
+							pixelCount = rightX - Toy2::g_screenClipLeft + 1;
+					}
+					else
+					{
+						pixel = rowStart + leftX - Toy2::g_screenClipLeft;
+						if (rightX <= Toy2::g_screenClipRight)
+							pixelCount = rightX - leftX + 1;
+						else
+							pixelCount = Toy2::g_screenClipRight - leftX + 1;
+					}
+
+					do
+					{
+						*pixel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+						u += uStep;
+						v += vStep;
+						pixelCount--;
+						pixel++;
+					} while (pixelCount > 0);
+				}
+			}
+			rowStart += g_backBufferPitchPixels;
+			scanline++;
+			scanlineCount--;
+		} while (scanlineCount != 0);
+	}
+
 #undef RASTERIZE_TEXTURED_EDGE
 #undef RASTERIZE_TEXTURED_EDGE_EXCLUSIVE
 #undef RASTERIZE_TEXTURED_EDGE_WITH_END
@@ -2814,8 +2975,6 @@ namespace SoftwareRenderer
 	void UnkRenderAPI30(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x00472E70
 	void UnkRenderAPI31(SoftwareRenderItem* item) {}
-	// STUB: TOY2 0x00474190
-	void UnkRenderAPI32(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x00474C80
 	void UnkRenderAPI33(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x00477EB0
@@ -2855,7 +3014,7 @@ namespace SoftwareRenderer
 		RasterizeAdditiveTexturedPolygon8,
 		RasterizeSubtractiveTexturedPolygon8,
 		{ UnkRenderAPI30, UnkRenderAPI31, UnkRenderAPI31, UnkRenderAPI31 },
-		{ UnkRenderAPI32, UnkRenderAPI33, UnkRenderAPI33, UnkRenderAPI33 },
+		{ RasterizeTexturedPolygon8, UnkRenderAPI33, UnkRenderAPI33, UnkRenderAPI33 },
 		UnkRenderAPI34,
 	};
 
