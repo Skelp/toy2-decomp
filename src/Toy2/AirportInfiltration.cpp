@@ -20,6 +20,7 @@
 #include "Numerics.h"
 
 #include <limits.h>
+#include <stdlib.h>
 
 namespace Toy2
 {
@@ -265,8 +266,120 @@ namespace Toy2
 			prospectorRam->boundHalfX = 90;
 		}
 
-		// STUB: TOY2 0x0042C3E0
-		void Method2(int32_t pathIndex, int32_t speedLimit) {}
+		// FUNCTION: TOY2 0x0042C3E0 [PROVISIONAL]
+		void UpdatePathPlatform(int32_t pathIndex, int32_t speedLimit)
+		{
+			if ((g_ledgeClimbPlatformIndex == Platform::g_pathPlatforms[pathIndex].platformIndex || pathIndex == 2 || pathIndex == 3)
+				&& (g_ledgeClimbPlatformIndex == Platform::g_pathPlatforms[2].platformIndex
+					|| g_ledgeClimbPlatformIndex == Platform::g_pathPlatforms[3].platformIndex))
+				return;
+
+			Vector4I targetPosition;
+			Vector3I platformOrigin;
+			Vector3I direction;
+			Vector3I pairedPlatformOrigin;
+			if (Platform::g_pathPlatforms[pathIndex].pathPosition
+				> (Levels::g_recordData[Platform::g_pathPlatforms[pathIndex].pathRecordType]->recordCount - 2) * 0x1000)
+			{
+				Platform::g_pathPlatforms[pathIndex].pathPosition = 0;
+				Path::SamplePoint(Platform::g_pathPlatforms[pathIndex].pathRecordType, 0, &targetPosition);
+				Platform::SetOrigin(Platform::g_pathPlatforms[pathIndex].platformIndex, targetPosition.x << 5, targetPosition.y << 5, targetPosition.z << 5);
+				Platform::GetOrigin(Platform::g_pathPlatforms[pathIndex].platformIndex, &platformOrigin);
+			}
+			else
+			{
+				Path::SamplePoint(Platform::g_pathPlatforms[pathIndex].pathRecordType, Platform::g_pathPlatforms[pathIndex].pathPosition, &targetPosition);
+				Platform::GetOrigin(Platform::g_pathPlatforms[pathIndex].platformIndex, &platformOrigin);
+				if (Platform::g_pathPlatforms[pathIndex].speed < speedLimit)
+					Platform::g_pathPlatforms[pathIndex].speed += Renderer::g_frameDelta * 4;
+
+				if (Platform::g_pathPlatforms[pathIndex].speed > (speedLimit >> 1) && Platform::g_pathPlatforms[pathIndex].previousX == platformOrigin.x
+					&& Platform::g_pathPlatforms[pathIndex].previousZ == platformOrigin.z)
+				{
+					if (pathIndex == 2 || pathIndex == 3)
+					{
+						Platform::g_pathPlatforms[2].speed = -speedLimit;
+						Platform::g_pathPlatforms[3].speed = Platform::g_pathPlatforms[2].speed;
+						if (pathIndex == 2)
+						{
+							Platform::GetOrigin(Platform::g_pathPlatforms[3].platformIndex, &pairedPlatformOrigin);
+							if (platformOrigin.x - pairedPlatformOrigin.x > 0)
+								pairedPlatformOrigin.x = platformOrigin.x - 0x4D648;
+							Platform::SetOrigin(
+								Platform::g_pathPlatforms[3].platformIndex, pairedPlatformOrigin.x, pairedPlatformOrigin.y, pairedPlatformOrigin.z);
+						}
+						else
+						{
+							Platform::GetOrigin(Platform::g_pathPlatforms[2].platformIndex, &pairedPlatformOrigin);
+							if (platformOrigin.x - pairedPlatformOrigin.x > 0)
+								pairedPlatformOrigin.x = platformOrigin.x - 0x4D648;
+							Platform::SetOrigin(
+								Platform::g_pathPlatforms[2].platformIndex, pairedPlatformOrigin.x, pairedPlatformOrigin.y, pairedPlatformOrigin.z);
+						}
+					}
+					else
+					{
+						Platform::g_pathPlatforms[pathIndex].speed = -speedLimit;
+					}
+				}
+
+				Platform::g_pathPlatforms[pathIndex].previousX = platformOrigin.x;
+				Platform::g_pathPlatforms[pathIndex].previousZ = platformOrigin.z;
+				direction.x = targetPosition.x * 0x20 - platformOrigin.x;
+				direction.y = targetPosition.y * 0x20 - platformOrigin.y;
+				direction.z = targetPosition.z * 0x20 - platformOrigin.z;
+				if (abs(direction.x) < 0x4000 && abs(direction.y) < 0x4000 && abs(direction.z) < 0x4000)
+					Platform::g_pathPlatforms[pathIndex].pathPosition += 0x1000;
+
+				while (abs(direction.x) > 0x4000 || abs(direction.y) > 0x4000 || abs(direction.z) > 0x4000)
+				{
+					direction.x >>= 2;
+					direction.y >>= 2;
+					direction.z >>= 2;
+				}
+
+				Nu3D::Math::NormalizeToFixedPoint(&direction, &direction);
+				int32_t movementSpeed = Renderer::g_frameDelta * Platform::g_pathPlatforms[pathIndex].speed;
+				Platform::SetVelocity(Platform::g_pathPlatforms[pathIndex].platformIndex,
+					movementSpeed * direction.x >> 10,
+					movementSpeed * direction.y >> 10,
+					movementSpeed * direction.z >> 10);
+			}
+
+			if (Platform::g_pathPlatforms[pathIndex].secondaryLinkIndex != 0)
+			{
+				Nu3D::Link::SetPositionRawAndCommit(
+					Platform::g_pathPlatforms[pathIndex].secondaryLinkIndex, platformOrigin.x >> 5, platformOrigin.y >> 5, platformOrigin.z >> 5);
+			}
+			Nu3D::Link::SetPositionRawAndCommit(
+				Platform::g_pathPlatforms[pathIndex].primaryLinkIndex, platformOrigin.x >> 5, platformOrigin.y >> 5, platformOrigin.z >> 5);
+
+			if (g_groundSlamTimer != 0 && Platform::g_pathPlatforms[pathIndex].facingAngle != 0x400
+				&& (Platform::GetFlags(Platform::g_pathPlatforms[pathIndex].platformIndex) & Platform::PLATFORM_FLAG_BUZZ_CONTACT)
+					== Platform::PLATFORM_FLAG_BUZZ_CONTACT)
+			{
+				g_groundSlamTimer = 0;
+				AudioManager::PlaySoundEffect(0x1C, &g_buzzActor.posAngles.pos);
+				Buzz::Launch(-0xC00, 2);
+				g_slammedPlatformRotation = -0x200;
+				g_slammedPlatformLinkId = Platform::g_pathPlatforms[pathIndex].primaryLinkIndex;
+				Platform::g_pathPlatforms[pathIndex].emitParticles = 0;
+			}
+
+			if (Platform::g_pathPlatforms[pathIndex].facingAngle != 0x400 && g_framePulseOutputs.sixtyFourTick != 0
+				&& Platform::g_pathPlatforms[pathIndex].emitParticles != 0)
+			{
+				int32_t particleAngle = ((uint16_t)Platform::g_pathPlatforms[pathIndex].facingAngle + 0x400) & 0xFFF;
+				if (Nu3D::Math::IsWithinDistance(&Camera::g_renderCameraTransform.pos, &platformOrigin, 600) != 0)
+				{
+					Nu3D::Particles::SpawnFromPreset(platformOrigin.x + Numerics::g_sinCosLUT[particleAngle],
+						platformOrigin.y - 0x4000,
+						platformOrigin.z + Numerics::g_sinCosLUT[(particleAngle + 0x400) & 0xFFF],
+						0x73,
+						2);
+				}
+			}
+		}
 
 		// FUNCTION: TOY2 0x0042CA60 [PROVISIONAL]
 		void Interactions()
@@ -365,11 +478,11 @@ namespace Toy2
 				Nu3D::Link::SetRotationAbsolute8bit(g_slammedPlatformLinkId, 0, linkRotation.y, g_slammedPlatformRotation);
 			}
 
-			Method2(0, 125);
-			Method2(1, 125);
-			Method2(2, 125);
-			Method2(3, 125);
-			Method2(4, 125);
+			UpdatePathPlatform(0, 125);
+			UpdatePathPlatform(1, 125);
+			UpdatePathPlatform(2, 125);
+			UpdatePathPlatform(3, 125);
+			UpdatePathPlatform(4, 125);
 
 			if (Sector::g_currentSectorIndex != 3 && g_hiddenCollectiblesVisible != 0)
 			{
