@@ -50,6 +50,10 @@ set(TOY2_SOURCES
 
     src/Logger.cpp
     src/Logger.h
+    src/LoggerCannotCreateDeviceContextError.inc
+    src/LoggerMissingOverlayDestinationError.inc
+    src/LoggerNoZBufferHardwareError.inc
+    src/LoggerSurfaceLostError.inc
 
     src/FileUtils.h
 

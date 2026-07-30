@@ -19,5 +19,5 @@ namespace Logger
 	void LogD3DError(int32_t errorCode);
 	void LogDDError(const char* message, HRESULT error);
 	void DebugLog(char* format, ...);
-	char* D3DErrorToString(int32_t error);
+	const char* D3DErrorToString(HRESULT errorCode);
 }
