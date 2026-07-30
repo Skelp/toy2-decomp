@@ -32,7 +32,7 @@ namespace Toy2
 		RGB32 g_menuClearColor;
 
 		// GLOBAL: TOY2 0x004F6BD0
-		int32_t g_settingsCursorYPositions[6] = { -1, 65, 85, 105, 125, 145 };
+		int32_t g_settingsCursorYPositions[5] = { -1, 65, 85, 105, 125 };
 
 		// GLOBAL: TOY2 0x0055A0E8
 		int32_t g_settingsSaveValue1;
