@@ -392,6 +392,48 @@ namespace Nu3D
 			return SpawnInstance(x, y, z, velocityX, velocityY, velocityZ, yawAngle, preset->groundAlignRotation, preset->rotationSpeed, typeId);
 		}
 
+		// FUNCTION: TOY2 0x00410850 [MATCHED]
+		void SpawnBreakBurst(ParticleInstance* source, uint8_t flags)
+		{
+			int32_t spawnY = source->height * 0x20 + source->pos.y;
+			int32_t burstType;
+			int32_t finalType;
+			if ((flags & 1) == 0)
+			{
+				finalType = 0xE;
+				burstType = 0xD;
+				if (Toy2::g_levelFileIndex == 1)
+				{
+					AudioManager::PlaySoundEffect(0xC, &source->pos);
+				}
+				else
+				{
+					AudioManager::PlaySoundEffect(0x64, &source->pos);
+				}
+			}
+			else
+			{
+				finalType = 0x38;
+				burstType = 0x1E;
+				AudioManager::PlaySoundEffect(0x4A, &source->pos);
+			}
+
+			int32_t particleCount = 5;
+			do
+			{
+				ParticleInstance* particle = SpawnFromPreset(source->pos.x, spawnY, source->pos.z, burstType, 9);
+				particle->updateParam = ((*g_randDatBufferPtr & 3) + 3) * 2;
+				g_randDatBufferPtr++;
+				particleCount--;
+				particle->lifetime = (uint16_t)particle->updateParam * 5;
+			} while (particleCount != 0);
+
+			if ((flags & 2) == 0)
+			{
+				SpawnFromPreset(source->pos.x, spawnY, source->pos.z, finalType, 2);
+			}
+		}
+
 		// GLOBAL: TOY2 0x00529E58;
 		ParticleInstance g_particleInstances[64];
 
