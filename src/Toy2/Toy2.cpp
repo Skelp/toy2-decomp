@@ -946,6 +946,47 @@ namespace Toy2
 		}
 	}
 
+	namespace HUD
+	{
+		// FUNCTION: TOY2 0x0049FC60 [MATCHED]
+		int32_t TickSlide(int32_t slideIndex)
+		{
+			if (g_isPaused == 0)
+			{
+				int16_t timer = g_slideTimers[slideIndex];
+
+				if (timer != 0 && (g_gameplayStateFlags & GAMEPLAY_STATE_CUTSCENE_ACTIVE) == 0)
+				{
+					if (g_slideAngles[slideIndex] < 0x400)
+					{
+						g_slideAngles[slideIndex] += Renderer::g_frameDelta << 5;
+						if (g_slideAngles[slideIndex] >= 0x400)
+							g_slideAngles[slideIndex] = 0x400;
+					}
+
+					if (timer < 1000)
+					{
+						g_slideTimers[slideIndex] = timer - (int16_t)Renderer::g_frameDelta;
+						if (g_slideTimers[slideIndex] <= 0)
+							g_slideTimers[slideIndex] = 0;
+					}
+				}
+				else if (g_slideAngles[slideIndex] > 0)
+				{
+					g_slideAngles[slideIndex] -= Renderer::g_frameDelta << 5;
+					if (g_slideAngles[slideIndex] <= 0)
+						g_slideAngles[slideIndex] = 0;
+				}
+			}
+
+			int16_t angle = g_slideAngles[slideIndex];
+			if (angle == 0)
+				return 1;
+
+			return (Numerics::g_sinCosLUT[angle] >> 8) - 0x40;
+		}
+	}
+
 	// STUB: TOY2 0x0049FD40
 	void RenderHUD() {}
 
