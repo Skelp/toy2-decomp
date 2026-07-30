@@ -155,10 +155,24 @@ namespace SoftwareRenderer
 
 	struct ScanlineScratch
 	{
-		uint8_t populated;
-		uint8_t data[0x4b];
+		union
+		{
+			int32_t populated;
+			uint8_t populatedByte;
+		};
+		int32_t leftXFixed;
+		int32_t leftInterpolants[5];
+		int32_t rightXFixed;
+		int32_t rightInterpolants[11];
 	};
 	STATIC_ASSERT(sizeof(ScanlineScratch) == 0x4c);
+	STATIC_ASSERT(offsetof(ScanlineScratch, leftXFixed) == 0x4);
+	STATIC_ASSERT(offsetof(ScanlineScratch, rightXFixed) == 0x1c);
+
+	// GLOBAL: TOY2 0x008393E0
+	ScanlineScratch g_scanlineScratch[1024];
+
+	void ClearScanlineFlags(ScanlineScratch* scanline, int32_t count);
 
 	// GLOBAL: TOY2 0x00B626E0
 	RenderCommand* g_sortedRenderBuckets[30000];
@@ -455,6 +469,10 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x0088290C
 	int32_t g_softWindowScaleY;
 
+	// When this flag is set, polygon edge setup skips odd-numbered scanlines.
+	// GLOBAL: TOY2 0x008828B0
+	int32_t g_skipOddScanlines;
+
 	// GLOBAL: TOY2 0x0088273C
 	int32_t g_unusedSoftwareRendererConfigA;
 
@@ -494,11 +512,12 @@ namespace SoftwareRenderer
 	STATIC_ASSERT(offsetof(SoftwareRenderItem, renderFlags) == 0x74);
 
 	typedef void (*SoftwareRenderCallback)(SoftwareRenderItem* item);
+	typedef void (*SoftwareSolidQuadCallback)(const PointI* point0, const PointI* point1, const PointI* point2, const PointI* point3, uint32_t colourPair);
 
 	struct SoftwareRenderDispatchTable
 	{
 		SoftwareRenderCallback highPriority;
-		SoftwareRenderCallback unused04;
+		SoftwareSolidQuadCallback solidQuad;
 		SoftwareRenderCallback flag20;
 		SoftwareRenderCallback flag1000;
 		SoftwareRenderCallback flag40[4];
@@ -509,8 +528,142 @@ namespace SoftwareRenderer
 
 	// STUB: TOY2 0x0045DB80
 	void UnkRenderAPI1(SoftwareRenderItem* item) {}
-	// STUB: TOY2 0x0046D2C0
-	void UnkRenderAPI2(SoftwareRenderItem* item) {}
+#define RASTERIZE_SOLID_EDGE(pointA, pointB, doneLabel)                                                                      \
+	do                                                                                                                       \
+	{                                                                                                                        \
+		int32_t edgeY;                                                                                                       \
+		int32_t edgeEndY;                                                                                                    \
+		int32_t edgeStartX;                                                                                                  \
+		int32_t edgeEndX;                                                                                                    \
+		int32_t edgeXStep;                                                                                                   \
+		int32_t edgeXFixed;                                                                                                  \
+		ScanlineScratch* edgeScanline;                                                                                       \
+		if ((pointA)->y < (pointB)->y)                                                                                       \
+		{                                                                                                                    \
+			if ((pointA)->y > Toy2::g_screenClipBottom || (pointB)->y < Toy2::g_screenClipTop)                               \
+				goto doneLabel;                                                                                              \
+			edgeY = (pointA)->y;                                                                                             \
+			edgeEndY = (pointB)->y;                                                                                          \
+			edgeStartX = (pointA)->x;                                                                                        \
+			edgeEndX = (pointB)->x;                                                                                          \
+		}                                                                                                                    \
+		else                                                                                                                 \
+		{                                                                                                                    \
+			if ((pointB)->y >= (pointA)->y || (pointB)->y > Toy2::g_screenClipBottom || (pointA)->y < Toy2::g_screenClipTop) \
+				goto doneLabel;                                                                                              \
+			edgeY = (pointB)->y;                                                                                             \
+			edgeEndY = (pointA)->y;                                                                                          \
+			edgeStartX = (pointB)->x;                                                                                        \
+			edgeEndX = (pointA)->x;                                                                                          \
+		}                                                                                                                    \
+		edgeXStep = (edgeEndX - edgeStartX) * 0x400 / (edgeEndY - edgeY);                                                    \
+		edgeXFixed = edgeStartX * 0x400 + 0x200;                                                                             \
+		if (edgeY < Toy2::g_screenClipTop)                                                                                   \
+		{                                                                                                                    \
+			edgeXFixed += (Toy2::g_screenClipTop - edgeY) * edgeXStep;                                                       \
+			edgeY = Toy2::g_screenClipTop;                                                                                   \
+		}                                                                                                                    \
+		edgeScanline = &g_scanlineScratch[edgeY];                                                                            \
+		do                                                                                                                   \
+		{                                                                                                                    \
+			if (g_skipOddScanlines == 0 || (edgeY & 1) == 0)                                                                 \
+			{                                                                                                                \
+				if (edgeScanline->populated == 0)                                                                            \
+				{                                                                                                            \
+					edgeScanline->rightXFixed = edgeXFixed;                                                                  \
+					edgeScanline->leftXFixed = edgeXFixed;                                                                   \
+					edgeScanline->populated = 1;                                                                             \
+				}                                                                                                            \
+				else if (edgeXFixed < edgeScanline->leftXFixed)                                                              \
+				{                                                                                                            \
+					edgeScanline->leftXFixed = edgeXFixed;                                                                   \
+				}                                                                                                            \
+				else if (edgeXFixed > edgeScanline->rightXFixed)                                                             \
+				{                                                                                                            \
+					edgeScanline->rightXFixed = edgeXFixed;                                                                  \
+				}                                                                                                            \
+			}                                                                                                                \
+			edgeScanline++;                                                                                                  \
+			edgeXFixed += edgeXStep;                                                                                         \
+			edgeY++;                                                                                                         \
+		} while (edgeY <= edgeEndY && edgeY <= Toy2::g_screenClipBottom);                                                    \
+	doneLabel:;                                                                                                              \
+	} while (0)
+
+	// FUNCTION: TOY2 0x0046D2C0 [PROVISIONAL]
+	void RasterizeSolidQuad16(const PointI* point0, const PointI* point1, const PointI* point2, const PointI* point3, uint32_t colourPair)
+	{
+		int32_t bottomY = point0->y;
+		int32_t topY = bottomY;
+		if (point1->y < topY)
+			topY = point1->y;
+		else if (point1->y > bottomY)
+			bottomY = point1->y;
+
+		if (point2->y < topY)
+			topY = point2->y;
+		else if (point2->y > bottomY)
+			bottomY = point2->y;
+
+		if (point3->y < topY)
+			topY = point3->y;
+		else if (point3->y > bottomY)
+			bottomY = point3->y;
+
+		if (topY < Toy2::g_screenClipTop)
+			topY = Toy2::g_screenClipTop;
+		if (bottomY > Toy2::g_screenClipBottom)
+			bottomY = Toy2::g_screenClipBottom;
+
+		int32_t scanlineCount = bottomY - topY + 1;
+		ScanlineScratch* scanline = &g_scanlineScratch[topY];
+		ClearScanlineFlags(scanline, scanlineCount);
+
+		RASTERIZE_SOLID_EDGE(point0, point1, edge01Done);
+		RASTERIZE_SOLID_EDGE(point1, point2, edge12Done);
+		RASTERIZE_SOLID_EDGE(point2, point3, edge23Done);
+		RASTERIZE_SOLID_EDGE(point3, point0, edge30Done);
+
+		uint16_t* rowStart = (uint16_t*)g_lockedBackBuffer + g_backBufferPitchPixels * topY + Toy2::g_screenClipLeft;
+		do
+		{
+			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
+			{
+				int32_t leftX = scanline->leftXFixed >> 10;
+				int32_t rightX = scanline->rightXFixed >> 10;
+				if (leftX != rightX)
+				{
+					if (leftX < Toy2::g_screenClipLeft)
+						leftX = Toy2::g_screenClipLeft;
+					if (rightX > Toy2::g_screenClipRight)
+						rightX = Toy2::g_screenClipRight;
+
+					uint16_t* pixel = rowStart + leftX - Toy2::g_screenClipLeft;
+					int32_t pixelCount = rightX - leftX + 1;
+					if (((uint32_t)pixel & 3) != 0)
+					{
+						*pixel++ = (uint16_t)colourPair;
+						pixelCount--;
+					}
+					if (pixelCount > 1)
+					{
+						Nu3D::MemSet32Util(pixel, pixelCount / 2, colourPair);
+						int32_t filledPixels = pixelCount & ~1;
+						pixelCount -= filledPixels;
+						pixel += filledPixels;
+					}
+					if (pixelCount != 0)
+						*pixel = (uint16_t)colourPair;
+				}
+			}
+
+			scanline++;
+			scanlineCount--;
+			rowStart += g_backBufferPitchPixels;
+		} while (scanlineCount != 0);
+	}
+
+#undef RASTERIZE_SOLID_EDGE
 	// STUB: TOY2 0x0045D110
 	void UnkRenderAPI3(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x0045C6B0
@@ -560,7 +713,7 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x00471520
 	void UnkRenderAPI26(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x004776C0
-	void UnkRenderAPI27(SoftwareRenderItem* item) {}
+	void UnkRenderAPI27(const PointI* point0, const PointI* point1, const PointI* point2, const PointI* point3, uint32_t colourPair) {}
 	// STUB: TOY2 0x00476D00
 	void UnkRenderAPI28(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x00476340
@@ -584,7 +737,7 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x004FCB80
 	SoftwareRenderDispatchTable g_softwareRenderDispatch555 = {
 		UnkRenderAPI1,
-		UnkRenderAPI2,
+		RasterizeSolidQuad16,
 		UnkRenderAPI3,
 		UnkRenderAPI4,
 		{ UnkRenderAPI5, UnkRenderAPI6, UnkRenderAPI7, UnkRenderAPI8 },
@@ -595,7 +748,7 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x004FCBB8
 	SoftwareRenderDispatchTable g_softwareRenderDispatch565 = {
 		UnkRenderAPI14,
-		UnkRenderAPI2,
+		RasterizeSolidQuad16,
 		UnkRenderAPI15,
 		UnkRenderAPI16,
 		{ UnkRenderAPI17, UnkRenderAPI18, UnkRenderAPI19, UnkRenderAPI20 },
@@ -986,7 +1139,7 @@ namespace SoftwareRenderer
 	{
 		do
 		{
-			scanline->populated = 0;
+			scanline->populatedByte = 0;
 			scanline++;
 		} while (--count != 0);
 	}

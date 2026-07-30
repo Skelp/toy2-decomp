@@ -384,7 +384,7 @@
 0x00469900 SoftwareRenderer::UnkRenderAPI18
 0x0046AC60 SoftwareRenderer::UnkRenderAPI19
 0x0046BF90 SoftwareRenderer::UnkRenderAPI20
-0x0046D2C0 SoftwareRenderer::UnkRenderAPI2
+0x0046D2C0 SoftwareRenderer::RasterizeSolidQuad16
 0x0046D7B0 SoftwareRenderer::UnkRenderAPI25
 0x00470BF0 SoftwareRenderer::SetPaletteOnAPI
 0x00470C70 SoftwareRenderer::UpdatePaletteTint
@@ -414,7 +414,7 @@
 0x0047D120 SoftwareRenderer::ClearBackBufferOnce
 0x0047D210 SoftwareRenderer::RenderSoftwareFrame
 0x0047D4E0 Toy2::BuildPerspectiveDivideTable
-0x0047D520 InputManager::MemSetUtil
+0x0047D520 Nu3D::MemSet32Util
 0x0047D540 SoftwareRenderer::FillRect32
 0x0047D650 SoftwareRenderer::ClearScanlineFlags
 0x0047D670 AudioManager::LoadSoundPack
