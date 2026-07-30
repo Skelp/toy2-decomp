@@ -6,6 +6,13 @@ namespace Toy2
 {
 	namespace Dialogue
 	{
+		enum SubtitlePageState
+		{
+			SUBTITLE_PAGE_REVEALING = 0,
+			SUBTITLE_PAGE_WAITING = 1,
+			SUBTITLE_PAGE_COMPLETE = 2,
+		};
+
 		struct CutsceneScript
 		{
 			int32_t selectRecordCommand;
@@ -53,6 +60,7 @@ namespace Toy2
 		extern int32_t g_subtitlePageState;
 
 		void WrapSubtitleText(char* subtitle);
+		void UpdateSubtitleBox();
 		void Begin(int32_t actorIndex, int32_t recordType, char* subtitle, int32_t buzzFacingAngle, int32_t actorFacingAngle, int32_t rewardTokenIndex);
 
 		STATIC_ASSERT(sizeof(DialogueRecords) == 0x1C);
