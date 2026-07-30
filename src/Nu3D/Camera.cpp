@@ -5,9 +5,13 @@
 #include "Nu3D/Viewport.h"
 #include "CharacterLoader.h"
 #include "DrawingDevice.h"
+#include "Random.h"
 #include "Renderer/Renderer.h"
 #include "SoftwareRenderer.h"
 #include "Toy2/Actor.h"
+#include "Toy2/Direct6.h"
+#include "Toy2/Toy2.h"
+#include "Toy2/Weather.h"
 #include <FLOAT.H>
 #include <MATH.H>
 #include <STDLIB.H>
@@ -22,6 +26,14 @@ namespace Nu3D
 	namespace Camera
 	{
 		static __forceinline int32_t ShiftFixedTowardZero(int32_t value, int32_t bits) { return (value + ((value >> 31) & ((1 << bits) - 1))) >> bits; }
+
+		struct ViewRotationHistoryEntry
+		{
+			Vector3I16 angles;
+			int16_t reserved;
+		};
+
+		STATIC_ASSERT(sizeof(ViewRotationHistoryEntry) == 8);
 
 		// GLOBAL: TOY2 0x0054DE9C
 		int16_t g_cameraTintBlue;
@@ -48,7 +60,7 @@ namespace Nu3D
 		int16_t g_tintBlend;
 
 		// GLOBAL: TOY2 0x0054C100
-		Matrix3x3I16 g_fixedViewRotation;
+		FixedViewTransform g_workingFixedViewTransform;
 
 		// FUNCTION: TOY2 0x00448F00 [PROVISIONAL]
 		int32_t IsActorSpawnVisible(const Vector3I* cameraPosition, const Toy2::Actor::Toy2Actor* actor)
@@ -68,17 +80,21 @@ namespace Nu3D
 				deltaZ = actor->creatureRam->pos.z * 32 - cameraPosition->z;
 				deltaX = actor->creatureRam->pos.x * 32 - cameraPosition->x;
 				radius = actor->boundingSphereRadius;
-				depth = ShiftFixedTowardZero(g_fixedViewRotation.m22 * deltaZ + g_fixedViewRotation.m21 * deltaY + g_fixedViewRotation.m20 * deltaX, 17);
+				depth = ShiftFixedTowardZero(g_workingFixedViewTransform.rotation.m22 * deltaZ + g_workingFixedViewTransform.rotation.m21 * deltaY
+						+ g_workingFixedViewTransform.rotation.m20 * deltaX,
+					17);
 
 				if (depth > -radius)
 				{
-					horizontal =
-						ShiftFixedTowardZero(g_fixedViewRotation.m02 * deltaZ + g_fixedViewRotation.m01 * deltaY + g_fixedViewRotation.m00 * deltaX, 17);
+					horizontal = ShiftFixedTowardZero(g_workingFixedViewTransform.rotation.m02 * deltaZ + g_workingFixedViewTransform.rotation.m01 * deltaY
+							+ g_workingFixedViewTransform.rotation.m00 * deltaX,
+						17);
 					viewBoundary = (depth << 8) / Toy2::g_destRectHalfWidth;
 					if (viewBoundary > abs(horizontal) - radius)
 					{
-						vertical =
-							ShiftFixedTowardZero(g_fixedViewRotation.m12 * deltaZ + g_fixedViewRotation.m11 * deltaY + g_fixedViewRotation.m10 * deltaX, 17);
+						vertical = ShiftFixedTowardZero(g_workingFixedViewTransform.rotation.m12 * deltaZ + g_workingFixedViewTransform.rotation.m11 * deltaY
+								+ g_workingFixedViewTransform.rotation.m10 * deltaX,
+							17);
 						if (viewBoundary > abs(vertical) - radius)
 							return 1;
 					}
@@ -98,7 +114,10 @@ namespace Nu3D
 		ActiveCameraTransform g_activeCameraTransform;
 
 		// GLOBAL: TOY2 0x00555314
-		Vector3I g_fixedViewPosition;
+		Vector4I g_fixedViewPosition;
+
+		// GLOBAL: TOY2 0x00555324
+		Vector3I g_sectorViewPosition;
 
 		// GLOBAL: TOY2 0x00555334
 		FixedViewTransform g_fixedViewTransform;
@@ -134,10 +153,37 @@ namespace Nu3D
 		int32_t g_billboardYaw;
 
 		// GLOBAL: TOY2 0x00554F0C
-		int32_t g_viewHeightHistory[32];
+		int16_t g_viewHeightHistory[64];
 
 		// GLOBAL: TOY2 0x0054BEF8
-		int32_t g_viewMatrixHistory[128];
+		ViewRotationHistoryEntry g_viewMatrixHistory[64];
+
+		// GLOBAL: TOY2 0x0054E058
+		FixedViewTransform g_previousFixedViewTransform;
+
+		// GLOBAL: TOY2 0x0054F630
+		Vector4I g_previousFixedViewPosition;
+
+		// GLOBAL: TOY2 0x0054DEA8
+		ViewRotationHistoryEntry g_fixedViewAngles;
+
+		// GLOBAL: TOY2 0x0054DD68
+		int32_t g_fixedViewTransformValid;
+
+		// GLOBAL: TOY2 0x00557AB0
+		FixedViewTransform g_blendedViewTransforms[4];
+
+		// GLOBAL: TOY2 0x00554DC0
+		int32_t g_zoneViewportLeftOffset;
+
+		// GLOBAL: TOY2 0x00553028
+		int32_t g_zoneViewportTopOffset;
+
+		// GLOBAL: TOY2 0x0055302C
+		int32_t g_zoneViewportRightOffset;
+
+		// GLOBAL: TOY2 0x005546B4
+		int32_t g_zoneViewportBottomOffset;
 
 		// GLOBAL: TOY2 0x0050A1F8
 		int32_t g_viewHistoryInitialized;
@@ -259,8 +305,114 @@ namespace Nu3D
 			return anyChannelChanged;
 		}
 
-		// STUB: TOY2 0x00446FC0
-		void SetupViewMatrix(ActiveCameraTransform* camera) {}
+		static __forceinline void BuildBlendedViewTransform(FixedViewTransform* transform, int32_t rotationIndex, int32_t row0ScaleIndex)
+		{
+			Math::EulerToRotationMatrix(&g_viewMatrixHistory[rotationIndex].angles, &transform->rotation);
+
+			int32_t blend = abs((int32_t)g_viewHeightHistory[rotationIndex]);
+			int32_t row0Scale = ShiftFixedTowardZero(g_viewHeightHistory[row0ScaleIndex], 4) + 0xF80;
+			int32_t row2Scale = ShiftFixedTowardZero(g_viewHeightHistory[rotationIndex], 4) + 0xF80;
+
+			transform->rotation.m00 =
+				(int16_t)ShiftFixedTowardZero((ShiftFixedTowardZero(transform->rotation.m00 * blend, 12) - blend + 0x1000) * row0Scale, 12);
+			transform->rotation.m01 = (int16_t)ShiftFixedTowardZero(ShiftFixedTowardZero(transform->rotation.m01 * blend, 12) * row0Scale, 12);
+			transform->rotation.m02 = (int16_t)ShiftFixedTowardZero(ShiftFixedTowardZero(transform->rotation.m02 * blend, 12) * row0Scale, 12);
+			transform->rotation.m10 = (int16_t)ShiftFixedTowardZero(transform->rotation.m10 * blend, 12);
+			transform->rotation.m11 = (int16_t)(ShiftFixedTowardZero(transform->rotation.m11 * blend, 12) - blend + 0x1000);
+			transform->rotation.m12 = (int16_t)ShiftFixedTowardZero(transform->rotation.m12 * blend, 12);
+			transform->rotation.m20 = (int16_t)ShiftFixedTowardZero(ShiftFixedTowardZero(transform->rotation.m20 * blend, 12) * row2Scale, 12);
+			transform->rotation.m21 = (int16_t)ShiftFixedTowardZero(ShiftFixedTowardZero(transform->rotation.m21 * blend, 12) * row2Scale, 12);
+			transform->rotation.m22 =
+				(int16_t)ShiftFixedTowardZero((ShiftFixedTowardZero(transform->rotation.m22 * blend, 12) - blend + 0x1000) * row2Scale, 12);
+
+			ViewMatrix::MultiplyFixed(&g_fixedViewTransform.rotation, &transform->rotation, &transform->rotation);
+		}
+
+		// FUNCTION: TOY2 0x00446FC0 [PROVISIONAL]
+		void SetupViewMatrix(ActiveCameraTransform* camera)
+		{
+			ViewRotationHistoryEntry viewAngles;
+			viewAngles.angles.x = camera->rotationAngles.x;
+			viewAngles.angles.y = (int16_t)(-camera->rotationAngles.y & 0xFFF);
+			viewAngles.angles.z = camera->rotationAngles.z;
+
+			Toy2::Sector::g_viewRotation = viewAngles.angles;
+			g_previousFixedViewPosition = g_fixedViewPosition;
+			g_previousFixedViewTransform = g_fixedViewTransform;
+			g_fixedViewAngles = viewAngles;
+			g_fixedViewTransformValid = 1;
+
+			g_zoneViewportLeftOffset = 0;
+			g_zoneViewportTopOffset = 0;
+			g_zoneViewportRightOffset = 0;
+			g_zoneViewportBottomOffset = 0;
+
+			Math::EulerToRotationMatrix(&viewAngles.angles, &g_workingFixedViewTransform.rotation);
+
+			if (g_renderMode == RENDERMODE_SOFTWARE)
+			{
+				g_workingFixedViewTransform.rotation.m00 = (int16_t)(g_workingFixedViewTransform.rotation.m00 * Toy2::g_softWindowWidth / 320);
+				g_workingFixedViewTransform.rotation.m01 = (int16_t)(g_workingFixedViewTransform.rotation.m01 * Toy2::g_softWindowWidth / 320);
+				g_workingFixedViewTransform.rotation.m02 = (int16_t)(g_workingFixedViewTransform.rotation.m02 * Toy2::g_softWindowWidth / 320);
+				g_workingFixedViewTransform.rotation.m10 = (int16_t)(g_workingFixedViewTransform.rotation.m10 * Toy2::g_softWindowHeight / 240);
+				g_workingFixedViewTransform.rotation.m11 = (int16_t)(g_workingFixedViewTransform.rotation.m11 * Toy2::g_softWindowHeight / 240);
+				g_workingFixedViewTransform.rotation.m12 = (int16_t)(g_workingFixedViewTransform.rotation.m12 * Toy2::g_softWindowHeight / 240);
+			}
+
+			g_fixedViewPosition.x = camera->pos.x;
+			g_fixedViewPosition.y = camera->pos.y;
+			g_fixedViewPosition.z = camera->pos.z;
+			g_sectorViewPosition.x = ShiftFixedTowardZero(camera->pos.x, 5);
+			g_sectorViewPosition.y = ShiftFixedTowardZero(camera->pos.y, 5);
+			g_sectorViewPosition.z = ShiftFixedTowardZero(camera->pos.z, 5);
+			g_fixedViewTransform = g_workingFixedViewTransform;
+
+			g_viewBobPhase += 0x18;
+			g_viewHistoryPhase += 0x20;
+			g_viewSwayPhase += 0xD;
+			g_viewHistoryIndex = (uint8_t)(g_viewHistoryIndex - 1) & 0x3F;
+
+			int32_t historyIndex = g_viewHistoryIndex;
+			int32_t nextHistoryIndex = (historyIndex + 1) & 0x3F;
+			int32_t bobHeight = ShiftFixedTowardZero(Numerics::g_sinCosLUT[(uint16_t)g_viewHistoryPhase & 0xFFF], 4);
+			int32_t heightDelta = g_viewHeightTarget - g_viewHeightHistory[nextHistoryIndex] + bobHeight;
+
+			if (heightDelta > 0)
+				g_viewHeightVelocity = (int16_t)(ShiftFixedTowardZero(g_viewHeightVelocity * 62, 6) + 0x10);
+			else
+				g_viewHeightVelocity = (int16_t)(ShiftFixedTowardZero(g_viewHeightVelocity * 62, 6) - 0x10);
+
+			g_viewHeightHistory[historyIndex] = g_viewHeightVelocity + g_viewHeightHistory[nextHistoryIndex];
+
+			int32_t bobAngle = g_viewBobPhase;
+			int32_t swayAngle = (g_viewSwayPhase >> 5) & 0x7F;
+			int32_t bobSine = ShiftFixedTowardZero(Numerics::g_sinCosLUT[bobAngle & 0xFFF], 10);
+			int32_t bobCosine = ShiftFixedTowardZero(Numerics::g_sinCosLUT[(bobAngle + 0x400) & 0xFFF], 10);
+			int32_t swaySine = ShiftFixedTowardZero(Numerics::g_sinCosLUT[swayAngle], 9);
+			int32_t swayCosine = ShiftFixedTowardZero(Numerics::g_sinCosLUT[swayAngle + 0x400], 9);
+
+			if (g_viewHeightHistory[historyIndex] < 0)
+			{
+				g_viewMatrixHistory[historyIndex].angles.x = (int16_t)(bobSine - swayCosine);
+				g_viewMatrixHistory[historyIndex].angles.z = (int16_t)(bobCosine - swaySine);
+			}
+			else
+			{
+				g_viewMatrixHistory[historyIndex].angles.x = (int16_t)(swayCosine + bobSine);
+				g_viewMatrixHistory[historyIndex].angles.z = (int16_t)(bobCosine + swaySine);
+			}
+
+			if (abs(g_viewHeightTarget - g_viewHeightHistory[nextHistoryIndex] + bobHeight) < 0x80)
+				g_viewHeightTarget = (int16_t)(*g_randDatBufferPtr++ * 0x18 + 0x800);
+
+			int32_t oldestSampleIndex = (historyIndex - 0x10) & 0x3F;
+			int32_t middleSampleIndex = (historyIndex - 0x20) & 0x3F;
+			int32_t recentSampleIndex = (historyIndex + 0x10) & 0x3F;
+			BuildBlendedViewTransform(&g_blendedViewTransforms[0], historyIndex, recentSampleIndex);
+			BuildBlendedViewTransform(&g_blendedViewTransforms[1], oldestSampleIndex, historyIndex);
+			BuildBlendedViewTransform(&g_blendedViewTransforms[2], middleSampleIndex, oldestSampleIndex);
+			BuildBlendedViewTransform(&g_blendedViewTransforms[3], recentSampleIndex, middleSampleIndex);
+		}
 
 		// FUNCTION: TOY2 0x004507F0 [MATCHED]
 		void SetObjectViewMatrix(const FixedViewTransform* transform)

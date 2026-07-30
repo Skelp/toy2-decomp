@@ -82,7 +82,7 @@ namespace Nu3D
 		extern CameraData g_activeCamera;
 		extern CameraData* g_currentCamera;
 		extern ActiveCameraTransform g_activeCameraTransform;
-		extern Vector3I g_fixedViewPosition;
+		extern Vector4I g_fixedViewPosition;
 		extern FixedViewTransform g_fixedViewTransform;
 		extern ObjectViewTransform g_objectViewTransform;
 		extern ReflectionState g_reflectionState;
