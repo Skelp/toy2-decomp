@@ -1806,8 +1806,107 @@ namespace Toy2
 
 	namespace Portal
 	{
-		// STUB: TOY2 0x0043FEF0
-		void UpdateActiveSector() {}
+		// GLOBAL: TOY2 0x0054D920
+		Vector3I g_previousSectorPosition;
+
+		// GLOBAL: TOY2 0x005551B0
+		Vector3I16 g_portalNormal;
+
+		// GLOBAL: TOY2 0x005551E0
+		Vector3I g_portalPlaneNormal;
+
+		// GLOBAL: TOY2 0x00555368
+		Vector3I g_portalIntersectionPoint;
+
+		// FUNCTION: TOY2 0x0043FEF0 [PROVISIONAL]
+		void UpdateActiveSector()
+		{
+			Levels::PortalRecord** portalRecords = reinterpret_cast<Levels::PortalRecord**>(Levels::g_recordData);
+			Levels::PortalEntry* entry = Levels::g_portalZones[Sector::g_currentSectorIndex].entries;
+			if (entry->recordIdx == 0xFF)
+				return;
+
+			do
+			{
+				if (entry->categoryIdx != 15 || g_hasBackdrop == 0)
+				{
+					if ((abs((g_buzzActor.posAngles.pos.x >> 7) - portalRecords[entry->recordIdx]->origin.x) < 0x4000
+							&& abs((g_buzzActor.posAngles.pos.y >> 7) - portalRecords[entry->recordIdx]->origin.y) < 0x4000
+							&& abs((g_buzzActor.posAngles.pos.z >> 7) - portalRecords[entry->recordIdx]->origin.z) < 0x4000)
+						|| (abs((g_buzzActor.posAngles.pos.x >> 7) - portalRecords[entry->recordIdx]->vertices[1].position.x) < 0x4000
+							&& abs((g_buzzActor.posAngles.pos.y >> 7) - portalRecords[entry->recordIdx]->vertices[1].position.y) < 0x4000
+							&& abs((g_buzzActor.posAngles.pos.z >> 7) - portalRecords[entry->recordIdx]->vertices[1].position.z) < 0x4000))
+					{
+						g_portalPlaneNormal.x = portalRecords[entry->recordIdx]->normal.x;
+						g_portalPlaneNormal.y = portalRecords[entry->recordIdx]->normal.y;
+						g_portalPlaneNormal.z = portalRecords[entry->recordIdx]->normal.z;
+
+						int32_t currentDistance = ((g_buzzActor.posAngles.pos.x >> 7) - portalRecords[entry->recordIdx]->origin.x) * g_portalPlaneNormal.x
+							+ ((g_buzzActor.posAngles.pos.y >> 7) - portalRecords[entry->recordIdx]->origin.y) * g_portalPlaneNormal.y
+							+ ((g_buzzActor.posAngles.pos.z >> 7) - portalRecords[entry->recordIdx]->origin.z) * g_portalPlaneNormal.z;
+
+						if (currentDistance < 0)
+						{
+							int32_t previousDistance = ((g_previousSectorPosition.x >> 7) - portalRecords[entry->recordIdx]->origin.x) * g_portalPlaneNormal.x
+								+ ((g_previousSectorPosition.y >> 7) - portalRecords[entry->recordIdx]->origin.y) * g_portalPlaneNormal.y
+								+ ((g_previousSectorPosition.z >> 7) - portalRecords[entry->recordIdx]->origin.z) * g_portalPlaneNormal.z;
+
+							if (previousDistance >= 0)
+							{
+								g_portalNormal.x = (int16_t)g_portalPlaneNormal.x;
+								g_portalNormal.y = (int16_t)g_portalPlaneNormal.y;
+								g_portalNormal.z = (int16_t)g_portalPlaneNormal.z;
+
+								int32_t distanceDelta = previousDistance - currentDistance;
+								g_portalIntersectionPoint.x =
+									(((g_buzzActor.posAngles.pos.x - g_previousSectorPosition.x) * previousDistance / distanceDelta
+										 + g_previousSectorPosition.x)
+										>> 7)
+									- portalRecords[entry->recordIdx]->origin.x;
+								g_portalIntersectionPoint.y =
+									(((g_buzzActor.posAngles.pos.y - g_previousSectorPosition.y) * previousDistance / distanceDelta
+										 + g_previousSectorPosition.y)
+										>> 7)
+									- portalRecords[entry->recordIdx]->origin.y;
+								g_portalIntersectionPoint.z =
+									(((g_buzzActor.posAngles.pos.z - g_previousSectorPosition.z) * previousDistance / distanceDelta
+										 + g_previousSectorPosition.z)
+										>> 7)
+									- portalRecords[entry->recordIdx]->origin.z;
+
+								if (Nu3D::Math::PointIntersectsTriangle(g_portalIntersectionPoint.x,
+										g_portalIntersectionPoint.y,
+										g_portalIntersectionPoint.z,
+										portalRecords[entry->recordIdx]->vertices[0].position.x - portalRecords[entry->recordIdx]->origin.x,
+										portalRecords[entry->recordIdx]->vertices[0].position.y - portalRecords[entry->recordIdx]->origin.y,
+										portalRecords[entry->recordIdx]->vertices[0].position.z - portalRecords[entry->recordIdx]->origin.z,
+										portalRecords[entry->recordIdx]->vertices[1].position.x - portalRecords[entry->recordIdx]->origin.x,
+										portalRecords[entry->recordIdx]->vertices[1].position.y - portalRecords[entry->recordIdx]->origin.y,
+										portalRecords[entry->recordIdx]->vertices[1].position.z - portalRecords[entry->recordIdx]->origin.z,
+										&g_portalNormal,
+										400)
+									|| Nu3D::Math::PointIntersectsTriangle(g_portalIntersectionPoint.x,
+										g_portalIntersectionPoint.y,
+										g_portalIntersectionPoint.z,
+										portalRecords[entry->recordIdx]->vertices[1].position.x - portalRecords[entry->recordIdx]->origin.x,
+										portalRecords[entry->recordIdx]->vertices[1].position.y - portalRecords[entry->recordIdx]->origin.y,
+										portalRecords[entry->recordIdx]->vertices[1].position.z - portalRecords[entry->recordIdx]->origin.z,
+										portalRecords[entry->recordIdx]->vertices[2].position.x - portalRecords[entry->recordIdx]->origin.x,
+										portalRecords[entry->recordIdx]->vertices[2].position.y - portalRecords[entry->recordIdx]->origin.y,
+										portalRecords[entry->recordIdx]->vertices[2].position.z - portalRecords[entry->recordIdx]->origin.z,
+										&g_portalNormal,
+										400))
+								{
+									Sector::g_currentSectorIndex = entry->categoryIdx;
+								}
+							}
+						}
+					}
+				}
+
+				++entry;
+			} while (entry->recordIdx != 0xFF);
+		}
 
 		// FUNCTION: TOY2 0x00440260 [MATCHED]
 		void UpdateActiveSectorAt(int32_t x, int32_t y, int32_t z)

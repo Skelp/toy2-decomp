@@ -34,6 +34,9 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00559C70
 		RecordData* g_recordData[96];
 
+		// GLOBAL: TOY2 0x0054F39C
+		PortalZone g_portalZones[20];
+
 		// GLOBAL: TOY2 0x0055A114
 		int32_t g_levelLoadConfig;
 

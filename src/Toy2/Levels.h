@@ -3,6 +3,8 @@
 #include "Common.h"
 #include "Numerics.h"
 
+#include <stddef.h>
+
 namespace Toy2
 {
 	namespace Levels
@@ -128,7 +130,23 @@ namespace Toy2
 			PortalEntry entries[16];
 		};
 
+		struct PortalVertex
+		{
+			Vector3I16 position;
+			uint8_t reserved[6];
+		};
+
+		struct PortalRecord
+		{
+			uint16_t recordCount;
+			uint16_t recordType;
+			Vector3I16 origin;
+			Vector3I16 normal;
+			PortalVertex vertices[3];
+		};
+
 		extern RecordData* g_recordData[96];
+		extern PortalZone g_portalZones[20];
 		extern ObjectList* g_objectListBase;
 		extern uint8_t g_levelDataHeapBase[1249280];
 		extern uint8_t* g_levelDataHeapBasePtr;
@@ -153,5 +171,10 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(ObjectList) == 0x4);
 		STATIC_ASSERT(sizeof(PortalEntry) == 0x2);
 		STATIC_ASSERT(sizeof(PortalZone) == 0x20);
+		STATIC_ASSERT(sizeof(PortalVertex) == 0xC);
+		STATIC_ASSERT(sizeof(PortalRecord) == 0x34);
+		STATIC_ASSERT(offsetof(PortalRecord, origin) == 0x4);
+		STATIC_ASSERT(offsetof(PortalRecord, normal) == 0xA);
+		STATIC_ASSERT(offsetof(PortalRecord, vertices) == 0x10);
 	}
 }
