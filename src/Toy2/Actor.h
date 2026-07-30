@@ -163,6 +163,7 @@ namespace Toy2
 		extern uint16_t* g_gunslingerMovementData;
 		extern uint16_t* g_prospectorMovementData;
 		extern uint16_t* g_smithMovementData;
+		extern uint16_t* g_tinManMovementData;
 		extern int32_t g_rcCarRearWheelRotation;
 		extern int32_t g_rcCarFrontWheelRotation;
 		void SetRCCarNodeAngle(Actor::Toy2Actor* actor, int32_t nodeIndex, int32_t pitch, int32_t yaw, int32_t roll);

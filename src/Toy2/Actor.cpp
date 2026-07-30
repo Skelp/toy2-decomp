@@ -1637,6 +1637,8 @@ namespace Toy2
 			actor->previousActorPhase = 0;
 		}
 
+		// GLOBAL: TOY2 0x004E02D8
+		uint16_t* g_tinManMovementData;
 		// GLOBAL: TOY2 0x004E0318
 		uint16_t* g_boxMovementData;
 		// GLOBAL: TOY2 0x004E0324

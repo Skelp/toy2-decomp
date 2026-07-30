@@ -2,6 +2,8 @@
 #include "Toy2/LevelLogic.h"
 #include "Toy2/Collision.h"
 #include "Toy2/Actor.h"
+#include "Toy2/Buzz.h"
+#include "Toy2/Camera.h"
 #include "Toy2/Collectables.h"
 #include "Toy2/Levels.h"
 #include "Toy2/Particles.h"
@@ -16,8 +18,21 @@
 
 namespace Toy2
 {
+	extern int32_t g_hudActorAnimationFrame;
+
+	namespace Lighting
+	{
+		void SpawnLight(int32_t x, int32_t y, int32_t z, int32_t colour, int32_t lifetime, int32_t sourceId);
+	}
+
 	namespace AndysHouse
 	{
+		enum TinManState
+		{
+			TIN_MAN_STATE_ACTIVE = 2,
+			TIN_MAN_STATE_DEFEATED = 3,
+		};
+
 		struct LinkOrigin
 		{
 			Vector3I position;
@@ -57,6 +72,8 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x004F0EDC
 		int16_t g_tokenLinkIds[] = { 0x39, 0x3A, 0x3B, 0x3C, 0x30, 0 };
+		// GLOBAL: TOY2 0x004F0330
+		char g_tinManChallengeDialogue[] = "ha ha ha ha ... defeat the ^tin robot^ to get a ^token^!";
 
 		// GLOBAL: TOY2 0x004F0EE8
 		extern const Collectables::TokenDialogueValue g_tokenDialogueValues[] = {
@@ -241,8 +258,149 @@ namespace Toy2
 {
 	namespace CreatureBehaviour
 	{
-		// STUB: TOY2 0x00416AB0
-		void TinMan(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// FUNCTION: TOY2 0x00416AB0 [PROVISIONAL]
+		void TinMan(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			AndysHouse::g_tinManBlinkToggle = (AndysHouse::g_tinManBlinkToggle - 1) & 1;
+			AndysHouse::g_tinManEffectTimer -= Renderer::g_frameDelta;
+			if (AndysHouse::g_tinManEffectTimer < 0)
+			{
+				AndysHouse::g_tinManEffectTimer = 0;
+				actor->useTint = 0;
+			}
+			else if (AndysHouse::g_tinManBlinkToggle != 0)
+			{
+				actor->useTint = 1;
+				actor->actorTint.r = 0x2000;
+				actor->actorTint.g = 0x2000;
+				actor->actorTint.b = 0x2000;
+			}
+			else
+			{
+				actor->useTint = 0;
+			}
+
+			actor->creatureRam->speedNoTarget = (actor->actorPhase + 14) * 12;
+			if (actor->primaryAnimIdx == 3 || actor->primaryAnimIdx == 5)
+			{
+				actor->creatureRam->defenseMode = 7;
+				if (actor->actorPhase != AndysHouse::g_previousTinManPhase)
+				{
+					AndysHouse::g_tinManEffectTimer = 60;
+					if (actor->actorPhase < 10)
+					{
+						actor->movementData = g_tinManMovementData + 101;
+						actor->creatureRam->defenseMode = 4;
+						actor->actorFlags &= ~Actor::ACTOR_FLAG_DAMAGES_BUZZ;
+						int32_t effectX = actor->pos.x + actor->collisionVolumes->offset.x;
+						int32_t effectY = actor->pos.y + actor->collisionVolumes->offset.y;
+						int32_t effectZ = actor->pos.z + actor->collisionVolumes->offset.z;
+						for (int32_t effectCount = 5; effectCount != 0; effectCount--)
+						{
+							Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(effectX, effectY, effectZ, 0x23, 0xE);
+							particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+						}
+						Lighting::SpawnLight(effectX, effectY, effectZ, 0xF08000, 0x20, (int32_t)actor);
+						AudioManager::PlaySoundEffect(-2, &actor->pos);
+						AndysHouse::g_tinManState = AndysHouse::TIN_MAN_STATE_DEFEATED;
+					}
+					else
+					{
+						actor->movementData = g_tinManMovementData + 90;
+					}
+					AndysHouse::g_previousTinManPhase = actor->actorPhase;
+					actor->movementCommandTimer = 0;
+				}
+			}
+			else
+			{
+				actor->creatureRam->defenseMode = 4;
+			}
+
+			int32_t canEngageBuzz;
+			if ((context->targetFlags & 1) != 0)
+			{
+				canEngageBuzz = 1;
+			}
+			else
+			{
+				RawLoader::CreatureListRam* creatureRam = actor->creatureRam;
+				int32_t deltaX = (g_buzzActor.posAngles.pos.x - actor->boundary.x) >> 5;
+				int32_t deltaZ = (g_buzzActor.posAngles.pos.z - actor->boundary.z) >> 5;
+				int32_t boundAngle = creatureRam->boundAngle * 8;
+				int32_t boundSin = Numerics::g_sinCosLUT[boundAngle] >> 2;
+				int32_t boundCos = Numerics::g_sinCosLUT[(boundAngle + 0x400) & 0xFFF] >> 2;
+				int32_t boundHalfX = creatureRam->boundHalfX * 0x100;
+				int32_t boundHalfZ = creatureRam->boundHalfZ * 0x100;
+				if ((uint32_t)(((boundCos * deltaX - boundSin * deltaZ) >> 7) + boundHalfX) >= (uint32_t)(boundHalfX * 2)
+					|| (uint32_t)(((boundCos * deltaZ + boundSin * deltaX) >> 7) + boundHalfZ) >= (uint32_t)(boundHalfZ * 2))
+					canEngageBuzz = 0;
+				else
+					canEngageBuzz = 1;
+			}
+
+			if (actor->primaryAnimIdx == 7)
+			{
+				if ((actor->animationFramePosition & (int32_t)0xFFFF0000) >= 0xD0000 && Collectables::g_tokenStates[4].active == 0)
+					Collectables::Activate(4, 0);
+
+				int32_t particleX = actor->pos.x + Numerics::g_sinCosLUT[actor->yawAngle] * 2 / 3;
+				int32_t particleY = actor->pos.y - 0x5000;
+				int32_t particleZ = actor->pos.z + Numerics::g_sinCosLUT[(actor->yawAngle + 0x400) & 0xFFF] * 2 / 3;
+				if (g_framePulseOutputs.sevenTick != 0)
+				{
+					Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(particleX, particleY, particleZ, 0x11, 0xA);
+					particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+				}
+
+				if ((*g_randDatBufferPtr++ & 3) != 0 && (actor->animationFramePosition & (int32_t)0xFFFF0000) == 0xE0000)
+				{
+					Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(particleX, particleY, particleZ, 4, 4);
+					particle->lifetime = (*g_randDatBufferPtr++ & 0xF) * 2 + 0x18;
+				}
+			}
+
+			if (canEngageBuzz != 0 && actor->primaryAnimIdx != 7)
+			{
+				if ((uint32_t)g_buzzActor.posAngles.pos.y > (uint32_t)-205114)
+				{
+					if (AndysHouse::g_tinManState == 0)
+					{
+						if (g_buzzActor.specialAirState != 0 && g_buzzActor.posAngles.pos.y < -179566)
+						{
+							Dialogue::Begin(8, 0x1A, AndysHouse::g_tinManChallengeDialogue, 0xE23, 0x700, -1);
+							AndysHouse::g_tinManState = 1;
+						}
+					}
+					else if (AndysHouse::g_tinManState == AndysHouse::TIN_MAN_STATE_ACTIVE)
+					{
+						Camera::g_actorCameraTarget.x = actor->pos.x;
+						Camera::g_actorCameraTarget.y = actor->pos.y;
+						Camera::g_actorCameraTarget.z = actor->pos.z;
+					}
+				}
+			}
+			else if (actor->primaryAnimIdx == 2)
+			{
+				actor->movementCommandTimer = 0;
+				actor->movementData = g_tinManMovementData + 10;
+			}
+
+			g_hudActorAnimationFrame = (actor->actorPhase - 9) * 54 / 11;
+			if (context->localForwardSpeed > 0)
+			{
+				AudioManager::g_dynamicSoundFrequencies[1] = context->localForwardSpeed * 2 + 0x800;
+			}
+			else
+			{
+				if (AudioManager::g_dynamicSoundFrequencies[1] > 0x200)
+					AudioManager::g_dynamicSoundFrequencies[1] -= (int16_t)Renderer::g_frameDelta * 0x20;
+			}
+
+			if (actor->actorPhase >= 10 && AudioManager::g_dynamicSoundFrequencies[1] > 0x200)
+				AudioManager::PlaySoundEffect(0x35, &actor->pos);
+		}
 
 		// FUNCTION: TOY2 0x00416A60 [MATCHED]
 		void Sheep(Actor::Toy2Actor::ActorBehaviourContext* context)
