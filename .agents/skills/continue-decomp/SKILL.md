@@ -48,7 +48,7 @@ tools/decomp baseline              # saved comparison and build identity
   build` and `tools/decomp report`. `candidates` reads that file for the match
   percentages.
 
-## 3. Select a target — budget: 3 tool calls
+## 3. Select a target
 
 ```sh
 tools/decomp audit --status                   # show the required audit scope
@@ -89,13 +89,10 @@ hands you a structure name, a field name, and proof the member is an array. A
 anything you would invent, and missing them is how a function ends up stating
 byte offsets.
 
-**Gate.** After one `evidence` call you should mostly be able to answer the
-"Minimal candidate checklist" in `AGENTS.md`. Mostly is enough. If the answers
-are mostly unknown, take the next candidate from the list you already have. Do
-not start a fresh survey.
-
-If you spend more than about 6 calls without getting on the branch, you are in
-analysis paralysis. Commit to the best candidate you have seen and proceed.
+**Gate.** Use the "Minimal candidate checklist" in `AGENTS.md` after the first
+`evidence` call. Get more evidence when one focused query can answer a missing
+item. Defer the target when its ABI, data model, or control flow stays unclear.
+A correct deferral is useful work and does not require a commit.
 
 ## 4. Get on the branch — immediately after selection
 
@@ -136,11 +133,9 @@ tools/decomp experiment try 0x004XXXXX natural-form
 - Change **one** source-level idea per cycle, so the result confirms or rejects
   that idea. If an idea does not move the diff toward a structural match,
   revert it. Do not accumulate speculative edits.
-- **Reasoning budget: if you have thought more than roughly 2 000 words about
-  one function without writing a file, stop and write the simplest form that
-  fits the evidence.** Then build. The comparison settles design questions
-  faster and more reliably than deliberation. A session that reasons for an hour
-  and commits nothing is a failed session, even when the reasoning is correct.
+- Write the simplest supported form when the evidence is sufficient. Then use
+  the comparison to test the source model. Do not write a complete body only to
+  satisfy a time, tool-call, or commit target.
 - **When two forms both fit the evidence, pick the simpler one, build it, and
   note the alternative in the final report.** Do not choose between them by thinking.
   If the simpler form regresses, that is your answer; `git restore` and take the
@@ -167,6 +162,9 @@ tools/decomp experiment try 0x004XXXXX natural-form
   verified tool artifact, and `[PROVISIONAL]` for all other `FUNCTION` bodies.
 - If reconstruction shows the candidate was genuinely opaque, `git restore` and
   take the next candidate. Do not delete the shared branch.
+- Stop a related cluster when two siblings remain below 50 percent under the
+  same source model. Investigate the common layout, macro, or control flow
+  before you implement another sibling.
 
 **Debt items invert the order: write, build, compare, then judge.** A debt item
 already matches the retail code, so you have a known-good baseline that ordinary
@@ -180,6 +178,9 @@ Do not settle a type design by reasoning when a build will decide it for you.
 1. Format the touched files with the repo `.clang-format`.
 2. Stage the intended source. Run `tools/decomp validate --target 0x004XXXXX
    --staged`.
+   Validation rejects a target below 50 percent by default. Keep that target as
+   a `STUB` unless a maintainer reviews it. A maintainer can set the ledger
+   origin to `maintainer-review` and use `--allow-low-score`.
 3. `tools/decomp compare` and inspect the target's differences.
 4. `tools/decomp lint` — no new error. This is a gate, not advice.
 5. `tools/decomp check` — only if a map entry or an annotation changed.
@@ -206,9 +207,8 @@ minutes and returns nothing.
 
 ## Gotchas
 
-- **Analysis paralysis is the default failure mode.** `candidates` plus one
-  `evidence` call is the whole selection procedure. If you are writing shell
-  loops over `ghidra decompile` to compare candidates, stop and pick one.
+- Use `candidates` and `evidence` before custom discovery work. Defer a target
+  when focused evidence does not support its source model.
 - **Do not polish near-matches.** Cycling functions above 90% for a
   source-fixable diff produces no reconstruction. The priority is `STUB`s and
   unannotated leaves.

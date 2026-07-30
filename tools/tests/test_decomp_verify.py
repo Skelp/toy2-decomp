@@ -113,6 +113,87 @@ class VerifyRegressionTests(unittest.TestCase):
             finally:
                 VERIFY.TOOL_ARTIFACTS = old_artifacts
 
+    def test_new_sub_50_target_requires_maintainer_review(self):
+        with tempfile.TemporaryDirectory() as directory:
+            baseline = self.write_report(directory, "before.json", 0.0)
+            current = self.write_report(directory, "after.json", 0.4)
+            source = Path(directory) / "src"
+            source.mkdir()
+            ledger = Path(directory) / "audit.tsv"
+            old_artifacts = VERIFY.TOOL_ARTIFACTS
+            VERIFY.TOOL_ARTIFACTS = Path(directory) / "none.tsv"
+            try:
+                self.assertEqual(
+                    VERIFY.validate(
+                        baseline,
+                        current,
+                        {0x401000},
+                        False,
+                        source_root=source,
+                        check_annotation_tags=False,
+                        audit_ledger=ledger,
+                    ),
+                    1,
+                )
+            finally:
+                VERIFY.TOOL_ARTIFACTS = old_artifacts
+
+    def test_maintainer_can_approve_a_reviewed_sub_50_target(self):
+        with tempfile.TemporaryDirectory() as directory:
+            baseline = self.write_report(directory, "before.json", 0.0)
+            current = self.write_report(directory, "after.json", 0.4)
+            source = Path(directory) / "src"
+            source.mkdir()
+            ledger = Path(directory) / "audit.tsv"
+            ledger.write_text(
+                "0x00401000\tprovisional\tpartial\t40.00\tclean\tmaintainer-review\t"
+                "the ABI and data layout are supported but local lifetimes remain uncertain\t"
+                "revisit when a related function identifies the original local declaration order\t"
+                "0.00,40.00\t-\t-\t-\taudited\tsub-50\n",
+                encoding="utf-8",
+            )
+            old_artifacts = VERIFY.TOOL_ARTIFACTS
+            VERIFY.TOOL_ARTIFACTS = Path(directory) / "none.tsv"
+            try:
+                self.assertEqual(
+                    VERIFY.validate(
+                        baseline,
+                        current,
+                        {0x401000},
+                        False,
+                        source_root=source,
+                        check_annotation_tags=False,
+                        audit_ledger=ledger,
+                        allow_low_score=True,
+                    ),
+                    0,
+                )
+            finally:
+                VERIFY.TOOL_ARTIFACTS = old_artifacts
+
+    def test_existing_sub_50_target_can_improve_without_new_work_approval(self):
+        with tempfile.TemporaryDirectory() as directory:
+            baseline = self.write_report(directory, "before.json", 0.2)
+            current = self.write_report(directory, "after.json", 0.4)
+            source = Path(directory) / "src"
+            source.mkdir()
+            old_artifacts = VERIFY.TOOL_ARTIFACTS
+            VERIFY.TOOL_ARTIFACTS = Path(directory) / "none.tsv"
+            try:
+                self.assertEqual(
+                    VERIFY.validate(
+                        baseline,
+                        current,
+                        {0x401000},
+                        False,
+                        source_root=source,
+                        check_annotation_tags=False,
+                    ),
+                    0,
+                )
+            finally:
+                VERIFY.TOOL_ARTIFACTS = old_artifacts
+
     def test_baseline_metadata_rejects_a_changed_report(self):
         with tempfile.TemporaryDirectory() as directory:
             report = self.write_report(directory, "before.json", 0.8)

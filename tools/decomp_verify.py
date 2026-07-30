@@ -456,6 +456,60 @@ def readability_audit_problems(
     return problems
 
 
+def low_score_review_problems(
+    ledger: Path,
+    targets: set[int],
+    baseline: dict,
+    current: dict,
+    artifacts: dict[int, str],
+    allow_low_score: bool,
+) -> list[str]:
+    records = {}
+    if ledger.exists():
+        with ledger.open(encoding="utf-8", newline="") as handle:
+            for row in csv.reader(handle, delimiter="\t"):
+                if row and not row[0].startswith("#"):
+                    records[int(row[0], 16)] = row
+
+    problems = []
+    for address in sorted(targets):
+        before = baseline.get(address)
+        status = current.get(address)
+        if status is None:
+            continue
+        tool = address in artifacts and is_symbol_only_diff(status)
+        if status.matching >= 0.5 or status.matching == 1.0 or status.effective or tool:
+            continue
+        if before is not None and before.matching > 0.0:
+            continue
+        if not allow_low_score:
+            problems.append(
+                f"0x{address:08X}: target score {status.matching * 100:.2f}% is below 50%. "
+                "Keep the function as STUB or get a maintainer review"
+            )
+            continue
+
+        row = records.get(address, [])
+        origin = row[5].strip() if len(row) > 5 else ""
+        uncertainty = row[6].strip() if len(row) > 6 else ""
+        trigger = row[7].strip() if len(row) > 7 else ""
+        tested_scores = row[8].strip() if len(row) > 8 else ""
+        audit_state = row[12].strip() if len(row) > 12 else ""
+        if (
+            origin != "maintainer-review"
+            or audit_state != "audited"
+            or len(uncertainty.split()) < 8
+            or len(trigger.split()) < 8
+            or not re.search(r"\b(?:if|when)\b", trigger, re.IGNORECASE)
+            or tested_scores in ("", "-")
+        ):
+            problems.append(
+                f"0x{address:08X}: low-score approval needs an audited ledger row with "
+                "origin maintainer-review, measured scores, uncertainty, and a revisit trigger"
+            )
+    return problems
+
+
 def classify(report: Path, address: int, source_root: Path = ROOT / "src") -> int:
     statuses = read_match_statuses(report)
     status = statuses.get(address)
@@ -514,6 +568,7 @@ def validate(
     source_root: Path = ROOT / "src",
     check_annotation_tags: bool = True,
     audit_ledger: Path = AUDIT_LEDGER,
+    allow_low_score: bool = False,
 ) -> int:
     baseline = read_match_statuses(baseline_path)
     current = read_match_statuses(current_path)
@@ -526,6 +581,11 @@ def validate(
         problems.extend(check_annotations(current_path, source_root))
     if allow_target_regression:
         problems.extend(readability_audit_problems(audit_ledger, targets, baseline, current))
+    problems.extend(
+        low_score_review_problems(
+            audit_ledger, targets, baseline, current, artifacts, allow_low_score
+        )
+    )
 
     for address, before in baseline.items():
         after = current.get(address)
@@ -616,6 +676,7 @@ def main() -> int:
     validate_parser.add_argument("current", type=Path)
     validate_parser.add_argument("targets", nargs="+", type=parse_address)
     validate_parser.add_argument("--allow-target-regression", action="store_true")
+    validate_parser.add_argument("--allow-low-score", action="store_true")
     validate_parser.add_argument("--metadata", type=Path)
     validate_parser.add_argument("--source-root", type=Path, default=ROOT / "src")
     validate_parser.add_argument("--skip-annotation-check", action="store_true")
@@ -677,6 +738,7 @@ def main() -> int:
         args.source_root,
         not args.skip_annotation_check,
         args.audit_ledger,
+        args.allow_low_score,
     )
 
 

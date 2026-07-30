@@ -209,6 +209,7 @@ switch ($Command) {
         Write-ComparisonReport $Current
         $Targets = @()
         $AllowTargetRegression = $false
+        $AllowLowScore = $false
         $Staged = $false
         for ($Index = 0; $Index -lt $CommandArgs.Count; $Index++) {
             if ($CommandArgs[$Index] -eq "--target" -and $Index + 1 -lt $CommandArgs.Count) {
@@ -216,6 +217,8 @@ switch ($Command) {
                 $Targets += $CommandArgs[$Index]
             } elseif ($CommandArgs[$Index] -eq "--allow-target-regression") {
                 $AllowTargetRegression = $true
+            } elseif ($CommandArgs[$Index] -eq "--allow-low-score") {
+                $AllowLowScore = $true
             } elseif ($CommandArgs[$Index] -eq "--staged") {
                 $Staged = $true
             } else {
@@ -226,6 +229,7 @@ switch ($Command) {
         $VerifyArgs = @("validate", $Baseline, $Current) + $Targets
         $VerifyArgs += @("--metadata", (Join-Path $Root "build\decomp-baseline-meta.json"))
         if ($AllowTargetRegression) { $VerifyArgs += "--allow-target-regression" }
+        if ($AllowLowScore) { $VerifyArgs += "--allow-low-score" }
         & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") @VerifyArgs
         Assert-LastExit "Validating comparison results"
         if ($Staged) {

@@ -304,6 +304,10 @@ build-compare loop resolves the rest.
 One `tools/decomp evidence` call answers most of these. If the answers are
 mostly unknown after that call, skip the function. Do not improvise.
 
+A supported deferral is a valid session result. Do not implement an opaque body
+to meet a time, tool-call, progress, or commit target. Record the reason in the
+handoff and select a smaller prerequisite when one exists.
+
 You do **not** need every field type confirmed, every callee resolved, or the
 complete struct layout before you start. Surveying candidates without
 committing to one is the most common way to spend a session and produce
@@ -488,6 +492,16 @@ source-fixable diff. When the remaining differences are import-thunk naming,
 data labels, or register allocation, that work produces no reconstruction.
 Switch to a `STUB` or an unannotated leaf instead.
 
+Stop a related cluster when two siblings remain below 50 percent with the same
+source model. Treat the common low score as evidence against the shared layout,
+macro expansion, or control flow. Resolve that model before another sibling.
+
+Validation rejects a new target below 50 percent by default. Leave the target
+as a `STUB` unless a maintainer accepts the complete behavior and data model.
+For an accepted exception, set the audit-ledger origin to `maintainer-review`.
+Record measured scores, uncertainty, and a conditional revisit trigger. Then
+use `tools/decomp validate --allow-low-score`.
+
 ## Ghidra sync
 
 `tools/decomp sync` drives upstream reccmp's headless Ghidra importer
@@ -559,6 +573,7 @@ per-session order, including the commit, sync, and report steps.
    --staged` for each changed function.
    It builds both targets, checks the saved full-report baseline, runs staged
    lint with warnings as errors, checks the map, and checks the diff.
+   It also rejects an unreviewed target below 50 percent.
 3. Run `tools/decomp compare`. Inspect relevant per-function differences.
 4. Run `tools/decomp lint`. It must report no new error. An exact match with a
    raw offset cast or a placeholder parameter is not finished work.

@@ -113,6 +113,13 @@ class ScoreTests(unittest.TestCase):
         candidates.score(large)
         self.assertGreater(leaf.rank, large.rank)
 
+    def test_a_medium_unannotated_function_outranks_an_oversized_stub(self):
+        medium = make(0x401000, "N::A", size=800, state="NOT_STARTED", siblings=4)
+        oversized = make(0x402000, "N::B", size=5000, state="STUB", siblings=4)
+        candidates.score(medium)
+        candidates.score(oversized)
+        self.assertGreater(medium.rank, oversized.rank)
+
     def test_lint_errors_make_a_matched_function_rank_as_work(self):
         # A 100% match that still states byte offsets is unfinished.
         clean = make(0x401000, "N::Clean", size=300, state="FUNCTION", match=1.0)
@@ -141,6 +148,21 @@ class ScoreTests(unittest.TestCase):
         candidates.score(alone)
         candidates.score(supported)
         self.assertGreater(supported.rank, alone.rank)
+
+    def test_low_scoring_nearby_siblings_lower_the_rank(self):
+        supported = make(0x401000, "N::A", size=300, state="STUB", siblings=5)
+        weak_model = make(
+            0x402000,
+            "N::B",
+            size=300,
+            state="STUB",
+            siblings=5,
+            nearby_provisional_scores=(0.22, 0.24, 0.21),
+        )
+        candidates.score(supported)
+        candidates.score(weak_model)
+        self.assertGreater(supported.rank, weak_model.rank)
+        self.assertTrue(any("nearby provisional" in reason for reason in weak_model.reasons))
 
 
 class SelectTests(unittest.TestCase):
@@ -183,6 +205,7 @@ class SelectTests(unittest.TestCase):
             "max_size": None,
             "exclude_capped": True,
             "debt_only": False,
+            "new_work_only": False,
         }
         arguments.update(kwargs)
         return [item.name for item in candidates.select(list(self.pool), **arguments)]
@@ -200,6 +223,12 @@ class SelectTests(unittest.TestCase):
 
     def test_debt_only_keeps_just_the_lint_failures(self):
         self.assertEqual(self.choose(debt_only=True), ["N::Debt"])
+
+    def test_new_work_excludes_implemented_functions(self):
+        chosen = self.choose(new_work_only=True)
+        self.assertNotIn("N::Near", chosen)
+        self.assertNotIn("N::Debt", chosen)
+        self.assertIn("N::Fresh", chosen)
 
     def test_a_legacy_cap_is_visible_by_default(self):
         self.assertIn("N::Capped", self.choose())

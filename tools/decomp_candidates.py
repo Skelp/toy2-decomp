@@ -73,6 +73,7 @@ class Candidate:
     lint_warnings: int = 0
     audit_state: str = ""
     audit_scope: str = ""
+    nearby_provisional_scores: tuple[float, ...] = ()
     reasons: list[str] = field(default_factory=list)
     rank: float = 0.0
 
@@ -207,6 +208,23 @@ def build_candidates() -> list[Candidate]:
         following = entries[index + 1][0] if index + 1 < len(entries) else address
         state, source = states.get(address, ("NOT_STARTED", ""))
         namespace = namespace_of(name)
+        nearby_scores: list[float] = []
+        for nearby_index in range(max(0, index - 4), min(len(entries), index + 5)):
+            nearby_address, nearby_name = entries[nearby_index]
+            if (
+                not namespace
+                or nearby_address == address
+                or namespace_of(nearby_name) != namespace
+            ):
+                continue
+            nearby_status = matches.get(nearby_address)
+            if (
+                states.get(nearby_address, ("", ""))[0] == "FUNCTION"
+                and nearby_status is not None
+                and nearby_status.matching != 1.0
+                and not nearby_status.effective
+            ):
+                nearby_scores.append(nearby_status.matching)
         candidates.append(
             Candidate(
                 address=address,
@@ -228,6 +246,7 @@ def build_candidates() -> list[Candidate]:
                 lint_warnings=lint_findings.get(address, (0, 0))[1],
                 audit_state=audit_ledger.get(address, ("", ""))[0],
                 audit_scope=audit_ledger.get(address, ("", ""))[1],
+                nearby_provisional_scores=tuple(nearby_scores),
             )
         )
     return candidates
@@ -277,9 +296,19 @@ def score(candidate: Candidate) -> None:
     elif candidate.size and candidate.size <= CLUSTER_MAX_SIZE:
         rank += 12.0
         reasons.append("small body")
-    elif candidate.size > 2000:
+    elif not candidate.size:
+        reasons.append("size unavailable")
+    elif candidate.size <= 1000:
+        reasons.append("medium body")
+    elif candidate.size <= 2000:
         rank -= 25.0
         reasons.append("large body")
+    elif candidate.size <= 4000:
+        rank -= 75.0
+        reasons.append("very large body")
+    else:
+        rank -= 125.0
+        reasons.append("oversized body")
 
     if candidate.siblings >= 3:
         rank += 20.0
@@ -289,6 +318,16 @@ def score(candidate: Candidate) -> None:
         reasons.append(f"{candidate.siblings} reconstructed sibling")
     else:
         reasons.append("no reconstructed sibling")
+
+    low_nearby_scores = [score for score in candidate.nearby_provisional_scores if score < 0.5]
+    if low_nearby_scores:
+        penalty = min(15.0 * len(low_nearby_scores), 60.0)
+        rank -= penalty
+        average = sum(low_nearby_scores) / len(low_nearby_scores)
+        reasons.append(
+            f"{len(low_nearby_scores)} nearby provisional sibling(s) average "
+            f"{average * 100:.1f}%"
+        )
 
     if candidate.namespace:
         rank += 3.0
@@ -321,9 +360,12 @@ def select(
     max_size: int | None,
     exclude_capped: bool,
     debt_only: bool = False,
+    new_work_only: bool = False,
 ) -> list[Candidate]:
     chosen: list[Candidate] = []
     for candidate in candidates:
+        if new_work_only and candidate.state == "FUNCTION":
+            continue
         if namespace and not candidate.name.startswith(namespace + "::"):
             continue
         if stubs_only and candidate.state != "STUB":
@@ -428,7 +470,7 @@ def main() -> int:
     parser.add_argument(
         "--new-work",
         action="store_true",
-        help="show STUB and unannotated work during the audit freeze",
+        help="show only STUB and unannotated work and bypass the audit freeze",
     )
     parser.add_argument("--max-size", type=int, help="drop candidates larger than this many bytes")
     parser.add_argument(
@@ -470,6 +512,7 @@ def main() -> int:
         max_size=args.max_size,
         exclude_capped=not args.include_capped,
         debt_only=args.debt or args.quality,
+        new_work_only=args.new_work,
     )
     if args.legacy_caps:
         chosen = [item for item in chosen if item.cap]
@@ -502,6 +545,7 @@ def main() -> int:
                     "lint_warnings": item.lint_warnings,
                     "audit_state": item.audit_state,
                     "audit_scope": item.audit_scope,
+                    "nearby_provisional_scores": item.nearby_provisional_scores,
                     "rank": item.rank,
                     "reasons": item.reasons,
                 }

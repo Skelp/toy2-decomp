@@ -10,6 +10,7 @@ init(autoreset=True)
 
 import build as build_script
 from tools.decomp_annotations import read_source_annotations
+from tools.decomp_status import read_match_statuses
 
 # Templates
 #
@@ -38,6 +39,7 @@ def parse_source_files():
             implemented_functions[address] = {
                 "status": status,
                 "file": annotation.source,
+                "verification": annotation.tag or "provisional",
             }
             func_occurrences.setdefault(address, []).append(location)
         elif annotation.kind == "global":
@@ -101,6 +103,33 @@ def parse_functions_map(functions_map_path):
             ida_functions[address] = func_name
 
     return ida_functions
+
+
+def progress_breakdown(source_functions, implemented_addresses, match_statuses):
+    counts = {
+        "matched": 0,
+        "effective": 0,
+        "tool": 0,
+        "provisional_75_plus": 0,
+        "provisional_50_to_75": 0,
+        "provisional_below_50": 0,
+        "provisional_unscored": 0,
+    }
+    for address in implemented_addresses:
+        verification = source_functions[address].get("verification", "provisional")
+        if verification in ("matched", "effective", "tool"):
+            counts[verification] += 1
+            continue
+        status = match_statuses.get(int(address, 16))
+        if status is None:
+            counts["provisional_unscored"] += 1
+        elif status.matching >= 0.75:
+            counts["provisional_75_plus"] += 1
+        elif status.matching >= 0.5:
+            counts["provisional_50_to_75"] += 1
+        else:
+            counts["provisional_below_50"] += 1
+    return counts
 
 
 def count_progress(namespace_filter=None, verbose=False):
@@ -171,6 +200,20 @@ def count_progress(namespace_filter=None, verbose=False):
     print(f"Implementation progress:    {implemented_percentage:.1f}%")
     print(f"Started progress:           {started_percentage:.1f}%")
     print(f"Implemented vs Overall:     {implemented_count}/{total_ida_functions}")
+    match_statuses = read_match_statuses(Path("build/decomp-report-data.json"))
+    breakdown = progress_breakdown(source_functions, implemented_addresses, match_statuses)
+    verified_count = breakdown["matched"] + breakdown["effective"] + breakdown["tool"]
+    provisional_count = implemented_count - verified_count
+    print("-" * 60)
+    print(f"Verified functions:         {verified_count}")
+    print(f"  Exact matches:            {breakdown['matched']}")
+    print(f"  Effective matches:        {breakdown['effective']}")
+    print(f"  Tool artifacts:           {breakdown['tool']}")
+    print(f"Provisional functions:      {provisional_count}")
+    print(f"  At least 75%:             {breakdown['provisional_75_plus']}")
+    print(f"  From 50% to 74.99%:       {breakdown['provisional_50_to_75']}")
+    print(f"  Below 50%:                {breakdown['provisional_below_50']}")
+    print(f"  No current score:         {breakdown['provisional_unscored']}")
     print("=" * 60)
 
     extra_functions = set(source_functions.keys()) - ida_addresses

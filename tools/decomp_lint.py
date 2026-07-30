@@ -130,6 +130,14 @@ RULE_HELP = {
         "A cast at a project-function call hides disagreement between the caller's data "
         "model and the declared interface. Correct the source type instead."
     ),
+    "surrogate-layout": (
+        "A local View type with reserved storage or void pointers can hide an unresolved "
+        "shared layout. Recover the owning type or keep the function as a STUB."
+    ),
+    "surrogate-layout-use": (
+        "A completed function casts project data to a local View type. Confirm the shared "
+        "layout and use its owning type."
+    ),
 }
 
 
@@ -407,6 +415,27 @@ def check_text(path: Path, text: str) -> list[Finding]:
     allowed = _allowed_rules(text)
 
     parameter_offsets: set[int] = set()
+
+    surrogate_view_use = re.compile(
+        r"reinterpret_cast\s*<\s*(?P<name>[A-Za-z_]\w*View)\s*\*\s*>"
+    )
+    for match in surrogate_view_use.finditer(masked):
+        line, _ = _line_column(text, match.start())
+        if _owner_at(owners, line).kind != "function":
+            continue
+        _add_finding(
+            findings,
+            path,
+            text,
+            owners,
+            allowed,
+            offset=match.start(),
+            rule="surrogate-layout-use",
+            severity="warning",
+            detail=f"completed code casts project data to local view {match.group('name')!r}",
+            subject=match.group("name"),
+            excerpt=match.group(0),
+        )
 
     opaque_state_slot = re.compile(
         r"\b[A-Za-z_]\w*(?:(?:->|\.)[A-Za-z_]\w*)*(?:->|\.)data\s*"
@@ -699,9 +728,25 @@ def check_text(path: Path, text: str) -> list[Finding]:
     for match, body_range in structs:
         start, end = body_range
         body = masked[start:end]
+        name = match.group(1)
+        if name.endswith("View") and (
+            PLACEHOLDER_FIELD_RE.search(body) or re.search(r"\bvoid\s*\*", body)
+        ):
+            _add_finding(
+                findings,
+                path,
+                text,
+                owners,
+                allowed,
+                offset=match.start(),
+                rule="surrogate-layout",
+                severity="warning",
+                detail=f"local view {name!r} contains unresolved storage or an untyped pointer",
+                subject=name,
+                excerpt=name,
+            )
         if not PLACEHOLDER_FIELD_RE.search(body):
             continue
-        name = match.group(1)
         ancestors = [
             parent.group(1)
             for parent, (parent_start, parent_end) in structs

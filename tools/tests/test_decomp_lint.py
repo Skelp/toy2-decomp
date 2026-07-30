@@ -191,6 +191,20 @@ class PointerModelTests(unittest.TestCase):
         )
         self.assertNotIn("anonymous-buffer-view", rules(source))
 
+    def test_local_view_with_reserved_storage_warns(self):
+        source = (
+            "struct RecordView { uint8_t reserved[8]; void* data; };\n"
+            "STATIC_ASSERT(sizeof(RecordView) == 12);\n"
+        )
+        self.assertEqual(severities(source).get("surrogate-layout"), "warning")
+
+    def test_completed_cast_to_local_view_warns(self):
+        source = (
+            "// FUNCTION: TOY2 0x00401000 [PROVISIONAL]\n"
+            "void f(void* data) { RecordView* view = reinterpret_cast<RecordView*>(data); use(view); }\n"
+        )
+        self.assertEqual(severities(source).get("surrogate-layout-use"), "warning")
+
     def test_narrow_suppression_needs_a_reason_and_applies_to_next_line(self):
         source = (
             "uint32_t* f(uint32_t* row, int pitch)\n{\n"

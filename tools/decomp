@@ -82,6 +82,7 @@ baseline() {
 
 validate() {
     local allow_target_regression=0
+    local allow_low_score=0
     local staged=0
     local targets=()
     while [[ $# -gt 0 ]]; do
@@ -93,6 +94,10 @@ validate() {
                 ;;
             --allow-target-regression)
                 allow_target_regression=1
+                shift
+                ;;
+            --allow-low-score)
+                allow_low_score=1
                 shift
                 ;;
             --staged)
@@ -125,6 +130,9 @@ validate() {
     )
     if [[ $allow_target_regression -eq 1 ]]; then
         verify_args+=(--allow-target-regression)
+    fi
+    if [[ $allow_low_score -eq 1 ]]; then
+        verify_args+=(--allow-low-score)
     fi
     python tools/decomp_verify.py "${verify_args[@]}"
     if [[ $staged -eq 1 ]]; then
