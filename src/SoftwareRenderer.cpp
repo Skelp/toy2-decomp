@@ -499,17 +499,42 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00500C04
 	int32_t g_pendingBackBufferClears;
 
-	// The software queue uses a linked item header. The render payload before
-	// this header depends on the item kind selected by renderFlags.
-	struct SoftwareRenderItem
+	struct SoftwareRasterVertex
 	{
-		uint8_t payload[0x70];
-		SoftwareRenderItem* next;
-		uint16_t renderFlags;
+		int32_t x;
+		int32_t y;
+		int32_t blue;
+		int32_t green;
+		int32_t red;
+		int32_t u;
+		int32_t v;
 	};
 
+	struct SoftwareRenderItem
+	{
+		SoftwareRasterVertex vertices[4];
+		SoftwareRenderItem* next;
+		uint16_t renderFlags;
+		uint8_t textureIndex;
+		uint8_t reserved[9];
+	};
+
+	STATIC_ASSERT(sizeof(SoftwareRasterVertex) == 0x1C);
+	STATIC_ASSERT(sizeof(SoftwareRenderItem) == 0x80);
 	STATIC_ASSERT(offsetof(SoftwareRenderItem, next) == 0x70);
 	STATIC_ASSERT(offsetof(SoftwareRenderItem, renderFlags) == 0x74);
+	STATIC_ASSERT(offsetof(SoftwareRenderItem, textureIndex) == 0x76);
+
+	enum SoftwareRenderFlags
+	{
+		SOFTWARE_RENDER_BLEND_50 = 0x10,
+		SOFTWARE_RENDER_ADDITIVE = 0x20,
+		SOFTWARE_RENDER_COLOUR_OFFSET = 0x40,
+		SOFTWARE_RENDER_SUBTRACTIVE = 0x1000,
+	};
+
+	// GLOBAL: TOY2 0x008827A0
+	void* g_softwareTextureData[64];
 
 	typedef void (*SoftwareRenderCallback)(SoftwareRenderItem* item);
 	typedef void (*SoftwareSolidQuadCallback)(const PointI* point0, const PointI* point1, const PointI* point2, const PointI* point3, uint32_t colourPair);
@@ -710,8 +735,246 @@ namespace SoftwareRenderer
 	void UnkRenderAPI24(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x0046D7B0
 	void UnkRenderAPI25(SoftwareRenderItem* item) {}
-	// STUB: TOY2 0x00471520
-	void UnkRenderAPI26(SoftwareRenderItem* item) {}
+	// FUNCTION: TOY2 0x00471520 [PROVISIONAL]
+	void RasterizeTexturedRect8(SoftwareRenderItem* item)
+	{
+		uint16_t flags = item->renderFlags;
+		int32_t useColourOffset = flags & SOFTWARE_RENDER_COLOUR_OFFSET;
+		item->vertices[2].u--;
+		item->vertices[2].v--;
+
+		int32_t colourOffsetIndex;
+		if (useColourOffset != 0)
+		{
+			colourOffsetIndex = (item->vertices[0].blue >> 12 & ~0x3F) + (item->vertices[0].green >> 15 & ~7) + (item->vertices[0].red >> 18);
+		}
+
+		int32_t right = item->vertices[2].x;
+		int32_t left = item->vertices[0].x;
+		int32_t top = item->vertices[0].y;
+		int32_t width = right - left;
+		if (width == 0)
+			width = 1;
+
+		int32_t bottom = item->vertices[2].y;
+		int32_t height = bottom - top;
+		if (height == 0)
+			height = 1;
+
+		int32_t v = item->vertices[0].v;
+		int32_t u = item->vertices[0].u;
+		int32_t uStep = (item->vertices[2].u - u) / width;
+		int32_t vStep = (item->vertices[2].v - v) / height;
+		width++;
+		height++;
+
+		uint8_t* destination = (uint8_t*)g_lockedBackBuffer + g_backBufferPitchPixels * Toy2::g_screenClipTop + Toy2::g_screenClipLeft;
+		uint8_t* texture = (uint8_t*)g_softwareTextureData[item->textureIndex];
+		if (top < Toy2::g_screenClipTop)
+		{
+			v += (Toy2::g_screenClipTop - top) * vStep;
+			height += top - Toy2::g_screenClipTop;
+		}
+		else
+		{
+			destination += (top - Toy2::g_screenClipTop) * g_backBufferPitchPixels;
+		}
+		if (bottom > Toy2::g_screenClipBottom)
+			height += Toy2::g_screenClipBottom - bottom;
+		if (left < Toy2::g_screenClipLeft)
+		{
+			u += (Toy2::g_screenClipLeft - left) * uStep;
+			width += left - Toy2::g_screenClipLeft;
+		}
+		else
+		{
+			destination += left - Toy2::g_screenClipLeft;
+		}
+		if (right >= Toy2::g_screenClipRight)
+			width += Toy2::g_screenClipRight - right;
+
+		int32_t rowWidth = width;
+		if (flags & SOFTWARE_RENDER_ADDITIVE)
+		{
+			if (useColourOffset != 0)
+			{
+				do
+				{
+					int32_t rowU = u;
+					int32_t remaining = width;
+					do
+					{
+						uint8_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+						if (texel != 0)
+						{
+							uint8_t litTexel = g_paletteColourOffsetTable[colourOffsetIndex + texel * 0x200];
+							*destination = g_additivePaletteTable[*destination + litTexel * 0x100];
+						}
+						destination++;
+						rowU += uStep;
+						remaining--;
+					} while (remaining != 0);
+					destination += g_backBufferPitchPixels - width;
+					v += vStep;
+					height--;
+				} while (height != 0);
+				return;
+			}
+
+			do
+			{
+				int32_t rowU = u;
+				int32_t remaining = rowWidth;
+				do
+				{
+					uint8_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					if (texel != 0)
+						*destination = g_additivePaletteTable[*destination + texel * 0x100];
+					destination++;
+					rowU += uStep;
+					remaining--;
+				} while (remaining != 0);
+				destination += g_backBufferPitchPixels - rowWidth;
+				v += vStep;
+				height--;
+			} while (height != 0);
+			return;
+		}
+
+		if (flags & SOFTWARE_RENDER_SUBTRACTIVE)
+		{
+			if (useColourOffset != 0)
+			{
+				do
+				{
+					int32_t rowU = u;
+					int32_t remaining = width;
+					do
+					{
+						uint8_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+						if (texel != 0)
+						{
+							uint8_t litTexel = g_paletteColourOffsetTable[colourOffsetIndex + texel * 0x200];
+							*destination = g_subtractivePaletteTable[*destination * 0x100 + litTexel];
+						}
+						destination++;
+						rowU += uStep;
+						remaining--;
+					} while (remaining != 0);
+					destination += g_backBufferPitchPixels - width;
+					v += vStep;
+					height--;
+				} while (height != 0);
+				return;
+			}
+
+			do
+			{
+				int32_t rowU = u;
+				int32_t remaining = rowWidth;
+				do
+				{
+					uint8_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					if (texel != 0)
+						*destination = g_subtractivePaletteTable[texel + *destination * 0x100];
+					destination++;
+					rowU += uStep;
+					remaining--;
+				} while (remaining != 0);
+				destination += g_backBufferPitchPixels - rowWidth;
+				v += vStep;
+				height--;
+			} while (height != 0);
+			return;
+		}
+
+		if (flags & SOFTWARE_RENDER_BLEND_50)
+		{
+			if (useColourOffset != 0)
+			{
+				do
+				{
+					int32_t rowU = u;
+					int32_t remaining = width;
+					do
+					{
+						uint8_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+						if (texel != 0)
+						{
+							uint8_t litTexel = g_paletteColourOffsetTable[colourOffsetIndex + texel * 0x200];
+							*destination = g_paletteBlend50Table[*destination + litTexel * 0x100];
+						}
+						destination++;
+						rowU += uStep;
+						remaining--;
+					} while (remaining != 0);
+					destination += g_backBufferPitchPixels - width;
+					v += vStep;
+					height--;
+				} while (height != 0);
+				return;
+			}
+
+			do
+			{
+				int32_t rowU = u;
+				int32_t remaining = rowWidth;
+				do
+				{
+					uint8_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					if (texel != 0)
+						*destination = g_paletteBlend50Table[*destination + texel * 0x100];
+					destination++;
+					rowU += uStep;
+					remaining--;
+				} while (remaining != 0);
+				destination += g_backBufferPitchPixels - rowWidth;
+				v += vStep;
+				height--;
+			} while (height != 0);
+			return;
+		}
+
+		if (useColourOffset != 0)
+		{
+			do
+			{
+				int32_t remaining = width;
+				int32_t rowU = u;
+				do
+				{
+					uint8_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					if (texel != 0)
+						*destination = g_paletteColourOffsetTable[colourOffsetIndex + texel * 0x200];
+					destination++;
+					rowU += uStep;
+					remaining--;
+				} while (remaining != 0);
+				destination += g_backBufferPitchPixels - width;
+				v += vStep;
+				height--;
+			} while (height != 0);
+			return;
+		}
+
+		do
+		{
+			int32_t remaining = width;
+			int32_t rowU = u;
+			do
+			{
+				uint8_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+				if (texel != 0)
+					*destination = texel;
+				destination++;
+				rowU += uStep;
+				remaining--;
+			} while (remaining != 0);
+			destination += g_backBufferPitchPixels - width;
+			v += vStep;
+			height--;
+		} while (height != 0);
+	}
 	// STUB: TOY2 0x004776C0
 	void UnkRenderAPI27(const PointI* point0, const PointI* point1, const PointI* point2, const PointI* point3, uint32_t colourPair) {}
 	// STUB: TOY2 0x00476D00
@@ -758,7 +1021,7 @@ namespace SoftwareRenderer
 
 	// GLOBAL: TOY2 0x004FCBF0
 	SoftwareRenderDispatchTable g_softwareRenderDispatchPalettized = {
-		UnkRenderAPI26,
+		RasterizeTexturedRect8,
 		UnkRenderAPI27,
 		UnkRenderAPI28,
 		UnkRenderAPI29,

@@ -395,7 +395,7 @@
 0x00471190 SoftwareRenderer::BuildAdditivePaletteTable
 0x00471250 SoftwareRenderer::BuildSubtractivePaletteTable
 0x00471300 SoftwareRenderer::SetNewPalette
-0x00471520 SoftwareRenderer::UnkRenderAPI26
+0x00471520 SoftwareRenderer::RasterizeTexturedRect8
 0x00471B30 SoftwareRenderer::UnkRenderAPI30
 0x00472E70 SoftwareRenderer::UnkRenderAPI31
 0x00474190 SoftwareRenderer::UnkRenderAPI32
