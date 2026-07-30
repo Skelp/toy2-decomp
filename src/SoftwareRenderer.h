@@ -225,7 +225,7 @@ namespace SoftwareRenderer
 
 	// One scanline of a triangle or a quad. RasterizeSortedRenderCommand and RasterizeRenderCommand choose the
 	// variant from the render state and publish it in g_spanRasterizer. RasterizeTriangleSpans
-	// and UnkFunc58 call it per scanline. There are 21 variants, one per
+	// and RasterizeQuadSpans call it per scanline. There are 21 variants, one per
 	// combination of pixel format, texturing, and blend mode.
 	//
 	// Every variant shares one ten-argument __cdecl signature. The walkers push
@@ -440,7 +440,7 @@ namespace SoftwareRenderer
 	void UnkFunc46(RenderCommand* command, uint32_t* texData);
 	void UnkFunc45(RenderCommand* command, uint32_t* texData);
 	void UnkFunc57(RenderCommand* command, uint32_t* texData);
-	void UnkFunc58(RenderCommand* command, uint32_t* texData);
+	void RasterizeQuadSpans(RenderCommand* command, uint32_t* texData);
 
 	void RasterizeRenderCommand(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans);
 	void RasterizeSortedRenderCommand(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans);

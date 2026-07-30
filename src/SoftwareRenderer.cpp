@@ -309,7 +309,7 @@ namespace SoftwareRenderer
 	float g_spanScaleH;
 
 	// The span rasterizer that RasterizeSortedRenderCommand and RasterizeRenderCommand select from the render
-	// state. RasterizeTriangleSpans and UnkFunc58 call it once per scanline. The
+	// state. RasterizeTriangleSpans and RasterizeQuadSpans call it once per scanline. The
 	// selection is a plain global, so the executors take no function argument.
 
 	// GLOBAL: TOY2 0x00B626B0
@@ -4538,8 +4538,248 @@ namespace SoftwareRenderer
 	// STUB: TOY2 0x004C7630
 	void UnkFunc45(RenderCommand* command, uint32_t* texData) {}
 
-	// STUB: TOY2 0x004C9190
-	void UnkFunc58(RenderCommand* command, uint32_t* texData) {}
+	// FUNCTION: TOY2 0x004C9190 [PROVISIONAL]
+	void RasterizeQuadSpans(RenderCommand* command, uint32_t* texData)
+	{
+		Nu3D::VertexTL* vertex0 = &command->vertices[0];
+		Nu3D::VertexTL* vertex1 = &command->vertices[1];
+		Nu3D::VertexTL* vertex2 = &command->vertices[2];
+		Nu3D::VertexTL* vertex3 = &command->vertices[3];
+		Nu3D::VertexTL* topCandidate = vertex0;
+		int32_t topCandidateIndex = 0;
+		if (vertex1->position.y <= topCandidate->position.y)
+		{
+			topCandidate = vertex1;
+			topCandidateIndex = 1;
+		}
+		if (vertex2->position.y <= topCandidate->position.y)
+		{
+			topCandidate = vertex2;
+			topCandidateIndex = 2;
+		}
+		if (vertex3->position.y <= topCandidate->position.y)
+			topCandidateIndex = 3;
+
+		Nu3D::VertexTL* vertexOrder[5];
+		switch (topCandidateIndex)
+		{
+			case 0:
+				vertexOrder[0] = vertex0;
+				vertexOrder[1] = vertex1;
+				vertexOrder[2] = vertex2;
+				vertexOrder[3] = vertex3;
+				vertexOrder[4] = vertex0;
+				break;
+			case 1:
+				vertexOrder[0] = vertex1;
+				vertexOrder[1] = vertex2;
+				vertexOrder[2] = vertex3;
+				vertexOrder[3] = vertex0;
+				vertexOrder[4] = vertex1;
+				break;
+			case 2:
+				vertexOrder[0] = vertex2;
+				vertexOrder[1] = vertex3;
+				vertexOrder[2] = vertex0;
+				vertexOrder[3] = vertex1;
+				vertexOrder[4] = vertex2;
+				break;
+			default:
+				vertexOrder[0] = vertex3;
+				vertexOrder[1] = vertex0;
+				vertexOrder[2] = vertex1;
+				vertexOrder[3] = vertex2;
+				vertexOrder[4] = vertex3;
+				break;
+		}
+
+		Nu3D::VertexTL** edgeAStart = &vertexOrder[0];
+		Nu3D::VertexTL** edgeAEnd = &vertexOrder[1];
+		Nu3D::VertexTL** edgeBEnd = &vertexOrder[3];
+		Nu3D::VertexTL** edgeBStart = &vertexOrder[4];
+		uint8_t* destination = (uint8_t*)g_backBuffer + (int32_t)(*edgeAStart)->position.y * g_primarySurfacePitch;
+
+		int32_t edgeARemaining = (int32_t)(*edgeAEnd)->position.y - (int32_t)(*edgeAStart)->position.y;
+		int32_t edgeBRemaining = (int32_t)(*edgeBEnd)->position.y - (int32_t)(*edgeBStart)->position.y;
+
+		int32_t edgeARed;
+		int32_t edgeAGreen;
+		int32_t edgeABlue;
+		int32_t edgeAEndRed;
+		int32_t edgeAEndGreen;
+		int32_t edgeAEndBlue;
+		int32_t edgeBRed;
+		int32_t edgeBGreen;
+		int32_t edgeBBlue;
+		int32_t edgeBEndRed;
+		int32_t edgeBEndGreen;
+		int32_t edgeBEndBlue;
+		UnpackColourChannels((*edgeAStart)->diffuse.value, &edgeARed, &edgeAGreen, &edgeABlue);
+		edgeBRed = edgeARed;
+		edgeBGreen = edgeAGreen;
+		edgeBBlue = edgeABlue;
+		UnpackColourChannels((*edgeAEnd)->diffuse.value, &edgeAEndRed, &edgeAEndGreen, &edgeAEndBlue);
+		UnpackColourChannels((*edgeBEnd)->diffuse.value, &edgeBEndRed, &edgeBEndGreen, &edgeBEndBlue);
+		Nu3D::VertexTL edgeA = **edgeAStart;
+		Nu3D::VertexTL edgeB = **edgeBStart;
+		int32_t completedEdge;
+		int32_t rows;
+		if (edgeARemaining < edgeBRemaining)
+		{
+			completedEdge = 0;
+			rows = edgeARemaining;
+		}
+		else
+		{
+			rows = edgeBRemaining;
+			completedEdge = edgeBRemaining < edgeARemaining ? 1 : 2;
+		}
+		if (rows < 0)
+			return;
+
+		float edgeAXStep;
+		float edgeAUStep;
+		float edgeAVStep;
+		int32_t edgeARedStep;
+		int32_t edgeAGreenStep;
+		int32_t edgeABlueStep;
+		if (edgeARemaining > 0)
+		{
+			float edgeHeight = (float)edgeARemaining;
+			edgeAXStep = ((*edgeAEnd)->position.x - (*edgeAStart)->position.x) / edgeHeight;
+			edgeAUStep = ((*edgeAEnd)->uv.x - (*edgeAStart)->uv.x) / edgeHeight;
+			edgeAVStep = ((*edgeAEnd)->uv.y - (*edgeAStart)->uv.y) / edgeHeight;
+			edgeARedStep = (edgeAEndRed - edgeARed) / edgeARemaining;
+			edgeAGreenStep = (edgeAEndGreen - edgeAGreen) / edgeARemaining;
+			edgeABlueStep = (edgeAEndBlue - edgeABlue) / edgeARemaining;
+		}
+
+		float edgeBXStep;
+		float edgeBUStep;
+		float edgeBVStep;
+		int32_t edgeBRedStep;
+		int32_t edgeBGreenStep;
+		int32_t edgeBBlueStep;
+		if (edgeBRemaining > 0)
+		{
+			float edgeHeight = (float)edgeBRemaining;
+			edgeBXStep = ((*edgeBEnd)->position.x - (*edgeBStart)->position.x) / edgeHeight;
+			edgeBUStep = ((*edgeBEnd)->uv.x - (*edgeBStart)->uv.x) / edgeHeight;
+			edgeBVStep = ((*edgeBEnd)->uv.y - (*edgeBStart)->uv.y) / edgeHeight;
+			edgeBRedStep = (edgeBEndRed - edgeBRed) / edgeBRemaining;
+			edgeBGreenStep = (edgeBEndGreen - edgeBGreen) / edgeBRemaining;
+			edgeBBlueStep = (edgeBEndBlue - edgeBBlue) / edgeBRemaining;
+		}
+
+		for (;;)
+		{
+			int32_t remainingRows = rows;
+			while (remainingRows > 0)
+			{
+				g_spanRasterizer(&edgeA, &edgeB, (uint16_t*)destination, texData, edgeARed, edgeAGreen, edgeABlue, edgeBRed, edgeBGreen, edgeBBlue);
+				edgeA.position.x += edgeAXStep;
+				edgeARed += edgeARedStep;
+				edgeA.uv.x += edgeAUStep;
+				edgeAGreen += edgeAGreenStep;
+				edgeA.uv.y += edgeAVStep;
+				edgeABlue += edgeABlueStep;
+				edgeBRed += edgeBRedStep;
+				edgeB.position.x += edgeBXStep;
+				edgeBGreen += edgeBGreenStep;
+				edgeBBlue += edgeBBlueStep;
+				edgeB.uv.x += edgeBUStep;
+				destination += g_primarySurfacePitch;
+				edgeB.uv.y += edgeBVStep;
+				remainingRows--;
+			}
+
+			if (completedEdge == 0)
+			{
+				edgeBRemaining -= rows;
+				edgeAStart++;
+				edgeAEnd++;
+				edgeARemaining = (int32_t)(*edgeAEnd)->position.y - (int32_t)(*edgeAStart)->position.y;
+			}
+			else if (completedEdge == 1)
+			{
+				edgeARemaining -= rows;
+				edgeBStart--;
+				edgeBEnd--;
+				edgeBRemaining = (int32_t)(*edgeBEnd)->position.y - (int32_t)(*edgeBStart)->position.y;
+			}
+			else
+			{
+				edgeAStart++;
+				edgeAEnd++;
+				edgeBStart--;
+				edgeBEnd--;
+				edgeARemaining = (int32_t)(*edgeAEnd)->position.y - (int32_t)(*edgeAStart)->position.y;
+				edgeBRemaining = (int32_t)(*edgeBEnd)->position.y - (int32_t)(*edgeBStart)->position.y;
+			}
+
+			int32_t nextCompletedEdge;
+			int32_t nextRows;
+			if (edgeARemaining < edgeBRemaining)
+			{
+				nextCompletedEdge = 0;
+				nextRows = edgeARemaining;
+			}
+			else
+			{
+				nextRows = edgeBRemaining;
+				nextCompletedEdge = edgeBRemaining < edgeARemaining ? 1 : 2;
+			}
+			if (nextRows < 0)
+				return;
+
+			if (completedEdge == 0)
+			{
+				edgeA = **edgeAStart;
+				UnpackColourChannels((*edgeAStart)->diffuse.value, &edgeARed, &edgeAGreen, &edgeABlue);
+				UnpackColourChannels((*edgeAEnd)->diffuse.value, &edgeAEndRed, &edgeAEndGreen, &edgeAEndBlue);
+			}
+			else if (completedEdge == 1)
+			{
+				edgeB = **edgeBStart;
+				UnpackColourChannels((*edgeBStart)->diffuse.value, &edgeBRed, &edgeBGreen, &edgeBBlue);
+				UnpackColourChannels((*edgeBEnd)->diffuse.value, &edgeBEndRed, &edgeBEndGreen, &edgeBEndBlue);
+			}
+			else
+			{
+				edgeA = **edgeAStart;
+				edgeB = **edgeBStart;
+				UnpackColourChannels((*edgeAStart)->diffuse.value, &edgeARed, &edgeAGreen, &edgeABlue);
+				UnpackColourChannels((*edgeAEnd)->diffuse.value, &edgeAEndRed, &edgeAEndGreen, &edgeAEndBlue);
+				UnpackColourChannels((*edgeBStart)->diffuse.value, &edgeBRed, &edgeBGreen, &edgeBBlue);
+				UnpackColourChannels((*edgeBEnd)->diffuse.value, &edgeBEndRed, &edgeBEndGreen, &edgeBEndBlue);
+			}
+
+			if (edgeARemaining > 0 && completedEdge != 1)
+			{
+				float edgeHeight = (float)edgeARemaining;
+				edgeAXStep = ((*edgeAEnd)->position.x - (*edgeAStart)->position.x) / edgeHeight;
+				edgeAUStep = ((*edgeAEnd)->uv.x - (*edgeAStart)->uv.x) / edgeHeight;
+				edgeAVStep = ((*edgeAEnd)->uv.y - (*edgeAStart)->uv.y) / edgeHeight;
+				edgeARedStep = (edgeAEndRed - edgeARed) / edgeARemaining;
+				edgeAGreenStep = (edgeAEndGreen - edgeAGreen) / edgeARemaining;
+				edgeABlueStep = (edgeAEndBlue - edgeABlue) / edgeARemaining;
+			}
+			if (edgeBRemaining > 0 && completedEdge != 0)
+			{
+				float edgeHeight = (float)edgeBRemaining;
+				edgeBXStep = ((*edgeBEnd)->position.x - (*edgeBStart)->position.x) / edgeHeight;
+				edgeBUStep = ((*edgeBEnd)->uv.x - (*edgeBStart)->uv.x) / edgeHeight;
+				edgeBVStep = ((*edgeBEnd)->uv.y - (*edgeBStart)->uv.y) / edgeHeight;
+				edgeBRedStep = (edgeBEndRed - edgeBRed) / edgeBRemaining;
+				edgeBGreenStep = (edgeBEndGreen - edgeBGreen) / edgeBRemaining;
+				edgeBBlueStep = (edgeBEndBlue - edgeBBlue) / edgeBRemaining;
+			}
+			completedEdge = nextCompletedEdge;
+			rows = nextRows;
+			if (edgeAStart >= edgeBStart)
+				return;
+		}
+	}
 
 	// Chooses the span rasterizer for one queued command, then runs it.
 	//
@@ -4693,7 +4933,7 @@ namespace SoftwareRenderer
 			RasterizeTriangleSpans(command, commandTexData);
 			return;
 		}
-		UnkFunc58(command, commandTexData);
+		RasterizeQuadSpans(command, commandTexData);
 	}
 
 	// FUNCTION: TOY2 0x004BCC40 [MATCHED]
@@ -4882,7 +5122,7 @@ namespace SoftwareRenderer
 			RasterizeTriangleSpans(command, commandTexData);
 			return;
 		}
-		UnkFunc58(command, commandTexData);
+		RasterizeQuadSpans(command, commandTexData);
 	}
 
 	// FUNCTION: TOY2 0x004BCB60 [PROVISIONAL]
