@@ -175,7 +175,7 @@
 0x00425F60 Toy2::ElevatorHop::Interactions
 0x004282D0 Toy2::CreatureBehaviour::GunsLLevel11
 0x00428650 Toy2::CreatureBehaviour::Rabid
-0x00428700 Toy2::AlsPenthouse::Method10
+0x00428700 Toy2::AlsPenthouse::FireCannonProjectile
 0x00428890 Toy2::AlsPenthouse::Method2
 0x00428BA0 Toy2::AlsPenthouse::UpdateObjectGroupFlash
 0x00428C80 Toy2::AlsPenthouse::Method1

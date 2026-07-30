@@ -17,6 +17,8 @@
 
 #include <limits.h>
 
+extern "C" double __cdecl sqrt(double);
+
 namespace Toy2
 {
 	extern int32_t g_hudActorAnimationFrame;
@@ -398,6 +400,31 @@ namespace Toy2
 				particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
 			}
 			AudioManager::PlaySoundEffect(-2, &position);
+		}
+
+		// FUNCTION: TOY2 0x00428700 [MATCHED]
+		void FireCannonProjectile(const Vector3I* cannonPosition, int32_t yawAngle)
+		{
+			if (g_cannonFireTimer <= 1000)
+				return;
+
+			int32_t cannonX = cannonPosition->x;
+			int32_t cannonY = cannonPosition->y - 0x4000;
+			int32_t cannonZ = cannonPosition->z;
+			int32_t deltaX = (cannonX + ((*g_randDatBufferPtr++ - 0x80) << 7) - g_buzzActor.posAngles.pos.x) >> 5;
+			int32_t deltaZ = (cannonZ + ((*g_randDatBufferPtr++ - 0x80) << 7) - g_buzzActor.posAngles.pos.z) >> 5;
+			int32_t horizontalDistance = (int32_t)sqrt((float)(deltaX * deltaX + deltaZ * deltaZ));
+			if (horizontalDistance < 2000)
+				return;
+
+			int32_t horizontalSpeed = horizontalDistance * 2 / 3;
+			int32_t travelTime = (horizontalDistance << 12) / horizontalSpeed;
+			int32_t velocityX = (Numerics::g_sinCosLUT[(yawAngle + 0x400) & 0xFFF] * horizontalSpeed) / 0x4000;
+			int32_t velocityY = ((g_buzzActor.posAngles.pos.y - cannonY) << 7) / travelTime - (travelTime << 7) / 0x100;
+			int32_t velocityZ = (Numerics::g_sinCosLUT[(yawAngle - 0x800) & 0xFFF] * horizontalSpeed) / 0x4000;
+
+			Nu3D::Particles::SpawnInstance(cannonX, cannonY, cannonZ, velocityX, velocityY, velocityZ, 0x80, 0, 0, 0x5C);
+			AudioManager::PlaySoundEffect(0x92, cannonPosition);
 		}
 
 		// STUB: TOY2 0x00428890
