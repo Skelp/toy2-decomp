@@ -380,7 +380,7 @@
 0x00464690 SoftwareRenderer::UnkRenderAPI23
 0x00465180 SoftwareRenderer::UnkRenderAPI24
 0x00467080 SoftwareRenderer::UnkRenderAPI17
-0x00468430 SoftwareRenderer::UnkRenderAPI16
+0x00468430 SoftwareRenderer::RasterizeSubtractiveTexturedPolygon565
 0x00468E90 SoftwareRenderer::UnkRenderAPI15
 0x00469900 SoftwareRenderer::UnkRenderAPI18
 0x0046AC60 SoftwareRenderer::UnkRenderAPI19
