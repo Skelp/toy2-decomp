@@ -313,6 +313,138 @@ namespace Toy2
 			}
 		}
 
+		// FUNCTION: TOY2 0x0042DCB0 [PROVISIONAL]
+		void UpdateTurntable()
+		{
+			Platform::GetRotation(0, &g_turntableRotation);
+			Platform::SetAngularVelocity(0, 0, Renderer::g_frameDelta * 4, 0);
+			g_turntableRotation.y >>= 2;
+
+			Vector3I linkPosition;
+			Vector3I platformOrigin;
+			Nu3D::Link::GetCurrentPosFixed(0, &linkPosition);
+			Platform::GetOrigin(0, &platformOrigin);
+			platformOrigin.x = (linkPosition.x - platformOrigin.x) * 3 >> 2;
+			platformOrigin.z = (linkPosition.z - platformOrigin.z) * 3 >> 2;
+			Platform::SetVelocity(0, platformOrigin.x, 0, platformOrigin.z);
+
+			int32_t offsetY = g_turntableCenter.y - g_turntableOrigin.y;
+			int32_t offsetX =
+				(((g_turntableCenter.x >> 8) * Numerics::g_sinCosLUT[(g_turntableRotation.y + 0x400) & 0xFFF]
+					 - (g_turntableCenter.z >> 8) * Numerics::g_sinCosLUT[(-g_turntableRotation.y) & 0xFFF])
+					>> 6)
+				- g_turntableOrigin.x;
+			int32_t offsetZ =
+				((Numerics::g_sinCosLUT[(-g_turntableRotation.y) & 0xFFF] * (g_turntableCenter.x >> 8)
+					 + (g_turntableCenter.z >> 8) * Numerics::g_sinCosLUT[(g_turntableRotation.y + 0x400) & 0xFFF])
+					>> 6)
+				- g_turntableOrigin.z;
+
+			int32_t linkId;
+			for (linkId = 0; linkId < 0x57; linkId++)
+			{
+				if (linkId == 3)
+					linkId = 4;
+				else if (linkId == 0x10)
+					linkId = 0x54;
+
+				Nu3D::Link::GetTargetPosFixed(linkId, &linkPosition);
+				int32_t relativeX = (linkPosition.x - g_turntableOrigin.x) >> 4;
+				int32_t relativeZ = (linkPosition.z - g_turntableOrigin.z) >> 4;
+				int32_t rotatedZ =
+					((relativeX * Numerics::g_sinCosLUT[(-g_turntableRotation.y) & 0xFFF]
+						 + relativeZ * Numerics::g_sinCosLUT[(g_turntableRotation.y + 0x400) & 0xFFF])
+						>> 10)
+					+ g_turntableOrigin.z + offsetZ;
+				int32_t rotatedX =
+					((relativeX * Numerics::g_sinCosLUT[(g_turntableRotation.y + 0x400) & 0xFFF]
+						 - relativeZ * Numerics::g_sinCosLUT[(-g_turntableRotation.y) & 0xFFF])
+						>> 10)
+					+ g_turntableOrigin.x + offsetX;
+				Nu3D::Link::SetPositionRawAndCommit(linkId, rotatedX >> 5, (linkPosition.y + offsetY) >> 5, rotatedZ >> 5);
+
+				if (linkId == 8 || linkId == 9)
+				{
+					Nu3D::Link::SetRotationRelative8bit(linkId, 0, g_turntableRotation.y, g_turntableRotation.y * 0x327);
+				}
+				else if (linkId == 10)
+				{
+					Nu3D::Link::SetRotationRelative8bit(linkId, 0, g_turntableRotation.y + 0x400, g_turntableRotation.y * -15);
+					linkPosition.x = rotatedX;
+					linkPosition.y += 0xC00;
+					linkPosition.z = rotatedZ;
+					if (Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &linkPosition, 0x50) != 0)
+					{
+						int32_t damageAngle =
+							Nu3D::Math::CartesianToFixedAngle(g_buzzActor.posAngles.pos.x - linkPosition.x, g_buzzActor.posAngles.pos.z - linkPosition.z);
+						Buzz::HandleDamage(damageAngle, 3);
+					}
+				}
+				else if (linkId == 11)
+				{
+					Nu3D::Link::SetRotationRelative8bit(linkId, 0, g_turntableRotation.y + 0x400, g_turntableRotation.y * -21);
+					linkPosition.x = rotatedX;
+					linkPosition.y += 0xC00;
+					linkPosition.z = rotatedZ;
+					if (Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &linkPosition, 0x50) != 0)
+					{
+						int32_t damageAngle =
+							Nu3D::Math::CartesianToFixedAngle(g_buzzActor.posAngles.pos.x - linkPosition.x, g_buzzActor.posAngles.pos.z - linkPosition.z);
+						Buzz::HandleDamage(damageAngle, 3);
+					}
+				}
+				else if (linkId == 13)
+				{
+					Nu3D::Link::SetRotationRelative8bit(linkId, 0, g_turntableRotation.y + 700, g_turntableRotation.y * -18);
+					linkPosition.x = rotatedX;
+					linkPosition.y += 0xC00;
+					linkPosition.z = rotatedZ;
+					if (Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &linkPosition, 0x50) != 0)
+					{
+						int32_t damageAngle =
+							Nu3D::Math::CartesianToFixedAngle(g_buzzActor.posAngles.pos.x - linkPosition.x, g_buzzActor.posAngles.pos.z - linkPosition.z);
+						Buzz::HandleDamage(damageAngle, 3);
+					}
+				}
+				else
+				{
+					Nu3D::Link::SetRotationRelative8bit(linkId, 0, g_turntableRotation.y, 0);
+				}
+			}
+
+			offsetX >>= 2;
+			offsetY >>= 2;
+			offsetZ >>= 2;
+			for (linkId = 0x10; linkId < 0x1F; linkId++)
+			{
+				Nu3D::Link::GetTargetPosFixed(linkId, &linkPosition);
+				int32_t relativeX = linkPosition.x - (g_turntableOrigin.x >> 2);
+				int32_t relativeZ = linkPosition.z - (g_turntableOrigin.z >> 2);
+				int32_t rotatedX =
+					((relativeX * Numerics::g_sinCosLUT[(g_turntableRotation.y + 0x400) & 0xFFF]
+						 - relativeZ * Numerics::g_sinCosLUT[(-g_turntableRotation.y) & 0xFFF])
+						>> 14)
+					+ (g_turntableOrigin.x >> 2) + offsetX;
+				int32_t rotatedZ =
+					((relativeX * Numerics::g_sinCosLUT[(-g_turntableRotation.y) & 0xFFF]
+						 + relativeZ * Numerics::g_sinCosLUT[(g_turntableRotation.y + 0x400) & 0xFFF])
+						>> 14)
+					+ (g_turntableOrigin.z >> 2) + offsetZ;
+				Nu3D::Link::SetPositionRawAndCommit(linkId, rotatedX >> 5, (linkPosition.y + offsetY) >> 5, rotatedZ >> 5);
+
+				if (linkId == 0x17 || linkId == 0x18)
+					Nu3D::Link::SetRotationRelative8bit(linkId, 0, g_turntableRotation.y, g_turntableRotation.y * 0x327);
+				else if (linkId == 0x19)
+					Nu3D::Link::SetRotationRelative8bit(linkId, 0, g_turntableRotation.y + 0x400, g_turntableRotation.y * -15);
+				else if (linkId == 0x1A)
+					Nu3D::Link::SetRotationRelative8bit(linkId, 0, g_turntableRotation.y + 0x400, g_turntableRotation.y * -21);
+				else if (linkId == 0x1C)
+					Nu3D::Link::SetRotationRelative8bit(linkId, 0, g_turntableRotation.y + 700, g_turntableRotation.y * -18);
+				else
+					Nu3D::Link::SetRotationRelative8bit(linkId, 0, g_turntableRotation.y, 0);
+			}
+		}
+
 		// FUNCTION: TOY2 0x0042E1D0 [PROVISIONAL]
 		void UpdatePlatforms()
 		{

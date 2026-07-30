@@ -209,7 +209,7 @@
 0x0042D8B0 Toy2::TarmacTrouble::UpdateBottomPuzzleLights
 0x0042D9C0 Toy2::TarmacTrouble::UpdateTopPuzzleLights
 0x0042DB10 Toy2::TarmacTrouble::ResetLightPuzzle
-0x0042DCB0 Toy2::TarmacTrouble::Method1
+0x0042DCB0 Toy2::TarmacTrouble::UpdateTurntable
 0x0042E1D0 Toy2::TarmacTrouble::UpdatePlatforms
 0x0042E600 Toy2::TarmacTrouble::Init
 0x0042E790 Toy2::TarmacTrouble::Interactions
