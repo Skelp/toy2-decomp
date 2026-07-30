@@ -56,6 +56,8 @@ namespace Nu3D
 
 namespace Toy2
 {
+	extern int32_t g_movementInputLockTimer;
+
 	namespace Actor
 	{
 		void UpdateAIMovement(Toy2Actor* actor);
@@ -726,8 +728,26 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0052ADB0
 	int16_t g_pauseMenuState;
 
+	enum PauseMenuState
+	{
+		PAUSE_MENU_MAIN = 0,
+		PAUSE_MENU_CAMERA = 1,
+		PAUSE_MENU_VOLUME = 2,
+		PAUSE_MENU_QUIT = 3,
+		PAUSE_MENU_SECRET = 4,
+	};
+
 	// GLOBAL: TOY2 0x0052B7E4
 	int16_t g_pauseMenuSelection;
+
+	// GLOBAL: TOY2 0x005039BC
+	uint8_t g_pauseMenuEntryCounts[5] = { 4, 2, 2, 2, 2 };
+
+	// GLOBAL: TOY2 0x00502750
+	char g_pauseSoundVolumeText[16] = "sfx **********";
+
+	// GLOBAL: TOY2 0x00502760
+	char g_pauseMusicVolumeText[16] = "bgm **********";
 
 	// GLOBAL: TOY2 0x0050A0B0
 	int32_t g_idleVoicePreset;
@@ -794,6 +814,12 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x00830CC8
 	int32_t g_pauseCheatTimer;
+
+	// GLOBAL: TOY2 0x00830E20
+	int32_t g_pauseMusicVolume;
+
+	// GLOBAL: TOY2 0x00830E30
+	int32_t g_pauseSoundVolume;
 
 	// GLOBAL: TOY2 0x0052F0D7
 	uint8_t g_levelTokenBits[16];
@@ -1417,8 +1443,206 @@ namespace Toy2
 				ElevatorHop::TransformMouseActors();
 		}
 
-		// STUB: TOY2 0x0049F4B0
-		void MenuLoop() {}
+		// FUNCTION: TOY2 0x0049F4B0 [PROVISIONAL]
+		void MenuLoop()
+		{
+			int32_t restoreCamera = 0;
+			if ((InputManager::g_curButtonsPressed & INPUT_SECRET_MENU) != 0 && (InputManager::g_prevButtonsPressed & INPUT_SECRET_MENU) == 0)
+			{
+				AudioManager::PlaySoundEffect(0x3D, 0);
+				g_pauseMenuState = PAUSE_MENU_SECRET;
+				g_pauseMenuSelection = 0;
+			}
+
+			if ((InputManager::g_curButtonsPressed & INPUT_DOWN) != 0 && (InputManager::g_prevButtonsPressed & INPUT_DOWN) == 0
+				&& g_pauseMenuSelection < g_pauseMenuEntryCounts[g_pauseMenuState] - 1)
+			{
+				AudioManager::PlaySoundEffect(0x3F, 0);
+				g_pauseMenuSelection++;
+				g_pauseCheatTimer = 0xEC4;
+			}
+
+			if ((InputManager::g_curButtonsPressed & INPUT_UP) != 0 && (InputManager::g_prevButtonsPressed & INPUT_UP) == 0 && g_pauseMenuSelection > 0)
+			{
+				AudioManager::PlaySoundEffect(0x3F, 0);
+				g_pauseMenuSelection--;
+				g_pauseCheatTimer = 0xEC4;
+			}
+
+			int32_t cancelPressed = (InputManager::g_curButtonsPressed & INPUT_CANCEL) != 0 && (InputManager::g_prevButtonsPressed & INPUT_CANCEL) == 0;
+			if (((InputManager::g_curButtonsPressed & INPUT_JUMP) != 0 && (InputManager::g_prevButtonsPressed & INPUT_JUMP) == 0) || cancelPressed)
+			{
+				switch (g_pauseMenuState)
+				{
+					case PAUSE_MENU_MAIN:
+						if (cancelPressed)
+							break;
+
+						if (g_pauseMenuSelection == 0)
+						{
+							AudioManager::PlaySoundEffect(0x3E, 0);
+							g_isPaused = 0;
+							AudioManager::PlayMusicLooping((int16_t)AudioManager::g_curTrackIndex);
+							if (g_buzzActor.airborneMode == 0)
+								g_buzzActor.airborneMode = 5;
+							g_movementInputLockTimer = 10;
+							restoreCamera = 1;
+						}
+						if (g_pauseMenuSelection == 1)
+						{
+							AudioManager::PlaySoundEffect(0x3D, 0);
+							g_pauseMenuState = PAUSE_MENU_CAMERA;
+							g_pauseMenuSelection = 0;
+						}
+						else if (g_pauseMenuSelection == 2)
+						{
+							g_pauseMusicVolume = SaveManager::g_save0Data.musicVolume;
+							g_pauseSoundVolume = SaveManager::g_save0Data.soundVolume;
+							AudioManager::PlaySoundEffect(0x3D, 0);
+							g_pauseMenuState = PAUSE_MENU_VOLUME;
+							g_pauseMenuSelection = 0;
+						}
+						else if (g_pauseMenuSelection == 3)
+						{
+							AudioManager::PlaySoundEffect(0x3D, 0);
+							g_pauseMenuState = PAUSE_MENU_QUIT;
+							g_pauseMenuSelection = 0;
+						}
+						break;
+
+					case PAUSE_MENU_CAMERA:
+						if (g_pauseMenuSelection == 0)
+						{
+							if (! cancelPressed)
+								SaveManager::g_save0Data.cameraType &= ~SaveManager::CAMERA_ACTIVE;
+							g_pauseMenuState = PAUSE_MENU_MAIN;
+						}
+						else if (g_pauseMenuSelection == 1)
+						{
+							if (! cancelPressed)
+								SaveManager::g_save0Data.cameraType |= SaveManager::CAMERA_ACTIVE;
+							g_pauseMenuState = PAUSE_MENU_MAIN;
+							g_pauseMenuSelection = 0;
+						}
+						AudioManager::PlaySoundEffect(0x3E, 0);
+						break;
+
+					case PAUSE_MENU_VOLUME:
+						if (g_pauseMenuSelection == 0)
+							g_pauseMenuState = PAUSE_MENU_MAIN;
+						else if (g_pauseMenuSelection == 1)
+						{
+							g_pauseMenuState = PAUSE_MENU_MAIN;
+							g_pauseMenuSelection = 0;
+						}
+
+						if (! cancelPressed)
+						{
+							SaveManager::g_save0Data.soundVolume = (uint8_t)g_pauseSoundVolume;
+							SaveManager::g_save0Data.musicVolume = (uint8_t)g_pauseMusicVolume;
+						}
+						AudioManager::SetVolumes(AudioManager::g_musicVolTable[SaveManager::g_save0Data.musicVolume] * 2 / 3,
+							AudioManager::g_soundVolTable[SaveManager::g_save0Data.soundVolume] * 3 / 2);
+						AudioManager::PlaySoundEffect(0x3E, 0);
+						break;
+
+					case PAUSE_MENU_QUIT:
+						if (cancelPressed)
+							g_pauseMenuSelection = 0;
+
+						if (g_pauseMenuSelection == 0)
+						{
+							g_pauseMenuState = PAUSE_MENU_MAIN;
+							AudioManager::PlaySoundEffect(0x3E, 0);
+							g_quitToTitleFlag = 0;
+						}
+						if (g_pauseMenuSelection == 1)
+						{
+							g_isPaused = 0;
+							AudioManager::PlaySoundEffect(0x3D, 0);
+							restoreCamera = 1;
+							if (g_levelTransition != 1)
+								g_levelTransition = 5;
+							g_buzzActor.actorFlags |= Buzz::ACTOR_FLAG_LOCK_FACING;
+							g_levelTransitionTimer = 0x2E;
+							Nu3D::Camera::g_targetTintBlue = 0;
+							Nu3D::Camera::g_targetTintGreen = 0;
+							Nu3D::Camera::g_targetTintRed = 0;
+							Nu3D::Camera::g_targetTintFadeSpeed = 6;
+							Nu3D::Camera::g_tintBlend = -1;
+						}
+						break;
+
+					case PAUSE_MENU_SECRET:
+						if (cancelPressed)
+							g_pauseMenuSelection = 0;
+
+						if (g_pauseMenuSelection == 0)
+						{
+							AudioManager::PlaySoundEffect(0x3E, 0);
+							g_isPaused = 0;
+							AudioManager::PlayMusicLooping((int16_t)AudioManager::g_curTrackIndex);
+							if (g_buzzActor.airborneMode == 0)
+								g_buzzActor.airborneMode = 5;
+							g_movementInputLockTimer = 10;
+							restoreCamera = 1;
+						}
+						if (g_pauseMenuSelection == 1)
+						{
+							AudioManager::PlaySoundEffect(0x3D, 0);
+							g_pauseMenuState = PAUSE_MENU_QUIT;
+							g_pauseMenuSelection = 0;
+							g_quitToTitleFlag = 1;
+						}
+						break;
+				}
+			}
+
+			if (g_pauseMenuState == PAUSE_MENU_VOLUME)
+			{
+				if (g_pauseSoundVolume > 0)
+					memset(g_pauseSoundVolumeText + 4, '*', g_pauseSoundVolume);
+				if (g_pauseSoundVolume < 10)
+					memset(g_pauseSoundVolumeText + 4 + g_pauseSoundVolume, ' ', 10 - g_pauseSoundVolume);
+				if (g_pauseMusicVolume > 0)
+					memset(g_pauseMusicVolumeText + 4, '*', g_pauseMusicVolume);
+				if (g_pauseMusicVolume < 10)
+					memset(g_pauseMusicVolumeText + 4 + g_pauseMusicVolume, ' ', 10 - g_pauseMusicVolume);
+
+				int32_t selectedVolume = g_pauseMenuSelection == 0 ? g_pauseSoundVolume : g_pauseMusicVolume;
+				if ((InputManager::g_curButtonsPressed & INPUT_RIGHT) != 0 && (InputManager::g_prevButtonsPressed & INPUT_RIGHT) == 0 && selectedVolume < 10)
+				{
+					selectedVolume++;
+					AudioManager::PlaySoundEffect(0x3D, 0);
+				}
+				if ((InputManager::g_curButtonsPressed & INPUT_LEFT) != 0 && (InputManager::g_prevButtonsPressed & INPUT_LEFT) == 0 && selectedVolume > 0)
+				{
+					selectedVolume--;
+					AudioManager::PlaySoundEffect(0x3D, 0);
+				}
+
+				if (g_pauseMenuSelection == 0)
+					g_pauseSoundVolume = selectedVolume;
+				else
+					g_pauseMusicVolume = selectedVolume;
+
+				AudioManager::SetVolumes(AudioManager::g_musicVolTable[g_pauseMusicVolume] * 2 / 3, AudioManager::g_soundVolTable[g_pauseSoundVolume] * 3 / 2);
+			}
+
+			if ((InputManager::g_curButtonsPressed & INPUT_MENU) != 0 && (InputManager::g_prevButtonsPressed & INPUT_MENU) == 0)
+			{
+				AudioManager::PlaySoundEffect(0x3E, 0);
+				g_isPaused = 0;
+				AudioManager::PlayMusicLooping((int16_t)AudioManager::g_curTrackIndex);
+				if (g_buzzActor.airborneMode == 0)
+					g_buzzActor.airborneMode = 5;
+				g_movementInputLockTimer = 10;
+				restoreCamera = 1;
+			}
+
+			if (restoreCamera)
+				Camera::g_renderCameraTransform = g_pauseCameraTarget;
+		}
 
 		// FUNCTION: TOY2 0x0049E330 [PROVISIONAL]
 		void PauseLoop()
