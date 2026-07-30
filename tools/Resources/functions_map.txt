@@ -401,7 +401,7 @@
 0x00472E70 SoftwareRenderer::UnkRenderAPI31
 0x00474190 SoftwareRenderer::UnkRenderAPI32
 0x00474C80 SoftwareRenderer::UnkRenderAPI33
-0x00476340 SoftwareRenderer::UnkRenderAPI29
+0x00476340 SoftwareRenderer::RasterizeSubtractiveTexturedPolygon8
 0x00476D00 SoftwareRenderer::UnkRenderAPI28
 0x004776C0 SoftwareRenderer::RasterizeSolidQuad8
 0x00477EB0 SoftwareRenderer::UnkRenderAPI34
