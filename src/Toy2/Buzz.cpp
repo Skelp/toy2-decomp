@@ -31,6 +31,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0053C650
 	int32_t g_spinCooldownTimer;
 
+	// GLOBAL: TOY2 0x0053C654
+	int32_t g_swingFacingAngle;
+
 	// GLOBAL: TOY2 0x0053C83C
 	int32_t g_spinHoverTimer;
 
@@ -535,6 +538,9 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x0053C5E8
 	int32_t g_environmentEffectType;
+
+	// GLOBAL: TOY2 0x0053C5F0
+	Vector3I g_swingAnchorPosition;
 
 	// GLOBAL: TOY2 0x0053C628
 	int32_t g_environmentSurfaceY;
@@ -1230,6 +1236,9 @@ namespace Toy2
 		const uint32_t SPIN_CHARGE_BLOCKING_ACTIONS = 0xFFFFE;
 		const uint32_t SPIN_HOVER_BLOCKING_ACTIONS = 0xFFF7E;
 		const uint32_t LEDGE_CLIMB_BLOCKING_ACTIONS = 0xFFF7F;
+		const uint32_t SWING_BLOCKING_ACTIONS = 0xFFB7E;
+		const uint32_t ACTION_STATE_SWING = 0x400;
+		const int16_t SWING_START_ANIMATION_STATE = 26;
 		const uint32_t TURN_RECOVERY_ACTION_MASK = 0xFF481;
 		const int16_t GROUND_SLAM_ANIMATION_STATE = 8;
 		const int32_t FACING_SNAP_THRESHOLD = 0x5DC;
@@ -2310,6 +2319,115 @@ namespace Toy2
 				g_spinHoverTimer = 0;
 				buzz->actorFlags &= ~ACTOR_FLAG_LOCK_FACING;
 			}
+		}
+
+		struct SwingRecord
+		{
+			Vector3I start;
+			Vector3I end;
+		};
+		STATIC_ASSERT(sizeof(SwingRecord) == 0x18);
+
+		// FUNCTION: TOY2 0x00435100 [PROVISIONAL]
+		int32_t HandleSwing(Toy2BuzzActor* buzz)
+		{
+			int32_t result = 0;
+			Vector3I normalizedDirection;
+			normalizedDirection.y = 0;
+			if (Levels::g_recordData[60] == 0)
+				return 0;
+
+			if ((g_actionStateFlags & SWING_BLOCKING_ACTIONS) != 0 || g_damageRegistered != 0)
+			{
+				g_swingTimer = 0;
+				g_actionStateFlags &= ~ACTION_STATE_SWING;
+				return 0;
+			}
+
+			if (g_swingTimer == 0)
+			{
+				SwingRecord* swing = reinterpret_cast<SwingRecord*>(Levels::g_recordData[60]->data);
+				for (int32_t swingIndex = 0; swingIndex < Levels::g_recordData[60]->recordCount / 2; swingIndex++, swing++)
+				{
+					int32_t heightAboveSwing = buzz->posAngles.pos.y - swing->start.y;
+					if (heightAboveSwing <= 0 || heightAboveSwing >= 0x4000)
+						continue;
+
+					int32_t directionX = (swing->end.x - swing->start.x) >> 5;
+					int32_t directionZ = (swing->end.z - swing->start.z) >> 5;
+					normalizedDirection.x = directionX;
+					normalizedDirection.z = directionZ;
+					Nu3D::Math::NormalizeToFixedPoint(&normalizedDirection, &normalizedDirection);
+
+					int32_t offsetX = (buzz->posAngles.pos.x - swing->start.x) >> 5;
+					int32_t offsetZ = (buzz->posAngles.pos.z - swing->start.z) >> 5;
+					int32_t distanceAlongSwing = (offsetZ * normalizedDirection.z + offsetX * normalizedDirection.x) >> 12;
+					int32_t swingLength = (normalizedDirection.z * directionZ + normalizedDirection.x * directionX) >> 12;
+					if (distanceAlongSwing <= 0 || distanceAlongSwing > swingLength)
+						continue;
+
+					offsetX -= (distanceAlongSwing * normalizedDirection.x) >> 12;
+					offsetZ -= (distanceAlongSwing * normalizedDirection.z) >> 12;
+					if (offsetZ * offsetZ + offsetX * offsetX >= 0x1000)
+						continue;
+
+					AudioManager::PlaySoundEffect(0x1B, &buzz->posAngles.pos);
+					g_swingTimer = 0x45;
+					buzz->animationState = SWING_START_ANIMATION_STATE;
+					buzz->previousAnimationState = -1;
+					g_swingAnchorPosition.x = swing->start.x + ((distanceAlongSwing * normalizedDirection.x) >> 7);
+					g_swingAnchorPosition.y = swing->start.y + 0x4000;
+					g_swingAnchorPosition.z = swing->start.z + ((distanceAlongSwing * normalizedDirection.z) >> 7);
+					g_swingFacingAngle = (Nu3D::Math::CartesianToFixedAngle(normalizedDirection.x, normalizedDirection.z) + 0x400) & 0xFFF;
+					if (((g_swingFacingAngle - buzz->posAngles.angles.yaw + 0x400) & 0xFFF) > 0x800)
+						g_swingFacingAngle = (g_swingFacingAngle - 0x800) & 0xFFF;
+					g_actionStateFlags |= ACTION_STATE_SWING;
+				}
+
+				if (g_swingTimer == 0)
+					return 0;
+			}
+
+			int32_t previousSwingTimer = g_swingTimer;
+			g_swingTimer -= Renderer::g_frameDelta;
+			if (previousSwingTimer > 15 && g_swingTimer <= 15)
+			{
+				g_jumpHeightControlActive = 0;
+				buzz->velocity.vertical = -0x600;
+				int32_t yaw = (int16_t)buzz->posAngles.angles.yaw;
+				buzz->velocity.lateral = Numerics::g_sinCosLUT[yaw] >> 1;
+				buzz->velocity.forward = Numerics::g_sinCosLUT[(yaw + 0x400) & 0xFFF] >> 1;
+				if ((InputManager::g_directionInputState & INPUT_JUMP) == 0)
+					buzz->airborneMode = 2;
+				AudioManager::Preset::PlayOneShotSound2(0x19, buzz);
+				result = 1;
+			}
+
+			if (g_swingTimer < 0)
+			{
+				if (buzz->animationState == SWING_START_ANIMATION_STATE)
+					buzz->animationState = ANIMATION_STATE_LANDING;
+				g_swingTimer = 0;
+				return result;
+			}
+			if (g_swingTimer < 16)
+				return result;
+
+			buzz->posAngles.pos.x -= (buzz->posAngles.pos.x - g_swingAnchorPosition.x) * Renderer::g_frameDelta / 16;
+			buzz->posAngles.pos.y -= (buzz->posAngles.pos.y - g_swingAnchorPosition.y) * Renderer::g_frameDelta / 16;
+			buzz->posAngles.pos.z -= (buzz->posAngles.pos.z - g_swingAnchorPosition.z) * Renderer::g_frameDelta / 16;
+			buzz->velocity.lateral = 0;
+			buzz->velocity.vertical = 0;
+			buzz->velocity.forward = 0;
+
+			int32_t facingDelta = (buzz->posAngles.angles.yaw - g_swingFacingAngle) & 0xFFF;
+			if (facingDelta >= 0x800)
+				facingDelta -= 0x1000;
+			buzz->posAngles.angles.yaw -= Renderer::g_frameDelta * facingDelta / 16;
+			Camera::g_gameplayCamera.roll = (Camera::g_gameplayCamera.roll - Renderer::g_frameDelta * facingDelta / 16) & 0xFFF;
+			buzz->posAngles.angles.yaw &= 0xFFF;
+			buzz->facingAngle = buzz->posAngles.angles.yaw;
+			return MOVEMENT_LOCK_VERTICAL;
 		}
 
 		// FUNCTION: TOY2 0x00435F30 [PROVISIONAL]
