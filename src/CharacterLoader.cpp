@@ -1,5 +1,6 @@
 #include "CharacterLoader.h"
 
+#include "FileUtils.h"
 #include "Nullsub.h"
 #include "Toy2/Actor.h"
 #include "Toy2/Animation.h"
@@ -23,6 +24,12 @@ namespace CharacterLoader
 		uint8_t data[1];
 
 		AnimationDataLink* Previous() { return reinterpret_cast<AnimationDataLink**>(this)[-1]; }
+	};
+
+	union CharacterDataCursor
+	{
+		CharacterAnimationData* animationData;
+		uint8_t* data;
 	};
 
 	namespace
@@ -98,7 +105,7 @@ namespace CharacterLoader
 	uint8_t* g_alternateAllParse[128];
 
 	// GLOBAL: TOY2 0x0053E8C8
-	uint8_t* g_charFileDataCache[128];
+	CharacterAnimationData* g_charFileDataCache[128];
 
 	// GLOBAL: TOY2 0x004F6EA0
 	Toy2::Actor::ActorCollisionVolume g_defaultCollisionVolume = { { 0, -250, 0 }, 1, { 512, 256, 512 }, 250 };
@@ -126,6 +133,9 @@ namespace CharacterLoader
 
 	// STUB: TOY2 0x0043B0C0
 	void LoadCharacterData(int32_t* loadedByteCount, uint8_t** dataBuffer, uint8_t* creatureList) {}
+
+	// STUB: TOY2 0x0043C750
+	void LoadSecondSection(int32_t baseBoneIndex) {}
 
 	// FUNCTION: TOY2 0x0043ABC0 [PROVISIONAL]
 	void LoadFirstSection(CharacterAnimationData* animationData, int8_t collectBoneRemaps)
@@ -173,6 +183,69 @@ namespace CharacterLoader
 				g_boneRemapCount = remapCount;
 			}
 		}
+	}
+
+	// FUNCTION: TOY2 0x0043ACA0 [TOOL]
+	void Load(const char* filename,
+		int32_t* loadedBoneCount,
+		uint8_t** dataBuffer,
+		int16_t creatureId,
+		Toy2::Actor::ActorCollisionVolume** collisionVolume,
+		ActorBounds* actorBounds)
+	{
+		CharacterDataCursor loadCursor;
+		int32_t animationSlotBase = creatureId * 4;
+		CharacterAnimationData* loadedAnimationData;
+		char loadFilename[256];
+
+		if (g_characterAnimationData[creatureId] != 0)
+			return;
+
+		CharacterAnimationData* cachedAnimationData = g_charFileDataCache[creatureId];
+		if (cachedAnimationData == 0)
+		{
+			strcpy(loadFilename, filename);
+			strcat(loadFilename, ".anm");
+			loadCursor.animationData = reinterpret_cast<CharacterAnimationData*>(*dataBuffer);
+			int32_t loadedSize = static_cast<int32_t>(FileUtils::LoadFile(loadFilename, loadCursor.animationData));
+			*dataBuffer += (loadedSize + 3) / 4 * 4;
+		}
+		else
+		{
+			loadCursor.animationData = cachedAnimationData;
+		}
+
+		CharacterAnimationData* animationData = loadCursor.animationData;
+		g_characterAnimationData[creatureId] = animationData;
+		loadedAnimationData = animationData;
+		animationData->modelId = 1;
+		loadedAnimationData->baseBoneIndex = static_cast<int16_t>(*loadedBoneCount);
+		LoadFirstSection(loadedAnimationData, 1);
+
+		if (g_alternateAllParse[creatureId] == 0)
+		{
+			strcpy(loadFilename, filename);
+			*loadedBoneCount += Toy2::Characters::LoadAll(loadFilename, *loadedBoneCount, dataBuffer);
+		}
+		else
+		{
+			loadCursor.data = g_alternateAllParse[creatureId];
+			*loadedBoneCount += AlternateAllParse(*loadedBoneCount, &loadCursor.data);
+			*dataBuffer = loadCursor.data;
+		}
+
+		if (g_boneTransforms[*loadedBoneCount - 1].trackType == 12)
+		{
+			--*loadedBoneCount;
+			*collisionVolume = reinterpret_cast<Toy2::Actor::ActorCollisionVolume*>(g_boneTransforms[*loadedBoneCount].animationData);
+			memcpy(actorBounds, g_specialTrackValues, sizeof(*actorBounds));
+		}
+
+		loadedAnimationData->endBoneIndex = static_cast<int16_t>(*loadedBoneCount);
+		for (AnimationDataLink* link = g_animationDataLinkHead; link != 0; link = link->Previous())
+			g_animationDataBySlot[animationSlotBase + link->slot % 4] = link->data;
+
+		LoadSecondSection(loadedAnimationData->baseBoneIndex);
 	}
 
 	// FUNCTION: TOY2 0x0043AED0 [TOOL]

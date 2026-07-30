@@ -83,7 +83,7 @@ namespace CharacterLoader
 	extern int16_t g_animationSlotCount;
 	extern CharacterAnimationData* g_characterAnimationData[128];
 	extern uint8_t* g_alternateAllParse[128];
-	extern uint8_t* g_charFileDataCache[128];
+	extern CharacterAnimationData* g_charFileDataCache[128];
 	extern Toy2::Actor::ActorCollisionVolume g_defaultCollisionVolume;
 	extern Toy2::Actor::ActorCollisionVolume* g_collisionVolumes[128];
 	extern ActorBounds g_actorBounds[128];
@@ -91,6 +91,12 @@ namespace CharacterLoader
 
 	void Start(int32_t* loadedByteCount, uint8_t** dataBuffer, uint8_t* creatureList);
 	void LoadFirstSection(CharacterAnimationData* animationData, int8_t collectBoneRemaps);
+	void Load(const char* filename,
+		int32_t* loadedBoneCount,
+		uint8_t** dataBuffer,
+		int16_t creatureId,
+		Toy2::Actor::ActorCollisionVolume** collisionVolume,
+		ActorBounds* actorBounds);
 	void LoadBuzzLight(const char* filename,
 		int32_t* loadedBoneCount,
 		uint8_t** dataBuffer,
