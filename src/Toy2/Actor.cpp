@@ -738,9 +738,6 @@ namespace Toy2
 			int32_t cameraFacingAngle)
 		{}
 
-		// STUB: TOY2 0x004A1E60
-		void RotatingHint(int32_t actorIndex, int32_t dialogueRecordIndex, char** subtitles) {}
-
 		// STUB: TOY2 0x004076F0
 		void UpdateAIMovement(Toy2Actor* actor) {}
 
@@ -1384,6 +1381,62 @@ namespace Toy2
 				actorFacingAngle,
 				cameraFacingAngle,
 				-1);
+		}
+
+		// FUNCTION: TOY2 0x004A1E60 [MATCHED]
+		void RotatingHint(int32_t actorIndex, int32_t dialogueRecordIndex, char** subtitles)
+		{
+			if (g_rotatingHintIndex == -1 && (g_creatureActors[actorIndex].actorFlags & ACTOR_FLAG_TARGETABLE) != 0)
+				g_rotatingHintIndex = *g_randDatBufferPtr++ & 3;
+
+			if ((g_creatureActors[actorIndex].actorFlags & ACTOR_FLAG_ACTIVE) != 0 && (g_gameplayStateFlags & GAMEPLAY_STATE_CUTSCENE_ACTIVE) == 0)
+			{
+				g_rotatingHintSoundTimer -= Renderer::g_frameDelta;
+				if (g_rotatingHintSoundTimer < 0)
+				{
+					g_rotatingHintSoundTimer = *g_randDatBufferPtr++ * 2 + 0xF0;
+					AudioManager::PlayOneShotSound3DActor(&g_creatureActors[actorIndex],
+						AudioManager::g_oneShotPresets[0xAA].encodedSoundIndex - 1,
+						AudioManager::g_oneShotPresets[0xAA].baseFrequency,
+						AudioManager::g_oneShotPresets[0xAA].leftVolume,
+						&g_creatureActors[actorIndex],
+						0);
+				}
+			}
+
+			if ((g_creatureActors[actorIndex].actorFlags & ACTOR_FLAG_INTERACTION_REQUESTED) == 0)
+				return;
+
+			if (g_rotatingHintIndex == -1)
+				g_rotatingHintIndex = 0;
+			g_creatureActors[actorIndex].actorFlags &= ~ACTOR_FLAG_INTERACTION_REQUESTED;
+
+			char* subtitle;
+			int32_t collectedTokenFlags = g_levelTokenBits[g_levelFileIndex];
+			if (collectedTokenFlags >= 0x1F)
+			{
+				subtitle = "hey! you have all the ^tokens^ buzz!";
+			}
+			else
+			{
+				AudioManager::PlayOneShotSound3DActor(&g_creatureActors[actorIndex],
+					AudioManager::g_oneShotPresets[0xAB].encodedSoundIndex - 1,
+					AudioManager::g_oneShotPresets[0xAB].baseFrequency,
+					AudioManager::g_oneShotPresets[0xAB].leftVolume,
+					&g_creatureActors[actorIndex],
+					0);
+				while (((collectedTokenFlags >> g_rotatingHintIndex) & 1) != 0)
+				{
+					g_rotatingHintIndex++;
+					if (g_rotatingHintIndex > 4)
+						g_rotatingHintIndex = 0;
+				}
+
+				subtitle = subtitles[g_rotatingHintIndex++];
+				if (g_rotatingHintIndex > 4)
+					g_rotatingHintIndex = 0;
+			}
+			Dialogue::Begin(actorIndex, dialogueRecordIndex, subtitle, -1, 0, -1);
 		}
 
 		// FUNCTION: TOY2 0x004A26F0 [PROVISIONAL]
