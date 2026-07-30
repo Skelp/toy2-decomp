@@ -156,6 +156,8 @@ namespace Toy2
 		extern int32_t g_alternateAmbientEmitterStart;
 
 		void InitLevelPlay(int32_t levelId);
+		void FlushRenderer();
+		int32_t InitLevelDefaults();
 		void DeactivateAmbientEmitter(int32_t emitterIndex, int32_t useAlternateType);
 		void UpdateAmbientEmitters();
 
