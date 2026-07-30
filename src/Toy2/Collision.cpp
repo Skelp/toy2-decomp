@@ -1101,8 +1101,16 @@ namespace Toy2
 			return angularVelocity;
 		}
 
+		const int32_t PLATFORM_FLAG_TRANSLATING = 0x80;
+
 		// GLOBAL: TOY2 0x0072872C
 		PlatformState g_platformStates[32];
+
+		// GLOBAL: TOY2 0x007290A0
+		int16_t g_contactPlatformIndices[32];
+
+		// GLOBAL: TOY2 0x007290E4
+		int32_t g_contactPlatformCount;
 
 		// FUNCTION: TOY2 0x00488580 [MATCHED]
 		int32_t GetFlags(int32_t platformIndex) { return g_platformStates[platformIndex].flags; }
@@ -1144,13 +1152,13 @@ namespace Toy2
 			{
 				if (x == 0 && y == 0 && z == 0)
 				{
-					g_platformStates[platformIndex].flags &= ~0x80;
+					g_platformStates[platformIndex].flags &= ~PLATFORM_FLAG_TRANSLATING;
 					g_platformStates[platformIndex].velocity.x = 0;
 					g_platformStates[platformIndex].velocity.y = 0;
 					g_platformStates[platformIndex].velocity.z = 0;
 					return;
 				}
-				g_platformStates[platformIndex].flags |= 0x80;
+				g_platformStates[platformIndex].flags |= PLATFORM_FLAG_TRANSLATING;
 				g_platformStates[platformIndex].velocity.x = x;
 				g_platformStates[platformIndex].velocity.y = y;
 				g_platformStates[platformIndex].velocity.z = z;
@@ -1174,7 +1182,7 @@ namespace Toy2
 		{
 			if (g_platformStates[sourcePlatformIndex].collisionMeshIndex != 0 && g_platformStates[destinationPlatformIndex].collisionMeshIndex != 0)
 			{
-				g_platformStates[destinationPlatformIndex].flags |= 0x80;
+				g_platformStates[destinationPlatformIndex].flags |= PLATFORM_FLAG_TRANSLATING;
 				g_platformStates[destinationPlatformIndex].velocity.x = g_platformStates[sourcePlatformIndex].velocity.x;
 				g_platformStates[destinationPlatformIndex].velocity.y = g_platformStates[sourcePlatformIndex].velocity.y;
 				g_platformStates[destinationPlatformIndex].velocity.z = g_platformStates[sourcePlatformIndex].velocity.z;
@@ -1227,6 +1235,66 @@ namespace Toy2
 				g_platformStates[platformIndex].rotationAnglesFixed.x >> 2,
 				g_platformStates[platformIndex].rotationAnglesFixed.y >> 2,
 				g_platformStates[platformIndex].rotationAnglesFixed.z >> 2);
+		}
+
+		// FUNCTION: TOY2 0x00488C10 [MATCHED]
+		void AdvancePartialMotion(int32_t frameScale, int32_t collisionScale, int32_t skipMotion)
+		{
+			if (g_contactPlatformCount <= 0)
+			{
+				return;
+			}
+
+			int16_t* platformIndex = g_contactPlatformIndices;
+			int32_t platformCount = g_contactPlatformCount;
+			do
+			{
+				int32_t currentPlatformIndex = *platformIndex;
+				if (skipMotion == 0)
+				{
+					if ((g_platformStates[currentPlatformIndex].flags & PLATFORM_FLAG_TRANSLATING) != 0)
+					{
+						int16_t translationX = g_platformStates[currentPlatformIndex].remainingTranslation.x;
+						int32_t remainingScale = frameScale - collisionScale;
+						int32_t movementX = translationX * frameScale / remainingScale;
+						int16_t collisionMeshIndex = g_platformStates[currentPlatformIndex].collisionMeshIndex;
+						int16_t translationY = g_platformStates[currentPlatformIndex].remainingTranslation.y;
+						Collision::g_collisionMeshInstances[collisionMeshIndex].origin.x += movementX;
+						int16_t translationZ = g_platformStates[currentPlatformIndex].remainingTranslation.z;
+						Collision::g_collisionMeshInstances[collisionMeshIndex].origin.y += translationY * frameScale / remainingScale;
+						int32_t movementZ = translationZ * frameScale / remainingScale;
+						Collision::g_collisionMeshInstances[collisionMeshIndex].origin.z += movementZ;
+						Collision::g_collisionMeshInstances[collisionMeshIndex].boundsMin.x += movementX;
+						Collision::g_collisionMeshInstances[collisionMeshIndex].boundsMin.z += movementZ;
+						g_platformStates[currentPlatformIndex].remainingTranslation.x = translationX - movementX;
+						translationY = g_platformStates[currentPlatformIndex].remainingTranslation.y;
+						g_platformStates[currentPlatformIndex].remainingTranslation.y = translationY - translationY * frameScale / remainingScale;
+						translationZ = g_platformStates[currentPlatformIndex].remainingTranslation.z;
+						g_platformStates[currentPlatformIndex].remainingTranslation.z = translationZ - translationZ * frameScale / remainingScale;
+					}
+
+					if ((g_platformStates[currentPlatformIndex].flags & PLATFORM_FLAG_ROTATED) != 0)
+					{
+						int32_t remainingScale = frameScale - collisionScale;
+						g_platformStates[currentPlatformIndex].rotationAnglesFixed.x +=
+							g_platformStates[currentPlatformIndex].remainingRotation.x * frameScale / remainingScale;
+						g_platformStates[currentPlatformIndex].rotationAnglesFixed.y +=
+							g_platformStates[currentPlatformIndex].remainingRotation.y * frameScale / remainingScale;
+						g_platformStates[currentPlatformIndex].rotationAnglesFixed.z +=
+							g_platformStates[currentPlatformIndex].remainingRotation.z * frameScale / remainingScale;
+
+						int16_t rotationX = g_platformStates[currentPlatformIndex].remainingRotation.x;
+						g_platformStates[currentPlatformIndex].remainingRotation.x = rotationX - rotationX * frameScale / remainingScale;
+						int16_t rotationY = g_platformStates[currentPlatformIndex].remainingRotation.y;
+						g_platformStates[currentPlatformIndex].remainingRotation.y = rotationY - rotationY * frameScale / remainingScale;
+						int16_t rotationZ = g_platformStates[currentPlatformIndex].remainingRotation.z;
+						g_platformStates[currentPlatformIndex].remainingRotation.z = rotationZ - rotationZ * frameScale / remainingScale;
+					}
+				}
+
+				platformIndex++;
+				platformCount--;
+			} while (platformCount != 0);
 		}
 
 		// FUNCTION: TOY2 0x0048B640 [MATCHED]
