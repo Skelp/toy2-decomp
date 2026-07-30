@@ -16,6 +16,11 @@ namespace Toy2
 	{
 		struct ClipHeader;
 	}
+
+	namespace Characters
+	{
+		int32_t LoadAll(char* filename, int32_t baseBoneIndex, uint8_t** dataBuffer);
+	}
 }
 
 namespace CharacterLoader

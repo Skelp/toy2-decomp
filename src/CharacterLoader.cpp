@@ -7,15 +7,6 @@
 
 #include <string.h>
 
-namespace Toy2
-{
-	namespace Characters
-	{
-		// STUB: TOY2 0x0043D820
-		int32_t LoadAll(char* filename, int32_t baseBoneIndex, uint8_t** dataBuffer) { return 0; }
-	}
-}
-
 namespace CharacterLoader
 {
 	struct AnimationDataLink
@@ -32,56 +23,53 @@ namespace CharacterLoader
 		uint8_t* data;
 	};
 
-	namespace
+	struct AlternateAllFileHeader
 	{
-		struct AlternateAllFileHeader
-		{
-			int32_t recordOffsetInWords;
-		};
+		int32_t recordOffsetInWords;
+	};
 
-		union AlternateAllReference
-		{
-			int32_t marker;
-			uint8_t* previous;
-		};
+	union AlternateAllReference
+	{
+		int32_t marker;
+		uint8_t* previous;
+	};
 
-		struct AlternateAllRecord
+	struct AlternateAllRecord
+	{
+		int32_t recordCount;
+		int32_t dataSizeInWords;
+		Vector3I translation;
+		int32_t nodeType;
+		uint8_t reservedBeforeAlternateDataType[6];
+		int16_t alternateDataType;
+		uint8_t reservedBeforeSpecialTrackValues[16];
+		union
 		{
-			int32_t recordCount;
-			int32_t dataSizeInWords;
-			Vector3I translation;
-			int32_t nodeType;
-			uint8_t reservedBeforeAlternateDataType[6];
-			int16_t alternateDataType;
-			uint8_t reservedBeforeSpecialTrackValues[16];
-			union
+			int32_t specialTrackValues[2];
+			struct
 			{
-				int32_t specialTrackValues[2];
-				struct
-				{
-					uint8_t reservedBeforeMetadataX[6];
-					int16_t metadataX;
-				};
+				uint8_t reservedBeforeMetadataX[6];
+				int16_t metadataX;
 			};
-			uint8_t reservedBeforeMetadataZ[6];
-			int16_t metadataZ;
-			uint8_t reservedBeforeMetadataY[6];
-			int16_t metadataY;
-			uint8_t reservedBeforeFlags[2];
-			uint16_t flags;
 		};
+		uint8_t reservedBeforeMetadataZ[6];
+		int16_t metadataZ;
+		uint8_t reservedBeforeMetadataY[6];
+		int16_t metadataY;
+		uint8_t reservedBeforeFlags[2];
+		uint16_t flags;
+	};
 
-		STATIC_ASSERT(sizeof(AlternateAllRecord) == 0x4C);
-		STATIC_ASSERT(offsetof(AlternateAllRecord, dataSizeInWords) == 0x04);
-		STATIC_ASSERT(offsetof(AlternateAllRecord, translation) == 0x08);
-		STATIC_ASSERT(offsetof(AlternateAllRecord, nodeType) == 0x14);
-		STATIC_ASSERT(offsetof(AlternateAllRecord, alternateDataType) == 0x1E);
-		STATIC_ASSERT(offsetof(AlternateAllRecord, specialTrackValues) == 0x30);
-		STATIC_ASSERT(offsetof(AlternateAllRecord, metadataX) == 0x36);
-		STATIC_ASSERT(offsetof(AlternateAllRecord, metadataZ) == 0x3E);
-		STATIC_ASSERT(offsetof(AlternateAllRecord, metadataY) == 0x46);
-		STATIC_ASSERT(offsetof(AlternateAllRecord, flags) == 0x4A);
-	}
+	STATIC_ASSERT(sizeof(AlternateAllRecord) == 0x4C);
+	STATIC_ASSERT(offsetof(AlternateAllRecord, dataSizeInWords) == 0x04);
+	STATIC_ASSERT(offsetof(AlternateAllRecord, translation) == 0x08);
+	STATIC_ASSERT(offsetof(AlternateAllRecord, nodeType) == 0x14);
+	STATIC_ASSERT(offsetof(AlternateAllRecord, alternateDataType) == 0x1E);
+	STATIC_ASSERT(offsetof(AlternateAllRecord, specialTrackValues) == 0x30);
+	STATIC_ASSERT(offsetof(AlternateAllRecord, metadataX) == 0x36);
+	STATIC_ASSERT(offsetof(AlternateAllRecord, metadataZ) == 0x3E);
+	STATIC_ASSERT(offsetof(AlternateAllRecord, metadataY) == 0x46);
+	STATIC_ASSERT(offsetof(AlternateAllRecord, flags) == 0x4A);
 
 	// GLOBAL: TOY2 0x0053EEE0
 	BoneTransform g_boneTransforms[300];
@@ -130,6 +118,89 @@ namespace CharacterLoader
 
 	// GLOBAL: TOY2 0x0054697C
 	uint8_t* g_allDataReferences[512];
+
+}
+
+namespace Toy2
+{
+	namespace Characters
+	{
+		// FUNCTION: TOY2 0x0043D820 [PROVISIONAL]
+		int32_t LoadAll(char* filename, int32_t baseBoneIndex, uint8_t** dataBuffer)
+		{
+			char loadFilename[100];
+			strcpy(loadFilename, filename);
+			strcat(loadFilename, ".all");
+			FileUtils::LoadFile(loadFilename, *dataBuffer);
+
+			uint8_t* fileData = *dataBuffer;
+			CharacterLoader::AlternateAllFileHeader* header = reinterpret_cast<CharacterLoader::AlternateAllFileHeader*>(fileData);
+			CharacterLoader::AlternateAllRecord* records = reinterpret_cast<CharacterLoader::AlternateAllRecord*>(fileData + header->recordOffsetInWords * 2);
+			*dataBuffer += sizeof(*header);
+			CharacterLoader::g_remapDataLinkHead = 0;
+			CharacterLoader::g_animationDataLinkHead = 0;
+
+			int32_t loadedBoneCount = 0;
+			int32_t recordIndex = 0;
+			if (records->recordCount > 0)
+			{
+				CharacterLoader::AlternateAllRecord* record = records;
+				CharacterLoader::BoneTransform* transform = &CharacterLoader::g_boneTransforms[baseBoneIndex];
+				do
+				{
+					int32_t nodeType = record->nodeType;
+					if (nodeType < 0x100)
+					{
+						++loadedBoneCount;
+						transform->translation.x = record->translation.x;
+						transform->translation.y = record->translation.y;
+						transform->translation.z = record->translation.z;
+						transform->nodeType = nodeType;
+						transform->animationData = *dataBuffer;
+						transform->remapMetadata.x = record->metadataX;
+						transform->remapMetadata.y = record->metadataY;
+						transform->remapMetadata.z = record->metadataZ;
+						transform->trackType = static_cast<uint8_t>(nodeType);
+
+						if (static_cast<int8_t>(nodeType) == 9)
+						{
+							CharacterLoader::g_specialTrackValues[0] = record->specialTrackValues[0];
+							CharacterLoader::g_specialTrackValues[1] = record->specialTrackValues[1];
+							transform->trackType = 12;
+						}
+
+						if ((record->flags & 0x40) == 0x40)
+							transform->trackType += 2;
+
+						++transform;
+					}
+					else
+					{
+						CharacterLoader::AlternateAllReference* reference = reinterpret_cast<CharacterLoader::AlternateAllReference*>(*dataBuffer);
+						if (reference->marker == 0x12345678)
+						{
+							reference->previous = CharacterLoader::g_allDataReferences[nodeType];
+							CharacterLoader::g_allDataReferences[nodeType] = reinterpret_cast<uint8_t*>(reference + 1);
+						}
+						else
+						{
+							CharacterLoader::g_allDataReferences[nodeType] = reinterpret_cast<uint8_t*>(reference);
+						}
+					}
+
+					*dataBuffer += record->dataSizeInWords * 2;
+					++recordIndex;
+					++record;
+				} while (recordIndex < records->recordCount);
+			}
+
+			return loadedBoneCount;
+		}
+	}
+}
+
+namespace CharacterLoader
+{
 
 	// STUB: TOY2 0x0043B0C0
 	void LoadCharacterData(int32_t* loadedByteCount, uint8_t** dataBuffer, uint8_t* creatureList) {}
