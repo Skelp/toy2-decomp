@@ -76,12 +76,6 @@ src/Toy2/Buzz.h	placeholder-field	unkVar22	0b31940ecb22	src/Toy2/Buzz.h
 0x00438a50	opaque-state-slot	soundRecord->data[1]	58dbde0cf034	src/Toy2/LevelSelect.cpp
 0x00438a50	opaque-state-slot	targetRecord->data[0]	277f94d56b17	src/Toy2/LevelSelect.cpp
 0x00438a50	unstructured-control-flow	goto-count	8564fcf859bd	src/Toy2/LevelSelect.cpp
-0x00452fc0	address-named-symbol	g_unk54717C	87a29dac69c7	src/Toy2/Levels.cpp
-0x00452fc0	unknown-symbol	g_unk54717C	87a29dac69c7	src/Toy2/Levels.cpp
-0x00452fc0	address-named-symbol	g_unk546D78	fdc4f844f8e5	src/Toy2/Levels.cpp
-0x00452fc0	unknown-symbol	g_unk546D78	fdc4f844f8e5	src/Toy2/Levels.cpp
-0x00452fc0	address-named-symbol	g_unk547CD0	c2480d2a0204	src/Toy2/Levels.cpp
-0x00452fc0	unknown-symbol	g_unk547CD0	c2480d2a0204	src/Toy2/Levels.cpp
 0x00452fc0	unstructured-control-flow	goto-count	9bbef2ba4b6b	src/Toy2/Levels.cpp
 src/Toy2/Levels.h	placeholder-field	unkVar0	59a21bbf9942	src/Toy2/Levels.h
 src/Toy2/Levels.h	placeholder-field	unkVar3	38c8e929d0c4	src/Toy2/Levels.h

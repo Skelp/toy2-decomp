@@ -844,9 +844,9 @@ namespace Toy2
 
 			g_hasBackdrop = 0;
 
-			CharacterLoader::g_unk54717C = 0;
-			CharacterLoader::g_unk546D78 = 0;
-			CharacterLoader::g_unk547CD0 = 0;
+			CharacterLoader::g_boneRemapCount = 0;
+			CharacterLoader::g_processedBoneRemapCount = 0;
+			CharacterLoader::g_animationSlotCount = 0;
 
 			SoftwareRenderer::g_backdropTextureColumn = -1;
 
