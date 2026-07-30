@@ -984,14 +984,15 @@ namespace Toy2
 			{
 				Animation::g_singleNodeIndex = boneIndex;
 				CharacterLoader::CharacterAnimationData* animationData = CharacterLoader::g_characterAnimationData[actor->creatureId];
-				Animation::EvaluateClip(animationData->clips[actor->primaryAnimIdx], actor->animationFramePosition, animationData->baseBoneIndex, 0);
+				Animation::EvaluateClip(animationData->clips[actor->primaryAnimIdx].pointer, actor->animationFramePosition, animationData->baseBoneIndex, 0);
 			}
 
 			if (actor->secondaryAnimIdx != -1)
 			{
 				Animation::g_singleNodeIndex = boneIndex;
 				CharacterLoader::CharacterAnimationData* animationData = CharacterLoader::g_characterAnimationData[actor->creatureId];
-				Animation::EvaluateClip(animationData->clips[actor->secondaryAnimIdx], actor->secondaryAnimationFramePosition, animationData->baseBoneIndex, 1);
+				Animation::EvaluateClip(
+					animationData->clips[actor->secondaryAnimIdx].pointer, actor->secondaryAnimationFramePosition, animationData->baseBoneIndex, 1);
 			}
 
 			Animation::g_singleNodeIndex = -1;
@@ -1138,7 +1139,7 @@ namespace Toy2
 		void UpdatePrimaryAnimation(Toy2Actor* actor)
 		{
 			CharacterLoader::CharacterAnimationData* animationData = CharacterLoader::g_characterAnimationData[actor->creatureId];
-			Animation::EvaluateClip(animationData->clips[actor->primaryAnimIdx], actor->animationFramePosition, animationData->baseBoneIndex, 0);
+			Animation::EvaluateClip(animationData->clips[actor->primaryAnimIdx].pointer, actor->animationFramePosition, animationData->baseBoneIndex, 0);
 		}
 
 		// FUNCTION: TOY2 0x00405C80 [PROVISIONAL]

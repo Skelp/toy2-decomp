@@ -14,6 +14,9 @@ namespace CharacterLoader
 	// GLOBAL: TOY2 0x0054717C
 	int16_t g_boneRemapCount;
 
+	// GLOBAL: TOY2 0x00547BB8
+	int16_t g_boneRemapIndices[140];
+
 	// GLOBAL: TOY2 0x00546D78
 	int16_t g_processedBoneRemapCount;
 
@@ -43,6 +46,54 @@ namespace CharacterLoader
 
 	// STUB: TOY2 0x0043B0C0
 	void LoadCharacterData(int32_t* loadedByteCount, uint8_t** dataBuffer, uint8_t* creatureList) {}
+
+	// FUNCTION: TOY2 0x0043ABC0 [PROVISIONAL]
+	void LoadFirstSection(CharacterAnimationData* animationData, int8_t collectBoneRemaps)
+	{
+		int16_t clipIndex;
+		int16_t nodeIndex;
+		int16_t remapCount;
+		Toy2::Animation::ClipHeader* firstClip = 0;
+		for (clipIndex = 0; clipIndex < animationData->clipCount; ++clipIndex)
+		{
+			CharacterAnimationData::ClipReference* clipReference = &animationData->clips[clipIndex];
+			if (clipReference->offset != 0)
+			{
+				clipReference->pointer = reinterpret_cast<Toy2::Animation::ClipHeader*>(reinterpret_cast<uint8_t*>(animationData) + clipReference->offset);
+				if (firstClip == 0)
+					firstClip = clipReference->pointer;
+			}
+		}
+
+		if (firstClip == 0 || ! collectBoneRemaps)
+			return;
+
+		if (firstClip->headerSize < 0)
+		{
+			Toy2::Animation::g_clipHeaderSize = -firstClip->headerSize;
+			Toy2::Animation::g_clipHasNegativeHeader = 1;
+		}
+		else
+		{
+			Toy2::Animation::g_clipHasNegativeHeader = 0;
+			Toy2::Animation::g_clipHeaderSize = sizeof(Toy2::Animation::ClipHeader) - 4;
+		}
+
+		int16_t* nodeOffsets = reinterpret_cast<int16_t*>(reinterpret_cast<uint8_t*>(firstClip) + Toy2::Animation::g_clipHeaderSize);
+		Toy2::Animation::g_clipNodeOffsets = nodeOffsets;
+		Toy2::Animation::g_clipScaleFlags = reinterpret_cast<uint8_t*>(nodeOffsets) + firstClip->nodeOffsetCount * sizeof(int16_t);
+
+		remapCount = g_boneRemapCount;
+		for (nodeIndex = 0; nodeIndex < firstClip->nodeOffsetCount; ++nodeIndex)
+		{
+			if (nodeOffsets[nodeIndex] == -2)
+			{
+				g_boneRemapIndices[remapCount] = animationData->baseBoneIndex + nodeIndex;
+				++remapCount;
+				g_boneRemapCount = remapCount;
+			}
+		}
+	}
 
 	// FUNCTION: TOY2 0x0043B9B0 [PROVISIONAL]
 	void Start(int32_t* loadedByteCount, uint8_t** dataBuffer, uint8_t* creatureList)

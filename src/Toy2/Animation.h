@@ -60,6 +60,10 @@ namespace Toy2
 		extern Vector3I g_nodeAngles[64][32];
 		extern RotationScratch g_keyframeRotation;
 		extern int32_t g_singleNodeIndex;
+		extern int16_t g_clipHasNegativeHeader;
+		extern uint8_t* g_clipScaleFlags;
+		extern int16_t* g_clipNodeOffsets;
+		extern int16_t g_clipHeaderSize;
 
 		// Pointer to the NULL-terminated list of actors currently being animated
 		// (set by AnimateActors, read by Actor::FindInActorList). NULL when idle.

@@ -28,11 +28,17 @@ namespace CharacterLoader
 
 	struct CharacterAnimationData
 	{
+		union ClipReference
+		{
+			uint32_t offset;
+			Toy2::Animation::ClipHeader* pointer;
+		};
+
 		int16_t modelId;
-		int16_t reserved;
+		int16_t clipCount;
 		int16_t baseBoneIndex;
-		int16_t reserved2;
-		Toy2::Animation::ClipHeader* clips[1];
+		int16_t endBoneIndex;
+		ClipReference clips[1];
 	};
 
 	struct BoneTransform
@@ -67,6 +73,7 @@ namespace CharacterLoader
 
 	extern BoneTransform g_boneTransforms[300];
 	extern int16_t g_boneRemapCount;
+	extern int16_t g_boneRemapIndices[140];
 	extern int16_t g_processedBoneRemapCount;
 	extern int16_t g_animationSlotCount;
 	extern CharacterAnimationData* g_characterAnimationData[128];
@@ -78,12 +85,16 @@ namespace CharacterLoader
 	extern uint8_t* g_animationDataBySlot[512];
 
 	void Start(int32_t* loadedByteCount, uint8_t** dataBuffer, uint8_t* creatureList);
+	void LoadFirstSection(CharacterAnimationData* animationData, int8_t collectBoneRemaps);
 	void InitGlobals();
 
 	STATIC_ASSERT(sizeof(ActorBounds) == 8);
 	STATIC_ASSERT(sizeof(BoneTransform) == 0x6C);
 	STATIC_ASSERT(sizeof(CharacterAnimationData) == 0xC);
+	STATIC_ASSERT(sizeof(CharacterAnimationData::ClipReference) == 4);
 	STATIC_ASSERT(offsetof(CharacterAnimationData, modelId) == 0);
+	STATIC_ASSERT(offsetof(CharacterAnimationData, clipCount) == 2);
 	STATIC_ASSERT(offsetof(CharacterAnimationData, baseBoneIndex) == 4);
+	STATIC_ASSERT(offsetof(CharacterAnimationData, endBoneIndex) == 6);
 	STATIC_ASSERT(offsetof(CharacterAnimationData, clips) == 8);
 }
