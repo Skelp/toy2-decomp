@@ -718,10 +718,11 @@ namespace DrawingDevice
 	// FUNCTION: TOY2 0x004ABF00 [PROVISIONAL]
 	void Destroy()
 	{
-		if (g_drawingDevice)
+		CD3DFramework* drawingDevice = g_drawingDevice;
+		if (drawingDevice)
 		{
-			g_drawingDevice->Release();
-			delete g_drawingDevice;
+			drawingDevice->Release();
+			delete drawingDevice;
 		}
 
 		g_drawingDevice = 0;
@@ -859,30 +860,34 @@ namespace DrawingDevice
 			device->EndScene();
 	}
 
-	// FUNCTION: TOY2 0x004BB590 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004BB590 [TOOL]
 	HRESULT BindTexWithStage(int32_t textureIndex, int32_t stageIndex)
 	{
-		Nu3D::BmpDataNode* bmpDataNode;
-
 		++g_setTexCalls;
 
-		if (textureIndex && (bmpDataNode = NGNLoader::g_textureDataFreeList[textureIndex].bmpDataNode) != 0)
-			return Nu3D::SetTexture(stageIndex, bmpDataNode);
-		else
-			return Nu3D::SetTexture(stageIndex, 0);
+		if (textureIndex)
+		{
+			NGNLoader::NGNTextureData* textureData = &NGNLoader::g_textureDataFreeList[textureIndex - 1];
+			if (textureData->bmpDataNode)
+				return Nu3D::SetTexture(stageIndex, textureData->bmpDataNode);
+		}
+
+		return Nu3D::SetTexture(stageIndex, 0);
 	}
 
-	// FUNCTION: TOY2 0x004BB540 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004BB540 [TOOL]
 	HRESULT BindTexToStage0(int32_t textureIndex)
 	{
-		Nu3D::BmpDataNode* bmpDataNode;
-
 		++g_setTexCalls;
 
-		if (textureIndex && (bmpDataNode = NGNLoader::g_textureDataFreeList[textureIndex].bmpDataNode) != 0)
-			return Nu3D::SetTexture(0, bmpDataNode);
-		else
-			return Nu3D::SetTexture(0, 0);
+		if (textureIndex)
+		{
+			NGNLoader::NGNTextureData* textureData = &NGNLoader::g_textureDataFreeList[textureIndex - 1];
+			if (textureData->bmpDataNode)
+				return Nu3D::SetTexture(0, textureData->bmpDataNode);
+		}
+
+		return Nu3D::SetTexture(0, 0);
 	}
 	// FUNCTION: TOY2 0x004ABC40 [MATCHED]
 	void LockPrimarySurface(LPDDSURFACEDESC2 surfaceDesc)

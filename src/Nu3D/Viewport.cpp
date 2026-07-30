@@ -73,9 +73,6 @@ namespace Nu3D
 		// GLOBAL: TOY2 0x009F6030
 		Plane g_frustumPlanes[32];
 
-		// GLOBAL: TOY2 0x009F6224
-		// This address is part of g_frustumPlanes[31], not a separate global.
-
 		// GLOBAL: TOY2 0x009F6230
 		int32_t g_frustumPlaneCount;
 
