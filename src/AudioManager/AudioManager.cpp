@@ -171,7 +171,7 @@ namespace AudioManager
 	uint16_t g_soundFreqTable[128];
 
 	// GLOBAL: TOY2 0x00534074
-	char g_sfxSubPath[8];
+	char g_sfxSubPath[4];
 
 	// GLOBAL: TOY2 0x004FD668
 	// clang-format off

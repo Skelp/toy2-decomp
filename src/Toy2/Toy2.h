@@ -152,6 +152,7 @@ namespace Toy2
 	void ProcessMiscEventsEx();
 	void RunModeSelect();
 	void OneInit();
+	void ReadIniFile();
 	void CheckForQuit();
 	int32_t ReadCfg();
 	int32_t ShowModeSelect();

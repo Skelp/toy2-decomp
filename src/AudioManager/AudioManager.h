@@ -62,6 +62,7 @@ namespace AudioManager
 
 	extern int32_t g_curTrackIndex;
 	extern int32_t g_loopingMusicTrackIndex;
+	extern int32_t g_quietMode;
 
 	extern int32_t g_dsResult;
 	extern LPDIRECTSOUNDBUFFER g_dsBuffers[768];
@@ -150,8 +151,6 @@ namespace AudioManager
 	extern int32_t g_loadedWaveFormatSize;
 	extern void* g_loadedWaveData;
 	extern uint16_t g_soundFreqTable[128];
-	extern char g_sfxSubPath[8];
-
 	extern HGLOBAL g_waveFormatHandle;
 	extern HGLOBAL g_sfxWaveFormatHandle;
 	extern HMMIO g_waveMmioHandle;
