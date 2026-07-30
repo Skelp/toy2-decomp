@@ -52,6 +52,7 @@ namespace SaveManager
 #pragma pack(pop)
 
 	void Init();
+	void AddInputEntry(int32_t inputCode, int32_t controlId);
 	void ClearBindByControlId(int32_t controlId);
 	void ClearBindByInputCode(int32_t inputCode);
 	int32_t GetInputCodeByControlId(int32_t controlId);

@@ -17,8 +17,50 @@ namespace Renderer
 
 namespace Toy2
 {
-	uint8_t ShowControlConfig();
+	extern int32_t g_inputSuppressFrames;
+
+	int32_t ShowControlConfig();
 	void ShowGraphicsConfig();
+
+	struct ControlConfigEntry
+	{
+		GameControlId controlId;
+		char* label;
+	};
+	STATIC_ASSERT(sizeof(ControlConfigEntry) == 8);
+
+	// GLOBAL: TOY2 0x00500E58
+	ControlConfigEntry g_controlConfigEntries[14] = {
+		{ INPUT_UP, "up" },
+		{ INPUT_DOWN, "down" },
+		{ INPUT_LEFT, "left" },
+		{ INPUT_RIGHT, "right" },
+		{ INPUT_JUMP, "jump" },
+		{ INPUT_FIRE, "fire" },
+		{ INPUT_SPIN, "spin" },
+		{ INPUT_CAMERA_LEFT, "camera left" },
+		{ INPUT_CAMERA_RIGHT, "camera right" },
+		{ INPUT_VISOR_TOGGLE, "visor toggle" },
+		{ INPUT_TARGET_LOCK, "target lock" },
+		{ INPUT_MENU, "menu" },
+		{ INPUT_CANCEL, "cancel" },
+		{ (GameControlId)0, 0 },
+	};
+
+	// GLOBAL: TOY2 0x00500EC8
+	int32_t g_controlConfigInputDelay = 30;
+
+	// GLOBAL: TOY2 0x00500ECC
+	int32_t g_controlConfigBlinkTimer = 20;
+
+	// GLOBAL: TOY2 0x00830C6C
+	int32_t g_controlConfigSelectedRow;
+
+	// GLOBAL: TOY2 0x00830C70
+	int32_t g_controlConfigFirstVisibleRow;
+
+	// GLOBAL: TOY2 0x00830C74
+	int32_t g_controlConfigAwaitingInput;
 
 	namespace MainMenu
 	{
@@ -635,8 +677,213 @@ namespace Toy2
 		}
 	}
 
-	// STUB: TOY2 0x0049C420
-	uint8_t ShowControlConfig() { return 0; }
+	// FUNCTION: TOY2 0x0049C420 [PROVISIONAL]
+	int32_t ShowControlConfig()
+	{
+		g_inputSuppressFrames = 30 / Renderer::g_frameDelta;
+
+		int32_t result = 0;
+		int32_t hasMoreRows = 0;
+
+		if (SaveManager::GetControlSettingId(TOY_INPUT_ESC) != TOY_INPUT_UNKNOWN)
+		{
+			SaveManager::ClearBindByInputCode(TOY_INPUT_ESC);
+			SaveManager::ClearBindByInputCode(TOY_INPUT_CAPITALA);
+			SaveManager::ClearBindByInputCode(TOY_INPUT_CAPITALB);
+			SaveManager::ClearBindByInputCode(TOY_INPUT_CAPITALC);
+			SaveManager::ClearBindByInputCode(TOY_INPUT_CAPITALD);
+			SaveManager::ClearBindByInputCode(TOY_INPUT_F1);
+			SaveManager::ClearBindByInputCode(TOY_INPUT_F2);
+		}
+
+		Renderer::DrawMenuTextScaled(160, 46, "control configuration", 0, 1, 0x800);
+
+		int32_t rowIndex = g_controlConfigFirstVisibleRow;
+		ControlConfigEntry* entry = &g_controlConfigEntries[rowIndex];
+		while (entry->controlId != 0)
+		{
+			int32_t rowY = (rowIndex - g_controlConfigFirstVisibleRow + 5) * 16;
+			if (rowY > 144)
+			{
+				hasMoreRows = 1;
+				break;
+			}
+
+			int32_t inputCode = SaveManager::GetInputCodeByControlId(entry->controlId);
+			char* inputName = InputManager::GetGameControlName(inputCode);
+
+			if (rowIndex != g_controlConfigSelectedRow || g_controlConfigBlinkTimer > 10 || g_controlConfigAwaitingInput != 0)
+				Renderer::DrawMenuTextScaled(150, rowY, entry->label, 0, 2, 0x800);
+
+			if (rowIndex != g_controlConfigSelectedRow || g_controlConfigBlinkTimer > 10 || g_controlConfigAwaitingInput == 0)
+			{
+				if (inputName == 0)
+				{
+					switch (entry->controlId)
+					{
+						case INPUT_UP:
+							inputName = "A";
+							break;
+						case INPUT_RIGHT:
+							inputName = "D";
+							break;
+						case INPUT_DOWN:
+							inputName = "B";
+							break;
+						case INPUT_LEFT:
+							inputName = "C";
+							break;
+						case INPUT_MENU:
+							inputName = InputManager::GetGameControlName(TOY_INPUT_F1);
+							break;
+						case INPUT_CANCEL:
+							inputName = InputManager::GetGameControlName(TOY_INPUT_ESC);
+							break;
+						case INPUT_JUMP:
+							inputName = InputManager::GetGameControlName(TOY_INPUT_F2);
+							break;
+						default:
+							inputName = "???";
+							break;
+					}
+				}
+
+				Renderer::DrawMenuTextScaled(160, rowY, inputName, 0, 0, 0x800);
+			}
+
+			++entry;
+			++rowIndex;
+		}
+
+		if (g_controlConfigBlinkTimer > 10)
+		{
+			if (g_controlConfigFirstVisibleRow != 0)
+				Renderer::Sprite::DrawScaled(152, 64, 0x43, 0x2d, 255, 255, 255, 255, 0x1000, 0x1000);
+			if (hasMoreRows)
+				Renderer::Sprite::DrawScaled(152, 150, 0x43, 0x2e, 255, 255, 255, 255, 0x1000, 0x1000);
+		}
+
+		if (g_controlConfigAwaitingInput == 0)
+		{
+			Renderer::DrawMenuTextScaled(160, 178, "ABto select, space to change", 0, 1, 0x600);
+			Renderer::DrawMenuTextScaled(160, 186, "return to accept, esc to cancel", 0, 1, 0x600);
+		}
+		else
+		{
+			Renderer::DrawMenuTextScaled(160, 182, "press desired key / button", 0, 1, 0x600);
+		}
+
+		if (g_controlConfigInputDelay > 0)
+		{
+			g_controlConfigInputDelay -= Renderer::g_frameDelta;
+		}
+		else if (g_controlConfigAwaitingInput == 0)
+		{
+			if (InputManager::IsKeyPressed(TOY_INPUT_CAPITALA))
+			{
+				if (g_controlConfigSelectedRow != 0)
+				{
+					AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 80, 80);
+					--g_controlConfigSelectedRow;
+				}
+				if (g_controlConfigFirstVisibleRow != 0 && g_controlConfigSelectedRow <= g_controlConfigFirstVisibleRow)
+					--g_controlConfigFirstVisibleRow;
+			}
+
+			if (InputManager::IsKeyPressed(TOY_INPUT_CAPITALB))
+			{
+				if ((g_controlConfigEntries[rowIndex].controlId != 0 && g_controlConfigSelectedRow < rowIndex) || g_controlConfigSelectedRow < rowIndex - 1)
+				{
+					AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 80, 80);
+					++g_controlConfigSelectedRow;
+				}
+				if (hasMoreRows && rowIndex <= g_controlConfigSelectedRow)
+					++g_controlConfigFirstVisibleRow;
+			}
+
+			if (InputManager::IsKeyPressed(TOY_INPUT_ESC))
+			{
+				result = 1;
+				g_controlConfigAwaitingInput = 0;
+				g_controlConfigFirstVisibleRow = 0;
+				g_controlConfigSelectedRow = 0;
+				g_controlConfigInputDelay = 30;
+				InputManager::g_curButtonsPressed = 0;
+				AudioManager::PlayOneShotSoundGlobal(2, 0x1200, 80, 80);
+			}
+
+			if (InputManager::IsKeyPressed(TOY_INPUT_RETURNKEY))
+			{
+				result = 2;
+				g_controlConfigAwaitingInput = 0;
+				g_controlConfigFirstVisibleRow = 0;
+				g_controlConfigSelectedRow = 0;
+				g_controlConfigInputDelay = 30;
+				SaveManager::AddInputEntry(TOY_INPUT_ESC, INPUT_CANCEL);
+				SaveManager::AddInputEntry(TOY_INPUT_CAPITALA, INPUT_UP);
+				SaveManager::AddInputEntry(TOY_INPUT_CAPITALB, INPUT_DOWN);
+				SaveManager::AddInputEntry(TOY_INPUT_CAPITALC, INPUT_LEFT);
+				SaveManager::AddInputEntry(TOY_INPUT_CAPITALD, INPUT_RIGHT);
+				SaveManager::AddInputEntry(TOY_INPUT_F1, INPUT_JUMP);
+				SaveManager::AddInputEntry(TOY_INPUT_F2, INPUT_MENU);
+				SaveManager::SaveToFile(99, 0);
+				AudioManager::PlayOneShotSoundGlobal(0, 0x1200, 80, 80);
+			}
+
+			if (InputManager::IsKeyPressed(TOY_INPUT_SPACE))
+			{
+				g_controlConfigAwaitingInput = 1;
+				g_controlConfigInputDelay = 30;
+				AudioManager::PlayOneShotSoundGlobal(0, 0x1200, 80, 80);
+			}
+		}
+		else
+		{
+			int32_t inputCode = InputManager::GetPressedInput();
+			if (inputCode != TOY_INPUT_UNKNOWN && inputCode != TOY_INPUT_DIRECTIONPAD && inputCode != TOY_INPUT_CAPITALA && inputCode != TOY_INPUT_CAPITALB
+				&& inputCode != TOY_INPUT_CAPITALC && inputCode != TOY_INPUT_CAPITALD)
+			{
+				switch (inputCode)
+				{
+					case TOY_INPUT_ESC:
+						g_controlConfigAwaitingInput = 0;
+						InputManager::IsKeyPressed(TOY_INPUT_ESC);
+						AudioManager::PlayOneShotSoundGlobal(2, 0x1200, 80, 80);
+						break;
+					case TOY_INPUT_F1:
+					case TOY_INPUT_F2:
+					case TOY_INPUT_F3:
+					case TOY_INPUT_F4:
+					case TOY_INPUT_F5:
+					case TOY_INPUT_F6:
+					case TOY_INPUT_F7:
+					case TOY_INPUT_F8:
+					case TOY_INPUT_F9:
+					case TOY_INPUT_F10:
+					case TOY_INPUT_F11:
+					case TOY_INPUT_F12:
+					case TOY_INPUT_F13:
+					case TOY_INPUT_F14:
+					case TOY_INPUT_F15:
+						break;
+					default:
+						SaveManager::ClearBindByControlId(g_controlConfigEntries[g_controlConfigSelectedRow].controlId);
+						SaveManager::ClearBindByInputCode(inputCode);
+						g_controlConfigInputDelay = 30;
+						SaveManager::AddInputEntry(inputCode, g_controlConfigEntries[g_controlConfigSelectedRow].controlId);
+						g_controlConfigAwaitingInput = 0;
+						AudioManager::PlayOneShotSoundGlobal(0, 0x1200, 80, 80);
+						break;
+				}
+			}
+		}
+
+		g_controlConfigBlinkTimer -= Renderer::g_frameDelta;
+		if (g_controlConfigBlinkTimer < 0)
+			g_controlConfigBlinkTimer += 20;
+
+		return result;
+	}
 
 	// STUB: TOY2 0x0049CAA0
 	void ShowGraphicsConfig() {}
