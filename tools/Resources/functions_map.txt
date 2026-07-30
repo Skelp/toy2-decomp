@@ -372,7 +372,7 @@
 0x0045BBC0 SoftwareRenderer::UnkRenderAPI9
 0x0045C6B0 SoftwareRenderer::UnkRenderAPI4
 0x0045D110 SoftwareRenderer::UnkRenderAPI3
-0x0045DB80 SoftwareRenderer::UnkRenderAPI1
+0x0045DB80 SoftwareRenderer::RasterizeTexturedRect555
 0x0045E390 SoftwareRenderer::UnkRenderAPI13
 0x00461D20 SoftwareRenderer::UnkRenderAPI14
 0x00463090 SoftwareRenderer::UnkRenderAPI21
