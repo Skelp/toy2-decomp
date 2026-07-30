@@ -20,6 +20,9 @@
 namespace Toy2
 {
 	extern int32_t g_hudActorAnimationFrame;
+	extern uint8_t g_environmentTintRed;
+	extern uint8_t g_environmentTintGreen;
+	extern uint8_t g_environmentTintBlue;
 
 	namespace AlsPenthouse
 	{
@@ -63,6 +66,11 @@ namespace Toy2
 			uint8_t platformId;
 			uint8_t linkId;
 		};
+		struct MoveableObjectInitTable
+		{
+			MoveableObject::InitEntry entries[3];
+			int16_t terminator;
+		};
 		enum GroundSlamTargetLinkOffset
 		{
 			GROUND_SLAM_SOURCE_LINK = 0,
@@ -85,6 +93,23 @@ namespace Toy2
 		int32_t g_objectGroupMask;
 		// GLOBAL: TOY2 0x0052FD3C
 		uint32_t g_activeLinkMask;
+		// GLOBAL: TOY2 0x004F3C54
+		char g_waterButtonInstructions[] = {
+#include "Toy2/AlsPenthouseWaterButtonInstructions.inc"
+		};
+		// GLOBAL: TOY2 0x004F3D04
+		char g_trainSwitchInstructions[] = {
+#include "Toy2/AlsPenthouseTrainSwitchInstructions.inc"
+		};
+		// GLOBAL: TOY2 0x004F3E60
+		extern const MoveableObjectInitTable g_moveableObjectInitTable = {
+			{
+				{ 30, 19, 13 },
+				{ 29, 20, 0 },
+				{ 81, 21, 14 },
+			},
+			-1,
+		};
 		// GLOBAL: TOY2 0x004F3E74
 		int32_t g_groundSlamTargetLinkIds[24] = {
 			50,
@@ -112,6 +137,20 @@ namespace Toy2
 			70,
 			77,
 		};
+		// GLOBAL: TOY2 0x004F3F18
+		int16_t g_tokenLinkIds[6] = { 96, 98, 99, 100, 97, 0 };
+		// GLOBAL: TOY2 0x004F3F24
+		extern const Collectables::TokenDialogueValue g_tokenDialogueValues[] = {
+			{ 120 },
+			{ 22 },
+			{ reinterpret_cast<int32_t>(g_waterButtonInstructions) },
+			{ 0xC00 },
+			{ 119 },
+			{ 21 },
+			{ reinterpret_cast<int32_t>(g_trainSwitchInstructions) },
+			{ 0xC00 },
+			{ -1 },
+		};
 		// GLOBAL: TOY2 0x004F3F48
 		ObjectGroup g_objectGroups[7] = {
 			{ 1, 36, 17, 84, -350, 0, 0 },
@@ -129,6 +168,114 @@ namespace Toy2
 			{ 6, 3 },
 			{ 9, 4 },
 		};
+		// GLOBAL: TOY2 0x004F4024
+		uint8_t g_initialHiddenLinkIds[33] = {
+			0x2C,
+			0x2B,
+			0x14,
+			0x15,
+			0x16,
+			0x17,
+			0x5B,
+			0x0C,
+			0x0D,
+			0x0E,
+			0x0F,
+			0x10,
+			0x11,
+			0x12,
+			0x1F,
+			0x20,
+			0x21,
+			0x22,
+			0x23,
+			0x24,
+			0x25,
+			0x42,
+			0x43,
+			0x44,
+			0x45,
+			0x46,
+			0x48,
+			0x49,
+			0x4A,
+			0x4B,
+			0x4C,
+			0x4D,
+			0x4F,
+		};
+		// GLOBAL: TOY2 0x0052FD58
+		int32_t g_groundSlamTargetTimers[6];
+		// GLOBAL: TOY2 0x0052FDFC
+		int32_t g_waterLevel;
+		// GLOBAL: TOY2 0x0052FD30
+		int32_t g_targetWaterLevel;
+		// GLOBAL: TOY2 0x0052FD78
+		int32_t g_waterLevelPhase;
+		// GLOBAL: TOY2 0x0052FDB8
+		int32_t g_objectReplacementPhase;
+		// GLOBAL: TOY2 0x0052FDAC
+		int32_t g_drainLinkScalePhase;
+		// GLOBAL: TOY2 0x0052FD7C
+		int32_t g_platform14VerticalVelocity;
+		// GLOBAL: TOY2 0x0052FD1C
+		int32_t g_platform14VerticalOffset;
+		// GLOBAL: TOY2 0x0052FD90
+		int32_t g_platform13VerticalVelocity;
+		// GLOBAL: TOY2 0x0052FD28
+		int32_t g_platform13VerticalOffset;
+		// GLOBAL: TOY2 0x0052FD50
+		int32_t g_platform16VerticalVelocity;
+		// GLOBAL: TOY2 0x0052FD18
+		int32_t g_platform16VerticalOffset;
+		// GLOBAL: TOY2 0x0052FD88
+		int32_t g_platform15VerticalVelocity;
+		// GLOBAL: TOY2 0x0052FD20
+		int32_t g_platform15VerticalOffset;
+		// GLOBAL: TOY2 0x0052FD0C
+		int32_t g_trainRotationAngle;
+		// GLOBAL: TOY2 0x0052FD4C
+		int32_t g_trainPathRecordType;
+		// GLOBAL: TOY2 0x0052FD84
+		int32_t g_trainPathPointIndex;
+		// GLOBAL: TOY2 0x0052FDBC
+		int32_t g_trainPathDirection;
+		// GLOBAL: TOY2 0x0052FD98
+		Vector3I g_trainPosition;
+		// GLOBAL: TOY2 0x0052FD74
+		int32_t g_linkReplacementTimer;
+		// GLOBAL: TOY2 0x0052FD44
+		int32_t g_replacedLinkId;
+		// GLOBAL: TOY2 0x0052FD24
+		int32_t g_trainCollisionTimer;
+		// GLOBAL: TOY2 0x0052FDF0
+		int32_t g_trainSpeed;
+		// GLOBAL: TOY2 0x0052FDB4
+		int32_t g_trainSoundTimer;
+		// GLOBAL: TOY2 0x0052FDF8
+		int32_t g_groundSlamTargetFlashPhase;
+		// GLOBAL: TOY2 0x0052FD48
+		uint32_t g_groundSlamTargetMask;
+		// GLOBAL: TOY2 0x0052FD34
+		int32_t g_gunslingerActorIndex;
+		// GLOBAL: TOY2 0x0052FD8C
+		int32_t g_cannonFireTimer;
+		// GLOBAL: TOY2 0x0052FD80
+		int32_t g_sector2ParticleTimer;
+		// GLOBAL: TOY2 0x0052FDF4
+		int32_t g_sector2ParticleVariant;
+		// GLOBAL: TOY2 0x0052FDB0
+		int32_t g_sector4ParticleTimer;
+		// GLOBAL: TOY2 0x0052FDC4
+		int32_t g_sector4ParticlePositionIndex;
+		// GLOBAL: TOY2 0x0052FD38
+		int32_t g_platform16RotationPhase;
+		// GLOBAL: TOY2 0x0052FD54
+		int32_t g_platform17RotationPhase;
+		// GLOBAL: TOY2 0x0052FDA8
+		int32_t g_sector5IconPhase;
+		// GLOBAL: TOY2 0x0052FDC0
+		int32_t g_platformCollisionState;
 		// GLOBAL: TOY2 0x0052FDC8
 		HiddenCollectibleState g_hiddenCollectibles[5];
 
@@ -161,7 +308,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x00428BA0 [PROVISIONAL]
+		// FUNCTION: TOY2 0x00428BA0 [MATCHED]
 		void UpdateObjectGroupFlash()
 		{
 			int32_t phase = Renderer::g_frameDelta;
@@ -253,14 +400,105 @@ namespace Toy2
 			AudioManager::PlaySoundEffect(-2, &position);
 		}
 
-		// STUB: TOY2 0x00429D70
-		void Init() {}
+		// STUB: TOY2 0x00428890
+		void Method2(uint32_t requestedMask) {}
+
+		// STUB: TOY2 0x00428E70
+		void Method8() {}
+
+		// FUNCTION: TOY2 0x00429D70 [MATCHED]
+		void Init()
+		{
+			Collectables::Init(g_tokenLinkIds, 0x71);
+			Collectables::LoadTokenTable(g_tokenDialogueValues);
+			Collectables::Activate(3, 1);
+			MoveableObject::InitTable(g_moveableObjectInitTable.entries);
+			InitHiddenCollectibles();
+			Levels::DeactivateAmbientEmitter(3, 1);
+
+			g_groundSlamTargetTimers[0] = 0;
+			g_groundSlamTargetTimers[1] = 0;
+			g_groundSlamTargetTimers[2] = 0;
+			g_groundSlamTargetTimers[3] = 0;
+			g_groundSlamTargetTimers[4] = 0;
+			g_groundSlamTargetTimers[5] = 0;
+
+			g_environmentSurfaceY = 0;
+			g_environmentEffectType = 1;
+			g_previousBuzzEnvironmentY = 0;
+			g_environmentTintBlue = 0x68;
+			g_environmentTintGreen = 0x68;
+			g_environmentTintRed = 0x80;
+			HUD::g_challengeState = 0;
+			AndysHouse::g_raceCheckpointPassCount = 0;
+			g_waterLevel = 0;
+			g_targetWaterLevel = 0;
+			g_activeLinkMask = 0;
+			g_waterLevelPhase = 0;
+			g_objectReplacementPhase = 0;
+
+			for (int32_t linkIndex = 0; linkIndex < 33; linkIndex++)
+				Nu3D::Link::SetScaleFromFixedOffsets(g_initialHiddenLinkIds[linkIndex], 0, 0, 0);
+
+			UpdateRaisedPlatforms(0x10);
+			g_drainLinkScalePhase = 0;
+			g_platform14VerticalVelocity = 0;
+			g_platform14VerticalOffset = 0;
+			g_platform13VerticalVelocity = 0;
+			g_platform13VerticalOffset = 0;
+			g_platform16VerticalVelocity = 0;
+			g_platform16VerticalOffset = 0;
+			g_platform15VerticalVelocity = 0;
+			g_platform15VerticalOffset = 0;
+			g_objectGroupMask = 0;
+			g_trainRotationAngle = 0;
+			Method2(0x25);
+			g_objectGroupFlashPhase = 0;
+			g_trainPathRecordType = 1;
+			g_trainPathPointIndex = 6;
+			g_trainPathDirection = 0;
+			g_trainPosition.x = Levels::g_recordData[1]->data[6].x << 5;
+			g_trainPosition.y = Levels::g_recordData[1]->data[6].y << 5;
+			g_trainPosition.z = Levels::g_recordData[1]->data[6].z << 5;
+			Method8();
+
+			g_linkReplacementTimer = 0;
+			g_replacedLinkId = 8;
+			Nu3D::Link::SetScaleFromFixedOffsets(0x31, 0, 0, 0);
+			g_trainCollisionTimer = 0;
+			g_trainSpeed = 0x100;
+			g_trainSoundTimer = 0x100;
+			g_groundSlamTargetFlashPhase = 0;
+			g_groundSlamTargetMask = 0;
+			g_gunslingerActorIndex = 11;
+			Nu3D::Link::SetScaleFromFixedOffsets(0x30, 0, 0, 0);
+
+			int32_t previousGunslingerPhase = Actor::g_creatureActors[11].actorPhase;
+			int32_t gunslingerZ = Actor::g_creatureActors[11].pos.z + 0x10000;
+			g_cannonFireTimer = 0;
+			g_sector2ParticleTimer = 0;
+			g_sector2ParticleVariant = 0;
+			g_sector4ParticleTimer = 0;
+			g_sector4ParticlePositionIndex = 0;
+			g_gunslingerEncounterState = 0;
+			g_gunslingerTintToggle = 0;
+			g_gunslingerPhaseTimer = 0;
+			g_previousGunslingerPhase = previousGunslingerPhase;
+			Actor::g_creatureActors[11].pos.z = gunslingerZ;
+			g_platform16RotationPhase = 0;
+			g_platform17RotationPhase = 0;
+			g_sector5IconPhase = 0;
+			g_platformCollisionState = 0;
+			Platform::DisableCollision(0x1A);
+			Platform::DisableCollision(0x1B);
+		}
 
 		// STUB: TOY2 0x0042A130
 		void Interactions() {}
 
 		STATIC_ASSERT(sizeof(ObjectGroup) == 0xE);
 		STATIC_ASSERT(sizeof(RaisedPlatformLink) == 0x2);
+		STATIC_ASSERT(sizeof(MoveableObjectInitTable) == 0x14);
 	}
 }
 

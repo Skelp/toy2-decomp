@@ -1,0 +1,1 @@
+"^stomp^ the buttons to change the track points and make the train switch tracks. get the train to go onto the dead end track so that you can push the box to the ^train bed^ to reach the pizza planet ^token^."

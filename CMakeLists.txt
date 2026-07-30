@@ -108,6 +108,8 @@ set(TOY2_SOURCES
     src/Toy2/AlsSpaceLand.cpp
     src/Toy2/BarnEncounter.cpp
     src/Toy2/ElevatorHop.cpp
+    src/Toy2/AlsPenthouseWaterButtonInstructions.inc
+    src/Toy2/AlsPenthouseTrainSwitchInstructions.inc
     src/Toy2/AlsPenthouse.cpp
     src/Toy2/EvilEmperorZurg.cpp
     src/Toy2/AirportInfiltration.cpp
