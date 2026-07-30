@@ -180,10 +180,10 @@
 0x00428BA0 Toy2::AlsPenthouse::UpdateObjectGroupFlash
 0x00428C80 Toy2::AlsPenthouse::Method1
 0x00428E70 Toy2::AlsPenthouse::Method8
-0x004292C0 Toy2::AlsPenthouse::Method6
+0x004292C0 Toy2::AlsPenthouse::UpdateRaisedPlatforms
 0x004293D0 Toy2::AlsPenthouse::Method5
 0x004295B0 Toy2::AlsPenthouse::Method9
-0x00429800 Toy2::AlsPenthouse::Method12
+0x00429800 Toy2::AlsPenthouse::CompleteGroundSlamTarget
 0x00429910 Toy2::AlsPenthouse::Method3
 0x00429CE0 Toy2::AlsPenthouse::InitHiddenCollectibles
 0x00429D70 Toy2::AlsPenthouse::Init

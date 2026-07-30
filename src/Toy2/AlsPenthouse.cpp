@@ -3,6 +3,7 @@
 #include "Toy2/Actor.h"
 #include "Toy2/Buzz.h"
 #include "Toy2/Collectables.h"
+#include "Toy2/Collision.h"
 #include "Toy2/Levels.h"
 #include "Toy2/Particles.h"
 #include "Toy2/Weather.h"
@@ -57,6 +58,18 @@ namespace Toy2
 			int32_t* verticalPosition;
 			int32_t savedVerticalPosition;
 		};
+		struct RaisedPlatformLink
+		{
+			uint8_t platformId;
+			uint8_t linkId;
+		};
+		enum GroundSlamTargetLinkOffset
+		{
+			GROUND_SLAM_SOURCE_LINK = 0,
+			GROUND_SLAM_HIDDEN_LINK = 1,
+			GROUND_SLAM_REPLACEMENT_LINK = 2,
+			GROUND_SLAM_SECOND_REPLACEMENT_LINK = 3,
+		};
 
 		// GLOBAL: TOY2 0x0052FD10
 		int32_t g_gunslingerPhaseTimer;
@@ -70,6 +83,35 @@ namespace Toy2
 		int32_t g_objectGroupFlashPhase;
 		// GLOBAL: TOY2 0x0052FD14
 		int32_t g_objectGroupMask;
+		// GLOBAL: TOY2 0x0052FD3C
+		uint32_t g_activeLinkMask;
+		// GLOBAL: TOY2 0x004F3E74
+		int32_t g_groundSlamTargetLinkIds[24] = {
+			50,
+			59,
+			66,
+			73,
+			51,
+			60,
+			67,
+			74,
+			58,
+			65,
+			72,
+			79,
+			52,
+			61,
+			68,
+			75,
+			53,
+			62,
+			69,
+			76,
+			54,
+			63,
+			70,
+			77,
+		};
 		// GLOBAL: TOY2 0x004F3F48
 		ObjectGroup g_objectGroups[7] = {
 			{ 1, 36, 17, 84, -350, 0, 0 },
@@ -79,6 +121,13 @@ namespace Toy2
 			{ 16, 33, 14, 86, 0, 0, 0 },
 			{ 32, 34, 15, 85, 0, 0, -350 },
 			{ 64, 35, 16, 85, 0, 0, 0 },
+		};
+		// GLOBAL: TOY2 0x004F3FAC
+		RaisedPlatformLink g_raisedPlatformLinks[4] = {
+			{ 7, 1 },
+			{ 8, 2 },
+			{ 6, 3 },
+			{ 9, 4 },
 		};
 		// GLOBAL: TOY2 0x0052FDC8
 		HiddenCollectibleState g_hiddenCollectibles[5];
@@ -151,6 +200,59 @@ namespace Toy2
 			}
 		}
 
+		// FUNCTION: TOY2 0x004292C0 [PROVISIONAL]
+		void UpdateRaisedPlatforms(uint32_t requestedMask)
+		{
+			Vector3I origin;
+			uint32_t platformMask = 0x10;
+			RaisedPlatformLink* platformLink = g_raisedPlatformLinks;
+			for (int32_t platformIndex = 0; platformIndex < 4; platformIndex++, platformLink++, platformMask *= 2)
+			{
+				if ((g_activeLinkMask & platformMask) == 0 && (requestedMask & platformMask) != 0)
+				{
+					Platform::GetOrigin(platformLink->platformId, &origin);
+					origin.y += 0xE10;
+					Platform::SetOrigin(platformLink->platformId, origin.x, origin.y, origin.z);
+					Nu3D::Link::SetScaleFromFixedOffsets(platformLink->linkId, 0x1000, 0x960, 0x1000);
+					g_activeLinkMask |= platformMask;
+				}
+
+				if ((g_activeLinkMask & platformMask) != 0 && (requestedMask & platformMask) == 0)
+				{
+					Platform::GetOrigin(platformLink->platformId, &origin);
+					origin.y -= 0xE10;
+					Platform::SetOrigin(platformLink->platformId, origin.x, origin.y, origin.z);
+					Nu3D::Link::SetScaleFromFixedOffsets(platformLink->linkId, 0x1000, 0xFFE, 0x1000);
+					g_activeLinkMask &= -1 - platformMask;
+				}
+			}
+		}
+
+		// FUNCTION: TOY2 0x00429800 [PROVISIONAL]
+		void CompleteGroundSlamTarget(int32_t timerOffset)
+		{
+			int32_t secondReplacementLinkId = g_groundSlamTargetLinkIds[timerOffset + GROUND_SLAM_SECOND_REPLACEMENT_LINK];
+			int32_t hiddenLinkId = g_groundSlamTargetLinkIds[timerOffset + GROUND_SLAM_HIDDEN_LINK];
+			int32_t sourceLinkId = g_groundSlamTargetLinkIds[timerOffset + GROUND_SLAM_SOURCE_LINK];
+			int32_t replacementLinkId = g_groundSlamTargetLinkIds[timerOffset + GROUND_SLAM_REPLACEMENT_LINK];
+			Vector3I position;
+			Nu3D::Link::GetRotation8Bit(sourceLinkId, &position);
+			Nu3D::Link::SetRotationRelative8bit(replacementLinkId, 0, position.y, 0);
+			Nu3D::Link::SetRotationRelative8bit(secondReplacementLinkId, 0, position.y, 0);
+			Nu3D::Link::SetScaleFromFixedOffsets(replacementLinkId, 0x1000, 0x1000, 0x1000);
+			Nu3D::Link::SetScaleFromFixedOffsets(secondReplacementLinkId, 0x1000, 0x1000, 0x1000);
+			Nu3D::Link::SetScaleFromFixedOffsets(sourceLinkId, 0, 0, 0);
+			Nu3D::Link::SetScaleFromFixedOffsets(hiddenLinkId, 0, 0, 0);
+
+			Nu3D::Link::GetCurrentPosFixed(sourceLinkId, &position);
+			for (int32_t particleIndex = 0; particleIndex < 4; particleIndex++)
+			{
+				Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(position.x, position.y - 0x3000, position.z, 0x23, 0xE);
+				particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+			}
+			AudioManager::PlaySoundEffect(-2, &position);
+		}
+
 		// STUB: TOY2 0x00429D70
 		void Init() {}
 
@@ -158,6 +260,7 @@ namespace Toy2
 		void Interactions() {}
 
 		STATIC_ASSERT(sizeof(ObjectGroup) == 0xE);
+		STATIC_ASSERT(sizeof(RaisedPlatformLink) == 0x2);
 	}
 }
 
