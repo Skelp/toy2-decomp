@@ -177,7 +177,7 @@
 0x00428650 Toy2::CreatureBehaviour::Rabid
 0x00428700 Toy2::AlsPenthouse::Method10
 0x00428890 Toy2::AlsPenthouse::Method2
-0x00428BA0 Toy2::AlsPenthouse::Method4
+0x00428BA0 Toy2::AlsPenthouse::UpdateObjectGroupFlash
 0x00428C80 Toy2::AlsPenthouse::Method1
 0x00428E70 Toy2::AlsPenthouse::Method8
 0x004292C0 Toy2::AlsPenthouse::Method6

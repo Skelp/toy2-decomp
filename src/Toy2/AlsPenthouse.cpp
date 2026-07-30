@@ -22,6 +22,29 @@ namespace Toy2
 
 	namespace AlsPenthouse
 	{
+		struct ObjectGroup
+		{
+			int16_t mask;
+			int16_t primaryLinkId;
+			int16_t alternateLinkId;
+			int16_t rotationLinkId;
+			int16_t rotationX;
+			int16_t rotationY;
+			int16_t rotationZ;
+		};
+		enum ObjectGroupPrimaryCursor
+		{
+			PRIMARY_CURSOR_MASK = -1,
+			PRIMARY_CURSOR_LINK = 0,
+			PRIMARY_CURSOR_ALTERNATE_LINK = 1,
+		};
+		enum ObjectGroupAlternateCursor
+		{
+			ALTERNATE_CURSOR_MASK = -2,
+			ALTERNATE_CURSOR_PRIMARY_LINK = -1,
+			ALTERNATE_CURSOR_LINK = 0,
+		};
+
 		enum GunslingerEncounterState
 		{
 			GUNSLINGER_ENCOUNTER_ACTIVE = 2,
@@ -43,6 +66,20 @@ namespace Toy2
 		int32_t g_gunslingerEncounterState;
 		// GLOBAL: TOY2 0x0052FD70
 		int32_t g_gunslingerTintToggle;
+		// GLOBAL: TOY2 0x0052FD08
+		int32_t g_objectGroupFlashPhase;
+		// GLOBAL: TOY2 0x0052FD14
+		int32_t g_objectGroupMask;
+		// GLOBAL: TOY2 0x004F3F48
+		ObjectGroup g_objectGroups[7] = {
+			{ 1, 36, 17, 84, -350, 0, 0 },
+			{ 2, 37, 18, 84, 0, 0, 0 },
+			{ 4, 31, 12, 86, 175, 0, 0 },
+			{ 8, 32, 13, 86, 350, 0, 0 },
+			{ 16, 33, 14, 86, 0, 0, 0 },
+			{ 32, 34, 15, 85, 0, 0, -350 },
+			{ 64, 35, 16, 85, 0, 0, 0 },
+		};
 		// GLOBAL: TOY2 0x0052FDC8
 		HiddenCollectibleState g_hiddenCollectibles[5];
 
@@ -75,11 +112,52 @@ namespace Toy2
 			}
 		}
 
+		// FUNCTION: TOY2 0x00428BA0 [PROVISIONAL]
+		void UpdateObjectGroupFlash()
+		{
+			int32_t phase = Renderer::g_frameDelta;
+			phase += g_objectGroupFlashPhase;
+			g_objectGroupFlashPhase = phase & 0x1F;
+
+			if (g_objectGroupFlashPhase < 24 && (g_objectGroupMask & 0x800) == 0)
+			{
+				g_objectGroupMask |= 0x800;
+				int16_t* group = &g_objectGroups[0].primaryLinkId;
+				do
+				{
+					if ((g_objectGroupMask & group[PRIMARY_CURSOR_MASK]) != 0)
+					{
+						Nu3D::Link::SetScaleFromFixedOffsets(group[PRIMARY_CURSOR_LINK], 0x1000, 0x1000, 0x1000);
+						Nu3D::Link::SetScaleFromFixedOffsets(group[PRIMARY_CURSOR_ALTERNATE_LINK], 0, 0, 0);
+					}
+					group += sizeof(ObjectGroup) / sizeof(int16_t);
+				} while ((int32_t)group < (int32_t)&g_objectGroups[7].primaryLinkId);
+				return;
+			}
+
+			if (g_objectGroupFlashPhase > 24 && (g_objectGroupMask & 0x800) != 0)
+			{
+				g_objectGroupMask &= ~0x800;
+				int16_t* group = &g_objectGroups[0].alternateLinkId;
+				do
+				{
+					if ((g_objectGroupMask & group[ALTERNATE_CURSOR_MASK]) != 0)
+					{
+						Nu3D::Link::SetScaleFromFixedOffsets(group[ALTERNATE_CURSOR_LINK], 0x1000, 0x1000, 0x1000);
+						Nu3D::Link::SetScaleFromFixedOffsets(group[ALTERNATE_CURSOR_PRIMARY_LINK], 0, 0, 0);
+					}
+					group += sizeof(ObjectGroup) / sizeof(int16_t);
+				} while ((int32_t)group < (int32_t)&g_objectGroups[7].alternateLinkId);
+			}
+		}
+
 		// STUB: TOY2 0x00429D70
 		void Init() {}
 
 		// STUB: TOY2 0x0042A130
 		void Interactions() {}
+
+		STATIC_ASSERT(sizeof(ObjectGroup) == 0xE);
 	}
 }
 
