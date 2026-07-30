@@ -248,6 +248,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0053C660
 	int32_t g_ledgeClimbTimer;
 
+	// GLOBAL: TOY2 0x00559E80
+	int32_t g_ledgeClimbPlatformIndex;
+
 	// GLOBAL: TOY2 0x0053C668
 	int32_t g_poleClimbState;
 
