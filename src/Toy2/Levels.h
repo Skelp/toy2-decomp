@@ -148,6 +148,8 @@ namespace Toy2
 		extern RecordData* g_recordData[96];
 		extern PortalZone g_portalZones[20];
 		extern ObjectList* g_objectListBase;
+		extern InstanceSection* g_instanceSection;
+		extern InstanceSection* g_secondInstanceSection;
 		extern uint8_t g_levelDataHeapBase[1249280];
 		extern uint8_t* g_levelDataHeapBasePtr;
 		extern int32_t g_levelLoadConfig;

@@ -29,6 +29,109 @@
 
 namespace Toy2
 {
+	struct ZoneRenderData
+	{
+		uint8_t visibilityDepth;
+		uint8_t isProcessed;
+		uint16_t portalRecordIndex;
+		int16_t minX;
+		int16_t minY;
+		int16_t maxX;
+		int16_t maxY;
+		uint8_t reservedC[4];
+		int16_t primaryInstanceBytes;
+		int16_t secondaryInstanceBytes;
+		uint8_t reserved14[32];
+	};
+
+	// GLOBAL: TOY2 0x00547ED8
+	int32_t g_zonedInstanceCount;
+	// GLOBAL: TOY2 0x0054D940
+	ZoneRenderData g_zoneRenderData[20];
+	// GLOBAL: TOY2 0x005574FC
+	int32_t g_zoneCount;
+
+	STATIC_ASSERT(sizeof(ZoneRenderData) == 0x34);
+	STATIC_ASSERT(offsetof(ZoneRenderData, primaryInstanceBytes) == 0x10);
+	STATIC_ASSERT(offsetof(ZoneRenderData, secondaryInstanceBytes) == 0x12);
+
+	// FUNCTION: TOY2 0x0043E5A0 [PROVISIONAL]
+	void InitZoneData()
+	{
+		int16_t instanceCount = sizeof(Levels::InstanceSection);
+		ZoneRenderData* zoneData = g_zoneRenderData;
+		do
+		{
+			zoneData->visibilityDepth = 0;
+			zoneData->isProcessed = 0;
+			zoneData->secondaryInstanceBytes = 0;
+			zoneData->primaryInstanceBytes = 0;
+			zoneData++;
+		} while (zoneData < g_zoneRenderData + 20);
+
+		int32_t zoneIndex = -1;
+		if (Levels::g_instanceSection->flags != 0)
+		{
+			Levels::InstanceSection* instance = Levels::g_instanceSection;
+			do
+			{
+				if ((uint8_t)instance->category != zoneIndex)
+				{
+					if (zoneIndex != -1)
+						g_zoneRenderData[zoneIndex].primaryInstanceBytes = instanceCount * sizeof(Levels::InstanceSection);
+
+					instanceCount = 0;
+					zoneIndex = (uint8_t)instance->category;
+				}
+
+				instanceCount++;
+				instance++;
+			} while (instance->flags != 0);
+
+			if (zoneIndex != -1)
+			{
+				g_zoneRenderData[zoneIndex].primaryInstanceBytes = instanceCount * sizeof(Levels::InstanceSection);
+				g_zoneCount = zoneIndex;
+			}
+		}
+
+		int32_t highestZoneIndex = g_zoneCount;
+		zoneIndex = -1;
+		if (Levels::g_secondInstanceSection->flags != 0)
+		{
+			Levels::InstanceSection* instance = Levels::g_secondInstanceSection;
+			do
+			{
+				if ((uint8_t)instance->category != zoneIndex)
+				{
+					if (zoneIndex != -1)
+						g_zoneRenderData[zoneIndex].secondaryInstanceBytes = instanceCount * sizeof(Levels::InstanceSection);
+
+					instanceCount = 0;
+					zoneIndex = (uint8_t)instance->category;
+				}
+
+				instanceCount++;
+				instance++;
+			} while (instance->flags != 0);
+
+			if (zoneIndex != -1)
+				g_zoneRenderData[zoneIndex].secondaryInstanceBytes = instanceCount * sizeof(Levels::InstanceSection);
+		}
+
+		if (highestZoneIndex < zoneIndex)
+			highestZoneIndex = zoneIndex;
+
+		g_zonedInstanceCount = 0;
+		for (int32_t i = 0; i < 20; i++)
+		{
+			g_zonedInstanceCount += (uint32_t)g_zoneRenderData[i].primaryInstanceBytes / sizeof(Levels::InstanceSection);
+			g_zonedInstanceCount += (uint32_t)g_zoneRenderData[i].secondaryInstanceBytes / sizeof(Levels::InstanceSection);
+		}
+
+		g_zoneCount = highestZoneIndex + 1;
+	}
+
 	namespace Levels
 	{
 		// GLOBAL: TOY2 0x00559C70
