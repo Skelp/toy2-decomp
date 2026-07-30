@@ -54,6 +54,52 @@ namespace Nu3D
 	}
 }
 
+namespace Renderer
+{
+	// GLOBAL: TOY2 0x00559C60
+	int32_t g_cinematicBarProgress;
+
+	// FUNCTION: TOY2 0x00440E90 [EFFECTIVE]
+	void DrawCinematicBars()
+	{
+		int32_t frameDelta = g_frameDelta;
+		int32_t barProgress;
+		Vector2F uvTopLeft = { 0.0f, 0.0f };
+		Vector2F uvBottomRight = { 1.0f, 1.0f };
+
+		if (Nu3D::Camera::g_viewHistoryInitialized != 0)
+		{
+			barProgress = g_cinematicBarProgress + frameDelta;
+			if (barProgress > 25)
+			{
+				g_cinematicBarProgress = 25;
+				goto drawBars;
+			}
+		}
+		else
+		{
+			barProgress = g_cinematicBarProgress - frameDelta;
+			if (barProgress < 0)
+			{
+				g_cinematicBarProgress = 0;
+				return;
+			}
+		}
+
+		g_cinematicBarProgress = barProgress;
+		if (barProgress <= 0)
+			return;
+
+	drawBars:
+		float barHeight = (float)g_cinematicBarProgress * 0.004f;
+		RGBA barColor;
+		barColor.value = 0xFF000000;
+		int32_t renderFlags = RENDER_ALPHA_DEFAULT | RENDER_ZWRITE | RENDER_CULL_NONE;
+		Sprite::Queue2DSprite(0.0f, 0.0f, 1.0f, barHeight, &uvTopLeft, &uvBottomRight, 0, barColor, renderFlags);
+		Sprite::Queue2DSprite(0.0f, 1.0f - barHeight, 1.0f, barHeight, &uvTopLeft, &uvBottomRight, 0, barColor, renderFlags);
+	}
+}
+
 namespace Toy2
 {
 	extern int32_t g_movementInputLockTimer;
