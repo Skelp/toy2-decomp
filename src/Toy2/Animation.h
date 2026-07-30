@@ -59,6 +59,7 @@ namespace Toy2
 		// The first index selects one of 64 actors. The second index selects one of 32 nodes.
 		extern Vector3I g_nodeAngles[64][32];
 		extern RotationScratch g_keyframeRotation;
+		extern RotationScratch g_nextKeyframeRotation;
 		extern int32_t g_singleNodeIndex;
 		extern int16_t g_clipHasNegativeHeader;
 		extern uint8_t* g_clipScaleFlags;

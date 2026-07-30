@@ -3,6 +3,7 @@
 #include "Nu3D/Link.h"
 #include "Nu3D/Math.h"
 #include "Renderer/Shadows.h"
+#include "Toy2/Animation.h"
 #include "Toy2/Buzz.h"
 
 #include <string.h>
@@ -18,6 +19,11 @@ namespace Toy2
 		extern void* g_cachedAllBuffer;
 
 		void BuildLevelPath(int32_t level, char* output, const char* suffix);
+	}
+
+	namespace Collision
+	{
+		struct PackedCollisionFace;
 	}
 
 	namespace Terrain
@@ -58,11 +64,15 @@ namespace Toy2
 
 		struct CollisionWorkspaceSlot
 		{
-			uint8_t reserved[0x18];
+			int32_t cachedPositionX;
+			uint8_t reserved[4];
+			int32_t cachedPositionZ;
+			uint8_t reserved2[12];
 			int16_t activeFrames;
-			uint8_t reserved2[2];
+			uint8_t reserved3[2];
 			int32_t entryCount;
-			uint8_t reserved3[0x5A0];
+			int16_t meshIndices[240];
+			Collision::PackedCollisionFace* faces[240];
 		};
 
 		struct CollisionWorkspace
@@ -85,6 +95,10 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(PlatformRuntimeRecord) == 0x34);
 		STATIC_ASSERT(offsetof(PlatformRuntimeRecord, collisionMeshIndex) == 0x30);
 		STATIC_ASSERT(sizeof(CollisionWorkspaceSlot) == 0x5C0);
+		STATIC_ASSERT(offsetof(CollisionWorkspaceSlot, activeFrames) == 0x18);
+		STATIC_ASSERT(offsetof(CollisionWorkspaceSlot, entryCount) == 0x1C);
+		STATIC_ASSERT(offsetof(CollisionWorkspaceSlot, meshIndices) == 0x20);
+		STATIC_ASSERT(offsetof(CollisionWorkspaceSlot, faces) == 0x200);
 		STATIC_ASSERT(sizeof(CollisionWorkspace) == 0x33C0);
 		STATIC_ASSERT(sizeof(TerrainRelocationLink) == 0x04);
 
@@ -281,6 +295,9 @@ namespace Toy2
 		const int16_t COLLISION_MESH_STATIC_A = 6;
 		const int16_t COLLISION_MESH_STATIC_B = 7;
 		const uint16_t COLLISION_MESH_EXCLUDE_FROM_GRID = 0x400;
+		const uint16_t COLLISION_MESH_EXCLUDE_FROM_QUERY = 0x100;
+
+		static __forceinline int32_t ShiftTowardZero(int32_t value, int32_t bits) { return (value + ((value >> 31) & ((1 << bits) - 1))) >> bits; }
 
 		STATIC_ASSERT(sizeof(SurfaceCollisionResult) == sizeof(CollisionQueryResult));
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, normal) == 0x08);
@@ -344,6 +361,12 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x0072D2A0
 		int32_t g_collisionTriangleCount;
+
+		// GLOBAL: TOY2 0x007291DC
+		PackedCollisionFace* g_collisionTriangles[240];
+
+		// GLOBAL: TOY2 0x007284B4
+		int16_t g_collisionTriangleMeshIndices[240];
 
 		// GLOBAL: TOY2 0x0072D2AC
 		int32_t g_collisionEdgeVertexCount;
@@ -699,8 +722,264 @@ namespace Toy2
 		// STUB: TOY2 0x0048C860
 		int32_t SweepAndSlide(Vector3I* position, Vector3I* movement, int32_t collisionThreshold, int16_t* collisionAngles, int32_t radius) { return 0; }
 
-		// STUB: TOY2 0x00485940
-		void GatherTrianglesAtXZ(const Vector3I* position) {}
+		// FUNCTION: TOY2 0x00485940 [PROVISIONAL]
+		void GatherTrianglesAtXZ(const Vector3I* position)
+		{
+			const int32_t cacheSlotCount = 8;
+			const int32_t maxTriangleCount = 240;
+			const int32_t cachedQueryOffset = 0x1000;
+			const int32_t cachedQueryDiameter = 0x2000;
+			const int32_t cachePositionRadius = 0x2000;
+			const int32_t cachePositionDiameter = 0x4000;
+			const int32_t cacheBuildOffset = 0x5000;
+			const int32_t cacheBuildDiameter = 0xA000;
+			const int32_t cachedFaceTolerance = 0x100;
+			const int32_t cacheBuildFaceTolerance = 0x500;
+			Vector3I queryPosition = *position;
+			CollisionMeshRecord* collisionMeshes = reinterpret_cast<CollisionMeshRecord*>(g_collisionMeshInstances);
+			int16_t* candidateMeshIndices = reinterpret_cast<int16_t*>(g_mathScratch);
+			int32_t cacheSlotIndex = -1;
+			int32_t replacementSlotIndex = -1;
+			int32_t lowestActivity = 0x7FFFFFFF;
+
+			for (int32_t slotIndex = 0; slotIndex < cacheSlotCount; slotIndex++)
+			{
+				Terrain::CollisionWorkspaceSlot& slot = Terrain::g_collisionWorkspace->slots[slotIndex];
+				if ((uint32_t)(queryPosition.x - slot.cachedPositionX + cachePositionRadius) < cachePositionDiameter
+					&& (uint32_t)(queryPosition.z - slot.cachedPositionZ + cachePositionRadius) < cachePositionDiameter && slot.activeFrames > 0)
+				{
+					cacheSlotIndex = slotIndex;
+					break;
+				}
+
+				if (slot.activeFrames < lowestActivity)
+				{
+					lowestActivity = slot.activeFrames;
+					replacementSlotIndex = slotIndex;
+				}
+			}
+
+			g_collisionTriangleCount = 0;
+
+			if (cacheSlotIndex >= 0)
+			{
+				Terrain::CollisionWorkspaceSlot& slot = Terrain::g_collisionWorkspace->slots[cacheSlotIndex];
+				slot.activeFrames = 8;
+				int32_t previousMeshIndex = -1;
+				bool meshIsInRange = false;
+				int32_t localX = 0;
+				int32_t localZ = 0;
+
+				for (int32_t entryIndex = slot.entryCount - 1; entryIndex >= 0; entryIndex--)
+				{
+					int32_t meshIndex = slot.meshIndices[entryIndex];
+					if (meshIndex != previousMeshIndex)
+					{
+						previousMeshIndex = meshIndex;
+						meshIsInRange = false;
+						CollisionMeshRecord& mesh = collisionMeshes[meshIndex];
+						if (queryPosition.x + cachedQueryOffset - mesh.boundsMin.x < mesh.boundsExt.x + cachedQueryDiameter
+							&& queryPosition.z + cachedQueryOffset - mesh.boundsMin.z < mesh.boundsExt.z + cachedQueryDiameter && mesh.typeFlags != 0
+							&& (mesh.flags & COLLISION_MESH_EXCLUDE_FROM_QUERY) == 0)
+						{
+							localX = ShiftTowardZero(queryPosition.x + cachedQueryOffset - mesh.origin.x, 5);
+							localZ = ShiftTowardZero(queryPosition.z + cachedQueryOffset - mesh.origin.z, 5);
+							meshIsInRange = true;
+						}
+					}
+
+					if (meshIsInRange)
+					{
+						PackedCollisionFace* face = slot.faces[entryIndex];
+						if ((uint32_t)(localX - face->boundsMinX) < (uint32_t)(face->boundsExtentX + cachedFaceTolerance)
+							&& (uint32_t)(localZ - face->boundsMinZBlock * 64 - face->vertex0.z) < (uint32_t)((face->boundsExtentZBlock + 4) * 64)
+							&& g_collisionTriangleCount < maxTriangleCount)
+						{
+							g_collisionTriangles[g_collisionTriangleCount] = face;
+							g_collisionTriangleMeshIndices[g_collisionTriangleCount] = (int16_t)meshIndex;
+							g_collisionTriangleCount++;
+						}
+					}
+				}
+			}
+			else
+			{
+				int32_t candidateMeshCount = 0;
+				for (int32_t cellIndex = 0; cellIndex < g_activeCollisionGridCellCount; cellIndex++)
+				{
+					CollisionGridCell& cell = g_collisionGrid[cellIndex];
+					if ((uint32_t)(queryPosition.x + cacheBuildOffset - cell.boundsMinX) < (uint32_t)(cell.boundsExtentX + cacheBuildDiameter)
+						&& (uint32_t)(queryPosition.z + cacheBuildOffset - cell.boundsMinZ) < (uint32_t)(cell.boundsExtentZ + cacheBuildDiameter))
+					{
+						for (int32_t meshListIndex = 0; meshListIndex < cell.meshCount; meshListIndex++)
+						{
+							candidateMeshIndices[candidateMeshCount++] = g_collisionGridMeshIndices[cell.meshListStart + meshListIndex];
+						}
+					}
+				}
+
+				cacheSlotIndex = replacementSlotIndex;
+				Terrain::CollisionWorkspaceSlot& slot = Terrain::g_collisionWorkspace->slots[cacheSlotIndex];
+				slot.entryCount = 0;
+
+				for (int32_t candidateIndex = 0; candidateIndex < candidateMeshCount; candidateIndex++)
+				{
+					int32_t meshIndex = candidateMeshIndices[candidateIndex];
+					CollisionMeshRecord& mesh = collisionMeshes[meshIndex];
+					if (queryPosition.x + cacheBuildOffset - mesh.boundsMin.x < mesh.boundsExt.x + cacheBuildDiameter
+						&& queryPosition.z + cacheBuildOffset - mesh.boundsMin.z < mesh.boundsExt.z + cacheBuildDiameter && mesh.typeFlags != 0
+						&& (mesh.flags & COLLISION_MESH_EXCLUDE_FROM_QUERY) == 0)
+					{
+						int32_t localX = ShiftTowardZero(queryPosition.x + cacheBuildOffset - mesh.origin.x, 5);
+						int32_t localZ = ShiftTowardZero(queryPosition.z + cacheBuildOffset - mesh.origin.z, 5);
+						CollisionTreeGroup* group = mesh.collisionTree;
+
+						while (group->marker >= 0)
+						{
+							int32_t faceCount = group->faceCount;
+							PackedCollisionFace* face = reinterpret_cast<PackedCollisionFace*>(group + 1);
+							if ((uint32_t)(localX - group->boundsMinX) < (uint32_t)(group->boundsExtentX + cacheBuildFaceTolerance)
+								&& (uint32_t)(localZ - group->boundsMinZ) < (uint32_t)(group->boundsExtentZ + cacheBuildFaceTolerance))
+							{
+								for (int32_t faceIndex = 0; faceIndex < faceCount; faceIndex++, face++)
+								{
+									if ((uint32_t)(localX - face->boundsMinX) < (uint32_t)(face->boundsExtentX + cacheBuildFaceTolerance)
+										&& (uint32_t)(localZ - face->boundsMinZBlock * 64 - face->vertex0.z) < (uint32_t)((face->boundsExtentZBlock + 20) * 64)
+										&& slot.entryCount < maxTriangleCount)
+									{
+										slot.faces[slot.entryCount] = face;
+										slot.meshIndices[slot.entryCount] = (int16_t)meshIndex;
+										slot.entryCount++;
+									}
+								}
+							}
+							else
+							{
+								face += faceCount;
+							}
+							group = reinterpret_cast<CollisionTreeGroup*>(face);
+						}
+					}
+				}
+
+				slot.activeFrames = 8;
+				slot.cachedPositionX = queryPosition.x;
+				slot.cachedPositionZ = queryPosition.z;
+				int32_t previousMeshIndex = -1;
+				bool meshIsInRange = false;
+				int32_t localX = 0;
+				int32_t localZ = 0;
+
+				for (int32_t entryIndex = slot.entryCount - 1; entryIndex >= 0; entryIndex--)
+				{
+					int32_t meshIndex = slot.meshIndices[entryIndex];
+					if (meshIndex != previousMeshIndex)
+					{
+						previousMeshIndex = meshIndex;
+						meshIsInRange = false;
+						CollisionMeshRecord& mesh = collisionMeshes[meshIndex];
+						if (queryPosition.x + cachedQueryOffset - mesh.boundsMin.x < mesh.boundsExt.x + cachedQueryDiameter
+							&& queryPosition.z + cachedQueryOffset - mesh.boundsMin.z < mesh.boundsExt.z + cachedQueryDiameter && mesh.typeFlags != 0
+							&& (mesh.flags & COLLISION_MESH_EXCLUDE_FROM_QUERY) == 0)
+						{
+							localX = ShiftTowardZero(queryPosition.x + cachedQueryOffset - mesh.origin.x, 5);
+							localZ = ShiftTowardZero(queryPosition.z + cachedQueryOffset - mesh.origin.z, 5);
+							meshIsInRange = true;
+						}
+					}
+
+					if (meshIsInRange)
+					{
+						PackedCollisionFace* face = slot.faces[entryIndex];
+						if ((uint32_t)(localX - face->boundsMinX) < (uint32_t)(face->boundsExtentX + cachedFaceTolerance)
+							&& (uint32_t)(localZ - face->boundsMinZBlock * 64 - face->vertex0.z) < (uint32_t)((face->boundsExtentZBlock + 4) * 64)
+							&& g_collisionTriangleCount < maxTriangleCount)
+						{
+							g_collisionTriangles[g_collisionTriangleCount] = face;
+							g_collisionTriangleMeshIndices[g_collisionTriangleCount] = (int16_t)meshIndex;
+							g_collisionTriangleCount++;
+						}
+					}
+				}
+			}
+
+			CollisionGridCell& movingCell = g_collisionGrid[256];
+			int32_t movingListIndex;
+			for (movingListIndex = 0; movingListIndex < movingCell.meshCount; movingListIndex++)
+			{
+				candidateMeshIndices[movingListIndex] = g_collisionGridMeshIndices[movingCell.meshListStart + movingListIndex];
+			}
+
+			for (movingListIndex = 0; movingListIndex < movingCell.meshCount; movingListIndex++)
+			{
+				int32_t meshIndex = candidateMeshIndices[movingListIndex];
+				CollisionMeshRecord& mesh = collisionMeshes[meshIndex];
+				Platform::PlatformState& platform = Platform::g_platformStates[mesh.platformIdx];
+				int32_t queryX;
+				int32_t queryZ;
+
+				if ((platform.flags & Platform::PLATFORM_FLAG_ROTATED) == 0)
+				{
+					queryX = queryPosition.x + cachedQueryOffset;
+					queryZ = queryPosition.z + cachedQueryOffset;
+				}
+				else
+				{
+					Animation::g_nextKeyframeRotation.angles.x = platform.rotationAnglesFixed.x >> 2;
+					Animation::g_nextKeyframeRotation.angles.y = platform.rotationAnglesFixed.y >> 2;
+					Animation::g_nextKeyframeRotation.angles.z = platform.rotationAnglesFixed.z >> 2;
+					Nu3D::Math::EulerToRotationMatrix(&Animation::g_nextKeyframeRotation.angles, &Animation::g_keyframeRotation.matrix);
+
+					int32_t deltaX = queryPosition.x - mesh.origin.x;
+					int32_t deltaY = queryPosition.y - mesh.origin.y;
+					int32_t deltaZ = queryPosition.z - mesh.origin.z;
+					queryX =
+						ShiftTowardZero(Animation::g_keyframeRotation.matrix.m00 * deltaX + Animation::g_keyframeRotation.matrix.m10 * deltaY
+								+ Animation::g_keyframeRotation.matrix.m20 * deltaZ,
+							12)
+						+ cachedQueryOffset + mesh.origin.x;
+					queryZ =
+						ShiftTowardZero(Animation::g_keyframeRotation.matrix.m02 * deltaX + Animation::g_keyframeRotation.matrix.m12 * deltaY
+								+ Animation::g_keyframeRotation.matrix.m22 * deltaZ,
+							12)
+						+ cachedQueryOffset + mesh.origin.z;
+				}
+
+				if (queryX - mesh.boundsMin.x < mesh.boundsExt.x + cachedQueryDiameter && queryZ - mesh.boundsMin.z < mesh.boundsExt.z + cachedQueryDiameter
+					&& mesh.typeFlags != 0)
+				{
+					int32_t localX = ShiftTowardZero(queryX - mesh.origin.x, 5);
+					int32_t localZ = ShiftTowardZero(queryZ - mesh.origin.z, 5);
+					CollisionTreeGroup* group = mesh.collisionTree;
+
+					while (group->marker >= 0)
+					{
+						int32_t faceCount = group->faceCount;
+						PackedCollisionFace* face = reinterpret_cast<PackedCollisionFace*>(group + 1);
+						if ((uint32_t)(localX - group->boundsMinX) < (uint32_t)(group->boundsExtentX + cachedFaceTolerance)
+							&& (uint32_t)(localZ - group->boundsMinZ) < (uint32_t)(group->boundsExtentZ + cachedFaceTolerance))
+						{
+							for (int32_t faceIndex = 0; faceIndex < faceCount; faceIndex++, face++)
+							{
+								if ((uint32_t)(localX - face->boundsMinX) < (uint32_t)(face->boundsExtentX + cachedFaceTolerance)
+									&& (uint32_t)(localZ - face->boundsMinZBlock * 64 - face->vertex0.z) < (uint32_t)((face->boundsExtentZBlock + 4) * 64)
+									&& g_collisionTriangleCount < maxTriangleCount)
+								{
+									g_collisionTriangles[g_collisionTriangleCount] = face;
+									g_collisionTriangleMeshIndices[g_collisionTriangleCount] = (int16_t)meshIndex;
+									g_collisionTriangleCount++;
+								}
+							}
+						}
+						else
+						{
+							face += faceCount;
+						}
+						group = reinterpret_cast<CollisionTreeGroup*>(face);
+					}
+				}
+			}
+		}
 
 		// STUB: TOY2 0x00486520
 		void ResolveGroundCeiling(PosAndAngles* position, int32_t radius) {}

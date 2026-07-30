@@ -448,7 +448,7 @@
 0x004855F0 Toy2::Buzz::HandleCollisions
 0x00485680 Toy2::Shadow::QueueStretched
 0x004857E0 Toy2::Shadow::QueueStretchedForBuzz
-0x00485940 Nu3D::Collision::GatherTrianglesAtXZ
+0x00485940 Toy2::Collision::GatherTrianglesAtXZ
 0x00486280 Nu3D::Collision::GetGroundHeight
 0x00486310 Nu3D::Collision::GetGroundHeightEx
 0x004863A0 Toy2::Buzz::UpdateFloorHeight
