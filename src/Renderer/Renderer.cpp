@@ -1525,6 +1525,48 @@ namespace Renderer
 		int32_t sourceOffsetY)
 	{ BlitTextureByIndex(textureIndex, destX, destY, width, height, wrapX, wrapY, destX + sourceOffsetX, destY + sourceOffsetY); }
 
+	// FUNCTION: TOY2 0x0049B2A0 [PROVISIONAL]
+	void DrawMenuText(int16_t yPos, char* text, int32_t dimmed)
+	{
+		int32_t textLength = 0;
+
+		if (*text)
+			while (text[++textLength]) {};
+
+		int32_t xPos = (40 - textLength) * 4;
+
+		if (textLength > 0)
+		{
+			do
+			{
+				uint8_t currentChar = *text++;
+
+				if (currentChar == '1')
+					Sprite::DrawTile(xPos - 4, yPos - 3, 68, 2);
+				else if (currentChar == '2')
+					Sprite::DrawTile(xPos - 4, yPos - 3, 68, 3);
+				else if (currentChar == '3')
+					Sprite::DrawTile(xPos - 4, yPos - 3, 68, 1);
+				else if (currentChar == '4')
+					Sprite::DrawTile(xPos - 4, yPos - 3, 68, 0);
+				else if (currentChar != ' ')
+				{
+					if (currentChar != '\'')
+						currentChar += 0x9F;
+					else
+						currentChar = 47;
+
+					if (dimmed)
+						Sprite::DrawScaled(xPos, yPos, 67, currentChar, 128, 128, 128, 0, 2048, 2048);
+					else
+						Sprite::DrawScaled(xPos, yPos, 67, currentChar, 128, 128, 128, 255, 2048, 2048);
+				}
+
+				xPos += 8;
+			} while (--textLength != 0);
+		}
+	}
+
 	// FUNCTION: TOY2 0x00401B60 [MATCHED]
 	void DrawBlackBorderBox(int32_t xPos, int32_t yPos, int32_t width, int32_t height, uint32_t red, uint32_t green, uint32_t blue)
 	{
