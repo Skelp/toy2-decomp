@@ -3826,7 +3826,7 @@ namespace Toy2
 
 		if (g_renderMode == RENDERMODE_SOFTWARE)
 		{
-			SoftwareRenderer::UnkFunc2();
+			SoftwareRenderer::RenderBackdropColourBands();
 			SoftwareRenderer::UpdateBackdropScroll();
 		}
 		else if (g_renderMode == RENDERMODE_D3D)

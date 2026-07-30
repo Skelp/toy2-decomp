@@ -36,8 +36,15 @@ namespace Nu3D
 		struct ActiveCameraTransform
 		{
 			Vector3I pos;
-			Angles angles;
-			int16_t roll;
+			union
+			{
+				struct
+				{
+					Angles angles;
+					int16_t roll;
+				};
+				Vector3I16 rotationAngles;
+			};
 			int16_t unkShort;
 		};
 

@@ -94,6 +94,16 @@ extern int32_t g_no32bitColors;
 extern PCProfile PC;
 extern int16_t g_renderMode;
 
+namespace Toy2
+{
+	extern int32_t g_skyColorRed;
+	extern int32_t g_skyColorGreen;
+	extern int32_t g_skyColorBlue;
+	extern int32_t g_groundColorRed;
+	extern int32_t g_groundColorGreen;
+	extern int32_t g_groundColorBlue;
+}
+
 int32_t ExamineMachine();
 void GetVidMem();
 int32_t D3DInit(char* commandLine);
