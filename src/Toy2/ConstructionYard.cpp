@@ -3,6 +3,7 @@
 #include "Toy2/Actor.h"
 #include "Toy2/Buzz.h"
 #include "Toy2/Camera.h"
+#include "Toy2/Collision.h"
 #include "Toy2/Collectables.h"
 #include "Toy2/Levels.h"
 #include "Toy2/Particles.h"
@@ -58,6 +59,76 @@ namespace Toy2
 		int32_t g_previousDrillPhase;
 
 		STATIC_ASSERT(sizeof(HiddenCollectibleState) == 0x8);
+
+		// FUNCTION: TOY2 0x0041BC20 [PROVISIONAL]
+		void MoveDrills(int32_t* cycleTimer, int32_t* verticalVelocity, int32_t* verticalOffset, int32_t drillLinkId, int32_t cycleDuration, int32_t platformId)
+		{
+			Vector3I drillPosition;
+			Nu3D::Link::GetCurrentPosFixed(drillLinkId, &drillPosition);
+			if (Nu3D::Math::IsWithinDistance(&drillPosition, &g_buzzActor.posAngles.pos, 0x480) == 0)
+				return;
+
+			Nu3D::Link::GetTargetPosFixed(drillLinkId, &drillPosition);
+			*cycleTimer += Renderer::g_frameDelta;
+			if (*cycleTimer < 50)
+			{
+				drillPosition.y -= *cycleTimer * 0x400;
+				Nu3D::Link::SetPositionRawAndCommit(drillLinkId, drillPosition.x >> 5, drillPosition.y >> 5, drillPosition.z >> 5);
+				if (*cycleTimer < 5)
+					Collision::MarkPlatformAsMoving(platformId);
+				else
+					Platform::DisableCollision(platformId);
+			}
+			else if (*cycleTimer < 150)
+			{
+				drillPosition.y -= 0xC800;
+				Nu3D::Link::SetPositionRawAndCommit(drillLinkId, drillPosition.x >> 5, drillPosition.y >> 5, drillPosition.z >> 5);
+				*verticalOffset = 0;
+				*verticalVelocity = 0;
+			}
+			else if (*cycleTimer < 250)
+			{
+				*verticalVelocity += Renderer::g_frameDelta * 0x180;
+				*verticalOffset += *verticalVelocity;
+				if (*verticalOffset > 0xC800)
+				{
+					*verticalOffset = 0xC800;
+					if (*verticalVelocity > 3000)
+					{
+						Nu3D::Particles::SpawnFromPreset(drillPosition.x, drillPosition.y - 0xC00, drillPosition.z, 0x19, 2);
+						AudioManager::PlaySoundEffect(0x69, &drillPosition);
+
+						for (int32_t particleIndex = 0; particleIndex < 8; particleIndex++)
+						{
+							Nu3D::Particles::ParticleInstance* particle =
+								Nu3D::Particles::SpawnFromPreset(drillPosition.x, drillPosition.y, drillPosition.z, 0x42, 0xE);
+							particle->groundAlignRot = *g_randDatBufferPtr++ << 4;
+							particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+						}
+
+						int32_t distanceResult = Nu3D::Math::IsWithinDistance(&drillPosition, &g_buzzActor.posAngles.pos, 500);
+						if (distanceResult != 0)
+							Camera::g_shakeTimer = 40 - ((int32_t)sqrt((float)distanceResult) >> 4);
+					}
+					*verticalVelocity = -(*verticalVelocity / 4);
+				}
+
+				drillPosition.y += *verticalOffset - 0xC800;
+				Nu3D::Link::SetPositionRawAndCommit(drillLinkId, drillPosition.x >> 5, drillPosition.y >> 5, drillPosition.z >> 5);
+				if (*verticalOffset > 0xB400)
+					Collision::MarkPlatformAsMoving(platformId);
+				else
+					Platform::DisableCollision(platformId);
+			}
+			else if (*cycleTimer > cycleDuration)
+			{
+				*cycleTimer = 0;
+				AudioManager::PlaySoundEffect(0x6A, &drillPosition);
+			}
+
+			Nu3D::Link::GetCurrentPosFixed(drillLinkId, &drillPosition);
+			Nu3D::Link::SetPositionRawAndCommit(drillLinkId + 0x12, drillPosition.x >> 7, drillPosition.y >> 7, drillPosition.z >> 7);
+		}
 
 		// FUNCTION: TOY2 0x0041C100 [TOOL]
 		void InitHiddenCollectibles()
