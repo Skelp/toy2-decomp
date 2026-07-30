@@ -295,6 +295,20 @@ namespace Toy2
 			int32_t boundingSqRadius;
 		};
 
+		struct CollisionSweep
+		{
+			Vector3I start;
+			int32_t reservedStart;
+			Vector3I end;
+			int32_t reservedEnd;
+			int32_t nearestFraction;
+			int32_t startDistance;
+			int32_t endDistance;
+			uint32_t contactFlags;
+			PackedCollisionFace* face;
+			Vector3I16 hitNormal;
+		};
+
 		const int16_t COLLISION_MESH_STATIC_A = 6;
 		const int16_t COLLISION_MESH_STATIC_B = 7;
 		const uint16_t COLLISION_MESH_EXCLUDE_FROM_GRID = 0x400;
@@ -313,6 +327,9 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(CollisionTreeGroup) == 0x0C);
 		STATIC_ASSERT(sizeof(CollisionGridCell) == 0x14);
 		STATIC_ASSERT(sizeof(CollisionMeshRecord) == sizeof(CollisionMeshInstance));
+		STATIC_ASSERT(sizeof(CollisionSweep) == 0x3C);
+		STATIC_ASSERT(offsetof(CollisionSweep, nearestFraction) == 0x20);
+		STATIC_ASSERT(offsetof(CollisionSweep, hitNormal) == 0x34);
 
 		// GLOBAL: TOY2 0x00729178
 		CollisionQueryResult g_collisionQueryResults[2];
@@ -724,6 +741,83 @@ namespace Toy2
 
 		// STUB: TOY2 0x0048C860
 		int32_t SweepAndSlide(Vector3I* position, Vector3I* movement, int32_t collisionThreshold, int16_t* collisionAngles, int32_t radius) { return 0; }
+
+		// FUNCTION: TOY2 0x00481D00 [PROVISIONAL]
+		int32_t SweepVertex(Vector3I* start, Vector3I* end, CollisionSweep* sweep, int32_t radius, const Vector3I16* adjacentNormals)
+		{
+			int32_t accepted;
+			Vector3I hitNormal;
+			Vector3I direction;
+
+			start->x >>= 2;
+			start->y >>= 2;
+			start->z >>= 2;
+			end->x >>= 2;
+			end->y >>= 2;
+			end->z >>= 2;
+
+			direction.x = end->x - start->x;
+			direction.y = end->y - start->y;
+			direction.z = end->z - start->z;
+			Nu3D::Math::NormalizeToFixedPoint(&direction, &direction);
+
+			Vector3I vertex = *start;
+			radius >>= 2;
+			int32_t projectedDistance = -(vertex.x * direction.x + vertex.y * direction.y + vertex.z * direction.z) >> 12;
+			int32_t sweepLength;
+			int32_t closestX;
+			int32_t closestY;
+			int32_t closestZ;
+			if (-radius <= projectedDistance
+				&& (sweepLength =
+						((((end->x - vertex.x) * direction.x + (end->y - vertex.y) * direction.y + (end->z - vertex.z) * direction.z) >> 8) + 0x80) >> 4,
+					projectedDistance <= sweepLength + radius)
+				&& (closestZ = vertex.z + (projectedDistance * direction.z >> 12),
+					closestY = vertex.y + (projectedDistance * direction.y >> 12),
+					closestX = vertex.x + (projectedDistance * direction.x >> 12),
+					closestX * closestX + closestY * closestY + closestZ * closestZ <= radius * radius))
+			{
+				int32_t hitDistance =
+					projectedDistance - (int32_t)sqrt((double)(radius * radius - (closestX * closestX + closestY * closestY + closestZ * closestZ)));
+				if (hitDistance >= 0 && hitDistance < sweepLength)
+				{
+					int32_t fraction = (hitDistance << 14) / sweepLength;
+					if (fraction < 0)
+					{
+						for (;;) {}
+					}
+					if (fraction < sweep->nearestFraction)
+					{
+						hitNormal.x = vertex.x + (hitDistance * direction.x >> 12);
+						hitNormal.y = vertex.y + (hitDistance * direction.y >> 12);
+						hitNormal.z = vertex.z + (hitDistance * direction.z >> 12);
+						accepted = false;
+						Nu3D::Math::NormalizeToFixedPoint(&hitNormal, &hitNormal);
+						hitNormal.x *= 4;
+						hitNormal.y *= 4;
+						hitNormal.z *= 4;
+						if (adjacentNormals[0].y != 0x7FFF
+							&& adjacentNormals[0].x * hitNormal.x + adjacentNormals[0].y * hitNormal.y + adjacentNormals[0].z * hitNormal.z > -0x80000)
+						{
+							accepted = true;
+						}
+						if ((adjacentNormals[1].y != 0x7FFF
+								&& adjacentNormals[1].x * hitNormal.x + adjacentNormals[1].y * hitNormal.y + adjacentNormals[1].z * hitNormal.z > -0x80000)
+							|| accepted)
+						{
+							sweep->startDistance = hitDistance;
+							sweep->hitNormal.x = (int16_t)hitNormal.x;
+							sweep->nearestFraction = fraction;
+							sweep->endDistance = hitDistance - sweepLength;
+							sweep->hitNormal.y = (int16_t)hitNormal.y;
+							sweep->hitNormal.z = (int16_t)hitNormal.z;
+							return 1;
+						}
+					}
+				}
+			}
+			return 0;
+		}
 
 		// FUNCTION: TOY2 0x00485940 [PROVISIONAL]
 		void GatherTrianglesAtXZ(const Vector3I* position)
