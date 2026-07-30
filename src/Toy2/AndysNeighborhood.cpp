@@ -1,8 +1,10 @@
 #include "Toy2/Toy2.h"
 #include "Toy2/LevelLogic.h"
 #include "Toy2/Actor.h"
+#include "Toy2/Camera.h"
 #include "Toy2/Particles.h"
 #include "AudioManager/AudioManager.h"
+#include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
 #include "Random.h"
@@ -14,6 +16,26 @@ namespace Toy2
 {
 	namespace AndysNeighborhood
 	{
+		enum KiteEncounterState
+		{
+			KITE_ENCOUNTER_ACTIVE = 2,
+		};
+
+		// GLOBAL: TOY2 0x0052F5D8
+		int32_t g_kiteTintTimer;
+		// GLOBAL: TOY2 0x0052F63C
+		int32_t g_kiteTintToggle;
+		// GLOBAL: TOY2 0x0052F65C
+		int32_t g_kiteSpinAngle;
+		// GLOBAL: TOY2 0x0052F664
+		int32_t g_kiteEncounterState;
+		// GLOBAL: TOY2 0x0052F6AC
+		int32_t g_previousKitePhase;
+		// GLOBAL: TOY2 0x0052F6B8
+		int32_t g_kiteBobAngle;
+		// GLOBAL: TOY2 0x0052F6EC
+		int32_t g_kiteRollAngle;
+
 		// STUB: TOY2 0x00418E50
 		void Init() {}
 
@@ -63,8 +85,109 @@ namespace Toy2
 				}
 			}
 		}
-		// STUB: TOY2 0x004189C0
-		void ZKite(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// FUNCTION: TOY2 0x004189C0 [PROVISIONAL]
+		void ZKite(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			AndysNeighborhood::g_kiteTintToggle = (AndysNeighborhood::g_kiteTintToggle - 1) & 1;
+			Actor::Toy2Actor* actor = context->actor;
+			AndysNeighborhood::g_kiteTintTimer -= Renderer::g_frameDelta;
+			if (AndysNeighborhood::g_kiteTintTimer < 0)
+			{
+				AndysNeighborhood::g_kiteTintTimer = 0;
+				actor->useTint = 0;
+			}
+			else if (AndysNeighborhood::g_kiteTintToggle != 0)
+			{
+				actor->useTint = 1;
+				actor->actorTint.r = 0x2000;
+				actor->actorTint.g = 0x2000;
+				actor->actorTint.b = 0x2000;
+			}
+			else
+			{
+				actor->useTint = 0;
+			}
+
+			AndysNeighborhood::g_kiteRollAngle = (AndysNeighborhood::g_kiteRollAngle + Renderer::g_frameDelta * 0x24) & 0xFFF;
+			actor->rollAngle = Numerics::g_sinCosLUT[AndysNeighborhood::g_kiteRollAngle] >> 6;
+			AndysNeighborhood::g_kiteBobAngle = (AndysNeighborhood::g_kiteBobAngle + Renderer::g_frameDelta * 0x40) & 0xFFF;
+			int32_t buzzX = g_buzzActor.posAngles.pos.x;
+			int32_t buzzZ = g_buzzActor.posAngles.pos.z;
+			actor->targetYaw = (Nu3D::Math::CartesianToFixedAngle(actor->pos.x - buzzX, actor->pos.z - buzzZ) - 0x800) & 0xFFF;
+
+			if (AndysNeighborhood::g_kiteEncounterState == AndysNeighborhood::KITE_ENCOUNTER_ACTIVE)
+			{
+				int32_t buzzY = g_buzzActor.posAngles.pos.y;
+				int32_t buzzIsAboveKite = buzzY > -0x72000;
+				if (buzzIsAboveKite)
+				{
+					actor->actorFlags = (actor->actorFlags & ~Actor::ACTOR_FLAG_TARGETS_BUZZ) | Actor::ACTOR_FLAG_TRACKS_TARGET;
+					actor->motionTargetPos.x = actor->boundary.x;
+					actor->motionTargetPos.z = actor->boundary.z;
+					actor->creatureRam->defenseMode = 4;
+					actor->movementCommandTimer = 0x32;
+				}
+				else
+				{
+					HUD::g_slideTimers[HUD::SLIDE_BOSS_STATUS] = 0x5A;
+					Camera::g_actorCameraTarget.x = actor->pos.x;
+					Camera::g_actorCameraTarget.y = actor->pos.y;
+					Camera::g_actorCameraTarget.z = actor->pos.z;
+				}
+
+				if (buzzY > -0x721AD)
+					buzzY = -0x721AD;
+
+				if ((context->targetFlags & 1) == 0 && ! buzzIsAboveKite)
+				{
+					actor->previousActorPhase = 2;
+					actor->motionTargetPos.x = g_buzzActor.posAngles.pos.x;
+					actor->motionTargetPos.y = Numerics::g_sinCosLUT[AndysNeighborhood::g_kiteBobAngle] - 0x3000 + buzzY;
+					actor->motionTargetPos.z = g_buzzActor.posAngles.pos.z;
+					if (actor->motionTargetPos.y > -0x741AD)
+						actor->motionTargetPos.y = -0x741AD;
+
+					int32_t spinSpeed = 0x108 - actor->actorPhase * 0x14;
+					AudioManager::g_dynamicSoundFrequencies[0] = (int16_t)spinSpeed * 0x10;
+					AudioManager::PlaySoundEffect(0x3C, &actor->pos);
+					AndysNeighborhood::g_kiteSpinAngle = (AndysNeighborhood::g_kiteSpinAngle + Renderer::g_frameDelta * spinSpeed) & 0xFFF;
+					actor->yawAngle = (int16_t)AndysNeighborhood::g_kiteSpinAngle;
+					actor->velX = Numerics::g_sinCosLUT[actor->targetYaw] >> 5;
+					actor->velForward = Numerics::g_sinCosLUT[(actor->targetYaw + 0x400) & 0xFFF] >> 5;
+				}
+				else
+				{
+					if (AndysNeighborhood::g_previousKitePhase != actor->actorPhase)
+					{
+						AndysNeighborhood::g_kiteTintTimer = 0x3C;
+						AndysNeighborhood::g_previousKitePhase = actor->actorPhase;
+						actor->movementCommandTimer = 0;
+						if (AndysNeighborhood::g_previousKitePhase > 0)
+							AudioManager::PlaySoundEffect(0x98, &actor->pos);
+					}
+
+					actor->motionTargetPos.y = Numerics::g_sinCosLUT[AndysNeighborhood::g_kiteBobAngle] - 0xA000 + buzzY;
+					AndysNeighborhood::g_kiteSpinAngle = actor->yawAngle;
+					actor->previousActorPhase -= (int16_t)Renderer::g_frameDelta;
+					if (actor->previousActorPhase < 0)
+					{
+						actor->previousActorPhase = 0x78;
+						int32_t movementAngle = actor->yawAngle + 0x200;
+						if (*g_randDatBufferPtr++ < 0x80)
+							movementAngle -= 0x400;
+						actor->velX = Numerics::g_sinCosLUT[movementAngle] >> 3;
+						actor->velForward = Numerics::g_sinCosLUT[(movementAngle + 0x400) & 0xFFF] >> 3;
+					}
+				}
+			}
+			else
+			{
+				actor->pos.y = (Numerics::g_sinCosLUT[AndysNeighborhood::g_kiteBobAngle] >> 3) - 0x7C000;
+			}
+
+			if (actor->pos.y > -0x741AD)
+				actor->pos.y = -0x741AD;
+		}
 		// FUNCTION: TOY2 0x00418CE0 [PROVISIONAL]
 		void LawnMower(Actor::Toy2Actor::ActorBehaviourContext* context)
 		{

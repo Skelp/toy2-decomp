@@ -190,7 +190,7 @@ namespace Toy2
 		int32_t g_cutsceneRecordType;
 
 		// GLOBAL: TOY2 0x0050A118
-		int32_t g_unk50A118;
+		Vector3I g_actorCameraTarget;
 
 		// GLOBAL: TOY2 0x0050A128
 		int32_t g_unk50A128;
@@ -344,7 +344,7 @@ namespace Toy2
 			camera->data[0] = 0;
 
 			g_scriptedCameraState = 0;
-			g_unk50A118 = (int32_t)0x80000000;
+			g_actorCameraTarget.x = (int32_t)0x80000000;
 			g_cutsceneDuration = 0;
 			g_unk50A4E8 = 0;
 			g_unk52AD98 = 0x10;

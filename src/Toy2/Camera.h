@@ -87,6 +87,7 @@ namespace Toy2
 		extern int32_t g_cutsceneCameraPathPoint;
 		extern int32_t g_cutsceneElapsedTime;
 		extern int32_t g_cutsceneSegmentDuration;
+		extern Vector3I g_actorCameraTarget;
 		extern Nu3D::Particles::ParticleInstance* g_cameraMarkerParticle;
 		extern Nu3D::Particles::ParticleInstance* g_targetMarkerParticle;
 
