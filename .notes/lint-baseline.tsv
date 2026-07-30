@@ -17,11 +17,9 @@ src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNo
 0x004c2e70	signature-concealment	GetPositionVector:arg2	c06c22f8bbfb	src/Nu3D/Light.cpp
 0x004c2e70	signature-concealment	GetForwardVector:arg2	0111be2a6b73	src/Nu3D/Light.cpp
 0x0047b170	unstructured-control-flow	goto-count	af283beb99ab	src/RawLoader.cpp
-0x004c9d00	unknown-symbol	UnkFunc39	ac5c2b44ceca	src/SoftwareRenderer.cpp
 0x004c9d00	unknown-symbol	UnkFunc46	69de56b951a5	src/SoftwareRenderer.cpp
 0x004c9a50	unknown-symbol	UnkFunc45	f96bfb695bbc	src/SoftwareRenderer.cpp
 0x004c9a50	unknown-symbol	UnkFunc46	69de56b951a5	src/SoftwareRenderer.cpp
-0x004c9a50	unknown-symbol	UnkFunc39	ac5c2b44ceca	src/SoftwareRenderer.cpp
 0x004bcb60	address-named-symbol	g_unkB7FBB8	d45cabe36754	src/SoftwareRenderer.cpp
 0x004bcb60	unknown-symbol	g_unkB7FBB8	d45cabe36754	src/SoftwareRenderer.cpp
 0x004bcb60	address-named-symbol	g_unkB626C0	10f072ec7310	src/SoftwareRenderer.cpp
