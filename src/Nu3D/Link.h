@@ -46,7 +46,7 @@ namespace Nu3D
 		void SetRotationRelative8bit(int32_t linkId, int32_t x, int32_t y, int32_t z);
 		void SetRotationAbsolute8bit(int32_t linkId, int32_t x, int32_t y, int32_t z);
 		void GetRotation8Bit(int32_t linkId, Vector3I* output);
-		void TransformVectorInt3x3(int32_t linkId, Vector3I* vector);
+		void TransformVectorInt3x3(int32_t linkId, Vector4I* vector);
 		void SetPositionRawAndCommit(int32_t linkId, int32_t x, int32_t y, int32_t z);
 		void GetCurrentPosFixed(int32_t linkId, Vector3I* output);
 		void GetTargetPosFixed(int32_t linkId, Vector3I* output);

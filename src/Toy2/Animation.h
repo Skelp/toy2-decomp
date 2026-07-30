@@ -76,6 +76,7 @@ namespace Toy2
 		extern int32_t g_isLastAnimatedActor;
 		extern int32_t g_applyRootNodeOffset;
 		extern int32_t g_rootOffsetNodeIndex;
+		extern int16_t g_applyBuzzBoneOffset;
 
 		// Pointers into the currently parsed animation data blob (set by ParseHeader,
 		// read by SampleNodeTransform). g_nodeKeyframeOffsets is a per-node short
@@ -87,6 +88,7 @@ namespace Toy2
 		extern uint8_t* g_keyframeData;
 
 		void ResetNodeAngles();
+		int32_t StepEventTrack(const uint8_t* eventTrack);
 		void ParseHeader(int16_t* header);
 		int32_t SampleNodeTransform(int32_t nodeIndex, int16_t* clipData, int32_t framePosition, D3DMATRIX* matrix);
 		void EvaluateClipToMatrices(

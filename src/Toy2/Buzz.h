@@ -2,6 +2,7 @@
 
 #include "Common.h"
 #include "Numerics.h"
+#include "Toy2/Actor.h"
 #include <stddef.h>
 
 namespace Toy2
@@ -27,7 +28,36 @@ namespace Toy2
 			ACTOR_FLAG_DEATH_TRANSITION = 0x10,
 			ACTOR_FLAG_STUNNED = 0x20,
 			ACTOR_FLAG_UNCONTROLLED_MOMENTUM = 0x40,
+			ACTOR_FLAG_BLOCK_EDGE_IDLE = 0x100,
 			ACTOR_FLAG_PRESERVE_HORIZONTAL_MOMENTUM = 0x200,
+		};
+
+		enum AnimationState
+		{
+			ANIMATION_STATE_AIRBORNE = 2,
+			ANIMATION_STATE_LANDING = 3,
+			ANIMATION_STATE_STANDING = 4,
+			ANIMATION_STATE_DAMAGE_REACTION = 5,
+			ANIMATION_STATE_SWINGING = 8,
+			ANIMATION_STATE_FORWARD_EDGE = 10,
+			ANIMATION_STATE_REAR_EDGE = 11,
+		};
+
+		enum CameraState
+		{
+			CAMERA_STATE_TARGETING = 3,
+			CAMERA_STATE_VISOR = 4,
+		};
+
+		enum PoleClimbFlags
+		{
+			POLE_CLIMB_DESCENDING = 0x2,
+			POLE_CLIMB_SLIDING = 0x4,
+		};
+
+		enum ZiplineState
+		{
+			ZIPLINE_RIDING = 2,
 		};
 
 		enum GrappleState
@@ -82,56 +112,65 @@ namespace Toy2
 
 		struct Toy2BuzzActor
 		{
-			PosAndAngles posAngles;
-			int16_t rollAngle;
-			int16_t primaryAnimIdx;
-			int16_t creatureId;
-			int16_t secondaryAnimIdx;
-			int32_t unkVar7;
-			int32_t unkVar8;
-			int32_t surfaceClampY;
-			Vector3I16 lightDirection;
-			int16_t lightDistance;
-			int32_t unkVar12;
-			int32_t unkVar13;
-			RGBA color;
-			int16_t unkWord1;
-			int16_t unkWord2;
-			int16_t unkWord3;
-			int16_t unkWord4;
-			int16_t actorFlags;
-			int16_t visibilityDistance;
-			int32_t unkVar22;
-			int16_t facingAngle;
-			int16_t unusedFrameState;
-			Vector3I respawnPos;
-			int32_t respawnYawAngle;
-			Vector3I motionTargetPos;
-			MovementVelocity velocity;
-			int32_t forwardSpeed;
-			int32_t lateralSpeed;
-			int32_t movementState;
-			int32_t animationEventPosition;
-			int32_t floorYPos;
-			int32_t isOnWalkableFloor;
-			int16_t airborneMode;
 			union
 			{
-				int16_t collisionFlags;
+				Actor::Toy2Actor boneAttachmentActor;
 				struct
 				{
-					uint8_t collisionState;
-					uint8_t collisionFlagsHigh;
+					PosAndAngles posAngles;
+					int16_t rollAngle;
+					int16_t primaryAnimIdx;
+					int16_t creatureId;
+					int16_t secondaryAnimIdx;
+					int32_t animationFramePosition;
+					int32_t secondaryAnimationFramePosition;
+					int32_t surfaceClampY;
+					Vector3I16 lightDirection;
+					int16_t lightDistance;
+					int16_t scaleX;
+					int16_t scaleY;
+					int16_t scaleZ;
+					int16_t scalePivotHeight;
+					RGBA color;
+					int16_t unkWord1;
+					int16_t unkWord2;
+					int16_t unkWord3;
+					int16_t unkWord4;
+					int16_t actorFlags;
+					int16_t visibilityDistance;
+					int32_t unkVar22;
+					int16_t facingAngle;
+					int16_t unusedFrameState;
+					Vector3I respawnPos;
+					int32_t respawnYawAngle;
+					Vector3I motionTargetPos;
+					MovementVelocity velocity;
+					int32_t forwardSpeed;
+					int32_t lateralSpeed;
+					int32_t baseAnimationFramePosition;
+					int32_t animationEventPosition;
+					int32_t floorYPos;
+					int32_t isOnWalkableFloor;
+					int16_t airborneMode;
+					union
+					{
+						int16_t collisionFlags;
+						struct
+						{
+							uint8_t collisionState;
+							uint8_t collisionFlagsHigh;
+						};
+					};
+					int16_t animationState;
+					int16_t previousAnimationState;
+					int16_t stunTimer;
+					int16_t health;
+					int16_t cosmicShieldTimer;
+					int16_t lives;
+					int16_t specialAirState;
+					int16_t coinsCollected;
 				};
 			};
-			int16_t animationState;
-			int16_t previousAnimationState;
-			int16_t stunTimer;
-			int16_t health;
-			int16_t cosmicShieldTimer;
-			int16_t lives;
-			int16_t specialAirState;
-			int16_t coinsCollected;
 		};
 
 		void Respawn();
@@ -170,7 +209,12 @@ namespace Toy2
 		STATIC_ASSERT(offsetof(BeamShot, color) == 0x28);
 		STATIC_ASSERT(sizeof(GadgetPickup) == 0x10);
 		STATIC_ASSERT(sizeof(Toy2BuzzActor) == 0xA0);
+		STATIC_ASSERT(offsetof(Toy2BuzzActor, animationFramePosition) == 0x18);
+		STATIC_ASSERT(offsetof(Toy2BuzzActor, secondaryAnimationFramePosition) == 0x1C);
 		STATIC_ASSERT(offsetof(Toy2BuzzActor, velocity) == 0x68);
+		STATIC_ASSERT(offsetof(Toy2BuzzActor, baseAnimationFramePosition) == 0x7C);
+		STATIC_ASSERT(offsetof(Toy2BuzzActor, animationEventPosition) == 0x80);
+		STATIC_ASSERT(offsetof(Toy2BuzzActor, animationState) == 0x90);
 	}
 
 	extern Buzz::Toy2BuzzActor g_buzzActor;

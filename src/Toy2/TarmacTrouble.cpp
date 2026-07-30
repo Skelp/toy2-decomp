@@ -321,23 +321,23 @@ namespace Toy2
 			Collectables::LoadTokenTable(g_tokenDialogueValues);
 			Collectables::Activate(3, 1);
 
-			Vector3I position;
+			PosAndAngles position;
 			int32_t actorIndex;
 			int32_t pickupIndex;
-			Vector3I nextPosition;
-			Nu3D::Link::GetCurrentPosFixed(10, &position);
-			Nu3D::Link::GetCurrentPosFixed(11, &nextPosition);
-			position.x = (position.x + nextPosition.x) >> 1;
-			position.y = (position.y + nextPosition.y) >> 1;
-			position.z = (position.z + nextPosition.z) >> 1;
-			Nu3D::Link::GetCurrentPosFixed(13, &nextPosition);
+			PosAndAngles nextPosition;
+			Nu3D::Link::GetCurrentPosFixed(10, &position.pos);
+			Nu3D::Link::GetCurrentPosFixed(11, &nextPosition.pos);
+			position.pos.x = (position.pos.x + nextPosition.pos.x) >> 1;
+			position.pos.y = (position.pos.y + nextPosition.pos.y) >> 1;
+			position.pos.z = (position.pos.z + nextPosition.pos.z) >> 1;
+			Nu3D::Link::GetCurrentPosFixed(13, &nextPosition.pos);
 
-			g_turntableCenter.x = (position.x + nextPosition.x) >> 1;
+			g_turntableCenter.x = (position.pos.x + nextPosition.pos.x) >> 1;
 			g_turntableOrigin.x = g_turntableCenter.x;
-			g_turntableCenter.y = (position.y + nextPosition.y) >> 1;
+			g_turntableCenter.y = (position.pos.y + nextPosition.pos.y) >> 1;
 			g_turntableOrigin.y = g_turntableCenter.y;
 			g_turntableRotation.z = 0;
-			g_turntableCenter.z = (position.z + nextPosition.z) >> 1;
+			g_turntableCenter.z = (position.pos.z + nextPosition.pos.z) >> 1;
 			g_turntableOrigin.z = g_turntableCenter.z;
 			g_turntableRotation.y = 0;
 			g_turntableRotation.x = 0;

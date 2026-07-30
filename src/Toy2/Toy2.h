@@ -207,6 +207,8 @@ namespace Toy2
 	extern int16_t g_levelTransition;
 	extern int32_t g_levelObjectiveProgress;
 	extern uint16_t g_gameplayStateFlags;
+	extern int32_t g_idleVoicePreset;
+	extern int32_t g_idleVoiceCooldown;
 	extern int32_t g_levelFileConversion[15];
 	extern uint8_t g_levelTokenBits[16];
 

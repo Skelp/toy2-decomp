@@ -176,7 +176,7 @@ namespace Nu3D
 		}
 
 		// FUNCTION: TOY2 0x004CCDA0 [PROVISIONAL]
-		void TransformVectorInt3x3(int32_t linkId, Vector3I* vector)
+		void TransformVectorInt3x3(int32_t linkId, Vector4I* vector)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
 			if (! image || ! image->links || linkId >= image->maxLinkId)
