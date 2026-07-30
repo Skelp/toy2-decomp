@@ -295,6 +295,12 @@ namespace Toy2
 			int32_t boundingSqRadius;
 		};
 
+		struct CollisionNormal
+		{
+			Vector3I16 direction;
+			int16_t reserved;
+		};
+
 		struct CollisionSweep
 		{
 			Vector3I start;
@@ -306,7 +312,7 @@ namespace Toy2
 			int32_t endDistance;
 			uint32_t contactFlags;
 			PackedCollisionFace* face;
-			Vector3I16 hitNormal;
+			CollisionNormal hitNormal;
 		};
 
 		const int16_t COLLISION_MESH_STATIC_A = 6;
@@ -316,6 +322,8 @@ namespace Toy2
 
 		static __forceinline int32_t ShiftTowardZero(int32_t value, int32_t bits) { return (value + ((value >> 31) & ((1 << bits) - 1))) >> bits; }
 
+		STATIC_ASSERT(sizeof(CollisionNormal) == 0x08);
+		STATIC_ASSERT(offsetof(CollisionNormal, reserved) == 0x06);
 		STATIC_ASSERT(sizeof(SurfaceCollisionResult) == sizeof(CollisionQueryResult));
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, normal) == 0x08);
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, contactState) == 0x0E);
@@ -806,11 +814,11 @@ namespace Toy2
 							|| accepted)
 						{
 							sweep->startDistance = hitDistance;
-							sweep->hitNormal.x = (int16_t)hitNormal.x;
+							sweep->hitNormal.direction.x = (int16_t)hitNormal.x;
 							sweep->nearestFraction = fraction;
 							sweep->endDistance = hitDistance - sweepLength;
-							sweep->hitNormal.y = (int16_t)hitNormal.y;
-							sweep->hitNormal.z = (int16_t)hitNormal.z;
+							sweep->hitNormal.direction.y = (int16_t)hitNormal.y;
+							sweep->hitNormal.direction.z = (int16_t)hitNormal.z;
 							return 1;
 						}
 					}
