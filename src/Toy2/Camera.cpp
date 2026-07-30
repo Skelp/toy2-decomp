@@ -17,6 +17,38 @@
 
 namespace Toy2
 {
+	namespace Visor
+	{
+		// FUNCTION: TOY2 0x004037E0 [MATCHED]
+		int32_t GetActorLockOnPoint(Vector3I* lockPoint, Actor::Toy2Actor* actor, int32_t maxDistanceSquared)
+		{
+			int32_t backwardSine = Numerics::g_sinCosLUT[(actor->yawAngle - 0x800) & 0xFFF] >> 2;
+			int32_t cosine = Numerics::g_sinCosLUT[(actor->yawAngle - 0x400) & 0xFFF] >> 2;
+			Actor::ActorCollisionVolume* volume = &actor->collisionVolumes[actor->primaryAnimIdx];
+			int32_t offsetX = (volume->offset.x * cosine + volume->offset.z * backwardSine) >> 12;
+			int32_t offsetZ = (volume->offset.z * cosine - volume->offset.x * backwardSine) >> 12;
+
+			if (maxDistanceSquared == -1)
+			{
+				lockPoint->x = actor->pos.x + offsetX;
+				lockPoint->y = actor->pos.y + volume->offset.y;
+				lockPoint->z = actor->pos.z + offsetZ;
+			}
+			else
+			{
+				lockPoint->x = (actor->pos.x - Camera::g_gameplayCamera.pos.x + offsetX) >> 5;
+				lockPoint->y = (actor->pos.y - Camera::g_gameplayCamera.pos.y + volume->offset.y) >> 5;
+				lockPoint->z = (actor->pos.z - Camera::g_gameplayCamera.pos.z + offsetZ) >> 5;
+				if (maxDistanceSquared != 0)
+				{
+					return lockPoint->x * lockPoint->x + lockPoint->y * lockPoint->y + lockPoint->z * lockPoint->z < maxDistanceSquared;
+				}
+			}
+
+			return false;
+		}
+	}
+
 	namespace Camera
 	{
 		// GLOBAL: TOY2 0x0052B814
