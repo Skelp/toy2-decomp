@@ -260,7 +260,8 @@ namespace Toy2
 			Vector3I16 vertex1Offset;
 			Vector3I16 vertex2Offset;
 			Vector3I16 vertex3Offset;
-			uint8_t reserved[12];
+			Vector3I16 firstPlaneNormal;
+			Vector3I16 secondPlaneNormal;
 		};
 
 		struct CollisionTreeGroup
@@ -332,6 +333,8 @@ namespace Toy2
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, contactTimer) == 0x24);
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, collisionDistance) == 0x2C);
 		STATIC_ASSERT(sizeof(PackedCollisionFace) == 0x2C);
+		STATIC_ASSERT(offsetof(PackedCollisionFace, firstPlaneNormal) == 0x20);
+		STATIC_ASSERT(offsetof(PackedCollisionFace, secondPlaneNormal) == 0x26);
 		STATIC_ASSERT(sizeof(CollisionTreeGroup) == 0x0C);
 		STATIC_ASSERT(sizeof(CollisionGridCell) == 0x14);
 		STATIC_ASSERT(sizeof(CollisionMeshRecord) == sizeof(CollisionMeshInstance));
