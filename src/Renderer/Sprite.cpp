@@ -760,6 +760,64 @@ namespace Renderer
 			return 1;
 		}
 
+		// FUNCTION: TOY2 0x004949B0 [PROVISIONAL]
+		void DrawClipped(int16_t xPos, int16_t yPos, int16_t clipLeft, int16_t clipRight, int16_t sheetIndex, int16_t tileIndex)
+		{
+			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
+			if (sheet)
+			{
+				int32_t textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
+				Vector2F uvTopLeft;
+				Vector2F uvBottomRight;
+				if (textureDataIndex != 0)
+				{
+					uint32_t bitmapWidth;
+					uint32_t bitmapHeight;
+					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
+
+					uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;
+					uvTopLeft.y = (float)sheet->tiles[tileIndex].y / (int32_t)bitmapHeight;
+					uvBottomRight.x = ((float)sheet->tileWidth + sheet->tiles[tileIndex].x) / (int32_t)bitmapWidth;
+					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
+				}
+
+				RGBA color = { (uint8_t)Nu3D::Camera::g_cameraTintRed, (uint8_t)Nu3D::Camera::g_cameraTintGreen, (uint8_t)Nu3D::Camera::g_cameraTintBlue, 255 };
+				float normalizedClipLeft = (float)clipLeft / g_virtualScreenWidth;
+				float normalizedClipRight = (float)clipRight / g_virtualScreenWidth;
+				float normalizedX = (float)xPos / g_virtualScreenWidth;
+				float normalizedY = (float)yPos / g_virtualScreenHeight;
+				float normalizedWidth = (float)sheet->tileWidth / g_virtualScreenWidth;
+
+				if (normalizedClipLeft <= normalizedX + normalizedWidth && normalizedX <= normalizedClipRight)
+				{
+					if (normalizedX < normalizedClipLeft)
+					{
+						float clippedFraction = (normalizedClipLeft - normalizedX) / normalizedWidth;
+						normalizedWidth -= normalizedClipLeft - normalizedX;
+						uvTopLeft.x += (uvBottomRight.x - uvTopLeft.x) * clippedFraction;
+						normalizedX = normalizedClipLeft;
+					}
+					if (normalizedX + normalizedWidth > normalizedClipRight)
+					{
+						float clippedWidth = normalizedX + normalizedWidth - normalizedClipRight;
+						float clippedFraction = clippedWidth / normalizedWidth;
+						normalizedWidth -= clippedWidth;
+						uvBottomRight.x -= (uvBottomRight.x - uvTopLeft.x) * clippedFraction;
+					}
+
+					Queue2DSprite(normalizedX,
+						normalizedY,
+						normalizedWidth,
+						(float)sheet->tileHeight / g_virtualScreenHeight,
+						&uvTopLeft,
+						&uvBottomRight,
+						textureDataIndex,
+						color,
+						RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT);
+				}
+			}
+		}
+
 		// FUNCTION: TOY2 0x00493DC0 [PROVISIONAL]
 		int16_t DrawColouredFixed(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue)
 		{

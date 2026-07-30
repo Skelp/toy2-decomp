@@ -46,6 +46,14 @@
 
 #include <Numerics.h>
 
+namespace Renderer
+{
+	namespace Sprite
+	{
+		void DrawClipped(int16_t xPos, int16_t yPos, int16_t clipLeft, int16_t clipRight, int16_t sheetIndex, int16_t tileIndex);
+	}
+}
+
 namespace Nu3D
 {
 	namespace Camera
@@ -706,6 +714,62 @@ namespace Toy2
 #include "CreditsText.inc"
 	};
 
+	namespace MovieViewer
+	{
+		struct SpriteTile
+		{
+			uint8_t sheetIndex;
+			uint8_t tileIndex;
+		};
+
+		struct MovieDefinition
+		{
+			SpriteTile thumbnail;
+			SpriteTile unusedTile;
+		};
+
+		struct MenuItem
+		{
+			SpriteTile thumbnail;
+			uint8_t movieIndex;
+			uint8_t terminator;
+		};
+
+		// GLOBAL: TOY2 0x004F6860
+		char g_selectPrompt[] = "press jump to select";
+
+		// GLOBAL: TOY2 0x004F6E3C
+		MovieDefinition g_movieDefinitions[20] = {
+			{ { 0x42, 1 }, { 0x41, 3 } },
+			{ { 0x43, 4 }, { 0x41, 3 } },
+			{ { 0x43, 5 }, { 0x41, 3 } },
+			{ { 0x43, 3 }, { 0x41, 3 } },
+			{ { 0x43, 2 }, { 0x41, 3 } },
+			{ { 0x41, 3 }, { 0x41, 3 } },
+			{ { 0x42, 3 }, { 0x41, 3 } },
+			{ { 0x42, 0 }, { 0x41, 3 } },
+			{ { 0x43, 1 }, { 0x41, 3 } },
+			{ { 0x41, 2 }, { 0x41, 3 } },
+			{ { 0x41, 1 }, { 0x41, 3 } },
+			{ { 0x41, 0 }, { 0x41, 3 } },
+			{ { 0x44, 2 }, { 0x41, 3 } },
+			{ { 0x44, 0 }, { 0x41, 3 } },
+			{ { 0x44, 1 }, { 0x41, 3 } },
+			{ { 0x44, 3 }, { 0x41, 3 } },
+			{ { 0x43, 0 }, { 0x41, 3 } },
+			{ { 0x42, 6 }, { 0x41, 3 } },
+			{ { 0x42, 2 }, { 0x41, 3 } },
+			{ { 0xFF, 0xFF }, { 0xFF, 0xFF } },
+		};
+
+		// GLOBAL: TOY2 0x004F6E8C
+		uint8_t g_movieOrder[20] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 16, 12, 13, 14, 15, 17, 18, 0xFF };
+
+		STATIC_ASSERT(sizeof(SpriteTile) == 2);
+		STATIC_ASSERT(sizeof(MovieDefinition) == 4);
+		STATIC_ASSERT(sizeof(MenuItem) == 4);
+	}
+
 	// GLOBAL: TOY2 0x0055A120
 	int32_t g_screenMusicStarted;
 
@@ -1245,7 +1309,10 @@ namespace Toy2
 	int32_t g_saveMenuState;
 
 	int32_t TickSaveMenuMachine(int32_t param);
-	int32_t MovieViewerTick(int32_t movieIdx);
+	namespace MovieViewer
+	{
+		int32_t Tick(int32_t movieIndex);
+	}
 	int32_t PlayMovie(int32_t movieId);
 	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId);
 	int32_t CleanupManagers();
@@ -3206,8 +3273,190 @@ namespace Toy2
 		return newState;
 	}
 
-	// STUB: TOY2 0x0043A600
-	int32_t MovieViewerTick(int32_t movieIdx) { return -1; }
+	namespace MovieViewer
+	{
+		// FUNCTION: TOY2 0x0043A600 [PROVISIONAL]
+		int32_t Tick(int32_t movieIndex)
+		{
+			InputManager::g_curButtonsPressed = 0;
+			InputManager::g_prevButtonsPressed = 0;
+			MainMenu::g_fadeTimer = 0;
+			MainMenu::g_nextScreen = 0;
+			Nu3D::Camera::g_cameraTintBlue = 0;
+			Nu3D::Camera::g_cameraTintGreen = 0;
+			Nu3D::Camera::g_cameraTintRed = 0;
+			Nu3D::Camera::SetTint(128, 128, 128, 12);
+			SoftwareRenderer::SetBackdropScrollOverride(0, 0);
+			Renderer::g_frameDelta = 1;
+			SetBackdropByIndex(0);
+
+			g_movieUnlocked[0] = 1;
+			int32_t selectedIndex = 0;
+			if (g_movieOrder[0] != movieIndex)
+			{
+				uint8_t* movieOrder = g_movieOrder;
+				do
+				{
+					if (movieOrder[1] == 0xFF)
+						break;
+					if (g_movieUnlocked[*movieOrder] != 0)
+						selectedIndex++;
+					movieOrder++;
+				} while (*movieOrder != movieIndex);
+			}
+
+			int32_t selectionPosition = (g_movieOrder[selectedIndex] != 0xFF ? selectedIndex : 0) * 0x1000;
+			MenuItem menuItems[48];
+			int32_t menuItemCount = 0;
+			for (int32_t definitionIndex = 0; g_movieDefinitions[definitionIndex].thumbnail.sheetIndex != 0xFF; definitionIndex++)
+			{
+				uint8_t orderedMovieIndex = g_movieOrder[definitionIndex];
+				if (g_movieUnlocked[orderedMovieIndex] != 0)
+				{
+					menuItems[menuItemCount].thumbnail = g_movieDefinitions[orderedMovieIndex].thumbnail;
+					menuItems[menuItemCount].movieIndex = orderedMovieIndex;
+					menuItemCount++;
+				}
+			}
+			menuItems[menuItemCount].thumbnail.sheetIndex = 0xFF;
+			menuItems[menuItemCount].thumbnail.tileIndex = 0xFF;
+			menuItems[menuItemCount].movieIndex = 0xFF;
+			menuItems[menuItemCount].terminator = 0xFF;
+
+			int32_t fadeTimer = 4000;
+			int32_t scrollVelocity = 0;
+			int32_t scrollPosition = selectionPosition;
+			int32_t framePhase = 0;
+			AudioManager::PlayMusicLooping(19);
+			g_screenMusicStarted = 1;
+			int32_t result = -1;
+			Nu3D::Camera::SetTint(128, 128, 128, 6);
+			int32_t rightTarget = selectionPosition + 0x400;
+			int32_t leftTarget = selectionPosition - 0x400;
+
+			while (true)
+			{
+				Nu3D::Camera::FadeToTargetTint();
+				framePhase += Renderer::g_frameDelta;
+
+				if (leftTarget > -0x400 && (framePhase & 0x3F) < 0x30)
+					Renderer::Sprite::DrawTile(0x10, 0x70, 0x39, 0);
+				if (menuItems[(selectionPosition >> 12) + 1].thumbnail.sheetIndex != 0xFF && (framePhase & 0x3F) < 0x30)
+					Renderer::Sprite::DrawTile(0x110, 0x70, 0x39, 1);
+
+				Renderer::Sprite::DrawTile(0, 0, 0x3C, 0);
+				Renderer::Sprite::DrawTile(0x80, 0, 0x3C, 1);
+				Renderer::Sprite::DrawTile(0x100, 0, 0x3D, 0);
+
+				int32_t thumbnailOffset = -((scrollPosition >> 5) & 0x7F);
+				Renderer::Sprite::DrawClipped(thumbnailOffset + 0x10C, 0x50, 0xD0, 0x108, 0x40, 0);
+				Renderer::Sprite::DrawClipped(thumbnailOffset + 0x72, 0x50, 0x38, 0x70, 0x40, 0);
+
+				int32_t centeredItemIndex = (scrollPosition + 0x800) >> 12;
+				thumbnailOffset = -(((scrollPosition - 0x800) >> 5) & 0x7F);
+				Renderer::Sprite::DrawClipped(thumbnailOffset + 0x10C,
+					0x50,
+					0xD0,
+					0x108,
+					menuItems[centeredItemIndex].thumbnail.sheetIndex,
+					menuItems[centeredItemIndex].thumbnail.tileIndex);
+				Renderer::Sprite::DrawClipped(thumbnailOffset + 0x72,
+					0x50,
+					0x38,
+					0x70,
+					menuItems[centeredItemIndex].thumbnail.sheetIndex,
+					menuItems[centeredItemIndex].thumbnail.tileIndex);
+
+				int16_t conveyorPosition = (int16_t)(-(scrollPosition >> 6) % 0x140);
+				Renderer::Sprite::DrawTile(conveyorPosition, 0, 0x3E, 0);
+				Renderer::Sprite::DrawTile(conveyorPosition + 0x80, 0, 0x3E, 1);
+				Renderer::Sprite::DrawTile(conveyorPosition + 0x100, 0, 0x3F, 0);
+
+				conveyorPosition = (int16_t)(-((scrollPosition >> 6) % 0x140));
+				Renderer::Sprite::DrawTile(conveyorPosition + 0x140, 0, 0x3E, 0);
+				Renderer::Sprite::DrawTile(conveyorPosition + 0x1C0, 0, 0x3E, 1);
+				Renderer::Sprite::DrawTile(conveyorPosition + 0x240, 0, 0x3F, 0);
+
+				Nullsub3();
+				MainMenu::RenderMenu();
+
+				if (fadeTimer > 1000)
+				{
+					if ((InputManager::g_curButtonsPressed & INPUT_LEFT) != 0 && (InputManager::g_prevButtonsPressed & INPUT_LEFT) == 0 && leftTarget > -0x400
+						&& fadeTimer > 0x17 && abs(scrollPosition - selectionPosition) < 0x800)
+					{
+						selectionPosition -= 0x1000;
+						leftTarget -= 0x1000;
+						rightTarget -= 0x1000;
+						AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 0x40, 0x60);
+					}
+
+					if ((InputManager::g_curButtonsPressed & INPUT_RIGHT) != 0 && (InputManager::g_prevButtonsPressed & INPUT_RIGHT) == 0
+						&& menuItems[(selectionPosition >> 12) + 1].thumbnail.sheetIndex != 0xFF && fadeTimer > 0x17
+						&& abs(scrollPosition - selectionPosition) < 0x800)
+					{
+						selectionPosition += 0x1000;
+						leftTarget += 0x1000;
+						rightTarget += 0x1000;
+						AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 0x60, 0x40);
+					}
+
+					if (scrollVelocity < 0)
+					{
+						scrollVelocity += Renderer::g_frameDelta * 8;
+						if (scrollVelocity > 0)
+							scrollVelocity = 0;
+					}
+					else if (scrollVelocity > 0)
+					{
+						scrollVelocity -= Renderer::g_frameDelta * 8;
+						if (scrollVelocity < 0)
+							scrollVelocity = 0;
+					}
+
+					if (scrollPosition < leftTarget)
+						scrollVelocity += Renderer::g_frameDelta * 0x10;
+					if (scrollPosition > rightTarget)
+						scrollVelocity -= Renderer::g_frameDelta * 0x10;
+
+					if (scrollVelocity > 0x80)
+						scrollVelocity = 0x80;
+					else if (scrollVelocity < -0x80)
+						scrollVelocity = -0x80;
+					scrollPosition += scrollVelocity;
+				}
+
+				Renderer::Sprite::DrawWhiteText(g_selectPrompt, 0xD4, 0xA0);
+				Nullsub6();
+
+				if (fadeTimer > 0 && fadeTimer < 1000)
+					fadeTimer -= Renderer::g_frameDelta;
+
+				if ((InputManager::g_curButtonsPressed & INPUT_CANCEL) != 0 && (InputManager::g_prevButtonsPressed & INPUT_CANCEL) == 0 && fadeTimer > 0x17
+					&& Nu3D::Camera::g_cameraTintBlue == 128)
+				{
+					fadeTimer = 0x35;
+					AudioManager::PlayOneShotSoundGlobal(2, 0x1200, 0x60, 0x60);
+					result = -1;
+					Nu3D::Camera::SetTint(0, 0, 0, 6);
+				}
+
+				if ((InputManager::g_curButtonsPressed & INPUT_JUMP) != 0 && (InputManager::g_prevButtonsPressed & INPUT_JUMP) == 0 && fadeTimer > 0x17
+					&& Nu3D::Camera::g_cameraTintBlue == 128)
+				{
+					fadeTimer = 0x35;
+					AudioManager::PlayOneShotSoundGlobal(0, 0x1200, 0x60, 0x60);
+					result = menuItems[(scrollPosition + 0x800) >> 12].movieIndex;
+					Nu3D::Camera::SetTint(0, 0, 0, 6);
+				}
+				else if (fadeTimer <= 0)
+				{
+					AudioManager::StopAndWait();
+					return result;
+				}
+			}
+		}
+	}
 
 	// FUNCTION: TOY2 0x00453FA0 [MATCHED]
 	void ShowMovieViewer()
@@ -3227,7 +3476,7 @@ namespace Toy2
 			MainMenu::g_menuClearColor.b = 0;
 			MainMenu::g_menuClearColor.g = 0;
 			MainMenu::g_menuClearColor.r = 0;
-			movieIdx = MovieViewerTick(movieIdx);
+			movieIdx = MovieViewer::Tick(movieIdx);
 
 			if (movieIdx < 0)
 				break;
