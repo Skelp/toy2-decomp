@@ -11,3 +11,6 @@ void Nullsub6() {}
 
 // FUNCTION: TOY2 0x0043D9D0 [MATCHED]
 void Nullsub7(int firstLinkIndex, int lastLinkIndex) {}
+
+// FUNCTION: TOY2 0x0044F810 [MATCHED]
+void Nullsub9() {}

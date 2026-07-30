@@ -333,6 +333,7 @@
 0x0044F200 Renderer::LensFlare::RegisterLight
 0x0044F420 Renderer::LensFlare::CullAndQueue
 0x0044F580 Renderer::LensFlare::RenderSlot
+0x0044F810 Nullsub9
 0x0044F820 Nu3D::Camera::EnableCameraSkew
 0x0044F840 Toy2::ShowModelNode
 0x0044F860 Toy2::HideModelNode

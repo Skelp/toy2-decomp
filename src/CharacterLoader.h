@@ -7,6 +7,11 @@
 
 namespace Toy2
 {
+	namespace Actor
+	{
+		struct ActorCollisionVolume;
+	}
+
 	namespace Animation
 	{
 		struct ClipHeader;
@@ -15,6 +20,12 @@ namespace Toy2
 
 namespace CharacterLoader
 {
+	struct ActorBounds
+	{
+		Vector3I16 offset;
+		int16_t radius;
+	};
+
 	struct CharacterAnimationData
 	{
 		int16_t modelId;
@@ -61,10 +72,15 @@ namespace CharacterLoader
 	extern CharacterAnimationData* g_characterAnimationData[128];
 	extern int32_t g_alternateAllParse[128];
 	extern uint8_t* g_charFileDataCache[128];
+	extern Toy2::Actor::ActorCollisionVolume g_defaultCollisionVolume;
+	extern Toy2::Actor::ActorCollisionVolume* g_collisionVolumes[128];
+	extern ActorBounds g_actorBounds[128];
+	extern uint8_t* g_animationDataBySlot[512];
 
-	void Start(int32_t* value, uint8_t** buffer, uint8_t* creatureList);
+	void Start(int32_t* loadedByteCount, uint8_t** dataBuffer, uint8_t* creatureList);
 	void InitGlobals();
 
+	STATIC_ASSERT(sizeof(ActorBounds) == 8);
 	STATIC_ASSERT(sizeof(BoneTransform) == 0x6C);
 	STATIC_ASSERT(sizeof(CharacterAnimationData) == 0xC);
 	STATIC_ASSERT(offsetof(CharacterAnimationData, modelId) == 0);
