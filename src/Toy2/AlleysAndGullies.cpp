@@ -1,13 +1,18 @@
 #include "Toy2/Toy2.h"
 #include "Toy2/LevelLogic.h"
 #include "Toy2/Actor.h"
+#include "Toy2/Collectables.h"
+#include "Toy2/Levels.h"
 #include "Toy2/Particles.h"
 #include "Toy2/Weather.h"
 #include "AudioManager/AudioManager.h"
+#include "Nu3D/Link.h"
 #include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
 #include "Random.h"
 #include "Numerics.h"
+
+#include <limits.h>
 
 namespace Toy2
 {
@@ -23,6 +28,12 @@ namespace Toy2
 			CLOWN_CHALLENGE_COMPLETE = 200,
 		};
 
+		struct HiddenCollectibleState
+		{
+			int32_t* verticalPosition;
+			int32_t savedVerticalPosition;
+		};
+
 		// GLOBAL: TOY2 0x0052F8B0
 		int32_t g_clownPhaseTimer;
 		// GLOBAL: TOY2 0x0052F8B8
@@ -31,6 +42,37 @@ namespace Toy2
 		int32_t g_clownChallengeState;
 		// GLOBAL: TOY2 0x0052F8FC
 		int32_t g_clownTintFlashToggle;
+		// GLOBAL: TOY2 0x0052F954
+		HiddenCollectibleState g_hiddenCollectibles[5];
+
+		STATIC_ASSERT(sizeof(HiddenCollectibleState) == 0x8);
+
+		// FUNCTION: TOY2 0x0041E300 [TOOL]
+		void InitHiddenCollectibles()
+		{
+			Levels::RecordData* pickupRecords = Levels::g_recordData[63];
+			Collectables::PickupRecord* pickup = reinterpret_cast<Collectables::PickupRecord*>(pickupRecords + 1);
+			for (int32_t pickupIndex = 0; pickupIndex < pickupRecords->recordCount; pickup++, pickupIndex++)
+			{
+				if (pickup->objectIndex == 97)
+					g_hiddenCollectibles[0].verticalPosition = &pickup->position.y;
+				if (pickup->objectIndex == 98)
+					g_hiddenCollectibles[1].verticalPosition = &pickup->position.y;
+				if (pickup->objectIndex == 99)
+					g_hiddenCollectibles[2].verticalPosition = &pickup->position.y;
+				if (pickup->objectIndex == 100)
+					g_hiddenCollectibles[3].verticalPosition = &pickup->position.y;
+				if (pickup->objectIndex == 101)
+					g_hiddenCollectibles[4].verticalPosition = &pickup->position.y;
+			}
+
+			for (int32_t hiddenIndex = 0; hiddenIndex < 5; hiddenIndex++)
+			{
+				g_hiddenCollectibles[hiddenIndex].savedVerticalPosition = *g_hiddenCollectibles[hiddenIndex].verticalPosition;
+				*g_hiddenCollectibles[hiddenIndex].verticalPosition = INT_MIN;
+				Nu3D::Link::SetScaleFromFixedOffsets(hiddenIndex + 97, 0, 0, 0);
+			}
+		}
 
 		// STUB: TOY2 0x0041E390
 		void Init() {}
