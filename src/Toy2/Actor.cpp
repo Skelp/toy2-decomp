@@ -1645,6 +1645,8 @@ namespace Toy2
 		uint16_t* g_dinoMovementData;
 		// GLOBAL: TOY2 0x004E0348
 		uint16_t* g_gunslingerMovementData;
+		// GLOBAL: TOY2 0x004E0350
+		uint16_t* g_buggyMovementData;
 		// GLOBAL: TOY2 0x004E0360
 		uint16_t* g_smithMovementData;
 		// GLOBAL: TOY2 0x004E0368

@@ -10,6 +10,7 @@ namespace Toy2
 	{
 		extern Vector3I16 g_viewRotation;
 		extern int32_t g_activeSectorIndex;
+		extern int32_t g_currentSectorIndex;
 	}
 
 	namespace Weather

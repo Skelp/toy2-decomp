@@ -15,6 +15,9 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x0054DEA0
 		int32_t g_activeSectorIndex;
+
+		// GLOBAL: TOY2 0x005D2A8C
+		int32_t g_currentSectorIndex;
 	}
 
 	namespace Weather

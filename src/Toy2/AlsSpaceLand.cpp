@@ -2,19 +2,37 @@
 #include "Toy2/LevelLogic.h"
 #include "Toy2/Actor.h"
 #include "Toy2/Buzz.h"
+#include "Toy2/Camera.h"
 #include "Toy2/Collectables.h"
 #include "Toy2/Particles.h"
+#include "Toy2/Weather.h"
 #include "AudioManager/AudioManager.h"
 #include "Nu3D/Link.h"
+#include "Nu3D/Math.h"
+#include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
+#include "Numerics.h"
 #include "Random.h"
 
 #include <string.h>
 
 namespace Toy2
 {
+	extern int32_t g_hudActorAnimationFrame;
+
+	namespace Lighting
+	{
+		void SpawnLight(int32_t x, int32_t y, int32_t z, int32_t colour, int32_t lifetime, int32_t sourceId);
+	}
+
 	namespace AlsSpaceLand
 	{
+		enum BuggyEncounterState
+		{
+			BUGGY_ENCOUNTER_ACTIVE = 2,
+			BUGGY_ENCOUNTER_DEFEATED = 3,
+		};
+
 		struct RotatingLinkState
 		{
 			int32_t rotationAngle;
@@ -98,6 +116,8 @@ namespace Toy2
 		int32_t g_laserCooldowns[2];
 		// GLOBAL: TOY2 0x0052FB98
 		int32_t g_projectileScanTimer;
+		// GLOBAL: TOY2 0x0052FB9C
+		int32_t g_buggyLaserTimer;
 		// GLOBAL: TOY2 0x0052FBA8
 		int32_t g_spaceshipLiftOffset;
 		// GLOBAL: TOY2 0x0052FBAC
@@ -181,8 +201,194 @@ namespace Toy2
 {
 	namespace CreatureBehaviour
 	{
-		// STUB: TOY2 0x00422660
-		void BBuggy(Actor::Toy2Actor::ActorBehaviourContext* context) {}
+		// FUNCTION: TOY2 0x00422660 [PROVISIONAL]
+		void BBuggy(Actor::Toy2Actor::ActorBehaviourContext* context)
+		{
+			Actor::Toy2Actor* actor = context->actor;
+			if (context->localForwardSpeed > 0)
+			{
+				AudioManager::g_dynamicSoundFrequencies[0] = context->localForwardSpeed * 4 + 0x800;
+				AudioManager::PlaySoundEffect(0x7F, &actor->pos);
+			}
+
+			if (Sector::g_currentSectorIndex != 5)
+				actor->motionTargetPos = actor->boundary;
+
+			AlsSpaceLand::g_buggyTintToggle = (AlsSpaceLand::g_buggyTintToggle - 1) & 1;
+			if (actor->actorPhase != AlsSpaceLand::g_previousBuggyPhase)
+			{
+				AlsSpaceLand::g_previousBuggyPhase = actor->actorPhase;
+				AlsSpaceLand::g_buggyPhaseTimer = 60;
+				actor->creatureRam->defenseMode = 4;
+			}
+
+			if (AlsSpaceLand::g_hammDialogueState > 1)
+			{
+				AlsSpaceLand::g_buggyPhaseTimer -= Renderer::g_frameDelta;
+				if (AlsSpaceLand::g_buggyPhaseTimer < 0)
+				{
+					AlsSpaceLand::g_buggyPhaseTimer = 0;
+					if (AlsSpaceLand::g_hammDialogueState == AlsSpaceLand::BUGGY_ENCOUNTER_ACTIVE)
+						actor->creatureRam->defenseMode = 7;
+					actor->useTint = 0;
+				}
+				else if (AlsSpaceLand::g_buggyTintToggle != 0)
+				{
+					actor->useTint = 1;
+					actor->actorTint.r = 0x2000;
+					actor->actorTint.g = 0x2000;
+					actor->actorTint.b = 0x2000;
+				}
+				else
+				{
+					actor->useTint = 0;
+				}
+			}
+			else
+			{
+				actor->useTint = 0;
+			}
+
+			if (AlsSpaceLand::g_hammDialogueState == AlsSpaceLand::BUGGY_ENCOUNTER_ACTIVE)
+			{
+				AlsSpaceLand::g_buggyLaserTimer -= Renderer::g_frameDelta;
+				if (AlsSpaceLand::g_buggyLaserTimer < 0)
+				{
+					AlsSpaceLand::g_buggyLaserTimer = 240;
+				}
+				else if (AlsSpaceLand::g_buggyLaserTimer < 40 && g_framePulseOutputs.eightTick != 0)
+				{
+					AudioManager::PlaySoundEffect(2, &actor->pos);
+					Vector3I beamOffset = { 0, 0, 0 };
+					Vector3I beamPosition = {
+						actor->pos.x + (Numerics::g_sinCosLUT[actor->yawAngle & 0xFFF] >> 2),
+						actor->pos.y - 0x1000,
+						actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle + 0x400) & 0xFFF] >> 2),
+					};
+					SpawnBeamShot(0, actor->yawAngle, 0, &beamPosition, &beamOffset, 4, 0);
+
+					if (beamPosition.y < g_buzzActor.posAngles.pos.y && Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &actor->pos, 0x200) != 0)
+					{
+						int32_t attackAngle =
+							Nu3D::Math::CartesianToFixedAngle(g_buzzActor.posAngles.pos.x - actor->pos.x, g_buzzActor.posAngles.pos.z - actor->pos.z);
+						if (((attackAngle - (uint16_t)actor->yawAngle + 0x20) & 0xFFF) < 0x40)
+						{
+							Buzz::HandleDamage(attackAngle, 2);
+							Lighting::SpawnLight(g_buzzActor.posAngles.pos.x,
+								g_buzzActor.posAngles.pos.y,
+								g_buzzActor.posAngles.pos.z,
+								0xF00000,
+								0x10,
+								g_buzzActor.posAngles.pos.z);
+						}
+					}
+				}
+
+				g_hudActorAnimationFrame = (actor->actorPhase - 9) * 54 / 20;
+				if (Sector::g_currentSectorIndex == 5)
+				{
+					HUD::g_slideTimers[HUD::SLIDE_BOSS_STATUS] = 90;
+					Camera::g_actorCameraTarget.x = actor->pos.x;
+					Camera::g_actorCameraTarget.y = actor->pos.y;
+					Camera::g_actorCameraTarget.z = actor->pos.z;
+					AlsSpaceLand::g_buggySoundTimer -= Renderer::g_frameDelta;
+					if (AlsSpaceLand::g_buggySoundTimer <= 0)
+					{
+						AlsSpaceLand::g_buggySoundTimer = *g_randDatBufferPtr++ + 0x708;
+						AudioManager::Preset::PlayOneShotSound(0xD4, &g_buzzActor);
+					}
+				}
+
+				actor->previousActorPhase -= (int16_t)Renderer::g_frameDelta;
+				if (actor->previousActorPhase < 0)
+				{
+					AudioManager::PlaySoundEffect(0x4C, &actor->pos);
+					actor->previousActorPhase = 400;
+					Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnInstance(
+						actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x800) & 0xFFF] >> 2),
+						actor->pos.y - 0x2000,
+						actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x400) & 0xFFF] >> 2),
+						0,
+						-2,
+						0,
+						actor->yawAngle * 4,
+						0,
+						0x80,
+						0x72);
+					particle->discPitchAngle = 0x400;
+				}
+			}
+
+			if (actor->actorPhase < 10 && AlsSpaceLand::g_hammDialogueState == AlsSpaceLand::BUGGY_ENCOUNTER_ACTIVE)
+			{
+				actor->movementData = g_buggyMovementData + 34;
+				actor->creatureRam->defenseMode = 4;
+				actor->actorFlags &= ~Actor::ACTOR_FLAG_DAMAGES_BUZZ;
+
+				int32_t effectX = actor->pos.x + actor->collisionVolumes->offset.x;
+				int32_t effectY = actor->pos.y + actor->collisionVolumes->offset.y;
+				int32_t effectZ = actor->pos.z + actor->collisionVolumes->offset.z;
+				for (int32_t particleCount = 5; particleCount != 0; particleCount--)
+				{
+					Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(effectX, effectY, effectZ, 0x23, 0xE);
+					particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+				}
+
+				Lighting::SpawnLight(effectX, effectY, effectZ, 0xF08000, 0x20, (int32_t)actor);
+				AudioManager::PlaySoundEffect(-2, &actor->pos);
+				AlsSpaceLand::g_hammDialogueState = AlsSpaceLand::BUGGY_ENCOUNTER_DEFEATED;
+				g_hudActorAnimationFrame = 0;
+			}
+
+			if (g_framePulseOutputs.fourTick != 0)
+			{
+				int32_t effectMode = 0;
+				if (actor->primaryAnimIdx == 1 && actor->animationFramePosition < 0x80000)
+					effectMode = 2;
+				if (actor->primaryAnimIdx == 0 && abs(context->localStrafeSpeed) > 0x200)
+					effectMode = 1;
+
+				if (effectMode != 0)
+				{
+					Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(
+						actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle + 0x680) & 0xFFF] >> 1),
+						actor->pos.y - 0x800,
+						actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x580) & 0xFFF] >> 1),
+						0x2A,
+						0xA);
+					particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+					if (effectMode == 2)
+					{
+						particle->velX = -0x80;
+						particle->velZ = 0x100;
+					}
+
+					particle = Nu3D::Particles::SpawnFromPreset(actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x680) & 0xFFF] >> 1),
+						actor->pos.y - 0x800,
+						actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x280) & 0xFFF] >> 1),
+						0x2A,
+						0xA);
+					particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+					if (effectMode == 2)
+					{
+						particle->velX = -0x80;
+						particle->velZ = 0x100;
+					}
+					AudioManager::PlaySoundEffect(0x36, &actor->pos);
+				}
+			}
+
+			if (actor->primaryAnimIdx == 2 && g_framePulseOutputs.sevenTick != 0)
+			{
+				Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(
+					actor->pos.x - Numerics::g_sinCosLUT[actor->yawAngle & 0xFFF] / 3,
+					actor->pos.y - 0x2000,
+					actor->pos.z - Numerics::g_sinCosLUT[(actor->yawAngle + 0x400) & 0xFFF] / 3,
+					0x11,
+					0xA);
+				particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+			}
+		}
 
 		// FUNCTION: TOY2 0x00422C70 [MATCHED]
 		void Martian(Actor::Toy2Actor::ActorBehaviourContext* context)
