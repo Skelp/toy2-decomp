@@ -493,6 +493,62 @@ namespace Toy2
 			Platform::DisableCollision(0x1B);
 		}
 
+		// FUNCTION: TOY2 0x00429FB0 [PROVISIONAL]
+		void UpdateFloatingPlatform(int32_t platformId, int32_t linkId, int32_t waterSurfaceY, int32_t* verticalVelocity, int32_t* verticalOffset)
+		{
+			Vector3I platformOrigin;
+			Platform::GetOrigin(platformId, &platformOrigin);
+
+			int32_t waterOffset;
+			if (waterSurfaceY < g_waterLevel)
+				waterOffset = 0;
+			else
+				waterOffset = g_waterLevel - waterSurfaceY;
+
+			if (g_groundSlamTimer == -40 && (Platform::GetFlags(platformId) & 3) == 2)
+				*verticalVelocity = 0x500;
+
+			if (*verticalOffset < 0)
+				*verticalVelocity += Renderer::g_frameDelta * 0x30;
+			else
+				*verticalVelocity -= Renderer::g_frameDelta * 0x30;
+
+			int32_t previousOffset = *verticalOffset;
+			*verticalOffset += *verticalVelocity * Renderer::g_frameDelta;
+			if (*verticalOffset >= 0 && previousOffset < 0)
+			{
+				if (*verticalVelocity > 0x200)
+					*verticalVelocity >>= 1;
+				else
+					*verticalVelocity = 0x200;
+
+				if (waterOffset != 0)
+					Nu3D::Particles::SpawnFromPreset(platformOrigin.x, platformOrigin.y - *verticalOffset, platformOrigin.z, 0x39, 2);
+			}
+
+			if (*verticalOffset > 0x2000)
+				*verticalVelocity = 0;
+			if (*verticalOffset < -0x800)
+				*verticalVelocity = 0;
+
+			Vector3I targetPosition;
+			Nu3D::Link::GetTargetPosFixed(linkId, &targetPosition);
+			Nu3D::Link::SetPositionRawAndCommit(linkId, platformOrigin.x >> 5, platformOrigin.y >> 5, platformOrigin.z >> 5);
+
+			if (waterOffset > -0x1000)
+				targetPosition.y += waterOffset - (*verticalOffset * waterOffset) / 0x1000;
+			else
+				targetPosition.y += waterOffset + *verticalOffset;
+
+			targetPosition.y -= platformOrigin.y;
+			if (targetPosition.y < -0x800)
+				targetPosition.y = -0x800;
+			else if (targetPosition.y > 0x800)
+				targetPosition.y = 0x800;
+
+			Platform::SetVelocity(platformId, 0, targetPosition.y, 0);
+		}
+
 		// STUB: TOY2 0x0042A130
 		void Interactions() {}
 
