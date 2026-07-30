@@ -1225,6 +1225,7 @@ namespace Toy2
 		const uint32_t SPIN_START_BLOCKING_ACTIONS = 0xFFF7F;
 		const uint32_t SPIN_CHARGE_BLOCKING_ACTIONS = 0xFFFFE;
 		const uint32_t SPIN_HOVER_BLOCKING_ACTIONS = 0xFFF7E;
+		const uint32_t LEDGE_CLIMB_BLOCKING_ACTIONS = 0xFFF7F;
 		const int16_t GROUND_SLAM_ANIMATION_STATE = 8;
 
 		union GrappleBeamVector
@@ -2088,6 +2089,79 @@ namespace Toy2
 				g_spinHoverTimer = 0;
 				buzz->actorFlags &= ~ACTOR_FLAG_LOCK_FACING;
 			}
+		}
+
+		// FUNCTION: TOY2 0x00435F30 [PROVISIONAL]
+		int32_t HandleLedgeClimb(Toy2BuzzActor* buzz)
+		{
+			if (buzz->velocity.vertical > 0 && (g_actionStateFlags & LEDGE_CLIMB_BLOCKING_ACTIONS) == 0)
+			{
+				int32_t floorY = buzz->floorYPos;
+				int32_t buzzY = buzz->posAngles.pos.y;
+				if (floorY - buzzY > 0x2000 && floorY != (int32_t)0x80000000)
+				{
+					PosAndAngles groundProbe;
+					groundProbe.pos.y = buzzY - 0x3600;
+					int32_t forwardOffsetX = Numerics::g_sinCosLUT[buzz->posAngles.angles.yaw & 0xFFF] / 3;
+					int32_t forwardOffsetZ = Numerics::g_sinCosLUT[(buzz->posAngles.angles.yaw + 0x400) & 0xFFF] / 3;
+					groundProbe.pos.x = buzz->posAngles.pos.x + forwardOffsetX;
+					groundProbe.pos.z = buzz->posAngles.pos.z + forwardOffsetZ;
+
+					int32_t groundY = Nu3D::Collision::GetGroundHeight(&groundProbe, 0) - 200;
+					if (Collision::g_groundNormal.y < -15000 && groundY < buzz->posAngles.pos.y - 0x3600 && groundY >= buzz->motionTargetPos.y - 0x3600)
+					{
+						PosAndAngles collisionPosition;
+						collisionPosition.pos.x = buzz->posAngles.pos.x - forwardOffsetX / 4;
+						collisionPosition.pos.y = buzz->posAngles.pos.y;
+						collisionPosition.pos.z = buzz->posAngles.pos.z - forwardOffsetZ / 4;
+						PosAndAngles collisionMovement;
+						collisionMovement.pos.x = 0;
+						collisionMovement.pos.y = groundY - buzz->posAngles.pos.y;
+						collisionMovement.pos.z = 0;
+						if (Collision::SweepAndSlide(&collisionPosition.pos, &collisionMovement.pos, 0x8000, 0, 0xFA0) == 0)
+						{
+							collisionPosition.pos.y = groundY - 6000;
+							collisionMovement.pos.x = forwardOffsetX + forwardOffsetX / 3;
+							collisionMovement.pos.y = 0;
+							collisionMovement.pos.z = forwardOffsetZ + forwardOffsetZ / 3;
+							if (Collision::SweepAndSlide(&collisionPosition.pos, &collisionMovement.pos, 0x8000, 0, 0xFA0) == 0)
+							{
+								AudioManager::PlaySoundEffect(0x17, &buzz->posAngles.pos);
+								Portal::UpdateActiveSectorAt(buzz->posAngles.pos.x, groundY, buzz->posAngles.pos.z);
+								buzz->posAngles.pos.x += forwardOffsetX;
+								buzz->posAngles.pos.y = groundY;
+								buzz->posAngles.pos.z += forwardOffsetZ;
+								g_ledgeClimbTimer = 0x52;
+								g_ledgeClimbPlatformIndex = Collision::GetGroundContactIdx();
+
+								collisionPosition.pos.y = groundY;
+								if (Collision::SweepAndSlide(&collisionPosition.pos, &collisionMovement.pos, 0x8000, 0, 0xFA0) != 0)
+								{
+									buzz->facingAngle =
+										(Nu3D::Math::CartesianToFixedAngle(Collision::g_groundNormal.x, Collision::g_groundNormal.z) - 0x800) & 0xFFF;
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if (g_ledgeClimbTimer != 0)
+			{
+				int32_t facingDelta = (buzz->posAngles.angles.yaw - buzz->facingAngle) & 0xFFF;
+				if (facingDelta > 0x800)
+					facingDelta -= 0x1000;
+				buzz->posAngles.angles.yaw -= Renderer::g_frameDelta * facingDelta / 16;
+				buzz->posAngles.angles.yaw &= 0xFFF;
+				Camera::g_gameplayCamera.roll = (Camera::g_gameplayCamera.roll - Renderer::g_frameDelta * facingDelta / 16) & 0xFFF;
+				g_ledgeClimbTimer -= Renderer::g_frameDelta;
+				if (g_ledgeClimbTimer < 0)
+					g_ledgeClimbTimer = 0;
+				return MOVEMENT_LOCK_LATERAL | MOVEMENT_LOCK_VERTICAL | MOVEMENT_LOCK_FORWARD;
+			}
+
+			g_ledgeClimbPlatformIndex = -1;
+			return 0;
 		}
 
 		// FUNCTION: TOY2 0x004A4B90 [MATCHED]

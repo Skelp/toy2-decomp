@@ -256,7 +256,7 @@
 0x00435100 Toy2::Buzz::HandleSwing
 0x004354E0 Toy2::Buzz::HandlePoleClimb
 0x004359D0 Toy2::Buzz::HandleZipline
-0x00435F30 Toy2::Camera::HandleLedgeClimb
+0x00435F30 Toy2::Buzz::HandleLedgeClimb
 0x00436220 Toy2::Buzz::HandleGameplay
 0x00436C90 AudioManager::SignalThreadExit
 0x00436CC0 AudioManager::Stream::IsThreadReady
