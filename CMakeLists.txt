@@ -143,6 +143,8 @@ set(TOY2_SOURCES
     src/Toy2/Lighting.h
     src/Toy2/Levels.cpp
     src/Toy2/Levels.h
+    src/Toy2/Object.cpp
+    src/Toy2/Object.h
     src/Toy2/Collision.h
     src/Toy2/Collision.cpp
     src/Toy2/Collectables.cpp

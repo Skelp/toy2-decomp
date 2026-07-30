@@ -98,11 +98,8 @@ namespace Toy2
 
 		struct ObjectDesc
 		{
-			int16_t unkVar1;
-			int16_t unkVar2;
-			int16_t id;
-			int16_t unkVar3;
-			int32_t unkVar4;
+			uint8_t reserved[0x1C];
+			int16_t classification;
 		};
 
 		struct Object
@@ -185,7 +182,8 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(ModelTypeData_B) == 0x20);
 		STATIC_ASSERT(sizeof(InstanceSection) == 0x14);
 		STATIC_ASSERT(sizeof(Object) == 0x14);
-		STATIC_ASSERT(sizeof(ObjectDesc) == 0xC);
+		STATIC_ASSERT(sizeof(ObjectDesc) == 0x1E);
+		STATIC_ASSERT(offsetof(ObjectDesc, classification) == 0x1C);
 		STATIC_ASSERT(sizeof(ObjectDescCache) == 0x1C);
 		STATIC_ASSERT(sizeof(LevelDataHeader) == 0x4);
 		STATIC_ASSERT(sizeof(LevelDataTrailer) == 0x4);
