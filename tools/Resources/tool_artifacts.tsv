@@ -10,6 +10,7 @@
 0x0041C100	TOOL-SYMBOL	97.96	2026-07-30	The one-past hidden-collectible state bound resolves to an unrelated nearby data label. The instruction bytes match.
 0x0041E300	TOOL-SYMBOL	97.96	2026-07-30	The one-past hidden-collectible state bound resolves to an unrelated nearby data label. The instruction bytes match.
 0x00429CE0	TOOL-SYMBOL	97.96	2026-07-30	The one-past hidden-collectible state bound resolves to an unrelated nearby data label. The instruction bytes match.
+0x0043AED0	TOOL-SYMBOL	99.13	2026-07-30	The special-track byte resolves through different nearby array elements. The instruction bytes match.
 0x004A4910	TOOL-SYMBOL	95.45	2026-07-28	one-past particle-array bound uses a different adjacent data label
 0x004A4D60	TOOL-SYMBOL	98.33	2026-07-28	one-past particle-array bound uses a different adjacent data label
 0x004A4E60	TOOL-SYMBOL	96.00	2026-07-28	one-past particle-array bound uses a different adjacent data label

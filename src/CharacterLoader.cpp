@@ -6,8 +6,25 @@
 
 #include <string.h>
 
+namespace Toy2
+{
+	namespace Characters
+	{
+		// STUB: TOY2 0x0043D820
+		int32_t LoadAll(char* filename, int32_t baseBoneIndex, uint8_t** dataBuffer) { return 0; }
+	}
+}
+
 namespace CharacterLoader
 {
+	struct AnimationDataLink
+	{
+		int32_t slot;
+		uint8_t data[1];
+
+		AnimationDataLink* Previous() { return reinterpret_cast<AnimationDataLink**>(this)[-1]; }
+	};
+
 	namespace
 	{
 		struct AlternateAllFileHeader
@@ -78,7 +95,7 @@ namespace CharacterLoader
 	CharacterAnimationData* g_characterAnimationData[128];
 
 	// GLOBAL: TOY2 0x0053E4C8
-	int32_t g_alternateAllParse[128];
+	uint8_t* g_alternateAllParse[128];
 
 	// GLOBAL: TOY2 0x0053E8C8
 	uint8_t* g_charFileDataCache[128];
@@ -96,7 +113,7 @@ namespace CharacterLoader
 	uint8_t* g_animationDataBySlot[512];
 
 	// GLOBAL: TOY2 0x00546D90
-	uint8_t* g_animationDataLinkHead;
+	AnimationDataLink* g_animationDataLinkHead;
 
 	// GLOBAL: TOY2 0x00546DF8
 	uint8_t* g_remapDataLinkHead;
@@ -155,6 +172,57 @@ namespace CharacterLoader
 				++remapCount;
 				g_boneRemapCount = remapCount;
 			}
+		}
+	}
+
+	// FUNCTION: TOY2 0x0043AED0 [TOOL]
+	void LoadBuzzLight(const char* filename,
+		int32_t* loadedBoneCount,
+		uint8_t** dataBuffer,
+		int16_t creatureId,
+		Toy2::Actor::ActorCollisionVolume** collisionVolume,
+		ActorBounds* actorBounds)
+	{
+		// Retail leaves this pointer uninitialized on the first-load path.
+		CharacterAnimationData* animationData;
+		int32_t animationSlotBase = creatureId * 4;
+		char loadFilename[256];
+		uint8_t* alternateAllData;
+
+		if (g_characterAnimationData[creatureId] != 0)
+			return;
+
+		g_characterAnimationData[creatureId] = animationData;
+		animationData->modelId = 1;
+		animationData->baseBoneIndex = static_cast<int16_t>(*loadedBoneCount);
+
+		if (g_alternateAllParse[creatureId] == 0)
+		{
+			strcpy(loadFilename, filename);
+			*loadedBoneCount += Toy2::Characters::LoadAll(loadFilename, *loadedBoneCount, dataBuffer);
+		}
+		else
+		{
+			alternateAllData = g_alternateAllParse[creatureId];
+			*loadedBoneCount += AlternateAllParse(*loadedBoneCount, &alternateAllData);
+		}
+
+		if (g_boneTransforms[*loadedBoneCount - 1].trackType == 12)
+		{
+			--*loadedBoneCount;
+			*collisionVolume = reinterpret_cast<Toy2::Actor::ActorCollisionVolume*>(g_boneTransforms[*loadedBoneCount].animationData);
+			memcpy(actorBounds, g_specialTrackValues, sizeof(*actorBounds));
+		}
+
+		animationData->endBoneIndex = static_cast<int16_t>(*loadedBoneCount);
+		for (AnimationDataLink* link = g_animationDataLinkHead; link != 0; link = link->Previous())
+			g_animationDataBySlot[animationSlotBase + link->slot % 4] = link->data;
+
+		for (int32_t boneIndex = animationData->baseBoneIndex; boneIndex < animationData->endBoneIndex; ++boneIndex)
+		{
+			g_boneTransforms[boneIndex].translation.x = 0;
+			g_boneTransforms[boneIndex].translation.y = 0;
+			g_boneTransforms[boneIndex].translation.z = 0;
 		}
 	}
 
