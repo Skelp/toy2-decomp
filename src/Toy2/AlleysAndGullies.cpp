@@ -18,6 +18,23 @@ namespace Toy2
 {
 	extern int32_t g_hudActorAnimationFrame;
 
+	// FUNCTION: TOY2 0x0041E020 [PROVISIONAL]
+	void InterpolatePathPoint(int32_t pathRecordType, int32_t pathPosition, Vector3I* position)
+	{
+		int32_t pointIndex = pathPosition / 0x1000;
+		int32_t fraction = pathPosition & 0xFFF;
+
+		position->x =
+			(Levels::g_recordData[pathRecordType]->data[pointIndex + 1].x - Levels::g_recordData[pathRecordType]->data[pointIndex].x) * fraction / 0x1000
+			+ Levels::g_recordData[pathRecordType]->data[pointIndex].x;
+		position->y =
+			(Levels::g_recordData[pathRecordType]->data[pointIndex + 1].y - Levels::g_recordData[pathRecordType]->data[pointIndex].y) * fraction / 0x1000
+			+ Levels::g_recordData[pathRecordType]->data[pointIndex].y;
+		position->z =
+			(Levels::g_recordData[pathRecordType]->data[pointIndex + 1].z - Levels::g_recordData[pathRecordType]->data[pointIndex].z) * fraction / 0x1000
+			+ Levels::g_recordData[pathRecordType]->data[pointIndex].z;
+	}
+
 	namespace AlleysAndGullies
 	{
 		enum ClownChallengeState
