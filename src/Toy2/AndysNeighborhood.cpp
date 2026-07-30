@@ -2,9 +2,14 @@
 #include "Toy2/LevelLogic.h"
 #include "Toy2/Actor.h"
 #include "Toy2/Camera.h"
+#include "Toy2/Collision.h"
+#include "Toy2/Collectables.h"
+#include "Toy2/KiteTail.h"
+#include "Toy2/Levels.h"
 #include "Toy2/Particles.h"
 #include "AudioManager/AudioManager.h"
 #include "Nu3D/Math.h"
+#include "Nu3D/Link.h"
 #include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
 #include "Random.h"
@@ -14,30 +19,211 @@
 
 namespace Toy2
 {
+	extern uint8_t g_environmentTintRed;
+	extern uint8_t g_environmentTintGreen;
+	extern uint8_t g_environmentTintBlue;
+
 	namespace AndysNeighborhood
 	{
+		struct MoveableObjectInitTable
+		{
+			MoveableObject::InitEntry entries[2];
+			int16_t terminator;
+		};
+
 		enum KiteEncounterState
 		{
 			KITE_ENCOUNTER_ACTIVE = 2,
 		};
 
+		// GLOBAL: TOY2 0x004F1460
+		char g_molehillChallengeInstructions[] = "the soldier will surrender if you quickly ^stomp^ on the ^molehills^ that he is near.";
+
+		// GLOBAL: TOY2 0x004F1518
+		MoveableObjectInitTable g_moveableObjectInitTable = {
+			{
+				{ -2, 2, 4 },
+				{ -2, 11, 20 },
+			},
+			-1,
+		};
+		// GLOBAL: TOY2 0x004F153C
+		Collectables::TokenDialogueValue g_tokenDialogueValues[] = {
+			{ 0x46 },
+			{ 0xC },
+			{ reinterpret_cast<int32_t>(g_molehillChallengeInstructions) },
+			{ 0x800 },
+		};
+		// GLOBAL: TOY2 0x004F154C
+		int16_t g_tokenLinkIds[] = { 0x33, 0x31, 0x32, 0x30, 0x34, 0 };
+
 		// GLOBAL: TOY2 0x0052F5D8
 		int32_t g_kiteTintTimer;
+		// GLOBAL: TOY2 0x0052F5DC
+		int32_t g_moleCurrentHoleIndex;
+		// GLOBAL: TOY2 0x0052F5E0
+		int32_t g_rcCarRaceStarted;
+		// GLOBAL: TOY2 0x0052F5E4
+		int32_t g_gateRotationVelocity;
+		// GLOBAL: TOY2 0x0052F5E8
+		int32_t g_moleTargetHoleIndex;
+		// GLOBAL: TOY2 0x0052F5EC
+		int32_t g_garageDoorRotationAngle;
+		// GLOBAL: TOY2 0x0052F5F0
+		int32_t g_gateRotationAngle;
+		// GLOBAL: TOY2 0x0052F608
+		int32_t g_poleScaleY;
+		// GLOBAL: TOY2 0x0052F60C
+		int32_t g_launchPadIsRising;
+		// GLOBAL: TOY2 0x0052F610
+		int32_t g_fallingTreesState;
+		// GLOBAL: TOY2 0x0052F614
+		int32_t g_fallingTreePitch;
+		// GLOBAL: TOY2 0x0052F618
+		int32_t g_fallingTreeRoll;
+		// GLOBAL: TOY2 0x0052F61C
+		int32_t g_moleHitTimer;
+		// GLOBAL: TOY2 0x0052F620
+		int32_t g_rcCarPathLap;
+		// GLOBAL: TOY2 0x0052F638
+		int32_t g_unusedState0;
 		// GLOBAL: TOY2 0x0052F63C
 		int32_t g_kiteTintToggle;
+		// GLOBAL: TOY2 0x0052F640
+		int32_t g_garageDoorRotationVelocity;
+		// GLOBAL: TOY2 0x0052F648
+		Vector3I g_launchPadPosition;
+		// GLOBAL: TOY2 0x0052F658
+		int32_t g_launchPadSoundTimer;
 		// GLOBAL: TOY2 0x0052F65C
 		int32_t g_kiteSpinAngle;
+		// GLOBAL: TOY2 0x0052F660
+		int32_t g_unusedRaceState;
 		// GLOBAL: TOY2 0x0052F664
 		int32_t g_kiteEncounterState;
+		// GLOBAL: TOY2 0x0052F668
+		int32_t g_rcCarPathPoint;
+		// GLOBAL: TOY2 0x0052F66C
+		int32_t g_fallingTreeShakeTimer;
+		// GLOBAL: TOY2 0x0052F674
+		int32_t g_targetLaunchPadDepression;
+		// GLOBAL: TOY2 0x0052F678
+		int32_t g_ambientParticlePending;
+		// GLOBAL: TOY2 0x0052F680
+		Vector3I g_polePosition;
+		// GLOBAL: TOY2 0x0052F690
+		int32_t g_launchPadDepression;
+		// GLOBAL: TOY2 0x0052F6A8
+		int32_t g_poleRiseSpeed;
 		// GLOBAL: TOY2 0x0052F6AC
 		int32_t g_previousKitePhase;
+		// GLOBAL: TOY2 0x0052F6B0
+		int32_t g_raceCheckpointIndex;
+		// GLOBAL: TOY2 0x0052F6B4
+		int32_t g_launchPadScaleY;
 		// GLOBAL: TOY2 0x0052F6B8
 		int32_t g_kiteBobAngle;
+		// GLOBAL: TOY2 0x0052F6C4
+		int32_t g_kiteHudPulseAngle;
+		// GLOBAL: TOY2 0x0052F6C8
+		int32_t g_firstTreeScaleY;
+		// GLOBAL: TOY2 0x0052F6CC
+		int32_t g_secondTreeScaleY;
+		// GLOBAL: TOY2 0x0052F6D0
+		int32_t g_destroyedMolehillCount;
+		// GLOBAL: TOY2 0x0052F6D4
+		int32_t g_molehillParticlePathPoint;
+		// GLOBAL: TOY2 0x0052F6D8
+		int32_t g_treeSwayAngle;
+		// GLOBAL: TOY2 0x0052F6DC
+		int32_t g_platform0TiltVelocity;
+		// GLOBAL: TOY2 0x0052F6E0
+		int32_t g_platform1TiltVelocity;
+		// GLOBAL: TOY2 0x0052F6E4
+		int32_t g_ambientParticlePathPoint;
+		// GLOBAL: TOY2 0x0052F6E8
+		int32_t g_unusedState1;
 		// GLOBAL: TOY2 0x0052F6EC
 		int32_t g_kiteRollAngle;
 
-		// STUB: TOY2 0x00418E50
-		void Init() {}
+		// FUNCTION: TOY2 0x00418E50 [EFFECTIVE]
+		void Init()
+		{
+			Collectables::Init(g_tokenLinkIds, 0x41);
+			Collectables::Activate(3, 1);
+			MoveableObject::InitTable(g_moveableObjectInitTable.entries);
+			Collectables::LoadTokenTable(g_tokenDialogueValues);
+
+			g_environmentSurfaceY = 0x4400;
+			g_previousBuzzEnvironmentY = 0x4400;
+			g_environmentTintBlue = 0x50;
+			g_environmentTintGreen = 0x60;
+			g_environmentTintRed = 0x80;
+			Platform::SetRotationAngles(0, 0, 0x961, 0);
+			Platform::SetRotationAngles(1, 0, 0xB4A, 0);
+
+			g_previousKitePhase = Actor::g_creatureActors[26].actorPhase;
+			Actor::g_creatureActors[26].actorFlags |= Actor::ACTOR_FLAG_BOSS;
+			Actor::g_creatureActors[4].previousActorPhase = 100;
+			g_kiteBobAngle = 0;
+			g_kiteRollAngle = 0;
+			g_kiteSpinAngle = 0;
+			g_kiteEncounterState = 0;
+			g_kiteTintTimer = 0;
+			g_kiteTintToggle = 0;
+			g_platform0TiltVelocity = 0;
+			g_platform1TiltVelocity = 0;
+			HUD::g_challengeState = 0;
+			g_rcCarPathPoint = 0;
+			g_rcCarPathLap = 0;
+			AndysHouse::g_raceCheckpointPassCount = 0;
+			g_unusedRaceState = 0;
+			g_rcCarRaceStarted = 0;
+			g_raceCheckpointIndex = 0;
+			g_ambientParticlePathPoint = 0;
+			g_ambientParticlePending = 1;
+			g_launchPadScaleY = 0xFFF;
+			g_targetLaunchPadDepression = 0;
+			g_launchPadDepression = 0;
+			g_launchPadIsRising = 0;
+			g_firstTreeScaleY = 0x1000;
+			g_secondTreeScaleY = 0x1000;
+			g_fallingTreeRoll = 0;
+			g_fallingTreePitch = 0;
+			g_treeSwayAngle = 0xC00;
+			g_fallingTreeShakeTimer = 0;
+			g_fallingTreesState = 0;
+			g_gateRotationAngle = 0x2EE;
+			g_gateRotationVelocity = 0;
+			g_garageDoorRotationAngle = 0;
+			g_garageDoorRotationVelocity = 0;
+			g_moleCurrentHoleIndex = 0;
+			g_molehillParticlePathPoint = 0;
+			g_moleHitTimer = 0;
+			g_moleTargetHoleIndex = 0;
+			g_destroyedMolehillCount = 0;
+			g_unusedState0 = 0;
+			g_launchPadSoundTimer = 0;
+			g_unusedState1 = 0;
+
+			Nu3D::Link::SetRotationRelative8bit(5, 0, 0, 0x2EE);
+			Nu3D::Link::GetCurrentPosFixed(6, &g_launchPadPosition);
+			Platform::DisableCollision(5);
+			Platform::DisableCollision(4);
+			Platform::DisableCollision(12);
+			Platform::AddFlags(7, 0x100);
+			Platform::SetOrigin(7, g_launchPadPosition.x, g_launchPadPosition.y, g_launchPadPosition.z);
+			Nu3D::Link::SetScaleFromFixedOffsets(21, 0, 0, 0);
+			Nu3D::Link::SetScaleFromFixedOffsets(32, 0, 0, 0);
+			Nu3D::Link::SetScaleFromFixedOffsets(33, 0, 0, 0);
+			Nu3D::Link::GetCurrentPosFixed(25, &g_polePosition);
+			g_poleScaleY = 0x118;
+			Nu3D::Link::SetScaleFromFixedOffsets(27, 0x1000, g_poleScaleY, 0x1000);
+			Levels::g_recordData[61]->data[0].y = g_polePosition.y;
+			g_poleRiseSpeed = 0;
+			g_kiteHudPulseAngle = 0;
+			KiteTail::Init(&Actor::g_creatureActors[26].pos, 0x10, 0x1000, 0, 0x60);
+		}
 
 		// STUB: TOY2 0x004190C0
 		void Interactions() {}
