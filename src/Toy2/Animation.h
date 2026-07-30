@@ -5,6 +5,11 @@
 
 #include <directx6/d3d.h>
 
+namespace Nu3D
+{
+	struct Creature;
+}
+
 namespace Toy2
 {
 	namespace Actor
@@ -14,12 +19,6 @@ namespace Toy2
 
 	namespace Animation
 	{
-		struct AnimationModel
-		{
-			uint8_t reserved[4];
-			int32_t nodeCount;
-		};
-
 		struct ClipHeader
 		{
 			enum
@@ -72,7 +71,7 @@ namespace Toy2
 		extern int32_t g_currentActorIndex;
 		extern D3DMATRIX g_nodeMatrices[64][32];
 		extern D3DMATRIX g_worldNodeMatrices[64][32];
-		extern AnimationModel* g_currentAnimationModel;
+		extern Nu3D::Creature* g_currentAnimationModel;
 		extern int32_t g_identityNodeIndex;
 		extern int32_t g_isLastAnimatedActor;
 		extern int32_t g_applyRootNodeOffset;
@@ -93,7 +92,8 @@ namespace Toy2
 		void ParseHeader(int16_t* header);
 		int32_t SampleNodeTransform(int32_t nodeIndex, int16_t* clipData, int32_t framePosition, D3DMATRIX* matrix);
 		void EvaluateClipToMatrices(
-			int32_t actorIndex, AnimationModel* model, const D3DMATRIX* actorMatrix, int16_t* clipData, int32_t framePosition, int32_t isSecondaryTrack);
+			int32_t actorIndex, Nu3D::Creature* creature, const D3DMATRIX* actorMatrix, int16_t* clipData, int32_t framePosition, int32_t isSecondaryTrack);
+		void AnimateActors(Actor::Toy2Actor** actors);
 
 		void EvaluateClip(ClipHeader* clip, int32_t framePosition, uint16_t baseBoneIndex, int32_t track);
 		void TransformByBone(Vector3I* position, void* actor, int32_t boneIndex);
@@ -101,7 +101,6 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(ClipHeader) == 0x10);
 		STATIC_ASSERT(sizeof(KeyframeSample) == 0x10);
 		STATIC_ASSERT(sizeof(RotationScratch) == 0x12);
-		STATIC_ASSERT(sizeof(AnimationModel) == 8);
 	}
 }
 

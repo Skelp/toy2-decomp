@@ -158,7 +158,7 @@ namespace NGNLoader
 	{
 		if (! creature->animData)
 		{
-			creature->animData = (void**)malloc(sizeof(void*) * 100);
+			creature->animData = (int16_t**)malloc(sizeof(int16_t*) * 100);
 			creature->animCount = 0;
 			if (! creature->animData)
 				return -1;
@@ -167,7 +167,7 @@ namespace NGNLoader
 		if (creature->animCount >= 100)
 			return -1;
 
-		creature->animData[creature->animCount] = malloc(dataSize);
+		creature->animData[creature->animCount] = (int16_t*)malloc(dataSize);
 		if (! creature->animData[creature->animCount])
 			return -1;
 

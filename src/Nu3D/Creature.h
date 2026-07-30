@@ -27,7 +27,7 @@ namespace Nu3D
 		Patch* patch;
 		int32_t* flagsList;
 		int32_t* nodeMetadata;
-		void** animData;
+		int16_t** animData;
 		int32_t animCount;
 
 		static void Destroy(Creature* creature);

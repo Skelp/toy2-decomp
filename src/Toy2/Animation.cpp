@@ -1,7 +1,9 @@
 #include "Toy2/Animation.h"
 
 #include "CharacterLoader.h"
+#include "NGNLoader/NGNLoader.h"
 #include "Nu3D/Math.h"
+#include "Renderer/Renderer.h"
 #include "Toy2/Buzz.h"
 
 #include <string.h>
@@ -45,7 +47,7 @@ namespace Toy2
 		D3DMATRIX g_worldNodeMatrices[64][32];
 
 		// GLOBAL: TOY2 0x00B62400
-		AnimationModel* g_currentAnimationModel;
+		Nu3D::Creature* g_currentAnimationModel;
 
 		// GLOBAL: TOY2 0x00508D00
 		int32_t g_identityNodeIndex;
@@ -404,7 +406,7 @@ namespace Toy2
 
 		// FUNCTION: TOY2 0x004CD7B0 [PROVISIONAL]
 		void EvaluateClipToMatrices(
-			int32_t actorIndex, AnimationModel* model, const D3DMATRIX* actorMatrix, int16_t* clipData, int32_t framePosition, int32_t isSecondaryTrack)
+			int32_t actorIndex, Nu3D::Creature* creature, const D3DMATRIX* actorMatrix, int16_t* clipData, int32_t framePosition, int32_t isSecondaryTrack)
 		{
 			if (clipData == 0)
 			{
@@ -422,7 +424,7 @@ namespace Toy2
 			}
 
 			ParseHeader(clipData);
-			for (int32_t nodeIndex = 0; nodeIndex < model->nodeCount; nodeIndex++)
+			for (int32_t nodeIndex = 0; nodeIndex < creature->nodeCount; nodeIndex++)
 			{
 				D3DMATRIX nodeMatrix;
 				Nu3D::Math::BuildIdentityMatrix(&nodeMatrix);
@@ -431,6 +433,106 @@ namespace Toy2
 					g_nodeMatrices[actorIndex][nodeIndex] = nodeMatrix;
 					Nu3D::Math::MultiplyMatrix3x4(&g_worldNodeMatrices[actorIndex][nodeIndex], &nodeMatrix, actorMatrix);
 				}
+			}
+		}
+
+		// FUNCTION: TOY2 0x004CD880 [PROVISIONAL]
+		void AnimateActors(Actor::Toy2Actor** actors)
+		{
+			g_actorAnimList = actors;
+			int32_t actorIndex = 0;
+			if (NGNLoader::g_ngnImage->creatureCount != 0 && *actors != 0)
+			{
+				Actor::Toy2Actor** actorCursor = actors;
+				do
+				{
+					g_isLastAnimatedActor = actorCursor[1] == 0;
+					Actor::Toy2Actor* actor = *actorCursor;
+					Nu3D::Creature* creature = NGNLoader::g_ngnImage->creatureData[actor->creatureId];
+					if (creature != 0)
+					{
+						g_currentAnimationModel = creature;
+						g_currentActorIndex = actorIndex;
+
+						D3DMATRIX secondaryActorMatrix;
+						D3DMATRIX primaryActorMatrix;
+						Nu3D::Math::BuildIdentityMatrix(&secondaryActorMatrix);
+						Nu3D::Math::BuildIdentityMatrix(&primaryActorMatrix);
+
+						float secondaryHeightOffset = 0.0f;
+						Vector3F transformVector;
+						transformVector.x = (float)actor->scaleX * (1.0f / 4096.0f);
+						transformVector.y = (float)actor->scaleY * (1.0f / 4096.0f);
+						transformVector.z = (float)actor->scaleZ * (1.0f / 4096.0f);
+						if (actor->scalePivotHeight != 0)
+						{
+							if (actor->scalePivotHeight == (int16_t)0x8000)
+								Nu3D::Math::MatrixApplyScale(&primaryActorMatrix, &transformVector);
+
+							uint16_t scalePivotHeight = (uint16_t)actor->scalePivotHeight;
+							if (scalePivotHeight == 0x8000 || (scalePivotHeight & 1) != 0)
+							{
+								if (scalePivotHeight != 0x8000)
+									secondaryHeightOffset = (1.0f - transformVector.y) * actor->scalePivotHeight;
+								Nu3D::Math::MatrixApplyScale(&secondaryActorMatrix, &transformVector);
+							}
+						}
+
+						Nu3D::Math::MatrixRotatePitch(&secondaryActorMatrix, actor->pitchAngle << 4);
+						Nu3D::Math::MatrixRotateYaw(&secondaryActorMatrix, (actor->yawAngle + 0x800) << 4);
+						Nu3D::Math::MatrixRotateRoll(&secondaryActorMatrix, actor->rollAngle << 4);
+						Nu3D::Math::MatrixRotatePitch(&primaryActorMatrix, actor->pitchAngle << 4);
+						Nu3D::Math::MatrixRotateYaw(&primaryActorMatrix, (actor->yawAngle + 0x800) << 4);
+						Nu3D::Math::MatrixRotateRoll(&primaryActorMatrix, actor->rollAngle << 4);
+
+						transformVector.x = (float)actor->pos.x * Renderer::LensFlare::k_positionScale;
+						transformVector.y = (float)actor->pos.y * Renderer::LensFlare::k_positionScale;
+						transformVector.z = (float)actor->pos.z * Renderer::LensFlare::k_positionScale;
+						Nu3D::Math::AddWorldSpaceTransform(&primaryActorMatrix, &transformVector);
+						transformVector.y = secondaryHeightOffset + transformVector.y;
+						Nu3D::Math::AddWorldSpaceTransform(&secondaryActorMatrix, &transformVector);
+
+						if (actor->secondaryAnimIdx != -1)
+						{
+							EvaluateClipToMatrices(actorIndex,
+								creature,
+								&secondaryActorMatrix,
+								creature->animData[actor->secondaryAnimIdx],
+								actor->secondaryAnimationFramePosition,
+								1);
+						}
+						if (actor->primaryAnimIdx != -1)
+						{
+							EvaluateClipToMatrices(
+								actorIndex, creature, &primaryActorMatrix, creature->animData[actor->primaryAnimIdx], actor->animationFramePosition, 0);
+						}
+
+						for (int32_t nodeIndex = 0; nodeIndex < creature->nodeCount; nodeIndex++)
+						{
+							Vector3I* nodeAngles = &g_nodeAngles[actorIndex][nodeIndex];
+							D3DMATRIX* nodeMatrix = &g_worldNodeMatrices[actorIndex][nodeIndex];
+							if (nodeAngles->z != 0)
+							{
+								Nu3D::Math::MatrixRotateRoll(nodeMatrix, nodeAngles->z << 4);
+								nodeAngles->z = 0;
+							}
+							if (nodeAngles->y != 0)
+							{
+								Nu3D::Math::MatrixRotateYaw(nodeMatrix, nodeAngles->y << 4);
+								nodeAngles->y = 0;
+							}
+							if (nodeAngles->x != 0)
+							{
+								Nu3D::Math::MatrixRotatePitch(nodeMatrix, nodeAngles->x << 4);
+								nodeAngles->x = 0;
+							}
+						}
+					}
+
+					g_currentAnimationModel = 0;
+					actorCursor++;
+					actorIndex++;
+				} while (*actorCursor != 0);
 			}
 		}
 	}
