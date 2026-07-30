@@ -167,6 +167,8 @@ namespace Toy2
 		int32_t g_raceCheckpointArmed;
 		// GLOBAL: TOY2 0x0052F584
 		int32_t g_previousRaceCheckpointMask;
+		// GLOBAL: TOY2 0x0052F588
+		int32_t g_horizontalLinkCycleAngle;
 		// GLOBAL: TOY2 0x0052F58C
 		int32_t g_tiltPlatformState;
 		// GLOBAL: TOY2 0x0052F590
@@ -177,6 +179,8 @@ namespace Toy2
 		int32_t g_ambientParticlePositionIndex;
 		// GLOBAL: TOY2 0x0052F59C
 		int32_t g_savedAmbientEmitterHeight;
+		// GLOBAL: TOY2 0x0052F5A4
+		int32_t g_horizontalLinkRotationAngle;
 		// GLOBAL: TOY2 0x0052F5A8
 		int32_t g_previousTinManPhase;
 		// GLOBAL: TOY2 0x0052F5AC
@@ -248,6 +252,52 @@ namespace Toy2
 			Platform::DisableCollision(14);
 			g_tinManEffectTimer = 0;
 			g_tinManBlinkToggle = 0;
+		}
+
+		// FUNCTION: TOY2 0x00417380 [MATCHED]
+		void UpdateHorizontalLinkEffect(int32_t cycleAngle, int32_t linkId, const LinkOrigin* origin, int32_t rotationAngle, int32_t platformId)
+		{
+			if (Nu3D::Math::IsWithinDistance(&origin->position, &g_buzzActor.posAngles.pos, 0x280) != 0)
+			{
+				int32_t positionAngle;
+				cycleAngle &= 0x1FFF;
+				if (cycleAngle < 0x800)
+				{
+					if (cycleAngle - Renderer::g_frameDelta * 0x40 < 0x400 && cycleAngle >= 0x400)
+						Platform::DisableCollision(platformId);
+					positionAngle = cycleAngle;
+				}
+				else if (cycleAngle < 0x1000)
+				{
+					positionAngle = 0x800;
+				}
+				else if (cycleAngle < 0x1800)
+				{
+					if (cycleAngle - Renderer::g_frameDelta * 0x40 < 0x1400 && cycleAngle >= 0x1400)
+					{
+						Collision::MarkPlatformAsMoving(platformId);
+						AudioManager::PlaySoundEffect(0x25, &origin->position);
+					}
+					positionAngle = 0x1800 - cycleAngle;
+				}
+				else
+				{
+					for (int32_t particleIndex = 0; particleIndex < g_framePulseOutputs.twoTickCount; particleIndex++)
+					{
+						Nu3D::Particles::ParticleInstance* particle =
+							Nu3D::Particles::SpawnFromPreset(origin->position.x - 0x3800, origin->position.y + 0x1000, origin->position.z, 0x18, 0xD);
+						particle->groundAlignRot = *g_randDatBufferPtr++ << 4;
+						particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+					}
+					positionAngle = 0;
+				}
+
+				Nu3D::Link::SetRotationRelative8bit(linkId, 0, 0, rotationAngle & 0xFFF);
+				Nu3D::Link::SetPositionRawAndCommit(linkId,
+					origin->position.x >> 5,
+					(origin->position.y >> 5) - (Numerics::g_sinCosLUT[(positionAngle + 0x400) & 0xFFF] >> 6) + 0x100,
+					origin->position.z >> 5);
+			}
 		}
 
 		// FUNCTION: TOY2 0x00417510 [MATCHED]
