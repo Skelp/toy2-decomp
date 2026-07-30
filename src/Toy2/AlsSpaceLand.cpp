@@ -1,5 +1,6 @@
 #include "Toy2/Toy2.h"
 #include "Toy2/LevelLogic.h"
+#include "Toy2/Levels.h"
 #include "Toy2/Actor.h"
 #include "Toy2/Buzz.h"
 #include "Toy2/Camera.h"
@@ -39,6 +40,12 @@ namespace Toy2
 			int32_t speedAngle;
 		};
 
+		union LaserPosition
+		{
+			Vector3I point;
+			Vector4I beam;
+		};
+
 		// GLOBAL: TOY2 0x004F2F0C
 		int16_t g_tokenLinkIds[] = { 0x31, 0x33, 0x32, 0x35, 0x34, 0 };
 
@@ -52,6 +59,8 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x0052FA58
 		int32_t g_buggyTintToggle;
+		// GLOBAL: TOY2 0x0052FA60
+		LaserPosition g_laserPositions[2];
 		// GLOBAL: TOY2 0x0052FA80
 		Collectables::PickupRecord* g_spaceshipTokenPickup;
 		// GLOBAL: TOY2 0x0052FA84
@@ -124,6 +133,91 @@ namespace Toy2
 		int32_t g_laserPathPoints[2];
 
 		STATIC_ASSERT(sizeof(RotatingLinkState) == 0x8);
+		STATIC_ASSERT(sizeof(LaserPosition) == 0x10);
+
+		// FUNCTION: TOY2 0x00422D20 [PROVISIONAL]
+		void FireLaser(int32_t laserIndex)
+		{
+			g_laserCooldowns[laserIndex] -= Renderer::g_frameDelta;
+			if (g_laserCooldowns[laserIndex] <= 0)
+			{
+				int32_t travelDuration = (*g_randDatBufferPtr++ & 7) + 8;
+				g_laserCooldowns[laserIndex] = travelDuration;
+				g_laserTravelDurations[laserIndex] = travelDuration;
+				g_laserPathPoints[laserIndex] += *g_randDatBufferPtr++ & 7;
+
+				Levels::RecordData* targetPath = Levels::g_recordData[laserIndex + 14];
+				if (g_laserPathPoints[laserIndex] >= targetPath->recordCount)
+					g_laserPathPoints[laserIndex] -= targetPath->recordCount;
+
+				Vector3I& targetPoint = targetPath->data[g_laserPathPoints[laserIndex]];
+				g_laserPositions[laserIndex].point.x = targetPoint.x << 5;
+				g_laserPositions[laserIndex].point.y = targetPoint.y << 5;
+				g_laserPositions[laserIndex].point.z = targetPoint.z << 5;
+
+				if (g_buzzActor.posAngles.pos.y > -0x150F)
+				{
+					int32_t distanceX = (g_laserPositions[laserIndex].point.x - g_buzzActor.posAngles.pos.x) >> 8;
+					int32_t distanceY = (g_laserPositions[laserIndex].point.y - g_buzzActor.posAngles.pos.y) >> 8;
+					int32_t distanceZ = (g_laserPositions[laserIndex].point.z - g_buzzActor.posAngles.pos.z) >> 8;
+					if (distanceX * distanceX + distanceY * distanceY + distanceZ * distanceZ < 250000)
+					{
+						g_laserPositions[laserIndex].point.x = g_buzzActor.posAngles.pos.x;
+						g_laserPositions[laserIndex].point.y = g_buzzActor.posAngles.pos.y - 0x800;
+						g_laserPositions[laserIndex].point.z = g_buzzActor.posAngles.pos.z;
+					}
+				}
+			}
+
+			Levels::RecordData* sourcePath = Levels::g_recordData[15 - laserIndex];
+			Vector3I& sourcePoint = sourcePath->data[g_laserPathPoints[laserIndex]];
+			Vector4I beamDirection;
+			beamDirection.x = (sourcePoint.x << 5) - g_laserPositions[laserIndex].point.x;
+			beamDirection.y = (sourcePoint.y << 5) - g_laserPositions[laserIndex].point.y;
+			beamDirection.z = (sourcePoint.z << 5) - g_laserPositions[laserIndex].point.z;
+			beamDirection.x = g_laserCooldowns[laserIndex] * beamDirection.x / g_laserTravelDurations[laserIndex];
+			beamDirection.y = g_laserCooldowns[laserIndex] * beamDirection.y / g_laserTravelDurations[laserIndex];
+			beamDirection.z = g_laserCooldowns[laserIndex] * beamDirection.z / g_laserTravelDurations[laserIndex];
+
+			if (laserIndex == 0)
+				Renderer::Beam::QueueBeam(9, 0x40, 400, &g_laserPositions[0].beam, &beamDirection, 0x80, 0, 0);
+			else
+				Renderer::Beam::QueueBeam(9, 0x40, 400, &g_laserPositions[laserIndex].beam, &beamDirection, 0, 0x40, 0x80);
+
+			if (g_laserCooldowns[laserIndex] == g_laserTravelDurations[laserIndex])
+			{
+				for (int32_t particleCount = 5; particleCount != 0; particleCount--)
+				{
+					Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(
+						g_laserPositions[laserIndex].point.x, g_laserPositions[laserIndex].point.y, g_laserPositions[laserIndex].point.z, 4, 4);
+					particle->lifetime = (*g_randDatBufferPtr++ & 0xF) * 2 + 0x18;
+				}
+
+				if (laserIndex != 0)
+				{
+					Lighting::SpawnLight(g_laserPositions[laserIndex].point.x,
+						g_laserPositions[laserIndex].point.y,
+						g_laserPositions[laserIndex].point.z,
+						0x78F0,
+						0x10,
+						g_laserPositions[laserIndex].point.x);
+				}
+				else
+				{
+					Lighting::SpawnLight(
+						g_laserPositions[0].point.x, g_laserPositions[0].point.y, g_laserPositions[0].point.z, 0xF00000, 0x10, g_laserPositions[0].point.z);
+				}
+
+				Vector3I* laserPosition = &g_laserPositions[laserIndex].point;
+				AudioManager::PlaySoundEffect(7, laserPosition);
+				if (Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, laserPosition, 0x19) != 0)
+				{
+					int32_t damageAngle =
+						Nu3D::Math::CartesianToFixedAngle(g_buzzActor.posAngles.pos.x - laserPosition->x, g_buzzActor.posAngles.pos.z - laserPosition->z);
+					Buzz::HandleDamage(damageAngle, 2);
+				}
+			}
+		}
 
 		// FUNCTION: TOY2 0x00423020 [PROVISIONAL]
 		void Init()
