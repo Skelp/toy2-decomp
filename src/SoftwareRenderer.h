@@ -436,7 +436,7 @@ namespace SoftwareRenderer
 	// The whole-primitive paths. The two quad rasterizers take only the command;
 	// the two triangle walkers also take the texture.
 	void UnkFunc39(RenderCommand* command);
-	void UnkFunc54(RenderCommand* command);
+	void RasterizeOpaqueQuad555(RenderCommand* command);
 	void UnkFunc46(RenderCommand* command, uint32_t* texData);
 	void UnkFunc45(RenderCommand* command, uint32_t* texData);
 	void UnkFunc57(RenderCommand* command, uint32_t* texData);
