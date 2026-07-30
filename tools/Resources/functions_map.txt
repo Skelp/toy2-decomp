@@ -139,7 +139,7 @@
 0x0041B780 Toy2::CreatureBehaviour::Drill
 0x0041BB80 Toy2::CreatureBehaviour::LTyke
 0x0041BC20 Toy2::ConstructionYard::MoveDrills
-0x0041BEE0 Toy2::ConstructionYard::Method1
+0x0041BEE0 Toy2::ConstructionYard::UpdateMovingPlatformLinks
 0x0041C100 Toy2::ConstructionYard::InitHiddenCollectibles
 0x0041C190 Toy2::ConstructionYard::Init
 0x0041C640 Toy2::ConstructionYard::Interactions

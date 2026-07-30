@@ -130,6 +130,73 @@ namespace Toy2
 			Nu3D::Link::SetPositionRawAndCommit(drillLinkId + 0x12, drillPosition.x >> 7, drillPosition.y >> 7, drillPosition.z >> 7);
 		}
 
+		// FUNCTION: TOY2 0x0041BEE0 [PROVISIONAL]
+		void UpdateMovingPlatformLinks(int32_t baseLinkId, int32_t platformId, int32_t useZAxis, int32_t travelDistance)
+		{
+			Vector3I currentPosition;
+			Vector3I targetPosition;
+			Vector3I platformOrigin;
+			Vector3I rotation;
+
+			Nu3D::Link::GetCurrentPosFixed(baseLinkId, &currentPosition);
+			Nu3D::Link::GetCurrentPosFixed(baseLinkId, &currentPosition);
+			Nu3D::Link::GetTargetPosFixed(baseLinkId, &targetPosition);
+			targetPosition.y = currentPosition.y - targetPosition.y;
+			Nu3D::Link::SetScaleFromFixedOffsets(baseLinkId + 0x39, 0x1000, ((targetPosition.y + travelDistance) * 0x1000) / travelDistance, 0x1000);
+
+			currentPosition.x >>= 5;
+			currentPosition.y >>= 5;
+			currentPosition.z >>= 5;
+			Nu3D::Link::SetPositionRawAndCommit(baseLinkId + 8, currentPosition.x, currentPosition.y, currentPosition.z);
+
+			Nu3D::Link::GetCurrentPosFixed(baseLinkId + 0x10, &targetPosition);
+			targetPosition.y >>= 5;
+			targetPosition.x = currentPosition.x;
+			targetPosition.z = currentPosition.z;
+			Nu3D::Link::SetPositionRawAndCommit(baseLinkId + 0x10, targetPosition.x, targetPosition.y, targetPosition.z);
+			Nu3D::Link::SetPositionRawAndCommit(baseLinkId + 0x39, targetPosition.x, targetPosition.y, targetPosition.z);
+
+			Nu3D::Link::GetCurrentPosFixed(baseLinkId + 0x14, &targetPosition);
+			targetPosition.y >>= 5;
+			if (useZAxis == 0)
+			{
+				targetPosition.x >>= 5;
+				targetPosition.z = currentPosition.z;
+			}
+			else
+			{
+				targetPosition.x = currentPosition.x;
+				targetPosition.z >>= 5;
+			}
+			Nu3D::Link::SetPositionRawAndCommit(baseLinkId + 0x14, targetPosition.x, targetPosition.y, targetPosition.z);
+
+			Platform::GetOrigin(platformId, &platformOrigin);
+			Platform::SetVelocity(
+				platformId, targetPosition.x * 0x20 - platformOrigin.x, targetPosition.y * 0x20 - platformOrigin.y, targetPosition.z * 0x20 - platformOrigin.z);
+
+			currentPosition.x >>= 2;
+			currentPosition.y >>= 2;
+			currentPosition.z >>= 2;
+			Nu3D::Link::SetPositionRawAndCommit(baseLinkId + 4, currentPosition.x, currentPosition.y, currentPosition.z);
+
+			Nu3D::Link::GetCurrentPosFixed(baseLinkId + 0x18, &targetPosition);
+			targetPosition.y >>= 5;
+			if (useZAxis == 0)
+			{
+				targetPosition.x >>= 5;
+				targetPosition.z = currentPosition.z;
+			}
+			else
+			{
+				targetPosition.z >>= 5;
+				targetPosition.x = currentPosition.x;
+			}
+			Nu3D::Link::SetPositionRawAndCommit(baseLinkId + 0x18, targetPosition.x, targetPosition.y, targetPosition.z);
+
+			Nu3D::Link::GetRotation8Bit(baseLinkId, &rotation);
+			Nu3D::Link::SetRotationAbsolute8bit(baseLinkId + 4, rotation.x, rotation.y, rotation.z);
+		}
+
 		// FUNCTION: TOY2 0x0041C100 [TOOL]
 		void InitHiddenCollectibles()
 		{
