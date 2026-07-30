@@ -62,6 +62,24 @@ namespace Toy2
 	// GLOBAL: TOY2 0x00830C74
 	int32_t g_controlConfigAwaitingInput;
 
+	// GLOBAL: TOY2 0x005009F4
+	char* g_graphicsDetailLabels[3] = { "low detail", "medium detail", "high detail" };
+
+	// GLOBAL: TOY2 0x00500A00
+	char* g_graphicsGammaLabels[3] = { "gamma correction normal", "gamma correction medium", "gamma correction high" };
+
+	// GLOBAL: TOY2 0x00500ED0
+	int32_t g_graphicsBlinkTimer = 20;
+
+	// GLOBAL: TOY2 0x00500ED4
+	int32_t g_graphicsCursorY = 72;
+
+	// GLOBAL: TOY2 0x00830C78
+	int32_t g_graphicsSelectedOption;
+
+	// GLOBAL: TOY2 0x00830C7C
+	int32_t g_graphicsInputDelay;
+
 	namespace MainMenu
 	{
 		// GLOBAL: TOY2 0x0053CA60
@@ -885,6 +903,149 @@ namespace Toy2
 		return result;
 	}
 
-	// STUB: TOY2 0x0049CAA0
-	void ShowGraphicsConfig() {}
+	// FUNCTION: TOY2 0x0049CAA0 [PROVISIONAL]
+	void ShowGraphicsConfig()
+	{
+		const uint32_t lensFlareFlag = 1;
+		const uint32_t animatedTexturesFlag = 4;
+		const int32_t optionCount = 4;
+		int32_t canDecrease = 0;
+		int32_t canIncrease = 0;
+
+		Renderer::DrawMenuText(50, "graphics configuration", 0);
+
+		if (g_graphicsSelectedOption != 0 || g_graphicsBlinkTimer < 10)
+			Renderer::DrawMenuText(75, (g_toyCfgData.flags & lensFlareFlag) != 0 ? "lens flare on" : "lens flare off", 0);
+
+		if (g_graphicsSelectedOption != 1 || g_graphicsBlinkTimer < 10)
+			Renderer::DrawMenuText(100, g_graphicsDetailLabels[g_toyCfgData.detail], 0);
+
+		if (g_graphicsSelectedOption != 2 || g_graphicsBlinkTimer < 10)
+		{
+			int32_t gammaLabelIndex = -(int32_t)((g_toyCfgData.gammaCorrection - 2.0f) * -2.0f);
+			Renderer::DrawMenuText(125, g_graphicsGammaLabels[gammaLabelIndex], 0);
+		}
+
+		if (g_graphicsSelectedOption != 3 || g_graphicsBlinkTimer < 10)
+			Renderer::DrawMenuText(150, (g_toyCfgData.flags & animatedTexturesFlag) != 0 ? "animated textures on" : "animated textures off", 0);
+
+		Renderer::DrawMenuTextScaled(160, 178, "AB to select, CD to change", 0, 1, 0x600);
+		Renderer::DrawMenuTextScaled(160, 186, "jump:accept  cancel:go back", 0, 1, 0x600);
+
+		if (g_graphicsInputDelay <= 0)
+		{
+			if ((InputManager::g_curButtonsPressed & INPUT_UP) != 0)
+			{
+				int32_t previousOption = g_graphicsSelectedOption - 1;
+				g_graphicsSelectedOption = previousOption < 0 ? 0 : previousOption;
+				g_graphicsInputDelay = 15;
+				AudioManager::PlayOneShotSoundGlobal(0, 0x1200, 80, 80);
+			}
+
+			if ((InputManager::g_curButtonsPressed & INPUT_DOWN) != 0)
+			{
+				int32_t nextOption = g_graphicsSelectedOption + 1;
+				g_graphicsSelectedOption = nextOption < optionCount ? nextOption : optionCount - 1;
+				g_graphicsInputDelay = 15;
+				AudioManager::PlayOneShotSoundGlobal(0, 0x1200, 80, 80);
+			}
+		}
+
+		switch (g_graphicsSelectedOption)
+		{
+			case 0:
+			case 3:
+				canDecrease = 1;
+				canIncrease = 1;
+				break;
+			case 1:
+				canDecrease = g_toyCfgData.detail != 0;
+				canIncrease = g_toyCfgData.detail < 2;
+				break;
+			case 2:
+				canDecrease = g_toyCfgData.gammaCorrection > 2.0f;
+				canIncrease = g_toyCfgData.gammaCorrection < 3.0f;
+				break;
+		}
+
+		int32_t cursorDelta = g_graphicsSelectedOption * 25 + 72 - g_graphicsCursorY;
+		if (cursorDelta <= 0)
+		{
+			if (cursorDelta < 0)
+			{
+				int32_t scaledStep = Renderer::g_frameDelta * cursorDelta / 5;
+				int32_t minimumStep = scaledStep;
+				if (scaledStep > -1)
+					minimumStep = -1;
+				if (cursorDelta <= minimumStep)
+				{
+					cursorDelta = scaledStep;
+					if (scaledStep > -1)
+						cursorDelta = -1;
+				}
+			}
+		}
+		else
+		{
+			int32_t scaledStep = Renderer::g_frameDelta * cursorDelta / 5;
+			int32_t maximumStep = 1;
+			if (scaledStep >= 1)
+				maximumStep = scaledStep;
+			if (maximumStep <= cursorDelta)
+			{
+				cursorDelta = scaledStep;
+				if (scaledStep < 1)
+					cursorDelta = 1;
+			}
+		}
+		g_graphicsCursorY += cursorDelta;
+
+		if (canDecrease)
+			Renderer::Sprite::DrawScaled(50, (int16_t)g_graphicsCursorY, 0x38, 3, 255, 255, 255, 255, 0x800, 0x800);
+		if (canIncrease)
+			Renderer::Sprite::DrawScaled(255, (int16_t)g_graphicsCursorY, 0x38, 2, 255, 255, 255, 255, 0x800, 0x800);
+
+		g_graphicsBlinkTimer -= Renderer::g_frameDelta;
+		if (g_graphicsBlinkTimer < 0)
+			g_graphicsBlinkTimer += 20;
+
+		if (g_graphicsInputDelay > 0)
+		{
+			g_graphicsInputDelay -= Renderer::g_frameDelta;
+			return;
+		}
+
+		if ((InputManager::g_curButtonsPressed & (INPUT_LEFT | INPUT_RIGHT)) != 0)
+		{
+			if ((InputManager::g_curButtonsPressed & INPUT_LEFT) != 0 && canDecrease)
+				AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 80, 80);
+			g_graphicsInputDelay = 15;
+		}
+		uint8_t buttonsPressed = (uint8_t)InputManager::g_curButtonsPressed;
+
+		switch (g_graphicsSelectedOption)
+		{
+			case 0:
+				if ((buttonsPressed & (INPUT_LEFT | INPUT_RIGHT)) != 0)
+					g_toyCfgData.flags = (g_toyCfgData.flags & ~lensFlareFlag) | ((g_toyCfgData.flags & lensFlareFlag) != 0 ? 0 : lensFlareFlag);
+				break;
+			case 1:
+				if ((buttonsPressed & INPUT_LEFT) != 0 && canDecrease)
+					--g_toyCfgData.detail;
+				if ((buttonsPressed & INPUT_RIGHT) != 0 && canIncrease)
+					++g_toyCfgData.detail;
+				break;
+			case 2:
+				if ((buttonsPressed & INPUT_LEFT) != 0 && canDecrease)
+					g_toyCfgData.gammaCorrection -= 0.5f;
+				if ((buttonsPressed & INPUT_RIGHT) != 0 && canIncrease)
+					g_toyCfgData.gammaCorrection += 0.5f;
+				break;
+			case 3:
+				if ((buttonsPressed & (INPUT_LEFT | INPUT_RIGHT)) != 0)
+					g_toyCfgData.flags =
+						(g_toyCfgData.flags & ~animatedTexturesFlag) | ((g_toyCfgData.flags & animatedTexturesFlag) != 0 ? 0 : animatedTexturesFlag);
+				break;
+		}
+	}
 }
