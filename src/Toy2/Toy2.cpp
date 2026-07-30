@@ -1,4 +1,5 @@
 #include "Toy2/Toy2.h"
+#include "Toy2/Gadget.h"
 #include "D3DApp/d3dapp.h"
 #include "D3DApp/d3dappi.h"
 #include "Toy2/Direct6.h"
@@ -184,23 +185,6 @@ namespace Toy2
 
 	namespace Gadget
 	{
-		struct LevelUnlockInfo
-		{
-			uint8_t modelNodeIndex;
-			uint8_t unlockFlag;
-		};
-
-		struct UnlockGeometryEntry
-		{
-			uint8_t levelIndex;
-			uint8_t lockedLinkId;
-			uint8_t unlockedLinkId;
-			uint8_t platformIndex;
-		};
-
-		STATIC_ASSERT(sizeof(LevelUnlockInfo) == 0x2);
-		STATIC_ASSERT(sizeof(UnlockGeometryEntry) == 0x4);
-
 		// GLOBAL: TOY2 0x00503A24
 		LevelUnlockInfo g_levelUnlockInfo[16] = {
 			{ 8, 1 },

@@ -117,6 +117,7 @@ namespace Toy2
 		extern Toy2Actor* g_renderActors[66];
 
 		extern Toy2Actor* g_lastKilledActor;
+		extern int32_t g_itemReturnHintSoundTimer;
 
 		// The retail executable clears this actor state but does not read it.
 		extern int32_t g_unusedActorStateBuffer[0x80];

@@ -6,6 +6,7 @@
 #include "Toy2/Collectables.h"
 #include "Toy2/Collision.h"
 #include "Toy2/Dialogue.h"
+#include "Toy2/Gadget.h"
 #include "Toy2/Levels.h"
 #include "Toy2/Toy2.h"
 #include "AudioManager/AudioManager.h"
@@ -728,7 +729,7 @@ namespace Toy2
 
 	namespace Actor
 	{
-		// STUB: TOY2 0x004A2480
+		// FUNCTION: TOY2 0x004A2480 [PROVISIONAL]
 		void ItemReturnReward(int32_t actorIndex,
 			int32_t dialogueRecordIndex,
 			char* missingItemSubtitle,
@@ -736,7 +737,80 @@ namespace Toy2
 			char* usageHintSubtitle,
 			int32_t actorFacingAngle,
 			int32_t cameraFacingAngle)
-		{}
+		{
+			if ((g_creatureActors[actorIndex].actorFlags & ACTOR_FLAG_ACTIVE) != 0 && (g_gameplayStateFlags & GAMEPLAY_STATE_CUTSCENE_ACTIVE) == 0)
+			{
+				g_itemReturnHintSoundTimer -= Renderer::g_frameDelta;
+				if (g_itemReturnHintSoundTimer < 0)
+				{
+					g_itemReturnHintSoundTimer = *g_randDatBufferPtr++ * 2 + 0xF0;
+					AudioManager::PlayOneShotSound3DActor(&g_creatureActors[actorIndex],
+						AudioManager::g_oneShotPresets[0xAF].encodedSoundIndex - 1,
+						AudioManager::g_oneShotPresets[0xAF].baseFrequency,
+						AudioManager::g_oneShotPresets[0xAF].leftVolume,
+						&g_creatureActors[actorIndex],
+						0);
+				}
+			}
+
+			if ((g_creatureActors[actorIndex].actorFlags & ACTOR_FLAG_INTERACTION_REQUESTED) == 0)
+				return;
+
+			g_creatureActors[actorIndex].actorFlags &= ~ACTOR_FLAG_INTERACTION_REQUESTED;
+			if (Gadget::g_unlockNodeState == 0)
+			{
+				Dialogue::Begin(actorIndex, dialogueRecordIndex, usageHintSubtitle, actorFacingAngle, cameraFacingAngle, -1);
+			}
+			if (Gadget::g_unlockNodeState > 0)
+			{
+				Dialogue::Begin(actorIndex, dialogueRecordIndex, missingItemSubtitle, actorFacingAngle, cameraFacingAngle, -1);
+				AudioManager::PlayOneShotSound3DActor(&g_creatureActors[actorIndex],
+					AudioManager::g_oneShotPresets[0xB0].encodedSoundIndex - 1,
+					AudioManager::g_oneShotPresets[0xB0].baseFrequency,
+					AudioManager::g_oneShotPresets[0xB0].leftVolume,
+					&g_creatureActors[actorIndex],
+					0);
+			}
+			if (Gadget::g_unlockNodeState >= 0)
+				return;
+
+			AudioManager::PlayOneShotSound3DActor(&g_creatureActors[actorIndex],
+				AudioManager::g_oneShotPresets[0xB1].encodedSoundIndex - 1,
+				AudioManager::g_oneShotPresets[0xB1].baseFrequency,
+				AudioManager::g_oneShotPresets[0xB1].leftVolume,
+				&g_creatureActors[actorIndex],
+				0);
+			ShowModelNode(9, -Gadget::g_unlockNodeState);
+			if (Gadget::g_unlockNodeState == -1)
+			{
+				ShowModelNode(9, 0xB);
+				ShowModelNode(9, 0xC);
+				ShowModelNode(9, 0xF);
+			}
+			Dialogue::Begin(actorIndex, dialogueRecordIndex, itemReturnedSubtitle, actorFacingAngle, cameraFacingAngle, -1);
+
+			Gadget::g_unlockNodeState = 0;
+			uint8_t unlockFlag = Gadget::g_levelUnlockInfo[g_levelFileIndex - 1].unlockFlag;
+			g_unlocks |= unlockFlag;
+			switch (unlockFlag)
+			{
+				case 1:
+					Gadget::ApplyUnlockToGeometry(Gadget::g_unlockBit1Geometry, 8);
+					break;
+				case 2:
+					Gadget::ApplyUnlockToGeometry(Gadget::g_unlockBit2Geometry, 4);
+					break;
+				case 4:
+					Gadget::ApplyUnlockToGeometry(Gadget::g_unlockBit4Geometry, 4);
+					break;
+				case 8:
+					Gadget::ApplyUnlockToGeometry(Gadget::g_unlockBit8Geometry, 4);
+					break;
+				case 0x10:
+					Gadget::ApplyUnlockToGeometry(Gadget::g_unlockBit16Geometry, 4);
+					break;
+			}
+		}
 
 		// STUB: TOY2 0x004076F0
 		void UpdateAIMovement(Toy2Actor* actor) {}
