@@ -27,8 +27,28 @@
 #include "Toy2/Direct6.h"
 #include "Toy2/Weather.h"
 
+namespace Nu3D
+{
+	namespace Camera
+	{
+		extern Vector3I g_sectorViewPosition;
+	}
+}
+
 namespace Toy2
 {
+	namespace Levels
+	{
+		extern int32_t g_type64Count;
+		extern int32_t g_currentType64Region;
+		extern Type64 g_type64Structs[24];
+
+		STATIC_ASSERT(sizeof(Type64) == 0x24);
+		STATIC_ASSERT(offsetof(Type64, boundsSizeSquared) == 0x18);
+		STATIC_ASSERT(offsetof(Type64, recordPtr) == 0x1C);
+		STATIC_ASSERT(offsetof(Type64, regionData) == 0x20);
+	}
+
 	namespace Level
 	{
 		struct PrimitiveCommandBytes
@@ -79,6 +99,46 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(PolyCountInstanceView) == sizeof(Levels::InstanceSection));
 		STATIC_ASSERT(offsetof(PolyCountInstanceView, flags) == 0x0E);
 		STATIC_ASSERT(offsetof(PolyCountInstanceView, renderData) == 0x10);
+
+		// GLOBAL: TOY2 0x0054DD94
+		uint8_t g_activeZoneVisTable[256];
+
+		// GLOBAL: TOY2 0x0054E054
+		int32_t g_visibilityRegionUpdateState;
+
+		// GLOBAL: TOY2 0x00550C20
+		uint8_t* g_activeRegionData;
+
+		// FUNCTION: TOY2 0x0043E070 [PROVISIONAL]
+		void UpdateVisibilityRegion()
+		{
+			int32_t previousRegion = Levels::g_currentType64Region;
+			int32_t smallestBoundsSize = 0x7FFFFFFF;
+
+			for (int32_t regionIndex = 0; regionIndex < Levels::g_type64Count; regionIndex++)
+			{
+				Levels::Type64& region = Levels::g_type64Structs[regionIndex];
+				if (region.boundsSizeSquared < smallestBoundsSize && Nu3D::Camera::g_sectorViewPosition.x >= region.boundsMin.x
+					&& Nu3D::Camera::g_sectorViewPosition.y >= region.boundsMin.y && Nu3D::Camera::g_sectorViewPosition.z >= region.boundsMin.z
+					&& Nu3D::Camera::g_sectorViewPosition.x <= region.boundsMax.x && Nu3D::Camera::g_sectorViewPosition.y <= region.boundsMax.y
+					&& Nu3D::Camera::g_sectorViewPosition.z <= region.boundsMax.z)
+				{
+					Levels::g_currentType64Region = regionIndex;
+					smallestBoundsSize = region.boundsSizeSquared;
+				}
+			}
+
+			if (Levels::g_currentType64Region == -1)
+				Levels::g_currentType64Region = 0;
+
+			if (Levels::g_currentType64Region != previousRegion)
+			{
+				uint8_t* regionData = Levels::g_type64Structs[Levels::g_currentType64Region].regionData;
+				memcpy(g_activeZoneVisTable, regionData + 4, sizeof(g_activeZoneVisTable));
+				g_visibilityRegionUpdateState = 2;
+				g_activeRegionData = regionData + 0x104;
+			}
+		}
 
 		// FUNCTION: TOY2 0x0043E2D0 [PROVISIONAL]
 		int32_t CountCommandStreamPolygons(void* streamData, uint32_t* formatValue)
@@ -438,6 +498,9 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x00557AAC
 		int32_t g_type64Count;
+
+		// GLOBAL: TOY2 0x00557A98
+		int32_t g_currentType64Region;
 
 		// GLOBAL: TOY2 0x00554040
 		Type64 g_type64Structs[24];
@@ -1013,23 +1076,23 @@ namespace Toy2
 					{
 						l_record = ADJ(l_type64Records);
 
-						l_unkVar0Y = &ADJ(l_type64Records)->unkVar0.y;
-						l_unkVar0Z = &ADJ(l_type64Records)->unkVar0.z;
+						l_unkVar0Y = &ADJ(l_type64Records)->boundsMin.y;
+						l_unkVar0Z = &ADJ(l_type64Records)->boundsMin.z;
 
-						ADJ(l_type64Records)->unkVar0.x = 0x7FFFFFFF;
-						ADJ(l_type64Records)->unkVar0.y = 0x7FFFFFFF;
-						ADJ(l_type64Records)->unkVar0.z = 0x7FFFFFFF;
+						ADJ(l_type64Records)->boundsMin.x = 0x7FFFFFFF;
+						ADJ(l_type64Records)->boundsMin.y = 0x7FFFFFFF;
+						ADJ(l_type64Records)->boundsMin.z = 0x7FFFFFFF;
 
-						ADJ(l_type64Records)->unkVar3.x = 0x80000000;
-						ADJ(l_type64Records)->unkVar3.y = 0x80000000;
-						ADJ(l_type64Records)->unkVar3.z = 0x80000000;
+						ADJ(l_type64Records)->boundsMax.x = 0x80000000;
+						ADJ(l_type64Records)->boundsMax.y = 0x80000000;
+						ADJ(l_type64Records)->boundsMax.z = 0x80000000;
 
 						for (l_recordOffset = 0; l_recordOffset < 24; l_recordOffset += 12)
 						{
 							l_bboxVert = ADJ(l_type64Records)->recordPtr + l_recordOffset;
 
-							if (*(l_bboxVert + 4) < l_record->unkVar0.x)
-								l_record->unkVar0.x = *(l_bboxVert + 4);
+							if (*(l_bboxVert + 4) < l_record->boundsMin.x)
+								l_record->boundsMin.x = *(l_bboxVert + 4);
 
 							l_bboxVert2 = ADJ(l_type64Records)->recordPtr + l_recordOffset;
 
@@ -1041,28 +1104,27 @@ namespace Toy2
 
 							l_bboxVert3 = ADJ(l_type64Records)->recordPtr + l_recordOffset;
 
-							if (*(l_bboxVert3 + 1) > ADJ(l_type64Records)->unkVar3.x)
-								ADJ(l_type64Records)->unkVar3.x = *(l_bboxVert3 + 1);
+							if (*(l_bboxVert3 + 1) > ADJ(l_type64Records)->boundsMax.x)
+								ADJ(l_type64Records)->boundsMax.x = *(l_bboxVert3 + 1);
 
 							l_bboxVert4 = ADJ(l_type64Records)->recordPtr + l_recordOffset;
 
-							if (*(l_bboxVert4 + 2) > ADJ(l_type64Records)->unkVar3.y)
-								ADJ(l_type64Records)->unkVar3.y = *(l_bboxVert4 + 2);
+							if (*(l_bboxVert4 + 2) > ADJ(l_type64Records)->boundsMax.y)
+								ADJ(l_type64Records)->boundsMax.y = *(l_bboxVert4 + 2);
 
-							if (*(ADJ(l_type64Records)->recordPtr + l_recordOffset + 12) > ADJ(l_type64Records)->unkVar3.z)
-								ADJ(l_type64Records)->unkVar3.z = *(ADJ(l_type64Records)->recordPtr + l_recordOffset + 12);
+							if (*(ADJ(l_type64Records)->recordPtr + l_recordOffset + 12) > ADJ(l_type64Records)->boundsMax.z)
+								ADJ(l_type64Records)->boundsMax.z = *(ADJ(l_type64Records)->recordPtr + l_recordOffset + 12);
 						}
 
-						l_extentZ = ADJ(l_type64Records)->unkVar3.z - *l_unkVar0Z;
-						l_extentY = ADJ(l_type64Records)->unkVar3.y - *l_unkVar0Y;
-						l_extentX = ADJ(l_type64Records++)->unkVar3.x - l_record->unkVar0.x;
+						l_extentZ = ADJ(l_type64Records)->boundsMax.z - *l_unkVar0Z;
+						l_extentY = ADJ(l_type64Records)->boundsMax.y - *l_unkVar0Y;
+						l_extentX = ADJ(l_type64Records++)->boundsMax.x - l_record->boundsMin.x;
 
-						// Current unkVar6 (double check this)
-						l_type64Records[-2].unkVar8 =
+						// Confirm this field type.
+						l_type64Records[-2].regionData =
 							((l_extentZ >> 5) * (l_extentZ >> 5) + (l_extentY >> 5) * (l_extentY >> 5) + (l_extentX >> 5) * (l_extentX >> 5));
 
-						// Current unkVar8
-						l_type64Records[-1].unkVar0.y = l_newLvlBase;
+						l_type64Records[-1].boundsMin.y = l_newLvlBase;
 
 						l_newLvlBase = (l_newLvlBase + *l_newLvlBase);
 
@@ -1072,7 +1134,7 @@ namespace Toy2
 
 				g_currentType64Region = -1;
 				Levels::g_unused11 = 1;
-				Toy2::Level::LoaderHelper();
+				Toy2::Level::UpdateVisibilityRegion();
 				Levels::g_unused10 = 0;
 			}
 

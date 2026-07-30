@@ -293,7 +293,7 @@
 0x0043D820 Toy2::Characters::LoadAll
 0x0043D9D0 Nullsub7
 0x0043D9E0 Nu3D::Camera::WorldToView
-0x0043E070 Toy2::Level::LoaderHelper
+0x0043E070 Toy2::Level::UpdateVisibilityRegion
 0x0043E2D0 Toy2::Level::CountCommandStreamPolygons
 0x0043E430 Toy2::Level::CalculatePolyCount
 0x0043E5A0 Toy2::InitZoneData

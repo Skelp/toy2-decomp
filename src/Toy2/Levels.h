@@ -89,11 +89,11 @@ namespace Toy2
 
 		struct Type64
 		{
-			Vector3I unkVar0;
-			Vector3I unkVar3;
-			int32_t unkVar6;
-			void* recordPtr;
-			void* unkVar8;
+			Vector3I boundsMin;
+			Vector3I boundsMax;
+			int32_t boundsSizeSquared;
+			uint8_t* recordPtr;
+			uint8_t* regionData;
 		};
 
 		struct ObjectDesc
