@@ -561,6 +561,7 @@ namespace SoftwareRenderer
 	enum SoftwareRenderFlags
 	{
 		SOFTWARE_RENDER_QUAD = 0x1,
+		SOFTWARE_RENDER_COLOUR_KEY = 0x8,
 		SOFTWARE_RENDER_BLEND_50 = 0x10,
 		SOFTWARE_RENDER_ADDITIVE = 0x20,
 		SOFTWARE_RENDER_COLOUR_OFFSET = 0x40,
@@ -1027,8 +1028,6 @@ namespace SoftwareRenderer
 	void UnkRenderAPI9(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x00459AB0
 	void UnkRenderAPI10(SoftwareRenderItem* item) {}
-	// STUB: TOY2 0x0045A5C0
-	void UnkRenderAPI11(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x0045B0B0
 	void UnkRenderAPI12(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x0045E390
@@ -1368,7 +1367,7 @@ namespace SoftwareRenderer
 
 #undef RASTERIZE_SOLID_EDGE
 
-#define RASTERIZE_TEXTURED_EDGE(vertexA, vertexB, doneLabel)                                                                     \
+#define RASTERIZE_TEXTURED_EDGE_WITH_END(vertexA, vertexB, doneLabel, endOperator)                                               \
 	do                                                                                                                           \
 	{                                                                                                                            \
 		int32_t edgeY;                                                                                                           \
@@ -1450,9 +1449,172 @@ namespace SoftwareRenderer
 			edgeU += edgeUStep;                                                                                                  \
 			edgeV += edgeVStep;                                                                                                  \
 			edgeY++;                                                                                                             \
-		} while (edgeY <= edgeEndY && edgeY <= Toy2::g_screenClipBottom);                                                        \
+		} while (edgeY endOperator edgeEndY && edgeY <= Toy2::g_screenClipBottom);                                               \
 	doneLabel:;                                                                                                                  \
 	} while (0)
+
+#define RASTERIZE_TEXTURED_EDGE(vertexA, vertexB, doneLabel) RASTERIZE_TEXTURED_EDGE_WITH_END(vertexA, vertexB, doneLabel, <=)
+#define RASTERIZE_TEXTURED_EDGE_EXCLUSIVE(vertexA, vertexB, doneLabel) RASTERIZE_TEXTURED_EDGE_WITH_END(vertexA, vertexB, doneLabel, <)
+
+	// FUNCTION: TOY2 0x0045A5C0 [PROVISIONAL]
+	void RasterizeBlend50TexturedPolygon555(SoftwareRenderItem* item)
+	{
+		int32_t bottomY = item->vertices[0].y;
+		int32_t topY = bottomY;
+		if (item->vertices[1].y < topY)
+			topY = item->vertices[1].y;
+		else if (item->vertices[1].y > bottomY)
+			bottomY = item->vertices[1].y;
+
+		if (item->vertices[2].y < topY)
+			topY = item->vertices[2].y;
+		else if (item->vertices[2].y > bottomY)
+			bottomY = item->vertices[2].y;
+
+		if (item->renderFlags & SOFTWARE_RENDER_QUAD)
+		{
+			if (item->vertices[3].y < topY)
+				topY = item->vertices[3].y;
+			else if (item->vertices[3].y > bottomY)
+				bottomY = item->vertices[3].y;
+		}
+
+		if (topY < Toy2::g_screenClipTop)
+			topY = Toy2::g_screenClipTop;
+		if (bottomY > Toy2::g_screenClipBottom)
+			bottomY = Toy2::g_screenClipBottom;
+
+		int32_t scanlineCount = bottomY - topY + 1;
+		ScanlineScratch* scanline = &g_scanlineScratch[topY];
+		ClearScanlineFlags(scanline, scanlineCount);
+
+		RASTERIZE_TEXTURED_EDGE_EXCLUSIVE(&item->vertices[0], &item->vertices[1], edge01DoneBlend50_555);
+		RASTERIZE_TEXTURED_EDGE_EXCLUSIVE(&item->vertices[1], &item->vertices[2], edge12DoneBlend50_555);
+		if ((item->renderFlags & SOFTWARE_RENDER_QUAD) == 0)
+		{
+			RASTERIZE_TEXTURED_EDGE_EXCLUSIVE(&item->vertices[2], &item->vertices[0], edge20DoneBlend50_555);
+		}
+		else
+		{
+			RASTERIZE_TEXTURED_EDGE_EXCLUSIVE(&item->vertices[2], &item->vertices[3], edge23DoneBlend50_555);
+			RASTERIZE_TEXTURED_EDGE_EXCLUSIVE(&item->vertices[3], &item->vertices[0], edge30DoneBlend50_555);
+		}
+
+		uint16_t* texture = (uint16_t*)g_softwareTextureData[item->textureIndex];
+		uint16_t* rowStart = (uint16_t*)g_lockedBackBuffer + g_backBufferPitchPixels * topY + Toy2::g_screenClipLeft;
+		if (item->renderFlags & SOFTWARE_RENDER_COLOUR_KEY)
+		{
+			do
+			{
+				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
+				{
+					int32_t leftX = scanline->leftXFixed >> 10;
+					int32_t rightX = scanline->rightXFixed >> 10;
+					if (leftX != rightX)
+					{
+						int32_t width = rightX - leftX;
+						int32_t u = scanline->leftInterpolants[0];
+						int32_t v = scanline->leftInterpolants[1];
+						int32_t uStep = (scanline->rightInterpolants[0] - u) / width;
+						int32_t vStep = (scanline->rightInterpolants[1] - v) / width;
+						int32_t pixelCount = width;
+						uint16_t* pixel;
+						if (leftX < Toy2::g_screenClipLeft)
+						{
+							int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
+							u += clippedPixels * uStep;
+							v += clippedPixels * vStep;
+							pixel = rowStart;
+							if (rightX == Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_softWindowWidth - 1;
+							else
+							{
+								pixelCount = Toy2::g_softWindowWidth;
+								if (rightX <= Toy2::g_screenClipRight)
+									pixelCount = rightX - Toy2::g_screenClipLeft;
+							}
+						}
+						else
+						{
+							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
+							if (rightX == Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_screenClipRight - leftX;
+							else if (rightX > Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_screenClipRight - leftX + 1;
+						}
+
+						for (; pixelCount > 0; pixelCount--)
+						{
+							uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+							if (texel != 0x3E0)
+								*pixel = (*pixel >> 1 & 0x3DEF) + (texel >> 1 & 0x3DEF);
+							u += uStep;
+							v += vStep;
+							pixel++;
+						}
+					}
+				}
+				rowStart += g_backBufferPitchPixels;
+				scanline++;
+				scanlineCount--;
+			} while (scanlineCount != 0);
+			return;
+		}
+
+		do
+		{
+			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
+			{
+				int32_t leftX = scanline->leftXFixed >> 10;
+				int32_t rightX = scanline->rightXFixed >> 10;
+				if (leftX != rightX)
+				{
+					int32_t width = rightX - leftX;
+					int32_t u = scanline->leftInterpolants[0];
+					int32_t v = scanline->leftInterpolants[1];
+					int32_t uStep = (scanline->rightInterpolants[0] - u) / width;
+					int32_t vStep = (scanline->rightInterpolants[1] - v) / width;
+					int32_t pixelCount = width;
+					uint16_t* pixel;
+					if (leftX < Toy2::g_screenClipLeft)
+					{
+						int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
+						v += clippedPixels * vStep;
+						u += clippedPixels * uStep;
+						pixel = rowStart;
+						if (rightX == Toy2::g_screenClipRight)
+							pixelCount = Toy2::g_softWindowWidth - 1;
+						else
+						{
+							pixelCount = Toy2::g_softWindowWidth;
+							if (rightX <= Toy2::g_screenClipRight)
+								pixelCount = rightX - Toy2::g_screenClipLeft;
+						}
+					}
+					else
+					{
+						pixel = rowStart + leftX - Toy2::g_screenClipLeft;
+						if (rightX == Toy2::g_screenClipRight)
+							pixelCount = Toy2::g_screenClipRight - leftX;
+						else if (rightX > Toy2::g_screenClipRight)
+							pixelCount = Toy2::g_screenClipRight - leftX + 1;
+					}
+
+					for (; pixelCount > 0; pixelCount--)
+					{
+						uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+						*pixel = (*pixel >> 1 & 0x3DEF) + (texel >> 1 & 0x3DEF);
+						u += uStep;
+						v += vStep;
+						pixel++;
+					}
+				}
+			}
+			rowStart += g_backBufferPitchPixels;
+			scanline++;
+			scanlineCount--;
+		} while (scanlineCount != 0);
+	}
 
 	// FUNCTION: TOY2 0x0045D110 [PROVISIONAL]
 	void RasterizeAdditiveTexturedPolygon555(SoftwareRenderItem* item)
@@ -2170,6 +2332,8 @@ namespace SoftwareRenderer
 	}
 
 #undef RASTERIZE_TEXTURED_EDGE
+#undef RASTERIZE_TEXTURED_EDGE_EXCLUSIVE
+#undef RASTERIZE_TEXTURED_EDGE_WITH_END
 	// STUB: TOY2 0x00471B30
 	void UnkRenderAPI30(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x00472E70
@@ -2193,7 +2357,7 @@ namespace SoftwareRenderer
 		RasterizeAdditiveTexturedPolygon555,
 		RasterizeSubtractiveTexturedPolygon555,
 		{ UnkRenderAPI5, UnkRenderAPI6, UnkRenderAPI7, UnkRenderAPI8 },
-		{ UnkRenderAPI9, UnkRenderAPI10, UnkRenderAPI11, UnkRenderAPI12 },
+		{ UnkRenderAPI9, UnkRenderAPI10, RasterizeBlend50TexturedPolygon555, UnkRenderAPI12 },
 		UnkRenderAPI13,
 	};
 
