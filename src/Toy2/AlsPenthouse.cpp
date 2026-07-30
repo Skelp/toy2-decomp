@@ -402,6 +402,41 @@ namespace Toy2
 			}
 		}
 
+		// FUNCTION: TOY2 0x004293D0 [PROVISIONAL]
+		void UpdateObjectReplacement()
+		{
+			int32_t sourceLinkId;
+			if ((g_activeLinkMask & 0x10) != 0)
+				sourceLinkId = 1;
+			else if ((g_activeLinkMask & 0x20) != 0)
+				sourceLinkId = 2;
+			else if ((g_activeLinkMask & 0x40) != 0)
+				sourceLinkId = 3;
+			else if ((g_activeLinkMask & 0x80) != 0)
+				sourceLinkId = 4;
+
+			g_objectReplacementPhase = (g_objectReplacementPhase + Renderer::g_frameDelta * 0x20) & 0x3FF;
+			Vector3I sourcePosition;
+			if ((g_activeLinkMask & 0x200) == 0 && g_objectReplacementPhase > 0x300)
+			{
+				g_activeLinkMask |= 0x200;
+				Nu3D::Link::GetCurrentPosFixed(sourceLinkId, &sourcePosition);
+				Nu3D::Link::SetPositionRawAndCommit(44, sourcePosition.x >> 5, sourcePosition.y >> 5, sourcePosition.z >> 5);
+				Nu3D::Link::SetScaleFromFixedOffsets(sourceLinkId, 0, 0, 0);
+				Nu3D::Link::SetScaleFromFixedOffsets(44, 0x1000, 0x800, 0x1000);
+				return;
+			}
+
+			if ((g_activeLinkMask & 0x200) != 0 && g_objectReplacementPhase < 0x300)
+			{
+				g_activeLinkMask &= ~0x200;
+				Nu3D::Link::GetCurrentPosFixed(sourceLinkId, &sourcePosition);
+				Nu3D::Link::SetPositionRawAndCommit(44, sourcePosition.x >> 5, sourcePosition.y >> 5, sourcePosition.z >> 5);
+				Nu3D::Link::SetScaleFromFixedOffsets(sourceLinkId, 0x1000, 0x800, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(44, 0, 0, 0);
+			}
+		}
+
 		// FUNCTION: TOY2 0x00429800 [PROVISIONAL]
 		void CompleteGroundSlamTarget(int32_t timerOffset)
 		{
@@ -536,6 +571,65 @@ namespace Toy2
 				g_trainPathTransitions[10].reverseDirection = 0;
 				g_trainPathTransitions[7].reverseRecordType = 11;
 				g_trainPathTransitions[7].reverseDirection = 0;
+			}
+		}
+
+		// FUNCTION: TOY2 0x00428C80 [MATCHED]
+		void UpdateUnderwaterLinks(uint32_t requestedMask)
+		{
+			if (Camera::g_renderCameraTransform.pos.y > g_environmentSurfaceY)
+				requestedMask = 0;
+
+			if ((g_activeLinkMask & 0x100) != 0 && (requestedMask & 0x100) == 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(43, 0, 0, 0);
+				g_activeLinkMask &= ~0x100;
+			}
+			if ((g_activeLinkMask & 1) != 0 && (requestedMask & 1) == 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(20, 0, 0, 0);
+				g_activeLinkMask &= ~1;
+			}
+			if ((g_activeLinkMask & 2) != 0 && (requestedMask & 2) == 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(21, 0, 0, 0);
+				g_activeLinkMask &= ~2;
+			}
+			if ((g_activeLinkMask & 4) != 0 && (requestedMask & 4) == 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(22, 0, 0, 0);
+				g_activeLinkMask &= ~4;
+			}
+			if ((g_activeLinkMask & 8) != 0 && (requestedMask & 8) == 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(23, 0, 0, 0);
+				g_activeLinkMask &= ~8;
+			}
+
+			if ((g_activeLinkMask & 0x100) == 0 && (requestedMask & 0x100) != 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(43, 0x1000, 0x1000, 0x1000);
+				g_activeLinkMask |= 0x100;
+			}
+			if ((g_activeLinkMask & 1) == 0 && (requestedMask & 1) != 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(20, 0x1000, 0x1000, 0x1000);
+				g_activeLinkMask |= 1;
+			}
+			if ((g_activeLinkMask & 2) == 0 && (requestedMask & 2) != 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(21, 0x1000, 0x1000, 0x1000);
+				g_activeLinkMask |= 2;
+			}
+			if ((g_activeLinkMask & 4) == 0 && (requestedMask & 4) != 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(22, 0x1000, 0x1000, 0x1000);
+				g_activeLinkMask |= 4;
+			}
+			if ((g_activeLinkMask & 8) == 0 && (requestedMask & 8) != 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(23, 0x1000, 0x1000, 0x1000);
+				g_activeLinkMask |= 8;
 			}
 		}
 
