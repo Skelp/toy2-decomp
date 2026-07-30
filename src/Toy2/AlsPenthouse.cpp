@@ -2,12 +2,14 @@
 #include "Toy2/LevelLogic.h"
 #include "Toy2/Actor.h"
 #include "Toy2/Buzz.h"
+#include "Toy2/Camera.h"
 #include "Toy2/Collectables.h"
 #include "Toy2/Collision.h"
 #include "Toy2/Levels.h"
 #include "Toy2/Particles.h"
 #include "Toy2/Weather.h"
 #include "AudioManager/AudioManager.h"
+#include "Nu3D/Camera.h"
 #include "Nu3D/Link.h"
 #include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
@@ -18,6 +20,7 @@
 #include <limits.h>
 
 extern "C" double __cdecl sqrt(double);
+extern "C" int __cdecl abs(int);
 
 namespace Toy2
 {
@@ -73,6 +76,13 @@ namespace Toy2
 			MoveableObject::InitEntry entries[3];
 			int16_t terminator;
 		};
+		struct TrainPathTransition
+		{
+			int16_t forwardRecordType;
+			int16_t forwardDirection;
+			int16_t reverseRecordType;
+			int16_t reverseDirection;
+		};
 		enum GroundSlamTargetLinkOffset
 		{
 			GROUND_SLAM_SOURCE_LINK = 0,
@@ -102,6 +112,21 @@ namespace Toy2
 		// GLOBAL: TOY2 0x004F3D04
 		char g_trainSwitchInstructions[] = {
 #include "Toy2/AlsPenthouseTrainSwitchInstructions.inc"
+		};
+		// GLOBAL: TOY2 0x004F3E00
+		TrainPathTransition g_trainPathTransitions[12] = {
+			{ 2, 0, 7, 0 },
+			{ 10, 0, 1, 1 },
+			{ 8, 1, 5, 1 },
+			{ 9, 1, 6, 0 },
+			{ 3, 0, 6, 0 },
+			{ 1, 0, 4, 0 },
+			{ 0, 0, 1, 0 },
+			{ 3, 1, 12, 0 },
+			{ 11, 0, 4, 1 },
+			{ 11, 1, 2, 1 },
+			{ 10, 1, 9, 1 },
+			{ 11, 1, 8, 0 },
 		};
 		// GLOBAL: TOY2 0x004F3E60
 		extern const MoveableObjectInitTable g_moveableObjectInitTable = {
@@ -427,11 +452,211 @@ namespace Toy2
 			AudioManager::PlaySoundEffect(0x92, cannonPosition);
 		}
 
-		// STUB: TOY2 0x00428890
-		void Method2(uint32_t requestedMask) {}
+		// FUNCTION: TOY2 0x00428890 [PROVISIONAL]
+		void UpdateObjectGroups(uint32_t requestedMask)
+		{
+			ObjectGroup* group = g_objectGroups;
+			do
+			{
+				if ((g_objectGroupMask & group->mask) != 0 && (requestedMask & group->mask) == 0)
+				{
+					Nu3D::Link::SetScaleFromFixedOffsets(group->primaryLinkId, 0, 0, 0);
+					Nu3D::Link::SetScaleFromFixedOffsets(group->alternateLinkId, 0, 0, 0);
+					g_objectGroupMask &= -1 - group->mask;
+					Nu3D::Link::SetRotationRelative8bit(group->rotationLinkId, group->rotationX, group->rotationY, group->rotationZ);
+				}
+				group++;
+			} while (group < &g_objectGroups[7]);
 
-		// STUB: TOY2 0x00428E70
-		void Method8() {}
+			if ((g_objectGroupMask & 1) == 0 && (requestedMask & 1) != 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(36, 0x1000, 0x1000, 0x1000);
+				g_objectGroupMask |= 1;
+				g_trainPathTransitions[2].reverseRecordType = 5;
+				g_trainPathTransitions[2].reverseDirection = 1;
+				g_trainPathTransitions[0].forwardRecordType = 2;
+				g_trainPathTransitions[0].forwardDirection = 0;
+			}
+			if ((g_objectGroupMask & 2) == 0 && (requestedMask & 2) != 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(37, 0x1000, 0x1000, 0x1000);
+				g_objectGroupMask |= 2;
+				g_trainPathTransitions[2].reverseRecordType = 1;
+				g_trainPathTransitions[2].reverseDirection = 1;
+				g_trainPathTransitions[0].forwardRecordType = 3;
+				g_trainPathTransitions[0].forwardDirection = 0;
+			}
+			if ((g_objectGroupMask & 4) == 0 && (requestedMask & 4) != 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(31, 0x1000, 0x1000, 0x1000);
+				g_objectGroupMask |= 4;
+				g_trainPathTransitions[3].forwardRecordType = 9;
+				g_trainPathTransitions[3].forwardDirection = 0;
+				g_trainPathTransitions[9].reverseRecordType = 2;
+				g_trainPathTransitions[9].reverseDirection = 1;
+				g_trainPathTransitions[7].forwardRecordType = 3;
+				g_trainPathTransitions[7].forwardDirection = 1;
+			}
+			if ((g_objectGroupMask & 8) == 0 && (requestedMask & 8) != 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(32, 0x1000, 0x1000, 0x1000);
+				g_objectGroupMask |= 8;
+				g_trainPathTransitions[3].forwardRecordType = 10;
+				g_trainPathTransitions[3].forwardDirection = 1;
+				g_trainPathTransitions[9].reverseRecordType = 4;
+				g_trainPathTransitions[9].reverseDirection = 1;
+				g_trainPathTransitions[7].forwardRecordType = 3;
+				g_trainPathTransitions[7].forwardDirection = 1;
+			}
+			if ((g_objectGroupMask & 0x10) == 0 && (requestedMask & 0x10) != 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(33, 0x1000, 0x1000, 0x1000);
+				g_objectGroupMask |= 0x10;
+				g_trainPathTransitions[3].forwardRecordType = 8;
+				g_trainPathTransitions[3].forwardDirection = 1;
+				g_trainPathTransitions[9].reverseRecordType = 2;
+				g_trainPathTransitions[9].reverseDirection = 1;
+				g_trainPathTransitions[7].forwardRecordType = 4;
+				g_trainPathTransitions[7].forwardDirection = 1;
+			}
+			if ((g_objectGroupMask & 0x20) == 0 && (requestedMask & 0x20) != 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(34, 0x1000, 0x1000, 0x1000);
+				g_objectGroupMask |= 0x20;
+				g_trainPathTransitions[10].reverseRecordType = 9;
+				g_trainPathTransitions[10].reverseDirection = 1;
+				g_trainPathTransitions[7].reverseRecordType = 12;
+				g_trainPathTransitions[7].reverseDirection = 0;
+			}
+			if ((g_objectGroupMask & 0x40) == 0 && (requestedMask & 0x40) != 0)
+			{
+				Nu3D::Link::SetScaleFromFixedOffsets(35, 0x1000, 0x1000, 0x1000);
+				g_objectGroupMask |= 0x40;
+				g_trainPathTransitions[10].reverseRecordType = 8;
+				g_trainPathTransitions[10].reverseDirection = 0;
+				g_trainPathTransitions[7].reverseRecordType = 11;
+				g_trainPathTransitions[7].reverseDirection = 0;
+			}
+		}
+
+		// FUNCTION: TOY2 0x00428E70 [PROVISIONAL]
+		void UpdateTrain()
+		{
+			if (g_trainPathRecordType == 0)
+				return;
+
+			if (Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &g_trainPosition, 0x30) != 0)
+			{
+				int32_t damageAngle =
+					Nu3D::Math::CartesianToFixedAngle(g_buzzActor.posAngles.pos.x - g_trainPosition.x, g_buzzActor.posAngles.pos.z - g_trainPosition.z);
+				Buzz::HandleDamage(damageAngle, 1);
+				g_trainSpeed = 0x10;
+				if (g_trainSoundTimer > 40)
+					g_trainSoundTimer = 40;
+			}
+			else if (g_trainSpeed < 0x100)
+			{
+				g_trainSpeed += 8;
+			}
+
+			if ((g_objectGroupMask & 0x400) == 0)
+			{
+				Levels::RecordData* pathRecord = Levels::g_recordData[g_trainPathRecordType];
+				Vector3I pathDirection;
+				pathDirection.x = pathRecord->data[g_trainPathPointIndex].x * 4 - g_trainPosition.x / 8;
+				pathDirection.y = pathRecord->data[g_trainPathPointIndex].y * 4 - g_trainPosition.y / 8;
+				pathDirection.z = pathRecord->data[g_trainPathPointIndex].z * 4 - g_trainPosition.z / 8;
+
+				if (abs(pathDirection.x) < 0x400 && abs(pathDirection.y) < 0x400 && abs(pathDirection.z) < 0x400)
+				{
+					int32_t endPointIndex;
+					if (g_trainPathDirection != 0)
+					{
+						g_trainPathPointIndex--;
+						endPointIndex = -1;
+					}
+					else
+					{
+						g_trainPathPointIndex++;
+						endPointIndex = pathRecord->recordCount;
+					}
+
+					if (g_trainPathPointIndex == endPointIndex)
+					{
+						TrainPathTransition* transition = &g_trainPathTransitions[g_trainPathRecordType - 1];
+						if (g_trainPathDirection != 0)
+						{
+							g_trainPathDirection = transition->reverseDirection;
+							g_trainPathRecordType = transition->reverseRecordType;
+						}
+						else
+						{
+							g_trainPathDirection = transition->forwardDirection;
+							g_trainPathRecordType = transition->forwardRecordType;
+						}
+
+						if (g_trainPathDirection != 0)
+							g_trainPathPointIndex = Levels::g_recordData[g_trainPathRecordType]->recordCount - 1;
+						else
+							g_trainPathPointIndex = 0;
+					}
+				}
+
+				Nu3D::Math::NormalizeToFixedPoint(&pathDirection, &pathDirection);
+				int32_t movementScale = Renderer::g_frameDelta * g_trainSpeed;
+				g_trainPosition.x += movementScale * pathDirection.x >> 10;
+				g_trainPosition.y += movementScale * pathDirection.y >> 10;
+				g_trainPosition.z += movementScale * pathDirection.z >> 10;
+
+				int32_t rotationDelta = (g_trainRotationAngle - Nu3D::Math::CartesianToFixedAngle(-pathDirection.z, -pathDirection.x)) & 0xFFF;
+				if (rotationDelta > 0x800)
+					g_trainRotationAngle += (0x1000 - rotationDelta) >> 2;
+				else
+					g_trainRotationAngle -= rotationDelta >> 2;
+
+				Nu3D::Link::SetRotationRelative8bit(38, 0, g_trainRotationAngle, 0);
+				Nu3D::Link::SetRotationRelative8bit(80, 0, g_trainRotationAngle, 0);
+			}
+
+			Nu3D::Link::SetPositionRawAndCommit(38, g_trainPosition.x >> 5, g_trainPosition.y >> 5, g_trainPosition.z >> 5);
+			Nu3D::Link::SetPositionRawAndCommit(80, g_trainPosition.x >> 7, g_trainPosition.y >> 7, g_trainPosition.z >> 7);
+
+			if (g_framePulseOutputs.fourTick != 0 && Nu3D::Math::IsWithinDistance(&Camera::g_renderCameraTransform.pos, &g_trainPosition, 0x300) != 0)
+			{
+				int32_t particleZ = g_trainPosition.z - (Numerics::g_sinCosLUT[g_trainRotationAngle & 0xFFF] >> 2);
+				int32_t particleY = g_trainPosition.y - 0x4000;
+				int32_t particleX = g_trainPosition.x - (Numerics::g_sinCosLUT[(g_trainRotationAngle + 0x400) & 0xFFF] >> 2);
+				Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(particleX, particleY, particleZ, 0x11, 0x1B);
+				particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+				g_trainSoundTimer -= Renderer::g_frameDelta;
+				if (g_trainSoundTimer <= 0)
+				{
+					g_trainSoundTimer = *g_randDatBufferPtr++ + 30;
+					AudioManager::PlaySoundEffect(0x97, &g_trainPosition);
+				}
+			}
+
+			Vector3I collisionPosition;
+			Nu3D::Link::GetCurrentPosFixed(30, &collisionPosition);
+			if (g_trainCollisionTimer > 0)
+			{
+				g_trainCollisionTimer -= Renderer::g_frameDelta;
+				if (Nu3D::Math::IsWithinDistance(&collisionPosition, &g_trainPosition, 0x60) != 0)
+					g_trainCollisionTimer = 0xB4;
+			}
+			else if (Nu3D::Math::IsWithinDistance(&collisionPosition, &g_trainPosition, 0x60) != 0)
+			{
+				g_trainCollisionTimer = 0xB4;
+				g_objectGroupMask |= 0x400;
+			}
+			else
+			{
+				g_objectGroupMask &= ~0x400;
+			}
+
+			if (g_trainPathRecordType == 0)
+				Collision::MarkPlatformAsMoving(27);
+		}
 
 		// FUNCTION: TOY2 0x00429D70 [MATCHED]
 		void Init()
@@ -479,7 +704,7 @@ namespace Toy2
 			g_platform15VerticalOffset = 0;
 			g_objectGroupMask = 0;
 			g_trainRotationAngle = 0;
-			Method2(0x25);
+			UpdateObjectGroups(0x25);
 			g_objectGroupFlashPhase = 0;
 			g_trainPathRecordType = 1;
 			g_trainPathPointIndex = 6;
@@ -487,7 +712,7 @@ namespace Toy2
 			g_trainPosition.x = Levels::g_recordData[1]->data[6].x << 5;
 			g_trainPosition.y = Levels::g_recordData[1]->data[6].y << 5;
 			g_trainPosition.z = Levels::g_recordData[1]->data[6].z << 5;
-			Method8();
+			UpdateTrain();
 
 			g_linkReplacementTimer = 0;
 			g_replacedLinkId = 8;
@@ -580,6 +805,7 @@ namespace Toy2
 		void Interactions() {}
 
 		STATIC_ASSERT(sizeof(ObjectGroup) == 0xE);
+		STATIC_ASSERT(sizeof(TrainPathTransition) == 0x8);
 		STATIC_ASSERT(sizeof(RaisedPlatformLink) == 0x2);
 		STATIC_ASSERT(sizeof(MoveableObjectInitTable) == 0x14);
 	}
