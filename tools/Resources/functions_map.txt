@@ -506,6 +506,7 @@
 0x00490BF0 Toy2::UpdateD3DState
 0x00490D00 Nullsub5
 0x00490D10 DevDraw::AppendClippedVertexPair
+0x00490EB0 DevDraw::CalculateProjectedDepth
 0x00490EE0 DevDraw::SubmitQuadFlushing
 0x00491F20 DevDraw::UnkFunc1
 0x00492F70 DevDraw::UnkFunc2

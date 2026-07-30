@@ -2,6 +2,7 @@
 #include "SoftwareRenderer.h"
 #include "DrawingDevice.h"
 #include "Nu3D/BmpDataNode.h"
+#include "Nu3D/Camera.h"
 #include "Nu3D/Math.h"
 #include "Toy2/Toy2.h"
 #include "Toy2/Direct6.h"
@@ -157,6 +158,59 @@ namespace DevDraw
 		Toy2::drawtranb->VerticeCount[slot] = 0;
 
 		return 1;
+	}
+
+	// FUNCTION: TOY2 0x00490D10 [MATCHED]
+	int16_t AppendClippedVertexPair(Vector3I16* pointA, Vector3I16* pointB, float red, float green, float blue)
+	{
+		if (pointA->x < Toy2::g_screenClipLeft)
+			pointA->x = Toy2::g_screenClipLeft;
+		if (pointB->x < Toy2::g_screenClipLeft)
+			pointB->x = Toy2::g_screenClipLeft;
+		if (pointA->x > Toy2::g_screenClipRight)
+			pointA->x = Toy2::g_screenClipRight;
+		if (pointB->x > Toy2::g_screenClipRight)
+			pointB->x = Toy2::g_screenClipRight;
+
+		if (pointA->y < Toy2::g_screenClipTop)
+			pointA->y = Toy2::g_screenClipTop;
+		if (pointB->y < Toy2::g_screenClipTop)
+			pointB->y = Toy2::g_screenClipTop;
+		if (pointA->y > Toy2::g_screenClipBottom)
+			pointA->y = Toy2::g_screenClipBottom;
+		if (pointB->y > Toy2::g_screenClipBottom)
+			pointB->y = Toy2::g_screenClipBottom;
+
+		if (Toy2::drawb->VerticePoolCount < 0x3FFE)
+		{
+			Nu3D::VertexTL* vertex = &Toy2::drawb->VerticePool[Toy2::drawb->VerticePoolCount++];
+			vertex->position.x = pointA->x;
+			vertex->position.y = pointA->y;
+			vertex->position.z = pointA->z;
+
+			uint32_t diffuse = 0xFF000000 | ((int32_t)(red * 255.0f) << 16) | ((int32_t)(green * 255.0f) << 8) | (int32_t)(blue * 255.0f);
+			vertex->diffuse.value = diffuse;
+			vertex->specular.value = 0;
+			vertex->uv.x = 0;
+
+			vertex = &Toy2::drawb->VerticePool[Toy2::drawb->VerticePoolCount++];
+			vertex->position.x = pointB->x;
+			vertex->position.y = pointB->y;
+			vertex->position.z = pointB->z;
+			vertex->diffuse.value = diffuse;
+			vertex->specular.value = 0;
+			vertex->uv.x = 0;
+		}
+
+		return 1;
+	}
+
+	// FUNCTION: TOY2 0x00490EB0 [MATCHED]
+	float CalculateProjectedDepth(int16_t depth)
+	{
+		float depthValue = depth;
+		return (depthValue - Nu3D::Camera::g_currentCamera->nearClip) * Nu3D::Camera::g_currentCamera->farClip
+			/ ((Nu3D::Camera::g_currentCamera->farClip - Nu3D::Camera::g_currentCamera->nearClip) * depthValue);
 	}
 
 }
