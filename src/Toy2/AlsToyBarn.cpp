@@ -5,6 +5,7 @@
 #include "Toy2/Particles.h"
 #include "Toy2/Weather.h"
 #include "AudioManager/AudioManager.h"
+#include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
 #include "Random.h"
@@ -17,6 +18,11 @@ namespace Toy2
 	namespace Lighting
 	{
 		void SpawnLight(int32_t x, int32_t y, int32_t z, int32_t colour, int32_t lifetime, int32_t sourceId);
+	}
+
+	namespace MoveableObject
+	{
+		extern State g_objects[10];
 	}
 
 	namespace AlsToyBarn
@@ -35,6 +41,35 @@ namespace Toy2
 		int32_t g_previousDinoPhase;
 		// GLOBAL: TOY2 0x0052FA50
 		int32_t g_dinoTintTimer;
+
+		// FUNCTION: TOY2 0x00420F70 [MATCHED]
+		void ResolveChickObjectCollision(int32_t actorIndex, int32_t objectIndex)
+		{
+			if ((Actor::g_creatureActors[actorIndex].actorFlags & Actor::ACTOR_FLAG_ACTIVE) != 0)
+			{
+				int32_t actorY = Actor::g_creatureActors[actorIndex].pos.y;
+				if (actorY > MoveableObject::g_objects[1].position.y - 0x9000)
+				{
+					int32_t deltaX = (MoveableObject::g_objects[objectIndex].position.x - Actor::g_creatureActors[actorIndex].pos.x) >> 5;
+					int32_t deltaZ = (MoveableObject::g_objects[objectIndex].position.z - Actor::g_creatureActors[actorIndex].pos.z) >> 5;
+					if (deltaZ * deltaZ + deltaX * deltaX < 490000)
+					{
+						int32_t objectY = MoveableObject::g_objects[objectIndex].position.y;
+						if (actorY < objectY - 0x8800)
+						{
+							Actor::g_creatureActors[actorIndex].pos.y = objectY - 0x9000;
+							return;
+						}
+
+						int32_t angle = Nu3D::Math::CartesianToFixedAngle(deltaX, deltaZ) & 0xFFF;
+						Actor::g_creatureActors[actorIndex].pos.x =
+							MoveableObject::g_objects[objectIndex].position.x - (Numerics::g_sinCosLUT[angle] * 700 >> 9);
+						Actor::g_creatureActors[actorIndex].pos.z =
+							MoveableObject::g_objects[objectIndex].position.z - (Numerics::g_sinCosLUT[(angle + 0x400) & 0xFFF] * 700 >> 9);
+					}
+				}
+			}
+		}
 
 		// STUB: TOY2 0x00421090
 		void Init() {}

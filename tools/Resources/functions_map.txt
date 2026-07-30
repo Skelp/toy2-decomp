@@ -155,7 +155,7 @@
 0x00420060 Toy2::SlimeTime::Interactions
 0x00420AF0 Toy2::CreatureBehaviour::Dino
 0x00420ED0 Toy2::CreatureBehaviour::Chick
-0x00420F70 Toy2::AlsToyBarn::Method1
+0x00420F70 Toy2::AlsToyBarn::ResolveChickObjectCollision
 0x00421090 Toy2::AlsToyBarn::Init
 0x00421340 Toy2::AlsToyBarn::Interactions
 0x00422660 Toy2::CreatureBehaviour::BBuggy
