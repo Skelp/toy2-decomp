@@ -43,6 +43,10 @@ namespace Toy2
 	extern int32_t g_gunFireTimer;
 	extern int32_t g_gunChargeTimer;
 	extern int32_t g_airborneTimer;
+	namespace Camera
+	{
+		extern int32_t g_forwardInputDisabled;
+	}
 	extern uint32_t g_animationEventFlags;
 	extern int32_t g_surfaceEffectState;
 
@@ -1226,7 +1230,9 @@ namespace Toy2
 		const uint32_t SPIN_CHARGE_BLOCKING_ACTIONS = 0xFFFFE;
 		const uint32_t SPIN_HOVER_BLOCKING_ACTIONS = 0xFFF7E;
 		const uint32_t LEDGE_CLIMB_BLOCKING_ACTIONS = 0xFFF7F;
+		const uint32_t TURN_RECOVERY_ACTION_MASK = 0xFF481;
 		const int16_t GROUND_SLAM_ANIMATION_STATE = 8;
+		const int32_t FACING_SNAP_THRESHOLD = 0x5DC;
 
 		union GrappleBeamVector
 		{
@@ -1765,6 +1771,109 @@ namespace Toy2
 
 			if (abs(buzz->velocity.vertical) < 2)
 				buzz->velocity.vertical = 0;
+		}
+
+		// FUNCTION: TOY2 0x004346C0 [MATCHED]
+		int32_t UpdateFacing(Toy2BuzzActor* buzz, MovementRates* movementRates)
+		{
+			int32_t forwardInput = 0;
+			if ((InputManager::g_directionInputState & (INPUT_UP | INPUT_RIGHT | INPUT_DOWN | INPUT_LEFT)) != 0)
+			{
+				if (g_facingInterpolationTimer != -1)
+				{
+					if (g_facingInterpolationTimer == 0)
+					{
+						g_targetFacingAngle = (int16_t)buzz->posAngles.angles.yaw;
+					}
+					else if (g_facingInterpolationTimer >= 0x10)
+					{
+						goto update_input_facing;
+					}
+
+					g_facingInterpolationTimer += Renderer::g_frameDelta;
+					if (g_facingInterpolationTimer >= 0x10)
+						g_facingInterpolationTimer = 0x10;
+				}
+
+			update_input_facing:
+				if (Camera::g_forwardInputDisabled == 0)
+					forwardInput = 1;
+
+				movementRates->lateralSpeedLimit =
+					::Camera::CalculateMaxTurnAngle(InputManager::g_directionInputState) * movementRates->lateralSpeedLimit >> 14;
+			}
+			else
+			{
+				if (g_facingInterpolationTimer > 0 && g_facingInterpolationTimer < 0x10 && buzz->specialAirState != 0)
+				{
+					int32_t angleDelta = (g_targetFacingAngle - (uint16_t)buzz->facingAngle) & 0xFFF;
+					if (angleDelta > 0x800)
+						angleDelta -= 0xFFF;
+
+					if ((g_gameplayStateFlags & GAMEPLAY_STATE_CUTSCENE_ACTIVE) == 0)
+					{
+						buzz->facingAngle = (int16_t)(g_targetFacingAngle - g_facingInterpolationTimer * angleDelta / 0x10) & 0xFFF;
+					}
+					g_facingInterpolationTimer = -1;
+				}
+
+				if (g_buzzActor.forwardSpeed < 0x200 && abs(g_buzzActor.lateralSpeed) < 0x200 && buzz->specialAirState != 0)
+					g_facingInterpolationTimer = 0;
+			}
+
+			int16_t facingAngle = buzz->facingAngle;
+			uint16_t yawAngle = buzz->posAngles.angles.yaw;
+			int32_t angleDelta = (yawAngle - facingAngle) & 0xFFF;
+			if (angleDelta > 0x800)
+			{
+				int32_t turnAmount = 0x1000 - angleDelta;
+				if (turnAmount > FACING_SNAP_THRESHOLD && g_slipperySurfaceState == 0)
+				{
+					buzz->posAngles.angles.yaw = (int16_t)facingAngle;
+					g_targetFacingAngle = facingAngle;
+					if ((g_actionStateFlags & TURN_RECOVERY_ACTION_MASK) == 1)
+					{
+						g_turnRecoveryTimer = 0x1A;
+						buzz->previousAnimationState = -1;
+						AudioManager::PlaySoundEffect(0x12, &buzz->posAngles.pos);
+					}
+				}
+				else
+				{
+					if (turnAmount > movementRates->turnRateLimit)
+						turnAmount = movementRates->turnRateLimit;
+					buzz->posAngles.angles.yaw = (int16_t)(yawAngle + Renderer::g_frameDelta * turnAmount / 8);
+				}
+			}
+			else if (angleDelta > FACING_SNAP_THRESHOLD && g_slipperySurfaceState == 0)
+			{
+				buzz->posAngles.angles.yaw = (int16_t)facingAngle;
+				g_targetFacingAngle = facingAngle;
+				if ((g_actionStateFlags & TURN_RECOVERY_ACTION_MASK) == 1)
+				{
+					g_turnRecoveryTimer = 0x1A;
+					buzz->previousAnimationState = -1;
+					AudioManager::PlaySoundEffect(0x12, &buzz->posAngles.pos);
+				}
+			}
+			else
+			{
+				if (angleDelta > movementRates->turnRateLimit)
+					angleDelta = movementRates->turnRateLimit;
+				buzz->posAngles.angles.yaw = (int16_t)(yawAngle - Renderer::g_frameDelta * angleDelta / 8);
+			}
+
+			buzz->posAngles.angles.yaw &= 0xFFF;
+			if (g_forcedFacingActive != 0)
+			{
+				if (((g_forcedFacingAngle - (uint16_t)buzz->facingAngle + 0x400) & 0xFFF) > 0x800)
+				{
+					g_forcedFacingActive = 0;
+					return forwardInput;
+				}
+				buzz->posAngles.angles.yaw = (int16_t)g_forcedFacingAngle;
+			}
+			return forwardInput;
 		}
 
 		// FUNCTION: TOY2 0x00434990 [PROVISIONAL]

@@ -282,7 +282,7 @@ namespace Toy2
 		int32_t g_unk52F118;
 
 		// GLOBAL: TOY2 0x0052F1CC
-		int32_t g_unk52F1CC;
+		int32_t g_forwardInputDisabled;
 
 		// GLOBAL: TOY2 0x0050A510
 		int32_t g_shakeTimer;
@@ -369,7 +369,7 @@ namespace Toy2
 			camera->data[2] = 0x40;
 			Actor::g_renderActors[65] = 0;
 			g_unk52F118 = 0;
-			g_unk52F1CC = 0;
+			g_forwardInputDisabled = 0;
 			camera->data[4] = 0;
 			camera->target.x = g_buzzActor.posAngles.pos.y;
 			camera->target.y = g_buzzActor.posAngles.pos.y;

@@ -29,8 +29,6 @@ src/Toy2/Buzz.h	placeholder-field	unkVar22	0b31940ecb22	src/Toy2/Buzz.h
 0x00403450	opaque-state-slot	camera->data[2]	ec78c2812689	src/Toy2/Camera.cpp
 0x00403450	address-named-symbol	g_unk52F118	cc9ba2d96d84	src/Toy2/Camera.cpp
 0x00403450	unknown-symbol	g_unk52F118	cc9ba2d96d84	src/Toy2/Camera.cpp
-0x00403450	address-named-symbol	g_unk52F1CC	85daaaf21935	src/Toy2/Camera.cpp
-0x00403450	unknown-symbol	g_unk52F1CC	85daaaf21935	src/Toy2/Camera.cpp
 0x00403450	opaque-state-slot	camera->data[4]	ea8831727752	src/Toy2/Camera.cpp
 0x00403450	opaque-state-slot	camera->data[0]	3d4ccaeae954	src/Toy2/Camera.cpp
 0x00403450	address-named-symbol	g_unk50A4E8	c8a725af08cc	src/Toy2/Camera.cpp
