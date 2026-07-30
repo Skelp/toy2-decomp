@@ -9,12 +9,21 @@
 #include "Nu3D/Primitive.h"
 #include "Nu3D/Viewport.h"
 #include "Renderer/Renderer.h"
+#include "Toy2/Actor.h"
+#include "Toy2/Animation.h"
 #include <FLOAT.H>
 
 namespace Nu3D
 {
 	namespace Scene
 	{
+		enum CreatureNodeFlags
+		{
+			CREATURE_NODE_HIDDEN = 0x1,
+			CREATURE_NODE_BILLBOARD = 0x2,
+			CREATURE_NODE_VERTEX_LIGHTING = 0x4,
+		};
+
 		// GLOBAL: TOY2 0x00508D04
 		float g_secondaryFarClip = 48000.0f;
 
@@ -38,6 +47,84 @@ namespace Nu3D
 
 		// GLOBAL: TOY2 0x00508D20
 		int32_t g_renderPrimaryGeometry = 1;
+
+		// FUNCTION: TOY2 0x004CAA60 [PROVISIONAL]
+		void RenderActor(Creature* creature, D3DMATRIX* matrices, int32_t renderFlags)
+		{
+			int32_t nodeIndex = 0;
+			if (creature->nodeCount > 0)
+			{
+				D3DMATRIX* nodeMatrix = matrices;
+				do
+				{
+					if (creature->primitives[nodeIndex] != 0 && (creature->flagsList[nodeIndex] & CREATURE_NODE_HIDDEN) != CREATURE_NODE_HIDDEN)
+					{
+						int32_t previousVertexLighting;
+						if ((creature->flagsList[nodeIndex] & CREATURE_NODE_VERTEX_LIGHTING) != 0)
+							previousVertexLighting = Renderer::EnableVertexLighting(1);
+
+						if ((creature->flagsList[nodeIndex] & CREATURE_NODE_BILLBOARD) != 0)
+						{
+							D3DMATRIX billboardMatrix = Camera::g_activeCamera.transform;
+							Math::ScaleMatrix(&billboardMatrix);
+							billboardMatrix._41 = nodeMatrix->_41;
+							billboardMatrix._42 = nodeMatrix->_42;
+							billboardMatrix._43 = nodeMatrix->_43;
+							Renderer::RenderPrimitive(creature->primitives[nodeIndex], &billboardMatrix, renderFlags);
+						}
+						else
+						{
+							Renderer::RenderPrimitive(creature->primitives[nodeIndex], nodeMatrix, renderFlags);
+						}
+
+						if ((creature->flagsList[nodeIndex] & CREATURE_NODE_VERTEX_LIGHTING) != 0)
+							Renderer::EnableVertexLighting(previousVertexLighting);
+					}
+
+					nodeIndex++;
+					nodeMatrix++;
+				} while (nodeIndex < creature->nodeCount);
+			}
+
+			Renderer::RenderPatchList(creature->patch, matrices, creature->flagsList, renderFlags);
+		}
+
+		// FUNCTION: TOY2 0x004CDC20 [PROVISIONAL]
+		void RenderActors(Toy2::Actor::Toy2Actor** actors)
+		{
+			int32_t previousRenderFlags = Renderer::Set508718(0);
+			if (NGNLoader::g_ngnImage->creatureCount != 0)
+			{
+				if (*actors != 0)
+				{
+					Toy2::Actor::Toy2Actor** actorCursor = actors;
+					D3DMATRIX(*worldMatrices)[32] = Toy2::Animation::g_worldNodeMatrices;
+					do
+					{
+						if (((*actorCursor)->actorFlags & Toy2::Actor::ACTOR_FLAG_TARGETABLE) != 0)
+						{
+							if ((*actorCursor)->useTint == 1)
+							{
+								Renderer::SetVertexColorModulation((*actorCursor)->actorTint.r, (*actorCursor)->actorTint.g, (*actorCursor)->actorTint.b);
+								Renderer::EnableVertexColorModulation(1);
+							}
+
+							Creature* creature = NGNLoader::g_ngnImage->creatureData[(*actorCursor)->creatureId];
+							if (creature != 0)
+								RenderActor(creature, *worldMatrices, 0);
+
+							if ((*actorCursor)->useTint == 1)
+								Renderer::EnableVertexColorModulation(0);
+						}
+
+						actorCursor++;
+						worldMatrices++;
+					} while (*actorCursor != 0);
+				}
+			}
+
+			Renderer::Set508718(previousRenderFlags);
+		}
 
 		// FUNCTION: TOY2 0x004BC720 [PROVISIONAL]
 		void RenderCellsInRadius(int32_t cellRadius, int32_t scalerType, NGNLoader::NGNImage* image)

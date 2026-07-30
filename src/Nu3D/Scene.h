@@ -2,13 +2,25 @@
 
 #include "Common.h"
 
+#include <directx6/d3d.h>
+
 namespace NGNLoader
 {
 	struct NGNImage;
 }
 
+namespace Toy2
+{
+	namespace Actor
+	{
+		struct Toy2Actor;
+	}
+}
+
 namespace Nu3D
 {
+	struct Creature;
+
 	namespace Scene
 	{
 		enum WorldRenderFlags
@@ -24,6 +36,8 @@ namespace Nu3D
 		extern float g_secondaryPortalNearClip;
 		extern float g_primaryFogFarClip;
 
+		void RenderActor(Creature* creature, D3DMATRIX* matrices, int32_t renderFlags);
+		void RenderActors(Toy2::Actor::Toy2Actor** actors);
 		void RenderCellsInRadius(int32_t cellRadius, int32_t scalerType, NGNLoader::NGNImage* image);
 		void RenderWorldGeometry(int32_t areaIndex, int32_t renderFlags);
 	}
