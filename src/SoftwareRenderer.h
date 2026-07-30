@@ -224,8 +224,8 @@ namespace SoftwareRenderer
 	void QueueRenderCommand(Nu3D::VertexTL* vertices[4], int32_t vertexCount, uint32_t* texData, int32_t renderState);
 
 	// One scanline of a triangle or a quad. RasterizeSortedRenderCommand and RasterizeRenderCommand choose the
-	// variant from the render state and publish it in g_spanRasterizer; UnkFunc57
-	// and UnkFunc58 then call it per scanline. There are 21 variants, one per
+	// variant from the render state and publish it in g_spanRasterizer. RasterizeTriangleSpans
+	// and UnkFunc58 call it per scanline. There are 21 variants, one per
 	// combination of pixel format, texturing, and blend mode.
 	//
 	// Every variant shares one ten-argument __cdecl signature. The walkers push
