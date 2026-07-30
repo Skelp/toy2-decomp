@@ -2,14 +2,20 @@
 #include "Toy2/LevelLogic.h"
 #include "Toy2/Actor.h"
 #include "Toy2/Camera.h"
+#include "Toy2/Collision.h"
+#include "Toy2/Collectables.h"
+#include "Toy2/Direct6.h"
+#include "Toy2/MainMenu.h"
 #include "Toy2/Particles.h"
 #include "Toy2/Weather.h"
 #include "AudioManager/AudioManager.h"
+#include "Nu3D/Link.h"
 #include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
 #include "Random.h"
 #include "Numerics.h"
+#include "Nullsub.h"
 
 namespace Toy2
 {
@@ -33,12 +39,106 @@ namespace Toy2
 			DINO_ENCOUNTER_DEFEATED = 3,
 		};
 
+		// GLOBAL: TOY2 0x004F2844
+		char g_hayBaleRideInstructions[] = {
+#include "HayBaleRideInstructions.inc"
+		};
+
+		// GLOBAL: TOY2 0x004F294C
+		uint16_t g_platform7MotionScript[18] = { 1, 0, 0xF894, 0, 8, 3, 0x7F, 0x60, 1, 0, 0, 0, 8, 3, 0x7F, 0x20, 0, 0x10 };
+		// GLOBAL: TOY2 0x004F2970
+		uint16_t g_platform8MotionScript[18] = { 1, 0, 0xF574, 0, 8, 3, 0x7F, 0x60, 1, 0, 0, 0, 8, 3, 0x7F, 0x20, 0, 0x10 };
+		// GLOBAL: TOY2 0x004F2994
+		uint16_t g_platform9MotionScript[18] = { 1, 0, 0xF574, 0, 8, 3, 0x7F, 0x60, 1, 0, 0, 0, 8, 3, 0x7F, 0x20, 0, 0x10 };
+		// GLOBAL: TOY2 0x004F29B8
+		uint16_t g_platform13MotionScript[18] = { 1, 0x316, 0, 0, 0xC, 3, 0xFF, 0x20, 1, 0, 0, 0, 0xC, 3, 0xFF, 0x20, 0, 0x10 };
+		// GLOBAL: TOY2 0x004F29DC
+		uint16_t g_platform12MotionScript[18] = { 1, 0x316, 0, 0, 0xC, 3, 0xFF, 0x20, 1, 0, 0, 0, 0xC, 3, 0xFF, 0x20, 0, 0x10 };
+		// GLOBAL: TOY2 0x004F2A00
+		uint16_t g_platform11MotionScript[18] = { 1, 0x316, 0, 0, 0xC, 3, 0xFF, 0x20, 1, 0, 0, 0, 0xC, 3, 0xFF, 0x20, 0, 0x10 };
+
+		// GLOBAL: TOY2 0x004F2A24
+		MoveableObject::InitEntry g_moveableObjectInitTable[] = {
+			{ 8, 5, 0 },
+			{ 9, 6, 1 },
+			{ -1, 0, 0 },
+		};
+
+		// GLOBAL: TOY2 0x004F2A48
+		int16_t g_tokenLinkIds[] = { 0x31, 0x33, 0x34, 0x32, 0x30, 0 };
+
+		// GLOBAL: TOY2 0x004F2A54
+		extern const Collectables::TokenDialogueValue g_tokenDialogueValues[] = {
+			{ 0x46 },
+			{ 0x14 },
+			{ reinterpret_cast<int32_t>(g_hayBaleRideInstructions) },
+			{ 0x400 },
+			{ -1 },
+		};
+
+		// GLOBAL: TOY2 0x0052F9BC
+		int32_t g_platform10VerticalVelocity;
+		// GLOBAL: TOY2 0x0052F9C0
+		int32_t g_groundSlamPlatformTimer;
+		// GLOBAL: TOY2 0x0052F9DC
+		int32_t g_chick10WasActive;
+		// GLOBAL: TOY2 0x0052F9E0
+		int32_t g_chick11WasActive;
+		// GLOBAL: TOY2 0x0052F9E4
+		int32_t g_hayBaleRideState;
+		// GLOBAL: TOY2 0x0052F9E8
+		int32_t g_platform14MotionSpeed;
+		// GLOBAL: TOY2 0x0052F9EC
+		int32_t g_launchPadBounceTimer;
+		// GLOBAL: TOY2 0x0052F9F0
+		uint16_t* g_platform12MotionCursor;
+		// GLOBAL: TOY2 0x0052F9F4
+		uint16_t* g_platform11MotionCursor;
+		// GLOBAL: TOY2 0x0052F9F8
+		uint16_t* g_platform9MotionCursor;
+		// GLOBAL: TOY2 0x0052F9FC
+		uint16_t* g_platform13MotionCursor;
+		// GLOBAL: TOY2 0x0052FA00
+		uint16_t* g_platform7MotionCursor;
+		// GLOBAL: TOY2 0x0052FA04
+		uint16_t* g_platform8MotionCursor;
+		// GLOBAL: TOY2 0x0052FA08
+		int32_t g_eggLiftOffset;
+		// GLOBAL: TOY2 0x0052FA0C
+		int32_t g_ambientParticlePositionIndex;
+		// GLOBAL: TOY2 0x0052FA10
+		int32_t g_targetEggLiftOffset;
+
 		// GLOBAL: TOY2 0x0052FA14
 		int32_t g_dinoEncounterState;
+		// GLOBAL: TOY2 0x0052FA18
+		int32_t g_unusedState;
+		// GLOBAL: TOY2 0x0052FA1C
+		int32_t g_eggChallengeState;
 		// GLOBAL: TOY2 0x0052FA20
 		int32_t g_dinoTintToggle;
+		// GLOBAL: TOY2 0x0052FA24
+		int32_t g_hayBaleRideTimer;
+		// GLOBAL: TOY2 0x0052FA28
+		int32_t g_hayBaleRideSpeed;
 		// GLOBAL: TOY2 0x0052FA2C
 		int32_t g_previousDinoPhase;
+		// GLOBAL: TOY2 0x0052FA30
+		int32_t g_hayBaleRideAngle;
+		// GLOBAL: TOY2 0x0052FA34
+		int32_t g_platform12MotionTimer;
+		// GLOBAL: TOY2 0x0052FA38
+		int32_t g_platform11MotionTimer;
+		// GLOBAL: TOY2 0x0052FA3C
+		int32_t g_platform9MotionTimer;
+		// GLOBAL: TOY2 0x0052FA40
+		int32_t g_platform13MotionTimer;
+		// GLOBAL: TOY2 0x0052FA44
+		int32_t g_platform7MotionTimer;
+		// GLOBAL: TOY2 0x0052FA48
+		int32_t g_platform8MotionTimer;
+		// GLOBAL: TOY2 0x0052FA4C
+		int32_t g_platform10ForwardSpeed;
 		// GLOBAL: TOY2 0x0052FA50
 		int32_t g_dinoTintTimer;
 
@@ -71,8 +171,80 @@ namespace Toy2
 			}
 		}
 
-		// STUB: TOY2 0x00421090
-		void Init() {}
+		// FUNCTION: TOY2 0x00421090 [PROVISIONAL]
+		void Init()
+		{
+			Collectables::Init(g_tokenLinkIds, 0x41);
+			Collectables::LoadTokenTable(g_tokenDialogueValues);
+			MoveableObject::InitTable(g_moveableObjectInitTable);
+			Collectables::Activate(3, 1);
+			Nullsub7(0x13, 0x12);
+
+			g_hayBaleRideState = 0;
+			g_hayBaleRideTimer = 0;
+			g_hayBaleRideAngle = 0;
+			g_hayBaleRideSpeed = 0;
+			Platform::AddFlags(0, 0x100);
+
+			Actor::g_creatureActors[6].actorFlags &= ~(Actor::ACTOR_FLAG_TARGETABLE | Actor::ACTOR_FLAG_COLLIDABLE);
+			g_ambientParticlePositionIndex = 0;
+			g_dinoEncounterState = 0;
+			g_dinoTintToggle = 0;
+			g_dinoTintTimer = 0;
+			g_previousDinoPhase = Actor::g_creatureActors[0].actorPhase;
+			g_chick10WasActive = 0;
+			g_chick11WasActive = 0;
+			g_unusedState = 0;
+			g_groundSlamPlatformTimer = 0;
+			Nu3D::Link::SetScaleFromFixedOffsets(0x1E, 0x1000, 0, 0x1000);
+
+			g_launchPadBounceTimer = 0;
+			Nu3D::Link::SetScaleFromFixedOffsets(3, 0x1000, 0, 0x1000);
+			g_platform14MotionSpeed = 0;
+			g_platform10VerticalVelocity = 0;
+			g_platform10ForwardSpeed = 0;
+			Platform::AddFlags(10, 0x100);
+			Platform::AddFlags(14, 0x100);
+
+			g_eggLiftOffset = 0;
+			g_eggChallengeState = 0;
+			g_targetEggLiftOffset = 0;
+			HUD::g_challengeState = 0;
+			AndysHouse::g_raceCheckpointPassCount = 0;
+
+			g_platform7MotionCursor = g_platform7MotionScript;
+			g_platform7MotionTimer = 0;
+			g_platform8MotionCursor = g_platform8MotionScript;
+			g_platform8MotionTimer = 0;
+			g_platform9MotionCursor = g_platform9MotionScript;
+			g_platform9MotionTimer = 0;
+			Platform::AddFlags(7, 0x100);
+			Platform::AddFlags(8, 0x100);
+			Platform::AddFlags(9, 0x100);
+			g_platform13MotionCursor = g_platform13MotionScript;
+			g_platform13MotionTimer = 0;
+			g_platform12MotionCursor = g_platform12MotionScript;
+			g_platform12MotionTimer = 0;
+			g_platform11MotionCursor = g_platform11MotionScript;
+			g_platform11MotionTimer = 0;
+
+			Vector3I platformOrigin;
+			Platform::GetOrigin(13, &platformOrigin);
+			Platform::SetOrigin(13, platformOrigin.x + 0x62C0, platformOrigin.y, platformOrigin.z);
+			Nu3D::Link::SetPositionRawAndCommit(12, (platformOrigin.x + 0x62C0) >> 5, platformOrigin.y >> 5, platformOrigin.z >> 5);
+
+			Platform::GetOrigin(12, &platformOrigin);
+			Platform::SetOrigin(12, platformOrigin.x + 0x62C0, platformOrigin.y, platformOrigin.z);
+			Nu3D::Link::SetPositionRawAndCommit(13, (platformOrigin.x + 0x62C0) >> 5, platformOrigin.y >> 5, platformOrigin.z >> 5);
+
+			Platform::GetOrigin(11, &platformOrigin);
+			Platform::SetOrigin(11, platformOrigin.x + 0x62C0, platformOrigin.y, platformOrigin.z);
+			Nu3D::Link::SetPositionRawAndCommit(14, (platformOrigin.x + 0x62C0) >> 5, platformOrigin.y >> 5, platformOrigin.z >> 5);
+
+			MainMenu::g_menuClearColor.r = g_skyColorRed;
+			MainMenu::g_menuClearColor.g = g_skyColorGreen;
+			MainMenu::g_menuClearColor.b = g_skyColorBlue;
+		}
 
 		// STUB: TOY2 0x00421340
 		void Interactions() {}

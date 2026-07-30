@@ -105,6 +105,7 @@ set(TOY2_SOURCES
     src/Toy2/AlleysAndGullies.cpp
     src/Toy2/SlimeTime.cpp
     src/Toy2/AlsToyBarn.cpp
+    src/Toy2/HayBaleRideInstructions.inc
     src/Toy2/AlsSpaceLand.cpp
     src/Toy2/BarnEncounter.cpp
     src/Toy2/ElevatorHop.cpp

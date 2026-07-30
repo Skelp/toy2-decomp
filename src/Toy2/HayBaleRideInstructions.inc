@@ -1,0 +1,1 @@
+"the ^hay bale ride^ will buck you over to the ^chick^ on the gumball machine but it will stop if you leave the area. unlock the ^rocket boots^ and jet over to the shopping cart to solve this puzzle."
