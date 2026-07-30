@@ -376,7 +376,7 @@
 0x0045E390 SoftwareRenderer::UnkRenderAPI13
 0x00461D20 SoftwareRenderer::UnkRenderAPI14
 0x00463090 SoftwareRenderer::RasterizeTexturedPolygon565
-0x00463B80 SoftwareRenderer::UnkRenderAPI22
+0x00463B80 SoftwareRenderer::RasterizeBlend25TexturedPolygon565
 0x00464690 SoftwareRenderer::RasterizeBlend50TexturedPolygon565
 0x00465180 SoftwareRenderer::UnkRenderAPI24
 0x00467080 SoftwareRenderer::UnkRenderAPI17
