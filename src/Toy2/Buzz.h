@@ -54,8 +54,9 @@ namespace Toy2
 
 		enum PoleClimbFlags
 		{
-			POLE_CLIMB_DESCENDING = 0x2,
+			POLE_CLIMB_ASCENDING = 0x2,
 			POLE_CLIMB_SLIDING = 0x4,
+			POLE_CLIMB_ATTACHING = 0x8,
 		};
 
 		enum ZiplineState

@@ -1011,7 +1011,7 @@ namespace Toy2
 				if (g_poleClimbState > 0)
 				{
 					g_buzzActor.animationState = 15;
-					if ((g_poleClimbState & POLE_CLIMB_DESCENDING) != 0)
+					if ((g_poleClimbState & POLE_CLIMB_ASCENDING) != 0)
 						g_buzzActor.animationState = 14;
 					if ((g_poleClimbState & POLE_CLIMB_SLIDING) != 0)
 					{
@@ -1248,6 +1248,7 @@ namespace Toy2
 		const uint32_t SPIN_CHARGE_BLOCKING_ACTIONS = 0xFFFFE;
 		const uint32_t SPIN_HOVER_BLOCKING_ACTIONS = 0xFFF7E;
 		const uint32_t LEDGE_CLIMB_BLOCKING_ACTIONS = 0xFFF7F;
+		const uint32_t POLE_CLIMB_BLOCKING_ACTIONS = 0xFFF6E;
 		const uint32_t SWING_BLOCKING_ACTIONS = 0xFFB7E;
 		const uint32_t ACTION_STATE_SWING = 0x400;
 		const int16_t SWING_START_ANIMATION_STATE = 26;
@@ -2440,6 +2441,219 @@ namespace Toy2
 			buzz->posAngles.angles.yaw &= 0xFFF;
 			buzz->facingAngle = buzz->posAngles.angles.yaw;
 			return MOVEMENT_LOCK_VERTICAL;
+		}
+
+		enum PoleType
+		{
+			POLE_TYPE_TOP_EXIT = 1,
+			POLE_TYPE_SLIDE = 2,
+			POLE_TYPE_DISABLED = 3,
+		};
+
+		enum PoleBoundaryState
+		{
+			POLE_BOUNDARY_NONE = 0,
+			POLE_BOUNDARY_BOTTOM = 1,
+			POLE_BOUNDARY_TOP = 2,
+		};
+
+		struct PoleRecord
+		{
+			Vector3I position;
+			int32_t type;
+			int32_t height;
+			int32_t reserved;
+		};
+		STATIC_ASSERT(sizeof(PoleRecord) == 0x18);
+
+		// FUNCTION: TOY2 0x004354E0 [PROVISIONAL]
+		int32_t HandlePoleClimb(Toy2BuzzActor* buzz)
+		{
+			Levels::RecordData* records = Levels::g_recordData[61];
+			if (records == 0 || g_damageRegistered != 0 || (g_actionStateFlags & POLE_CLIMB_BLOCKING_ACTIONS) != 0)
+				return 0;
+
+			int32_t poleBoundaryState = POLE_BOUNDARY_NONE;
+			if (g_poleClimbState == 0)
+			{
+				PoleRecord* pole = reinterpret_cast<PoleRecord*>(records->data);
+				int32_t poleIndex = 0;
+				int32_t poleCount = records->recordCount >> 1;
+				if (poleCount == 0)
+					return 0;
+
+				for (;;)
+				{
+					if (pole->type != POLE_TYPE_DISABLED)
+					{
+						int32_t distanceX = (buzz->posAngles.pos.x - pole->position.x) >> 8;
+						int32_t distanceZ = (buzz->posAngles.pos.z - pole->position.z) >> 8;
+						if (distanceX * distanceX + distanceZ * distanceZ < 0x200)
+						{
+							int32_t heightDelta = pole->position.y - buzz->posAngles.pos.y;
+							if (heightDelta >= -0x1E00 && heightDelta > pole->height - 0x3600)
+								break;
+						}
+					}
+
+					poleIndex++;
+					pole++;
+					if (poleIndex >= poleCount)
+						return 0;
+				}
+
+				g_poleRecordOffset = poleIndex * 6;
+				g_poleClimbState = POLE_CLIMB_ATTACHING;
+				g_movementInputLockTimer = 10;
+				buzz->posAngles.pos.x -= (buzz->posAngles.pos.x - pole->position.x) >> 2;
+				buzz->posAngles.pos.z -= (buzz->posAngles.pos.z - pole->position.z) >> 2;
+				buzz->velocity.vertical = 0;
+			}
+
+			PoleRecord* pole = reinterpret_cast<PoleRecord*>(reinterpret_cast<int32_t*>(records->data) + g_poleRecordOffset);
+			if (g_poleClimbState < 0)
+			{
+				int32_t distanceX = (buzz->posAngles.pos.x - pole->position.x) >> 5;
+				int32_t distanceZ = (buzz->posAngles.pos.z - pole->position.z) >> 5;
+				if (distanceX * distanceX + distanceZ * distanceZ > 0x8400)
+				{
+					g_poleClimbState = 0;
+					g_poleRecordOffset = 0;
+					return 0;
+				}
+			}
+			else if (g_poleClimbState > 0)
+			{
+				int32_t heightDelta = pole->position.y - buzz->posAngles.pos.y;
+				if (heightDelta < -0x1E00)
+				{
+					g_poleClimbState = -1;
+					buzz->airborneMode = 5;
+					buzz->animationState = ANIMATION_STATE_LANDING;
+					g_jumpHeightControlActive = 0;
+					return MOVEMENT_LOCK_LATERAL;
+				}
+
+				if (heightDelta >= pole->height - 0x3600)
+				{
+					buzz->velocity.vertical = 0;
+					buzz->posAngles.pos.y = pole->position.y - pole->height + 0x3600;
+					poleBoundaryState = POLE_BOUNDARY_TOP;
+				}
+			}
+
+			if (g_poleClimbState <= 0)
+				return 0;
+
+			buzz->posAngles.pos.x -= (buzz->posAngles.pos.x - pole->position.x) >> 2;
+			buzz->posAngles.pos.z -= (buzz->posAngles.pos.z - pole->position.z) >> 2;
+			buzz->velocity.lateral = 0;
+			buzz->velocity.forward = 0;
+
+			if (pole->type == POLE_TYPE_SLIDE)
+			{
+				g_poleClimbState = 1;
+				if (buzz->specialAirState != 0)
+				{
+					g_poleClimbState = -1;
+					return MOVEMENT_LOCK_LATERAL;
+				}
+
+				buzz->velocity.vertical += Renderer::g_frameDelta * 0x40 / 4;
+				if (buzz->velocity.vertical > 0x800)
+					buzz->velocity.vertical = 0x800;
+				g_poleClimbState |= POLE_CLIMB_SLIDING;
+			}
+			else if (g_poleClimbState != POLE_CLIMB_ATTACHING || (InputManager::g_directionInputState & INPUT_DOWN) == 0)
+			{
+				g_poleClimbState = 1;
+				if ((InputManager::g_directionInputState & INPUT_UP) != 0)
+				{
+					buzz->collisionFlags = 0;
+					buzz->specialAirState = 0;
+					if (poleBoundaryState != POLE_BOUNDARY_TOP)
+					{
+						buzz->velocity.vertical = -0x100;
+						g_poleClimbState |= POLE_CLIMB_ASCENDING;
+					}
+				}
+				else if ((InputManager::g_directionInputState & INPUT_DOWN) != 0)
+				{
+					if (buzz->specialAirState != 0)
+					{
+						g_poleClimbState = -1;
+						return MOVEMENT_LOCK_LATERAL;
+					}
+
+					if (poleBoundaryState != POLE_BOUNDARY_BOTTOM)
+					{
+						buzz->velocity.vertical += Renderer::g_frameDelta * 0x80 / 4;
+						if (buzz->velocity.vertical > 0x400)
+							buzz->velocity.vertical = 0x400;
+						buzz->posAngles.angles.yaw += buzz->velocity.vertical * Renderer::g_frameDelta / 16;
+						g_poleClimbState |= POLE_CLIMB_SLIDING;
+					}
+				}
+				else
+				{
+					if (buzz->velocity.vertical > 0)
+						buzz->velocity.vertical -= Renderer::g_frameDelta * 0x100 / 4;
+					if (buzz->velocity.vertical < 0)
+						buzz->velocity.vertical = 0;
+				}
+			}
+
+			if ((InputManager::g_directionInputState & INPUT_LEFT) != 0)
+				buzz->posAngles.angles.yaw += Renderer::g_frameDelta * -0x40 / 2;
+			if ((InputManager::g_directionInputState & INPUT_RIGHT) != 0)
+				buzz->posAngles.angles.yaw += Renderer::g_frameDelta * 0x40 / 2;
+			buzz->posAngles.angles.yaw &= 0xFFF;
+			buzz->facingAngle = buzz->posAngles.angles.yaw;
+
+			bool exitAtTop = false;
+			if (poleBoundaryState == POLE_BOUNDARY_TOP && pole->type == POLE_TYPE_TOP_EXIT)
+				exitAtTop = true;
+
+			if ((InputManager::g_directionInputState & INPUT_JUMP) == 0 || (InputManager::g_prevDirectionInputState & INPUT_JUMP) != 0)
+			{
+				if (! exitAtTop)
+					return MOVEMENT_LOCK_VERTICAL;
+			}
+			else if (! exitAtTop)
+			{
+				if (g_movementInputLockTimer != 0)
+					return MOVEMENT_LOCK_VERTICAL;
+
+				buzz->velocity.vertical = -0x400;
+				if ((InputManager::g_directionInputState & (INPUT_UP | INPUT_RIGHT | INPUT_DOWN | INPUT_LEFT)) != 0)
+				{
+					::Camera::CalculateMaxTurnAngle(InputManager::g_directionInputState);
+					buzz->posAngles.angles.yaw = buzz->facingAngle;
+				}
+				int32_t yaw = buzz->posAngles.angles.yaw;
+				buzz->velocity.lateral = Numerics::g_sinCosLUT[yaw & 0xFFF] >> 1;
+				buzz->velocity.forward = Numerics::g_sinCosLUT[(yaw + 0x400) & 0xFFF] >> 1;
+				buzz->airborneMode = 1;
+				g_jumpHeightControlActive = 0;
+				AudioManager::Preset::PlayOneShotSound2(0x19, buzz);
+			}
+			else
+			{
+				buzz->actorFlags |= ACTOR_FLAG_PRESERVE_HORIZONTAL_MOMENTUM;
+				buzz->velocity.vertical = -0x600;
+				buzz->velocity.lateral = 0;
+				buzz->velocity.forward = 0;
+				buzz->airborneMode = 2;
+				AudioManager::Preset::PlayOneShotSound2(0x19, buzz);
+				g_jumpHeightControlActive = 0;
+			}
+
+			g_poleClimbState = -1;
+			buzz->collisionFlags = 0;
+			buzz->specialAirState = 0;
+			buzz->animationState = ANIMATION_STATE_AIRBORNE;
+			buzz->facingAngle = buzz->posAngles.angles.yaw;
+			return MOVEMENT_LOCK_LATERAL;
 		}
 
 		struct ZiplineRecord
