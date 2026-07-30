@@ -126,7 +126,7 @@
 0x00416F30 Toy2::CreatureBehaviour::RCCarLevel1
 0x004171D0 Toy2::AndysHouse::Init
 0x00417380 Toy2::AndysHouse::Method2
-0x00417510 Toy2::AndysHouse::Method1
+0x00417510 Toy2::AndysHouse::UpdateVerticalLinkEffect
 0x00417680 Toy2::AndysHouse::Interactions
 0x00418610 Toy2::CreatureBehaviour::Army
 0x00418720 Toy2::CreatureBehaviour::RCCarLevel2

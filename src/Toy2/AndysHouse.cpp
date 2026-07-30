@@ -9,6 +9,7 @@
 #include "Toy2/Particles.h"
 #include "AudioManager/AudioManager.h"
 #include "Nu3D/Link.h"
+#include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
 #include "Random.h"
@@ -247,6 +248,49 @@ namespace Toy2
 			Platform::DisableCollision(14);
 			g_tinManEffectTimer = 0;
 			g_tinManBlinkToggle = 0;
+		}
+
+		// FUNCTION: TOY2 0x00417510 [MATCHED]
+		void UpdateVerticalLinkEffect(int32_t cycleAngle, int32_t linkId, const LinkOrigin* origin, int32_t rotationAngle)
+		{
+			if (Nu3D::Math::IsWithinDistance(&origin->position, &g_buzzActor.posAngles.pos, 0x280) != 0)
+			{
+				int32_t scaleAngle;
+				cycleAngle &= 0x1FFF;
+				if (cycleAngle < 0x800)
+				{
+					scaleAngle = cycleAngle;
+				}
+				else if (cycleAngle < 0x1000)
+				{
+					scaleAngle = 0x800;
+				}
+				else if (cycleAngle < 0x1800)
+				{
+					scaleAngle = 0x1800 - cycleAngle;
+				}
+				else
+				{
+					if (cycleAngle - Renderer::g_frameDelta * 0x40 < 0x1800)
+					{
+						Nu3D::Particles::SpawnFromPreset(origin->position.x, origin->position.y + 0x4800, origin->position.z, 0x19, 2);
+						Nu3D::Particles::SpawnFromPreset(origin->position.x, origin->position.y + 0x6000, origin->position.z, 0x1A, 2);
+						AudioManager::PlaySoundEffect(0x24, &origin->position);
+					}
+
+					scaleAngle = 0;
+					for (int32_t particleIndex = 0; particleIndex < g_framePulseOutputs.twoTickCount; particleIndex++)
+					{
+						Nu3D::Particles::ParticleInstance* particle =
+							Nu3D::Particles::SpawnFromPreset(origin->position.x, origin->position.y + 0x6000, origin->position.z, 0x18, 9);
+						particle->groundAlignRot = *g_randDatBufferPtr++ << 4;
+						particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+					}
+				}
+
+				Nu3D::Link::SetRotationRelative8bit(linkId, 0, rotationAngle & 0xFFF, 0);
+				Nu3D::Link::SetScaleFromFixedOffsets(linkId, 0x1000, (Numerics::g_sinCosLUT[(scaleAngle + 0x400) & 0xFFF] >> 3) + 0xC00, 0x1000);
+			}
 		}
 
 		// STUB: TOY2 0x00417680
