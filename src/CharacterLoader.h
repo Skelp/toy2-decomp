@@ -44,7 +44,11 @@ namespace CharacterLoader
 	struct BoneTransform
 	{
 		Vector3I translation;
-		int32_t unkInt4;
+		union
+		{
+			int32_t nodeType;
+			uint8_t* alternateData;
+		};
 		Vector3I16 rotationAngles;
 		int16_t unkInt6_;
 		int16_t scaleX;
@@ -52,13 +56,14 @@ namespace CharacterLoader
 		int16_t scaleZ;
 		uint8_t hasScale;
 		uint8_t track;
-		int32_t unkInt9;
+		uint8_t* animationData;
 		int32_t unkInt10;
-		Vector3I16 unkVec5;
+		Vector3I16 remapMetadata;
 		int16_t unkInt11;
 		int32_t unkInt13;
-		int16_t unkInt14;
-		int16_t unkInt14_;
+		int16_t remapSlot;
+		uint8_t trackType;
+		uint8_t trackTypePadding;
 		int32_t unkInt15;
 		int32_t unkInt16;
 		int32_t unkInt17;
@@ -86,10 +91,16 @@ namespace CharacterLoader
 
 	void Start(int32_t* loadedByteCount, uint8_t** dataBuffer, uint8_t* creatureList);
 	void LoadFirstSection(CharacterAnimationData* animationData, int8_t collectBoneRemaps);
+	int32_t AlternateAllParse(int32_t baseBoneIndex, uint8_t** dataBuffer);
 	void InitGlobals();
 
 	STATIC_ASSERT(sizeof(ActorBounds) == 8);
 	STATIC_ASSERT(sizeof(BoneTransform) == 0x6C);
+	STATIC_ASSERT(offsetof(BoneTransform, nodeType) == 0x0C);
+	STATIC_ASSERT(offsetof(BoneTransform, animationData) == 0x20);
+	STATIC_ASSERT(offsetof(BoneTransform, remapMetadata) == 0x28);
+	STATIC_ASSERT(offsetof(BoneTransform, remapSlot) == 0x34);
+	STATIC_ASSERT(offsetof(BoneTransform, trackType) == 0x36);
 	STATIC_ASSERT(sizeof(CharacterAnimationData) == 0xC);
 	STATIC_ASSERT(sizeof(CharacterAnimationData::ClipReference) == 4);
 	STATIC_ASSERT(offsetof(CharacterAnimationData, modelId) == 0);

@@ -8,6 +8,57 @@
 
 namespace CharacterLoader
 {
+	namespace
+	{
+		struct AlternateAllFileHeader
+		{
+			int32_t recordOffsetInWords;
+		};
+
+		union AlternateAllReference
+		{
+			int32_t marker;
+			uint8_t* previous;
+		};
+
+		struct AlternateAllRecord
+		{
+			int32_t recordCount;
+			int32_t dataSizeInWords;
+			Vector3I translation;
+			int32_t nodeType;
+			uint8_t reservedBeforeAlternateDataType[6];
+			int16_t alternateDataType;
+			uint8_t reservedBeforeSpecialTrackValues[16];
+			union
+			{
+				int32_t specialTrackValues[2];
+				struct
+				{
+					uint8_t reservedBeforeMetadataX[6];
+					int16_t metadataX;
+				};
+			};
+			uint8_t reservedBeforeMetadataZ[6];
+			int16_t metadataZ;
+			uint8_t reservedBeforeMetadataY[6];
+			int16_t metadataY;
+			uint8_t reservedBeforeFlags[2];
+			uint16_t flags;
+		};
+
+		STATIC_ASSERT(sizeof(AlternateAllRecord) == 0x4C);
+		STATIC_ASSERT(offsetof(AlternateAllRecord, dataSizeInWords) == 0x04);
+		STATIC_ASSERT(offsetof(AlternateAllRecord, translation) == 0x08);
+		STATIC_ASSERT(offsetof(AlternateAllRecord, nodeType) == 0x14);
+		STATIC_ASSERT(offsetof(AlternateAllRecord, alternateDataType) == 0x1E);
+		STATIC_ASSERT(offsetof(AlternateAllRecord, specialTrackValues) == 0x30);
+		STATIC_ASSERT(offsetof(AlternateAllRecord, metadataX) == 0x36);
+		STATIC_ASSERT(offsetof(AlternateAllRecord, metadataZ) == 0x3E);
+		STATIC_ASSERT(offsetof(AlternateAllRecord, metadataY) == 0x46);
+		STATIC_ASSERT(offsetof(AlternateAllRecord, flags) == 0x4A);
+	}
+
 	// GLOBAL: TOY2 0x0053EEE0
 	BoneTransform g_boneTransforms[300];
 
@@ -43,6 +94,18 @@ namespace CharacterLoader
 
 	// GLOBAL: TOY2 0x00547188
 	uint8_t* g_animationDataBySlot[512];
+
+	// GLOBAL: TOY2 0x00546D90
+	uint8_t* g_animationDataLinkHead;
+
+	// GLOBAL: TOY2 0x00546DF8
+	uint8_t* g_remapDataLinkHead;
+
+	// GLOBAL: TOY2 0x00547180
+	int32_t g_specialTrackValues[2];
+
+	// GLOBAL: TOY2 0x0054697C
+	uint8_t* g_allDataReferences[512];
 
 	// STUB: TOY2 0x0043B0C0
 	void LoadCharacterData(int32_t* loadedByteCount, uint8_t** dataBuffer, uint8_t* creatureList) {}
@@ -93,6 +156,89 @@ namespace CharacterLoader
 				g_boneRemapCount = remapCount;
 			}
 		}
+	}
+
+	// FUNCTION: TOY2 0x0043D6B0 [PROVISIONAL]
+	int32_t AlternateAllParse(int32_t baseBoneIndex, uint8_t** dataBuffer)
+	{
+		int32_t loadedBoneCount = 0;
+		int32_t recordIndex = 0;
+		AlternateAllFileHeader* header = reinterpret_cast<AlternateAllFileHeader*>(*dataBuffer);
+		int32_t recordOffsetInWords = header->recordOffsetInWords;
+		AlternateAllRecord* records = reinterpret_cast<AlternateAllRecord*>(*dataBuffer + recordOffsetInWords * 2);
+		*dataBuffer += sizeof(*header);
+		g_remapDataLinkHead = 0;
+		g_animationDataLinkHead = 0;
+
+		if (records->recordCount < 1)
+			return 0;
+
+		AlternateAllRecord* record = records;
+		BoneTransform* transform = &g_boneTransforms[baseBoneIndex];
+		do
+		{
+			int32_t nodeType = record->nodeType;
+			if (nodeType < 0x100)
+			{
+				++loadedBoneCount;
+				transform->translation.x = record->translation.x;
+				transform->translation.y = record->translation.y;
+				transform->translation.z = record->translation.z;
+				transform->nodeType = nodeType;
+				transform->animationData = *dataBuffer;
+				transform->remapMetadata.x = record->metadataX;
+				transform->remapMetadata.y = record->metadataY;
+				transform->remapMetadata.z = record->metadataZ;
+				transform->trackType = static_cast<uint8_t>(nodeType);
+
+				if (static_cast<int8_t>(nodeType) == 9)
+				{
+					g_specialTrackValues[0] = record->specialTrackValues[0];
+					g_specialTrackValues[1] = record->specialTrackValues[1];
+					transform->trackType = 12;
+				}
+
+				if (record->alternateDataType != 0)
+				{
+					if (record->alternateDataType == 1)
+						transform->trackType += 4;
+					else
+						transform->trackType += 8;
+
+					uint8_t* alternateData = *dataBuffer;
+					while (alternateData[3] != 0)
+					{
+						if ((alternateData[3] & 0x7C) == 0x34)
+							alternateData += 0x24;
+						else if ((alternateData[3] & 0x7C) == 0x3C)
+							alternateData += 0x30;
+					}
+					transform->alternateData = alternateData + 4;
+				}
+
+				if ((record->flags & 0x40) == 0x40)
+					transform->trackType += 2;
+
+				++transform;
+			}
+			else
+			{
+				AlternateAllReference* reference = reinterpret_cast<AlternateAllReference*>(*dataBuffer);
+				uint8_t* referenceData = reinterpret_cast<uint8_t*>(reference);
+				if (reference->marker == 0x12345678)
+				{
+					reference->previous = g_allDataReferences[nodeType];
+					referenceData = reinterpret_cast<uint8_t*>(reference + 1);
+				}
+				g_allDataReferences[nodeType] = referenceData;
+			}
+
+			*dataBuffer += record->dataSizeInWords * 2;
+			++recordIndex;
+			++record;
+		} while (recordIndex < records->recordCount);
+
+		return loadedBoneCount;
 	}
 
 	// FUNCTION: TOY2 0x0043B9B0 [PROVISIONAL]
