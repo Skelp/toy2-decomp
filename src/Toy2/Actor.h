@@ -159,6 +159,7 @@ namespace Toy2
 
 	namespace CreatureBehaviour
 	{
+		extern uint16_t* g_dinoMovementData;
 		extern uint16_t* g_gunslingerMovementData;
 		extern uint16_t* g_prospectorMovementData;
 		extern uint16_t* g_smithMovementData;
