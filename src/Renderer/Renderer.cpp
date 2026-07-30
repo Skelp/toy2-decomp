@@ -22,6 +22,7 @@
 #include "Logger.h"
 
 #include <cstdarg>
+#include <cstring>
 #include <cstdio>
 
 namespace Renderer
@@ -1623,6 +1624,102 @@ namespace Renderer
 
 				xPos += 8;
 			} while (--textLength != 0);
+		}
+	}
+
+	// FUNCTION: TOY2 0x0049B3B0 [PROVISIONAL]
+	void DrawMenuTextScaled(int32_t xPos, int32_t yPos, char* text, int32_t dimmed, int32_t alignment, int32_t scale)
+	{
+		int32_t textLength = strlen(text);
+		int32_t drawX;
+
+		switch (alignment)
+		{
+			case 0:
+				drawX = xPos;
+				break;
+			case 2:
+				drawX = xPos - textLength * scale * 16 / 4096;
+				break;
+			default:
+				drawX = xPos - textLength * scale * 16 / 8192;
+				break;
+		}
+
+		if (textLength > 0)
+		{
+			int32_t charAdvance = scale * 16 / 4096;
+			xPos = textLength;
+			do
+			{
+				uint8_t currentChar = *text++;
+				if (currentChar != ' ')
+				{
+					switch (currentChar)
+					{
+						case '\'':
+							currentChar = 47;
+							break;
+						case ',':
+							currentChar = 26;
+							break;
+						case '.':
+							currentChar = 27;
+							break;
+						case '/':
+							currentChar = 28;
+							break;
+						case '\\':
+							currentChar = 29;
+							break;
+						case '?':
+							currentChar = 30;
+							break;
+						case ':':
+							currentChar = 31;
+							break;
+						case ';':
+							currentChar = 32;
+							break;
+						case '(':
+							currentChar = 33;
+							break;
+						case ')':
+							currentChar = 34;
+							break;
+						case '0':
+							currentChar += 0xFC;
+							break;
+						case '1':
+						case '2':
+						case '3':
+						case '4':
+						case '5':
+						case '6':
+						case '7':
+						case '8':
+						case '9':
+							currentChar += 0xF2;
+							break;
+						case 'A':
+						case 'B':
+						case 'C':
+						case 'D':
+							currentChar += 0xEC;
+							break;
+						default:
+							currentChar += 0x9F;
+							break;
+					}
+
+					if (dimmed)
+						Sprite::DrawScaled(drawX, yPos, 67, currentChar, 128, 128, 128, 0, scale, scale);
+					else
+						Sprite::DrawScaled(drawX, yPos, 67, currentChar, 128, 128, 128, 255, scale, scale);
+				}
+
+				drawX += charAdvance;
+			} while (--xPos != 0);
 		}
 	}
 
