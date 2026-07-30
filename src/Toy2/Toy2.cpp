@@ -685,6 +685,292 @@ namespace Toy2
 		}
 	}
 
+	namespace Ini
+	{
+		enum Keyword
+		{
+			KEYWORD_UNKNOWN = -1,
+			KEYWORD_COMMENT = 11,
+			KEYWORD_KEY = 14,
+			KEYWORD_JOY = 15,
+			KEYWORD_MESSAGE = 16,
+		};
+
+		struct KeywordEntry
+		{
+			const char* name;
+			int32_t keyword;
+		};
+
+		struct ControlTextEntry
+		{
+			int32_t x;
+			int32_t y;
+			int32_t reserved0;
+			const char* text;
+			int32_t reserved1;
+			int32_t reserved2;
+		};
+
+		struct MessageTextEntry
+		{
+			int32_t x;
+			int32_t y;
+			const char* text;
+			int32_t reserved;
+		};
+
+		// GLOBAL: TOY2 0x004EFFC8
+		ControlTextEntry g_keyTextEntries[14] = {
+			{ 60, 40, 0, "forward", 0, 0 },
+			{ 60, 60, 0, "back", 0, 0 },
+			{ 60, 80, 0, "left", 0, 0 },
+			{ 60, 100, 0, "right", 0, 0 },
+			{ 60, 120, 0, "fire/get/drop", 0, 0 },
+			{ 60, 140, 0, "jump/change", 0, 0 },
+			{ 60, 160, 0, "seed color", 0, 0 },
+			{ 200, 40, 0, "camera", 0, 0 },
+			{ 200, 60, 0, "lock camera", 0, 0 },
+			{ 240, 80, 0, "walk", 0, 0 },
+			{ 200, 100, 0, "kick", 0, 0 },
+			{ 80, 180, 0, "game pad", 0, 0 },
+			{ 80, 200, 0, "restore defaults", 0, 0 },
+			{ 80, 220, 0, "accept", 0, 0 },
+		};
+
+		// GLOBAL: TOY2 0x004F0114
+		ControlTextEntry* g_keyTextTable[15] = {
+			&g_keyTextEntries[0],
+			&g_keyTextEntries[1],
+			&g_keyTextEntries[2],
+			&g_keyTextEntries[3],
+			&g_keyTextEntries[4],
+			&g_keyTextEntries[5],
+			&g_keyTextEntries[6],
+			&g_keyTextEntries[7],
+			&g_keyTextEntries[8],
+			&g_keyTextEntries[9],
+			&g_keyTextEntries[10],
+			&g_keyTextEntries[11],
+			&g_keyTextEntries[12],
+			&g_keyTextEntries[13],
+			(ControlTextEntry*)-1,
+		};
+
+		// GLOBAL: TOY2 0x004F0150
+		ControlTextEntry g_joyTextEntries[10] = {
+			{ 40, 40, 0, "fire/get/drop", 0, 0 },
+			{ 40, 60, 0, "jump/change", 0x100, 0 },
+			{ 40, 80, 0, "seed color", 0x200, 0 },
+			{ 40, 100, 0, "camera", 0x300, 0 },
+			{ 200, 40, 0, "lock camera", 0x400, 0 },
+			{ 200, 60, 0, "walk", 0x500, 0 },
+			{ 200, 80, 0, "kick", 0x600, 0 },
+			{ 80, 180, 0, "keyboard", 0, 0 },
+			{ 80, 200, 0, "restore defaults", 0, 0 },
+			{ 80, 220, 0, "accept", 0, 0 },
+		};
+
+		// GLOBAL: TOY2 0x004F023C
+		ControlTextEntry* g_joyTextTable[11] = {
+			&g_joyTextEntries[0],
+			&g_joyTextEntries[1],
+			&g_joyTextEntries[2],
+			&g_joyTextEntries[3],
+			&g_joyTextEntries[4],
+			&g_joyTextEntries[5],
+			&g_joyTextEntries[6],
+			&g_joyTextEntries[7],
+			&g_joyTextEntries[8],
+			&g_joyTextEntries[9],
+			(ControlTextEntry*)-1,
+		};
+
+		// GLOBAL: TOY2 0x004F4F60
+		KeywordEntry g_keywords[] = {
+#include "IniKeywords.inc"
+		};
+
+		// GLOBAL: TOY2 0x004F5398
+		MessageTextEntry g_messageTextEntries[25] = {
+			{ 20, 200, "select option and press enter", 0 },
+			{ 90, 200, "() - to change", 0 },
+			{ 20, 220, "press enter to accept changes", 0 },
+			{ 50, 240, "press esc to go back", 0 },
+			{ 70, 120, "do you want to quit", 0 },
+			{ 90, 4, "video options", 0 },
+			{ 100, 4, "define keys", 0 },
+			{ 130, 4, "save game", 0 },
+			{ 10, 200, "select file", 0 },
+			{ 10, 220, "press esc to go back", 0 },
+			{ 130, 4, "confirm", 0 },
+			{ 80, 180, "do you wish to", 0 },
+			{ 70, 200, "save over this game", 0 },
+			{ 130, 4, "enter name", 0 },
+			{ 130, 4, "load game", 0 },
+			{ 10, 200, "select game and press enter", 0 },
+			{ 10, 220, "press esc to go back", 0 },
+			{ 0, 0, &SaveManager::g_emptyString, 0 },
+			{ 0, 0, &SaveManager::g_emptyString, 0 },
+			{ 0, 0, &SaveManager::g_emptyString, 0 },
+			{ 0, 0, &SaveManager::g_emptyString, 0 },
+			{ 0, 0, &SaveManager::g_emptyString, 0 },
+			{ 0, 0, &SaveManager::g_emptyString, 0 },
+			{ 0, 0, &SaveManager::g_emptyString, 0 },
+			{ 0, 0, &SaveManager::g_emptyString, 0 },
+		};
+
+		// GLOBAL: TOY2 0x004F5524
+		MessageTextEntry* g_messageTextTable[25] = {
+			&g_messageTextEntries[0],
+			&g_messageTextEntries[1],
+			&g_messageTextEntries[2],
+			&g_messageTextEntries[3],
+			&g_messageTextEntries[4],
+			&g_messageTextEntries[5],
+			&g_messageTextEntries[6],
+			&g_messageTextEntries[7],
+			&g_messageTextEntries[8],
+			&g_messageTextEntries[9],
+			&g_messageTextEntries[10],
+			&g_messageTextEntries[11],
+			&g_messageTextEntries[12],
+			&g_messageTextEntries[13],
+			&g_messageTextEntries[14],
+			&g_messageTextEntries[15],
+			&g_messageTextEntries[16],
+			&g_messageTextEntries[17],
+			&g_messageTextEntries[18],
+			&g_messageTextEntries[19],
+			&g_messageTextEntries[20],
+			&g_messageTextEntries[21],
+			&g_messageTextEntries[22],
+			&g_messageTextEntries[23],
+			&g_messageTextEntries[24],
+		};
+
+		// GLOBAL: TOY2 0x0053006C
+		char g_defTextStorage[64][256];
+
+		// GLOBAL: TOY2 0x0053406C
+		int32_t g_defTextCount;
+
+		// GLOBAL: TOY2 0x00534070
+		FILE* g_iniFile;
+
+		// GLOBAL: TOY2 0x0053407C
+		char g_iniToken[1024];
+
+		STATIC_ASSERT(sizeof(ControlTextEntry) == 0x18);
+		STATIC_ASSERT(sizeof(MessageTextEntry) == 0x10);
+
+		// FUNCTION: TOY2 0x00430BF0 [PROVISIONAL]
+		void ParseDefText()
+		{
+			if (fscanf(g_iniFile, "%s", g_iniToken) == EOF)
+				Logger::Log("EOF reached .\n");
+
+			int32_t keyword;
+			if (g_iniToken[0] == '#')
+			{
+				keyword = KEYWORD_COMMENT;
+			}
+			else
+			{
+				KeywordEntry* entry = g_keywords;
+				while (entry->keyword != KEYWORD_UNKNOWN)
+				{
+					if (strcmp(entry->name, g_iniToken) == 0)
+					{
+						keyword = entry->keyword;
+						goto keywordFound;
+					}
+					++entry;
+				}
+				keyword = KEYWORD_UNKNOWN;
+			}
+
+		keywordFound:
+			ControlTextEntry** controlTextTable;
+			switch (keyword)
+			{
+				case KEYWORD_KEY:
+					controlTextTable = g_keyTextTable;
+					break;
+				case KEYWORD_JOY:
+					controlTextTable = g_joyTextTable;
+					break;
+				case KEYWORD_MESSAGE:
+					break;
+				default:
+					memset(g_iniToken, 0, sizeof(g_iniToken));
+					char* output = g_iniToken;
+					int32_t character;
+					do
+					{
+						character = fgetc(g_iniFile);
+						*output++ = (char)character;
+					} while (character != EOF && character != '\n');
+
+					Logger::Log("UNKNOWN DefText : %s", g_iniToken);
+					return;
+			}
+
+			if (fscanf(g_iniFile, "%s", g_iniToken) == EOF)
+				Logger::Log("EOF reached .\n");
+			int32_t entryIndex = atoi(g_iniToken);
+
+			char character;
+			do
+			{
+				character = (char)fgetc(g_iniFile);
+			} while (character != '"' && character != EOF);
+
+			char text[256];
+			char* output = text;
+			do
+			{
+				character = (char)fgetc(g_iniFile);
+				*output++ = character;
+			} while (character != '"' && character != EOF);
+			output[-1] = '\0';
+
+			if (fscanf(g_iniFile, "%s", g_iniToken) == EOF)
+				Logger::Log("EOF reached .\n");
+			int32_t x = atoi(g_iniToken);
+
+			if (fscanf(g_iniFile, "%s", g_iniToken) == EOF)
+				Logger::Log("EOF reached .\n");
+			int32_t y = atoi(g_iniToken);
+
+			if (g_defTextCount < 64)
+			{
+				strncpy(g_defTextStorage[g_defTextCount], text, 256);
+				if (keyword >= KEYWORD_KEY)
+				{
+					ControlTextEntry* entry;
+					if (keyword < KEYWORD_MESSAGE)
+					{
+						entry = controlTextTable[entryIndex];
+						entry->text = g_defTextStorage[g_defTextCount];
+						entry->x = x;
+						entry->y = y;
+					}
+					else
+					{
+						if (keyword != KEYWORD_MESSAGE)
+							return;
+						MessageTextEntry* message = g_messageTextTable[entryIndex];
+						message->text = g_defTextStorage[g_defTextCount];
+						message->x = x;
+						message->y = y;
+					}
+					++g_defTextCount;
+				}
+			}
+		}
+	}
+
 	// GLOBAL: TOY2 0x004F5C9C
 	char g_saveGamePrompt[] = "SAVE GAME?";
 
