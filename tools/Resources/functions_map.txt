@@ -479,7 +479,7 @@
 0x0048A4C0 Toy2::Camera::PrepareCameraCollisionCandidates
 0x0048ACC0 Toy2::Platform::StepMotionScript
 0x0048B640 Toy2::Platform::HadBuzzContactThisFrame
-0x0048B660 Toy2::Levels::Method1
+0x0048B660 Toy2::Collision::ApplySurfaceVelocity
 0x0048B750 Nu3D::Collision::SweepAgainstCandidates
 0x0048C030 Nu3D::Collision::RaycastAgainstCandidates
 0x0048C860 Toy2::Collision::SweepAndSlide

@@ -6,10 +6,39 @@
 
 namespace Toy2
 {
+	extern int32_t g_ziplineState;
+	extern int32_t g_ledgeClimbTimer;
+	extern int32_t g_poleClimbState;
+
 	namespace Collision
 	{
+		struct SurfaceCollisionResult
+		{
+			uint32_t contactFlags;
+			Platform::CollisionFace* face;
+			Vector3I16 normal;
+			int16_t contactState;
+			uint8_t reserved[8];
+			Vector3I16 movement;
+			Vector3I16 surfaceVelocity;
+			int32_t contactTimer;
+			int16_t platformIndex;
+			uint8_t reserved2[4];
+			uint16_t surfaceType;
+		};
+
+		STATIC_ASSERT(sizeof(SurfaceCollisionResult) == sizeof(CollisionQueryResult));
+		STATIC_ASSERT(offsetof(SurfaceCollisionResult, normal) == 0x08);
+		STATIC_ASSERT(offsetof(SurfaceCollisionResult, contactState) == 0x0E);
+		STATIC_ASSERT(offsetof(SurfaceCollisionResult, movement) == 0x18);
+		STATIC_ASSERT(offsetof(SurfaceCollisionResult, surfaceVelocity) == 0x1E);
+		STATIC_ASSERT(offsetof(SurfaceCollisionResult, contactTimer) == 0x24);
+
 		// GLOBAL: TOY2 0x00729178
 		CollisionQueryResult g_collisionQueryResults[2];
+
+		// GLOBAL: TOY2 0x007295A0
+		int32_t g_surfaceVelocityBlend;
 
 		// GLOBAL: TOY2 0x007295A8
 		CollisionMeshInstance g_collisionMeshInstances[300];
@@ -87,6 +116,34 @@ namespace Toy2
 
 		// STUB: TOY2 0x00486520
 		void ResolveGroundCeiling(PosAndAngles* position, int32_t radius) {}
+
+		// FUNCTION: TOY2 0x0048B660 [MATCHED]
+		void ApplySurfaceVelocity(int32_t queryIndex, int32_t x, int32_t y, int32_t z)
+		{
+			if (g_ledgeClimbTimer != 0 || g_poleClimbState != 0 || g_ziplineState != 0)
+				return;
+
+			if (reinterpret_cast<SurfaceCollisionResult*>(g_collisionQueryResults)[queryIndex].contactState != 0
+				&& reinterpret_cast<SurfaceCollisionResult*>(g_collisionQueryResults)[queryIndex].normal.x * x
+						+ reinterpret_cast<SurfaceCollisionResult*>(g_collisionQueryResults)[queryIndex].normal.y * y
+						+ reinterpret_cast<SurfaceCollisionResult*>(g_collisionQueryResults)[queryIndex].normal.z * z
+					< 0)
+			{
+				g_surfaceVelocityBlend = 0;
+				return;
+			}
+
+			int32_t blend = g_surfaceVelocityBlend;
+			if (blend < 0x1000)
+			{
+				blend += 0x100;
+				g_surfaceVelocityBlend = blend;
+			}
+
+			reinterpret_cast<SurfaceCollisionResult*>(g_collisionQueryResults)[queryIndex].surfaceVelocity.x += (int16_t)(blend * x / 0x1000);
+			reinterpret_cast<SurfaceCollisionResult*>(g_collisionQueryResults)[queryIndex].surfaceVelocity.y += (int16_t)(blend * y / 0x1000);
+			reinterpret_cast<SurfaceCollisionResult*>(g_collisionQueryResults)[queryIndex].surfaceVelocity.z += (int16_t)(blend * z / 0x1000);
+		}
 	}
 
 	namespace Platform
