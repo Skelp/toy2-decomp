@@ -48,6 +48,10 @@
 
 namespace Renderer
 {
+	extern float g_parallaxHorizOffset;
+	extern float g_parallaxTexHeightRatio;
+	extern float g_parallaxTexWidthRatio;
+
 	namespace Sprite
 	{
 		void DrawClipped(int16_t xPos, int16_t yPos, int16_t clipLeft, int16_t clipRight, int16_t sheetIndex, int16_t tileIndex);
@@ -1068,6 +1072,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0072E34C
 	int32_t g_mpegPlaybackDisabled;
 
+	// GLOBAL: TOY2 0x0072E354
+	char g_saveSlotDescriptions[8][256];
+
 	// GLOBAL: TOY2 0x0072EF94
 	int32_t g_movieTimingRate;
 
@@ -1309,6 +1316,8 @@ namespace Toy2
 	int32_t g_saveMenuState;
 
 	int32_t TickSaveMenuMachine(int32_t param);
+	int16_t UpdateD3DState();
+	void UpdateAudioChannels();
 	namespace MovieViewer
 	{
 		int32_t Tick(int32_t movieIndex);
@@ -3487,8 +3496,352 @@ namespace Toy2
 		g_levelFileIndex = prevLevelFileIdx;
 	}
 
-	// STUB: TOY2 0x0049B9E0
-	int32_t TickSaveMenuMachine(int32_t param) { return 0; }
+	// FUNCTION: TOY2 0x0049B9E0 [PROVISIONAL]
+	int32_t TickSaveMenuMachine(int32_t postGameSave)
+	{
+		enum SaveMenuState
+		{
+			SAVE_MENU_OPTIONS,
+			SAVE_MENU_LOAD,
+			SAVE_MENU_SAVE,
+			SAVE_MENU_EXIT
+		};
+
+		int32_t finished = 0;
+		int32_t result = 0;
+		int32_t state = SAVE_MENU_OPTIONS;
+		int32_t selectedItem = 0;
+		int32_t inputDelay = 30;
+		int32_t blinkTimer = 20;
+		RGBA clearColor;
+		clearColor.value = 0;
+
+		Nu3D::Camera::g_cameraTintBlue = 0;
+		Nu3D::Camera::g_cameraTintGreen = 0;
+		Nu3D::Camera::g_cameraTintRed = 0;
+		Nu3D::Camera::SetTint(128, 128, 128, 12);
+
+		if (postGameSave)
+			state = SAVE_MENU_SAVE;
+
+		int32_t slotXOffsets[8];
+		for (int32_t slot = 0; slot < 8; ++slot)
+		{
+			char fileName[256];
+			sprintf(fileName, "Toy2%02d.sav", slot + 1);
+
+			FILE* file = fopen(fileName, "rb");
+			if (file)
+			{
+				int32_t descriptionLength;
+				fread(&descriptionLength, 1, 4, file);
+				if (descriptionLength && g_saveSlotDescriptions[slot])
+				{
+					fread(g_saveSlotDescriptions[slot], 1, descriptionLength, file);
+					g_saveSlotDescriptions[slot][descriptionLength] = '\0';
+				}
+				fclose(file);
+			}
+			else
+			{
+				g_saveSlotDescriptions[slot][0] = '\0';
+			}
+
+			slotXOffsets[slot] = (int32_t)(cos(slot * 0.642699062824249f - 1.0f) * 80.0);
+		}
+
+		while (! finished)
+		{
+			ProcessWndEvents();
+			if (g_windowData.wndIsExiting)
+			{
+				DrawingDevice::RestoreToGDISurface(1);
+				Logger::GetErrorHandler("C:\\projects\\toy2\\toy2.cpp", 0x123E)(&SaveManager::g_emptyString);
+			}
+
+			if (InputManager::IsKeyPressed(DIK_F3))
+			{
+				SoftwareRenderer::ZoomOut();
+				g_extraControlsUnused = 15;
+			}
+			if (InputManager::IsKeyPressed(DIK_F4))
+			{
+				SoftwareRenderer::ZoomIn();
+				g_extraControlsUnused = 15;
+			}
+			if (InputManager::IsKeyPressed(DIK_F5))
+			{
+				Graphics::RemoveDetailLevel();
+				g_extraControlsUnused = 15;
+			}
+			if (InputManager::IsKeyPressed(DIK_F6))
+			{
+				Graphics::AddDetailLevel();
+				g_extraControlsUnused = 15;
+			}
+
+			InputManager::UpdateButtonStates();
+			if (g_inputSuppressFrames)
+			{
+				--g_inputSuppressFrames;
+				InputManager::g_curButtonsPressed = 0;
+			}
+			UpdateAudioChannels();
+			SoftwareRenderer::g_backBufferClearComplete = 0;
+
+			Renderer::DoFrameDelay(0);
+			Nu3D::Camera::FadeToTargetTint();
+			Renderer::ClearScreen(clearColor, 2);
+
+			if (Renderer::BeginScene())
+			{
+				SoftwareRenderer::g_backBufferClearComplete = 0;
+				Renderer::g_parallaxHorizOffset = 0.0f;
+				Renderer::g_parallaxTexHeightRatio = 1.0f;
+				Renderer::g_parallaxTexWidthRatio = 1.0f;
+				Renderer::RenderParallaxBackground(0);
+
+				switch (state)
+				{
+					case SAVE_MENU_OPTIONS: {
+						SoftwareRenderer::g_backBufferClearComplete = 0;
+						if (NGNLoader::GetTextureDataIndex(g_sectorBackdropTexTable.primary[1]))
+							g_nextBackdropId = g_sectorBackdropTexTable.primary[1];
+						else if (NGNLoader::GetTextureDataIndex(g_sectorBackdropTexTable.secondary[0]))
+							g_nextBackdropId = g_sectorBackdropTexTable.secondary[0];
+						g_hasBackdrop = 1;
+
+						Renderer::DrawFormattedText(256, 25, "load / save options");
+						if (selectedItem != 0 || blinkTimer >= 10)
+							Renderer::DrawFormattedText(256, 75, "load game");
+						if (selectedItem != 1 || blinkTimer >= 10)
+							Renderer::DrawFormattedText(256, 100, "save game");
+						if (selectedItem != 2 || blinkTimer >= 10)
+							Renderer::DrawFormattedText(256, 125, "main menu");
+
+						if (inputDelay <= 0)
+						{
+							if ((InputManager::g_curButtonsPressed & INPUT_UP) && ! (InputManager::g_prevButtonsPressed & INPUT_UP) && selectedItem != 0)
+							{
+								--selectedItem;
+								AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 0x50, 0x50);
+							}
+							if ((InputManager::g_curButtonsPressed & INPUT_DOWN) && ! (InputManager::g_prevButtonsPressed & INPUT_DOWN) && selectedItem < 2)
+							{
+								++selectedItem;
+								AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 0x50, 0x50);
+							}
+
+							if (InputManager::g_curButtonsPressed & INPUT_JUMP)
+							{
+								if (selectedItem == 0)
+									state = SAVE_MENU_LOAD;
+								else if (selectedItem == 1)
+									state = SAVE_MENU_SAVE;
+								else
+								{
+									AudioManager::PlayOneShotSoundGlobal(2, 0x1200, 0x50, 0x50);
+									state = SAVE_MENU_EXIT;
+									Nu3D::Camera::SetTint(0, 0, 0, 6);
+								}
+
+								if (selectedItem < 2)
+								{
+									selectedItem = 0;
+									inputDelay = 30;
+									AudioManager::PlayOneShotSoundGlobal(0, 0x1200, 0x50, 0x50);
+								}
+							}
+
+							if (InputManager::g_curButtonsPressed & INPUT_CANCEL)
+							{
+								AudioManager::PlayOneShotSoundGlobal(2, 0x1200, 0x50, 0x50);
+								state = SAVE_MENU_EXIT;
+								Nu3D::Camera::SetTint(0, 0, 0, 6);
+							}
+						}
+						break;
+					}
+
+					case SAVE_MENU_LOAD: {
+						Renderer::g_parallaxCurHorizScroll = 0.0f;
+						if (NGNLoader::GetTextureDataIndex(g_sectorBackdropTexTable.primary[1]))
+							g_nextBackdropId = g_sectorBackdropTexTable.primary[1];
+						else if (NGNLoader::GetTextureDataIndex(g_sectorBackdropTexTable.secondary[0]))
+							g_nextBackdropId = g_sectorBackdropTexTable.secondary[0];
+						g_hasBackdrop = 1;
+
+						Renderer::DrawFormattedText(256, 3, "select slot to load");
+						for (int32_t slot = 0; slot < 8; ++slot)
+						{
+							if (slot != selectedItem || blinkTimer >= 10)
+							{
+								if (g_saveSlotDescriptions[slot][0])
+									Renderer::DrawFormattedText(slotXOffsets[slot] + 256, slot * 23 + 33, "%s", g_saveSlotDescriptions[slot]);
+								else
+									Renderer::DrawFormattedText(slotXOffsets[slot] + 256, slot * 23 + 33, "empty slot");
+							}
+						}
+						Renderer::DrawFormattedText(256, 228, "jump:select  cancel:menu");
+
+						if ((InputManager::g_curButtonsPressed & INPUT_UP) && ! (InputManager::g_prevButtonsPressed & INPUT_UP) && selectedItem != 0)
+						{
+							--selectedItem;
+							AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 0x50, 0x50);
+						}
+						if ((InputManager::g_curButtonsPressed & INPUT_DOWN) && ! (InputManager::g_prevButtonsPressed & INPUT_DOWN) && selectedItem < 7)
+						{
+							++selectedItem;
+							AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 0x50, 0x50);
+						}
+
+						if (inputDelay <= 0)
+						{
+							if ((InputManager::g_curButtonsPressed & INPUT_JUMP) && g_saveSlotDescriptions[selectedItem][0])
+							{
+								int32_t saveNumber = selectedItem + 1;
+								char fileName[256];
+								sprintf(fileName, "Toy2%02d.sav", saveNumber);
+								FILE* file = fopen(fileName, "rb");
+								if (file)
+								{
+									int32_t descriptionLength;
+									char description[256];
+									fread(&descriptionLength, 1, 4, file);
+									if (descriptionLength)
+									{
+										fread(description, 1, descriptionLength, file);
+										description[descriptionLength] = '\0';
+									}
+									if (saveNumber == 99)
+										fread(&SaveManager::g_save99Data, 1, sizeof(SaveManager::g_save99Data), file);
+									else
+										fread(&SaveManager::g_save0Data, 1, sizeof(SaveManager::g_save0Data), file);
+									fclose(file);
+								}
+
+								state = SAVE_MENU_EXIT;
+								Nu3D::Camera::SetTint(0, 0, 0, 6);
+								AudioManager::PlayOneShotSoundGlobal(0, 0x1200, 0x50, 0x50);
+								result = 1;
+							}
+
+							if (InputManager::g_curButtonsPressed & INPUT_CANCEL)
+							{
+								AudioManager::PlayOneShotSoundGlobal(2, 0x1200, 0x50, 0x50);
+								inputDelay = 30;
+								state = SAVE_MENU_OPTIONS;
+							}
+						}
+						break;
+					}
+
+					case SAVE_MENU_SAVE: {
+						Renderer::g_parallaxCurHorizScroll = 0.0f;
+						if (NGNLoader::GetTextureDataIndex(g_sectorBackdropTexTable.primary[1]))
+							g_nextBackdropId = g_sectorBackdropTexTable.primary[1];
+						else if (NGNLoader::GetTextureDataIndex(g_sectorBackdropTexTable.secondary[0]))
+							g_nextBackdropId = g_sectorBackdropTexTable.secondary[0];
+						g_hasBackdrop = 1;
+
+						Renderer::DrawFormattedText(256, 3, "select slot to save");
+						for (int32_t slot = 0; slot < 8; ++slot)
+						{
+							if (slot != selectedItem || blinkTimer >= 10)
+							{
+								if (g_saveSlotDescriptions[slot][0])
+									Renderer::DrawFormattedText(slotXOffsets[slot] + 256, slot * 23 + 33, "%s", g_saveSlotDescriptions[slot]);
+								else
+									Renderer::DrawFormattedText(slotXOffsets[slot] + 256, slot * 23 + 33, "empty slot");
+							}
+						}
+						Renderer::DrawFormattedText(256, 228, postGameSave ? "jump:save  cancel:continue" : "jump:select  cancel:menu");
+
+						if ((InputManager::g_curButtonsPressed & INPUT_UP) && ! (InputManager::g_prevButtonsPressed & INPUT_UP) && selectedItem != 0)
+						{
+							--selectedItem;
+							AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 0x50, 0x50);
+						}
+						if ((InputManager::g_curButtonsPressed & INPUT_DOWN) && ! (InputManager::g_prevButtonsPressed & INPUT_DOWN) && selectedItem < 7)
+						{
+							++selectedItem;
+							AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 0x50, 0x50);
+						}
+
+						if (inputDelay <= 0)
+						{
+							if (InputManager::g_curButtonsPressed & INPUT_JUMP)
+							{
+								int32_t progress = ComputeTokenProgress();
+								char description[256];
+								sprintf(description, "TOK %d LEV %d", (progress >> 16) & 0xff, progress & 0xff);
+								SaveManager::SaveToFile(selectedItem + 1, description);
+								state = SAVE_MENU_EXIT;
+								Nu3D::Camera::SetTint(0, 0, 0, 6);
+
+								for (int32_t slot = 0; slot < 8; ++slot)
+								{
+									char fileName[256];
+									sprintf(fileName, "Toy2%02d.sav", slot + 1);
+									FILE* file = fopen(fileName, "rb");
+									if (file)
+									{
+										int32_t descriptionLength;
+										fread(&descriptionLength, 1, 4, file);
+										if (descriptionLength && g_saveSlotDescriptions[slot])
+										{
+											fread(g_saveSlotDescriptions[slot], 1, descriptionLength, file);
+											g_saveSlotDescriptions[slot][descriptionLength] = '\0';
+										}
+										fclose(file);
+									}
+									else
+									{
+										g_saveSlotDescriptions[slot][0] = '\0';
+									}
+								}
+								AudioManager::PlayOneShotSoundGlobal(0, 0x1200, 0x50, 0x50);
+							}
+
+							if (InputManager::g_curButtonsPressed & INPUT_CANCEL)
+							{
+								AudioManager::PlayOneShotSoundGlobal(2, 0x1200, 0x50, 0x50);
+								if (postGameSave)
+								{
+									state = SAVE_MENU_EXIT;
+									Nu3D::Camera::SetTint(0, 0, 0, 6);
+								}
+								else
+								{
+									inputDelay = 30;
+									state = SAVE_MENU_OPTIONS;
+								}
+							}
+						}
+						break;
+					}
+
+					case SAVE_MENU_EXIT: {
+						if (Nu3D::Camera::g_cameraTintBlue == 0)
+							finished = 1;
+						break;
+					}
+				}
+
+				Renderer::DrawTintOverlay();
+				Renderer::Sprite::DrawQueuedSprite();
+				Renderer::EndScene(1);
+			}
+
+			if (inputDelay > 0)
+				inputDelay -= Renderer::g_frameDelta;
+			blinkTimer -= Renderer::g_frameDelta;
+			if (blinkTimer < 0)
+				blinkTimer += 20;
+		}
+
+		return result;
+	}
 
 	// FUNCTION: TOY2 0x00453F20 [MATCHED]
 	int32_t ShowSaveScreen()
