@@ -91,6 +91,7 @@ namespace Toy2
 		extern Nu3D::Particles::ParticleInstance* g_cameraMarkerParticle;
 		extern Nu3D::Particles::ParticleInstance* g_targetMarkerParticle;
 
+		void UpdateGravityBoots(Buzz::Toy2BuzzActor* buzz);
 		void InitGameplayCamera(GameplayCamera* camera, Buzz::Toy2BuzzActor* buzz);
 		void InitCutsceneCamera(const Vector3I* focusPosition, const Vector3I* cameraPosition);
 		void BeginScriptedCutsceneAtPoint(Vector3I* focusPosition, int32_t duration, int32_t cameraDistance);

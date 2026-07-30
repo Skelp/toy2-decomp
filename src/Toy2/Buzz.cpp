@@ -2365,6 +2365,82 @@ namespace Toy2
 
 	namespace Camera
 	{
+		// FUNCTION: TOY2 0x004A4BB0 [PROVISIONAL]
+		void UpdateGravityBoots(Buzz::Toy2BuzzActor* buzz)
+		{
+			g_airborneTimer = 0;
+			buzz->collisionFlags = 0;
+
+			if (buzz->posAngles.pos.y < buzz->floorYPos - g_gravityBootsHoverHeight)
+			{
+				buzz->velocity.vertical += Renderer::g_frameDelta * 0x20;
+				if (buzz->velocity.vertical > 0x180)
+					buzz->velocity.vertical = 0x180;
+			}
+			else
+			{
+				buzz->velocity.vertical -= Renderer::g_frameDelta * 0x20;
+				if (buzz->velocity.vertical < -0x180)
+					buzz->velocity.vertical = -0x180;
+			}
+
+			int32_t particleVariant;
+			if ((InputManager::g_directionInputState & INPUT_JUMP) != 0)
+			{
+				g_gravityBootsHoverHeight += Renderer::g_frameDelta * 0x400;
+				if (g_gravityBootsHoverHeight >= 0xC000)
+					g_gravityBootsHoverHeight = 0xC000;
+				particleVariant = 1;
+			}
+			else
+			{
+				particleVariant = 0;
+				g_gravityBootsHoverHeight -= Renderer::g_frameDelta * 0x400;
+				if (g_gravityBootsHoverHeight <= 0x2000)
+					g_gravityBootsHoverHeight = 0x2000;
+			}
+
+			if (g_framePulseOutputs.fourTick != 0)
+			{
+				if (g_gravityBootsTimer < 120)
+				{
+					particleVariant = 2;
+					if (g_framePulseOutputs.eightTick != 0)
+						goto update_timer;
+				}
+				else if (g_framePulseOutputs.eightTick != 0 && particleVariant != 0)
+				{
+					particleVariant = 0;
+				}
+				else if (particleVariant == -1)
+				{
+					goto update_timer;
+				}
+
+				Nu3D::Particles::SpawnInstance(buzz->posAngles.pos.x,
+					buzz->posAngles.pos.y,
+					buzz->posAngles.pos.z,
+					0,
+					0,
+					0,
+					0,
+					g_framePulsePhases.thirtyTwoTick << 7,
+					0x80,
+					particleVariant + 0x51);
+				int32_t exhaustRotation = -g_framePulsePhases.thirtyTwoTick;
+				exhaustRotation <<= 7;
+				exhaustRotation &= 0xFFF;
+				Nu3D::Particles::SpawnInstance(
+					buzz->posAngles.pos.x, buzz->posAngles.pos.y, buzz->posAngles.pos.z, 0, 0, 0, 0, exhaustRotation, -0x80, particleVariant + 0x51);
+			}
+
+		update_timer:
+			AudioManager::PlaySoundEffect(0x50, &g_buzzActor.posAngles.pos);
+			g_gravityBootsTimer -= Renderer::g_frameDelta;
+			if (g_gravityBootsTimer <= 0)
+				g_gravityBootsTimer = 0;
+		}
+
 		// FUNCTION: TOY2 0x004A4F80 [PROVISIONAL]
 		int32_t UpdateRocketBoots(Buzz::Toy2BuzzActor* buzz, Buzz::MovementRates* movementRates)
 		{
