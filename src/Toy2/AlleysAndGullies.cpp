@@ -9,6 +9,7 @@
 #include "Toy2/Weather.h"
 #include "AudioManager/AudioManager.h"
 #include "Nu3D/Link.h"
+#include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
 #include "Random.h"
@@ -153,6 +154,54 @@ namespace Toy2
 
 		STATIC_ASSERT(sizeof(HiddenCollectibleState) == 0x8);
 		STATIC_ASSERT(sizeof(MoveableObjectInitTable) == 0x1A);
+
+		// FUNCTION: TOY2 0x0041E150 [PROVISIONAL]
+		void UpdateMovingWood(
+			int32_t* pathPosition, int32_t platformIndex, int32_t pathRecordType, int32_t primaryLinkIndex, int32_t secondaryLinkIndex, int32_t speed)
+		{
+			Vector3I direction;
+			Vector3I platformOrigin;
+			Vector3I targetPosition;
+
+			if (*pathPosition > (Levels::g_recordData[pathRecordType]->recordCount - 2) * 0x1000)
+			{
+				*pathPosition = 0;
+				InterpolatePathPoint(pathRecordType, 0, &targetPosition);
+				Platform::SetOrigin(platformIndex, targetPosition.x << 5, targetPosition.y << 5, targetPosition.z << 5);
+				Platform::GetOrigin(platformIndex, &platformOrigin);
+			}
+			else
+			{
+				InterpolatePathPoint(pathRecordType, *pathPosition, &targetPosition);
+				Platform::GetOrigin(platformIndex, &platformOrigin);
+
+				direction.x = targetPosition.x * 0x20 - platformOrigin.x;
+				direction.y = targetPosition.y * 0x20 - platformOrigin.y;
+				direction.z = targetPosition.z * 0x20 - platformOrigin.z;
+
+				if (direction.x < 0x1000)
+					*pathPosition += 0x1000;
+
+				while (abs(direction.x) > 0x4000 || abs(direction.y) > 0x4000 || abs(direction.z) > 0x4000)
+				{
+					direction.x >>= 2;
+					direction.y >>= 2;
+					direction.z >>= 2;
+				}
+
+				Nu3D::Math::NormalizeToFixedPoint(&direction, &direction);
+				Platform::SetVelocity(platformIndex,
+					Renderer::g_frameDelta * direction.x * speed >> 10,
+					Renderer::g_frameDelta * direction.y * speed >> 10,
+					Renderer::g_frameDelta * direction.z * speed >> 10);
+			}
+
+			if (secondaryLinkIndex != 0)
+			{
+				Nu3D::Link::SetPositionRawAndCommit(secondaryLinkIndex, platformOrigin.x >> 5, platformOrigin.y >> 5, platformOrigin.z >> 5);
+			}
+			Nu3D::Link::SetPositionRawAndCommit(primaryLinkIndex, platformOrigin.x >> 5, platformOrigin.y >> 5, platformOrigin.z >> 5);
+		}
 
 		// FUNCTION: TOY2 0x0041E300 [TOOL]
 		void InitHiddenCollectibles()
