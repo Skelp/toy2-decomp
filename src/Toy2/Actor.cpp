@@ -1085,8 +1085,17 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00830C98
 		int32_t g_coinQuestHintTimer;
 
+		// GLOBAL: TOY2 0x00830CA4
+		int32_t g_rotatingHintSoundTimer;
+
 		// GLOBAL: TOY2 0x00830D1C
 		int32_t g_coinTokenAwarded;
+
+		// GLOBAL: TOY2 0x00830D24
+		int32_t g_rotatingHintIndex;
+
+		// GLOBAL: TOY2 0x00830D34
+		int32_t g_itemReturnHintSoundTimer;
 
 		// GLOBAL: TOY2 0x00529D48
 		Toy2Actor* g_renderActors[66];
