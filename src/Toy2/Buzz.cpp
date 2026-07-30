@@ -1233,6 +1233,9 @@ namespace Toy2
 		const uint32_t TURN_RECOVERY_ACTION_MASK = 0xFF481;
 		const int16_t GROUND_SLAM_ANIMATION_STATE = 8;
 		const int32_t FACING_SNAP_THRESHOLD = 0x5DC;
+		const int32_t JUMP_HEIGHT_TARGET = 0x6A80;
+		const int32_t MIN_CONTROLLED_JUMP_VELOCITY = -0x74C;
+		const int32_t MAX_CONTROLLED_JUMP_VELOCITY = -0x22A;
 
 		union GrappleBeamVector
 		{
@@ -1265,6 +1268,115 @@ namespace Toy2
 			g_forcedFacingActive = 0;
 			g_turnRecoveryTimer = 0;
 			g_jumpHeightControlActive = 0;
+		}
+
+		// FUNCTION: TOY2 0x004340D0 [PROVISIONAL]
+		void UpdateJumpAndGravity(Toy2BuzzActor* buzz, int32_t jumpVelocity, int32_t suppressJumpInput)
+		{
+			int32_t gravityDivisor;
+			int32_t terminalVelocity;
+			if ((g_buzzActor.actorFlags & ACTOR_FLAG_BLOCK_EDGE_IDLE) != 0)
+			{
+				gravityDivisor = 4;
+				if (g_environmentEffectType == 1)
+				{
+					terminalVelocity = 0x400;
+				}
+				else
+				{
+					terminalVelocity = 0x40;
+					if (buzz->velocity.vertical >= 0)
+						buzz->specialAirState = 6;
+				}
+			}
+			else
+			{
+				gravityDivisor = 2;
+				terminalVelocity = 0x800;
+			}
+
+			if ((InputManager::g_directionInputState & INPUT_JUMP) != 0 && suppressJumpInput == 0)
+			{
+				int16_t airborneMode = buzz->airborneMode;
+				int32_t airborneTimer = g_airborneTimer;
+				if ((airborneMode == 2 && buzz->velocity.vertical > -0x400 && g_spinHoverTimer >= 0 && buzz->specialAirState == 0
+						&& buzz->cosmicShieldTimer <= 0 && airborneTimer >= 0)
+					|| (airborneMode == 0 && airborneTimer == 0x50))
+				{
+					g_airborneTimer = 0;
+					int32_t heightDelta = g_jumpStartY - buzz->posAngles.pos.y;
+					if (heightDelta > 0 && g_jumpHeightControlActive != 0)
+					{
+						int32_t gravity = 0x100 / (gravityDivisor * gravityDivisor);
+						buzz->velocity.vertical = -(int32_t)sqrt((double)(gravity * (JUMP_HEIGHT_TARGET - heightDelta) * 2));
+						if (buzz->velocity.vertical < MIN_CONTROLLED_JUMP_VELOCITY)
+							buzz->velocity.vertical = MIN_CONTROLLED_JUMP_VELOCITY;
+						if (buzz->velocity.vertical > MAX_CONTROLLED_JUMP_VELOCITY)
+							buzz->velocity.vertical = MAX_CONTROLLED_JUMP_VELOCITY;
+					}
+					else
+					{
+						buzz->velocity.vertical = -0x900 / gravityDivisor;
+					}
+					buzz->airborneMode = 5;
+					buzz->animationState = GROUND_SLAM_ANIMATION_STATE;
+					AudioManager::PlaySoundEffect(0x10, &g_buzzActor.posAngles.pos);
+					airborneTimer = g_airborneTimer;
+				}
+
+				airborneMode = buzz->airborneMode;
+				if (airborneMode == 1 || airborneMode >= 4)
+				{
+					if (buzz->collisionFlags != 0)
+						buzz->airborneMode = 5;
+					else if (airborneMode == 6)
+						buzz->airborneMode = 3;
+				}
+				else if (buzz->specialAirState != 0 && g_groundSlamTimer == 0 && airborneTimer != 0x50)
+				{
+					if (AudioManager::IsActorSoundPlaying(buzz) == 0)
+						AudioManager::Preset::PlayOneShotSound2(0x19, buzz);
+
+					g_buzzActor.airborneMode = 1;
+					g_buzzActor.collisionFlags = 0;
+					g_buzzActor.specialAirState = 0;
+					g_buzzActor.animationState = ANIMATION_STATE_AIRBORNE;
+					g_buzzActor.velocity.vertical = jumpVelocity;
+					g_forcedFacingActive = 0;
+					g_turnRecoveryTimer = 0;
+					g_jumpHeightControlActive = 0;
+					g_jumpStartY = buzz->posAngles.pos.y;
+					g_jumpHeightControlActive = 1;
+				}
+				else if (airborneMode == 2)
+				{
+					buzz->airborneMode = 3;
+				}
+			}
+			else
+			{
+				if (buzz->collisionFlags != 0)
+					buzz->airborneMode = 0;
+
+				if (buzz->airborneMode == 1)
+				{
+					if (buzz->velocity.vertical < 0)
+					{
+						if (buzz->velocity.vertical < -0x320 / gravityDivisor)
+							buzz->velocity.vertical += 0x180 / (gravityDivisor * gravityDivisor);
+						buzz->velocity.vertical = buzz->velocity.vertical / 2 - 0x100 / (gravityDivisor * gravityDivisor);
+					}
+					buzz->airborneMode = 2;
+				}
+
+				if (buzz->airborneMode == 5)
+					buzz->airborneMode = 6;
+			}
+
+			if (buzz->collisionFlags == 0)
+				buzz->velocity.vertical += (Renderer::g_frameDelta << 8) / (gravityDivisor * gravityDivisor);
+			if (buzz->velocity.vertical > terminalVelocity)
+				buzz->velocity.vertical = terminalVelocity;
 		}
 
 		// FUNCTION: TOY2 0x004343D0 [PROVISIONAL]
