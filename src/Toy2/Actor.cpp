@@ -1104,23 +1104,23 @@ namespace Toy2
 		Toy2Actor* g_lastKilledActor;
 
 		// GLOBAL: TOY2 0x0052ADD8
-		int32_t g_unk52ADD8[0x80];
+		int32_t g_unusedActorStateBuffer[0x80];
 
 		// GLOBAL: TOY2 0x0052EF48
-		int32_t g_unk52EF48;
+		int32_t g_unusedActorState0;
 
 		// GLOBAL: TOY2 0x0052EF88
-		int32_t g_unk52EF88;
+		int32_t g_unusedActorState1;
 
 		// FUNCTION: TOY2 0x00407150 [PROVISIONAL]
 		void InitCreatureRam()
 		{
 			memset(g_creatureActors, 0, sizeof(g_creatureActors));
-			memset(g_unk52ADD8, 0, sizeof(g_unk52ADD8));
+			memset(g_unusedActorStateBuffer, 0, sizeof(g_unusedActorStateBuffer));
 			g_lastKilledActor = (Toy2Actor*)-1;
 			g_activeActors[0] = 0;
-			g_unk52EF48 = 0;
-			g_unk52EF88 = 0;
+			g_unusedActorState0 = 0;
+			g_unusedActorState1 = 0;
 
 			Toy2Actor* actor = g_creatureActors;
 			RawLoader::CreatureListRam* creature = RawLoader::g_creatureListRam;

@@ -118,11 +118,10 @@ namespace Toy2
 
 		extern Toy2Actor* g_lastKilledActor;
 
-		// Actor-system state reset by InitCreatureRam. Roles are not yet confirmed;
-		// the consuming functions (Game::UpdateActors et al.) are unreconstructed.
-		extern int32_t g_unk52ADD8[0x80];
-		extern int32_t g_unk52EF48;
-		extern int32_t g_unk52EF88;
+		// The retail executable clears this actor state but does not read it.
+		extern int32_t g_unusedActorStateBuffer[0x80];
+		extern int32_t g_unusedActorState0;
+		extern int32_t g_unusedActorState1;
 
 		void InitCreatureRam();
 		void UpdatePrimaryAnimation(Toy2Actor* actor);
