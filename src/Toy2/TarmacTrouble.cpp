@@ -313,6 +313,59 @@ namespace Toy2
 			}
 		}
 
+		// FUNCTION: TOY2 0x0042E1D0 [PROVISIONAL]
+		void UpdatePlatforms()
+		{
+			Vector3I position;
+
+			Nu3D::Link::GetTargetPosFixed(3, &position);
+			Nu3D::Link::SetPositionRawAndCommit(
+				3, position.x >> 5, (position.y + g_platformLiftOffset + Numerics::g_sinCosLUT[g_platformBobAngle & 0xFFF] / 2) >> 5, position.z >> 5);
+
+			Nu3D::Link::GetTargetPosFixed(0x30, &position);
+			Nu3D::Link::SetPositionRawAndCommit(
+				0x30, position.x >> 5, (position.y + g_platformLiftOffset + Numerics::g_sinCosLUT[g_platformBobAngle & 0xFFF] / 2) >> 5, position.z >> 5);
+
+			Nu3D::Link::GetTargetPosFixed(0x42, &position);
+			Nu3D::Link::SetPositionRawAndCommit(
+				0x42, position.x >> 5, (position.y + g_platformLiftOffset + Numerics::g_sinCosLUT[g_platformBobAngle & 0xFFF] / 2) >> 5, position.z >> 5);
+
+			Nu3D::Link::GetTargetPosFixed(0x43, &position);
+			Nu3D::Link::SetPositionRawAndCommit(
+				0x43, position.x >> 5, (position.y + g_platformLiftOffset + Numerics::g_sinCosLUT[g_platformBobAngle & 0xFFF] / 2) >> 5, position.z >> 5);
+
+			Nu3D::Link::GetTargetPosFixed(0x44, &position);
+			Nu3D::Link::SetPositionRawAndCommit(
+				0x44, position.x >> 5, (position.y + g_platformLiftOffset + Numerics::g_sinCosLUT[g_platformBobAngle & 0xFFF] / 2) >> 5, position.z >> 5);
+
+			Nu3D::Link::GetTargetPosFixed(0x74, &position);
+			Nu3D::Link::SetPositionRawAndCommit(0x74,
+				position.x >> 5,
+				(position.y - 0xA000 + g_platformLiftOffset + Numerics::g_sinCosLUT[g_platformBobAngle & 0xFFF] / 4) >> 5,
+				position.z >> 5);
+
+			Collectables::PickupRecord* puzzleTokenPickup =
+				reinterpret_cast<Collectables::PickupRecord*>(Levels::g_recordData[63] + 1) + g_puzzleTokenPickupIndex;
+			if (puzzleTokenPickup->position.y != INT_MIN)
+				puzzleTokenPickup->position.y = (position.y - 0xA000 + g_platformLiftOffset + Numerics::g_sinCosLUT[g_platformBobAngle & 0xFFF] / 4) >> 5;
+
+			Nu3D::Link::GetTargetPosFixed(0x31, &position);
+			Nu3D::Link::SetPositionRawAndCommit(0x31,
+				position.x >> 5,
+				(position.y + ((Numerics::g_sinCosLUT[g_platformBobAngle & 0xFFF] / 2 + g_platformLiftOffset) >> 2)) >> 5,
+				position.z >> 5);
+
+			Nu3D::Link::GetTargetPosFixed(0x32, &position);
+			Nu3D::Link::SetPositionRawAndCommit(0x32,
+				position.x >> 5,
+				(position.y + ((Numerics::g_sinCosLUT[g_platformBobAngle & 0xFFF] / 2 + g_platformLiftOffset) >> 2)) >> 5,
+				position.z >> 5);
+
+			Nu3D::Link::SetRotationRelative8bit(0x30, 0, g_platformBobAngle * 21, 0);
+			Nu3D::Link::SetRotationRelative8bit(0x32, 0, g_platformBobAngle * 21, 0);
+			g_platformBobAngle += Renderer::g_frameDelta * 33;
+		}
+
 		// FUNCTION: TOY2 0x0042E600 [PROVISIONAL]
 		void Init()
 		{
