@@ -220,7 +220,7 @@ namespace Toy2
 					Nu3D::Math::EulerToRotationMatrix(&transform->rotationAngles, &transform->rotation);
 				}
 
-				if (g_clipHasNegativeHeader && clip->buzzOffsetNode == (int16_t)baseBoneIndex)
+				if (g_clipHasNegativeHeader && clip->offsetNode == (int16_t)baseBoneIndex)
 				{
 					Vector3I offset = { 0, -200, 0 };
 					TransformByBone(&offset, &g_buzzActor, baseBoneIndex);
@@ -285,8 +285,122 @@ namespace Toy2
 			position->z = transform->translation.z + transformed.z;
 		}
 
-		// STUB: TOY2 0x004CD1B0
-		int32_t SampleNodeTransform(int32_t nodeIndex, int16_t* clipData, int32_t framePosition, D3DMATRIX* matrix) { return 0; }
+		// FUNCTION: TOY2 0x004CD1B0 [PROVISIONAL]
+		int32_t SampleNodeTransform(int32_t nodeIndex, int16_t* clipData, int32_t framePosition, D3DMATRIX* matrix)
+		{
+			ClipHeader* clip = (ClipHeader*)clipData;
+			int32_t fraction = (uint16_t)framePosition;
+			float blend = (float)fraction * (1.0f / 65535.0f);
+			uint32_t lastFrame = clip->frameCountAndFlags - 2;
+			uint32_t frame = (uint32_t)framePosition >> 16;
+			if (frame > lastFrame)
+				frame = lastFrame;
+
+			uint32_t nextFrame = frame + 1;
+			if ((int32_t)frame >= (int32_t)lastFrame)
+				nextFrame = frame;
+
+			int16_t* frameData = (int16_t*)g_keyframeData + clip->sampleStride * frame;
+			int32_t sampleOffset = ((int16_t*)g_nodeKeyframeOffsets)[nodeIndex];
+			if (sampleOffset == -3 || sampleOffset == -2 || sampleOffset == -1)
+				return 0;
+
+			KeyframeSample* sample = (KeyframeSample*)(frameData + sampleOffset);
+			KeyframeSample* nextSample = (KeyframeSample*)((int16_t*)g_keyframeData + clip->sampleStride * nextFrame + sampleOffset);
+			Vector3F translation;
+			D3DMATRIX rotation;
+
+			if (fraction != 0)
+			{
+				translation.x = (float)((((nextSample->translationX >> 2) - (sample->translationX >> 2)) * fraction >> 16) + (sample->translationX >> 2));
+				translation.y = (float)((((nextSample->translationY >> 2) - (sample->translationY >> 2)) * fraction >> 16) + (sample->translationY >> 2));
+				translation.z = (float)((((nextSample->translationZ >> 2) - (sample->translationZ >> 2)) * fraction >> 16) + (sample->translationZ >> 2));
+
+				uint32_t packedRotation = sample->packedRotationLow | (sample->packedRotationHigh << 16);
+				int32_t pitch = ((sample->translationX & 3) << 4) | ((int32_t)packedRotation >> 14 & 0xffc0);
+				int32_t yaw = ((sample->translationY & 3) << 4) | ((int32_t)packedRotation >> 4 & 0xffc0);
+				int32_t roll = (((packedRotation & 0x3ff) << 2) | (sample->translationZ & 3)) << 4;
+
+				packedRotation = nextSample->packedRotationLow | (nextSample->packedRotationHigh << 16);
+				int32_t nextPitch = ((nextSample->translationX & 3) << 4) | ((int32_t)packedRotation >> 14 & 0xffc0);
+				int32_t nextYaw = ((nextSample->translationY & 3) << 4) | ((int32_t)packedRotation >> 4 & 0xffc0);
+				int32_t nextRoll = (((packedRotation & 0x3ff) << 2) | (nextSample->translationZ & 3)) << 4;
+
+				Nu3D::Math::BuildIdentityMatrix(&rotation);
+				Nu3D::Math::MatrixRotatePitch(&rotation, pitch);
+				Nu3D::Math::MatrixRotateYaw(&rotation, yaw);
+				Nu3D::Math::MatrixRotateRoll(&rotation, roll);
+				D3DMATRIX nextRotation;
+				Nu3D::Math::BuildIdentityMatrix(&nextRotation);
+				Nu3D::Math::MatrixRotatePitch(&nextRotation, nextPitch);
+				Nu3D::Math::MatrixRotateYaw(&nextRotation, nextYaw);
+				Nu3D::Math::MatrixRotateRoll(&nextRotation, nextRoll);
+
+				rotation._11 = (nextRotation._11 - rotation._11) * blend + rotation._11;
+				rotation._12 = (nextRotation._12 - rotation._12) * blend + rotation._12;
+				rotation._13 = (nextRotation._13 - rotation._13) * blend + rotation._13;
+				rotation._21 = (nextRotation._21 - rotation._21) * blend + rotation._21;
+				rotation._22 = (nextRotation._22 - rotation._22) * blend + rotation._22;
+				rotation._23 = (nextRotation._23 - rotation._23) * blend + rotation._23;
+				rotation._31 = (nextRotation._31 - rotation._31) * blend + rotation._31;
+				rotation._32 = (nextRotation._32 - rotation._32) * blend + rotation._32;
+				rotation._33 = (nextRotation._33 - rotation._33) * blend + rotation._33;
+			}
+			else
+			{
+				translation.x = (float)(sample->translationX >> 2);
+				translation.y = (float)(sample->translationY >> 2);
+				translation.z = (float)(sample->translationZ >> 2);
+
+				uint32_t packedRotation = sample->packedRotationLow | (sample->packedRotationHigh << 16);
+				int32_t pitch = ((nextSample->translationX & 3) << 4) | ((int32_t)packedRotation >> 14 & 0xffc0);
+				int32_t yaw = ((nextSample->translationY & 3) << 4) | ((int32_t)packedRotation >> 4 & 0xffc0);
+				int32_t roll = (((packedRotation & 0x3ff) << 2) | (nextSample->translationZ & 3)) << 4;
+				Nu3D::Math::BuildIdentityMatrix(&rotation);
+				Nu3D::Math::MatrixRotatePitch(&rotation, pitch);
+				Nu3D::Math::MatrixRotateYaw(&rotation, yaw);
+				Nu3D::Math::MatrixRotateRoll(&rotation, roll);
+			}
+
+			Vector3F scale;
+			if ((g_nodeScaleFlags[nodeIndex / 8] & (1 << (nodeIndex % 8))) != 0)
+			{
+				if (fraction != 0)
+				{
+					scale.x = (float)(((nextSample->scaleX - sample->scaleX) * fraction >> 16) + sample->scaleX) * (1.0f / 4096.0f);
+					scale.y = (float)(((nextSample->scaleY - sample->scaleY) * fraction >> 16) + sample->scaleY) * (1.0f / 4096.0f);
+					scale.z = (float)(((nextSample->scaleZ - sample->scaleZ) * fraction >> 16) + sample->scaleZ) * (1.0f / 4096.0f);
+				}
+				else
+				{
+					scale.x = (float)sample->scaleX * (1.0f / 4096.0f);
+					scale.y = (float)sample->scaleY * (1.0f / 4096.0f);
+					scale.z = (float)sample->scaleZ * (1.0f / 4096.0f);
+				}
+			}
+			else
+			{
+				scale.x = 1.0f;
+				scale.y = 1.0f;
+				scale.z = 1.0f;
+			}
+
+			if (clip->offsetNode == nodeIndex)
+				g_rootOffsetNodeIndex = clip->offsetNode;
+			if (g_applyRootNodeOffset != 0 && g_rootOffsetNodeIndex != 0)
+			{
+				Vector3F rootPosition = { 0.0f, -200.0f, 0.0f };
+				Nu3D::Bones::GetRootWorldPos(&rootPosition, g_rootOffsetNodeIndex);
+				translation.x += rootPosition.x;
+				translation.y += rootPosition.y + 200.0f;
+				translation.z += rootPosition.z;
+			}
+
+			Nu3D::Math::MatrixApplyScale(matrix, &scale);
+			Nu3D::Math::MultiplyMatrix3x4(matrix, matrix, &rotation);
+			Nu3D::Math::AddWorldSpaceTransform(matrix, &translation);
+			return 1;
+		}
 
 		// FUNCTION: TOY2 0x004CD7B0 [PROVISIONAL]
 		void EvaluateClipToMatrices(

@@ -34,7 +34,7 @@ namespace Toy2
 			uint16_t sampleStride;
 			uint16_t nodeOffsetCount;
 			uint16_t scaleFlagByteCount;
-			int16_t buzzOffsetNode;
+			int16_t offsetNode;
 		};
 
 		struct KeyframeSample
