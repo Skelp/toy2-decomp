@@ -818,6 +818,87 @@ namespace Renderer
 			}
 		}
 
+		// FUNCTION: TOY2 0x00493A60 [MATCHED]
+		int16_t DrawTinted(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue, uint32_t flags)
+		{
+			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
+			int32_t textureDataIndex;
+			Vector2F uvMin;
+			Vector2F uvMax;
+			uint32_t bitmapWidth;
+			uint32_t bitmapHeight;
+			RGBA color;
+			uint8_t* alpha;
+			int32_t blendMode;
+			int32_t renderFlags;
+			float inverseHeight;
+			float inverseWidth;
+
+			if (sheet)
+			{
+				textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
+
+				if (textureDataIndex)
+				{
+					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
+
+					uvMin.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;
+					uvMin.y = (float)sheet->tiles[tileIndex].y / (int32_t)bitmapHeight;
+					uvMax.x = ((float)sheet->tileWidth + sheet->tiles[tileIndex].x) / (int32_t)bitmapWidth;
+					uvMax.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
+				}
+
+				color.r = (uint8_t)Nu3D::Camera::g_cameraTintBlue;
+				color.g = (uint8_t)Nu3D::Camera::g_cameraTintGreen;
+				color.b = (uint8_t)Nu3D::Camera::g_cameraTintRed;
+
+				alpha = &color.a;
+				if (! alpha)
+					alpha = (uint8_t*)&sheetIndex;
+
+				blendMode = flags & 96;
+				if (blendMode != 0)
+				{
+					if (blendMode != 32)
+					{
+						if (blendMode != 64)
+						{
+							*alpha = 255 - (uint8_t)((flags >> 8) & 0xFF);
+							renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT;
+						}
+						else
+						{
+							*alpha = 255;
+							renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_ALT;
+						}
+					}
+					else
+					{
+						*alpha = 255;
+						renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_CUSTOM;
+					}
+				}
+				else
+				{
+					*alpha = 128;
+					renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT;
+				}
+
+				inverseHeight = 1.0f / g_virtualScreenHeight;
+				inverseWidth = 1.0f / g_virtualScreenWidth;
+				Queue2DSprite((float)xPos * inverseWidth,
+					(float)yPos * inverseHeight,
+					(float)sheet->tileWidth * inverseWidth,
+					(float)sheet->tileHeight * inverseHeight,
+					&uvMin,
+					&uvMax,
+					textureDataIndex,
+					color,
+					renderFlags);
+			}
+			return 1;
+		}
+
 		// FUNCTION: TOY2 0x00493DC0 [PROVISIONAL]
 		int16_t DrawColouredFixed(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue)
 		{

@@ -35,6 +35,7 @@ namespace Renderer
 			uint32_t flags,
 			int32_t scaleX,
 			int32_t scaleY);
+		int16_t DrawTinted(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue, uint32_t flags);
 
 		void Queue2DSprite(float xPosition,
 			float yPosition,
