@@ -1,8 +1,11 @@
 #include "Toy2/Collision.h"
+#include "FileUtils.h"
 #include "Nu3D/Link.h"
 #include "Nu3D/Math.h"
 #include "Renderer/Shadows.h"
 #include "Toy2/Buzz.h"
+
+#include <string.h>
 
 namespace Toy2
 {
@@ -12,13 +15,202 @@ namespace Toy2
 
 	namespace Levels
 	{
+		extern void* g_cachedAllBuffer;
+
 		void BuildLevelPath(int32_t level, char* output, const char* suffix);
 	}
 
 	namespace Terrain
 	{
-		// STUB: TOY2 0x00489980
-		int32_t LoadAll(char*, int32_t, uint8_t**) { return 0; }
+		struct TerrainFileHeader
+		{
+			int32_t descriptorTableOffsetInWords;
+		};
+
+		struct TerrainMeshDescriptor
+		{
+			int32_t reserved;
+			int32_t collisionTreeWordCount;
+			Vector3I origin;
+			int32_t typeOrRelocationIndex;
+			uint8_t reserved2[6];
+			int16_t platformId;
+			uint8_t reserved3[12];
+			int16_t flags;
+			uint8_t reserved4[26];
+			int16_t sourceMeshId;
+			int16_t isClone;
+		};
+
+		struct PlatformRuntimeRecord
+		{
+			Vector3I origin;
+			Vector3I16 rotationAnglesFixed;
+			int16_t motionMode;
+			Vector3I16 velocity;
+			Vector3I16 remainingTranslation;
+			Vector3I16 angularVelocity;
+			Vector3I16 remainingRotation;
+			Platform::CollisionFace* contactFace;
+			int16_t collisionMeshIndex;
+			int16_t flags;
+		};
+
+		struct CollisionWorkspaceSlot
+		{
+			uint8_t reserved[0x18];
+			int16_t activeFrames;
+			uint8_t reserved2[2];
+			int32_t entryCount;
+			uint8_t reserved3[0x5A0];
+		};
+
+		struct CollisionWorkspace
+		{
+			CollisionWorkspaceSlot slots[9];
+		};
+
+		union TerrainRelocationLink
+		{
+			int32_t marker;
+			uint8_t* next;
+		};
+
+		STATIC_ASSERT(sizeof(TerrainFileHeader) == 0x04);
+		STATIC_ASSERT(sizeof(TerrainMeshDescriptor) == 0x4C);
+		STATIC_ASSERT(offsetof(TerrainMeshDescriptor, collisionTreeWordCount) == 0x04);
+		STATIC_ASSERT(offsetof(TerrainMeshDescriptor, platformId) == 0x1E);
+		STATIC_ASSERT(offsetof(TerrainMeshDescriptor, flags) == 0x2C);
+		STATIC_ASSERT(offsetof(TerrainMeshDescriptor, sourceMeshId) == 0x48);
+		STATIC_ASSERT(sizeof(PlatformRuntimeRecord) == 0x34);
+		STATIC_ASSERT(offsetof(PlatformRuntimeRecord, collisionMeshIndex) == 0x30);
+		STATIC_ASSERT(sizeof(CollisionWorkspaceSlot) == 0x5C0);
+		STATIC_ASSERT(sizeof(CollisionWorkspace) == 0x33C0);
+		STATIC_ASSERT(sizeof(TerrainRelocationLink) == 0x04);
+
+		// GLOBAL: TOY2 0x007286EC
+		PlatformRuntimeRecord g_platformRuntimeRecords[33];
+
+		// GLOBAL: TOY2 0x007290F0
+		uint8_t* g_terrainRelocationHeads[8];
+
+		// GLOBAL: TOY2 0x0072871C
+		CollisionWorkspace* g_collisionWorkspace;
+
+		// FUNCTION: TOY2 0x00489980 [PROVISIONAL]
+		int32_t LoadAll(char* filename, int32_t baseMeshIndex, uint8_t** buffer)
+		{
+			int32_t loadedMeshCount;
+			int32_t descriptorIndex;
+			char allFilename[100];
+			int16_t sourceMeshIndices[100];
+
+			if (Levels::g_cachedAllBuffer == NULL)
+			{
+				strcpy(allFilename, filename);
+				strcat(allFilename, ".all");
+				FileUtils::LoadFile(allFilename, *buffer);
+			}
+			else
+			{
+				*buffer = static_cast<uint8_t*>(Levels::g_cachedAllBuffer);
+			}
+
+			TerrainFileHeader* fileHeader = reinterpret_cast<TerrainFileHeader*>(*buffer);
+			int32_t* descriptorTable = reinterpret_cast<int32_t*>(*buffer + fileHeader->descriptorTableOffsetInWords * 2);
+			*buffer += sizeof(TerrainFileHeader);
+			loadedMeshCount = 0;
+			descriptorIndex = 0;
+
+			memset(sourceMeshIndices, -1, sizeof(sourceMeshIndices));
+			memset(g_terrainRelocationHeads, 0, sizeof(g_terrainRelocationHeads));
+
+			if (*descriptorTable > 0)
+			{
+				TerrainMeshDescriptor* descriptor = reinterpret_cast<TerrainMeshDescriptor*>(descriptorTable);
+				Collision::CollisionMeshInstance* mesh = &Collision::g_collisionMeshInstances[baseMeshIndex];
+
+				do
+				{
+					if (descriptor->typeOrRelocationIndex < 256)
+					{
+						loadedMeshCount++;
+
+						if (descriptor->isClone == 1)
+						{
+							int32_t sourceMeshIndex = sourceMeshIndices[descriptor->sourceMeshId];
+							if (sourceMeshIndex < 0)
+							{
+								mesh->typeFlags = 0;
+							}
+							else
+							{
+								*mesh = Collision::g_collisionMeshInstances[sourceMeshIndex];
+								mesh->origin.x = descriptor->origin.x;
+								mesh->origin.y = descriptor->origin.y;
+								mesh->origin.z = descriptor->origin.z;
+								mesh->platformIdx = descriptor->typeOrRelocationIndex;
+								mesh->origin.x <<= 5;
+								mesh->origin.y <<= 5;
+								mesh->origin.z <<= 5;
+							}
+						}
+						else
+						{
+							mesh->typeFlags = static_cast<int16_t>(descriptor->typeOrRelocationIndex);
+							mesh->unk = descriptor->flags;
+							mesh->origin.x = descriptor->origin.x << 5;
+							mesh->origin.y = descriptor->origin.y << 5;
+							mesh->origin.z = descriptor->origin.z << 5;
+							mesh->collisionTree = reinterpret_cast<int32_t>(*buffer);
+
+							if (descriptor->platformId != 0)
+							{
+								PlatformRuntimeRecord& platform = g_platformRuntimeRecords[descriptor->platformId];
+								platform.collisionMeshIndex = static_cast<int16_t>(baseMeshIndex);
+								platform.origin.x = mesh->origin.x;
+								platform.origin.y = mesh->origin.y;
+								platform.origin.z = mesh->origin.z;
+								mesh->platformIdx = descriptor->platformId - 1;
+							}
+
+							if (descriptor->sourceMeshId >= 0)
+							{
+								sourceMeshIndices[descriptor->sourceMeshId] = static_cast<int16_t>(baseMeshIndex);
+							}
+						}
+
+						baseMeshIndex++;
+						mesh++;
+					}
+					else
+					{
+						TerrainRelocationLink* relocation = reinterpret_cast<TerrainRelocationLink*>(*buffer);
+						if (relocation->marker == 0x12345678)
+						{
+							int32_t relocationIndex = descriptor->typeOrRelocationIndex - 256;
+							relocation->next = g_terrainRelocationHeads[relocationIndex];
+							g_terrainRelocationHeads[relocationIndex] = *buffer + sizeof(TerrainRelocationLink);
+						}
+					}
+
+					*buffer += descriptor->collisionTreeWordCount * 2;
+					descriptorIndex++;
+					descriptor++;
+				} while (descriptorIndex < *descriptorTable);
+			}
+
+			g_collisionWorkspace = reinterpret_cast<CollisionWorkspace*>(*buffer);
+			*buffer += sizeof(CollisionWorkspace);
+
+			for (int32_t slotIndex = 0; slotIndex < 9; slotIndex++)
+			{
+				g_collisionWorkspace->slots[slotIndex].activeFrames = 0;
+				g_collisionWorkspace->slots[slotIndex].entryCount = 0;
+			}
+
+			return loadedMeshCount;
+		}
 	}
 
 	namespace Collision
