@@ -42,7 +42,7 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, char* cmdLine, int3
 	AllocateConsole();
 #endif
 
-	Toy2::g_unused0 = 0;
+	Toy2::g_d3dAppInfo = NULL;
 
 	memset(&d3dappi, 0, sizeof(d3dappi));
 

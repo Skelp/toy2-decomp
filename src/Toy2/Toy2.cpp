@@ -861,7 +861,7 @@ namespace Toy2
 	};
 
 	// GLOBAL: TOY2 0x00534550
-	int32_t g_unused0;
+	D3DAppInfo* g_d3dAppInfo;
 
 	// GLOBAL: TOY2 0x00731F18
 	int32_t g_saveMenuState;

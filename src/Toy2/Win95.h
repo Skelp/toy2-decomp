@@ -1,27 +1,10 @@
 #pragma once
 
 #include "Common.h"
+#include "D3DApp/d3dapp.h"
 
 #include <directx6/ddraw.h>
 #include <windows.h>
-
-struct RenderStateCache
-{
-	int32_t zWriteEnable;
-	int32_t texturePerspective;
-	int32_t shadeMode;
-	int32_t textureFilter;
-	int32_t cullMode;
-	int32_t fillMode;
-	int32_t ditherEnable;
-	int32_t specularEnable;
-	int32_t antiAlias;
-	int32_t fogEnable;
-	int32_t fogColor;
-	int32_t fogTableMode;
-	float fogStart;
-	float fogEnd;
-};
 
 struct WindowData
 {
@@ -33,7 +16,7 @@ struct WindowData
 	HWND mainHwnd;
 	WNDCLASSEXA wndClass;
 	int32_t nShowCmd;
-	RenderStateCache stateCache;
+	D3DAppRenderState stateCache;
 	int32_t unkInt1;
 	int32_t unkInt2;
 	int32_t unkInt3;
@@ -58,5 +41,4 @@ void SysParmsOnExit();
 void LogErrorNotSet();
 void Nullsub8();
 
-STATIC_ASSERT(sizeof(RenderStateCache) == 0x38);
 STATIC_ASSERT(sizeof(WindowData) == 0xC8);

@@ -517,6 +517,7 @@
 0x004946A0 Renderer::Sprite::DrawTiledFixed
 0x00494820 Renderer::Sprite::DrawTile
 0x004949B0 Renderer::Sprite::DrawClipped
+0x00497D70 InitD3DSettings
 0x00498140 Toy2::InitDirect3DMaterials
 0x00498470 SaveManager::SetLightShadowEffects
 0x00498550 Toy2::ProcessMiscEvents

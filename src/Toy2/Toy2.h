@@ -3,6 +3,8 @@
 #include "Common.h"
 #include "Renderer/Renderer.h"
 
+struct D3DAppInfo;
+
 namespace Toy2
 {
 	enum GameplayStateFlags
@@ -187,7 +189,7 @@ namespace Toy2
 	extern int32_t g_mainMenuState;
 	extern int32_t g_attractModeTimer;
 	extern int32_t g_returnedToTitle;
-	extern int32_t g_unused0;
+	extern D3DAppInfo* g_d3dAppInfo;
 	extern int32_t g_unused1;
 	extern int32_t g_unused2;
 	extern int32_t g_modeSelectFinished;

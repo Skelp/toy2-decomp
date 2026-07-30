@@ -45,8 +45,110 @@ void GetVidMem()
 	Logger::Log("GetVidMem : Total PRIMARY video memory is %d, free memory is %d.\n", total, free);
 }
 
-// STUB: TOY2 0x00409E30
-int32_t D3DInit(char* commandLine) { return TRUE; }
+struct D3DInitSettings
+{
+	D3DAppRenderState renderState;
+	int32_t windowState;
+	int32_t savedWindowOptions[2];
+	char windowTitle[32];
+};
+
+STATIC_ASSERT(sizeof(D3DInitSettings) == 0x64);
+
+// FUNCTION: TOY2 0x00497D70 [MATCHED]
+void InitD3DSettings(D3DInitSettings* settings)
+{
+	lstrcpyA(settings->windowTitle, "Loading - A Bugs Life");
+	settings->renderState.bPerspCorrect = TRUE;
+	settings->renderState.bDithering = TRUE;
+	g_windowData.unkInt5 = 0;
+	g_windowData.unkInt4 = 1;
+	settings->renderState.bSpecular = FALSE;
+}
+
+// FUNCTION: TOY2 0x00409E30 [MATCHED]
+int32_t D3DInit(char* commandLine)
+{
+	if (! D3DAppCreate(0, g_windowData.mainHwnd, &Toy2::g_d3dAppInfo))
+	{
+		LogErrorNotSet();
+		return FALSE;
+	}
+
+	D3DInitSettings settings;
+	memcpy(&settings.renderState, &d3dapprs, sizeof(settings.renderState));
+	lstrcpyA(settings.windowTitle, "BUGS");
+	settings.windowState = 0;
+	settings.savedWindowOptions[0] = g_windowData.unkInt6;
+	settings.savedWindowOptions[1] = g_windowData.unkInt3;
+	InitD3DSettings(&settings);
+	g_windowData.unkInt3 = settings.savedWindowOptions[1];
+	g_windowData.unkInt6 = settings.savedWindowOptions[0];
+	SetWindowTextA(g_windowData.mainHwnd, settings.windowTitle);
+
+	if (g_renderMode == RENDERMODE_D3D)
+	{
+		D3DAppRenderState* renderState = &g_windowData.stateCache;
+		memcpy(renderState, &settings.renderState, sizeof(*renderState));
+		if (renderState != NULL)
+			memcpy(&d3dapprs, &settings.renderState, sizeof(d3dapprs));
+
+		if (d3dappi.bRenderingIsOK && ! D3DAppISetRenderState())
+		{
+			LogErrorNotSet();
+			return FALSE;
+		}
+
+		HRESULT result = d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_CULLMODE, D3DCULL_NONE);
+		if (result < 0)
+			Logger::LogDDError("d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_CULLMODE, D3DCULL_NONE)", result);
+
+		result = d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_COLORKEYENABLE, 1);
+		if (result < 0)
+			Logger::LogDDError("d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_COLORKEYENABLE, 1)", result);
+
+		result = d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_ALPHABLENDENABLE, 1);
+		if (result < 0)
+			Logger::LogDDError("d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_ALPHABLENDENABLE, 1)", result);
+
+		result = d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_SRCBLEND, D3DBLEND_BOTHSRCALPHA);
+		if (result < 0)
+			Logger::LogDDError("d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_SRCBLEND, D3DBLEND_BOTHSRCALPHA)", result);
+
+		result = d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_TEXTUREADDRESS, D3DTADDRESS_CLAMP);
+		if (result < 0)
+			Logger::LogDDError("d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_TEXTUREADDRESS, D3DTADDRESS_CLAMP)", result);
+
+		result = d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_TEXTUREMAG, D3DFILTER_NEAREST);
+		if (result < 0)
+			Logger::LogDDError("d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_TEXTUREMAG, (DWORD) D3DFILTER_NEAREST)", result);
+
+		result = d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_TEXTUREMIN, D3DFILTER_NEAREST);
+		if (result < 0)
+			Logger::LogDDError("d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_TEXTUREMIN, (DWORD) D3DFILTER_NEAREST)", result);
+
+		result = d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_ALPHATESTENABLE, 1);
+		if (result < 0)
+			Logger::LogDDError("d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_ALPHATESTENABLE, 1)", result);
+
+		result = d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_SUBPIXELX, 1);
+		if (result < 0)
+			Logger::LogDDError("d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_SUBPIXELX, 1)", result);
+
+		result = d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_TEXTUREMAPBLEND, D3DTBLEND_MODULATE);
+		if (result < 0)
+			Logger::LogDDError("d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_TEXTUREMAPBLEND, D3DTBLEND_MODULATE)", result);
+
+		if ((PC.D3D->hwDeviceDesc.dpcTriCaps.dwAlphaCmpCaps & D3DPCMPCAPS_GREATEREQUAL) != 0)
+		{
+			d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_ALPHAREF, 0x1000);
+			d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_ALPHATESTENABLE, 1);
+			d3dappi.lpD3DDevice->SetRenderState(D3DRENDERSTATE_ALPHAFUNC, D3DCMP_GREATEREQUAL);
+		}
+	}
+
+	return TRUE;
+}
 
 // FUNCTION: TOY2 0x0040A350 [MATCHED]
 int32_t D3DRestart()
