@@ -159,6 +159,45 @@ namespace Toy2
 
 	namespace Gadget
 	{
+		struct UnlockGeometryEntry
+		{
+			uint8_t levelIndex;
+			uint8_t lockedLinkId;
+			uint8_t unlockedLinkId;
+			uint8_t platformIndex;
+		};
+
+		STATIC_ASSERT(sizeof(UnlockGeometryEntry) == 0x4);
+
+		// FUNCTION: TOY2 0x004A27A0 [PROVISIONAL]
+		void ApplyUnlockToGeometry(const UnlockGeometryEntry* entries, int32_t scale)
+		{
+			while (entries->levelIndex != 0xFF)
+			{
+				if (entries->levelIndex == g_levelFileIndex)
+				{
+					Nu3D::Link::SetScaleFromFixedOffsets(entries->lockedLinkId, 0, 0, 0);
+					int32_t fixedScale = scale << 10;
+					Nu3D::Link::SetScaleFromFixedOffsets(entries->unlockedLinkId, fixedScale, fixedScale, fixedScale);
+					Platform::DisableCollision(entries->platformIndex);
+
+					Levels::RecordData* pickupRecords = Levels::g_recordData[63];
+					int32_t pickupCount = pickupRecords->recordCount;
+					Collectables::PickupRecord* pickup = reinterpret_cast<Collectables::PickupRecord*>(pickupRecords + 1);
+					for (int32_t pickupIndex = 0; pickupIndex < pickupCount; pickup++, pickupIndex++)
+					{
+						if (pickup->objectIndex == entries->unlockedLinkId)
+						{
+							pickup->facingAngle = 0x1F;
+							break;
+						}
+					}
+				}
+
+				entries++;
+			}
+		}
+
 		// STUB: TOY2 0x004A2080
 		void InitLevelUnlockGeometry() {}
 	}
