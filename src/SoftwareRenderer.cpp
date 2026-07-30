@@ -20,13 +20,6 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x004F7400
 	PointI g_backdropScrollOverride = { -32768, -32768 };
 
-	struct BackdropDimensions
-	{
-		int32_t width;
-		int32_t height;
-		int32_t verticalOffset;
-	};
-
 	// GLOBAL: TOY2 0x004F73A8
 	BackdropDimensions g_backdropDimensions = { 0, 0, 0 };
 

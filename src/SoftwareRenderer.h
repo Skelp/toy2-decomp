@@ -15,7 +15,13 @@ namespace Renderer
 namespace SoftwareRenderer
 {
 	extern PointI g_backdropScrollOverride;
-	struct BackdropDimensions;
+	struct BackdropDimensions
+	{
+		int32_t width;
+		int32_t height;
+		int32_t verticalOffset;
+	};
+
 	extern BackdropDimensions g_backdropDimensions;
 	extern BackdropDimensions g_staticBackdropDimensions;
 	extern int32_t g_backdropTextureColumn;

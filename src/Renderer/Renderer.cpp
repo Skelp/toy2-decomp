@@ -749,6 +749,16 @@ namespace Renderer
 	// GLOBAL: TOY2 0x00830C50
 	float g_parallaxCurHorizScroll;
 
+	// GLOBAL: TOY2 0x00830C4C
+	int32_t g_previousParallaxYaw;
+
+	// GLOBAL: TOY2 0x00731F24
+	float g_parallaxScrollStep;
+
+	const float kParallaxVerticalScale = 0.238732412457466f;
+	const float kParallaxYawScale = 4.1887903213501f;
+	const float kCameraAngleScale = 0.0000152587890625f;
+
 	// GLOBAL: TOY2 0x00731CD0
 	float g_parallaxTexHeightRatio;
 
@@ -1870,6 +1880,50 @@ namespace Renderer
 
 			if (g_renderMode == RENDERMODE_SOFTWARE && SoftwareRenderer::g_bitsPerPixel == 8)
 				SoftwareRenderer::UpdatePaletteTint();
+		}
+	}
+
+	// FUNCTION: TOY2 0x0048F230 [PROVISIONAL]
+	void UpdateBackgroundScroll(int16_t cameraPitch, int32_t cameraYaw)
+	{
+		int32_t textureDataIndex;
+		if (Toy2::g_hasStaticBackdrop)
+			textureDataIndex = NGNLoader::GetTextureDataIndex(37);
+		else
+			textureDataIndex = NGNLoader::GetTextureDataIndex(Toy2::g_nextBackdropId);
+
+		if (textureDataIndex && g_drawParallaxTexture)
+		{
+			uint32_t bitmapWidth;
+			uint32_t bitmapHeight;
+			uint32_t textureWidth;
+			uint32_t textureHeight;
+			uint32_t* textureData;
+			NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, &textureWidth, &textureHeight, &textureData);
+
+			g_parallaxTexWidthRatio = (float)(int32_t)bitmapWidth / g_virtualScreenWidth;
+			g_parallaxTexFirstPixel.value = textureData[0];
+			g_parallaxTexLastPixel.value = textureData[textureWidth * textureHeight - 1];
+			g_parallaxTexHeightRatio = (float)(int32_t)bitmapHeight / g_virtualScreenHeight;
+
+			float currentYaw = (float)(cameraYaw & 0xFFFF);
+			int32_t yawDelta = (int32_t)(currentYaw - g_previousParallaxYaw);
+			g_previousParallaxYaw = (int32_t)currentYaw;
+			if (yawDelta > 0x8000)
+				yawDelta -= 0x10000;
+			if (yawDelta < -0x8000)
+				yawDelta += 0x10000;
+
+			g_parallaxScrollStep = (float)yawDelta * kParallaxYawScale * kCameraAngleScale;
+			g_parallaxCurHorizScroll += g_parallaxScrollStep;
+			while (g_parallaxCurHorizScroll <= -g_parallaxTexWidthRatio)
+				g_parallaxCurHorizScroll += g_parallaxTexWidthRatio;
+			while (g_parallaxCurHorizScroll > 0.0f)
+				g_parallaxCurHorizScroll -= g_parallaxTexWidthRatio;
+
+			g_parallaxHorizOffset = (float)cameraPitch * kCameraAngleScale;
+			g_parallaxHorizOffset = (float)SoftwareRenderer::g_backdropDimensions.verticalOffset / g_virtualScreenHeight
+				+ g_parallaxHorizOffset / (kParallaxVerticalScale * Nu3D::Camera::g_currentCamera->aspectRatio);
 		}
 	}
 

@@ -252,6 +252,7 @@ namespace Renderer
 
 	void InitRenderState(int32_t newStage);
 	int32_t SetupMaterialRenderState(Nu3D::Material* material, int32_t stateFlags);
+	void UpdateBackgroundScroll(int16_t cameraPitch, int32_t cameraYaw);
 	void ResetParallax();
 	void RenderParallaxBackground(int32_t forceRender);
 	void FlushRenderQueues();
