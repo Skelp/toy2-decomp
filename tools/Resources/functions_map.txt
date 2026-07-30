@@ -1103,7 +1103,7 @@
 0x004C5F00 SoftwareRenderer::RasterizeAlphaBlendSpan565
 0x004C6080 SoftwareRenderer::RasterizeTexturedAlphaBlendSpan565
 0x004C6340 SoftwareRenderer::RasterizeTriangleSpans
-0x004C6B80 SoftwareRenderer::UnkFunc46
+0x004C6B80 SoftwareRenderer::RasterizeTexturedQuad
 0x004C7630 SoftwareRenderer::RasterizeTexturedQuadPairSample
 0x004C80D0 SoftwareRenderer::RasterizeOpaqueQuad555
 0x004C8930 SoftwareRenderer::RasterizeOpaqueQuad565

@@ -437,7 +437,7 @@ namespace SoftwareRenderer
 	// the two triangle walkers also take the texture.
 	void RasterizeOpaqueQuad565(RenderCommand* command);
 	void RasterizeOpaqueQuad555(RenderCommand* command);
-	void UnkFunc46(RenderCommand* command, uint32_t* texData);
+	void RasterizeTexturedQuad(RenderCommand* command, uint32_t* texData);
 	void RasterizeTexturedQuadPairSample(RenderCommand* command, uint32_t* texData);
 	void UnkFunc57(RenderCommand* command, uint32_t* texData);
 	void RasterizeQuadSpans(RenderCommand* command, uint32_t* texData);
