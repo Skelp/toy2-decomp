@@ -8904,7 +8904,7 @@ namespace SoftwareRenderer
 
 	// This function resolves the current texture with GetCurrentTextureData.
 	// It groups the index stream into one triple for each triangle.
-	// It sends each triple and the selected texture pointer to UnkFunc22.
+	// It sends each triple and the selected texture pointer to SubmitDepthCheckedPrimitive.
 	// Each index selects one 32-byte VertexTL from lpvVertices.
 	//
 	// dwFlags is unused by the retail body.
@@ -8934,7 +8934,7 @@ namespace SoftwareRenderer
 				vertices[0] = &vertexBase[indices[0]];
 				vertices[1] = &vertexBase[indices[1]];
 				vertices[2] = &vertexBase[indices[2]];
-				UnkFunc22(vertices, 3, maskedTexData, Renderer::g_renderStateCache[0], g_softwarePrimitiveType, 0);
+				SubmitDepthCheckedPrimitive(vertices, 3, maskedTexData, Renderer::g_renderStateCache[0], g_softwarePrimitiveType, 0);
 				indices += 3;
 				remaining--;
 			} while (remaining != 0);
@@ -8942,7 +8942,9 @@ namespace SoftwareRenderer
 	}
 
 	// STUB: TOY2 0x004C0320
-	void UnkFunc22(Nu3D::VertexTL* vertices[3], int32_t vertexCount, uint32_t* texData, int32_t renderState, int32_t primitiveType, DWORD drawFlags) {}
+	void SubmitDepthCheckedPrimitive(
+		Nu3D::VertexTL* vertices[3], int32_t vertexCount, uint32_t* texData, int32_t renderState, int32_t primitiveType, DWORD drawFlags)
+	{}
 
 	// FUNCTION: TOY2 0x004C1540 [PROVISIONAL]
 	void ProcessIndexedTriangleStrip(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags)
@@ -8962,7 +8964,7 @@ namespace SoftwareRenderer
 			vertices[3] = &vertexBase[firstIndex];
 			vertices[2] = &vertexBase[secondIndex];
 			vertices[1] = &vertexBase[previousIndex1];
-			UnkFunc22(vertices, 4, texData, Renderer::g_renderStateCache[0], g_softwarePrimitiveType, 0);
+			SubmitDepthCheckedPrimitive(vertices, 4, texData, Renderer::g_renderStateCache[0], g_softwarePrimitiveType, 0);
 
 			for (DWORD remaining = (dwIndexCount - 4) / 2; remaining != 0; remaining--)
 			{
@@ -8974,7 +8976,7 @@ namespace SoftwareRenderer
 				vertices[3] = &vertexBase[oldIndex0];
 				vertices[2] = &vertexBase[oldIndex1];
 				vertices[1] = &vertexBase[previousIndex1];
-				UnkFunc22(vertices, 4, texData, Renderer::g_renderStateCache[0], g_softwarePrimitiveType, 0);
+				SubmitDepthCheckedPrimitive(vertices, 4, texData, Renderer::g_renderStateCache[0], g_softwarePrimitiveType, 0);
 			}
 
 			if ((dwIndexCount & 1) != 0)
@@ -8982,7 +8984,7 @@ namespace SoftwareRenderer
 				vertices[0] = &vertexBase[*lpwIndices];
 				vertices[1] = &vertexBase[previousIndex1];
 				vertices[2] = &vertexBase[previousIndex0];
-				UnkFunc22(vertices, 3, texData, Renderer::g_renderStateCache[0], g_softwarePrimitiveType, 0);
+				SubmitDepthCheckedPrimitive(vertices, 3, texData, Renderer::g_renderStateCache[0], g_softwarePrimitiveType, 0);
 			}
 		}
 		else
@@ -8990,7 +8992,7 @@ namespace SoftwareRenderer
 			vertices[0] = &vertexBase[lpwIndices[0]];
 			vertices[1] = &vertexBase[lpwIndices[1]];
 			vertices[2] = &vertexBase[lpwIndices[2]];
-			UnkFunc22(vertices, 3, texData, Renderer::g_renderStateCache[0], g_softwarePrimitiveType, 0);
+			SubmitDepthCheckedPrimitive(vertices, 3, texData, Renderer::g_renderStateCache[0], g_softwarePrimitiveType, 0);
 		}
 	}
 
