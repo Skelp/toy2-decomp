@@ -35,30 +35,6 @@ namespace Nu3D
 
 		static __forceinline int32_t MultiplyFixed12(int32_t left, int32_t right) { return ShiftFixedTowardZero(left * right, 12); }
 
-		static int32_t Cross2D32(const PointI& point1, const PointI& point2, const PointI& point3)
-		{ return (point1.y - point2.y) * (point3.x - point2.x) - (point3.y - point2.y) * (point1.x - point2.x); }
-
-		static int32_t PointNearLineSegment(const Vector3I* point, const Vector3I* edge, int32_t tolerance)
-		{
-			int32_t projection = point->x * edge->x + point->y * edge->y + point->z * edge->z;
-			int32_t lengthSquared = edge->x * edge->x + edge->y * edge->y + edge->z * edge->z;
-
-			if (projection < 0 || projection > lengthSquared)
-				return 0;
-
-			int32_t divisor = lengthSquared;
-			if ((divisor & 0xFFFFFF00) == 0)
-				divisor = 0x100;
-
-			int32_t fraction = (projection << 6) / (divisor >> 8);
-			int32_t deltaX = point->x - ((fraction * edge->x) >> 14);
-			int32_t deltaY = point->y - ((fraction * edge->y) >> 14);
-			int32_t deltaZ = point->z - ((fraction * edge->z) >> 14);
-			int32_t radius = tolerance / 31;
-
-			return deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ < 2 * radius * radius;
-		}
-
 		// FUNCTION: TOY2 0x00450C70 [PROVISIONAL]
 		Matrix3x3I16* SetRotationXYZ(const Vector3I16* angles, Matrix3x3I16* output)
 		{
@@ -160,62 +136,115 @@ namespace Nu3D
 			const Vector3I16* normal,
 			int32_t tolerance)
 		{
-			PointI point;
-			PointI edge1;
-			PointI edge2;
-			int32_t normalDirection;
+			int16_t normalY = normal->y;
+			int16_t normalX = normal->x;
+			int32_t absNormalY = abs((int32_t)normalY);
+			int32_t absNormalX = abs((int32_t)normalX);
 
-			int32_t absNormalX = normal->x < 0 ? -normal->x : normal->x;
-			int32_t absNormalY = normal->y < 0 ? -normal->y : normal->y;
-			int32_t absNormalZ = normal->z < 0 ? -normal->z : normal->z;
-
-			if (absNormalX >= absNormalY && absNormalX >= absNormalZ)
+			if (absNormalY >= absNormalX && absNormalY >= abs((int32_t)normal->z))
 			{
-				point.x = pointY;
-				point.y = pointZ;
-				edge1.x = edge1Y;
-				edge1.y = edge1Z;
-				edge2.x = edge2Y;
-				edge2.y = edge2Z;
-				normalDirection = normal->x;
+				if (normalY < 0)
+				{
+					if (pointX * edge1Z - pointZ * edge1X >= 0 && (pointZ - edge2Z) * edge2X - (pointX - edge2X) * edge2Z >= 0
+						&& (pointZ - edge1Z) * (edge1X - edge2X) + (pointX - edge1X) * (edge2Z - edge1Z) >= 0)
+						return 1;
+				}
+				else if ((pointZ - edge1Z) * edge1X - (pointX - edge1X) * edge1Z >= 0 && pointX * edge2Z - pointZ * edge2X >= 0
+					&& (edge2X - edge1X) * (pointZ - edge2Z) + (pointX - edge2X) * (edge1Z - edge2Z) >= 0)
+				{
+					return 1;
+				}
 			}
-			else if (absNormalY >= absNormalZ)
+			else if (absNormalX >= absNormalY && absNormalX >= abs((int32_t)normal->z))
 			{
-				point.x = pointX;
-				point.y = pointZ;
-				edge1.x = edge1X;
-				edge1.y = edge1Z;
-				edge2.x = edge2X;
-				edge2.y = edge2Z;
-				normalDirection = -normal->y;
+				if (normalX < 0)
+				{
+					if ((pointZ - edge1Z) * edge1Y - (pointY - edge1Y) * edge1Z >= 0 && pointY * edge2Z - pointZ * edge2Y >= 0
+						&& (edge2Y - edge1Y) * (pointZ - edge2Z) + (pointY - edge2Y) * (edge1Z - edge2Z) >= 0)
+						return 1;
+				}
+				else if (pointY * edge1Z - pointZ * edge1Y >= 0 && (pointZ - edge2Z) * edge2Y - (pointY - edge2Y) * edge2Z >= 0
+					&& (pointY - edge1Y) * (edge2Z - edge1Z) + (pointZ - edge1Z) * (edge1Y - edge2Y) >= 0)
+				{
+					return 1;
+				}
 			}
 			else
 			{
-				point.x = pointX;
-				point.y = pointY;
-				edge1.x = edge1X;
-				edge1.y = edge1Y;
-				edge2.x = edge2X;
-				edge2.y = edge2Y;
-				normalDirection = normal->z;
+				if (normal->z < 0)
+				{
+					if (pointY * edge1X - pointX * edge1Y >= 0 && (pointX - edge2X) * edge2Y - (pointY - edge2Y) * edge2X >= 0
+						&& (pointY - edge1Y) * (edge2X - edge1X) + (pointX - edge1X) * (edge1Y - edge2Y) >= 0)
+						return 1;
+				}
+				else if ((pointX - edge1X) * edge1Y - (pointY - edge1Y) * edge1X >= 0 && pointY * edge2X - pointX * edge2Y >= 0
+					&& (pointX - edge2X) * (edge2Y - edge1Y) + (pointY - edge2Y) * (edge1X - edge2X) >= 0)
+				{
+					return 1;
+				}
 			}
 
-			PointI origin = { 0, 0 };
-			int32_t side1 = Cross2D32(origin, edge1, point);
-			int32_t side2 = Cross2D32(edge1, edge2, point);
-			int32_t side3 = Cross2D32(edge2, origin, point);
-			if (normalDirection < 0 ? side1 >= 0 && side2 >= 0 && side3 >= 0 : side1 <= 0 && side2 <= 0 && side3 <= 0)
-				return 1;
+			int32_t projection = pointX * edge2X + pointY * edge2Y + pointZ * edge2Z;
+			int32_t lengthSquared = edge2X * edge2X + edge2Y * edge2Y + edge2Z * edge2Z;
+			if (projection >= 0 && projection <= lengthSquared)
+			{
+				if ((lengthSquared & 0xFFFFFF00) == 0)
+					lengthSquared = 0x100;
+				int32_t fraction = (projection << 6) / (lengthSquared >> 8);
+				int32_t deltaX = pointX - ((fraction * edge2X) >> 14);
+				int32_t deltaY = pointY - ((fraction * edge2Y) >> 14);
+				int32_t deltaZ = pointZ - ((fraction * edge2Z) >> 14);
+				int32_t radius = tolerance / 31;
+				if (deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ < 2 * radius * radius)
+					return 1;
+			}
 
-			Vector3I point3D = { pointX, pointY, pointZ };
-			Vector3I edge1_3D = { edge1X, edge1Y, edge1Z };
-			Vector3I edge2_3D = { edge2X, edge2Y, edge2Z };
-			if (PointNearLineSegment(&point3D, &edge1_3D, tolerance) || PointNearLineSegment(&point3D, &edge2_3D, tolerance))
-				return 1;
+			projection = pointX * edge1X + pointY * edge1Y + pointZ * edge1Z;
+			lengthSquared = edge1X * edge1X + edge1Y * edge1Y + edge1Z * edge1Z;
+			if (projection >= 0 && projection <= lengthSquared)
+			{
+				if ((lengthSquared & 0xFFFFFF00) == 0)
+					lengthSquared = 0x100;
+				int32_t fraction = (projection << 6) / (lengthSquared >> 8);
+				int32_t deltaX = pointX - ((fraction * edge1X) >> 14);
+				int32_t deltaY = pointY - ((fraction * edge1Y) >> 14);
+				int32_t deltaZ = pointZ - ((fraction * edge1Z) >> 14);
+				int32_t radius = tolerance / 31;
+				if (deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ < 2 * radius * radius)
+					return 1;
+			}
 
-			Vector3I finalEdge = { edge1X - edge2X, edge1Y - edge2Y, edge1Z - edge2Z };
-			Vector3I pointFromEdge2 = { pointX - edge2X, pointY - edge2Y, pointZ - edge2Z };
-			return (int16_t)PointNearLineSegment(&pointFromEdge2, &finalEdge, tolerance);
+			int32_t finalEdgeX = edge1X - edge2X;
+			int32_t finalEdgeY = edge1Y - edge2Y;
+			int32_t finalEdgeZ = edge1Z - edge2Z;
+			int32_t relativeX = pointX - edge2X;
+			int32_t relativeY = pointY - edge2Y;
+			int32_t relativeZ = pointZ - edge2Z;
+			projection = relativeX * finalEdgeX + relativeY * finalEdgeY + relativeZ * finalEdgeZ;
+			lengthSquared = finalEdgeX * finalEdgeX + finalEdgeY * finalEdgeY + finalEdgeZ * finalEdgeZ;
+			if (projection >= 0 && projection <= lengthSquared)
+			{
+				if ((lengthSquared & 0xFFFFFF00) == 0)
+					lengthSquared = 0x100;
+				int32_t fraction = (projection << 6) / (lengthSquared >> 8);
+				int32_t deltaX = relativeX - ((fraction * finalEdgeX) >> 14);
+				int32_t deltaY = relativeY - ((fraction * finalEdgeY) >> 14);
+				int32_t deltaZ = relativeZ - ((fraction * finalEdgeZ) >> 14);
+				int32_t radius = tolerance / 31;
+				if (deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ < 2 * radius * radius)
+					return 1;
+			}
+
+			int32_t radius = tolerance / 31;
+			int32_t radiusSquared = 2 * radius * radius;
+			if (pointX * pointX + pointY * pointY + pointZ * pointZ < radiusSquared
+				|| (pointX - edge1X) * (pointX - edge1X) + (pointY - edge1Y) * (pointY - edge1Y) + (pointZ - edge1Z) * (pointZ - edge1Z) < radiusSquared
+				|| relativeX * relativeX + relativeY * relativeY + relativeZ * relativeZ < radiusSquared)
+			{
+				return 1;
+			}
+
+			return 0;
 		}
 
 		// FUNCTION: TOY2 0x00490B90 [PROVISIONAL]
