@@ -851,7 +851,7 @@ int32_t WINAPI ExamineDDEnumCallback(LPGUID guid, LPSTR driverDesc, LPSTR driver
 	return 1;
 }
 
-// FUNCTION: TOY2 0x004092F0 [PROVISIONAL]
+// FUNCTION: TOY2 0x004092F0 [MATCHED]
 HRESULT WINAPI ExamineDDModesEnumCallback(LPDDSURFACEDESC surfaceDesc, LPVOID context)
 {
 	ExamineDevice* examineContext = (ExamineDevice*)context;
@@ -867,17 +867,13 @@ HRESULT WINAPI ExamineDDModesEnumCallback(LPDDSURFACEDESC surfaceDesc, LPVOID co
 	displayMode->h = surfaceDesc->dwHeight;
 	displayMode->bpp = surfaceDesc->ddpfPixelFormat.dwRGBBitCount;
 
-	int32_t curDisplayModeCount = examineContext->displayModeCount + 1;
-	examineContext->displayModeCount = curDisplayModeCount;
-
-	return curDisplayModeCount != 128;
+	return ++examineContext->displayModeCount != 128;
 }
 
 // FUNCTION: TOY2 0x00409130 [PROVISIONAL]
 HRESULT WINAPI
 ExamineD3DEnumCallback(LPGUID guid, LPSTR deviceDesc, LPSTR deviceName, LPD3DDEVICEDESC d3DHWDeviceDesc, LPD3DDEVICEDESC d3DHELDeviceDesc, LPVOID context)
 {
-	LPD3DDEVICEDESC hwDeviceDesc = d3DHWDeviceDesc;
 	ExamineDevice* examineContext = (ExamineDevice*)context;
 
 	InterfaceDevice* item = &examineContext->interfaceDevices[examineContext->deviceCount];
@@ -891,8 +887,7 @@ ExamineD3DEnumCallback(LPGUID guid, LPSTR deviceDesc, LPSTR deviceName, LPD3DDEV
 	lstrcpyA(item->baseName, deviceName);
 	lstrcpyA(item->description, deviceDesc);
 
-	if (! d3DHWDeviceDesc->dcmColorModel)
-		hwDeviceDesc = d3DHELDeviceDesc;
+	LPD3DDEVICEDESC hwDeviceDesc = d3DHWDeviceDesc->dcmColorModel ? d3DHWDeviceDesc : d3DHELDeviceDesc;
 
 	memcpy(&item->hwDeviceDesc, hwDeviceDesc, sizeof(item->hwDeviceDesc));
 
@@ -911,33 +906,23 @@ ExamineD3DEnumCallback(LPGUID guid, LPSTR deviceDesc, LPSTR deviceName, LPD3DDEV
 	Logger::Log("DIRECT 3D DEVICE BASE NAME : %s.\n", item->baseName);
 	Logger::Log("DIRECT 3D DEVICE DESCRIPTION : %s.\n", item->description);
 
-	const char* texFlag = "TRUE";
-	if (! item->hasTexturing)
-		texFlag = "FALSE";
+	const char* texFlag = item->hasTexturing ? "TRUE" : "FALSE";
 
 	Logger::Log("DIRECT 3D DEVICE TextureFlag\t:\t%s.\n", texFlag);
 
-	const char* zBufferFlag = "TRUE";
-	if (! item->hasZBuffer)
-		zBufferFlag = "FALSE";
+	const char* zBufferFlag = item->hasZBuffer ? "TRUE" : "FALSE";
 
 	Logger::Log("DIRECT 3D DEVICE ZBufferFlag : %s.\n", zBufferFlag);
 
-	const char* hardwareAccelFlag = "TRUE";
-	if (! item->isHardwareAccelerated)
-		hardwareAccelFlag = "FALSE";
+	const char* hardwareAccelFlag = item->isHardwareAccelerated ? "TRUE" : "FALSE";
 
 	Logger::Log("DIRECT 3D DEVICE HardwareAccel : %s.\n", hardwareAccelFlag);
 
-	const char* squareOnlyFlag = "TRUE";
-	if (! item->isSquareTexturesOnly)
-		squareOnlyFlag = "FALSE";
+	const char* squareOnlyFlag = item->isSquareTexturesOnly ? "TRUE" : "FALSE";
 
 	Logger::Log("DIRECT 3D DEVICE SquareOnly : %s.\n", squareOnlyFlag);
 
-	const char* alphaBlending = "ON";
-	if (! item->hasAlphaBlending)
-		alphaBlending = "OFF";
+	const char* alphaBlending = item->hasAlphaBlending ? "ON" : "OFF";
 
 	Logger::Log("DIRECT 3D DEVICE Alpha blending is %s.\n", alphaBlending);
 	Logger::Log("\n");
