@@ -202,11 +202,12 @@ namespace Nu3D
 		material->originalMetadata = materialFile->metadata;
 	}
 
-	// FUNCTION: TOY2 0x004C2450 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004C2450 [MATCHED]
 	Material* Material::TryCache(MaterialFile* materialFile)
 	{
 		Material nu3dMaterial;
 		ConvertFileToMaterial(&nu3dMaterial, materialFile);
+		uint32_t d3dMaterialSize = sizeof(D3DMATERIAL);
 
 		Material* material = g_materialActiveListHead;
 
@@ -215,9 +216,12 @@ namespace Nu3D
 			do
 			{
 				if (material->texDataIndex == materialFile->texDataIndex && material->originalMetadata == nu3dMaterial.originalMetadata
-					&& material->opacity == nu3dMaterial.opacity && ! memcmp(&nu3dMaterial.d3dMaterial, &material->d3dMaterial, sizeof(D3DMATERIAL)))
+					&& material->opacity == nu3dMaterial.opacity)
 				{
-					break;
+					int32_t comparison = memcmp(&nu3dMaterial.d3dMaterial, &material->d3dMaterial, d3dMaterialSize);
+
+					if (comparison == 0)
+						break;
 				}
 
 				material = material->next;
