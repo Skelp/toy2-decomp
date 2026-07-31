@@ -211,9 +211,9 @@ namespace Nu3D
 		// FUNCTION: TOY2 0x00490B90 [PROVISIONAL]
 		void CrossProduct3D(const Vector3I* left, const Vector3I* right, Vector3I* output)
 		{
-			int32_t z = right->y * left->x - right->x * left->y;
-			int32_t y = right->x * left->z - right->z * left->x;
-			int32_t x = right->z * left->y - right->y * left->z;
+			int32_t z = left->x * right->y - left->y * right->x;
+			int32_t y = left->z * right->x - left->x * right->z;
+			int32_t x = left->y * right->z - left->z * right->y;
 
 			output->x = x;
 			output->y = y;
