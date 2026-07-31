@@ -2593,7 +2593,7 @@ namespace Renderer
 			DrawingDevice::DrawPrimitive(D3DPT_TRIANGLELIST, D3DFVF_0x1C4, vertices, vertexCount, 0x10);
 	}
 
-	// FUNCTION: TOY2 0x004B6A50 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004B6A50 [MATCHED]
 	void FlushRenderQueues()
 	{
 		if (g_drawMaterialBuckets)
@@ -2606,10 +2606,7 @@ namespace Renderer
 		ResetRenderPools();
 
 		if (g_isSoftwareRendering)
-		{
-			SoftwareRenderer::FlushSortedRenderCommands();
-			SoftwareRenderer::ResetRenderCommands();
-		}
+			SoftwareRenderer::FlushSortedRenderCommandsAndReset();
 	}
 
 	// FUNCTION: TOY2 0x004B8BF0 [MATCHED]

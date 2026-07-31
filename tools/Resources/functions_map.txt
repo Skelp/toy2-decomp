@@ -1034,6 +1034,8 @@
 0x004C14A0 SoftwareRenderer::ProcessIndexedTriangleList
 0x004C1540 SoftwareRenderer::ProcessIndexedTriangleStrip
 0x004C1720 SoftwareRenderer::ProcessIndexedPrimitive
+0x004C1790 SoftwareRenderer::FlushSortedRenderCommandsAndReset
+0x004C17A0 SoftwareRenderer::FlushRenderCommandsAndReset
 0x004C17B0 SoftwareRenderer::PresentFrame
 0x004C19E0 SoftwareDevice::ProcessVerticesOnBuffer
 0x004C1C20 SoftwareRenderer::SetCameraNearFarZ

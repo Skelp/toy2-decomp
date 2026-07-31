@@ -204,6 +204,8 @@ namespace SoftwareRenderer
 	void FlushRenderCommands();
 	void ResetRenderCommands();
 	void FlushSortedRenderCommands();
+	void FlushRenderCommandsAndReset();
+	void FlushSortedRenderCommandsAndReset();
 	void SetPaletteOnAPI();
 	void UpdatePaletteTint();
 	void LoadPaletteEntries(const uint8_t* source);

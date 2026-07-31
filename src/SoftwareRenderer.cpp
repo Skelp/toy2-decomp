@@ -8289,6 +8289,20 @@ namespace SoftwareRenderer
 		}
 	}
 
+	// FUNCTION: TOY2 0x004C1790 [MATCHED]
+	void FlushSortedRenderCommandsAndReset()
+	{
+		FlushSortedRenderCommands();
+		ResetRenderCommands();
+	}
+
+	// FUNCTION: TOY2 0x004C17A0 [MATCHED]
+	void FlushRenderCommandsAndReset()
+	{
+		FlushRenderCommands();
+		ResetRenderCommands();
+	}
+
 	// FUNCTION: TOY2 0x004C9A50 [MATCHED]
 	void RasterizeSortedRenderCommand(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans)
 	{

@@ -1602,17 +1602,14 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B8460 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004B8460 [MATCHED]
 		void DrawQueuedSprite()
 		{
 			DispatchCommand(g_queued2DSprite);
 			ResetQueue();
 
 			if (g_isSoftwareRendering)
-			{
-				SoftwareRenderer::FlushRenderCommands();
-				SoftwareRenderer::ResetRenderCommands();
-			}
+				SoftwareRenderer::FlushRenderCommandsAndReset();
 		}
 	}
 }
