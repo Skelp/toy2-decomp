@@ -451,7 +451,7 @@ namespace DrawingDevice
 		return FAILED(m_pD3D->CreateDevice(*guid, m_pddsRenderTarget, &m_pd3dDevice, 0)) ? 0x82000004 : 0;
 	}
 
-	// FUNCTION: TOY2 0x004AF550 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004AF550 [MATCHED]
 	HRESULT CD3DFramework::CreateAndSetViewport()
 	{
 		D3DVIEWPORT2 viewport2;
@@ -463,10 +463,10 @@ namespace DrawingDevice
 		if (m_pd3dDevice->AddViewport(m_pvViewport) < 0)
 			return 0x82000006;
 
-		if (m_pvViewport->SetViewport2(&viewport2) >= 0)
-			return m_pd3dDevice->SetCurrentViewport(m_pvViewport) >= 0 ? 0 : 0x82000006;
+		if (m_pvViewport->SetViewport2(&viewport2) < 0)
+			return 0x82000006;
 
-		return 0x82000006;
+		return m_pd3dDevice->SetCurrentViewport(m_pvViewport) < 0 ? 0x82000006 : 0;
 	}
 
 	// FUNCTION: TOY2 0x004AF5F0 [MATCHED]
