@@ -1,4 +1,5 @@
 # address	blocked-by	reason
+0x00401FB0	-	needs source evidence for argument register homes after the scoped remaining count scored 67.31% versus the 33.33% baseline
 0x004025C0	-	Typed TokenDialogueEntry source and an explicit two-exit loop both compile at 55.38%; retail anchors the cursor on dialogueRecordIndex, while VC6 anchors it on subtitle. Only a raw negative-index cursor reproduces the retail anchor.
 0x00402A10	-	Complete typed command interpreter with scaled path coordinates scored 25.79%; an explicit input-lock lifetime was neutral. Retail uses a different command/path pointer lifetime model across the whole 2624-byte body, and raw RecordData indexing would conceal the established data model.
 0x0040B9D0	-	The complete DirectDraw flow stays at 76.19%. Four natural forms only change the compiler's shared zero register.

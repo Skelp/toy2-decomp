@@ -1831,12 +1831,12 @@ namespace Renderer
 		int32_t xPos = centerX - textLength * 4;
 		if (textLength > 0)
 		{
+			int32_t remaining = textLength;
 			do
 			{
-				DrawChar(xPos, yPos, *text, red, green, blue, fullWidthLayout);
-				text++;
+				DrawChar(xPos, yPos, *text++, red, green, blue, fullWidthLayout);
 				xPos += 8;
-			} while (--textLength != 0);
+			} while (--remaining != 0);
 		}
 	}
 
