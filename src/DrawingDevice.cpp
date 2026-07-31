@@ -130,8 +130,8 @@ namespace DrawingDevice
 			return 0;
 	}
 
-	// FUNCTION: TOY2 0x004AEDA0 [PROVISIONAL]
-	HRESULT CD3DFramework::InitalizeForWindow(HWND hWnd, GUID* ddAppGuid, DDAppDevice* device, DDAppDevice::DisplayMode* displayMode, uint8_t flags)
+	// FUNCTION: TOY2 0x004AEDA0 [MATCHED]
+	HRESULT CD3DFramework::InitalizeForWindow(HWND hWnd, GUID* ddAppGuid, DDAppDevice* device, DDAppDevice::DisplayMode* displayMode, int32_t flags)
 	{
 		if (! hWnd || ! displayMode && (flags & 1) != 0)
 			return DDERR_INVALIDPARAMS;
@@ -141,19 +141,19 @@ namespace DrawingDevice
 
 		HRESULT result = InitalizeDeviceAndSurfaces(ddAppGuid, &device->guid, displayMode, flags);
 
-		if ((result & 0x80000000) != 0)
+		if (FAILED(result))
 		{
 			Cleanup();
 
 			if (result == DDERR_GENERIC)
-				return 0x82000000;
+				result = 0x82000000;
 		}
 
 		return result;
 	}
 
 	// FUNCTION: TOY2 0x004AEE10 [PROVISIONAL]
-	HRESULT CD3DFramework::InitalizeDeviceAndSurfaces(GUID* ddAppGuid, GUID* deviceGuid, DDAppDevice::DisplayMode* displayMode, uint8_t flags)
+	HRESULT CD3DFramework::InitalizeDeviceAndSurfaces(GUID* ddAppGuid, GUID* deviceGuid, DDAppDevice::DisplayMode* displayMode, int32_t flags)
 	{
 		HRESULT result = CreateDirectDraw(ddAppGuid, flags);
 
@@ -201,7 +201,7 @@ namespace DrawingDevice
 	}
 
 	// FUNCTION: TOY2 0x004AEEE0 [PROVISIONAL]
-	HRESULT CD3DFramework::CreateDirectDraw(LPGUID lpGUID, uint8_t flags)
+	HRESULT CD3DFramework::CreateDirectDraw(LPGUID lpGUID, int32_t flags)
 	{
 		LPDIRECTDRAW lpDD;
 		if (DirectDrawCreate(lpGUID, &lpDD, 0) < 0)
@@ -229,7 +229,7 @@ namespace DrawingDevice
 	}
 
 	// FUNCTION: TOY2 0x004AEF80 [PROVISIONAL]
-	HRESULT CD3DFramework::SelectD3DDeviceAndZFormat(GUID* deviceGuid, uint8_t flags)
+	HRESULT CD3DFramework::SelectD3DDeviceAndZFormat(GUID* deviceGuid, int32_t flags)
 	{
 		if (m_pDD->QueryInterface(IID_IDirect3D3, (LPVOID*)&m_pD3D) < 0)
 			return 0x82000003;
@@ -281,7 +281,7 @@ namespace DrawingDevice
 	}
 
 	// FUNCTION: TOY2 0x004AF110 [PROVISIONAL]
-	HRESULT CD3DFramework::CreatePrimaryChainAndRects(DDAppDevice::DisplayMode* displayMode, uint8_t flags)
+	HRESULT CD3DFramework::CreatePrimaryChainAndRects(DDAppDevice::DisplayMode* displayMode, int32_t flags)
 	{
 		DDSURFACEDESC2 d3dDesc;
 		HRESULT surfaceResult;
@@ -567,7 +567,7 @@ namespace DrawingDevice
 	}
 
 	// FUNCTION: TOY2 0x004ABEB0 [PROVISIONAL]
-	HRESULT CD3DFramework::Build(HWND hWnd, GUID* guid, DDAppDevice* device, DDAppDevice::DisplayMode* displayMode, uint8_t flags)
+	HRESULT CD3DFramework::Build(HWND hWnd, GUID* guid, DDAppDevice* device, DDAppDevice::DisplayMode* displayMode, int32_t flags)
 	{
 		g_drawingDevice = new CD3DFramework();
 		Nu3D::g_currentBmpDataNode = 0;

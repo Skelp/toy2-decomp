@@ -85,11 +85,11 @@ namespace DrawingDevice
 		void Release();
 		int32_t Cleanup();
 
-		HRESULT InitalizeForWindow(HWND hWnd, GUID* ddAppGuid, DDAppDevice* device, DDAppDevice::DisplayMode* displayMode, uint8_t flags);
-		HRESULT InitalizeDeviceAndSurfaces(GUID* ddAppGuid, GUID* deviceGuid, DDAppDevice::DisplayMode* displayMode, uint8_t flags);
-		HRESULT CreateDirectDraw(LPGUID lpGUID, uint8_t flags);
-		HRESULT SelectD3DDeviceAndZFormat(GUID* deviceGuid, uint8_t flags);
-		HRESULT CreatePrimaryChainAndRects(DDAppDevice::DisplayMode* displayMode, uint8_t flags);
+		HRESULT InitalizeForWindow(HWND hWnd, GUID* ddAppGuid, DDAppDevice* device, DDAppDevice::DisplayMode* displayMode, int32_t flags);
+		HRESULT InitalizeDeviceAndSurfaces(GUID* ddAppGuid, GUID* deviceGuid, DDAppDevice::DisplayMode* displayMode, int32_t flags);
+		HRESULT CreateDirectDraw(LPGUID lpGUID, int32_t flags);
+		HRESULT SelectD3DDeviceAndZFormat(GUID* deviceGuid, int32_t flags);
+		HRESULT CreatePrimaryChainAndRects(DDAppDevice::DisplayMode* displayMode, int32_t flags);
 		HRESULT CreateZBuffer();
 		HRESULT CreateD3DDevice(const CLSID* guid);
 		HRESULT CreateAndSetViewport();
@@ -100,7 +100,7 @@ namespace DrawingDevice
 		int32_t GetSlotSurfaceCaps(uint32_t index, uint32_t* capsOut);
 		int32_t GetSlotTexSize(uint32_t index, int32_t* widthOut, int32_t* heightOut);
 
-		static HRESULT Build(HWND hWnd, GUID* guid, DDAppDevice* device, DDAppDevice::DisplayMode* displayMode, uint8_t flags);
+		static HRESULT Build(HWND hWnd, GUID* guid, DDAppDevice* device, DDAppDevice::DisplayMode* displayMode, int32_t flags);
 		static void InitSurfaceDesc(LPDDSURFACEDESC2 ddSurfaceDesc, DWORD flags, DWORD caps);
 		static void BuildViewport(D3DVIEWPORT2* viewport, DWORD width, DWORD height);
 		static HRESULT WINAPI EnumZBufferFormats(LPDDPIXELFORMAT lpDDPixFmt, LPVOID lpContext);
