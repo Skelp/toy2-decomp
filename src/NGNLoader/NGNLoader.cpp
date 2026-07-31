@@ -104,7 +104,7 @@ namespace NGNLoader
 	// FUNCTION: TOY2 0x004CB300 [MATCHED]
 	void GetScaleVector(Vector3F* output) { *output = g_vertexScaleVector; }
 
-	// FUNCTION: TOY2 0x004BB320 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004BB320 [MATCHED]
 	NGNTextureData* GetTextureData(NGNTextureParams* texParams, int32_t ignoreParams)
 	{
 		NGNTextureParams localTexParams;
@@ -114,10 +114,7 @@ namespace NGNLoader
 		localTexParams.rawTexStr = 0;
 		uint32_t textureParamsSize = sizeof(NGNTextureParams);
 
-		if (! g_textureCache.activeList)
-			return 0;
-
-		do
+		while (cacheHead)
 		{
 			int32_t comparison = 0;
 			if (! ignoreParams)
@@ -139,7 +136,7 @@ namespace NGNLoader
 			}
 
 			cacheHead = cacheHead->next;
-		} while (cacheHead);
+		}
 
 		return 0;
 	}
