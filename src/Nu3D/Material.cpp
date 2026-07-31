@@ -33,23 +33,17 @@ namespace Nu3D
 		Renderer::g_boundMaterial = 0;
 
 		int32_t count = 1;
-		Material* node = g_materialFreeList;
-
-		do
+		for (; count < 3000; ++count)
 		{
-			node[1].prev = node;
-			node->next = node + 1;
-			node[1].id = count;
-
-			node = node->next;
-			++count;
-
-		} while (node < &g_materialFreeList[2999]);
+			g_materialFreeList[count].id = count;
+			g_materialFreeList[count - 1].next = &g_materialFreeList[count];
+			g_materialFreeList[count].prev = &g_materialFreeList[count - 1];
+		}
 
 		g_materialFreeList[0].id = 0;
 		g_materialFreeList[0].prev = 0;
 		g_materialFreeListHead = g_materialFreeList;
-		g_materialFreeList[2999].next = 0;
+		g_materialFreeList[count - 1].next = 0;
 
 		DrawingDevice::BindTexToStage0(0);
 	}
