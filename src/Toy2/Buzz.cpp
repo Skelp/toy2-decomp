@@ -581,6 +581,12 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0053C818
 	int32_t g_slipperySurfaceState;
 
+	// GLOBAL: TOY2 0x0053C81C
+	int32_t g_riderPlatformOffsetX;
+
+	// GLOBAL: TOY2 0x0053C820
+	int32_t g_riderPlatformOffsetZ;
+
 	// GLOBAL: TOY2 0x0053C648
 	int32_t g_forcedFacingActive;
 
