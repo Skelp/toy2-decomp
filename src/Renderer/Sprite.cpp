@@ -1056,87 +1056,85 @@ namespace Renderer
 			int32_t scaleY)
 		{
 			SpriteSheet* sheet;
-
-			if ((sheetIndex & 0x8000) == 0)
-				sheet = g_spriteSheets[(int16_t)sheetIndex];
-			else
-				sheet = g_fallbackSpriteSheet;
-
-			if (! sheet)
-				return 1;
-
-			int32_t textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
-
+			int32_t textureDataIndex;
 			Vector2F uvMin;
 			Vector2F uvMax;
-
-			if (textureDataIndex)
-			{
-				uint32_t bitmapWidth;
-				uint32_t bitmapHeight;
-				NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
-
-				int16_t ti = (int16_t)tileIndex;
-
-				double dW = (double)bitmapWidth;
-				double dH = (double)bitmapHeight;
-
-				uvMin.x = sheet->tiles[ti].x / dW;
-				uvMin.y = sheet->tiles[ti].y / dH;
-
-				uvMax.x = ((double)sheet->tileWidth + (double)sheet->tiles[ti].x) / dW;
-				uvMax.y = ((double)sheet->tileHeight + (double)sheet->tiles[ti].y) / dH;
-			}
-
+			uint32_t bitmapWidth;
+			uint32_t bitmapHeight;
 			RGBA packedColor;
-			packedColor.g = (uint8_t)green;
-			packedColor.r = (uint8_t)red;
-			packedColor.b = (uint8_t)blue;
-
-			uint8_t* alphaPtr = &packedColor.a;
-
-			if (! alphaPtr)
-				alphaPtr = (uint8_t*)&red;
-
-			int32_t blendMode = flags & 96;
+			uint8_t* alphaPtr;
+			int32_t blendMode;
 			int32_t renderFlags;
+			float inverseHeight;
+			float inverseWidth;
 
-			if (blendMode != 0)
+			if (sheetIndex < 0)
+				sheet = g_fallbackSpriteSheet;
+			else
+				sheet = g_spriteSheets[sheetIndex];
+
+			if (sheet)
 			{
-				if (blendMode == 32)
+				textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
+
+				if (textureDataIndex)
 				{
-					*alphaPtr = 255;
-					renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_CUSTOM;
+					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
+
+					uvMin.x = (float)sheet->tiles[(int16_t)tileIndex].x / (int32_t)bitmapWidth;
+					uvMin.y = (float)sheet->tiles[(int16_t)tileIndex].y / (int32_t)bitmapHeight;
+					uvMax.x = ((float)sheet->tileWidth + sheet->tiles[(int16_t)tileIndex].x) / (int32_t)bitmapWidth;
+					uvMax.y = ((float)sheet->tileHeight + sheet->tiles[(int16_t)tileIndex].y) / (int32_t)bitmapHeight;
 				}
-				else if (blendMode == 64)
+
+				packedColor.r = (uint8_t)red;
+				packedColor.g = (uint8_t)green;
+				packedColor.b = (uint8_t)blue;
+
+				alphaPtr = &packedColor.a;
+				if (! alphaPtr)
+					alphaPtr = (uint8_t*)&red;
+
+				blendMode = flags & 96;
+				if (blendMode != 0)
 				{
-					*alphaPtr = 255;
-					renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_ALT;
+					if (blendMode != 32)
+					{
+						if (blendMode != 64)
+						{
+							*alphaPtr = 255 - (uint8_t)((flags >> 8) & 0xFF);
+							renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT;
+						}
+						else
+						{
+							*alphaPtr = 255;
+							renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_ALT;
+						}
+					}
+					else
+					{
+						*alphaPtr = 255;
+						renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_CUSTOM;
+					}
 				}
 				else
 				{
-					*alphaPtr = 255 - (uint8_t)((flags >> 8) & 0xFF);
+					*alphaPtr = 128;
 					renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT;
 				}
-			}
-			else
-			{
-				*alphaPtr = 128;
-				renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT;
-			}
 
-			float invHeight = 1.0 / g_virtualScreenHeight;
-			float invWidth = 1.0 / g_virtualScreenWidth;
-
-			Queue2DSprite(xPos * invWidth,
-				yPos * invHeight,
-				((scaleX * sheet->tileWidth) >> 12) * invWidth,
-				((scaleY * sheet->tileHeight) >> 12) * invHeight,
-				&uvMin,
-				&uvMax,
-				textureDataIndex,
-				packedColor,
-				renderFlags);
+				inverseHeight = 1.0f / g_virtualScreenHeight;
+				inverseWidth = 1.0f / g_virtualScreenWidth;
+				Queue2DSprite((float)xPos * inverseWidth,
+					(float)yPos * inverseHeight,
+					(float)((sheet->tileWidth * scaleX) >> 12) * inverseWidth,
+					(float)((sheet->tileHeight * scaleY) >> 12) * inverseHeight,
+					&uvMin,
+					&uvMax,
+					textureDataIndex,
+					packedColor,
+					renderFlags);
+			}
 
 			return 1;
 		}
