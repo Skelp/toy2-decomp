@@ -47,6 +47,9 @@
 
 #include <Numerics.h>
 
+void Nullsub10();
+void Nullsub11();
+
 namespace AudioManager
 {
 	extern char g_sfxSubPath[4];
@@ -1612,6 +1615,24 @@ namespace Toy2
 	// GLOBAL: TOY2 0x00731F0C
 	uint32_t g_cpuClockHz;
 
+	// GLOBAL: TOY2 0x00726F44
+	int32_t g_cpuProfileTotalMs;
+
+	// GLOBAL: TOY2 0x00726F48
+	int32_t g_cpuProfileSampleIndex;
+
+	// GLOBAL: TOY2 0x00726F4C
+	int32_t g_cpuProfileStartMs;
+
+	// GLOBAL: TOY2 0x00726F50
+	int32_t g_cpuProfileWorkIndex;
+
+	// GLOBAL: TOY2 0x00726F54
+	int32_t g_cpuProfileSamples[10];
+
+	// GLOBAL: TOY2 0x00726F7C
+	float g_cpuProfileWorkValue;
+
 	// GLOBAL: TOY2 0x0052AD9C
 	int32_t g_returnedToTitle;
 
@@ -1839,6 +1860,9 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x00534550
 	D3DAppInfo* g_d3dAppInfo;
+
+	// GLOBAL: TOY2 0x00534560
+	int32_t g_demoVersion;
 
 	// GLOBAL: TOY2 0x00731F18
 	int32_t g_saveMenuState;
@@ -4902,11 +4926,127 @@ namespace Toy2
 		return 1;
 	}
 
-	// STUB: TOY2 0x0048E730
+#pragma function(abs)
+#pragma optimize("", off)
+	// FUNCTION: TOY2 0x0047EF80 [MATCHED]
+	void ProfileCPU()
+	{
+		g_cpuProfileTotalMs = 0;
+		for (g_cpuProfileSampleIndex = 0; g_cpuProfileSampleIndex < 10; g_cpuProfileSampleIndex++)
+		{
+			g_cpuProfileStartMs = timeGetTime();
+			for (g_cpuProfileWorkIndex = 0; g_cpuProfileWorkIndex < 1000000; g_cpuProfileWorkIndex++)
+			{
+				g_cpuProfileWorkValue = (float)g_cpuProfileWorkIndex;
+				g_cpuProfileWorkValue = g_cpuProfileWorkValue / 50000.0f;
+				g_cpuProfileWorkValue = g_cpuProfileWorkValue * 50000.0f;
+			}
+
+			g_cpuProfileSamples[g_cpuProfileSampleIndex] = abs((int32_t)timeGetTime() - g_cpuProfileStartMs);
+			g_cpuProfileTotalMs += g_cpuProfileSamples[g_cpuProfileSampleIndex];
+		}
+
+		g_cpuProfileTotalMs /= 10;
+		g_cpuClockHz = 56000 / g_cpuProfileTotalMs;
+		g_cpuClockHz *= 1000000;
+		Logger::Log("CalculateClockSpeed->time[0]=%i\n", g_cpuProfileSamples[0]);
+		Logger::Log("                   ->time[1]=%i\n", g_cpuProfileSamples[1]);
+		Logger::Log("                   ->time[2]=%i\n", g_cpuProfileSamples[2]);
+		Logger::Log("                   ->time[3]=%i\n", g_cpuProfileSamples[3]);
+		Logger::Log("                   ->time[4]=%i\n", g_cpuProfileSamples[4]);
+		Logger::Log("                   ->time[5]=%i\n", g_cpuProfileSamples[5]);
+		Logger::Log("                   ->time[6]=%i\n", g_cpuProfileSamples[6]);
+		Logger::Log("                   ->time[7]=%i\n", g_cpuProfileSamples[7]);
+		Logger::Log("                   ->time[8]=%i\n", g_cpuProfileSamples[8]);
+		Logger::Log("                   ->time[9]=%i\n", g_cpuProfileSamples[9]);
+		Logger::Log("                   ->avgtime=%i\n", g_cpuProfileTotalMs);
+		Logger::Log("                   ->CPUSPEED=%u\n", g_cpuClockHz);
+		g_cpuProfileWorkValue = (float)g_cpuClockHz;
+		g_cpuProfileWorkValue = g_cpuProfileWorkValue / 1000000.0f;
+		Logger::Log("INIT : CPU clock speed is %f MHZ\n", g_cpuProfileWorkValue);
+	}
+#pragma optimize("", on)
+#pragma intrinsic(abs)
+
+	// FUNCTION: TOY2 0x0048E730 [PROVISIONAL]
 	void OneInit()
 	{
-		g_randDatBufferPtr = g_randDatBuffer;
+		Logger::g_logsEnabled = 0;
+		g_mpegPlaybackDisabled = 0;
+		Ini::g_cheatsEnabled = 0;
+		Ini::g_highQualityMpeg = 0;
+
+		char* command = strtok(g_windowData.lpCmdLine, " -");
+		while (command != NULL)
+		{
+			if (lstrcmpA(command, "cheat") == 0)
+				Ini::g_cheatsEnabled = 1;
+			if (lstrcmpA(command, "log") == 0)
+				Logger::g_logsEnabled = 1;
+			if (lstrcmpA(command, "mpeg") == 0)
+			{
+				g_mpegPlaybackDisabled = 1;
+				Logger::Log("ONEINIT : Mpeg play OFF.\n");
+			}
+			if (lstrcmpA(command, "high") == 0)
+			{
+				Ini::g_highQualityMpeg = 1;
+				Logger::Log("ONEINIT : Hi quality mpeg playing ON.\n");
+			}
+			if (lstrcmpA(command, "demo") == 0)
+			{
+				g_demoVersion = g_demoVersion == 0;
+				Logger::Log("ONEINIT : Switched to %s version.\n", g_demoVersion == 1 ? "demo" : "full");
+			}
+
+			command = strtok(NULL, " -");
+		}
+
 		SaveManager::Init();
+		Nullsub10();
+		SaveManager::g_save0Data.musicVolume = 0x80;
+		SaveManager::g_save0Data.soundVolume = 0xFF;
+		AudioManager::SetVolumesProcessed(0x80, 0xFF);
+
+		int32_t saveNameLength;
+		char secondBuffer[256];
+		char firstBuffer[256];
+
+		sprintf(firstBuffer, "Toy2%02d.sav", 0);
+		FILE* saveFile = fopen(firstBuffer, "rb");
+		if (saveFile != NULL)
+		{
+			fread(&saveNameLength, 1, sizeof(saveNameLength), saveFile);
+			if (saveNameLength != 0)
+			{
+				fread(secondBuffer, 1, saveNameLength, saveFile);
+				secondBuffer[saveNameLength] = '\0';
+			}
+			fread(&SaveManager::g_save0Data, 1, sizeof(SaveManager::g_save0Data), saveFile);
+			fclose(saveFile);
+		}
+
+		sprintf(secondBuffer, "Toy2%02d.sav", 99);
+		saveFile = fopen(secondBuffer, "rb");
+		if (saveFile != NULL)
+		{
+			fread(&saveNameLength, 1, sizeof(saveNameLength), saveFile);
+			if (saveNameLength != 0)
+			{
+				fread(firstBuffer, 1, saveNameLength, saveFile);
+				firstBuffer[saveNameLength] = '\0';
+			}
+			fread(&SaveManager::g_save99Data, 1, sizeof(SaveManager::g_save99Data), saveFile);
+			fclose(saveFile);
+		}
+
+		SaveManager::InitProgressData(&SaveManager::g_save0Data);
+		SaveManager::LoadProgressData(&SaveManager::g_save0Data);
+		g_levelIndex = 0;
+		g_randDatBufferPtr = g_randDatBuffer;
+		ProfileCPU();
+		Nullsub11();
+		ReadIniFile();
 	}
 
 	// FUNCTION: TOY2 0x00490730 [MATCHED]
