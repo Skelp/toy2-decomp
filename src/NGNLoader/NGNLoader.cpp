@@ -1095,16 +1095,16 @@ namespace NGNLoader
 			return 0;
 	}
 
-	// FUNCTION: TOY2 0x004BB0E0 [PROVISIONAL]
-	NGNTextureData* GetTextureDataByIndex(uint32_t texDataIndex) { return &g_textureDataFreeList[texDataIndex]; }
+	// FUNCTION: TOY2 0x004BB0E0 [TOOL]
+	NGNTextureData* GetTextureDataByIndex(uint32_t texDataIndex) { return &g_textureDataFreeList[texDataIndex - 1]; }
 
-	// FUNCTION: TOY2 0x004BB5E0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004BB5E0 [TOOL]
 	void RetrieveTextureData(
 		int32_t texDataIndex, uint32_t* bitmapWidthOut, uint32_t* bitmapHeightOut, uint32_t* textureWidth, uint32_t* textureHeight, uint32_t** textureData)
 	{
 		if (texDataIndex)
 		{
-			Nu3D::BmpDataNode* bmpDataNode = g_textureDataFreeList[texDataIndex].bmpDataNode;
+			Nu3D::BmpDataNode* bmpDataNode = g_textureDataFreeList[texDataIndex - 1].bmpDataNode;
 
 			if (bmpDataNode)
 			{
@@ -1126,20 +1126,20 @@ namespace NGNLoader
 		}
 	}
 
-	// FUNCTION: TOY2 0x004BB6C0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004BB6C0 [TOOL]
 	HBITMAP GetBmpHandle(int32_t index)
 	{
 		if (index)
-			return g_textureDataFreeList[index].bmpDataNode->bitmapHandle;
+			return g_textureDataFreeList[index - 1].bmpDataNode->bitmapHandle;
 		else
 			return 0;
 	}
 
-	// FUNCTION: TOY2 0x004BB690 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004BB690 [TOOL]
 	int32_t CopyToDDSurfaceByIndex(int32_t texIndex, LPDIRECTDRAWSURFACE4 ddSurface)
 	{
 		if (texIndex)
-			return Nu3D::CopyToDDSurface(g_textureDataFreeList[texIndex].bmpDataNode, ddSurface);
+			return Nu3D::CopyToDDSurface(g_textureDataFreeList[texIndex - 1].bmpDataNode, ddSurface);
 		else
 			return 0;
 	}

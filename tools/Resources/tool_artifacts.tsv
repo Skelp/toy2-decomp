@@ -17,6 +17,10 @@
 0x004A4D60	TOOL-SYMBOL	98.33	2026-07-28	one-past particle-array bound uses a different adjacent data label
 0x004A4E60	TOOL-SYMBOL	96.00	2026-07-28	one-past particle-array bound uses a different adjacent data label
 0x004A62A0	TOOL-SYMBOL	98.00	2026-07-28	one-past particle-array bound uses a different adjacent data label
+0x004BB0E0	TOOL-SYMBOL	80.00	2026-07-31	The one-before-array texture-record base resolves to unrelated nearby data labels. The instructions match.
 0x004BB540	TOOL-SYMBOL	90.91	2026-07-30	The one-before-array texture-record base resolves to unrelated nearby data labels. The instruction bytes match.
 0x004BB590	TOOL-SYMBOL	91.67	2026-07-30	The one-before-array texture-record base resolves to unrelated nearby data labels. The instruction bytes match.
+0x004BB5E0	TOOL-SYMBOL	97.06	2026-07-31	The one-before-array texture-record base resolves to unrelated nearby data labels. The instructions match.
+0x004BB690	TOOL-SYMBOL	92.86	2026-07-31	The one-before-array texture-record base resolves to unrelated nearby data labels. The instructions match.
+0x004BB6C0	TOOL-SYMBOL	90.00	2026-07-31	The one-before-array texture-record base resolves to unrelated nearby data labels. The instructions match.
 0x004DBB80	TOOL-SYMBOL	94.74	2026-07-28	time-scale constant uses a different nearby data label
