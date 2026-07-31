@@ -285,9 +285,9 @@ namespace NGNLoader
 				int32_t flags;
 
 				if ((textureFlags & TEXTURE_FLAG_ALPHA_BITMAP) != 0)
-					flags = 1;
+					flags = Nu3D::BMP_TEXTURE_ALPHA_BITMAP;
 				else
-					flags = 2 * (textureFlags & TEXTURE_FLAG_COLOR_KEY);
+					flags = (textureFlags & TEXTURE_FLAG_COLOR_KEY) != 0 ? Nu3D::BMP_TEXTURE_TRANSPARENT_GREEN : 0;
 
 				textureData->bmpDataNode = LoadLocalBmpTexture(rawTexStrBuffer, flags);
 				textureData->textureCacheIndex = textureCache->textureIndex;

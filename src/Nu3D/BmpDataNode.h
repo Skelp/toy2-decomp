@@ -6,9 +6,21 @@
 #include <directx6/d3d.h>
 #include <windows.h>
 #include <stdio.h>
+#include <stddef.h>
 
 namespace Nu3D
 {
+	enum BmpTextureFlags
+	{
+		BMP_TEXTURE_ALPHA_BITMAP = 0x1,
+		BMP_TEXTURE_TRANSPARENT_WHITE = 0x2,
+		BMP_TEXTURE_TRANSPARENT_BLACK = 0x4,
+		BMP_TEXTURE_TRANSPARENT_GREEN = 0x8,
+		BMP_TEXTURE_ALPHA_MASK = 0xF,
+		BMP_TEXTURE_KEEP_BITMAP = 0x20,
+		BMP_TEXTURE_BORROWED_SURFACE = 0x40
+	};
+
 	struct BmpDataNode
 	{
 		enum SlotSurfaceMode
@@ -32,7 +44,7 @@ namespace Nu3D
 		LPDIRECTDRAWSURFACE4 sourceSurface;
 		LPDIRECTDRAWSURFACE4 fallbackSurface;
 		char texName[80];
-		int32_t unkVar5;
+		uint32_t reserved;
 		int32_t flags;
 		int32_t refCount;
 		BmpDataNode* next;
@@ -83,4 +95,8 @@ namespace Nu3D
 	int32_t CreateTextureResource(HBITMAP bitmapHandle, const char* textureName, int32_t flags);
 
 	STATIC_ASSERT(sizeof(BmpDataNode) == 0x110);
+	STATIC_ASSERT(offsetof(BmpDataNode, texName) == 0xAC);
+	STATIC_ASSERT(offsetof(BmpDataNode, reserved) == 0xFC);
+	STATIC_ASSERT(offsetof(BmpDataNode, flags) == 0x100);
+	STATIC_ASSERT(offsetof(BmpDataNode, next) == 0x108);
 }

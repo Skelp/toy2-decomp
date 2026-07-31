@@ -113,7 +113,7 @@ namespace Nu3D
 
 					pixel = ((uint16_t)pixelFormatInfo.redMask & shiftedValue) | pixel;
 
-					if ((bmpDataNode->flags & 0xF) != 0)
+					if ((bmpDataNode->flags & BMP_TEXTURE_ALPHA_MASK) != 0)
 					{
 						if (pixelFormatInfo.alphaShift >= 0)
 							shiftedValue = sourcePixel[3] << (int8_t)pixelFormatInfo.alphaShift;
@@ -203,7 +203,7 @@ namespace Nu3D
 
 		if (bmpDataNode->surface)
 		{
-			if ((bmpDataNode->flags & 64) == 0)
+			if ((bmpDataNode->flags & BMP_TEXTURE_BORROWED_SURFACE) == 0)
 			{
 				bmpDataNode->surface->Release();
 				bmpDataNode->surface = 0;
@@ -219,7 +219,7 @@ namespace Nu3D
 		D3DDEVICEDESC deviceDesc2;
 		D3DDEVICEDESC deviceDesc;
 
-		if ((bmpDataNode->flags & 0x40) != 0)
+		if ((bmpDataNode->flags & BMP_TEXTURE_BORROWED_SURFACE) != 0)
 			return 0;
 
 		DestroyBmpDataNode(bmpDataNode);
@@ -258,10 +258,10 @@ namespace Nu3D
 		surfaceDesc.dwHeight = height;
 		memset(&findPixelFormat.minAlphaBits, 0, 12);
 
-		if ((flags & 0xF) != 0)
+		if ((flags & BMP_TEXTURE_ALPHA_MASK) != 0)
 		{
 			findPixelFormat.needAlpha = 1;
-			findPixelFormat.minAlphaBits = (flags & 1) != 0 ? 4 : 1;
+			findPixelFormat.minAlphaBits = (flags & BMP_TEXTURE_ALPHA_BITMAP) != 0 ? 4 : 1;
 		}
 
 		d3dDevice->EnumTextureFormats(FindSuitablePixelFormat, &findPixelFormat);
@@ -339,19 +339,19 @@ namespace Nu3D
 			color.g = g_lastBmpPalette[paletteIndex + 1];
 			color.r = g_lastBmpPalette[paletteIndex + 2];
 
-			if ((flags & 2) != 0)
+			if ((flags & BMP_TEXTURE_TRANSPARENT_WHITE) != 0)
 			{
 				color.a = -(color.value != -1);
 				return color;
 			}
 
-			if ((flags & 4) != 0)
+			if ((flags & BMP_TEXTURE_TRANSPARENT_BLACK) != 0)
 			{
 				color.a = -(color.value != 0xFF000000);
 				return color;
 			}
 
-			if ((flags & 8) != 0 && color.value == 0xFF00FF00)
+			if ((flags & BMP_TEXTURE_TRANSPARENT_GREEN) != 0 && color.value == 0xFF00FF00)
 			{
 				RGBA empty;
 				empty.value = 0;
@@ -371,15 +371,15 @@ namespace Nu3D
 			color.g = pixelOffset[1];
 			color.r = pixelOffset[2];
 
-			if ((flags & 2) != 0)
+			if ((flags & BMP_TEXTURE_TRANSPARENT_WHITE) != 0)
 			{
 				color.a = -(color.value != -1);
 			}
-			else if ((flags & 4) != 0)
+			else if ((flags & BMP_TEXTURE_TRANSPARENT_BLACK) != 0)
 			{
 				color.a = -(color.value != 0xFF000000);
 			}
-			else if ((flags & 8) != 0 && color.value == 0xFF00FF00)
+			else if ((flags & BMP_TEXTURE_TRANSPARENT_GREEN) != 0 && color.value == 0xFF00FF00)
 			{
 				color.value = 0;
 			}
@@ -579,7 +579,7 @@ namespace Nu3D
 
 		if (bmpDataNode->slotSurfaceMode == BmpDataNode::SLOT_SURFACE_DIRECT)
 		{
-			bmpDataNode->flags |= 0x40;
+			bmpDataNode->flags |= BMP_TEXTURE_BORROWED_SURFACE;
 			bmpDataNode->surface = slotSurface;
 			slotSurface->QueryInterface(IID_IDirect3DTexture2, (LPVOID*)&bmpDataNode->d3dTexture);
 			bmpDataNode->surfaceDesc.dwSize = sizeof(DDSURFACEDESC2);
@@ -645,7 +645,7 @@ namespace Nu3D
 		if (! mainBmp)
 			return 0;
 
-		if ((flags & 1) != 0)
+		if ((flags & BMP_TEXTURE_ALPHA_BITMAP) != 0)
 			alphaBmp = ProcessBmpInfoFromStream(handle);
 
 		uint32_t* texDataBuffer = ProcessBmpPixelData(mainBmp, alphaBmp, flags);
@@ -687,7 +687,7 @@ namespace Nu3D
 		if (alphaBmp)
 			DeleteObject(alphaBmp);
 
-		if ((flags & 32) != 0)
+		if ((flags & BMP_TEXTURE_KEEP_BITMAP) != 0)
 			bmpDataNode->bitmapHandle = mainBmp;
 		else
 			DeleteObject(mainBmp);

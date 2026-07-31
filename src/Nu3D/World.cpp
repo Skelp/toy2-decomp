@@ -42,10 +42,10 @@ namespace NGNLoader
 			int32_t isBGR = 0;
 
 			if (textureId != 14 && textureId != 36 && textureId != 37)
-				flags = 8;
+				flags = Nu3D::BMP_TEXTURE_TRANSPARENT_GREEN;
 
 			if (textureId > 31)
-				flags |= 32;
+				flags |= Nu3D::BMP_TEXTURE_KEEP_BITMAP;
 
 			if (strstr(rawTexStr, "bgr"))
 			{
