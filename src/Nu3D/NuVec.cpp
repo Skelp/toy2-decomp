@@ -41,17 +41,20 @@ namespace Nu3D
 			result->z = transformedZ;
 		}
 
-		// FUNCTION: TOY2 0x004A8D80 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004A8D80 [MATCHED]
 		void TransformPointPerspective(Vector3F* result, const Vector3F* sourceVector, const D3DMATRIX* matrix)
 		{
-			float inverseW = 1.0f / (matrix->_34 * sourceVector->z + matrix->_14 * sourceVector->x + matrix->_24 * sourceVector->y);
-			float transformedY = matrix->_32 * sourceVector->z + matrix->_12 * sourceVector->x + matrix->_22 * sourceVector->y;
-			float transformedZ = matrix->_33 * sourceVector->z + matrix->_13 * sourceVector->x + matrix->_23 * sourceVector->y;
+			float transformedW = matrix->_34 * sourceVector->z;
+			transformedW += matrix->_24 * sourceVector->y;
+			transformedW += matrix->_14 * sourceVector->x;
+			float inverseW = 1.0f / transformedW;
+			float transformedY = (matrix->_32 * sourceVector->z + matrix->_22 * sourceVector->y + matrix->_12 * sourceVector->x) * inverseW;
+			float transformedZ = (matrix->_33 * sourceVector->z + matrix->_23 * sourceVector->y + matrix->_13 * sourceVector->x) * inverseW;
 			float transformedX = matrix->_31 * sourceVector->z + matrix->_21 * sourceVector->y;
 
 			result->x = (transformedX + sourceVector->x * matrix->_11) * inverseW;
-			result->y = transformedY * inverseW;
-			result->z = transformedZ * inverseW;
+			result->y = transformedY;
+			result->z = transformedZ;
 		}
 
 		// FUNCTION: TOY2 0x004A8D20 [MATCHED]
