@@ -89,59 +89,42 @@ namespace Nu3D
 	// FUNCTION: TOY2 0x004C28E0 [MATCHED]
 	Material* Material::GetHead() { return g_materialActiveListHead; }
 
-	// FUNCTION: TOY2 0x004C2750 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004C2750 [MATCHED]
 	void Material::InsertSorted(Material* material)
 	{
-		Material* activeHead1 = g_materialActiveListHead;
-		Material* activeHead2 = g_materialActiveListHead;
+		Material* current = g_materialActiveListHead;
+		Material* previous = current;
 
-		if (g_materialActiveListHead)
+		while (current && current->texDataIndex < material->texDataIndex)
 		{
-			while (activeHead1->texDataIndex < material->texDataIndex)
-			{
-				activeHead2 = activeHead1;
-				activeHead1 = activeHead1->next;
+			previous = current;
+			current = current->next;
+		}
 
-				if (! activeHead1)
-					goto LBL_ASSIGN_NEXT;
-			}
-
-			if (activeHead1)
-			{
-				Material* prev = activeHead1->prev;
-
-				if (prev)
-					prev->next = material;
-				else
-					g_materialActiveListHead = material;
-
-				material->next = activeHead1;
-				material->prev = activeHead1->prev;
-				activeHead1->prev = material;
-
-				return;
-			}
-
-		LBL_ASSIGN_NEXT:
-
-			if (! activeHead2)
-			{
+		if (current)
+		{
+			if (current->prev)
+				current->prev->next = material;
+			else
 				g_materialActiveListHead = material;
-				material->prev = 0;
-				material->next = 0;
-				return;
-			}
 
-			activeHead2->next = material;
-			material->prev = activeHead2;
-			material->next = 0;
+			material->next = current;
+			material->prev = current->prev;
+			current->prev = material;
+			return;
 		}
-		else
+
+		if (previous)
 		{
-			g_materialActiveListHead = material;
-			material->prev = 0;
+			previous->next = material;
+			material->prev = previous;
 			material->next = 0;
+			return;
 		}
+
+		g_materialActiveListHead = material;
+		material->prev = 0;
+		material->next = 0;
 	}
 
 	// FUNCTION: TOY2 0x004AC0F0 [MATCHED]
@@ -325,7 +308,7 @@ namespace Nu3D
 		return material;
 	}
 
-	// FUNCTION: TOY2 0x004C24D0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004C24D0 [MATCHED]
 	Material* Material::CreateFromFile(MaterialFile* materialFile)
 	{
 		Material* cached = TryCache(materialFile);
@@ -354,13 +337,11 @@ namespace Nu3D
 			material->texDataIndex = 0;
 			material->renderEntryHead = 0;
 
-			int32_t metadata = materialFile->metadata;
-
-			material->metadata = metadata;
+			material->metadata = materialFile->metadata;
 			material->opacity = materialFile->opacity;
 
 			if (materialFile->opacity != 1.0f)
-				material->metadata = metadata | 3;
+				material->metadata |= 3;
 
 			if (materialFile->texDataIndex)
 				AttachTexture(material, materialFile->texDataIndex);

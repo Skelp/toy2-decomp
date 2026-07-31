@@ -32,7 +32,7 @@ namespace Nu3D
 		D3DMATERIAL d3dMaterial;
 		D3DMATERIALHANDLE d3dMaterialHandle;
 		LPDIRECT3DMATERIAL3 direct3DMat3;
-		int32_t texDataIndex;
+		uint32_t texDataIndex;
 		float opacity;
 		Renderer::RenderEntry* renderEntryHead;
 		int32_t metadata;
