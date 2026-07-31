@@ -158,7 +158,7 @@ namespace Toy2
 	int32_t ShowModeSelect();
 	void InitSoftwareRenderer();
 	void InitDirect3DRenderer();
-	int32_t Run(int32_t argc, char** argv);
+	int32_t Run(int32_t argCount, char** argList);
 	void RenderGame(int32_t fullRender);
 	void PlayLevelMusic();
 	void AdvanceFramePhase();
