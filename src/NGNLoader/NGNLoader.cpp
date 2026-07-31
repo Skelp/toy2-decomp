@@ -301,16 +301,11 @@ namespace NGNLoader
 	// FUNCTION: TOY2 0x004AC220 [MATCHED]
 	Nu3D::BmpDataNode* LoadTextureContents(FILE* stream, const char* rawTexStr, int32_t flags) { return Nu3D::LoadTextureByStream(stream, rawTexStr, flags); }
 
-	// FUNCTION: TOY2 0x004BC320 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004BC320 [MATCHED]
 	Nu3D::Portal::PortalState* AllocAreaPortal(NGNImage* ngnImage)
 	{
-		int32_t entryCount = ngnImage->portalEntryCount;
-		if (entryCount < ngnImage->areaPortalCount && ngnImage->portalStatePool)
-		{
-			Nu3D::Portal::PortalState* newAlloc = &ngnImage->portalStatePool[entryCount];
-			ngnImage->portalEntryCount = entryCount + 1;
-			return newAlloc;
-		}
+		if (ngnImage->portalEntryCount < ngnImage->areaPortalCount && ngnImage->portalStatePool)
+			return &ngnImage->portalStatePool[ngnImage->portalEntryCount++];
 
 		return 0;
 	}
