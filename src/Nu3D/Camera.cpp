@@ -436,6 +436,27 @@ namespace Nu3D
 			g_objectViewTransform.position.z = transform->position.z;
 		}
 
+		// FUNCTION: TOY2 0x0043D9E0 [PROVISIONAL]
+		void WorldToView(const Vector3I16* source, Vector3I* destination, int32_t* viewDistance)
+		{
+			Vector3I16 sourcePosition = *source;
+			int32_t transformedX =
+				sourcePosition.x * g_objectViewTransform.m00 + sourcePosition.y * g_objectViewTransform.m01 + sourcePosition.z * g_objectViewTransform.m02;
+			int16_t viewX = (int16_t)(transformedX / 0x1000 + g_objectViewTransform.position.x);
+
+			int32_t transformedY =
+				sourcePosition.x * g_objectViewTransform.m10 + sourcePosition.y * g_objectViewTransform.m11 + sourcePosition.z * g_objectViewTransform.m12;
+			int16_t viewY = (int16_t)(transformedY / 0x1000 + g_objectViewTransform.position.y);
+
+			int32_t transformedZ =
+				sourcePosition.x * g_objectViewTransform.m20 + sourcePosition.y * g_objectViewTransform.m21 + sourcePosition.z * g_objectViewTransform.m22;
+			int16_t viewZ = (int16_t)(transformedZ / 0x1000 + g_objectViewTransform.position.z);
+
+			destination->x = viewX;
+			destination->y = viewY;
+			destination->z = viewZ;
+		}
+
 		// FUNCTION: TOY2 0x004B68A0 [MATCHED]
 		void SetBillboardYaw(int32_t yaw) { g_billboardYaw = yaw; }
 
