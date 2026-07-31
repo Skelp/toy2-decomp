@@ -65,12 +65,27 @@ namespace Toy2
 			int16_t flags;
 		};
 
-		struct CollisionWorkspaceSlot
+		struct CollisionCachePosition
 		{
 			int32_t cachedPositionX;
 			uint8_t reserved[4];
 			int32_t cachedPositionZ;
 			uint8_t reserved2[12];
+		};
+
+		struct CollisionQueryBounds
+		{
+			Vector3I maximum;
+			Vector3I minimum;
+		};
+
+		struct CollisionWorkspaceSlot
+		{
+			union
+			{
+				CollisionCachePosition cachePosition;
+				CollisionQueryBounds queryBounds;
+			};
 			int16_t activeFrames;
 			uint8_t reserved3[2];
 			int32_t entryCount;
@@ -97,6 +112,8 @@ namespace Toy2
 		STATIC_ASSERT(offsetof(TerrainMeshDescriptor, sourceMeshId) == 0x48);
 		STATIC_ASSERT(sizeof(PlatformRuntimeRecord) == 0x34);
 		STATIC_ASSERT(offsetof(PlatformRuntimeRecord, collisionMeshIndex) == 0x30);
+		STATIC_ASSERT(sizeof(CollisionCachePosition) == 0x18);
+		STATIC_ASSERT(sizeof(CollisionQueryBounds) == 0x18);
 		STATIC_ASSERT(sizeof(CollisionWorkspaceSlot) == 0x5C0);
 		STATIC_ASSERT(offsetof(CollisionWorkspaceSlot, activeFrames) == 0x18);
 		STATIC_ASSERT(offsetof(CollisionWorkspaceSlot, entryCount) == 0x1C);
@@ -392,6 +409,9 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x0072D2A0
 		int32_t g_collisionTriangleCount;
+
+		// GLOBAL: TOY2 0x007291D8
+		uint16_t g_collisionPassFlags;
 
 		// GLOBAL: TOY2 0x007291DC
 		PackedCollisionFace* g_collisionTriangles[240];
@@ -853,8 +873,8 @@ namespace Toy2
 			for (int32_t slotIndex = 0; slotIndex < cacheSlotCount; slotIndex++)
 			{
 				Terrain::CollisionWorkspaceSlot& slot = Terrain::g_collisionWorkspace->slots[slotIndex];
-				if ((uint32_t)(queryPosition.x - slot.cachedPositionX + cachePositionRadius) < cachePositionDiameter
-					&& (uint32_t)(queryPosition.z - slot.cachedPositionZ + cachePositionRadius) < cachePositionDiameter && slot.activeFrames > 0)
+				if ((uint32_t)(queryPosition.x - slot.cachePosition.cachedPositionX + cachePositionRadius) < cachePositionDiameter
+					&& (uint32_t)(queryPosition.z - slot.cachePosition.cachedPositionZ + cachePositionRadius) < cachePositionDiameter && slot.activeFrames > 0)
 				{
 					cacheSlotIndex = slotIndex;
 					break;
@@ -971,8 +991,8 @@ namespace Toy2
 				}
 
 				slot.activeFrames = 8;
-				slot.cachedPositionX = queryPosition.x;
-				slot.cachedPositionZ = queryPosition.z;
+				slot.cachePosition.cachedPositionX = queryPosition.x;
+				slot.cachePosition.cachedPositionZ = queryPosition.z;
 				int32_t previousMeshIndex = -1;
 				bool meshIsInRange = false;
 				int32_t localX = 0;
@@ -1581,6 +1601,158 @@ namespace Nu3D
 			if ((int8_t)surfaceType == -1)
 				return -1;
 			return surfaceType & 0xFF;
+		}
+	}
+}
+
+namespace Toy2
+{
+	namespace Camera
+	{
+		// FUNCTION: TOY2 0x0048A4C0 [PROVISIONAL]
+		void PrepareCameraCollisionCandidates(const Vector3I* position, int32_t movementX, int32_t movementY, int32_t movementZ, int32_t radius)
+		{
+			const int32_t queryRadius = 0x6400;
+			const int32_t queryDiameter = 0xC800;
+			const int32_t diagonalScale = 0x1644;
+			const int32_t coordinateShift = 5;
+			const int32_t blockScale = 64;
+			const int32_t maxCandidateCount = 240;
+			const int32_t workspaceSlotIndex = 8;
+
+			Collision::g_collisionEdgeVertexCount = 0;
+			Collision::g_collisionPassFlags = 0;
+			Terrain::g_collisionWorkspace->slots[workspaceSlotIndex].entryCount = 0;
+
+			int32_t maximumX;
+			int32_t maximumY;
+			int32_t maximumZ;
+			int32_t querySizeX;
+			int32_t querySizeY;
+			int32_t querySizeZ;
+			if (movementX < 0)
+			{
+				maximumX = position->x + queryRadius;
+				querySizeX = queryDiameter - movementX;
+			}
+			else
+			{
+				maximumX = position->x + queryRadius + movementX;
+				querySizeX = queryDiameter + movementX;
+			}
+
+			if (movementY < 0)
+			{
+				maximumY = position->y + queryRadius;
+				querySizeY = queryDiameter - movementY;
+			}
+			else
+			{
+				maximumY = position->y + queryRadius + movementY;
+				querySizeY = queryDiameter + movementY;
+			}
+
+			if (movementZ < 0)
+			{
+				maximumZ = position->z + queryRadius;
+				querySizeZ = queryDiameter - movementZ;
+			}
+			else
+			{
+				maximumZ = position->z + queryRadius + movementZ;
+				querySizeZ = queryDiameter + movementZ;
+			}
+
+			int32_t scaledRadius = radius * diagonalScale;
+			int32_t maximumPadding = scaledRadius / 0x1000;
+			int32_t sizePadding = scaledRadius / 0x800;
+			maximumX += maximumPadding;
+			maximumY += maximumPadding;
+			maximumZ += maximumPadding;
+			querySizeX += sizePadding;
+			querySizeY += sizePadding;
+			querySizeZ += sizePadding;
+
+			Terrain::g_collisionWorkspace->slots[workspaceSlotIndex].queryBounds.maximum.x = maximumX;
+			Terrain::g_collisionWorkspace->slots[workspaceSlotIndex].queryBounds.maximum.y = maximumY;
+			Terrain::g_collisionWorkspace->slots[workspaceSlotIndex].queryBounds.maximum.z = maximumZ;
+			Terrain::g_collisionWorkspace->slots[workspaceSlotIndex].queryBounds.minimum.x = maximumX - querySizeX;
+			Terrain::g_collisionWorkspace->slots[workspaceSlotIndex].queryBounds.minimum.y = maximumY - querySizeY;
+			Terrain::g_collisionWorkspace->slots[workspaceSlotIndex].queryBounds.minimum.z = maximumZ - querySizeZ;
+
+			uint32_t querySizeXBlocks = (uint32_t)(querySizeX + 0x1F) >> coordinateShift;
+			uint32_t querySizeYBlocks = (uint32_t)(querySizeY + 0x1F) >> coordinateShift;
+			uint32_t querySizeZBlocks = (uint32_t)(querySizeZ + 0x1F) >> coordinateShift;
+			int16_t* candidateMeshIndices = reinterpret_cast<int16_t*>(Collision::g_mathScratch);
+			int16_t* candidateWrite = candidateMeshIndices;
+			int32_t candidateMeshCount = 0;
+
+			for (int32_t cellIndex = 0; cellIndex < Collision::g_activeCollisionGridCellCount; cellIndex++)
+			{
+				Collision::CollisionGridCell& cell = Collision::g_collisionGrid[cellIndex];
+				if ((uint32_t)(maximumX - cell.boundsMinX) < (uint32_t)(cell.boundsExtentX + querySizeX)
+					&& (uint32_t)(maximumZ - cell.boundsMinZ) < (uint32_t)(cell.boundsExtentZ + querySizeZ))
+				{
+					int32_t meshCount = cell.meshCount;
+					int16_t* meshList = &Collision::g_collisionGridMeshIndices[cell.meshListStart];
+					while (meshCount > 0)
+					{
+						*candidateWrite++ = *meshList++;
+						meshCount--;
+					}
+					candidateMeshCount += cell.meshCount;
+				}
+			}
+
+			Collision::CollisionMeshRecord* collisionMeshes = reinterpret_cast<Collision::CollisionMeshRecord*>(Collision::g_collisionMeshInstances);
+			int16_t* candidateMesh = candidateMeshIndices;
+			for (; candidateMeshCount > 0; candidateMesh++, candidateMeshCount--)
+			{
+				int32_t meshIndex = *candidateMesh;
+				Collision::CollisionMeshRecord& mesh = collisionMeshes[meshIndex];
+				if ((uint32_t)(maximumX - mesh.boundsMin.x) >= (uint32_t)(mesh.boundsExt.x + querySizeX)
+					|| (uint32_t)(maximumY - mesh.boundsMin.y) >= (uint32_t)(mesh.boundsExt.y + querySizeY)
+					|| (uint32_t)(maximumZ - mesh.boundsMin.z) >= (uint32_t)(mesh.boundsExt.z + querySizeZ) || mesh.typeFlags == 0 || (mesh.flags & 0x200) != 0)
+				{
+					continue;
+				}
+
+				int32_t localMaximumX = (maximumX - mesh.origin.x) / 0x20;
+				int32_t localMaximumY = (maximumY - mesh.origin.y) / 0x20;
+				int32_t localMaximumZ = (maximumZ - mesh.origin.z) / 0x20;
+				Collision::CollisionTreeGroup* group = mesh.collisionTree;
+
+				while (group->marker >= 0)
+				{
+					int32_t faceCount = group->faceCount;
+					Collision::PackedCollisionFace* face = reinterpret_cast<Collision::PackedCollisionFace*>(group + 1);
+					if ((uint32_t)(localMaximumX - group->boundsMinX) < (uint32_t)(group->boundsExtentX + querySizeXBlocks)
+						&& (uint32_t)(localMaximumZ - group->boundsMinZ) < (uint32_t)(group->boundsExtentZ + querySizeZBlocks))
+					{
+						for (int32_t faceIndex = 0; faceIndex < faceCount; faceIndex++, face++)
+						{
+							if ((uint32_t)(localMaximumX - face->boundsMinX) < (uint32_t)(face->boundsExtentX + querySizeXBlocks)
+								&& (uint32_t)(localMaximumZ - face->boundsMinZBlock * blockScale - face->vertex0.z)
+									< (uint32_t)(face->boundsExtentZBlock * blockScale + querySizeZBlocks)
+								&& (uint32_t)(localMaximumY - face->boundsMinYBlock * blockScale - face->vertex0.y)
+									< (uint32_t)(face->boundsExtentYBlock * blockScale + querySizeYBlocks)
+								&& Terrain::g_collisionWorkspace->slots[workspaceSlotIndex].entryCount < maxCandidateCount)
+							{
+								Terrain::g_collisionWorkspace->slots[workspaceSlotIndex]
+									.faces[Terrain::g_collisionWorkspace->slots[workspaceSlotIndex].entryCount] = face;
+								Terrain::g_collisionWorkspace->slots[workspaceSlotIndex]
+									.meshIndices[Terrain::g_collisionWorkspace->slots[workspaceSlotIndex].entryCount] = *candidateMesh;
+								Terrain::g_collisionWorkspace->slots[workspaceSlotIndex].entryCount++;
+							}
+						}
+					}
+					else
+					{
+						face += faceCount;
+					}
+					group = reinterpret_cast<Collision::CollisionTreeGroup*>(face);
+				}
+			}
 		}
 	}
 }
