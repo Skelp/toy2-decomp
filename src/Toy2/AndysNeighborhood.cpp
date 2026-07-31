@@ -15,6 +15,7 @@
 #include "Random.h"
 #include "Numerics.h"
 
+#include <limits.h>
 #include <stdlib.h>
 
 namespace Toy2
@@ -227,6 +228,33 @@ namespace Toy2
 
 		// STUB: TOY2 0x004190C0
 		void Interactions() {}
+
+		// FUNCTION: TOY2 0x00448080 [MATCHED]
+		void UpdatePickupGroundHeights()
+		{
+			PosAndAngles groundProbe;
+			int32_t pickupIndex = 0;
+			Collectables::PickupRecord* pickup = reinterpret_cast<Collectables::PickupRecord*>(Levels::g_recordData[63] + 1);
+			if (Levels::g_recordData[63]->recordCount > 0)
+			{
+				do
+				{
+					if (pickup->position.y != INT_MIN && pickup->objectIndex < 0x30)
+					{
+						groundProbe.pos.x = pickup->position.x << 5;
+						groundProbe.pos.z = pickup->position.z << 5;
+						groundProbe.pos.y = (pickup->position.y - 10) << 5;
+						pickup->groundHeight = Nu3D::Collision::GetGroundHeightEx(&groundProbe, 0, 0) >> 5;
+						if (pickup->groundHeight == 0x7FFF)
+							pickup->groundHeight = 0x7FFE;
+						if (pickup->groundHeight - pickup->position.y > 0x1800)
+							pickup->groundHeight = 0x7FFF;
+					}
+					pickup++;
+					pickupIndex++;
+				} while (pickupIndex < Levels::g_recordData[63]->recordCount);
+			}
+		}
 	}
 }
 
