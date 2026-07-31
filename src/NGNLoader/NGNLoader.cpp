@@ -854,15 +854,15 @@ namespace NGNLoader
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C36A0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004C36A0 [MATCHED]
 	void BuildGrid(int32_t gridWidth, int32_t gridHeight, int32_t type, NGNImage* ngnImage)
 	{
-		int32_t gridSize = gridWidth * gridHeight;
-		ngnImage->spacialGrid[type] = (Nu3D::Link::DynamicScaler**)malloc(sizeof(Nu3D::Link::DynamicScaler*) * gridSize);
+		int32_t gridByteSize = sizeof(Nu3D::Link::DynamicScaler*) * gridWidth * gridHeight;
+		ngnImage->spacialGrid[type] = (Nu3D::Link::DynamicScaler**)malloc(gridByteSize);
 
-		if (&ngnImage->spacialGrid[type])
+		if (ngnImage->spacialGrid)
 		{
-			memset(ngnImage->spacialGrid[type], 0, sizeof(Nu3D::Link::DynamicScaler*) * gridSize);
+			memset(ngnImage->spacialGrid[type], 0, gridByteSize);
 
 			ngnImage->gridWidth = gridWidth;
 			ngnImage->gridHeight = gridHeight;
@@ -874,15 +874,14 @@ namespace NGNLoader
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C3240 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004C3240 [MATCHED]
 	void BuildScalerEntries(NGNImage* ngnImage)
 	{
-		for (int32_t type = 0; type < 2 && ngnImage->dynamicScalers[type]; ++type)
+		for (int32_t type = 0; ngnImage->dynamicScalers[type] && type < 2; ++type)
 		{
 			for (int32_t index = 0; index < ngnImage->shapeCounts[type]; ++index)
 			{
-				Nu3D::Link::DynamicScaler* scaler = &ngnImage->dynamicScalers[type][index];
-				Nu3D::Portal::AreaPortal::BuildScalerEntry(ngnImage, scaler->areaIndex, scaler);
+				Nu3D::Portal::AreaPortal::BuildScalerEntry(ngnImage, ngnImage->dynamicScalers[type][index].areaIndex, &ngnImage->dynamicScalers[type][index]);
 			}
 		}
 	}
