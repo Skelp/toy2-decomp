@@ -179,19 +179,19 @@ namespace NGNLoader
 		return -1;
 	}
 
-	// FUNCTION: TOY2 0x004CA1D0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004CA1D0 [MATCHED]
 	int32_t ExtractShapePatch(FILE* stream, Nu3D::Creature* creature)
 	{
+		int16_t stripVertexCount;
+		int16_t materialIndex;
+		int16_t controlPointIndices[4];
+		int16_t vertexIndices[4];
 		int32_t patchCount;
 		fread(&patchCount, sizeof(patchCount), 1, stream);
 
-		for (int32_t patchIndex = 0; patchIndex < patchCount; ++patchIndex)
+		int32_t patchIndex = 0;
+		for (; patchIndex < patchCount; ++patchIndex)
 		{
-			int16_t stripVertexCount;
-			int16_t materialIndex;
-			int16_t controlPointIndices[4];
-			int16_t vertexIndices[4];
-
 			fread(&stripVertexCount, sizeof(stripVertexCount), 1, stream);
 			fread(&materialIndex, sizeof(materialIndex), 1, stream);
 			fread(controlPointIndices, sizeof(int16_t), 4, stream);
@@ -202,10 +202,7 @@ namespace NGNLoader
 			{
 				patch = Nu3D::Patch::AllocAndResize(stripVertexCount * 2, 2);
 				if (! patch)
-				{
-					Logger::GetErrorHandler("C:\\projects\\nu3d\\hobjload.c", 220)("unable to create patch");
-					continue;
-				}
+					goto unable_to_create_patch;
 
 				for (int32_t index = 0; index < stripVertexCount; ++index)
 				{
@@ -219,29 +216,38 @@ namespace NGNLoader
 			else
 			{
 				patch = Nu3D::Patch::AllocAndResize(4, 4);
-				if (! patch)
+				if (patch)
 				{
+					Nu3D::CopyShapeVertex(vertexIndices[0], &patch->patchVertices.data.vertices[0]);
+					Nu3D::CopyNormalsFromNearestVertex(creature, controlPointIndices[0], &patch->patchVertices.data.vertices[0]);
+					Nu3D::CopyShapeVertex(vertexIndices[1], &patch->patchVertices.data.vertices[1]);
+					Nu3D::CopyNormalsFromNearestVertex(creature, controlPointIndices[1], &patch->patchVertices.data.vertices[1]);
+					Nu3D::CopyShapeVertex(vertexIndices[2], &patch->patchVertices.data.vertices[2]);
+					Nu3D::CopyNormalsFromNearestVertex(creature, controlPointIndices[2], &patch->patchVertices.data.vertices[2]);
+					Nu3D::CopyShapeVertex(vertexIndices[3], &patch->patchVertices.data.vertices[3]);
+					Nu3D::CopyNormalsFromNearestVertex(creature, controlPointIndices[3], &patch->patchVertices.data.vertices[3]);
+				}
+				else
+				{
+				unable_to_create_patch:
 					Logger::GetErrorHandler("C:\\projects\\nu3d\\hobjload.c", 220)("unable to create patch");
 					continue;
 				}
-
-				for (int32_t index = 0; index < 4; ++index)
-				{
-					Nu3D::CopyShapeVertex(vertexIndices[index], &patch->patchVertices.data.vertices[index]);
-					Nu3D::CopyNormalsFromNearestVertex(creature, controlPointIndices[index], &patch->patchVertices.data.vertices[index]);
-				}
 			}
 
-			for (int32_t index = 0; index < 4; ++index)
-				patch->controlPointIndices[index] = controlPointIndices[index];
+			{
+				for (int32_t index = 0; index < 4; ++index)
+					patch->controlPointIndices[index] = controlPointIndices[index];
 
-			patch->materialId = ObjectLoad::GetCurrentMatByIndex(materialIndex)->id;
-			patch->listNext = creature->patch;
-			creature->patch = patch;
-			Nu3D::Patch::CreateAllVertexBuffers(patch);
+				patch->materialId = ObjectLoad::GetCurrentMatByIndex(materialIndex)->id;
+				patch->listNext = creature->patch;
+				creature->patch = patch;
+				Nu3D::Patch::CreateAllVertexBuffers(patch);
+				continue;
+			}
 		}
 
-		return patchCount;
+		return patchIndex;
 	}
 
 }
