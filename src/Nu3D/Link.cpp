@@ -261,7 +261,7 @@ namespace Nu3D
 			output->z = (int32_t)link->targetPos.z << shift;
 		}
 
-		// FUNCTION: TOY2 0x004CCFF0 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004CCFF0 [MATCHED]
 		void SnapToOtherLinkUsingScale(int32_t linkId, int32_t targetLinkId)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
@@ -273,16 +273,21 @@ namespace Nu3D
 			if (! target->dynamicScaler || ! link->dynamicScaler)
 				return;
 
-			link->currentPos.x = (link->currentPos.x - target->currentPos.x) * target->currentScale.x + target->currentPos.x;
-			link->currentPos.y = (link->currentPos.y - target->currentPos.y) * target->currentScale.y + target->currentPos.y;
-			link->currentPos.z = (link->currentPos.z - target->currentPos.z) * target->currentScale.z + target->currentPos.z;
+			float transformedY = (link->currentPos.y - target->currentPos.y) * target->currentScale.y + target->currentPos.y;
+			float transformedZ = (link->currentPos.z - target->currentPos.z) * target->currentScale.z + target->currentPos.z;
+			float transformedX = (link->currentPos.x - target->currentPos.x) * target->currentScale.x + target->currentPos.x;
+			link->currentPos.x = transformedX;
+			link->currentPos.y = transformedY;
+			link->currentPos.z = transformedZ;
 
-			DynamicScaler* scaler = link->dynamicScaler;
-			scaler->translation = link->currentPos;
-			scaler->transformMatrix._41 = link->currentPos.x;
-			scaler->transformMatrix._42 = link->currentPos.y;
-			scaler->transformMatrix._43 = link->currentPos.z;
-			Spatial::UnlinkScalerThenReinsert(scaler, image);
+			{
+				DynamicScaler* scaler = link->dynamicScaler;
+				scaler->transformMatrix._41 = link->currentPos.x;
+				scaler->transformMatrix._42 = link->currentPos.y;
+				scaler->transformMatrix._43 = link->currentPos.z;
+			}
+			link->dynamicScaler->translation = link->currentPos;
+			Spatial::UnlinkScalerThenReinsert(link->dynamicScaler, NGNLoader::g_ngnImage);
 		}
 
 		// FUNCTION: TOY2 0x004CD0C0 [MATCHED]
