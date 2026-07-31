@@ -172,11 +172,10 @@ form.
 
 Then write `drawb->VerticeCount[i]` and confirm both functions hold at 100%.
 
-## 2. `d3dappi` — the Direct3D application structure (partly done)
+## 2. `d3dappi` — the Direct3D application structure — DONE
 
-`8afe907` retyped `lpViewport` to `lpD3DViewport`. The remaining members are
-still unmatched to globals, so this item stays open. Retype one member at a
-time and run the full `tools/decomp compare` after each.
+`8afe907` retyped `lpViewport` to `lpD3DViewport`. The structure now declares
+all 17 members that the retail strings name.
 
 `.notes/original-names.md` lists 17 members recovered from the retail strings:
 `lpDD`, `lpFrontBuffer`, `lpBackBuffer`, `lpZBuffer`, `lpD3D`, `lpD3DDevice`,
@@ -184,11 +183,10 @@ time and run the full `tools/decomp compare` after each.
 `lpTextureMatHandle`, `lpGroundMat`, `lpGroundMatHandle`, `lpSkyMat`,
 `lpSkyMatHandle`, `TextureHandle`, `hwnd`.
 
-Several `g_unkNNNNNN` globals in `DrawingDevice`, `Renderer`, and
-`SoftwareRenderer` are very likely members of this one structure. Before adding
-another COM-interface global, check whether it belongs here. Do this
-incrementally: retype one member, run the full `tools/decomp compare`, confirm
-no regression.
+Seven unused `unkInt` members previously followed `lpSkyMatHandle`. Ghidra has
+no retail cross-references to their addresses. They are now part of the unknown
+padding before `lpD3D`. Offset assertions pin all named members after this
+padding. Do not split this padding without new cross-reference evidence.
 
 ## 3. `SoftwareRenderer` placeholder parameters
 
