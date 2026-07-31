@@ -106,6 +106,7 @@ namespace Toy2
 
 		struct PlatformState
 		{
+			Vector3I origin;
 			Vector3I16 rotationAnglesFixed;
 			int16_t motionMode;
 			Vector3I16 velocity;
@@ -115,7 +116,6 @@ namespace Toy2
 			CollisionFace* contactFace;
 			int16_t collisionMeshIndex;
 			int16_t flags;
-			uint8_t reserved[0xC];
 		};
 
 		int32_t GetFlags(int32_t platformIndex);
@@ -143,14 +143,15 @@ namespace Toy2
 
 		extern PlatformState g_platformStates[32];
 
-		STATIC_ASSERT(offsetof(PlatformState, velocity) == 0x8);
+		STATIC_ASSERT(offsetof(PlatformState, origin) == 0x0);
+		STATIC_ASSERT(offsetof(PlatformState, velocity) == 0x14);
 		STATIC_ASSERT(offsetof(CollisionFace, normal) == 0x20);
-		STATIC_ASSERT(offsetof(PlatformState, remainingTranslation) == 0xE);
-		STATIC_ASSERT(offsetof(PlatformState, angularVelocity) == 0x14);
-		STATIC_ASSERT(offsetof(PlatformState, remainingRotation) == 0x1A);
-		STATIC_ASSERT(offsetof(PlatformState, contactFace) == 0x20);
-		STATIC_ASSERT(offsetof(PlatformState, collisionMeshIndex) == 0x24);
-		STATIC_ASSERT(offsetof(PlatformState, flags) == 0x26);
+		STATIC_ASSERT(offsetof(PlatformState, remainingTranslation) == 0x1A);
+		STATIC_ASSERT(offsetof(PlatformState, angularVelocity) == 0x20);
+		STATIC_ASSERT(offsetof(PlatformState, remainingRotation) == 0x26);
+		STATIC_ASSERT(offsetof(PlatformState, contactFace) == 0x2C);
+		STATIC_ASSERT(offsetof(PlatformState, collisionMeshIndex) == 0x30);
+		STATIC_ASSERT(offsetof(PlatformState, flags) == 0x32);
 		STATIC_ASSERT(sizeof(PlatformState) == 0x34);
 	}
 }

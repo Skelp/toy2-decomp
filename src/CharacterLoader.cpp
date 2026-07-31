@@ -122,8 +122,9 @@ namespace CharacterLoader
 	// GLOBAL: TOY2 0x00547180
 	int32_t g_specialTrackValues[2];
 
-	// GLOBAL: TOY2 0x0054697C
-	uint8_t* g_allDataReferences[512];
+	// The file format reserves node types 0x100 through 0x104 for data references.
+	// GLOBAL: TOY2 0x00546D7C
+	uint8_t* g_allDataReferences[5];
 
 }
 
@@ -185,12 +186,12 @@ namespace Toy2
 						CharacterLoader::AlternateAllReference* reference = reinterpret_cast<CharacterLoader::AlternateAllReference*>(*dataBuffer);
 						if (reference->marker == 0x12345678)
 						{
-							reference->previous = CharacterLoader::g_allDataReferences[nodeType];
-							CharacterLoader::g_allDataReferences[nodeType] = reinterpret_cast<uint8_t*>(reference + 1);
+							reference->previous = CharacterLoader::g_allDataReferences[nodeType - 0x100];
+							CharacterLoader::g_allDataReferences[nodeType - 0x100] = reinterpret_cast<uint8_t*>(reference + 1);
 						}
 						else
 						{
-							CharacterLoader::g_allDataReferences[nodeType] = reinterpret_cast<uint8_t*>(reference);
+							CharacterLoader::g_allDataReferences[nodeType - 0x100] = reinterpret_cast<uint8_t*>(reference);
 						}
 					}
 
@@ -666,10 +667,10 @@ namespace CharacterLoader
 				uint8_t* referenceData = reinterpret_cast<uint8_t*>(reference);
 				if (reference->marker == 0x12345678)
 				{
-					reference->previous = g_allDataReferences[nodeType];
+					reference->previous = g_allDataReferences[nodeType - 0x100];
 					referenceData = reinterpret_cast<uint8_t*>(reference + 1);
 				}
-				g_allDataReferences[nodeType] = referenceData;
+				g_allDataReferences[nodeType - 0x100] = referenceData;
 			}
 
 			*dataBuffer += record->dataSizeInWords * 2;

@@ -34,7 +34,7 @@ namespace Toy2
 		{
 			uint16_t recordCount;
 			uint16_t recordType;
-			PickupRecord records[655];
+			PickupRecord records[112];
 		};
 
 		struct TokenState
@@ -77,6 +77,6 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(TokenDialogueEntry) == 0x10);
 		STATIC_ASSERT(sizeof(TokenDialogueValue) == 0x4);
 		STATIC_ASSERT(sizeof(PickupRecord) == 0x10);
-		STATIC_ASSERT(sizeof(PickupTable) == 0x28F4);
+		STATIC_ASSERT(sizeof(PickupTable) == 0x704);
 	}
 }

@@ -221,7 +221,6 @@ namespace Toy2
 	extern int32_t g_idleVoicePreset;
 	extern int32_t g_idleVoiceCooldown;
 	extern int32_t g_levelFileConversion[15];
-	extern uint8_t g_levelTokenBits[16];
 
 	STATIC_ASSERT(sizeof(ToyCfg) == 0x18);
 	STATIC_ASSERT(sizeof(FramePulseOutputs) == 0xC);

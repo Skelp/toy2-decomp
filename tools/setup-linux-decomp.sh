@@ -108,7 +108,7 @@ elif [[ "$(git -C "$RECCMP_SUBMODULE" rev-parse HEAD)" != "21416ad1938f5c372a578
 fi
 
 # Install reccmp from the pinned submodule in editable mode so the local
-# patches below (parser + union write) take effect. The submodule is pinned to
+# patches below take effect. The submodule is pinned to
 # upstream master (commit 21416ad1), which carries the evolved Ghidra importer
 # used by `tools/decomp sync`.
 "$TOOLING/venv/bin/python" -m pip install -e "$RECCMP_SUBMODULE" colorama==0.4.6
@@ -118,6 +118,10 @@ fi
 #    bodies (e.g. "{ return foo(); }"). Still required on upstream master.
 # 2. Union datatype write support: upstream only dereferences existing unions
 #    and aborts otherwise; this project needs unions created by the importer.
+# 3. Variadic function support: import fixed parameters and set Ghidra's
+#    variadic flag instead of rejecting the complete signature.
+# 4. Containing global refresh: remove stale generated data that contains a
+#    corrected global's start address.
 apply_reccmp_patch() {
     local patch_file="$1"
     local name
@@ -130,6 +134,8 @@ apply_reccmp_patch() {
 }
 apply_reccmp_patch "$ROOT/tools/patches/reccmp-0.1.6-want-curly-fix.patch"
 apply_reccmp_patch "$ROOT/tools/patches/reccmp-union-write.patch"
+apply_reccmp_patch "$ROOT/tools/patches/reccmp-variadic-functions.patch"
+apply_reccmp_patch "$ROOT/tools/patches/reccmp-containing-global-refresh.patch"
 
 # Recover the SDK bundle previously used by this project. The DirectDraw and
 # Direct3D 3 interfaces used by the game are ABI-compatible with these headers.

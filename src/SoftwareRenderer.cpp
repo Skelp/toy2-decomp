@@ -4112,12 +4112,12 @@ namespace SoftwareRenderer
 		else
 		{
 			BackdropDimensions* dimensions = Toy2::g_hasStaticBackdrop ? &g_staticBackdropDimensions : &g_backdropDimensions;
-			int32_t yaw = (int16_t)Toy2::Camera::g_renderCameraTransform.angles.yaw;
+			int32_t yaw = (int16_t)Toy2::Camera::g_renderCameraTransform.rotation.euler.angles.yaw;
 			int32_t sinYaw = Numerics::g_sinCosLUT[-yaw & 0xFFF];
 			int32_t cosYaw = Numerics::g_sinCosLUT[0x400 - yaw & 0xFFF];
 
 			Matrix3x3I16 rotation;
-			Nu3D::Math::EulerToRotationMatrix(&Toy2::Camera::g_renderCameraTransform.rotationAngles, &rotation);
+			Nu3D::Math::EulerToRotationMatrix(&Toy2::Camera::g_renderCameraTransform.rotation.vector, &rotation);
 
 			int32_t transformed = rotation.m02 * cosYaw + rotation.m00 * sinYaw;
 			g_backdropViewX = (transformed + ((transformed >> 31) & 0xFFF)) >> 12;

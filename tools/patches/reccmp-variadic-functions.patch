@@ -1,0 +1,76 @@
+reccmp master: Import variadic function signatures
+
+CV PDB argument lists use a trailing T_NOTYPE entry to mark a variadic
+function. The importer currently rejects the complete function when it sees
+this marker. This prevents Ghidra from receiving the name, return type, fixed
+parameters, and calling convention.
+
+Keep the marker as signature metadata, remove it from the fixed parameter
+list, and set Ghidra's variadic flag. Include the flag in the match check so a
+later sync repairs an incomplete signature.
+
+Generated against reccmp commit e043de8b.
+Apply from the reccmp submodule root with `patch -p1`.
+
+diff --git a/reccmp/ghidra/importer/function_importer.py b/reccmp/ghidra/importer/function_importer.py
+index 78d5b9c4..c97b1b67 100644
+--- a/reccmp/ghidra/importer/function_importer.py
++++ b/reccmp/ghidra/importer/function_importer.py
+@@ -35,7 +35,6 @@
+ from .exceptions import (
+     ParameterMismatchError,
+     ReccmpGhidraException,
+-    TypeNotImplementedError,
+ )
+ from .type_importer import PdbTypeImporter
+ from .types import CompiledRegexReplacements
+@@ -139,11 +138,7 @@ def __init__(
+             self.signature.return_type
+         )
+ 
+-        if CVInfoTypeEnum.T_NOTYPE in self.signature.arglist:
+-            # Variadric functions have a T_NOTYPE as their last argument
+-            raise TypeNotImplementedError(
+-                f"Function '{self.get_full_name()}' is probably variadric, which is not implemented yet."
+-            )
++        self.is_variadic = CVInfoTypeEnum.T_NOTYPE in self.signature.arglist
+ 
+         self.arguments: Sequence[ParameterImpl] = [
+             ParameterImpl(
+@@ -151,7 +146,11 @@ def __init__(
+                 type_importer.import_pdb_type_into_ghidra(type_key),
+                 api.getCurrentProgram(),
+             )
+-            for (index, type_key) in enumerate(self.signature.arglist)
++            for (index, type_key) in enumerate(
++                type_key
++                for type_key in self.signature.arglist
++                if type_key != CVInfoTypeEnum.T_NOTYPE
++            )
+         ]
+ 
+     def matches_ghidra_function(self, ghidra_function: Function) -> bool:
+@@ -160,6 +159,7 @@ def matches_ghidra_function(self, ghidra_function: Function) -> bool:
+         namespace_match = self.namespace == ghidra_function.getParentNamespace()
+         ghidra_return_type = ghidra_function.getReturnType()
+         return_type_match = self.return_type == ghidra_return_type
++        variadic_match = self.is_variadic == ghidra_function.hasVarArgs()
+ 
+         # Handle edge case: Return type X that is larger than the return register.
+         # In that case, the function returns `X*` and has another argument `X* __return_storage_ptr`.
+@@ -213,6 +213,7 @@ def matches_ghidra_function(self, ghidra_function: Function) -> bool:
+             name_match
+             and namespace_match
+             and return_type_match
++            and variadic_match
+             and calling_convention_match
+             and args_match
+         )
+@@ -313,6 +314,7 @@ def overwrite_ghidra_function(self, ghidra_function: Function):
+         ghidra_function.setParentNamespace(self.namespace)
+         ghidra_function.setReturnType(self.return_type, SourceType.USER_DEFINED)
+         ghidra_function.setCallingConvention(self.signature.call_type)
++        ghidra_function.setVarArgs(self.is_variadic)
+ 
+         if self.is_stub:
+             logger.debug(

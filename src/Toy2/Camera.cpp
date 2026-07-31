@@ -36,9 +36,9 @@ namespace Toy2
 			}
 			else
 			{
-				lockPoint->x = (actor->pos.x - Camera::g_gameplayCamera.pos.x + offsetX) >> 5;
-				lockPoint->y = (actor->pos.y - Camera::g_gameplayCamera.pos.y + volume->offset.y) >> 5;
-				lockPoint->z = (actor->pos.z - Camera::g_gameplayCamera.pos.z + offsetZ) >> 5;
+				lockPoint->x = (actor->pos.x - Camera::g_gameplayCamera.position.view.pos.x + offsetX) >> 5;
+				lockPoint->y = (actor->pos.y - Camera::g_gameplayCamera.position.view.pos.y + volume->offset.y) >> 5;
+				lockPoint->z = (actor->pos.z - Camera::g_gameplayCamera.position.view.pos.z + offsetZ) >> 5;
 				if (maxDistanceSquared != 0)
 				{
 					return lockPoint->x * lockPoint->x + lockPoint->y * lockPoint->y + lockPoint->z * lockPoint->z < maxDistanceSquared;
@@ -114,36 +114,37 @@ namespace Toy2
 
 				if (g_cutsceneInputLockTimer > 0)
 				{
-					g_renderCameraTransform.pos.x =
-						g_gameplayCamera.pos.x + ((g_renderCameraTransform.pos.x - g_gameplayCamera.pos.x) * g_cutsceneInputLockTimer >> 6);
-					g_renderCameraTransform.pos.y =
-						g_gameplayCamera.pos.y + ((g_renderCameraTransform.pos.y - g_gameplayCamera.pos.y) * g_cutsceneInputLockTimer >> 6);
-					g_renderCameraTransform.pos.z =
-						g_gameplayCamera.pos.z + ((g_renderCameraTransform.pos.z - g_gameplayCamera.pos.z) * g_cutsceneInputLockTimer >> 6);
+					g_renderCameraTransform.pos.x = g_gameplayCamera.position.view.pos.x
+						+ ((g_renderCameraTransform.pos.x - g_gameplayCamera.position.view.pos.x) * g_cutsceneInputLockTimer >> 6);
+					g_renderCameraTransform.pos.y = g_gameplayCamera.position.view.pos.y
+						+ ((g_renderCameraTransform.pos.y - g_gameplayCamera.position.view.pos.y) * g_cutsceneInputLockTimer >> 6);
+					g_renderCameraTransform.pos.z = g_gameplayCamera.position.view.pos.z
+						+ ((g_renderCameraTransform.pos.z - g_gameplayCamera.position.view.pos.z) * g_cutsceneInputLockTimer >> 6);
 
-					int32_t pitchDelta = (g_renderCameraTransform.angles.pitch - g_gameplayCamera.target.visorAimAngles.pitch) & 0xFFF;
+					int32_t pitchDelta = (g_renderCameraTransform.rotation.euler.angles.pitch - g_gameplayCamera.target.view.visorAimAngles.pitch) & 0xFFF;
 					if (pitchDelta >= 0x800)
 						pitchDelta -= 0x1000;
-					int32_t yawDelta = (g_renderCameraTransform.angles.yaw - g_gameplayCamera.target.visorAimAngles.yaw) & 0xFFF;
+					int32_t yawDelta = (g_renderCameraTransform.rotation.euler.angles.yaw - g_gameplayCamera.target.view.visorAimAngles.yaw) & 0xFFF;
 					if (yawDelta >= 0x800)
 						yawDelta -= 0x1000;
-					int32_t rollDelta = (g_renderCameraTransform.roll - g_gameplayCamera.angles.pitch) & 0xFFF;
+					int32_t rollDelta = (g_renderCameraTransform.rotation.euler.roll - g_gameplayCamera.angles.pitch) & 0xFFF;
 					if (rollDelta >= 0x800)
 						rollDelta -= 0x1000;
 
-					g_renderCameraTransform.angles.pitch =
-						(uint16_t)(g_gameplayCamera.target.visorAimAngles.pitch + (pitchDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
-					g_renderCameraTransform.angles.yaw =
-						(uint16_t)(g_gameplayCamera.target.visorAimAngles.yaw + (yawDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
-					g_renderCameraTransform.roll = (int16_t)(g_gameplayCamera.angles.pitch + (rollDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
+					g_renderCameraTransform.rotation.euler.angles.pitch =
+						(uint16_t)(g_gameplayCamera.target.view.visorAimAngles.pitch + (pitchDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
+					g_renderCameraTransform.rotation.euler.angles.yaw =
+						(uint16_t)(g_gameplayCamera.target.view.visorAimAngles.yaw + (yawDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
+					g_renderCameraTransform.rotation.euler.roll =
+						(int16_t)(g_gameplayCamera.angles.pitch + (rollDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
 					g_cutsceneInputLockTimer -= Renderer::g_frameDelta;
 					return;
 				}
 
-				g_renderCameraTransform.pos = g_gameplayCamera.pos;
-				g_renderCameraTransform.angles.pitch = g_gameplayCamera.target.visorAimAngles.pitch;
-				g_renderCameraTransform.angles.yaw = g_gameplayCamera.target.visorAimAngles.yaw;
-				g_renderCameraTransform.roll = g_gameplayCamera.angles.pitch;
+				g_renderCameraTransform.pos = g_gameplayCamera.position.view.pos;
+				g_renderCameraTransform.rotation.euler.angles.pitch = g_gameplayCamera.target.view.visorAimAngles.pitch;
+				g_renderCameraTransform.rotation.euler.angles.yaw = g_gameplayCamera.target.view.visorAimAngles.yaw;
+				g_renderCameraTransform.rotation.euler.roll = g_gameplayCamera.angles.pitch;
 				return;
 			}
 			else
@@ -160,33 +161,35 @@ namespace Toy2
 
 				if (g_cutsceneInputLockTimer > 0)
 				{
-					g_renderCameraTransform.pos.x =
-						g_cutsceneCamera.pos.x + ((g_renderCameraTransform.pos.x - g_cutsceneCamera.pos.x) * g_cutsceneInputLockTimer >> 6);
-					g_renderCameraTransform.pos.y =
-						g_cutsceneCamera.pos.y + ((g_renderCameraTransform.pos.y - g_cutsceneCamera.pos.y) * g_cutsceneInputLockTimer >> 6);
-					g_renderCameraTransform.pos.z =
-						g_cutsceneCamera.pos.z + ((g_renderCameraTransform.pos.z - g_cutsceneCamera.pos.z) * g_cutsceneInputLockTimer >> 6);
+					g_renderCameraTransform.pos.x = g_cutsceneCamera.position.view.pos.x
+						+ ((g_renderCameraTransform.pos.x - g_cutsceneCamera.position.view.pos.x) * g_cutsceneInputLockTimer >> 6);
+					g_renderCameraTransform.pos.y = g_cutsceneCamera.position.view.pos.y
+						+ ((g_renderCameraTransform.pos.y - g_cutsceneCamera.position.view.pos.y) * g_cutsceneInputLockTimer >> 6);
+					g_renderCameraTransform.pos.z = g_cutsceneCamera.position.view.pos.z
+						+ ((g_renderCameraTransform.pos.z - g_cutsceneCamera.position.view.pos.z) * g_cutsceneInputLockTimer >> 6);
 
-					int32_t pitchDelta = (g_renderCameraTransform.angles.pitch - g_cutsceneCamera.angles.pitch) & 0xFFF;
+					int32_t pitchDelta = (g_renderCameraTransform.rotation.euler.angles.pitch - g_cutsceneCamera.angles.pitch) & 0xFFF;
 					if (pitchDelta >= 0x800)
 						pitchDelta -= 0x1000;
-					int32_t yawDelta = (g_renderCameraTransform.angles.yaw - g_cutsceneCamera.angles.yaw) & 0xFFF;
+					int32_t yawDelta = (g_renderCameraTransform.rotation.euler.angles.yaw - g_cutsceneCamera.angles.yaw) & 0xFFF;
 					if (yawDelta >= 0x800)
 						yawDelta -= 0x1000;
-					int32_t rollDelta = (g_renderCameraTransform.roll - g_cutsceneCamera.roll) & 0xFFF;
+					int32_t rollDelta = (g_renderCameraTransform.rotation.euler.roll - g_cutsceneCamera.roll) & 0xFFF;
 					if (rollDelta >= 0x800)
 						rollDelta -= 0x1000;
 
-					g_renderCameraTransform.angles.pitch = (uint16_t)(g_cutsceneCamera.angles.pitch + (pitchDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
-					g_renderCameraTransform.angles.yaw = (uint16_t)(g_cutsceneCamera.angles.yaw + (yawDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
-					g_renderCameraTransform.roll = (int16_t)(g_cutsceneCamera.roll + (rollDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
+					g_renderCameraTransform.rotation.euler.angles.pitch =
+						(uint16_t)(g_cutsceneCamera.angles.pitch + (pitchDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
+					g_renderCameraTransform.rotation.euler.angles.yaw =
+						(uint16_t)(g_cutsceneCamera.angles.yaw + (yawDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
+					g_renderCameraTransform.rotation.euler.roll = (int16_t)(g_cutsceneCamera.roll + (rollDelta * g_cutsceneInputLockTimer >> 6)) & 0xFFF;
 					g_cutsceneInputLockTimer -= Renderer::g_frameDelta;
 					return;
 				}
 
-				g_renderCameraTransform.pos = g_cutsceneCamera.pos;
-				g_renderCameraTransform.angles = g_cutsceneCamera.angles;
-				g_renderCameraTransform.roll = g_cutsceneCamera.roll;
+				g_renderCameraTransform.pos = g_cutsceneCamera.position.view.pos;
+				g_renderCameraTransform.rotation.euler.angles = g_cutsceneCamera.angles;
+				g_renderCameraTransform.rotation.euler.roll = g_cutsceneCamera.roll;
 				return;
 			}
 		}
@@ -213,7 +216,7 @@ namespace Toy2
 		Vector3I g_cutsceneCameraPosition;
 
 		// GLOBAL: TOY2 0x0052B7E8
-		GameplayCamera g_cutsceneCamera;
+		CameraState g_cutsceneCamera;
 
 		// GLOBAL: TOY2 0x0050A0CC
 		int32_t g_nextCutsceneMoveSpeed;
@@ -339,41 +342,41 @@ namespace Toy2
 		{
 			memset(&g_renderCameraTransform, 0, sizeof(g_renderCameraTransform));
 			memset(camera, 0, sizeof(*camera));
-			memset(&g_cutsceneCamera, 0, sizeof(g_cutsceneCamera) - sizeof(int32_t));
+			memset(&g_cutsceneCamera, 0, sizeof(g_cutsceneCamera) + sizeof(g_cameraTransitionState) + sizeof(g_gameplayStateFlags));
 
 			int16_t buzzYaw = buzz->posAngles.angles.yaw;
 			camera->angles.yaw = 0x4B0;
-			camera->target.visorAimAngles.yaw = buzzYaw;
+			camera->target.view.visorAimAngles.yaw = buzzYaw;
 			camera->roll = buzzYaw;
-			camera->target.visorAimAngles.pitch = 0;
+			camera->target.view.visorAimAngles.pitch = 0;
 			camera->angles.pitch = 0;
-			camera->pos.x = (Numerics::g_sinCosLUT[(buzzYaw - 0x800) & 0xFFF] * 0x4B0 >> 9) + buzz->posAngles.pos.x;
-			camera->pos.z = (Numerics::g_sinCosLUT[(buzzYaw - 0x400) & 0xFFF] * 0x4B0 >> 9) + buzz->posAngles.pos.z;
-			camera->pos.y = buzz->posAngles.pos.y;
-			camera->pos.y = Nu3D::Collision::GetGroundHeight(&camera->groundProbe, 0);
-			if (camera->pos.y == (int32_t)0x80000000)
+			camera->position.view.pos.x = (Numerics::g_sinCosLUT[(buzzYaw - 0x800) & 0xFFF] * 0x4B0 >> 9) + buzz->posAngles.pos.x;
+			camera->position.view.pos.z = (Numerics::g_sinCosLUT[(buzzYaw - 0x400) & 0xFFF] * 0x4B0 >> 9) + buzz->posAngles.pos.z;
+			camera->position.view.pos.y = buzz->posAngles.pos.y;
+			camera->position.view.pos.y = Nu3D::Collision::GetGroundHeight(&camera->position.groundProbe, 0);
+			if (camera->position.view.pos.y == (int32_t)0x80000000)
 			{
-				camera->pos.y = buzz->posAngles.pos.y;
+				camera->position.view.pos.y = buzz->posAngles.pos.y;
 			}
-			if (camera->pos.y > buzz->posAngles.pos.y - 0x4000)
+			if (camera->position.view.pos.y > buzz->posAngles.pos.y - 0x4000)
 			{
-				camera->pos.y = buzz->posAngles.pos.y - 0x4000;
+				camera->position.view.pos.y = buzz->posAngles.pos.y - 0x4000;
 			}
 
-			camera->lookAt.x = camera->pos.x;
-			camera->pos.y -= 0x3200;
-			camera->lookAt.y = camera->pos.y;
-			camera->lookAt.z = camera->pos.z;
-			camera->data[1] = 0;
-			camera->data[3] = 0;
-			camera->data[2] = 0x40;
+			camera->position.view.lookAt.x = camera->position.view.pos.x;
+			camera->position.view.pos.y -= 0x3200;
+			camera->position.view.lookAt.y = camera->position.view.pos.y;
+			camera->position.view.lookAt.z = camera->position.view.pos.z;
+			camera->state.data[1] = 0;
+			camera->state.fields.modeTransitionState = 0;
+			camera->state.data[2] = 0x40;
 			Actor::g_renderActors[65] = 0;
 			g_unk52F118 = 0;
 			g_forwardInputDisabled = 0;
-			camera->data[4] = 0;
+			camera->state.data[4] = 0;
 			camera->target.x = g_buzzActor.posAngles.pos.y;
 			camera->target.y = g_buzzActor.posAngles.pos.y;
-			camera->data[0] = 0;
+			camera->state.data[0] = 0;
 
 			g_scriptedCameraState = 0;
 			g_actorCameraTarget.x = (int32_t)0x80000000;
@@ -407,20 +410,20 @@ namespace Toy2
 		// FUNCTION: TOY2 0x00402030 [PROVISIONAL]
 		void InitCutsceneCamera(const Vector3I* focusPosition, const Vector3I* cameraPosition)
 		{
-			g_cutsceneCamera.pos.x = cameraPosition->x;
-			g_cutsceneCamera.pos.y = cameraPosition->y;
-			g_cutsceneCamera.pos.z = cameraPosition->z;
-			g_cutsceneCamera.lookAt.x = focusPosition->x;
-			g_cutsceneCamera.lookAt.y = focusPosition->y;
-			g_cutsceneCamera.lookAt.z = focusPosition->z;
+			g_cutsceneCamera.position.view.pos.x = cameraPosition->x;
+			g_cutsceneCamera.position.view.pos.y = cameraPosition->y;
+			g_cutsceneCamera.position.view.pos.z = cameraPosition->z;
+			g_cutsceneCamera.position.view.lookAt.x = focusPosition->x;
+			g_cutsceneCamera.position.view.lookAt.y = focusPosition->y;
+			g_cutsceneCamera.position.view.lookAt.z = focusPosition->z;
 
-			int32_t deltaX = (g_cutsceneCamera.lookAt.x - g_cutsceneCamera.pos.x) >> 5;
-			int32_t deltaY = (g_cutsceneCamera.lookAt.y - g_cutsceneCamera.pos.y) >> 5;
-			int32_t deltaZ = (g_cutsceneCamera.lookAt.z - g_cutsceneCamera.pos.z) >> 5;
+			int32_t deltaX = (g_cutsceneCamera.position.view.lookAt.x - g_cutsceneCamera.position.view.pos.x) >> 5;
+			int32_t deltaY = (g_cutsceneCamera.position.view.lookAt.y - g_cutsceneCamera.position.view.pos.y) >> 5;
+			int32_t deltaZ = (g_cutsceneCamera.position.view.lookAt.z - g_cutsceneCamera.position.view.pos.z) >> 5;
 
-			g_cutsceneCamera.target.x = g_cutsceneCamera.pos.x;
-			g_cutsceneCamera.target.y = g_cutsceneCamera.pos.y;
-			g_cutsceneCamera.target.z = g_cutsceneCamera.pos.z;
+			g_cutsceneCamera.target.x = g_cutsceneCamera.position.view.pos.x;
+			g_cutsceneCamera.target.y = g_cutsceneCamera.position.view.pos.y;
+			g_cutsceneCamera.target.view.z = g_cutsceneCamera.position.view.pos.z;
 			g_cutsceneCamera.angles.yaw = (uint16_t)Nu3D::Math::CartesianToFixedAngle(deltaX, deltaZ);
 			int32_t horizontalDistanceSq = deltaZ * deltaZ + deltaX * deltaX;
 			int32_t heightSq = deltaY < 0 ? deltaY * deltaY : -(deltaY * deltaY);
@@ -447,11 +450,11 @@ namespace Toy2
 				g_buzzActor.actorFlags |= 1;
 				g_gameplayCamera.roll = g_buzzActor.posAngles.angles.yaw;
 				g_buzzActor.facingAngle = g_buzzActor.posAngles.angles.yaw;
-				g_gameplayCamera.pos.y = g_buzzActor.posAngles.pos.y - 0x3000;
+				g_gameplayCamera.position.view.pos.y = g_buzzActor.posAngles.pos.y - 0x3000;
 				g_gameplayCamera.angles.yaw = 0x4B0;
-				g_gameplayCamera.target.visorAimAngles.pitch = 0;
-				g_gameplayCamera.lookAt.x = g_gameplayCamera.pos.x;
-				g_gameplayCamera.modeTransitionState = 0;
+				g_gameplayCamera.target.view.visorAimAngles.pitch = 0;
+				g_gameplayCamera.position.view.lookAt.x = g_gameplayCamera.position.view.pos.x;
+				g_gameplayCamera.state.fields.modeTransitionState = 0;
 				g_scriptedCameraState = 0;
 
 				Nu3D::Link::SetScaleFromFixedOffsets(0x2D, 0, 0, 0);
@@ -497,11 +500,11 @@ namespace Toy2
 				g_buzzActor.actorFlags |= 1;
 				g_gameplayCamera.roll = g_buzzActor.posAngles.angles.yaw;
 				g_buzzActor.facingAngle = g_buzzActor.posAngles.angles.yaw;
-				g_gameplayCamera.pos.y = g_buzzActor.posAngles.pos.y - 0x3000;
+				g_gameplayCamera.position.view.pos.y = g_buzzActor.posAngles.pos.y - 0x3000;
 				g_gameplayCamera.angles.yaw = 0x4B0;
-				g_gameplayCamera.target.visorAimAngles.pitch = 0;
-				g_gameplayCamera.lookAt.x = g_gameplayCamera.pos.x;
-				g_gameplayCamera.modeTransitionState = 0;
+				g_gameplayCamera.target.view.visorAimAngles.pitch = 0;
+				g_gameplayCamera.position.view.lookAt.x = g_gameplayCamera.position.view.pos.x;
+				g_gameplayCamera.state.fields.modeTransitionState = 0;
 				g_scriptedCameraState = 0;
 
 				Nu3D::Link::SetScaleFromFixedOffsets(0x2D, 0, 0, 0);
@@ -529,15 +532,15 @@ namespace Toy2
 		}
 
 		// FUNCTION: TOY2 0x00403640 [PROVISIONAL]
-		void SmoothToTarget(GameplayCamera* camera)
+		void SmoothToTarget(CameraState* camera)
 		{
-			camera->pos.x += (camera->target.x - camera->pos.x) >> 3;
-			camera->pos.y += (camera->target.y - camera->pos.y) >> 3;
-			camera->pos.z += (camera->target.z - camera->pos.z) >> 3;
+			camera->position.view.pos.x += (camera->target.x - camera->position.view.pos.x) >> 3;
+			camera->position.view.pos.y += (camera->target.y - camera->position.view.pos.y) >> 3;
+			camera->position.view.pos.z += (camera->target.view.z - camera->position.view.pos.z) >> 3;
 
-			int32_t deltaX = (camera->lookAt.x - camera->target.x) >> 5;
-			int32_t deltaY = (camera->lookAt.y - camera->target.y) >> 5;
-			int32_t deltaZ = (camera->lookAt.z - camera->target.z) >> 5;
+			int32_t deltaX = (camera->position.view.lookAt.x - camera->target.x) >> 5;
+			int32_t deltaY = (camera->position.view.lookAt.y - camera->target.y) >> 5;
+			int32_t deltaZ = (camera->position.view.lookAt.z - camera->target.view.z) >> 5;
 
 			int32_t yawAngle = Nu3D::Math::CartesianToFixedAngle(deltaX, deltaZ);
 			int32_t yawDelta = (yawAngle - camera->angles.yaw) & 0xfff;
@@ -583,10 +586,10 @@ namespace Toy2
 			camera->roll = g_buzzActor.posAngles.angles.yaw;
 			g_buzzActor.facingAngle = g_buzzActor.posAngles.angles.yaw;
 			camera->angles.yaw = 0x4B0;
-			camera->pos.y = g_buzzActor.posAngles.pos.y - 0x3000;
-			camera->target.visorAimAngles.pitch = 0;
-			camera->lookAt.x = camera->pos.x;
-			camera->modeTransitionState = 0;
+			camera->position.view.pos.y = g_buzzActor.posAngles.pos.y - 0x3000;
+			camera->target.view.visorAimAngles.pitch = 0;
+			camera->position.view.lookAt.x = camera->position.view.pos.x;
+			camera->state.fields.modeTransitionState = 0;
 			g_buzzActor.actorFlags |= 1;
 			g_scriptedCameraState = 0;
 
@@ -636,8 +639,9 @@ namespace Camera
 	int32_t CalculateMaxTurnAngle(uint16_t directionInputState)
 	{
 		int32_t inputMagnitude = 0;
-		int32_t cameraRelativeAngle = Nu3D::Math::CartesianToFixedAngle((Toy2::g_buzzActor.posAngles.pos.x - Toy2::Camera::g_gameplayCamera.lookAt.x) >> 5,
-			(Toy2::g_buzzActor.posAngles.pos.z - Toy2::Camera::g_gameplayCamera.lookAt.z) >> 5);
+		int32_t cameraRelativeAngle = Nu3D::Math::CartesianToFixedAngle(
+			(Toy2::g_buzzActor.posAngles.pos.x - Toy2::Camera::g_gameplayCamera.position.view.lookAt.x) >> 5,
+			(Toy2::g_buzzActor.posAngles.pos.z - Toy2::Camera::g_gameplayCamera.position.view.lookAt.z) >> 5);
 
 		if ((InputManager::g_directionalInputCount == 1 || InputManager::g_directionalInputCount == 2) && Toy2::g_demoMode == 0)
 		{

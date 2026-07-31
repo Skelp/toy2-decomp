@@ -1,0 +1,29 @@
+reccmp master: Replace stale containing global data
+
+A corrected global can start inside a larger data item that an earlier sync
+created from an incorrect source declaration. `getDataAt` does not return that
+containing item, so `createData` fails and leaves the stale type in place.
+
+Remove the data item that contains the new start address. The importer already
+removes later data items from the new range. Together, these operations let the
+current PDB declaration replace stale generated data in either direction.
+
+Generated against reccmp commit e043de8b.
+Apply from the reccmp submodule root with `patch -p1`.
+
+diff --git a/reccmp/ghidra/importer/globals_importer.py b/reccmp/ghidra/importer/globals_importer.py
+index d6bbc671..03bfac13 100644
+--- a/reccmp/ghidra/importer/globals_importer.py
++++ b/reccmp/ghidra/importer/globals_importer.py
+@@ -43,7 +43,10 @@ def import_global_into_ghidra(
+         data_type = type_importer.import_pdb_type_into_ghidra(node.data_type.key)
+         address_ghidra = api.getAddressFactory().getAddress(hex(glob.orig_addr))
+ 
+-        existing_data = api.getDataAt(address_ghidra)
++        # A previous sync can leave a larger data item at an address that now
++        # belongs to a corrected, smaller global. Remove the containing item so
++        # the current PDB type can replace it.
++        existing_data = api.getDataContaining(address_ghidra)
+         if existing_data is not None:
+             api.removeData(existing_data)
+ 

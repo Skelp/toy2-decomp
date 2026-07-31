@@ -9,6 +9,7 @@
 #include "Nu3D/Camera.h"
 #include "Nu3D/Link.h"
 #include "Nu3D/Particles.h"
+#include "SaveManager.h"
 
 #include <limits.h>
 #include <string.h>
@@ -29,7 +30,7 @@ namespace Toy2
 		// FUNCTION: TOY2 0x004A0C80 [PROVISIONAL]
 		void Init(int16_t* tokenLinkIds, int32_t firstHiddenLinkId)
 		{
-			int32_t collectedTokens = g_levelTokenBits[g_levelFileIndex];
+			int32_t collectedTokens = SaveManager::g_save0Data.tokens[g_levelFileIndex];
 			int32_t i = 0;
 			g_tokenCollectionState = 0;
 
@@ -239,10 +240,10 @@ namespace Toy2
 				Camera::g_gameplayCamera.roll = g_buzzActor.posAngles.angles.yaw;
 				g_buzzActor.facingAngle = g_buzzActor.posAngles.angles.yaw;
 				Camera::g_gameplayCamera.angles.yaw = 0x4B0;
-				Camera::g_gameplayCamera.pos.y = cameraY;
-				Camera::g_gameplayCamera.target.visorAimAngles.pitch = 0;
-				Camera::g_gameplayCamera.lookAt.x = Camera::g_gameplayCamera.pos.x;
-				Camera::g_gameplayCamera.modeTransitionState = 0;
+				Camera::g_gameplayCamera.position.view.pos.y = cameraY;
+				Camera::g_gameplayCamera.target.view.visorAimAngles.pitch = 0;
+				Camera::g_gameplayCamera.position.view.lookAt.x = Camera::g_gameplayCamera.position.view.pos.x;
+				Camera::g_gameplayCamera.state.fields.modeTransitionState = 0;
 				Camera::g_scriptedCameraState = 0;
 
 				Nu3D::Link::SetScaleFromFixedOffsets(0x2D, 0, 0, 0);

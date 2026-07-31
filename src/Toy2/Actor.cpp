@@ -18,6 +18,7 @@
 #include "Nu3D/Particles.h"
 #include "Random.h"
 #include "Renderer/Renderer.h"
+#include "SaveManager.h"
 
 #include <limits.h>
 #include <stdlib.h>
@@ -353,10 +354,10 @@ namespace Toy2
 				Camera::g_gameplayCamera.roll = g_buzzActor.posAngles.angles.yaw;
 				g_buzzActor.facingAngle = g_buzzActor.posAngles.angles.yaw;
 				Camera::g_gameplayCamera.angles.yaw = 0x4B0;
-				Camera::g_gameplayCamera.pos.y = cameraY;
-				Camera::g_gameplayCamera.target.visorAimAngles.pitch = 0;
-				Camera::g_gameplayCamera.lookAt.x = Camera::g_gameplayCamera.pos.x;
-				Camera::g_gameplayCamera.modeTransitionState = 0;
+				Camera::g_gameplayCamera.position.view.pos.y = cameraY;
+				Camera::g_gameplayCamera.target.view.visorAimAngles.pitch = 0;
+				Camera::g_gameplayCamera.position.view.lookAt.x = Camera::g_gameplayCamera.position.view.pos.x;
+				Camera::g_gameplayCamera.state.fields.modeTransitionState = 0;
 				Camera::g_scriptedCameraState = 0;
 
 				Nu3D::Link::SetScaleFromFixedOffsets(0x2D, 0, 0, 0);
@@ -443,8 +444,8 @@ namespace Toy2
 		// FUNCTION: TOY2 0x00410540 [PROVISIONAL]
 		void SpawnBurstRingAtPoint(Actor::Toy2Actor* actor, uint8_t red, uint8_t green, uint8_t blue, int32_t verticalOffset)
 		{
-			int32_t cameraSine = Numerics::g_sinCosLUT[(int16_t)Camera::g_renderCameraTransform.angles.yaw & 0xFFF];
-			int32_t cameraCosine = Numerics::g_sinCosLUT[((int16_t)Camera::g_renderCameraTransform.angles.yaw + 0x400) & 0xFFF];
+			int32_t cameraSine = Numerics::g_sinCosLUT[(int16_t)Camera::g_renderCameraTransform.rotation.euler.angles.yaw & 0xFFF];
+			int32_t cameraCosine = Numerics::g_sinCosLUT[((int16_t)Camera::g_renderCameraTransform.rotation.euler.angles.yaw + 0x400) & 0xFFF];
 
 			for (int32_t ringAngle = 0; ringAngle < 0x1000; ringAngle += 0x200)
 			{
@@ -476,8 +477,8 @@ namespace Toy2
 		// FUNCTION: TOY2 0x004106C0 [PROVISIONAL]
 		void SpawnBurstRingAtActor(Actor::Toy2Actor* actor, uint8_t red, uint8_t green, uint8_t blue, int32_t verticalOffset)
 		{
-			int32_t cameraSine = Numerics::g_sinCosLUT[(int16_t)Camera::g_renderCameraTransform.angles.yaw & 0xFFF];
-			int32_t cameraCosine = Numerics::g_sinCosLUT[((int16_t)Camera::g_renderCameraTransform.angles.yaw + 0x400) & 0xFFF];
+			int32_t cameraSine = Numerics::g_sinCosLUT[(int16_t)Camera::g_renderCameraTransform.rotation.euler.angles.yaw & 0xFFF];
+			int32_t cameraCosine = Numerics::g_sinCosLUT[((int16_t)Camera::g_renderCameraTransform.rotation.euler.angles.yaw + 0x400) & 0xFFF];
 
 			int16_t* radiusSample = Numerics::g_sinCosLUT;
 			int32_t ringAngle = 0;
@@ -514,9 +515,8 @@ namespace Toy2
 
 	namespace Lighting
 	{
-		// GLOBAL: TOY2 0x0050387C
-		BuzzLightPreset g_buzzLightPresets[16] = {
-			{ { 0x40001000, 0x20008000, 0x20004000 }, 0x20008000, (int32_t)0x80004000 },
+		// GLOBAL: TOY2 0x00503890
+		BuzzLightPreset g_buzzLightPresets[15] = {
 			{ { 0x400, -0x400, 0x400 }, 0x960, 0x908060 },
 			{ { 0x400, -0x400, 0x400 }, 0x960, 0xA02000 },
 			{ { 0, -0x400, 0 }, 0x960, 0xC0C000 },
@@ -533,7 +533,6 @@ namespace Toy2
 			{ { 0x200, -0x400, 0x200 }, 0x960, 0x204080 },
 			{ { 0x400, -0x400, 0x400 }, 0x960, 0x406080 },
 		};
-
 		// GLOBAL: TOY2 0x00830D60
 		LightingState g_lightingState;
 
@@ -571,9 +570,9 @@ namespace Toy2
 		void UpdateBuzzLight()
 		{
 			int32_t buzzLightY = g_buzzActor.posAngles.pos.y - 0x2000;
-			g_lightingState.dynamicLights[0].position.x = g_buzzActor.posAngles.pos.x + g_buzzLightPresets[g_levelFileIndex].positionOffset.x * 0x10;
-			g_lightingState.dynamicLights[0].position.z = g_buzzActor.posAngles.pos.z + g_buzzLightPresets[g_levelFileIndex].positionOffset.z * 0x10;
-			g_lightingState.dynamicLights[0].position.y = buzzLightY + g_buzzLightPresets[g_levelFileIndex].positionOffset.y * 0x10;
+			g_lightingState.dynamicLights[0].position.x = g_buzzActor.posAngles.pos.x + g_buzzLightPresets[g_levelFileIndex - 1].positionOffset.x * 0x10;
+			g_lightingState.dynamicLights[0].position.z = g_buzzActor.posAngles.pos.z + g_buzzLightPresets[g_levelFileIndex - 1].positionOffset.z * 0x10;
+			g_lightingState.dynamicLights[0].position.y = buzzLightY + g_buzzLightPresets[g_levelFileIndex - 1].positionOffset.y * 0x10;
 
 			int32_t nearestLightIndex;
 			int32_t nearestDistanceSquared;
@@ -719,9 +718,9 @@ namespace Toy2
 			g_lightingState.dynamicLights[0].sourceId = 0;
 			g_buzzActor.lightDistance = 0x960;
 
-			g_lightingState.dynamicLights[0].colour.r = (uint8_t)(g_buzzLightPresets[levelFileIndex].colour >> 16);
-			g_lightingState.dynamicLights[0].colour.g = (uint8_t)(g_buzzLightPresets[levelFileIndex].colour >> 8);
-			g_lightingState.dynamicLights[0].colour.b = (uint8_t)g_buzzLightPresets[levelFileIndex].colour;
+			g_lightingState.dynamicLights[0].colour.r = (uint8_t)(g_buzzLightPresets[levelFileIndex - 1].colour >> 16);
+			g_lightingState.dynamicLights[0].colour.g = (uint8_t)(g_buzzLightPresets[levelFileIndex - 1].colour >> 8);
+			g_lightingState.dynamicLights[0].colour.b = (uint8_t)g_buzzLightPresets[levelFileIndex - 1].colour;
 
 			UpdateBuzzLight();
 		}
@@ -1285,7 +1284,7 @@ namespace Toy2
 		int32_t g_itemReturnHintSoundTimer;
 
 		// GLOBAL: TOY2 0x00529D48
-		Toy2Actor* g_renderActors[66];
+		Toy2Actor* g_renderActors[64];
 
 		// GLOBAL: TOY2 0x0050A54C
 		Toy2Actor* g_lastKilledActor;
@@ -1486,7 +1485,7 @@ namespace Toy2
 			g_creatureActors[actorIndex].actorFlags &= ~ACTOR_FLAG_INTERACTION_REQUESTED;
 
 			char* subtitle;
-			int32_t collectedTokenFlags = g_levelTokenBits[g_levelFileIndex];
+			int32_t collectedTokenFlags = SaveManager::g_save0Data.tokens[g_levelFileIndex];
 			if (collectedTokenFlags >= 0x1F)
 			{
 				subtitle = "hey! you have all the ^tokens^ buzz!";

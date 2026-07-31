@@ -2156,8 +2156,8 @@ namespace Toy2
 			int32_t autoAim;
 			if (Camera::g_scriptedCameraState == CAMERA_STATE_VISOR)
 			{
-				aimPitch = -(int16_t)Camera::g_gameplayCamera.target.visorAimAngles.pitch;
-				aimYaw = (int16_t)Camera::g_gameplayCamera.target.visorAimAngles.yaw;
+				aimPitch = -(int16_t)Camera::g_gameplayCamera.target.view.visorAimAngles.pitch;
+				aimYaw = (int16_t)Camera::g_gameplayCamera.target.view.visorAimAngles.yaw;
 				autoAim = 0;
 			}
 			else

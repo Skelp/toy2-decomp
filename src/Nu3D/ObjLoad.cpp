@@ -46,7 +46,7 @@ namespace NGNLoader
 		char g_nameTableBuffer[5120];
 
 		// GLOBAL: TOY2 0x00AE8234
-		uint32_t g_textureTable[42];
+		uint32_t g_textureTable[20];
 
 		// GLOBAL: TOY2 0x00B05750
 		Nu3D::Material* g_curMaterialList[20];
@@ -64,7 +64,7 @@ namespace NGNLoader
 		Nu3D::Vertex g_processedPrimVerts[2000];
 
 		// GLOBAL: TOY2 0x00AFBB0C
-		int16_t g_indexDataConversion[17702];
+		int16_t g_indexDataConversion[10000];
 
 		// GLOBAL: TOY2 0x00508A6C
 		int32_t g_drawTypeConversion[8] = { 0, 0, 2, 1, 3, 5, 4, -1 };

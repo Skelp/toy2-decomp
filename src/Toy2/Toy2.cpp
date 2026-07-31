@@ -984,6 +984,11 @@ namespace Toy2
 			int32_t reserved0;
 			const char* text;
 			int32_t reserved1;
+		};
+
+		struct PaddedControlTextEntry
+		{
+			ControlTextEntry entry;
 			int32_t reserved2;
 		};
 
@@ -992,72 +997,81 @@ namespace Toy2
 			int32_t x;
 			int32_t y;
 			const char* text;
+		};
+
+		struct PaddedMessageTextEntry
+		{
+			MessageTextEntry entry;
 			int32_t reserved;
 		};
 
 		// GLOBAL: TOY2 0x004EFFC8
-		ControlTextEntry g_keyTextEntries[14] = {
-			{ 60, 40, 0, "forward", 0, 0 },
-			{ 60, 60, 0, "back", 0, 0 },
-			{ 60, 80, 0, "left", 0, 0 },
-			{ 60, 100, 0, "right", 0, 0 },
-			{ 60, 120, 0, "fire/get/drop", 0, 0 },
-			{ 60, 140, 0, "jump/change", 0, 0 },
-			{ 60, 160, 0, "seed color", 0, 0 },
-			{ 200, 40, 0, "camera", 0, 0 },
-			{ 200, 60, 0, "lock camera", 0, 0 },
-			{ 240, 80, 0, "walk", 0, 0 },
-			{ 200, 100, 0, "kick", 0, 0 },
-			{ 80, 180, 0, "game pad", 0, 0 },
-			{ 80, 200, 0, "restore defaults", 0, 0 },
-			{ 80, 220, 0, "accept", 0, 0 },
+		PaddedControlTextEntry g_keyTextEntries[13] = {
+			{ { 60, 40, 0, "forward", 0 }, 0 },
+			{ { 60, 60, 0, "back", 0 }, 0 },
+			{ { 60, 80, 0, "left", 0 }, 0 },
+			{ { 60, 100, 0, "right", 0 }, 0 },
+			{ { 60, 120, 0, "fire/get/drop", 0 }, 0 },
+			{ { 60, 140, 0, "jump/change", 0 }, 0 },
+			{ { 60, 160, 0, "seed color", 0 }, 0 },
+			{ { 200, 40, 0, "camera", 0 }, 0 },
+			{ { 200, 60, 0, "lock camera", 0 }, 0 },
+			{ { 240, 80, 0, "walk", 0 }, 0 },
+			{ { 200, 100, 0, "kick", 0 }, 0 },
+			{ { 80, 180, 0, "game pad", 0 }, 0 },
+			{ { 80, 200, 0, "restore defaults", 0 }, 0 },
 		};
+
+		// GLOBAL: TOY2 0x004F0100
+		ControlTextEntry g_keyAcceptTextEntry = { 80, 220, 0, "accept", 0 };
 
 		// GLOBAL: TOY2 0x004F0114
 		ControlTextEntry* g_keyTextTable[15] = {
-			&g_keyTextEntries[0],
-			&g_keyTextEntries[1],
-			&g_keyTextEntries[2],
-			&g_keyTextEntries[3],
-			&g_keyTextEntries[4],
-			&g_keyTextEntries[5],
-			&g_keyTextEntries[6],
-			&g_keyTextEntries[7],
-			&g_keyTextEntries[8],
-			&g_keyTextEntries[9],
-			&g_keyTextEntries[10],
-			&g_keyTextEntries[11],
-			&g_keyTextEntries[12],
-			&g_keyTextEntries[13],
+			&g_keyTextEntries[0].entry,
+			&g_keyTextEntries[1].entry,
+			&g_keyTextEntries[2].entry,
+			&g_keyTextEntries[3].entry,
+			&g_keyTextEntries[4].entry,
+			&g_keyTextEntries[5].entry,
+			&g_keyTextEntries[6].entry,
+			&g_keyTextEntries[7].entry,
+			&g_keyTextEntries[8].entry,
+			&g_keyTextEntries[9].entry,
+			&g_keyTextEntries[10].entry,
+			&g_keyTextEntries[11].entry,
+			&g_keyTextEntries[12].entry,
+			&g_keyAcceptTextEntry,
 			(ControlTextEntry*)-1,
 		};
 
 		// GLOBAL: TOY2 0x004F0150
-		ControlTextEntry g_joyTextEntries[10] = {
-			{ 40, 40, 0, "fire/get/drop", 0, 0 },
-			{ 40, 60, 0, "jump/change", 0x100, 0 },
-			{ 40, 80, 0, "seed color", 0x200, 0 },
-			{ 40, 100, 0, "camera", 0x300, 0 },
-			{ 200, 40, 0, "lock camera", 0x400, 0 },
-			{ 200, 60, 0, "walk", 0x500, 0 },
-			{ 200, 80, 0, "kick", 0x600, 0 },
-			{ 80, 180, 0, "keyboard", 0, 0 },
-			{ 80, 200, 0, "restore defaults", 0, 0 },
-			{ 80, 220, 0, "accept", 0, 0 },
+		PaddedControlTextEntry g_joyTextEntries[9] = {
+			{ { 40, 40, 0, "fire/get/drop", 0 }, 0 },
+			{ { 40, 60, 0, "jump/change", 0x100 }, 0 },
+			{ { 40, 80, 0, "seed color", 0x200 }, 0 },
+			{ { 40, 100, 0, "camera", 0x300 }, 0 },
+			{ { 200, 40, 0, "lock camera", 0x400 }, 0 },
+			{ { 200, 60, 0, "walk", 0x500 }, 0 },
+			{ { 200, 80, 0, "kick", 0x600 }, 0 },
+			{ { 80, 180, 0, "keyboard", 0 }, 0 },
+			{ { 80, 200, 0, "restore defaults", 0 }, 0 },
 		};
+
+		// GLOBAL: TOY2 0x004F0228
+		ControlTextEntry g_joyAcceptTextEntry = { 80, 220, 0, "accept", 0 };
 
 		// GLOBAL: TOY2 0x004F023C
 		ControlTextEntry* g_joyTextTable[11] = {
-			&g_joyTextEntries[0],
-			&g_joyTextEntries[1],
-			&g_joyTextEntries[2],
-			&g_joyTextEntries[3],
-			&g_joyTextEntries[4],
-			&g_joyTextEntries[5],
-			&g_joyTextEntries[6],
-			&g_joyTextEntries[7],
-			&g_joyTextEntries[8],
-			&g_joyTextEntries[9],
+			&g_joyTextEntries[0].entry,
+			&g_joyTextEntries[1].entry,
+			&g_joyTextEntries[2].entry,
+			&g_joyTextEntries[3].entry,
+			&g_joyTextEntries[4].entry,
+			&g_joyTextEntries[5].entry,
+			&g_joyTextEntries[6].entry,
+			&g_joyTextEntries[7].entry,
+			&g_joyTextEntries[8].entry,
+			&g_joyAcceptTextEntry,
 			(ControlTextEntry*)-1,
 		};
 
@@ -1067,61 +1081,63 @@ namespace Toy2
 		};
 
 		// GLOBAL: TOY2 0x004F5398
-		MessageTextEntry g_messageTextEntries[25] = {
-			{ 20, 200, "select option and press enter", 0 },
-			{ 90, 200, "() - to change", 0 },
-			{ 20, 220, "press enter to accept changes", 0 },
-			{ 50, 240, "press esc to go back", 0 },
-			{ 70, 120, "do you want to quit", 0 },
-			{ 90, 4, "video options", 0 },
-			{ 100, 4, "define keys", 0 },
-			{ 130, 4, "save game", 0 },
-			{ 10, 200, "select file", 0 },
-			{ 10, 220, "press esc to go back", 0 },
-			{ 130, 4, "confirm", 0 },
-			{ 80, 180, "do you wish to", 0 },
-			{ 70, 200, "save over this game", 0 },
-			{ 130, 4, "enter name", 0 },
-			{ 130, 4, "load game", 0 },
-			{ 10, 200, "select game and press enter", 0 },
-			{ 10, 220, "press esc to go back", 0 },
-			{ 0, 0, &SaveManager::g_emptyString, 0 },
-			{ 0, 0, &SaveManager::g_emptyString, 0 },
-			{ 0, 0, &SaveManager::g_emptyString, 0 },
-			{ 0, 0, &SaveManager::g_emptyString, 0 },
-			{ 0, 0, &SaveManager::g_emptyString, 0 },
-			{ 0, 0, &SaveManager::g_emptyString, 0 },
-			{ 0, 0, &SaveManager::g_emptyString, 0 },
-			{ 0, 0, &SaveManager::g_emptyString, 0 },
+		PaddedMessageTextEntry g_messageTextEntries[24] = {
+			{ { 20, 200, "select option and press enter" }, 0 },
+			{ { 90, 200, "() - to change" }, 0 },
+			{ { 20, 220, "press enter to accept changes" }, 0 },
+			{ { 50, 240, "press esc to go back" }, 0 },
+			{ { 70, 120, "do you want to quit" }, 0 },
+			{ { 90, 4, "video options" }, 0 },
+			{ { 100, 4, "define keys" }, 0 },
+			{ { 130, 4, "save game" }, 0 },
+			{ { 10, 200, "select file" }, 0 },
+			{ { 10, 220, "press esc to go back" }, 0 },
+			{ { 130, 4, "confirm" }, 0 },
+			{ { 80, 180, "do you wish to" }, 0 },
+			{ { 70, 200, "save over this game" }, 0 },
+			{ { 130, 4, "enter name" }, 0 },
+			{ { 130, 4, "load game" }, 0 },
+			{ { 10, 200, "select game and press enter" }, 0 },
+			{ { 10, 220, "press esc to go back" }, 0 },
+			{ { 0, 0, &SaveManager::g_emptyString }, 0 },
+			{ { 0, 0, &SaveManager::g_emptyString }, 0 },
+			{ { 0, 0, &SaveManager::g_emptyString }, 0 },
+			{ { 0, 0, &SaveManager::g_emptyString }, 0 },
+			{ { 0, 0, &SaveManager::g_emptyString }, 0 },
+			{ { 0, 0, &SaveManager::g_emptyString }, 0 },
+			{ { 0, 0, &SaveManager::g_emptyString }, 0 },
 		};
+
+		// GLOBAL: TOY2 0x004F5518
+		MessageTextEntry g_emptyMessageTextEntry = { 0, 0, &SaveManager::g_emptyString };
 
 		// GLOBAL: TOY2 0x004F5524
 		MessageTextEntry* g_messageTextTable[25] = {
-			&g_messageTextEntries[0],
-			&g_messageTextEntries[1],
-			&g_messageTextEntries[2],
-			&g_messageTextEntries[3],
-			&g_messageTextEntries[4],
-			&g_messageTextEntries[5],
-			&g_messageTextEntries[6],
-			&g_messageTextEntries[7],
-			&g_messageTextEntries[8],
-			&g_messageTextEntries[9],
-			&g_messageTextEntries[10],
-			&g_messageTextEntries[11],
-			&g_messageTextEntries[12],
-			&g_messageTextEntries[13],
-			&g_messageTextEntries[14],
-			&g_messageTextEntries[15],
-			&g_messageTextEntries[16],
-			&g_messageTextEntries[17],
-			&g_messageTextEntries[18],
-			&g_messageTextEntries[19],
-			&g_messageTextEntries[20],
-			&g_messageTextEntries[21],
-			&g_messageTextEntries[22],
-			&g_messageTextEntries[23],
-			&g_messageTextEntries[24],
+			&g_messageTextEntries[0].entry,
+			&g_messageTextEntries[1].entry,
+			&g_messageTextEntries[2].entry,
+			&g_messageTextEntries[3].entry,
+			&g_messageTextEntries[4].entry,
+			&g_messageTextEntries[5].entry,
+			&g_messageTextEntries[6].entry,
+			&g_messageTextEntries[7].entry,
+			&g_messageTextEntries[8].entry,
+			&g_messageTextEntries[9].entry,
+			&g_messageTextEntries[10].entry,
+			&g_messageTextEntries[11].entry,
+			&g_messageTextEntries[12].entry,
+			&g_messageTextEntries[13].entry,
+			&g_messageTextEntries[14].entry,
+			&g_messageTextEntries[15].entry,
+			&g_messageTextEntries[16].entry,
+			&g_messageTextEntries[17].entry,
+			&g_messageTextEntries[18].entry,
+			&g_messageTextEntries[19].entry,
+			&g_messageTextEntries[20].entry,
+			&g_messageTextEntries[21].entry,
+			&g_messageTextEntries[22].entry,
+			&g_messageTextEntries[23].entry,
+			&g_emptyMessageTextEntry,
 		};
 
 		// GLOBAL: TOY2 0x0053006C
@@ -1154,8 +1170,10 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00882C2C
 		char g_iniInstallSearchPath[512];
 
-		STATIC_ASSERT(sizeof(ControlTextEntry) == 0x18);
-		STATIC_ASSERT(sizeof(MessageTextEntry) == 0x10);
+		STATIC_ASSERT(sizeof(ControlTextEntry) == 0x14);
+		STATIC_ASSERT(sizeof(PaddedControlTextEntry) == 0x18);
+		STATIC_ASSERT(sizeof(MessageTextEntry) == 0xC);
+		STATIC_ASSERT(sizeof(PaddedMessageTextEntry) == 0x10);
 
 		// FUNCTION: TOY2 0x00430BF0 [PROVISIONAL]
 		void ParseDefText()
@@ -2041,12 +2059,6 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x00830E30
 	int32_t g_pauseSoundVolume;
-
-	// GLOBAL: TOY2 0x0052F0D7
-	uint8_t g_levelTokenBits[16];
-
-	// GLOBAL: TOY2 0x0052F0E7
-	uint8_t g_movieUnlocked[19];
 
 	// GLOBAL: TOY2 0x0052F2D8
 	int16_t g_unlocks;
@@ -2949,8 +2961,9 @@ namespace Toy2
 					cameraTarget.y = g_buzzActor.posAngles.pos.y - 0x4000;
 					cameraTarget.z = g_buzzActor.posAngles.pos.z;
 
-					Camera::g_renderCameraTransform.angles.yaw = (Camera::g_renderCameraTransform.angles.yaw + Renderer::g_frameDelta * 8) & 0xFFF;
-					int32_t yaw = (int16_t)Camera::g_renderCameraTransform.angles.yaw;
+					Camera::g_renderCameraTransform.rotation.euler.angles.yaw =
+						(Camera::g_renderCameraTransform.rotation.euler.angles.yaw + Renderer::g_frameDelta * 8) & 0xFFF;
+					int32_t yaw = (int16_t)Camera::g_renderCameraTransform.rotation.euler.angles.yaw;
 					movement.x = -Numerics::g_sinCosLUT[yaw] * 2;
 					movement.y = 0;
 					movement.z = -Numerics::g_sinCosLUT[(yaw + 0x400) & 0xFFF] * 2;
@@ -2984,11 +2997,11 @@ namespace Toy2
 			}
 
 			cameraTarget = g_pauseCameraTarget.pos;
-			Camera::g_renderCameraTransform.angles.yaw &= 0xFFF;
-			yawDelta = (Camera::g_renderCameraTransform.angles.yaw - g_pauseCameraTarget.angles.yaw) & 0xFFF;
+			Camera::g_renderCameraTransform.rotation.euler.angles.yaw &= 0xFFF;
+			yawDelta = (Camera::g_renderCameraTransform.rotation.euler.angles.yaw - g_pauseCameraTarget.rotation.euler.angles.yaw) & 0xFFF;
 			if (yawDelta > 0x800)
 				yawDelta -= 0x1000;
-			Camera::g_renderCameraTransform.angles.yaw -= Renderer::g_frameDelta * yawDelta / 16;
+			Camera::g_renderCameraTransform.rotation.euler.angles.yaw -= Renderer::g_frameDelta * yawDelta / 16;
 
 		smooth_camera:
 			Camera::g_renderCameraTransform.pos.x -= (Camera::g_renderCameraTransform.pos.x - cameraTarget.x) * Renderer::g_frameDelta / 16;
@@ -3875,7 +3888,7 @@ namespace Toy2
 		int32_t levelCount = 0;
 		for (int32_t i = 0; i < 15; i++)
 		{
-			int32_t bits = g_levelTokenBits[g_levelFileConversion[i]];
+			int32_t bits = SaveManager::g_save0Data.tokens[g_levelFileConversion[i]];
 			if (! bits)
 				break;
 			for (int32_t j = 0; j < 5; j++)
@@ -3993,7 +4006,7 @@ namespace Toy2
 		InitialiseLevelVariables(levelIndex);
 		Gadget::InitLevelUnlockGeometry();
 
-		SaveManager::g_curLevelTokenData = g_levelTokenBits[g_levelFileIndex];
+		SaveManager::g_curLevelTokenData = SaveManager::g_save0Data.tokens[g_levelFileIndex];
 		g_savedUnlocks = SaveManager::g_save0Data.unlocks;
 		g_framePhase = 0;
 		g_unusedLevelState[0] = 0;
@@ -4074,7 +4087,7 @@ namespace Toy2
 			Renderer::g_frameDelta = 1;
 			SetBackdropByIndex(0);
 
-			g_movieUnlocked[0] = 1;
+			SaveManager::g_save0Data.moviesUnlocked[0] = 1;
 			int32_t selectedIndex = 0;
 			if (g_movieOrder[0] != movieIndex)
 			{
@@ -4083,7 +4096,7 @@ namespace Toy2
 				{
 					if (movieOrder[1] == 0xFF)
 						break;
-					if (g_movieUnlocked[*movieOrder] != 0)
+					if (SaveManager::g_save0Data.moviesUnlocked[*movieOrder] != 0)
 						selectedIndex++;
 					movieOrder++;
 				} while (*movieOrder != movieIndex);
@@ -4095,7 +4108,7 @@ namespace Toy2
 			for (int32_t definitionIndex = 0; g_movieDefinitions[definitionIndex].thumbnail.sheetIndex != 0xFF; definitionIndex++)
 			{
 				uint8_t orderedMovieIndex = g_movieOrder[definitionIndex];
-				if (g_movieUnlocked[orderedMovieIndex] != 0)
+				if (SaveManager::g_save0Data.moviesUnlocked[orderedMovieIndex] != 0)
 				{
 					menuItems[menuItemCount].thumbnail = g_movieDefinitions[orderedMovieIndex].thumbnail;
 					menuItems[menuItemCount].movieIndex = orderedMovieIndex;
@@ -4643,9 +4656,9 @@ namespace Toy2
 	// FUNCTION: TOY2 0x0049EB20 [MATCHED]
 	void UnlockAndPlayMovie(int32_t movieId, int32_t backgroundId, int32_t forcePlay)
 	{
-		if (! g_movieUnlocked[movieId] || forcePlay)
+		if (! SaveManager::g_save0Data.moviesUnlocked[movieId] || forcePlay)
 		{
-			g_movieUnlocked[movieId] = 1;
+			SaveManager::g_save0Data.moviesUnlocked[movieId] = 1;
 			PlayMovieWithTransition(movieId + 10, backgroundId);
 		}
 	}

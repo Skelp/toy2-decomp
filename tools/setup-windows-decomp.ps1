@@ -115,7 +115,7 @@ if (-not (Test-Path (Join-Path $ReccmpSubmodule ".git"))) {
 }
 
 # Install reccmp from the pinned submodule in editable mode so the local
-# patches below (parser + union write) take effect. The submodule is pinned to
+# patches below take effect. The submodule is pinned to
 # upstream master (commit 21416ad1), which carries the evolved Ghidra importer
 # used by `tools/decomp sync`.
 & $VenvPython -m pip install -e $ReccmpSubmodule colorama==0.4.6
@@ -126,6 +126,10 @@ Assert-LastExit "Installing reccmp"
 #    bodies (e.g. "{ return foo(); }"). Still required on upstream master.
 # 2. Union datatype write support: upstream only dereferences existing unions
 #    and aborts otherwise; this project needs unions created by the importer.
+# 3. Variadic function support: import fixed parameters and set Ghidra's
+#    variadic flag instead of rejecting the complete signature.
+# 4. Containing global refresh: remove stale generated data that contains a
+#    corrected global's start address.
 function Apply-ReccmpPatch([string] $PatchFile) {
     Push-Location $ReccmpSubmodule
     try {
@@ -142,6 +146,8 @@ function Apply-ReccmpPatch([string] $PatchFile) {
 }
 Apply-ReccmpPatch (Join-Path $Root "tools\patches\reccmp-0.1.6-want-curly-fix.patch")
 Apply-ReccmpPatch (Join-Path $Root "tools\patches\reccmp-union-write.patch")
+Apply-ReccmpPatch (Join-Path $Root "tools\patches\reccmp-variadic-functions.patch")
+Apply-ReccmpPatch (Join-Path $Root "tools\patches\reccmp-containing-global-refresh.patch")
 
 & $VenvPython (Join-Path $Root "tools\provision-directx.py") --root $Root
 Assert-LastExit "Provisioning DirectX SDK files"

@@ -647,9 +647,9 @@ namespace Toy2
 
 				cameraTransform.pos.x += (levelSelectCam.pos.x - cameraTransform.pos.x) >> 1;
 				cameraTransform.pos.y += (levelSelectCam.pos.y - cameraTransform.pos.y) >> 1;
-				cameraTransform.angles = levelSelectCam.angles;
+				cameraTransform.rotation.euler.angles = levelSelectCam.angles;
 				cameraTransform.pos.z += (levelSelectCam.pos.z - cameraTransform.pos.z) >> 1;
-				cameraTransform.roll = cameraRoll;
+				cameraTransform.rotation.euler.roll = cameraRoll;
 
 				Nu3D::Camera::ApplyTransformToCamera(&cameraTransform);
 				Nu3D::Camera::FadeToTargetTint();

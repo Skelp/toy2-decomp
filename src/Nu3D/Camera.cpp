@@ -332,9 +332,9 @@ namespace Nu3D
 		void SetupViewMatrix(ActiveCameraTransform* camera)
 		{
 			ViewRotationHistoryEntry viewAngles;
-			viewAngles.angles.x = camera->rotationAngles.x;
-			viewAngles.angles.y = (int16_t)(-camera->rotationAngles.y & 0xFFF);
-			viewAngles.angles.z = camera->rotationAngles.z;
+			viewAngles.angles.x = camera->rotation.vector.x;
+			viewAngles.angles.y = (int16_t)(-camera->rotation.vector.y & 0xFFF);
+			viewAngles.angles.z = camera->rotation.vector.z;
 
 			Toy2::Sector::g_viewRotation = viewAngles.angles;
 			g_previousFixedViewPosition = g_fixedViewPosition;
@@ -492,9 +492,9 @@ namespace Nu3D
 				return;
 
 			g_activeCameraTransform = *camera;
-			g_cameraPitch = -(int16_t)camera->angles.pitch * 16;
-			g_cameraYaw = (int16_t)camera->angles.yaw << 4;
-			g_cameraRoll = camera->roll << 4;
+			g_cameraPitch = -(int16_t)camera->rotation.euler.angles.pitch * 16;
+			g_cameraYaw = (int16_t)camera->rotation.euler.angles.yaw << 4;
+			g_cameraRoll = camera->rotation.euler.roll << 4;
 
 			Math::ApplyRotateXFromLut(&g_currentCamera->transform, g_cameraPitch);
 			Math::RotateYFromLut(&g_currentCamera->transform, g_cameraYaw);

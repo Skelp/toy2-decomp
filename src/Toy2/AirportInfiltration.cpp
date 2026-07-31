@@ -129,10 +129,16 @@ namespace Toy2
 			{ 0, 0, -0x500 },
 		};
 
+		struct MoveableObjectInitTable
+		{
+			MoveableObject::InitEntry entries[1];
+			int16_t terminator;
+		};
+
 		// GLOBAL: TOY2 0x004F46A4
-		MoveableObject::InitEntry g_moveableObjectInitTable[] = {
-			{ 8, 11, 0 },
-			{ -1, 0, 0 },
+		MoveableObjectInitTable g_moveableObjectInitTable = {
+			{ { 8, 11, 0 } },
+			-1,
 		};
 
 		// GLOBAL: TOY2 0x004F46C0
@@ -234,7 +240,7 @@ namespace Toy2
 		// FUNCTION: TOY2 0x0042C930 [MATCHED]
 		void Init()
 		{
-			MoveableObject::InitTable(g_moveableObjectInitTable);
+			MoveableObject::InitTable(g_moveableObjectInitTable.entries);
 			Collectables::Init(g_tokenLinkIds, 0x40);
 			Collectables::Activate(3, 1);
 			InitHiddenCollectibles();

@@ -51,20 +51,6 @@ namespace Toy2
 			int16_t isClone;
 		};
 
-		struct PlatformRuntimeRecord
-		{
-			Vector3I origin;
-			Vector3I16 rotationAnglesFixed;
-			int16_t motionMode;
-			Vector3I16 velocity;
-			Vector3I16 remainingTranslation;
-			Vector3I16 angularVelocity;
-			Vector3I16 remainingRotation;
-			Platform::CollisionFace* contactFace;
-			int16_t collisionMeshIndex;
-			int16_t flags;
-		};
-
 		struct CollisionCachePosition
 		{
 			int32_t cachedPositionX;
@@ -110,8 +96,6 @@ namespace Toy2
 		STATIC_ASSERT(offsetof(TerrainMeshDescriptor, platformId) == 0x1E);
 		STATIC_ASSERT(offsetof(TerrainMeshDescriptor, flags) == 0x2C);
 		STATIC_ASSERT(offsetof(TerrainMeshDescriptor, sourceMeshId) == 0x48);
-		STATIC_ASSERT(sizeof(PlatformRuntimeRecord) == 0x34);
-		STATIC_ASSERT(offsetof(PlatformRuntimeRecord, collisionMeshIndex) == 0x30);
 		STATIC_ASSERT(sizeof(CollisionCachePosition) == 0x18);
 		STATIC_ASSERT(sizeof(CollisionQueryBounds) == 0x18);
 		STATIC_ASSERT(sizeof(CollisionWorkspaceSlot) == 0x5C0);
@@ -121,9 +105,6 @@ namespace Toy2
 		STATIC_ASSERT(offsetof(CollisionWorkspaceSlot, faces) == 0x200);
 		STATIC_ASSERT(sizeof(CollisionWorkspace) == 0x33C0);
 		STATIC_ASSERT(sizeof(TerrainRelocationLink) == 0x04);
-
-		// GLOBAL: TOY2 0x007286EC
-		PlatformRuntimeRecord g_platformRuntimeRecords[33];
 
 		// GLOBAL: TOY2 0x007290F0
 		uint8_t* g_terrainRelocationHeads[8];
@@ -200,7 +181,7 @@ namespace Toy2
 
 							if (descriptor->platformId != 0)
 							{
-								PlatformRuntimeRecord& platform = g_platformRuntimeRecords[descriptor->platformId];
+								Platform::PlatformState& platform = Platform::g_platformStates[descriptor->platformId - 1];
 								platform.collisionMeshIndex = static_cast<int16_t>(baseMeshIndex);
 								platform.origin.x = mesh->origin.x;
 								platform.origin.y = mesh->origin.y;
@@ -1228,7 +1209,7 @@ namespace Toy2
 
 		const int32_t PLATFORM_FLAG_TRANSLATING = 0x80;
 
-		// GLOBAL: TOY2 0x0072872C
+		// GLOBAL: TOY2 0x00728720
 		PlatformState g_platformStates[32];
 
 		// GLOBAL: TOY2 0x007290A0

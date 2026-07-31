@@ -991,13 +991,9 @@ namespace AudioManager
 	// FUNCTION: TOY2 0x0049E9C0 [MATCHED]
 	void ClearSequence7Cursor() { g_soundSequenceSlots[7].cursor = 0; }
 
-	// Pointer table for the six sequence-data blobs. Callers pass a negative
-	// identifier (-1..-6); the access is g_sequenceDataPtrs[-sequenceId - 1].
-	// A NULL sentinel follows the six valid entries. The build leaves the
-	// table zero-initialized; reccmp compares only .text, so the referencing
-	// code resolves by symbol name.
+	// Callers use identifiers from -1 through -6 to select the six sequence-data blobs.
 	// GLOBAL: TOY2 0x00503828
-	int16_t* g_sequenceDataPtrs[7];
+	int16_t* g_sequenceDataPtrs[6];
 
 	// Header at the start of each sequence-data blob: three peak-volume
 	// fields that the engine doubles into the 8-bit DirectSound range.

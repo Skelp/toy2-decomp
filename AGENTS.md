@@ -538,6 +538,12 @@ installed editable so the local patches in `tools/patches/` take effect:
 - `reccmp-union-write.patch` — upstream only dereferences existing unions and
   aborts otherwise. This patch implements the union write path so the importer
   can create PDB unions.
+- `reccmp-variadic-functions.patch` — upstream rejects PDB signatures that use
+  a trailing `T_NOTYPE` variadic marker. This patch imports the fixed
+  parameters and sets Ghidra's variadic flag.
+- `reccmp-containing-global-refresh.patch` — upstream removes data only when
+  its start matches the new global. This patch also removes stale generated
+  data that contains a corrected global's start address.
 
 ```sh
 tools/decomp sync          # import all matched entities into Ghidra
@@ -552,8 +558,8 @@ of the import. It restarts the bridge afterwards.
 
 reccmp imports *every* matched function, not only exact matches. Effective and
 partial matches receive their PDB name and signature too. A small number of
-upstream limitations surface as non-fatal failures (e.g. variadic functions,
-some struct collisions). The import transaction still commits the rest. Do not
+upstream limitations can surface as non-fatal failures. The import transaction
+still commits the rest. Do not
 manually push speculative names or types into the Ghidra project. The map is
 the persistence layer for names. The reconstructable, local-only Ghidra
 project is a scratchpad. Exploring a speculative name in your own local Ghidra

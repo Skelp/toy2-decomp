@@ -20,57 +20,72 @@ namespace Toy2
 {
 	namespace Camera
 	{
+#pragma pack(push, 2)
 		// Gameplay camera controller state. Fixed-point positions and 12-bit
 		// angles drive the view transform that UpdateActiveTransform blends
 		// into the render camera. Fields beyond the angles are confirmed by
 		// InitGameplayCamera zeroing the full 0x34-byte struct; their roles
 		// are reconstructed as the cluster is recovered.
-		struct GameplayCamera
+		struct CameraCore
 		{
+			union Position
+			{
+				struct View
+				{
+					Vector3I pos;
+					Vector3I lookAt;
+				} view;
+				PosAndAngles groundProbe;
+			};
+
 			struct TargetPosition
 			{
 				int32_t x;
 				int32_t y;
-				union
+				union View
 				{
 					int32_t z;
 					Angles visorAimAngles;
-				};
+				} view;
 			};
 
-			union
-			{
-				struct
-				{
-					Vector3I pos; // 0x00 — current camera position (fixed-point)
-					Vector3I lookAt; // 0x0C — look-at position (fixed-point)
-				};
-				PosAndAngles groundProbe;
-			};
+			Position position;
 			TargetPosition target; // 0x18 — position the camera moves toward (fixed-point)
 			Angles angles; // 0x24 — pitch and yaw (12-bit fixed-point angles)
 			uint16_t roll; // 0x28 — roll angle (12-bit fixed-point)
-			union
-			{
-				uint16_t data[5]; // 0x2A — remaining camera state
-				struct
-				{
-					uint16_t reserved2A;
-					uint16_t reserved2C;
-					uint16_t reserved2E;
-					uint16_t modeTransitionState;
-					uint16_t reserved32;
-				};
-			};
 		};
 
+		struct CameraState : CameraCore
+		{
+			uint16_t state;
+		};
+
+		struct GameplayCamera : CameraCore
+		{
+			union State
+			{
+				uint16_t data[5];
+				struct Fields
+				{
+					uint16_t slot0;
+					uint16_t slot1;
+					uint16_t slot2;
+					uint16_t modeTransitionState;
+					uint16_t slot4;
+				} fields;
+			} state;
+		};
+
+		STATIC_ASSERT(sizeof(CameraCore) == 0x2A);
+		STATIC_ASSERT(sizeof(CameraState) == 0x2C);
 		STATIC_ASSERT(sizeof(GameplayCamera) == 0x34);
-		STATIC_ASSERT(sizeof(GameplayCamera::TargetPosition) == 0xC);
-		STATIC_ASSERT(offsetof(GameplayCamera, groundProbe) == 0);
-		STATIC_ASSERT(offsetof(GameplayCamera, modeTransitionState) == 0x30);
+		STATIC_ASSERT(sizeof(CameraCore::TargetPosition) == 0xC);
+		STATIC_ASSERT(offsetof(GameplayCamera, state) == 0x2A);
+		STATIC_ASSERT(offsetof(GameplayCamera::State::Fields, modeTransitionState) == 6);
+#pragma pack(pop)
 
 		extern GameplayCamera g_gameplayCamera;
-		extern GameplayCamera g_cutsceneCamera;
+		extern CameraState g_cutsceneCamera;
 		extern Nu3D::Camera::ActiveCameraTransform g_renderCameraTransform;
 		extern int32_t g_scriptedCameraState;
 		extern int32_t g_cutsceneInputLockTimer;
@@ -95,7 +110,7 @@ namespace Toy2
 		void InitGameplayCamera(GameplayCamera* camera, Buzz::Toy2BuzzActor* buzz);
 		void InitCutsceneCamera(const Vector3I* focusPosition, const Vector3I* cameraPosition);
 		void BeginScriptedCutsceneAtPoint(Vector3I* focusPosition, int32_t duration, int32_t cameraDistance);
-		void SmoothToTarget(GameplayCamera* camera);
+		void SmoothToTarget(CameraState* camera);
 		void SnapBehindBuzz(GameplayCamera* camera);
 		void GameplayMode(GameplayCamera* camera);
 		void VisorMode(GameplayCamera* camera);
