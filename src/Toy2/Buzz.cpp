@@ -2404,9 +2404,8 @@ namespace Toy2
 					return 0;
 			}
 
-			int32_t previousSwingTimer = g_swingTimer;
 			g_swingTimer -= Renderer::g_frameDelta;
-			if (previousSwingTimer > 15 && g_swingTimer <= 15)
+			if (g_swingTimer + Renderer::g_frameDelta > 15 && g_swingTimer <= 15)
 			{
 				g_jumpHeightControlActive = 0;
 				buzz->velocity.vertical = -0x600;
@@ -2426,7 +2425,7 @@ namespace Toy2
 				g_swingTimer = 0;
 				return result;
 			}
-			if (g_swingTimer < 16)
+			if (g_swingTimer <= 15)
 				return result;
 
 			buzz->posAngles.pos.x -= (buzz->posAngles.pos.x - g_swingAnchorPosition.x) * Renderer::g_frameDelta / 16;
@@ -2831,15 +2830,15 @@ namespace Toy2
 			if (buzz->velocity.vertical > 0 && (g_actionStateFlags & LEDGE_CLIMB_BLOCKING_ACTIONS) == 0)
 			{
 				int32_t floorY = buzz->floorYPos;
-				int32_t buzzY = buzz->posAngles.pos.y;
-				if (floorY - buzzY > 0x2000 && floorY != (int32_t)0x80000000)
+				PosAndAngles groundProbe;
+				groundProbe.pos.y = buzz->posAngles.pos.y;
+				if (floorY - groundProbe.pos.y > 0x2000 && floorY != (int32_t)0x80000000)
 				{
-					PosAndAngles groundProbe;
-					groundProbe.pos.y = buzzY - 0x3600;
-					int32_t forwardOffsetX = Numerics::g_sinCosLUT[buzz->posAngles.angles.yaw & 0xFFF] / 3;
-					int32_t forwardOffsetZ = Numerics::g_sinCosLUT[(buzz->posAngles.angles.yaw + 0x400) & 0xFFF] / 3;
-					groundProbe.pos.x = buzz->posAngles.pos.x + forwardOffsetX;
-					groundProbe.pos.z = buzz->posAngles.pos.z + forwardOffsetZ;
+					groundProbe.pos.y -= 0x3600;
+					int32_t forwardOffsetX;
+					groundProbe.pos.x = buzz->posAngles.pos.x + (forwardOffsetX = Numerics::g_sinCosLUT[buzz->posAngles.angles.yaw & 0xFFF] / 3);
+					int32_t forwardOffsetZ;
+					groundProbe.pos.z = buzz->posAngles.pos.z + (forwardOffsetZ = Numerics::g_sinCosLUT[(buzz->posAngles.angles.yaw + 0x400) & 0xFFF] / 3);
 
 					int32_t groundY = Nu3D::Collision::GetGroundHeight(&groundProbe, 0) - 200;
 					if (Collision::g_groundNormal.y < -15000 && groundY < buzz->posAngles.pos.y - 0x3600 && groundY >= buzz->motionTargetPos.y - 0x3600)
