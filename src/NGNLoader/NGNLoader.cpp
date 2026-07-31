@@ -1211,7 +1211,7 @@ namespace Nu3D
 		free(creature);
 	}
 
-	// FUNCTION: TOY2 0x004CA0C0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004CA0C0 [MATCHED]
 	void CopyNormalsFromNearestVertex(Creature* creature, int32_t nodeIndex, Vertex* vertex)
 	{
 		float closestDistanceSquared = 3.402823466e+38F;
@@ -1221,16 +1221,17 @@ namespace Nu3D
 		{
 			for (int32_t index = 0; index < primitive->patchVerts.vertexCount; ++index)
 			{
-				Vertex* candidate = &primitive->patchVerts.data.vertices[index];
-				float deltaX = candidate->position.x - vertex->position.x;
-				float deltaY = candidate->position.y - vertex->position.y;
+				Vertex* vertices = primitive->patchVerts.data.vertices;
+				Vertex* candidate = &vertices[index];
 				float deltaZ = candidate->position.z - vertex->position.z;
-				float distanceSquared = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
+				float deltaY = candidate->position.y - vertex->position.y;
+				float deltaX = candidate->position.x - vertex->position.x;
+				float distanceSquared = deltaZ * deltaZ + deltaY * deltaY + deltaX * deltaX;
 
 				if (distanceSquared < closestDistanceSquared && distanceSquared < 1024.0f)
 				{
-					vertex->normals = candidate->normals;
 					closestDistanceSquared = distanceSquared;
+					vertex->normals = candidate->normals;
 					if (distanceSquared < 1.0f)
 						return;
 				}
