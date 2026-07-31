@@ -256,21 +256,19 @@ void SysParmsOnExit() { SystemParametersInfoA(SPI_SETSCREENSAVERRUNNING, g_sysPa
 
 namespace Logger
 {
-	// FUNCTION: TOY2 0x004A66A0 [MODIFIED] [PROVISIONAL]
+	// FUNCTION: TOY2 0x004A66A0 [MATCHED]
 	void Log(char* format, ...)
 	{
 		char buffer[1024];
 
-		va_list argList;
-		va_start(argList, format);
-
-		memset(buffer, 0, sizeof(buffer));
-		vsprintf(buffer, format, argList);
-
-		printf("%s", buffer); // Addition
-
 		if (g_logsEnabled)
 		{
+			va_list argList;
+			va_start(argList, format);
+
+			memset(buffer, 0, sizeof(buffer));
+			vsprintf(buffer, format, argList);
+
 			if (g_logFileExists)
 			{
 				g_logFileExists = 0;

@@ -19,7 +19,7 @@ namespace Logger
 	int32_t g_logsEnabled;
 
 	// GLOBAL: TOY2 0x00504E54
-	int32_t g_logFileExists = 1;
+	int16_t g_logFileExists = 1;
 
 	// GLOBAL: TOY2 0x005066A0
 	extern const char g_surfaceLostError[] = {
