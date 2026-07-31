@@ -67,11 +67,11 @@ namespace Toy2
 				uint16_t data[5];
 				struct Fields
 				{
-					uint16_t slot0;
-					uint16_t slot1;
-					uint16_t slot2;
+					uint16_t unused0;
+					uint16_t unused1;
+					uint16_t orbitPitch;
 					uint16_t modeTransitionState;
-					uint16_t slot4;
+					uint16_t orbitInputFlags;
 				} fields;
 			} state;
 		};

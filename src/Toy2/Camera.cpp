@@ -228,10 +228,10 @@ namespace Toy2
 		Vector3I g_actorCameraTarget;
 
 		// GLOBAL: TOY2 0x0050A128
-		int32_t g_unk50A128;
+		int32_t g_targetCameraDistance;
 
 		// GLOBAL: TOY2 0x0050A12C
-		int32_t g_unk50A12C;
+		int32_t g_cameraCollisionFlags;
 
 		// GLOBAL: TOY2 0x0050A134
 		int32_t g_cutsceneWaitTimer;
@@ -246,10 +246,10 @@ namespace Toy2
 		const int32_t* g_cutsceneCommandCursor;
 
 		// GLOBAL: TOY2 0x0050A4B4
-		int32_t g_unk50A4B4;
+		int32_t g_cameraYawVelocity;
 
 		// GLOBAL: TOY2 0x0050A4B8
-		int32_t g_unk50A4B8;
+		int32_t g_unusedCameraState0;
 
 		// GLOBAL: TOY2 0x0050A4BC
 		int32_t g_cutsceneCameraPathPoint;
@@ -258,19 +258,19 @@ namespace Toy2
 		int32_t g_cutsceneElapsedTime;
 
 		// GLOBAL: TOY2 0x0050A4E0
-		int32_t g_unk50A4E0;
+		int32_t g_movingPlatformCameraBlend;
 
 		// GLOBAL: TOY2 0x0050A4E4
-		int32_t g_unk50A4E4;
+		int32_t g_cameraRecenterYawDelta;
 
 		// GLOBAL: TOY2 0x0050A4E8
-		int32_t g_unk50A4E8;
+		int32_t g_cameraSnapToTarget;
 
 		// GLOBAL: TOY2 0x0050A514
 		int32_t g_cutsceneFocusPathPoint;
 
 		// GLOBAL: TOY2 0x0050A534
-		int32_t g_unk50A534;
+		int32_t g_cameraRecenterTimer;
 
 		// GLOBAL: TOY2 0x0050A53C
 		int32_t g_cutsceneSegmentProgress;
@@ -279,10 +279,10 @@ namespace Toy2
 		int32_t g_cutsceneSegmentDuration;
 
 		// GLOBAL: TOY2 0x0052AD98
-		int32_t g_unk52AD98;
+		int32_t g_cameraSmoothingDivisor;
 
 		// GLOBAL: TOY2 0x0052F118
-		int32_t g_unk52F118;
+		int32_t g_unusedCameraState1;
 
 		// GLOBAL: TOY2 0x0052F1CC
 		int32_t g_forwardInputDisabled;
@@ -367,30 +367,30 @@ namespace Toy2
 			camera->position.view.pos.y -= 0x3200;
 			camera->position.view.lookAt.y = camera->position.view.pos.y;
 			camera->position.view.lookAt.z = camera->position.view.pos.z;
-			camera->state.data[1] = 0;
+			camera->state.fields.unused1 = 0;
 			camera->state.fields.modeTransitionState = 0;
-			camera->state.data[2] = 0x40;
+			camera->state.fields.orbitPitch = 0x40;
 			Actor::g_renderActors[65] = 0;
-			g_unk52F118 = 0;
+			g_unusedCameraState1 = 0;
 			g_forwardInputDisabled = 0;
-			camera->state.data[4] = 0;
+			camera->state.fields.orbitInputFlags = 0;
 			camera->target.x = g_buzzActor.posAngles.pos.y;
 			camera->target.y = g_buzzActor.posAngles.pos.y;
-			camera->state.data[0] = 0;
+			camera->state.fields.unused0 = 0;
 
 			g_scriptedCameraState = 0;
 			g_actorCameraTarget.x = (int32_t)0x80000000;
 			g_cutsceneDuration = 0;
-			g_unk50A4E8 = 0;
-			g_unk52AD98 = 0x10;
-			g_unk50A4B4 = 0;
-			g_unk50A4B8 = 0;
-			g_unk50A12C = 0;
-			g_unk50A4E4 = 0;
-			g_unk50A128 = 0x4B0;
-			g_unk50A534 = 0;
+			g_cameraSnapToTarget = 0;
+			g_cameraSmoothingDivisor = 0x10;
+			g_cameraYawVelocity = 0;
+			g_unusedCameraState0 = 0;
+			g_cameraCollisionFlags = 0;
+			g_cameraRecenterYawDelta = 0;
+			g_targetCameraDistance = 0x4B0;
+			g_cameraRecenterTimer = 0;
 			g_shakeTimer = 0;
-			g_unk50A4E0 = 0;
+			g_movingPlatformCameraBlend = 0;
 			g_cutsceneInputLockTimer = 0;
 			Nu3D::Camera::g_viewHistoryInitialized = 0;
 			g_cutsceneCommandCursor = 0;
