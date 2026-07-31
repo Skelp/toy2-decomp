@@ -112,32 +112,36 @@ namespace NGNLoader
 
 		memcpy(&localTexParams, texParams, sizeof(localTexParams));
 		localTexParams.rawTexStr = 0;
+		uint32_t textureParamsSize = sizeof(NGNTextureParams);
 
 		if (! g_textureCache.activeList)
 			return 0;
 
-		while (! ignoreParams && memcmp(&cacheHead->params, &localTexParams, sizeof(NGNTextureParams)) || strcmpi(cacheHead->texName, texParams->rawTexStr))
+		do
 		{
+			int32_t comparison = 0;
+			if (! ignoreParams)
+				comparison = memcmp(&cacheHead->params, &localTexParams, textureParamsSize);
+
+			if (comparison == 0 && strcmpi(cacheHead->texName, texParams->rawTexStr) == 0)
+			{
+				NGNTextureData* result = g_textureData.activeList;
+
+				while (result)
+				{
+					if (result->textureCacheIndex == cacheHead->textureIndex)
+						return result;
+
+					result = result->next;
+				}
+
+				return 0;
+			}
+
 			cacheHead = cacheHead->next;
+		} while (cacheHead);
 
-			if (! cacheHead)
-				return 0;
-		}
-
-		NGNTextureData* result = g_textureData.activeList;
-
-		if (! g_textureData.activeList)
-			return 0;
-
-		while (result->textureCacheIndex != cacheHead->textureIndex)
-		{
-			result = result->next;
-
-			if (! result)
-				return 0;
-		}
-
-		return result;
+		return 0;
 	}
 
 	// FUNCTION: TOY2 0x004BB4C0 [MATCHED]
