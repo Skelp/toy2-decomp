@@ -143,7 +143,7 @@ namespace Toy2
 					int16_t unkWord4;
 					int16_t actorFlags;
 					int16_t visibilityDistance;
-					int32_t unkVar22;
+					int32_t unusedActorVelocityX;
 					int16_t facingAngle;
 					int16_t unusedFrameState;
 					Vector3I respawnPos;
@@ -217,6 +217,7 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(Toy2BuzzActor) == 0xA0);
 		STATIC_ASSERT(offsetof(Toy2BuzzActor, animationFramePosition) == 0x18);
 		STATIC_ASSERT(offsetof(Toy2BuzzActor, secondaryAnimationFramePosition) == 0x1C);
+		STATIC_ASSERT(offsetof(Toy2BuzzActor, unusedActorVelocityX) == 0x44);
 		STATIC_ASSERT(offsetof(Toy2BuzzActor, velocity) == 0x68);
 		STATIC_ASSERT(offsetof(Toy2BuzzActor, baseAnimationFramePosition) == 0x7C);
 		STATIC_ASSERT(offsetof(Toy2BuzzActor, animationEventPosition) == 0x80);

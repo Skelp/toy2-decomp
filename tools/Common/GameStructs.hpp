@@ -247,7 +247,7 @@ struct Toy2BuzzActor
 	int16_t unkWord4;
 	uint16_t actorFlags;
 	int16_t visibilityDistance;
-	int32_t unkVar22;
+	int32_t unusedActorVelocityX;
 	int16_t facingAngle;
 	int16_t unkVar23;
 	int32_t unkVar24;

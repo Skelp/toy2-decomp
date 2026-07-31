@@ -6,7 +6,6 @@
 0x004bcb60	unknown-symbol	g_unkB7FBB8	d45cabe36754	src/SoftwareRenderer.cpp
 0x004bcb60	address-named-symbol	g_unkB626C0	10f072ec7310	src/SoftwareRenderer.cpp
 0x004bcb60	unknown-symbol	g_unkB626C0	10f072ec7310	src/SoftwareRenderer.cpp
-src/Toy2/Buzz.h	placeholder-field	unkVar22	0b31940ecb22	src/Toy2/Buzz.h
 0x00438a50	opaque-state-slot	startRecord->data[1]	29bb2dac2fd9	src/Toy2/LevelSelect.cpp
 0x00438a50	opaque-state-slot	soundRecord->data[1]	58dbde0cf034	src/Toy2/LevelSelect.cpp
 0x00438a50	opaque-state-slot	targetRecord->data[0]	277f94d56b17	src/Toy2/LevelSelect.cpp

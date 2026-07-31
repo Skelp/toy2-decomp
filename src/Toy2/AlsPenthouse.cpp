@@ -335,7 +335,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x00428BA0 [PROVISIONAL]
+		// FUNCTION: TOY2 0x00428BA0 [MATCHED]
 		void UpdateObjectGroupFlash()
 		{
 			int32_t phase = Renderer::g_frameDelta;
