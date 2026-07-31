@@ -5341,6 +5341,21 @@ namespace Toy2
 		return 0;
 	}
 
+	// FUNCTION: TOY2 0x004CE860 [MATCHED]
+	int32_t WriteCfg()
+	{
+		FILE* fileHandle = fopen("toy2.cfg", "wb");
+
+		if (fileHandle)
+		{
+			fwrite(&g_toyCfgData, 1, sizeof(ToyCfg), fileHandle);
+			fclose(fileHandle);
+			return 1;
+		}
+
+		return 0;
+	}
+
 	// FUNCTION: TOY2 0x0047D8D0 [MATCHED]
 	void UnusedInit()
 	{

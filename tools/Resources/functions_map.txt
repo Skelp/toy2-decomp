@@ -1174,6 +1174,7 @@
 0x004CE6C0 Nu3D::Light::SetDirectionalLight
 0x004CE760 Toy2::InitCfg
 0x004CE810 Toy2::ReadCfg
+0x004CE860 Toy2::WriteCfg
 0x004CE8B0 Toy2::Levels::InitLevelDefaults
 0x004CE910 Nu3D::Light::BuildGlobalLights
 0x004CEA20 Toy2::FlushRenderer
