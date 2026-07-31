@@ -98,9 +98,12 @@ namespace Nu3D
 			return output;
 		}
 
-		// FUNCTION: TOY2 0x00451F80 [PROVISIONAL]
-		int32_t Cross2D(Point2I16 point1, Point2I16 point2, Point2I16 point3)
-		{ return (point1.y - point2.y) * (point3.x - point2.x) - (point3.y - point2.y) * (point1.x - point2.x); }
+		// FUNCTION: TOY2 0x00451F80 [MATCHED]
+		int32_t Cross2D(int32_t packedPoint1, int32_t packedPoint2, int32_t packedPoint3)
+		{
+			return ((int16_t)(packedPoint1 >> 16) - (int16_t)(packedPoint2 >> 16)) * ((int16_t)packedPoint3 - (int16_t)packedPoint2)
+				- ((int16_t)(packedPoint3 >> 16) - (int16_t)(packedPoint2 >> 16)) * ((int16_t)packedPoint1 - (int16_t)packedPoint2);
+		}
 
 		// FUNCTION: TOY2 0x00451FD0 [MATCHED]
 		int32_t NormalizeToFixedPoint(const Vector3I* input, Vector3I* output)
