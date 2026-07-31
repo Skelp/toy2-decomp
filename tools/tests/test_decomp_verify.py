@@ -1,5 +1,7 @@
 import importlib.util
 import csv
+import contextlib
+import io
 import json
 import tempfile
 import unittest
@@ -37,6 +39,41 @@ class VerifyRegressionTests(unittest.TestCase):
                 )
             finally:
                 VERIFY.TOOL_ARTIFACTS = old_artifacts
+
+    def test_session_summary_reports_new_targets_and_distribution(self):
+        with tempfile.TemporaryDirectory() as directory:
+            baseline = Path(directory) / "before.json"
+            current = Path(directory) / "after.json"
+            baseline.write_text(
+                json.dumps(
+                    {
+                        "data": [
+                            {"address": "0x401000", "matching": 0.4, "stub": True},
+                            {"address": "0x402000", "matching": 0.8},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            current.write_text(
+                json.dumps(
+                    {
+                        "data": [
+                            {"address": "0x401000", "matching": 1.0},
+                            {"address": "0x402000", "matching": 0.9},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                result = VERIFY.session_summary(
+                    baseline, current, [0x401000, 0x402000]
+                )
+            self.assertEqual(result, 0)
+            self.assertIn("2 (1 new, 1 exact)", output.getvalue())
+            self.assertIn("mean 95.00%", output.getvalue())
 
     def test_rejects_full_report_regression_when_target_improves(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -149,7 +186,7 @@ class VerifyRegressionTests(unittest.TestCase):
                 "0x00401000\tprovisional\tpartial\t40.00\tclean\tmaintainer-review\t"
                 "the ABI and data layout are supported but local lifetimes remain uncertain\t"
                 "revisit when a related function identifies the original local declaration order\t"
-                "0.00,40.00\t-\t-\t-\taudited\tsub-50\n",
+                "0.00,40.00\t-\t-\t-\taudited\tsub-50\tnatural-loop,early-return\n",
                 encoding="utf-8",
             )
             old_artifacts = VERIFY.TOOL_ARTIFACTS
@@ -167,6 +204,62 @@ class VerifyRegressionTests(unittest.TestCase):
                         allow_low_score=True,
                     ),
                     0,
+                )
+            finally:
+                VERIFY.TOOL_ARTIFACTS = old_artifacts
+
+    def test_new_target_below_75_requires_maintainer_review(self):
+        with tempfile.TemporaryDirectory() as directory:
+            baseline = self.write_report(directory, "before.json", 0.0)
+            current = self.write_report(directory, "after.json", 0.7)
+            source = Path(directory) / "src"
+            source.mkdir()
+            old_artifacts = VERIFY.TOOL_ARTIFACTS
+            VERIFY.TOOL_ARTIFACTS = Path(directory) / "none.tsv"
+            try:
+                self.assertEqual(
+                    VERIFY.validate(
+                        baseline,
+                        current,
+                        {0x401000},
+                        False,
+                        source_root=source,
+                        check_annotation_tags=False,
+                        audit_ledger=Path(directory) / "audit.tsv",
+                    ),
+                    1,
+                )
+            finally:
+                VERIFY.TOOL_ARTIFACTS = old_artifacts
+
+    def test_new_provisional_target_requires_specific_ledger_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            baseline = self.write_report(directory, "before.json", 0.0)
+            current = self.write_report(directory, "after.json", 0.8)
+            source = Path(directory) / "src"
+            source.mkdir()
+            ledger = Path(directory) / "audit.tsv"
+            ledger.write_text(
+                "0x00401000\tprovisional\tpartial\t80.00\tclean\tinitial-audit\t"
+                "binary or source model is not verified\t"
+                "recheck ABI, layout, control flow, and natural source forms\t"
+                "80.00\t-\t-\t-\tpending\t-\t-\n",
+                encoding="utf-8",
+            )
+            old_artifacts = VERIFY.TOOL_ARTIFACTS
+            VERIFY.TOOL_ARTIFACTS = Path(directory) / "none.tsv"
+            try:
+                self.assertEqual(
+                    VERIFY.validate(
+                        baseline,
+                        current,
+                        {0x401000},
+                        False,
+                        source_root=source,
+                        check_annotation_tags=False,
+                        audit_ledger=ledger,
+                    ),
+                    1,
                 )
             finally:
                 VERIFY.TOOL_ARTIFACTS = old_artifacts

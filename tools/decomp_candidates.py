@@ -10,6 +10,7 @@ no Ghidra call and no reccmp run:
   the owning translation unit.
 - `build/decomp-report-data.json` supplies the current match percent when a
   comparison is available.
+- `build/decomp-deferrals.tsv` supplies local supported deferrals.
 - `.notes/caps-registry.tsv` supplies legacy mismatch claims for the audit queue.
 - `tools/Resources/tool_artifacts.tsv` supplies the narrow tool-only allowlist.
 - `tools/decomp_lint.py` supplies the source-plausibility errors, so a function
@@ -41,6 +42,7 @@ CAPS_REGISTRY = ROOT / ".notes" / "caps-registry.tsv"
 TOOL_ARTIFACTS = ROOT / "tools" / "Resources" / "tool_artifacts.tsv"
 AUDIT_FREEZE = ROOT / "tools" / "Resources" / "audit-freeze.txt"
 AUDIT_LEDGER = ROOT / "tools" / "Resources" / "audit-ledger.tsv"
+DEFERRALS = ROOT / "build" / "decomp-deferrals.tsv"
 
 sys.path.insert(0, str(ROOT))
 from tools.decomp_annotations import read_source_annotations  # noqa: E402
@@ -74,6 +76,7 @@ class Candidate:
     audit_state: str = ""
     audit_scope: str = ""
     nearby_provisional_scores: tuple[float, ...] = ()
+    deferred_reason: str = ""
     reasons: list[str] = field(default_factory=list)
     rank: float = 0.0
 
@@ -153,8 +156,38 @@ def read_audit_ledger(path: Path = AUDIT_LEDGER) -> dict[int, tuple[str, str]]:
     return records
 
 
+def read_deferrals(path: Path = DEFERRALS) -> dict[int, str]:
+    if not path.exists():
+        return {}
+    records = {}
+    with path.open(encoding="utf-8", newline="") as handle:
+        for row in csv.reader(handle, delimiter="\t"):
+            if not row or row[0].lstrip().startswith("#"):
+                continue
+            try:
+                records[int(row[0].strip(), 16)] = row[1].strip()
+            except (IndexError, ValueError):
+                continue
+    return records
+
+
+def write_deferral(address: int, reason: str, path: Path = DEFERRALS) -> None:
+    records = read_deferrals(path)
+    records[address] = reason.strip()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+        writer.writerow(("# address", "reason"))
+        for item_address, item_reason in sorted(records.items()):
+            writer.writerow((f"0x{item_address:08X}", item_reason))
+
+
 def namespace_of(name: str) -> str:
     return name.rsplit("::", 1)[0] if "::" in name else ""
+
+
+def parse_address(value: str) -> int:
+    return int(value, 16)
 
 
 def read_lint_findings() -> dict[int, tuple[int, int]]:
@@ -196,6 +229,7 @@ def build_candidates() -> list[Candidate]:
     tool_artifacts = read_tool_artifacts(TOOL_ARTIFACTS)
     lint_findings = read_lint_findings()
     audit_ledger = read_audit_ledger()
+    deferrals = read_deferrals()
 
     reconstructed_per_namespace: dict[str, int] = {}
     for address, name in entries:
@@ -247,6 +281,7 @@ def build_candidates() -> list[Candidate]:
                 audit_state=audit_ledger.get(address, ("", ""))[0],
                 audit_scope=audit_ledger.get(address, ("", ""))[1],
                 nearby_provisional_scores=tuple(nearby_scores),
+                deferred_reason=deferrals.get(address, ""),
             )
         )
     return candidates
@@ -319,13 +354,13 @@ def score(candidate: Candidate) -> None:
     else:
         reasons.append("no reconstructed sibling")
 
-    low_nearby_scores = [score for score in candidate.nearby_provisional_scores if score < 0.5]
-    if low_nearby_scores:
-        penalty = min(15.0 * len(low_nearby_scores), 60.0)
+    weak_nearby_scores = [score for score in candidate.nearby_provisional_scores if score < 0.75]
+    if weak_nearby_scores:
+        penalty = min(sum((0.75 - score) * 60.0 for score in weak_nearby_scores), 90.0)
         rank -= penalty
-        average = sum(low_nearby_scores) / len(low_nearby_scores)
+        average = sum(weak_nearby_scores) / len(weak_nearby_scores)
         reasons.append(
-            f"{len(low_nearby_scores)} nearby provisional sibling(s) average "
+            f"{len(weak_nearby_scores)} nearby provisional sibling(s) average "
             f"{average * 100:.1f}%"
         )
 
@@ -346,6 +381,9 @@ def score(candidate: Candidate) -> None:
         rank -= 200.0
         reasons.append(f"tool-only artifact: {candidate.tool_artifact}")
 
+    if candidate.deferred_reason:
+        reasons.append(f"supported deferral: {candidate.deferred_reason}")
+
     candidate.rank = rank
     candidate.reasons = reasons
 
@@ -361,10 +399,15 @@ def select(
     exclude_capped: bool,
     debt_only: bool = False,
     new_work_only: bool = False,
+    include_deferred: bool = False,
 ) -> list[Candidate]:
     chosen: list[Candidate] = []
     for candidate in candidates:
+        if candidate.deferred_reason and not include_deferred:
+            continue
         if new_work_only and candidate.state == "FUNCTION":
+            continue
+        if new_work_only and candidate.size > CLUSTER_MAX_SIZE:
             continue
         if namespace and not candidate.name.startswith(namespace + "::"):
             continue
@@ -431,7 +474,7 @@ def print_table(chosen: list[Candidate], limit: int, show_reasons: bool) -> None
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Rank reconstruction candidates from committed inputs only.",
+        description="Rank reconstruction candidates from repository evidence.",
     )
     parser.add_argument("namespace", nargs="?", help="restrict to one map namespace, e.g. Nu3D")
     parser.add_argument("--stubs", action="store_true", help="only functions marked STUB in src/")
@@ -470,8 +513,15 @@ def main() -> int:
     parser.add_argument(
         "--new-work",
         action="store_true",
-        help="show only STUB and unannotated work and bypass the audit freeze",
+        help="show only small STUB and unannotated work and bypass the audit freeze",
     )
+    parser.add_argument(
+        "--include-deferred",
+        action="store_true",
+        help="include targets from the local supported-deferral record",
+    )
+    parser.add_argument("--record-deferral", type=parse_address, metavar="ADDRESS", help=argparse.SUPPRESS)
+    parser.add_argument("--reason", help=argparse.SUPPRESS)
     parser.add_argument("--max-size", type=int, help="drop candidates larger than this many bytes")
     parser.add_argument(
         "--include-capped",
@@ -482,6 +532,13 @@ def main() -> int:
     parser.add_argument("--why", action="store_true", help="print the rank and its evidence")
     parser.add_argument("--json", action="store_true", help="emit JSON instead of a table")
     args = parser.parse_args()
+
+    if args.record_deferral is not None:
+        if not args.reason or not args.reason.strip():
+            parser.error("--record-deferral needs --reason")
+        write_deferral(args.record_deferral, args.reason)
+        print(f"Deferred 0x{args.record_deferral:08X}: {args.reason.strip()}")
+        return 0
 
     if not MAP_PATH.exists():
         print(f"error: {MAP_PATH} not found", file=sys.stderr)
@@ -513,6 +570,7 @@ def main() -> int:
         exclude_capped=not args.include_capped,
         debt_only=args.debt or args.quality,
         new_work_only=args.new_work,
+        include_deferred=args.include_deferred,
     )
     if args.legacy_caps:
         chosen = [item for item in chosen if item.cap]
@@ -546,6 +604,7 @@ def main() -> int:
                     "audit_state": item.audit_state,
                     "audit_scope": item.audit_scope,
                     "nearby_provisional_scores": item.nearby_provisional_scores,
+                    "deferred_reason": item.deferred_reason,
                     "rank": item.rank,
                     "reasons": item.reasons,
                 }

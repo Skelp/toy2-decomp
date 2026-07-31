@@ -134,6 +134,9 @@ validate() {
     if [[ $allow_low_score -eq 1 ]]; then
         verify_args+=(--allow-low-score)
     fi
+    if [[ $staged -eq 1 ]]; then
+        verify_args+=(--require-staged-ledger)
+    fi
     python tools/decomp_verify.py "${verify_args[@]}"
     if [[ $staged -eq 1 ]]; then
         python tools/decomp_lint.py --staged --warnings-as-errors
@@ -234,6 +237,7 @@ Commands:
   score <addr>...   Print only the similarity verdict for one or more addresses
   bc <addr>         Build toy2.exe, then compare one address verbosely
   candidates [ns]   Rank reconstruction candidates (no Ghidra, no reccmp run)
+  defer <addr> ...  Record a supported local deferral
   evidence <addr>   Collect bounded evidence for one target in a single call
   audit [args]      Rank audits, show completion, or refresh the audit ledger
   baseline          Save a fresh parent-state comparison before source edits
@@ -242,6 +246,7 @@ Commands:
   lint [files]      Check reconstructed source for decompiler residue
   names             Re-extract .notes/original-names.md from the retail binary
   report [file]     Generate the self-contained HTML decompilation dashboard
+  session-summary   Summarize selected targets against the saved baseline
   progress [scope]  Show annotation progress, optionally for a namespace
   check             Verify functions_map.txt is sorted, deduplicated, named, in-range
   run [args]        Run the recompiled toy2.exe through Wine
@@ -307,6 +312,15 @@ case "$command" in
     candidates)
         exec python tools/decomp_candidates.py "$@"
         ;;
+    defer)
+        if [[ $# -lt 3 || ${2:-} != "--reason" ]]; then
+            echo "Usage: tools/decomp defer <address> --reason <text>" >&2
+            exit 2
+        fi
+        address="$1"
+        shift 2
+        exec python tools/decomp_candidates.py --record-deferral "$address" --reason "$*"
+        ;;
     audit)
         if [[ ${1:-} == "--status" ]]; then
             shift
@@ -360,6 +374,14 @@ case "$command" in
         ;;
     report)
         report "$@"
+        ;;
+    session-summary)
+        if [[ $# -eq 0 ]]; then
+            echo "Usage: tools/decomp session-summary <address> [address...]" >&2
+            exit 2
+        fi
+        exec python tools/decomp_verify.py session-summary \
+            build/decomp-baseline-report.json build/decomp-report-data.json "$@"
         ;;
     progress)
         if [[ $# -gt 1 ]]; then

@@ -10,9 +10,9 @@ naming, anti-score-chasing) live in `AGENTS.md`. This file does not repeat them.
 
 Run from the repository root: `/run/media/skelp/1TB/venvs/toy2-decomp`.
 
-**The discipline: select fast, commit early, investigate on the branch.** The
-most common failure mode is surveying candidates without ever starting. The
-build-compare loop is the real validation. Pre-investigation is not.
+**The discipline: select promptly, test early, and commit after the quality
+review.** The most common failure mode is surveying candidates without a
+source-model test. The build-compare loop supplies the test.
 
 ## 1. Read this much, and no more
 
@@ -53,14 +53,14 @@ tools/decomp baseline              # saved comparison and build identity
 ```sh
 tools/decomp audit --status                   # show the required audit scope
 tools/decomp candidates --limit 15 --why      # show required pending audits
-tools/decomp candidates --new-work --why      # use only for same-session verification
+tools/decomp candidates --new-work --why      # small evidence-backed new work
 tools/decomp evidence 0x004XXXXX              # the single best candidate
 ```
 
 **Complete the required audits before new work.** During the freeze, the
 default list contains pending former CAP, sub-50 percent, and verified-code
-debt audits. Use `--new-work` only if the function can become exact, effective,
-or tool-equivalent in the same session.
+debt audits. Use `--new-work` only when the evidence supports a complete body
+that can reach at least 75 percent. Exact, effective, and tool results also pass.
 
 For a source-debt audit, use the order in `.notes/refactor-debt.md`. The file
 starts with the smallest supported fixes.
@@ -93,6 +93,8 @@ byte offsets.
 `evidence` call. Get more evidence when one focused query can answer a missing
 item. Defer the target when its ABI, data model, or control flow stays unclear.
 A correct deferral is useful work and does not require a commit.
+Record it with `tools/decomp defer <address> --reason <text>`. Candidate lists
+hide it until you use `--include-deferred`.
 
 ## 4. Get on the branch — immediately after selection
 
@@ -165,6 +167,10 @@ tools/decomp experiment try 0x004XXXXX natural-form
 - Stop a related cluster when two siblings remain below 50 percent under the
   same source model. Investigate the common layout, macro, or control flow
   before you implement another sibling.
+- If small new work is not supported, fix type, layout, or lint debt next.
+  After that, select a 50 to 90 percent leaf with a known source defect.
+  Otherwise, stop with a supported deferral. Do not select a large orchestration
+  function only because the small candidates are exhausted.
 
 **Debt items invert the order: write, build, compare, then judge.** A debt item
 already matches the retail code, so you have a known-good baseline that ordinary
@@ -178,9 +184,11 @@ Do not settle a type design by reasoning when a build will decide it for you.
 1. Format the touched files with the repo `.clang-format`.
 2. Stage the intended source. Run `tools/decomp validate --target 0x004XXXXX
    --staged`.
-   Validation rejects a target below 50 percent by default. Keep that target as
-   a `STUB` unless a maintainer reviews it. A maintainer can set the ledger
-   origin to `maintainer-review` and use `--allow-low-score`.
+   Validation rejects a new target below 75 percent by default. Keep that target
+   as a `STUB` unless a maintainer reviews it. A maintainer can set the ledger
+   origin to `maintainer-review` and use `--allow-low-score`. Each new
+   provisional target also needs a complete ledger row. Record the current
+   score, tested forms, measured scores, uncertainty, and a conditional trigger.
 3. `tools/decomp compare` and inspect the target's differences.
 4. `tools/decomp lint` — no new error. This is a gate, not advice.
 5. `tools/decomp check` — only if a map entry or an annotation changed.
@@ -193,7 +201,7 @@ Do not settle a type design by reasoning when a build will decide it for you.
 
 ## 7. Finish the session — once, not per commit
 
-These three steps are per **session**. Running them after every commit spends
+These four steps are per **session**. Running them after every commit spends
 minutes and returns nothing.
 
 1. `tools/decomp sync` — reccmp's headless importer pushes every matched
@@ -202,7 +210,9 @@ minutes and returns nothing.
 2. `tools/decomp report` — writes `build/decomp-report.html` and
    `build/decomp-report-data.json`. The next session's `candidates` reads the
    JSON, so this step is what keeps selection accurate.
-3. `git push origin agent/continuous` (use `-u` on the first push; rebase first
+3. `tools/decomp session-summary <address>...` — report the new target count,
+   exact count, score distribution, and global accuracy change.
+4. `git push origin agent/continuous` (use `-u` on the first push; rebase first
    if the remote has advanced).
 
 ## Gotchas

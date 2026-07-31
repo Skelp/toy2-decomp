@@ -97,6 +97,19 @@ class ReadCapsTests(unittest.TestCase):
                 {0x401000: ("pending", "sub-50")},
             )
 
+    def test_deferral_round_trip_preserves_other_rows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "deferrals.tsv"
+            candidates.write_deferral(0x402000, "unknown dispatch table", path)
+            candidates.write_deferral(0x401000, "unknown structure layout", path)
+            self.assertEqual(
+                candidates.read_deferrals(path),
+                {
+                    0x401000: "unknown structure layout",
+                    0x402000: "unknown dispatch table",
+                },
+            )
+
 
 class ScoreTests(unittest.TestCase):
     def test_a_stub_outranks_an_unannotated_function_of_the_same_size(self):
@@ -149,7 +162,7 @@ class ScoreTests(unittest.TestCase):
         candidates.score(supported)
         self.assertGreater(supported.rank, alone.rank)
 
-    def test_low_scoring_nearby_siblings_lower_the_rank(self):
+    def test_weak_nearby_siblings_lower_the_rank(self):
         supported = make(0x401000, "N::A", size=300, state="STUB", siblings=5)
         weak_model = make(
             0x402000,
@@ -157,7 +170,7 @@ class ScoreTests(unittest.TestCase):
             size=300,
             state="STUB",
             siblings=5,
-            nearby_provisional_scores=(0.22, 0.24, 0.21),
+            nearby_provisional_scores=(0.70, 0.62, 0.51),
         )
         candidates.score(supported)
         candidates.score(weak_model)
@@ -194,6 +207,13 @@ class SelectTests(unittest.TestCase):
             make(
                 0x408000, "N::Debt", size=300, state="FUNCTION", match=1.0, lint_errors=6
             ),
+            make(
+                0x409000,
+                "N::Deferred",
+                size=64,
+                state="NOT_STARTED",
+                deferred_reason="unknown dispatch table",
+            ),
         ]
 
     def choose(self, **kwargs):
@@ -206,6 +226,7 @@ class SelectTests(unittest.TestCase):
             "exclude_capped": True,
             "debt_only": False,
             "new_work_only": False,
+            "include_deferred": False,
         }
         arguments.update(kwargs)
         return [item.name for item in candidates.select(list(self.pool), **arguments)]
@@ -228,7 +249,12 @@ class SelectTests(unittest.TestCase):
         chosen = self.choose(new_work_only=True)
         self.assertNotIn("N::Near", chosen)
         self.assertNotIn("N::Debt", chosen)
+        self.assertNotIn("N::Big", chosen)
         self.assertIn("N::Fresh", chosen)
+
+    def test_deferrals_are_hidden_unless_requested(self):
+        self.assertNotIn("N::Deferred", self.choose())
+        self.assertIn("N::Deferred", self.choose(include_deferred=True))
 
     def test_a_legacy_cap_is_visible_by_default(self):
         self.assertIn("N::Capped", self.choose())

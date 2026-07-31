@@ -131,6 +131,7 @@ list.
 ```sh
 tools/decomp candidates              # ranked targets; no Ghidra, no reccmp run
 tools/decomp candidates Nu3D --stubs --why
+tools/decomp defer 0x00401230 --reason "unknown dispatch table and two unnamed callees"
 tools/decomp audit --legacy-caps --why # review old mismatch claims
 tools/decomp audit --status             # show freeze-audit completion
 tools/decomp audit --refresh-ledger     # refresh scores and preserve audit notes
@@ -151,6 +152,7 @@ tools/decomp progress
 tools/decomp check
 tools/decomp sync
 tools/decomp report
+tools/decomp session-summary 0x00401230 ...
 tools/decomp validate --target 0x00401230 --staged
 ```
 
@@ -253,6 +255,11 @@ prerequisite instead. Also defer very large orchestration functions until you
 understand their leaf operations and types. Do not fill an opaque body with
 guessed fields merely to replace a `STUB`.
 
+Record a supported deferral with `tools/decomp defer <address> --reason
+<text>`. The command writes to the ignored local deferral record under
+`build/`. Candidate lists hide these targets by default. Use
+`--include-deferred` when new evidence can resolve a recorded reason.
+
 Choose the TU by subsystem and ownership, not simply by address proximity. Use
 the namespace and name in `functions_map.txt`, existing declarations, callers,
 and neighboring source. Extend an established TU when it owns the same
@@ -312,6 +319,16 @@ You do **not** need every field type confirmed, every callee resolved, or the
 complete struct layout before you start. Surveying candidates without
 committing to one is the most common way to spend a session and produce
 nothing.
+
+If the preferred new work is not supported, use this fallback order:
+
+1. Select another small, evidence-backed new target.
+2. Fix a supported type, layout, or lint debt item.
+3. Improve a 50 to 90 percent leaf only when evidence identifies a source defect.
+4. Stop with a supported deferral.
+
+Do not select a large orchestration function only because small work is not
+available.
 
 ## Function map and Ghidra project
 
@@ -496,11 +513,16 @@ Stop a related cluster when two siblings remain below 50 percent with the same
 source model. Treat the common low score as evidence against the shared layout,
 macro expansion, or control flow. Resolve that model before another sibling.
 
-Validation rejects a new target below 50 percent by default. Leave the target
+Validation rejects a new target below 75 percent by default. Leave the target
 as a `STUB` unless a maintainer accepts the complete behavior and data model.
+Scores below 50 percent remain exceptional and need the same explicit review.
 For an accepted exception, set the audit-ledger origin to `maintainer-review`.
-Record measured scores, uncertainty, and a conditional revisit trigger. Then
-use `tools/decomp validate --allow-low-score`.
+Record the current score, tested natural forms, measured scores, specific
+uncertainty, and a conditional revisit trigger. Then use `tools/decomp validate
+--allow-low-score`.
+
+Each new provisional target needs a complete audit-ledger row during
+validation. An `initial-audit` row or a general placeholder does not pass.
 
 ## Ghidra sync
 

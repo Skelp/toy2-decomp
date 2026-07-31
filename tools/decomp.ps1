@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("configure", "build", "compare", "score", "candidates", "audit", "baseline", "validate", "experiment", "lint", "report", "progress", "run", "shell", "help")]
+    [ValidateSet("configure", "build", "compare", "score", "candidates", "defer", "audit", "baseline", "validate", "experiment", "lint", "report", "session-summary", "progress", "run", "shell", "help")]
     [string] $Command = "help",
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -128,11 +128,13 @@ Commands:
   compare [args]    Run reccmp against the reference and recompiled EXEs
   score <addr>...   Show exact/effective/tool/provisional verdicts
   candidates [args] Rank reconstruction candidates
+  defer <addr> ...  Record a supported local deferral
   audit [args]      Review audits, show completion, or refresh the ledger
   validate [args]   Build and reject comparison or source-quality regressions
   experiment [args] Store and compare one source-form experiment
   lint [args]       Check reconstructed source plausibility
   report [file]     Generate the self-contained HTML decompilation dashboard
+  session-summary   Summarize selected targets against the saved baseline
   progress [scope]  Show annotation progress, optionally for a namespace
   run [args]        Run the recompiled toy2.exe
   shell             Start cmd.exe with the VC6 environment active
@@ -147,6 +149,26 @@ if ($Command -eq "help") {
 if ($Command -eq "lint") {
     & python (Join-Path $Root "tools\decomp_lint.py") @CommandArgs
     Assert-LastExit "Checking source plausibility"
+    exit 0
+}
+if ($Command -eq "defer") {
+    if ($CommandArgs.Count -lt 3 -or $CommandArgs[1] -ne "--reason") {
+        throw "Usage: tools/decomp.ps1 defer <address> --reason <text>"
+    }
+    $Reason = ($CommandArgs[2..($CommandArgs.Count - 1)] -join " ")
+    & python (Join-Path $Root "tools\decomp_candidates.py") `
+        --record-deferral $CommandArgs[0] --reason $Reason
+    Assert-LastExit "Recording the supported deferral"
+    exit 0
+}
+if ($Command -eq "session-summary") {
+    if ($CommandArgs.Count -eq 0) {
+        throw "Usage: tools/decomp.ps1 session-summary <address> [address...]"
+    }
+    & python (Join-Path $Root "tools\decomp_verify.py") session-summary `
+        (Join-Path $Root "build\decomp-baseline-report.json") `
+        (Join-Path $Root "build\decomp-report-data.json") @CommandArgs
+    Assert-LastExit "Summarizing the session"
     exit 0
 }
 if ($Command -in @("candidates", "audit")) {
@@ -230,6 +252,7 @@ switch ($Command) {
         $VerifyArgs += @("--metadata", (Join-Path $Root "build\decomp-baseline-meta.json"))
         if ($AllowTargetRegression) { $VerifyArgs += "--allow-target-regression" }
         if ($AllowLowScore) { $VerifyArgs += "--allow-low-score" }
+        if ($Staged) { $VerifyArgs += "--require-staged-ledger" }
         & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") @VerifyArgs
         Assert-LastExit "Validating comparison results"
         if ($Staged) {

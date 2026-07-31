@@ -7,6 +7,7 @@ import argparse
 import csv
 import json
 import re
+import statistics
 import subprocess
 import sys
 from hashlib import sha256
@@ -348,6 +349,7 @@ def write_audit_ledger(report: Path, source_root: Path, output: Path) -> None:
                 previous[11] if len(previous) > 11 else "-",
                 audit_state,
                 ",".join(scopes) or "-",
+                previous[14] if len(previous) > 14 else "-",
             )
         )
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -359,6 +361,7 @@ def write_audit_ledger(report: Path, source_root: Path, output: Path) -> None:
                 "origin", "uncertainty", "revisit-trigger", "tested-scores",
                 "before-score", "after-score", "eliminated-source-defect",
                 "audit-state", "freeze-scope",
+                "tested-forms",
             )
         )
         writer.writerows(sorted(rows))
@@ -463,6 +466,7 @@ def low_score_review_problems(
     current: dict,
     artifacts: dict[int, str],
     allow_low_score: bool,
+    new_targets: set[int] | None = None,
 ) -> list[str]:
     records = {}
     if ledger.exists():
@@ -478,13 +482,18 @@ def low_score_review_problems(
         if status is None:
             continue
         tool = address in artifacts and is_symbol_only_diff(status)
-        if status.matching >= 0.5 or status.matching == 1.0 or status.effective or tool:
+        if status.matching >= 0.75 or status.matching == 1.0 or status.effective or tool:
             continue
-        if before is not None and before.matching > 0.0:
+        is_new = (
+            address in new_targets
+            if new_targets is not None
+            else before is None or before.matching == 0.0
+        )
+        if not is_new:
             continue
         if not allow_low_score:
             problems.append(
-                f"0x{address:08X}: target score {status.matching * 100:.2f}% is below 50%. "
+                f"0x{address:08X}: new target score {status.matching * 100:.2f}% is below 75%. "
                 "Keep the function as STUB or get a maintainer review"
             )
             continue
@@ -495,6 +504,7 @@ def low_score_review_problems(
         trigger = row[7].strip() if len(row) > 7 else ""
         tested_scores = row[8].strip() if len(row) > 8 else ""
         audit_state = row[12].strip() if len(row) > 12 else ""
+        tested_forms = row[14].strip() if len(row) > 14 else ""
         if (
             origin != "maintainer-review"
             or audit_state != "audited"
@@ -502,12 +512,168 @@ def low_score_review_problems(
             or len(trigger.split()) < 8
             or not re.search(r"\b(?:if|when)\b", trigger, re.IGNORECASE)
             or tested_scores in ("", "-")
+            or tested_forms in ("", "-")
         ):
             problems.append(
                 f"0x{address:08X}: low-score approval needs an audited ledger row with "
-                "origin maintainer-review, measured scores, uncertainty, and a revisit trigger"
+                "origin maintainer-review, measured scores, tested forms, uncertainty, "
+                "and a revisit trigger"
             )
     return problems
+
+
+def new_provisional_ledger_problems(
+    ledger: Path,
+    targets: set[int],
+    baseline: dict,
+    current: dict,
+    artifacts: dict[int, str],
+    require_staged: bool = False,
+    new_targets: set[int] | None = None,
+) -> list[str]:
+    records = {}
+    staged_error = False
+    if require_staged:
+        try:
+            relative = ledger.resolve().relative_to(ROOT.resolve()).as_posix()
+            staged_diff = subprocess.run(
+                ["git", "diff", "--cached", "--quiet", "--", relative],
+                cwd=ROOT,
+                capture_output=True,
+                check=False,
+            )
+            if staged_diff.returncode != 1:
+                raise ValueError("the audit ledger has no staged change")
+            content = subprocess.run(
+                ["git", "show", f":{relative}"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=True,
+            ).stdout
+            rows = csv.reader(content.splitlines(), delimiter="\t")
+            for row in rows:
+                if row and not row[0].startswith("#"):
+                    records[int(row[0], 16)] = row
+        except (OSError, ValueError, subprocess.CalledProcessError):
+            staged_error = True
+    elif ledger.exists():
+        with ledger.open(encoding="utf-8", newline="") as handle:
+            for row in csv.reader(handle, delimiter="\t"):
+                if row and not row[0].startswith("#"):
+                    records[int(row[0], 16)] = row
+
+    problems = []
+    for address in sorted(targets):
+        before = baseline.get(address)
+        status = current.get(address)
+        is_new = (
+            address in new_targets
+            if new_targets is not None
+            else before is None or before.matching == 0.0
+        )
+        if status is None or not is_new:
+            continue
+        tool = address in artifacts and is_symbol_only_diff(status)
+        if status.matching == 1.0 or status.effective or tool:
+            continue
+        if staged_error:
+            problems.append(
+                f"0x{address:08X}: stage the audit ledger with the new provisional target"
+            )
+            continue
+        row = records.get(address, [])
+        score = row[3].strip() if len(row) > 3 else ""
+        origin = row[5].strip() if len(row) > 5 else ""
+        uncertainty = row[6].strip() if len(row) > 6 else ""
+        trigger = row[7].strip() if len(row) > 7 else ""
+        tested_scores = row[8].strip() if len(row) > 8 else ""
+        audit_state = row[12].strip() if len(row) > 12 else ""
+        tested_forms = row[14].strip() if len(row) > 14 else ""
+        if (
+            score != f"{status.matching * 100:.2f}"
+            or origin in ("", "initial-audit")
+            or audit_state != "audited"
+            or len(uncertainty.split()) < 8
+            or len(trigger.split()) < 8
+            or not re.search(r"\b(?:if|when)\b", trigger, re.IGNORECASE)
+            or tested_scores in ("", "-")
+            or tested_forms in ("", "-")
+        ):
+            problems.append(
+                f"0x{address:08X}: new provisional target needs an audited ledger row "
+                "with its current score, specific uncertainty, tested forms, measured "
+                "scores, and a conditional revisit trigger"
+            )
+    return problems
+
+
+def session_summary(baseline_path: Path, current_path: Path, targets: list[int]) -> int:
+    baseline = read_match_statuses(baseline_path)
+    current = read_match_statuses(current_path)
+    try:
+        baseline_payload = json.loads(baseline_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        baseline_payload = {"data": []}
+    try:
+        current_payload = json.loads(current_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        current_payload = {"data": []}
+    baseline_stubs = {
+        int(str(item["address"]), 16)
+        for item in baseline_payload.get("data", [])
+        if item.get("stub") and item.get("address") is not None
+    }
+    selected = [current[address] for address in targets if address in current]
+    missing = [address for address in targets if address not in current]
+    if missing:
+        for address in missing:
+            print(f"error: 0x{address:08X} is not in the current report", file=sys.stderr)
+        return 1
+    scores = [status.matching * 100 for status in selected]
+    new_count = sum(
+        address not in baseline or address in baseline_stubs for address in targets
+    )
+    exact_count = sum(status.matching == 1.0 for status in selected)
+    before_scores = [
+        1.0 if item.get("effective") else float(item.get("matching", 0.0))
+        for item in baseline_payload.get("data", [])
+        if not item.get("stub") and item.get("matching") is not None
+    ]
+    after_scores = [
+        1.0 if item.get("effective") else float(item.get("matching", 0.0))
+        for item in current_payload.get("data", [])
+        if not item.get("stub") and item.get("matching") is not None
+    ]
+    before_accuracy = statistics.fmean(before_scores) if before_scores else 0.0
+    after_accuracy = statistics.fmean(after_scores) if after_scores else 0.0
+    print(f"Session targets: {len(selected)} ({new_count} new, {exact_count} exact)")
+    if scores:
+        print(
+            f"Target similarity: mean {statistics.fmean(scores):.2f}%, "
+            f"median {statistics.median(scores):.2f}%, minimum {min(scores):.2f}%"
+        )
+    print(
+        f"Global effective accuracy: {before_accuracy * 100:.2f}% -> "
+        f"{after_accuracy * 100:.2f}% ({(after_accuracy - before_accuracy) * 100:+.2f} points)"
+    )
+    return 0
+
+
+def head_function_addresses() -> set[int]:
+    result = subprocess.run(
+        ["git", "grep", "-h", "-E", r"FUNCTION:.*0x[0-9A-Fa-f]{8}", "HEAD", "--", "src"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode not in (0, 1):
+        raise RuntimeError("git could not read the baseline source annotations")
+    return {
+        int(match.group(0), 16)
+        for match in re.finditer(r"0x[0-9A-Fa-f]{8}", result.stdout)
+    }
 
 
 def classify(report: Path, address: int, source_root: Path = ROOT / "src") -> int:
@@ -569,6 +735,7 @@ def validate(
     check_annotation_tags: bool = True,
     audit_ledger: Path = AUDIT_LEDGER,
     allow_low_score: bool = False,
+    require_staged_ledger: bool = False,
 ) -> int:
     baseline = read_match_statuses(baseline_path)
     current = read_match_statuses(current_path)
@@ -577,13 +744,31 @@ def validate(
     if metadata_path is not None:
         problems.extend(validate_metadata(metadata_path, baseline_path))
     source_debt = read_source_debt(source_root)
+    new_targets = targets - head_function_addresses() if require_staged_ledger else None
     if check_annotation_tags:
         problems.extend(check_annotations(current_path, source_root))
     if allow_target_regression:
         problems.extend(readability_audit_problems(audit_ledger, targets, baseline, current))
     problems.extend(
         low_score_review_problems(
-            audit_ledger, targets, baseline, current, artifacts, allow_low_score
+            audit_ledger,
+            targets,
+            baseline,
+            current,
+            artifacts,
+            allow_low_score,
+            new_targets,
+        )
+    )
+    problems.extend(
+        new_provisional_ledger_problems(
+            audit_ledger,
+            targets,
+            baseline,
+            current,
+            artifacts,
+            require_staged_ledger,
+            new_targets,
         )
     )
 
@@ -681,6 +866,7 @@ def main() -> int:
     validate_parser.add_argument("--source-root", type=Path, default=ROOT / "src")
     validate_parser.add_argument("--skip-annotation-check", action="store_true")
     validate_parser.add_argument("--audit-ledger", type=Path, default=AUDIT_LEDGER)
+    validate_parser.add_argument("--require-staged-ledger", action="store_true")
 
     annotations_parser = subparsers.add_parser("annotations")
     annotations_parser.add_argument("report", type=Path)
@@ -702,6 +888,11 @@ def main() -> int:
     audit_status_parser.add_argument("--source-root", type=Path, default=ROOT / "src")
     audit_status_parser.add_argument("--audit-ledger", type=Path, default=AUDIT_LEDGER)
     audit_status_parser.add_argument("--check", action="store_true")
+
+    session_parser = subparsers.add_parser("session-summary")
+    session_parser.add_argument("baseline", type=Path)
+    session_parser.add_argument("current", type=Path)
+    session_parser.add_argument("targets", nargs="+", type=parse_address)
 
     args = parser.parse_args()
     if args.command == "metadata":
@@ -729,6 +920,8 @@ def main() -> int:
         result = audit_status(args.report, args.source_root, args.audit_ledger)
         print(json.dumps(result, indent=2))
         return 1 if args.check and result["pending"] else 0
+    if args.command == "session-summary":
+        return session_summary(args.baseline, args.current, args.targets)
     return validate(
         args.baseline,
         args.current,
@@ -739,6 +932,7 @@ def main() -> int:
         not args.skip_annotation_check,
         args.audit_ledger,
         args.allow_low_score,
+        args.require_staged_ledger,
     )
 
 
