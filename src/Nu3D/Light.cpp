@@ -8,16 +8,19 @@
 
 namespace
 {
-	uint8_t ColorChannelToByte(float channel)
+	inline uint8_t ColorChannelToByte(float channel)
 	{
 		int32_t value = (int32_t)(channel * 255.0f);
 
-		if (value < 0)
-			return 0;
-		if (value > 255)
-			return 255;
+		if (value < 256)
+		{
+			if (value < 0)
+				return 0;
+			if (value <= 255)
+				return (uint8_t)value;
+		}
 
-		return (uint8_t)value;
+		return 255;
 	}
 }
 
@@ -257,27 +260,25 @@ namespace Nu3D
 	{
 		if (light->type != TYPE_AMBIENT)
 		{
-			Direct3DLightDescriptionView& description = light->typedDescription;
-
-			Math::GetPositionVector(&light->transform, &description.dvPosition);
-			Math::GetForwardVector(&light->transform, &description.dvDirection);
-			description.dcvColor.r = light->color.r;
-			description.dcvColor.g = light->color.g;
-			description.dcvColor.b = light->color.b;
-			description.dcvColor.a = light->color.a;
-			description.dvRange = light->range;
-			description.dvTheta = (float)light->theta * 3.14159265358979323846f / 32768.0f;
-			description.dvPhi = (float)light->phi * 3.14159265358979323846f / 32768.0f;
-			description.dwFlags = light->enabled & D3DLIGHT_ACTIVE;
+			Math::GetPositionVector(&light->transform, &light->typedDescription.dvPosition);
+			Math::GetForwardVector(&light->transform, &light->typedDescription.dvDirection);
+			light->typedDescription.dcvColor.r = light->color.r;
+			light->typedDescription.dcvColor.g = light->color.g;
+			light->typedDescription.dcvColor.b = light->color.b;
+			light->typedDescription.dcvColor.a = light->color.a;
+			light->typedDescription.dvRange = light->range;
+			light->typedDescription.dvTheta = (float)light->theta * 3.14159265358979323846f / 32768.0f;
+			light->typedDescription.dvPhi = (float)light->phi * 3.14159265358979323846f / 32768.0f;
+			light->typedDescription.dwFlags = light->enabled & D3DLIGHT_ACTIVE;
 			DrawingDevice::SetLight(light->direct3DLight, &light->direct3DDescription);
 		}
 		else if (light->enabled & D3DLIGHT_ACTIVE)
 		{
 			RGBA ambientColor;
-			ambientColor.b = ColorChannelToByte(light->color.b);
-			ambientColor.g = ColorChannelToByte(light->color.g);
-			ambientColor.r = ColorChannelToByte(light->color.r);
 			ambientColor.a = ColorChannelToByte(light->color.a);
+			ambientColor.r = ColorChannelToByte(light->color.r);
+			ambientColor.g = ColorChannelToByte(light->color.g);
+			ambientColor.b = ColorChannelToByte(light->color.b);
 			DrawingDevice::SetLightState(D3DLIGHTSTATE_AMBIENT, ambientColor.value);
 		}
 	}
