@@ -849,7 +849,7 @@ namespace Nu3D
 		// FUNCTION: TOY2 0x004BBCB0 [MATCHED]
 		void SetEffectMode(int32_t effectMode) { g_effectMode = effectMode; }
 
-		// FUNCTION: TOY2 0x004BC080 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004BC080 [MATCHED]
 		void UnprojectPointsFromCamera(Vector3F* output, const Vector3F* input, int32_t count)
 		{
 			const Vector3F* end = input + count;
@@ -862,10 +862,9 @@ namespace Nu3D
 			{
 				Math::TransformPointByMatrix(output, input++, &g_screenToClipMatrix);
 
-				float depth = (projectionOffset + output->z) / projectionZ;
-				output->z = depth;
-				output->x = depth * output->x / projectionX;
-				output->y = depth * output->y / projectionY;
+				output->z = (projectionOffset + output->z) / projectionZ;
+				output->x = output->z * output->x / projectionX;
+				output->y = output->z * output->y / projectionY;
 
 				Math::TransformPointByMatrix(output, output, &g_activeCamera.transform);
 				++output;
