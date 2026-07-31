@@ -2474,11 +2474,13 @@ namespace Toy2
 			Levels::RecordData* records = Levels::g_recordData[61];
 			if (records == 0 || g_damageRegistered != 0 || (g_actionStateFlags & POLE_CLIMB_BLOCKING_ACTIONS) != 0)
 				return 0;
+			PoleRecord* poles = reinterpret_cast<PoleRecord*>(records->data);
 
+			PoleRecord* pole;
 			int32_t poleBoundaryState = POLE_BOUNDARY_NONE;
 			if (g_poleClimbState == 0)
 			{
-				PoleRecord* pole = reinterpret_cast<PoleRecord*>(records->data);
+				pole = poles;
 				int32_t poleIndex = 0;
 				int32_t poleCount = records->recordCount >> 1;
 
@@ -2508,9 +2510,10 @@ namespace Toy2
 				buzz->posAngles.pos.x -= (buzz->posAngles.pos.x - pole->position.x) >> 2;
 				buzz->posAngles.pos.z -= (buzz->posAngles.pos.z - pole->position.z) >> 2;
 				buzz->velocity.vertical = 0;
+				goto updatePolePosition;
 			}
 
-			PoleRecord* pole = reinterpret_cast<PoleRecord*>(reinterpret_cast<int32_t*>(records->data) + g_poleRecordOffset);
+			pole = reinterpret_cast<PoleRecord*>(reinterpret_cast<int32_t*>(poles) + g_poleRecordOffset);
 			if (g_poleClimbState < 0)
 			{
 				int32_t distanceX = (buzz->posAngles.pos.x - pole->position.x) >> 5;
@@ -2545,6 +2548,8 @@ namespace Toy2
 			if (g_poleClimbState <= 0)
 				return 0;
 
+		updatePolePosition:
+			pole = reinterpret_cast<PoleRecord*>(reinterpret_cast<int32_t*>(poles) + g_poleRecordOffset);
 			buzz->posAngles.pos.x -= (buzz->posAngles.pos.x - pole->position.x) >> 2;
 			buzz->posAngles.pos.z -= (buzz->posAngles.pos.z - pole->position.z) >> 2;
 			buzz->velocity.lateral = 0;
