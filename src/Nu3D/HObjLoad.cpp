@@ -154,7 +154,7 @@ namespace NGNLoader
 		return creature;
 	}
 
-	// FUNCTION: TOY2 0x004CA040 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004CA040 [MATCHED]
 	int32_t ExtractAnimations(FILE* stream, Nu3D::Creature* creature, uint32_t dataSize)
 	{
 		if (! creature->animData)
@@ -165,15 +165,18 @@ namespace NGNLoader
 				return -1;
 		}
 
-		if (creature->animCount >= 100)
-			return -1;
+		if (creature->animCount < 100)
+		{
+			creature->animData[creature->animCount] = (int16_t*)malloc(dataSize);
 
-		creature->animData[creature->animCount] = (int16_t*)malloc(dataSize);
-		if (! creature->animData[creature->animCount])
-			return -1;
+			if (creature->animData[creature->animCount])
+			{
+				fread(creature->animData[creature->animCount], 1, dataSize, stream);
+				return ++creature->animCount;
+			}
+		}
 
-		fread(creature->animData[creature->animCount], dataSize, 1, stream);
-		return ++creature->animCount;
+		return -1;
 	}
 
 	// FUNCTION: TOY2 0x004CA1D0 [PROVISIONAL]
