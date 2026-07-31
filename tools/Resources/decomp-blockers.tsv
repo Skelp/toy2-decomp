@@ -20,10 +20,13 @@
 0x00434990	-	The complete gun-fire update scores 46.18%; three structured forms preserve input, timing, weapon dispatch, effects, sounds, and state but leave the CAP-09 FPO frame and register homes unresolved.
 0x004398B0	-	2176-byte post-game screen loop depends on an undeclared 64-entry particle record, several unresolved globals, and intertwined animation/input/fade state; no reference analogue or reconstructed sibling
 0x0043C750	-	The function cyclically reorders 0x30-byte animation track records, but metadata fields at +0x0A/+0x12/+0x1A/+0x22 and +0x24..+0x2F have no corroborated roles or typed readers; completing it would require guessed layout names
+0x0043D9E0	-	Needs source evidence for the component evaluation order. Five natural forms did not reproduce the retail register schedule.
 0x00445720	-	The complete typed shadow draw path scores 54.43%; six forms preserve the quad data and call but leave stack-slot and assignment scheduling differences.
 0x00447D40	-	Natural cursor initialization and fallback-store ordering preserve the 87.32% result; the remaining differences are pointer-address folding and independent store scheduling, with behavior and data model already established.
+0x0044E710	-	Needs source evidence for the segment pointer anchors and scratch-vector lifetimes; one explicit position-pointer form caused only an unrelated register-allocation change.
 0x0044EB90	-	The complete typed kite-tail draw path remains below 50%; three structural forms leave the CAP-03 register homes and one packed-colour stack slot unresolved.
 0x0044F010	-	The complete precipitation draw path scores 37.84%; four forms preserve the layout and draw call but leave the FPO frame and conversion schedule unresolved.
+0x00450E50	0x00451280	Needs the ProjectQuad caller model to identify the padded point ABI and projection local lifetimes.
 0x00451280	-	Semantics and ABI are recovered, but VC6 eliminates the retail dead transformed-X fields. Direct locals scored 36.05%, address helper 34.76%, volatile outputs 29.98%, Vector4 results 32.41%, and in-place Vector4 results 32.62%. Needs evidence for the original transform idiom before promotion.
 0x00461D20	-	The complete RasterizeTexturedRect555 analogue has the same 626-instruction structure but measures only 24.90%; cloning its 565 constants would create a new sub-threshold target without a resolved shared rasterizer source model
 0x0047B170	-	5776-byte RNC Method 2 decompressor has seven interdependent decode-loop gotos and no reference implementation; current 16.99% body requires an algorithm-level reconstruction, not a local control-flow cleanup
