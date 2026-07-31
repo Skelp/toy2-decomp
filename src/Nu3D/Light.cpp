@@ -284,25 +284,29 @@ namespace Nu3D
 		}
 	}
 
-	// FUNCTION: TOY2 0x004C2FF0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004C2FF0 [MATCHED]
 	int32_t Light::InitPool(int32_t poolSize)
 	{
 		if (g_lightPool)
 			DestroyAllLights();
 
 		g_lightPool = (Light*)malloc(sizeof(Light) * poolSize);
-		if (!g_lightPool)
-			return 0;
-
-		for (int32_t i = 0; i < poolSize; ++i)
+		if (g_lightPool)
 		{
-			g_lightPool[i].previous = i + 1 < poolSize ? &g_lightPool[i + 1] : 0;
-			g_lightPool[i].next = i > 0 ? &g_lightPool[i - 1] : 0;
-		}
+			int32_t i = 1;
+			for (; i < poolSize; ++i)
+			{
+				g_lightPool[i].next = &g_lightPool[i - 1];
+				g_lightPool[i - 1].previous = &g_lightPool[i];
+			}
+			g_lightPool[0].next = 0;
+			g_lightPool[i - 1].previous = 0;
 
-		g_freeLightHead = g_lightPool;
-		g_allocatedLightTail = 0;
-		return 1;
+			g_freeLightHead = g_lightPool;
+			g_allocatedLightTail = 0;
+			return 1;
+		}
+		return 0;
 	}
 
 	// FUNCTION: TOY2 0x004C3090 [MATCHED]
