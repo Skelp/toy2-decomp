@@ -61,10 +61,10 @@ namespace Nu3D
 				maximumDistanceSquared = 640000;
 			}
 
-			int32_t distanceZ = (Toy2::Camera::g_renderCameraTransform.pos.z - z) >> 8;
-			int32_t distanceY = (Toy2::Camera::g_renderCameraTransform.pos.y - y) >> 8;
 			int32_t distanceX = (Toy2::Camera::g_renderCameraTransform.pos.x - x) >> 8;
-			if (distanceZ * distanceZ + distanceY * distanceY + distanceX * distanceX >= maximumDistanceSquared)
+			int32_t distanceY = (Toy2::Camera::g_renderCameraTransform.pos.y - y) >> 8;
+			int32_t distanceZ = (Toy2::Camera::g_renderCameraTransform.pos.z - z) >> 8;
+			if (distanceX * distanceX + distanceY * distanceY + distanceZ * distanceZ >= maximumDistanceSquared)
 			{
 				return &g_rejectedParticleInstance;
 			}
@@ -105,8 +105,8 @@ namespace Nu3D
 			const ParticleType* particleType = &g_particleTypes[typeId - 1];
 			particle->pos.z = z;
 			particle->pos.x = x;
-			particle->pos.y = y;
 			particle->velX = velocityX / 2;
+			particle->pos.y = y;
 			particle->groundHeightY = INT_MIN;
 			particle->velY = velocityY / 2;
 			particle->velZ = velocityZ / 2;
