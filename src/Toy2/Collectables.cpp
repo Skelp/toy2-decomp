@@ -134,12 +134,7 @@ namespace Toy2
 				}
 			}
 
-			if (g_originalPickupRecords == 0)
-			{
-				g_pickupTable.recordType = 0;
-				g_pickupTable.recordCount = 0;
-			}
-			else
+			if (Levels::g_recordData[63] != 0)
 			{
 				PickupRecord* source = reinterpret_cast<PickupRecord*>(Levels::g_recordData[63] + 1);
 				for (int32_t i = 0; i < Levels::g_recordData[63]->recordCount; i++)
@@ -157,6 +152,11 @@ namespace Toy2
 				}
 				g_pickupTable.recordType = g_originalPickupRecords->recordType;
 				g_pickupTable.recordCount = g_originalPickupRecords->recordCount;
+			}
+			else
+			{
+				g_pickupTable.recordType = 0;
+				g_pickupTable.recordCount = 0;
 			}
 
 			Levels::g_recordData[63] = reinterpret_cast<Levels::RecordData*>(&g_pickupTable);
