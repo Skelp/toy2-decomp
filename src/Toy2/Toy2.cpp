@@ -641,10 +641,14 @@ namespace Toy2
 		// FUNCTION: TOY2 0x004334D0 [PROVISIONAL]
 		void ComputeSegment(int32_t pathRecordType, State* object)
 		{
-			Levels::RecordData* path = Levels::g_recordData[pathRecordType];
-			int32_t pathPoint = object->currentPathPoint;
-			int32_t deltaX = path->data[pathPoint + 1].x - path->data[pathPoint].x;
-			int32_t deltaZ = path->data[pathPoint + 1].z - path->data[pathPoint].z;
+			int32_t deltaX;
+			int32_t deltaZ;
+			{
+				Levels::RecordData* path = Levels::g_recordData[pathRecordType];
+				int32_t pathPoint = object->currentPathPoint;
+				deltaX = path->data[pathPoint + 1].x - path->data[pathPoint].x;
+				deltaZ = path->data[pathPoint + 1].z - path->data[pathPoint].z;
+			}
 
 			object->facingAngle = (int16_t)(Nu3D::Math::CartesianToFixedAngle(deltaX, deltaZ) & 0xFFF);
 
@@ -654,15 +658,20 @@ namespace Toy2
 			direction.z = deltaZ;
 			Nu3D::Math::NormalizeToFixedPoint(&direction, &direction);
 
+			int32_t squaredLength = deltaZ * deltaZ + deltaX * deltaX;
 			object->directionX = direction.x;
-			object->segmentLength = (int16_t)sqrt((float)(deltaX * deltaX + deltaZ * deltaZ));
+			object->segmentLength = (int16_t)sqrt((float)squaredLength);
 			object->directionZ = direction.z;
 			object->swingState = 0;
 
-			if (object->targetPathPoint < Levels::g_recordData[object->pathRecordType]->recordCount - 2
-				&& path->data[pathPoint + 1].x == path->data[pathPoint + 2].x && path->data[pathPoint + 1].z == path->data[pathPoint + 2].z)
+			if (object->targetPathPoint < Levels::g_recordData[object->pathRecordType]->recordCount - 2)
 			{
-				object->swingState = object->segmentLength / 2;
+				Levels::RecordData* path = Levels::g_recordData[pathRecordType];
+				int32_t pathPoint = object->currentPathPoint;
+				if (path->data[pathPoint + 1].x == path->data[pathPoint + 2].x && path->data[pathPoint + 1].z == path->data[pathPoint + 2].z)
+				{
+					object->swingState = object->segmentLength / 2;
+				}
 			}
 		}
 
