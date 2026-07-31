@@ -214,6 +214,7 @@ namespace Toy2
 		{
 			Levels::ModelTypeData_B* renderData = instance->unk6;
 			void* modelData = renderData->modelPtr;
+			uint32_t formatValue;
 
 			switch (static_cast<uint16_t>(static_cast<uint8_t>(instance->flags)) & 0xFF6F)
 			{
@@ -222,7 +223,6 @@ namespace Toy2
 				case 0x41:
 				case 0x44: {
 					Levels::ModelTypeData_B* model = static_cast<Levels::ModelTypeData_B*>(modelData);
-					uint32_t formatValue;
 					int32_t polygonCount = CountCommandStreamPolygons(model->modelPtr, &formatValue);
 					formatValue = model->reservedFlags >> 3;
 					if (formatValue > 0x12)
@@ -230,6 +230,21 @@ namespace Toy2
 						formatValue = 0x12;
 					}
 					model->reservedFlags = (formatValue << 3) + (model->reservedFlags & MODEL_PRIMITIVE_FLAGS_MASK);
+					return polygonCount;
+				}
+
+				case 9:
+				case 12:
+				case 0x49:
+				case 0x4C: {
+					Levels::ModelTypeData_A* model = static_cast<Levels::ModelTypeData_A*>(modelData);
+					int32_t polygonCount = CountCommandStreamPolygons(reinterpret_cast<void*>(model->meshPtr), &formatValue);
+					formatValue = model->padding[0] >> 3;
+					if (formatValue > 0x12)
+					{
+						formatValue = 0x12;
+					}
+					model->padding[0] = (formatValue << 3) + (model->padding[0] & MODEL_PRIMITIVE_FLAGS_MASK);
 					return polygonCount;
 				}
 
@@ -254,23 +269,6 @@ namespace Toy2
 							batchCount--;
 						} while (batchCount != 0);
 					}
-					return polygonCount;
-				}
-
-				case 9:
-				case 12:
-				case 0x49:
-				case 0x4C: {
-					Levels::ModelTypeData_A* model = static_cast<Levels::ModelTypeData_A*>(modelData);
-					uint32_t formatValue;
-					void* commandStream = reinterpret_cast<void*>(model->meshPtr);
-					int32_t polygonCount = CountCommandStreamPolygons(commandStream, &formatValue);
-					formatValue = model->padding[0] >> 3;
-					if (formatValue > 0x12)
-					{
-						formatValue = 0x12;
-					}
-					model->padding[0] = (formatValue << 3) + (model->padding[0] & MODEL_PRIMITIVE_FLAGS_MASK);
 					return polygonCount;
 				}
 
