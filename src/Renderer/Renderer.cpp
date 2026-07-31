@@ -1484,12 +1484,12 @@ namespace Renderer
 		return ((uint16_t)(color.g & 0xF8) << 3) + ((uint16_t)(color.b & 0xF8) << 8) + (uint16_t)(color.r >> 3);
 	}
 
-	// FUNCTION: TOY2 0x004B37B0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004B37B0 [MATCHED]
 	RGBA ApplyGammaCorrection(RGBA color)
 	{
-		color.b = g_gammaLUT[color.b];
-		color.g = g_gammaLUT[color.g];
 		color.r = g_gammaLUT[color.r];
+		color.g = g_gammaLUT[color.g];
+		color.b = g_gammaLUT[color.b];
 
 		return color;
 	}
@@ -1509,7 +1509,7 @@ namespace Renderer
 		SoftwareRenderer::g_softwareClearColor = (convertedColor << 16) | convertedColor;
 	}
 
-	// FUNCTION: TOY2 0x004B2D80 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004B2D80 [MATCHED]
 	void ApplyFogSettings()
 	{
 		if (g_fogEnabled)
@@ -1518,8 +1518,8 @@ namespace Renderer
 			DrawingDevice::SetRenderState(D3DRENDERSTATE_FOGCOLOR, g_fogColor & 0xFFFFFF);
 
 			DrawingDevice::SetLightState(D3DLIGHTSTATE_FOGMODE, 3);
-			DrawingDevice::SetLightState(D3DLIGHTSTATE_FOGSTART, g_fogStart);
-			DrawingDevice::SetLightState(D3DLIGHTSTATE_FOGEND, g_fogEnd);
+			DrawingDevice::SetLightState(D3DLIGHTSTATE_FOGSTART, *(DWORD*)&g_fogStart);
+			DrawingDevice::SetLightState(D3DLIGHTSTATE_FOGEND, *(DWORD*)&g_fogEnd);
 		}
 		else
 		{
