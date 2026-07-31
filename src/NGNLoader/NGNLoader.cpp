@@ -252,20 +252,19 @@ namespace NGNLoader
 	// FUNCTION: TOY2 0x004AC240 [MATCHED]
 	Nu3D::BmpDataNode* LoadLocalBmpTexture(const char* rawTexStr, int32_t flags) { return Nu3D::LoadLocalBmpTexture(rawTexStr, flags); }
 
-	// FUNCTION: TOY2 0x004BB3C0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004BB3C0 [MATCHED]
 	uint32_t GetOrAllocateTexture(NGNTextureParams* texParams)
 	{
 		char rawTexStrBuffer[256];
+		NGNTextureCache* textureCache;
 
-		NGNTextureData* cachedTextureData = GetTextureData(texParams, 0);
+		NGNTextureData* textureData = GetTextureData(texParams, 0);
 
-		// If its already cached, return it
-		if (cachedTextureData)
-			return cachedTextureData->textureIndex;
+		if (textureData)
+			goto texture_ready;
 
-		NGNTextureCache* textureCache = AllocateTextureCache();
+		textureCache = AllocateTextureCache();
 
-		// Build a new entry if its new
 		if (textureCache)
 		{
 			memcpy(&textureCache->params, texParams, sizeof(textureCache->params));
@@ -274,33 +273,35 @@ namespace NGNLoader
 
 			strcpy(textureCache->texName, texParams->rawTexStr);
 
-			NGNTextureData* textureData = AllocateTextureData();
+			textureData = AllocateTextureData();
 
 			if (textureData)
 			{
 				textureData->textureFlags = texParams->textureFlags;
-				textureData->color.r = texParams->color.r;
-				textureData->color.g = texParams->color.g;
 				textureData->color.b = texParams->color.b;
+				textureData->color.g = texParams->color.g;
+				textureData->color.r = texParams->color.r;
 
-				uint32_t textureFlags = texParams->textureFlags;
 				strcpy(rawTexStrBuffer, texParams->rawTexStr);
 
 				int32_t flags;
 
-				if ((textureFlags & TEXTURE_FLAG_ALPHA_BITMAP) != 0)
+				if ((texParams->textureFlags & TEXTURE_FLAG_ALPHA_BITMAP) != 0)
 					flags = Nu3D::BMP_TEXTURE_ALPHA_BITMAP;
 				else
-					flags = (textureFlags & TEXTURE_FLAG_COLOR_KEY) != 0 ? Nu3D::BMP_TEXTURE_TRANSPARENT_GREEN : 0;
+					flags = (texParams->textureFlags & TEXTURE_FLAG_COLOR_KEY) != 0 ? Nu3D::BMP_TEXTURE_TRANSPARENT_GREEN : 0;
 
 				textureData->bmpDataNode = LoadLocalBmpTexture(rawTexStrBuffer, flags);
 				textureData->textureCacheIndex = textureCache->textureIndex;
 
-				return textureData->textureIndex;
+				goto texture_ready;
 			}
 		}
 
 		return 0;
+
+	texture_ready:
+		return textureData->textureIndex;
 	}
 
 	// FUNCTION: TOY2 0x004AC220 [MATCHED]
