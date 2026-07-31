@@ -63,42 +63,12 @@ namespace Toy2
 			PrimitiveCommandBytes bytes;
 		};
 
+		enum ModelPrimitiveInfo
+		{
+			MODEL_PRIMITIVE_FLAGS_MASK = 0x7,
+		};
+
 		STATIC_ASSERT(sizeof(PrimitiveCommandWord) == 2);
-
-		struct ModelTypeBPolygonView
-		{
-			int16_t transform[9];
-			uint8_t flags;
-			uint8_t primitiveInfo;
-			void* polygonData;
-		};
-
-		struct ModelTypeAPolygonView
-		{
-			uint8_t reserved[0x18];
-			uint8_t flags;
-			uint8_t primitiveInfo;
-			uint8_t reserved2[2];
-			int32_t polygonData;
-		};
-
-		struct PolyCountInstanceView
-		{
-			Vector3I position;
-			int16_t modelId;
-			int8_t flags;
-			int8_t category;
-			ModelTypeBPolygonView* renderData;
-		};
-
-		STATIC_ASSERT(offsetof(ModelTypeBPolygonView, primitiveInfo) == 0x13);
-		STATIC_ASSERT(offsetof(ModelTypeBPolygonView, polygonData) == 0x14);
-		STATIC_ASSERT(sizeof(ModelTypeAPolygonView) == 0x20);
-		STATIC_ASSERT(offsetof(ModelTypeAPolygonView, primitiveInfo) == 0x19);
-		STATIC_ASSERT(offsetof(ModelTypeAPolygonView, polygonData) == 0x1C);
-		STATIC_ASSERT(sizeof(PolyCountInstanceView) == sizeof(Levels::InstanceSection));
-		STATIC_ASSERT(offsetof(PolyCountInstanceView, flags) == 0x0E);
-		STATIC_ASSERT(offsetof(PolyCountInstanceView, renderData) == 0x10);
 
 		// GLOBAL: TOY2 0x0054DD94
 		uint8_t g_activeZoneVisTable[256];
@@ -240,25 +210,24 @@ namespace Toy2
 		// FUNCTION: TOY2 0x0043E430 [PROVISIONAL]
 		int32_t CalculatePolyCount(Levels::InstanceSection* instance)
 		{
-			PolyCountInstanceView* instanceView = reinterpret_cast<PolyCountInstanceView*>(instance);
-			ModelTypeBPolygonView* renderData = instanceView->renderData;
-			void* modelData = renderData->polygonData;
+			Levels::ModelTypeData_B* renderData = instance->unk6;
+			void* modelData = renderData->modelPtr;
 
-			switch (static_cast<uint16_t>(static_cast<uint8_t>(instanceView->flags)) & 0xFF6F)
+			switch (static_cast<uint16_t>(static_cast<uint8_t>(instance->flags)) & 0xFF6F)
 			{
 				case 1:
 				case 4:
 				case 0x41:
 				case 0x44: {
-					ModelTypeBPolygonView* model = static_cast<ModelTypeBPolygonView*>(modelData);
+					Levels::ModelTypeData_B* model = static_cast<Levels::ModelTypeData_B*>(modelData);
 					uint32_t formatValue;
-					int32_t polygonCount = CountCommandStreamPolygons(model->polygonData, &formatValue);
-					formatValue = model->primitiveInfo >> 3;
+					int32_t polygonCount = CountCommandStreamPolygons(model->modelPtr, &formatValue);
+					formatValue = model->reservedFlags >> 3;
 					if (formatValue > 0x12)
 					{
 						formatValue = 0x12;
 					}
-					model->primitiveInfo = (formatValue << 3) + (model->primitiveInfo & 7);
+					model->reservedFlags = (formatValue << 3) + (model->reservedFlags & MODEL_PRIMITIVE_FLAGS_MASK);
 					return polygonCount;
 				}
 
@@ -266,7 +235,7 @@ namespace Toy2
 				case 3:
 				case 0x42:
 				case 0x43: {
-					int32_t* polygonData = static_cast<int32_t*>(static_cast<ModelTypeBPolygonView*>(modelData)->polygonData);
+					int32_t* polygonData = static_cast<int32_t*>(static_cast<Levels::ModelTypeData_B*>(modelData)->modelPtr);
 					int32_t polygonCount = 0;
 					int32_t batchCount = *polygonData;
 					int32_t* batch = polygonData + batchCount * 3 + 1;
@@ -290,16 +259,16 @@ namespace Toy2
 				case 12:
 				case 0x49:
 				case 0x4C: {
-					ModelTypeAPolygonView* model = static_cast<ModelTypeAPolygonView*>(modelData);
+					Levels::ModelTypeData_A* model = static_cast<Levels::ModelTypeData_A*>(modelData);
 					uint32_t formatValue;
-					void* commandStream = reinterpret_cast<void*>(model->polygonData);
+					void* commandStream = reinterpret_cast<void*>(model->meshPtr);
 					int32_t polygonCount = CountCommandStreamPolygons(commandStream, &formatValue);
-					formatValue = model->primitiveInfo >> 3;
+					formatValue = model->padding[0] >> 3;
 					if (formatValue > 0x12)
 					{
 						formatValue = 0x12;
 					}
-					model->primitiveInfo = (formatValue << 3) + (model->primitiveInfo & 7);
+					model->padding[0] = (formatValue << 3) + (model->padding[0] & MODEL_PRIMITIVE_FLAGS_MASK);
 					return polygonCount;
 				}
 
@@ -307,7 +276,7 @@ namespace Toy2
 				case 11:
 				case 0x4A:
 				case 0x4B: {
-					int32_t* polygonData = reinterpret_cast<int32_t*>(static_cast<ModelTypeAPolygonView*>(modelData)->polygonData);
+					int32_t* polygonData = reinterpret_cast<int32_t*>(static_cast<Levels::ModelTypeData_A*>(modelData)->meshPtr);
 					int32_t polygonCount = 0;
 					int32_t batchCount = *polygonData;
 					int32_t* batch = polygonData + batchCount * 3 + 1;
