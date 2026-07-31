@@ -407,7 +407,7 @@ namespace Toy2
 			Nu3D::Link::SetScaleFromFixedOffsets(0x2F, 0, 0, 0);
 		}
 
-		// FUNCTION: TOY2 0x00402030 [PROVISIONAL]
+		// FUNCTION: TOY2 0x00402030 [MATCHED]
 		void InitCutsceneCamera(const Vector3I* focusPosition, const Vector3I* cameraPosition)
 		{
 			g_cutsceneCamera.position.view.pos.x = cameraPosition->x;
@@ -417,17 +417,23 @@ namespace Toy2
 			g_cutsceneCamera.position.view.lookAt.y = focusPosition->y;
 			g_cutsceneCamera.position.view.lookAt.z = focusPosition->z;
 
+			g_cutsceneCamera.target.x = g_cutsceneCamera.position.view.pos.x;
+			g_cutsceneCamera.target.y = g_cutsceneCamera.position.view.pos.y;
+			g_cutsceneCamera.target.view.z = g_cutsceneCamera.position.view.pos.z;
+
 			int32_t deltaX = (g_cutsceneCamera.position.view.lookAt.x - g_cutsceneCamera.position.view.pos.x) >> 5;
 			int32_t deltaY = (g_cutsceneCamera.position.view.lookAt.y - g_cutsceneCamera.position.view.pos.y) >> 5;
 			int32_t deltaZ = (g_cutsceneCamera.position.view.lookAt.z - g_cutsceneCamera.position.view.pos.z) >> 5;
 
-			g_cutsceneCamera.target.x = g_cutsceneCamera.position.view.pos.x;
-			g_cutsceneCamera.target.y = g_cutsceneCamera.position.view.pos.y;
-			g_cutsceneCamera.target.view.z = g_cutsceneCamera.position.view.pos.z;
 			g_cutsceneCamera.angles.yaw = (uint16_t)Nu3D::Math::CartesianToFixedAngle(deltaX, deltaZ);
-			int32_t horizontalDistanceSq = deltaZ * deltaZ + deltaX * deltaX;
-			int32_t heightSq = deltaY < 0 ? deltaY * deltaY : -(deltaY * deltaY);
-			g_cutsceneCamera.angles.pitch = (uint16_t)-Nu3D::Math::CartesianToFixedAngle(heightSq, horizontalDistanceSq);
+			if (deltaY < 0)
+			{
+				g_cutsceneCamera.angles.pitch = (uint16_t)-Nu3D::Math::CartesianToFixedAngle(deltaY * deltaY, deltaZ * deltaZ + deltaX * deltaX);
+			}
+			else
+			{
+				g_cutsceneCamera.angles.pitch = (uint16_t)-Nu3D::Math::CartesianToFixedAngle(-(deltaY * deltaY), deltaZ * deltaZ + deltaX * deltaX);
+			}
 			g_cutsceneCamera.roll = 0;
 		}
 
