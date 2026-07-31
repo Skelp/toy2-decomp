@@ -1129,7 +1129,7 @@ namespace AudioManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x0049E910 [PROVISIONAL]
+	// FUNCTION: TOY2 0x0049E910 [MATCHED]
 	void StartSoundSequenceOnActor(int32_t sequenceId, Vector3I* position)
 	{
 		SoundSequenceSlot& slot = g_soundSequenceSlots[7];
@@ -1138,8 +1138,9 @@ namespace AudioManager
 		slot.position.z = position->z;
 		slot.timer = 0;
 
-		SequenceHeader* header = (SequenceHeader*)g_sequenceDataPtrs[-sequenceId - 1];
-		slot.cursor = (uint8_t*)(header + 1);
+		slot.cursor = (uint8_t*)g_sequenceDataPtrs[-sequenceId - 1];
+		SequenceHeader* header = (SequenceHeader*)slot.cursor;
+		slot.cursor += sizeof(SequenceHeader);
 
 		if (header->leftVolume != 0 || header->rightVolume != 0)
 		{
