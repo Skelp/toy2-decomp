@@ -1166,7 +1166,7 @@
 0x004CE050 Nu3D::Camera::ApplyTransformToCamera
 0x004CE2C0 NGNLoader::GetTextureDataIndex
 0x004CE340 Renderer::Glue::ReleaseBackdrop
-0x004CE380 Glue::SetBackdrop
+0x004CE380 Renderer::Glue::SetBackdrop
 0x004CE4D0 Glue::BackdropBltFast
 0x004CE510 Renderer::BlitTextureByIndex
 0x004CE570 Nu3D::Creature::SetNodeVisibleByIndex

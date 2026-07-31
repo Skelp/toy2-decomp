@@ -45,26 +45,24 @@ namespace Renderer
 		}
 
 		// FUNCTION: TOY2 0x004CE380 [PROVISIONAL]
-		HBITMAP SetBackdrop(int32_t textureIndex)
+		int32_t SetBackdrop(int32_t textureIndex)
 		{
 			int32_t texIndex = NGNLoader::GetTextureDataIndex(textureIndex);
 
-			if (g_sysMemBackdrop && texIndex == g_selectedTex)
-				return (HBITMAP)1;
-
-			ReleaseBackdrop();
-			g_selectedTex = texIndex;
-
-			if (Renderer::GetIsSoftwareRendering())
-				return 0;
-
-			HBITMAP bmpHandle = NGNLoader::GetBmpHandle(texIndex);
-
-			if (bmpHandle)
+			if (! g_sysMemBackdrop || texIndex != g_selectedTex)
 			{
+				ReleaseBackdrop();
+				g_selectedTex = texIndex;
+
+				if (Renderer::GetIsSoftwareRendering())
+					return 0;
+
+				if (! NGNLoader::GetBmpHandle(texIndex))
+					return 0;
+
 				LPDIRECTDRAWSURFACE4 backBuffer = DrawingDevice::GetBackBuffer();
 
-                DDSURFACEDESC2 surfaceDesc;
+				DDSURFACEDESC2 surfaceDesc;
 				surfaceDesc.dwSize = sizeof(DDSURFACEDESC2);
 
 				backBuffer->GetSurfaceDesc(&surfaceDesc);
@@ -76,15 +74,13 @@ namespace Renderer
 
 				Logger::DebugLog("glueSetBackdrop()\r\n");
 
-				LPDIRECTDRAW4 ddraw4 = DrawingDevice::GetDDraw4();
-
-				if (ddraw4->CreateSurface(&surfaceDesc, &g_sysMemBackdrop, 0))
+				if (DrawingDevice::GetDDraw4()->CreateSurface(&surfaceDesc, &g_sysMemBackdrop, 0))
 				{
 					Logger::DebugLog("Failed to create video memory backdrop\r\n");
 
 					surfaceDesc.ddsCaps.dwCaps = 2112;
 
-					if (ddraw4->CreateSurface(&surfaceDesc, &g_sysMemBackdrop, 0))
+					if (DrawingDevice::GetDDraw4()->CreateSurface(&surfaceDesc, &g_sysMemBackdrop, 0))
 					{
 						Logger::DebugLog("Failed to create system memory backdrop\r\n");
 						return 0;
@@ -97,11 +93,9 @@ namespace Renderer
 					g_sysMemBackdrop = 0;
 					return 0;
 				}
-
-				return (HBITMAP)1;
 			}
 
-			return bmpHandle;
+			return 1;
 		}
 	}
 }

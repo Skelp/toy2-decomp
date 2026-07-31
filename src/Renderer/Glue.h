@@ -8,7 +8,7 @@ namespace Renderer
 	namespace Glue
 	{
 		int32_t BackdropBltFast();
-		HBITMAP SetBackdrop(int32_t textureIndex);
+		int32_t SetBackdrop(int32_t textureIndex);
 		void ReleaseBackdrop();
 	}
 }
