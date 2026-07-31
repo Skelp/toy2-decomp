@@ -2668,6 +2668,7 @@ namespace Toy2
 		{
 			if (Levels::g_recordData[62] == 0 || g_damageRegistered != 0)
 				return 0;
+			ZiplineRecord* zipline = reinterpret_cast<ZiplineRecord*>(Levels::g_recordData[62]->data);
 
 			if (g_ziplineCooldown > 0)
 			{
@@ -2676,86 +2677,91 @@ namespace Toy2
 					g_ziplineCooldown = 0;
 			}
 
-			if ((g_actionStateFlags & LEDGE_CLIMB_BLOCKING_ACTIONS) == 0 && g_ziplineCooldown == 0 && (Levels::g_recordData[62]->recordCount & 0xFFFE) != 0)
+			if ((g_actionStateFlags & LEDGE_CLIMB_BLOCKING_ACTIONS) == 0 && g_ziplineCooldown == 0)
 			{
-				ZiplineRecord* zipline = reinterpret_cast<ZiplineRecord*>(Levels::g_recordData[62]->data);
-				for (int32_t ziplineIndex = 0; ziplineIndex < Levels::g_recordData[62]->recordCount / 2; ziplineIndex++, zipline++)
+				int32_t ziplineIndex = 0;
+				if (ziplineIndex < Levels::g_recordData[62]->recordCount / 2)
 				{
-					int32_t directionX = zipline->end.x - zipline->start.x;
-					int32_t buzzX = buzz->posAngles.pos.x;
-					if (directionX < 0)
+					do
 					{
-						if ((uint32_t)(buzzX - zipline->end.x + 0x800) > (uint32_t)(0x1000 - directionX))
+						int32_t startX = zipline->start.x;
+						int32_t directionX = zipline->end.x - startX;
+						int32_t buzzX = buzz->posAngles.pos.x;
+						if (directionX < 0)
+						{
+							if ((uint32_t)(buzzX - zipline->end.x + 0x800) > (uint32_t)(0x1000 - directionX))
+								continue;
+						}
+						else if ((uint32_t)(buzzX - startX + 0x800) > (uint32_t)(directionX + 0x1000))
+						{
 							continue;
-					}
-					else if ((uint32_t)(buzzX - zipline->start.x + 0x800) > (uint32_t)(directionX + 0x1000))
-					{
-						continue;
-					}
+						}
 
-					int32_t directionZ = zipline->end.z - zipline->start.z;
-					int32_t buzzZ = buzz->posAngles.pos.z;
-					if (directionZ < 0)
-					{
-						if ((uint32_t)(buzzZ - zipline->end.z + 0x800) > (uint32_t)(0x1000 - directionZ))
+						int32_t startZ = zipline->start.z;
+						int32_t directionZ = zipline->end.z - startZ;
+						int32_t buzzZ = buzz->posAngles.pos.z;
+						if (directionZ < 0)
+						{
+							if ((uint32_t)(buzzZ - zipline->end.z + 0x800) > (uint32_t)(0x1000 - directionZ))
+								continue;
+						}
+						else if ((uint32_t)(buzzZ - startZ + 0x800) > (uint32_t)(directionZ + 0x1000))
+						{
 							continue;
-					}
-					else if ((uint32_t)(buzzZ - zipline->start.z + 0x800) > (uint32_t)(directionZ + 0x1000))
-					{
-						continue;
-					}
+						}
 
-					int32_t directionY = zipline->end.y - zipline->start.y;
-					if (directionY < 0)
-					{
-						if ((uint32_t)(buzz->posAngles.pos.y - zipline->end.y + 0x1000) > (uint32_t)(0x4E00 - directionY))
+						int32_t directionY = zipline->end.y - zipline->start.y;
+						if (directionY < 0)
+						{
+							if ((uint32_t)(buzz->posAngles.pos.y - zipline->end.y + 0x1000) > (uint32_t)(0x4E00 - directionY))
+								continue;
+						}
+						else if ((uint32_t)(buzz->posAngles.pos.y - zipline->start.y + 0x1000) > (uint32_t)(directionY + 0x4E00))
+						{
 							continue;
-					}
-					else if ((uint32_t)(buzz->posAngles.pos.y - zipline->start.y + 0x1000) > (uint32_t)(directionY + 0x4E00))
-					{
-						continue;
-					}
+						}
 
-					directionX >>= 5;
-					directionY >>= 5;
-					directionZ >>= 5;
-					int32_t offsetX = (buzzX - zipline->start.x) >> 5;
-					int32_t offsetZ = (buzzZ - zipline->start.z) >> 5;
-					int32_t dominantOffset;
-					int32_t dominantDirection;
-					if (abs(offsetX) < abs(offsetZ))
-					{
-						dominantOffset = offsetZ;
-						dominantDirection = directionZ;
-					}
-					else
-					{
-						dominantOffset = offsetX;
-						dominantDirection = directionX;
-					}
+						directionX >>= 5;
+						directionY >>= 5;
+						directionZ >>= 5;
+						int32_t offsetX = (buzzX - startX) >> 5;
+						int32_t offsetZ = (buzzZ - startZ) >> 5;
+						int32_t dominantOffset;
+						int32_t dominantDirection;
+						if (abs(offsetX) < abs(offsetZ))
+						{
+							dominantOffset = offsetZ;
+							dominantDirection = directionZ;
+						}
+						else
+						{
+							dominantOffset = offsetX;
+							dominantDirection = directionX;
+						}
 
-					int32_t verticalOffset = dominantOffset * directionY / dominantDirection;
-					int32_t projectedX = ((zipline->start.x - buzzX) >> 5) + dominantOffset * directionX / dominantDirection;
-					int32_t projectedZ = ((zipline->start.z - buzzZ) >> 5) + dominantOffset * directionZ / dominantDirection;
-					if (projectedX * projectedX + projectedZ * projectedZ >= 0x2000)
-						continue;
+						int32_t verticalOffset = dominantOffset * directionY / dominantDirection;
+						int32_t projectedX = ((startX - buzzX) >> 5) + dominantOffset * directionX / dominantDirection;
+						int32_t projectedZ = ((startZ - buzzZ) >> 5) + dominantOffset * directionZ / dominantDirection;
+						if (projectedX * projectedX + projectedZ * projectedZ >= 0x2000)
+							continue;
 
-					int32_t heightDelta = (verticalOffset + 0x1F0) * 0x20 - buzz->posAngles.pos.y + zipline->start.y;
-					if (heightDelta <= -0x1000 || heightDelta >= 0x3E00)
-						continue;
+						int32_t heightDelta = (verticalOffset + 0x1F0) * 0x20 - buzz->posAngles.pos.y + zipline->start.y;
+						if (heightDelta <= -0x1000 || heightDelta >= 0x3E00)
+							continue;
 
-					g_ziplineState = ZIPLINE_APPROACHING;
-					g_ziplineRecordIndex = ziplineIndex * 2;
-					g_ziplineTargetYOrSpeed = verticalOffset * 0x20 + zipline->start.y;
-					g_ziplineDirection.x = directionX;
-					g_ziplineDirection.y = directionY;
-					g_ziplineDirection.z = directionZ;
-					Nu3D::Math::NormalizeToFixedPoint(&g_ziplineDirection, &g_ziplineDirection);
-					g_ziplineEndProgress = (int32_t)sqrt((double)(directionX * directionX + directionY * directionY + directionZ * directionZ));
-					g_ziplineProgress = (int32_t)sqrt((double)(projectedX * projectedX + verticalOffset * verticalOffset + projectedZ * projectedZ));
-					if (g_ziplineEndProgress - g_ziplineProgress >= 200)
-						break;
-					g_ziplineState = 0;
+						g_ziplineState = ZIPLINE_APPROACHING;
+						g_ziplineRecordIndex = ziplineIndex * 2;
+						g_ziplineTargetYOrSpeed = verticalOffset * 0x20 + zipline->start.y;
+						g_ziplineDirection.x = directionX;
+						g_ziplineDirection.y = directionY;
+						g_ziplineDirection.z = directionZ;
+						Nu3D::Math::NormalizeToFixedPoint(&g_ziplineDirection, &g_ziplineDirection);
+						g_ziplineEndProgress = (int32_t)sqrt((double)(directionX * directionX + directionY * directionY + directionZ * directionZ));
+						g_ziplineProgress = (int32_t)sqrt((double)(projectedX * projectedX + verticalOffset * verticalOffset + projectedZ * projectedZ));
+						if (g_ziplineEndProgress - g_ziplineProgress >= 200)
+							break;
+						g_ziplineState = 0;
+					} while (++zipline, ++ziplineIndex < Levels::g_recordData[62]->recordCount / 2);
 				}
 			}
 
@@ -2778,7 +2784,7 @@ namespace Toy2
 				return 0;
 
 			AudioManager::PlaySoundEffect(0x23, &buzz->posAngles.pos);
-			ZiplineRecord* zipline = reinterpret_cast<ZiplineRecord*>(&Levels::g_recordData[62]->data[g_ziplineRecordIndex]);
+			zipline = reinterpret_cast<ZiplineRecord*>(&Levels::g_recordData[62]->data[g_ziplineRecordIndex]);
 			g_ziplineTargetYOrSpeed += Renderer::g_frameDelta;
 			if (g_ziplineTargetYOrSpeed > 0x30)
 				g_ziplineTargetYOrSpeed = 0x30;
@@ -2808,9 +2814,8 @@ namespace Toy2
 
 			g_ziplineState = 0;
 			g_ziplineCooldown = 30;
-			int32_t yaw = buzz->posAngles.angles.yaw;
-			buzz->velocity.lateral = (Numerics::g_sinCosLUT[yaw & 0xFFF] >> 5) * g_ziplineTargetYOrSpeed;
-			buzz->velocity.forward = (Numerics::g_sinCosLUT[(yaw + 0x400) & 0xFFF] >> 5) * g_ziplineTargetYOrSpeed;
+			buzz->velocity.lateral = (Numerics::g_sinCosLUT[buzz->posAngles.angles.yaw & 0xFFF] >> 5) * g_ziplineTargetYOrSpeed;
+			buzz->velocity.forward = (Numerics::g_sinCosLUT[(buzz->posAngles.angles.yaw + 0x400) & 0xFFF] >> 5) * g_ziplineTargetYOrSpeed;
 			buzz->velocity.vertical = -0x5C0;
 			buzz->airborneMode = 1;
 			g_jumpHeightControlActive = 0;
