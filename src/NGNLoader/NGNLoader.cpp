@@ -819,7 +819,7 @@ namespace NGNLoader
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x004B9630 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004B9630 [MATCHED]
 	void BuildTex14(int32_t unused)
 	{
 		RGBColor color;

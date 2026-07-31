@@ -256,19 +256,14 @@ namespace Nu3D
 		LPDIRECT3DDEVICE3 device = DrawingDevice::g_drawingDevice->m_pd3dDevice;
 		return direct3DMaterial3->GetHandle(device, d3dMaterialHandle);
 	}
-	// FUNCTION: TOY2 0x004C26D0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004C26D0 [MATCHED]
 	void Material::AttachTexture(Material* material, uint32_t texDataIndex)
 	{
 		NGNLoader::NGNTextureData* textureData = NGNLoader::GetTextureDataByIndex(texDataIndex);
 
-		int32_t metadata = material->metadata;
-
 		material->texDataIndex = texDataIndex;
-
-		int32_t flag = (4 * (textureData->isTex14 & 1)) | metadata;
-
-		material->metadata = flag;
-		material->metadata = flag | ((textureData->isTex14 & 2) != 0 ? 3 : 0);
+		material->metadata |= (textureData->isTex14 & 1) << 2;
+		material->metadata |= (textureData->isTex14 & 2) != 0 ? 3 : 0;
 
 		Unlink(material);
 		InsertSorted(material);
@@ -375,9 +370,11 @@ namespace Nu3D
 	}
 
 	// FUNCTION: TOY2 0x004C2630 [PROVISIONAL]
-	void Material::SetOpacity(Material* material, float alpha)
+	float Material::SetOpacity(Material* material, float alpha)
 	{
-		if (material->opacity != alpha)
+		float previousOpacity = material->opacity;
+
+		if (previousOpacity != alpha)
 		{
 			LPDIRECT3DMATERIAL3 direct3DMat3 = material->direct3DMat3;
 
@@ -390,19 +387,18 @@ namespace Nu3D
 
 			SetMaterial(direct3DMat3, &material->d3dMaterial);
 
-			int32_t metadata = material->metadata;
-
-			if (material->opacity != 1.0f || (metadata & 2) != 0)
+			if (material->opacity != 1.0f || (material->metadata & 2) != 0)
 			{
-				metadata |= 1;
+				material->metadata |= 1;
 			}
 			else
 			{
-				metadata &= ~1;
+				material->metadata &= ~1;
 			}
 
-			material->metadata = metadata;
 			material->metadata |= material->originalMetadata;
 		}
+
+		return previousOpacity;
 	}
 }

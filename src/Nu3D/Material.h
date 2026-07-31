@@ -56,7 +56,7 @@ namespace Nu3D
 		static void AttachTexture(Material* material, uint32_t texDataIndex);
 		static Material* CreateFromColor(RGBColor* rgbColor);
 		static Material* CreateFromFile(MaterialFile* materialFile);
-		static void SetOpacity(Material* material, float alpha);
+		static float SetOpacity(Material* material, float alpha);
 	};
 
 	STATIC_ASSERT(sizeof(Material) == 0x84);
