@@ -1127,7 +1127,7 @@
 0x004CB300 NGNLoader::GetScaleVector
 0x004CB320 NGNLoader::ExtractShapeTextures
 0x004CB4E0 NGNLoader::ExtractShapeMaterials
-0x004CB940 ObjectLoad::GetCurrentMatByIndex
+0x004CB940 NGNLoader::ObjectLoad::GetCurrentMatByIndex
 0x004CB970 NGNLoader::ExtractShapeVertices
 0x004CBC40 Nu3D::CopyShapeVertex
 0x004CBC90 NGNLoader::ExtractShapePrimitives

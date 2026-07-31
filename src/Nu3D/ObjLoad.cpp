@@ -917,8 +917,8 @@ namespace NGNLoader
 			return result;
 		}
 
-		// FUNCTION: TOY2 0x004CB940 [PROVISIONAL]
-		Nu3D::Material* GetCurrentMatByIndex(uint32_t index)
+		// FUNCTION: TOY2 0x004CB940 [MATCHED]
+		Nu3D::Material* GetCurrentMatByIndex(int32_t index)
 		{
 			if (index >= g_curMaterialCount || index < 0)
 				return 0;
@@ -930,10 +930,10 @@ namespace NGNLoader
 
 namespace Nu3D
 {
-	// FUNCTION: TOY2 0x004CBC40 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004CBC40 [MATCHED]
 	int32_t CopyShapeVertex(int32_t index, Vertex* output)
 	{
-		if (index < 0 || index >= NGNLoader::ObjectLoad::g_curVertexCount || ! output)
+		if (index >= NGNLoader::ObjectLoad::g_curVertexCount || index < 0 || ! output)
 			return 0;
 
 		memcpy(output, &NGNLoader::ObjectLoad::g_shapeVertices[index], sizeof(Vertex));
