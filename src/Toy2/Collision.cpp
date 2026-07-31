@@ -153,21 +153,19 @@ namespace Toy2
 
 						if (descriptor->isClone == 1)
 						{
-							int32_t sourceMeshIndex = sourceMeshIndices[descriptor->sourceMeshId];
-							if (sourceMeshIndex < 0)
-							{
-								mesh->typeFlags = 0;
-							}
-							else
+							int16_t sourceMeshIndex = sourceMeshIndices[descriptor->sourceMeshId];
+							if (sourceMeshIndex >= 0)
 							{
 								*mesh = Collision::g_collisionMeshInstances[sourceMeshIndex];
-								mesh->origin.x = descriptor->origin.x;
-								mesh->origin.y = descriptor->origin.y;
-								mesh->origin.z = descriptor->origin.z;
+								mesh->origin = descriptor->origin;
 								mesh->platformIdx = descriptor->typeOrRelocationIndex;
 								mesh->origin.x <<= 5;
 								mesh->origin.y <<= 5;
 								mesh->origin.z <<= 5;
+							}
+							else
+							{
+								mesh->typeFlags = 0;
 							}
 						}
 						else
@@ -181,11 +179,10 @@ namespace Toy2
 
 							if (descriptor->platformId != 0)
 							{
-								Platform::PlatformState& platform = Platform::g_platformStates[descriptor->platformId - 1];
-								platform.collisionMeshIndex = static_cast<int16_t>(baseMeshIndex);
-								platform.origin.x = mesh->origin.x;
-								platform.origin.y = mesh->origin.y;
-								platform.origin.z = mesh->origin.z;
+								Platform::g_platformStates[descriptor->platformId - 1].collisionMeshIndex = static_cast<int16_t>(baseMeshIndex);
+								Platform::g_platformStates[descriptor->platformId - 1].origin.x = mesh->origin.x;
+								Platform::g_platformStates[descriptor->platformId - 1].origin.y = mesh->origin.y;
+								Platform::g_platformStates[descriptor->platformId - 1].origin.z = mesh->origin.z;
 								mesh->platformIdx = descriptor->platformId - 1;
 							}
 
