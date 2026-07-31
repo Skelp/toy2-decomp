@@ -24,17 +24,21 @@ namespace Nu3D
 			result->z = transformedZ;
 		}
 
-		// FUNCTION: TOY2 0x004A8C60 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004A8C60 [MATCHED]
 		void ProjectPoint(Vector3F* result, const Vector3F* sourceVector, const D3DMATRIX* matrix)
 		{
-			float inverseW = 1.0f / (matrix->_34 * sourceVector->z + matrix->_14 * sourceVector->x + matrix->_24 * sourceVector->y + matrix->_44);
-			float transformedY = matrix->_32 * sourceVector->z + matrix->_12 * sourceVector->x + matrix->_22 * sourceVector->y + matrix->_42;
-			float transformedZ = matrix->_33 * sourceVector->z + matrix->_13 * sourceVector->x + matrix->_23 * sourceVector->y + matrix->_43;
+			float transformedW = matrix->_34 * sourceVector->z;
+			transformedW += matrix->_24 * sourceVector->y;
+			transformedW += matrix->_14 * sourceVector->x;
+			transformedW += matrix->_44;
+			float inverseW = 1.0f / transformedW;
+			float transformedY = (matrix->_32 * sourceVector->z + matrix->_22 * sourceVector->y + matrix->_12 * sourceVector->x + matrix->_42) * inverseW;
+			float transformedZ = (matrix->_33 * sourceVector->z + matrix->_23 * sourceVector->y + matrix->_13 * sourceVector->x + matrix->_43) * inverseW;
 			float transformedX = matrix->_31 * sourceVector->z + matrix->_21 * sourceVector->y;
 
 			result->x = (transformedX + sourceVector->x * matrix->_11 + matrix->_41) * inverseW;
-			result->y = transformedY * inverseW;
-			result->z = transformedZ * inverseW;
+			result->y = transformedY;
+			result->z = transformedZ;
 		}
 
 		// FUNCTION: TOY2 0x004A8D80 [PROVISIONAL]
