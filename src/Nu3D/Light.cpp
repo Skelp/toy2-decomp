@@ -374,14 +374,19 @@ namespace Nu3D
 		g_directionalLight = BuildDirectional(&transform, &color, 1);
 	}
 
-	// FUNCTION: TOY2 0x004CEA50 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004CEA50 [MATCHED]
 	void Light::Cleanup()
 	{
-		Destroy(g_defaultDirectionalLight1);
-		Destroy(g_defaultDirectionalLight2);
-		Destroy(g_defaultDirectionalLight3);
-		Destroy(g_directionalLight);
-		Destroy(g_ambientLight);
+		if (g_defaultDirectionalLight1)
+			Destroy(g_defaultDirectionalLight1);
+		if (g_defaultDirectionalLight2)
+			Destroy(g_defaultDirectionalLight2);
+		if (g_defaultDirectionalLight3)
+			Destroy(g_defaultDirectionalLight3);
+		if (g_directionalLight)
+			Destroy(g_directionalLight);
+		if (g_ambientLight)
+			Destroy(g_ambientLight);
 		DestroyAllLights();
 
 		g_ambientLight = 0;
