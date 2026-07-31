@@ -1902,7 +1902,7 @@ namespace Toy2
 	int32_t g_unused2;
 
 	// GLOBAL: TOY2 0x0072EFD8
-	int32_t g_pastInitialBoot;
+	int16_t g_pastInitialBoot;
 
 	// GLOBAL: TOY2 0x0052ADB4
 	int32_t g_attractModeInputTimer;
@@ -4828,7 +4828,7 @@ namespace Toy2
 
 		int32_t result = 0;
 		int32_t fadeFrames = 600;
-		int32_t threshold = ((int16_t)g_pastInitialBoot != 0) ? 600 : 300;
+		int32_t threshold = g_pastInitialBoot != 0 ? 600 : 300;
 
 		while (true)
 		{
