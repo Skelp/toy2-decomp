@@ -21,6 +21,12 @@ namespace Toy2
 
 	namespace ElevatorHop
 	{
+		enum FramePulseIndex
+		{
+			FRAME_PULSE_SEVEN_TICK = 7,
+			FRAME_PULSE_SIXTEEN_TICK = 9,
+		};
+
 		extern int32_t g_link18PathPointIndex;
 		extern int32_t g_link19PathPointIndex;
 		extern int32_t g_link20PathPointIndex;
@@ -238,23 +244,33 @@ void Toy2::ElevatorHop::UpdatePathLinks()
 		Levels::g_recordData[9]->data[g_link20PathPointIndex + 6].z);
 }
 
-// FUNCTION: TOY2 0x00425EB0 [PROVISIONAL]
+// FUNCTION: TOY2 0x00425EB0 [MATCHED]
 void Toy2::ElevatorHop::SpawnFanParticle(const Vector3I* position, int32_t fanIndex, int32_t velocityScale)
 {
+	int32_t pulseIndex;
 	if (fanIndex == 4)
 	{
+		pulseIndex = FRAME_PULSE_SEVEN_TICK;
 		AudioManager::g_dynamicSoundFrequencies[0] = 0x1400;
 		AudioManager::PlaySoundEffect(0x8C, position);
 	}
-
-	if ((fanIndex == 4 ? g_framePulseOutputs.sevenTick : g_framePulseOutputs.sixteenTick) != 0)
+	else
 	{
-		Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(position->x, position->y, position->z, fanIndex == 4 ? 0x4F : 0x4E, 2);
+		pulseIndex = FRAME_PULSE_SIXTEEN_TICK;
+	}
+
+	if (g_framePulseOutputs.bytes[pulseIndex] != 0)
+	{
+		Nu3D::Particles::ParticleInstance* particle;
+		if (fanIndex != 4)
+			particle = Nu3D::Particles::SpawnFromPreset(position->x, position->y, position->z, 0x4E, 2);
+		else
+			particle = Nu3D::Particles::SpawnFromPreset(position->x, position->y, position->z, 0x4F, 2);
 		particle->velX = g_fanParticleVelocityFactors[fanIndex].x * velocityScale;
 		particle->velY = g_fanParticleVelocityFactors[fanIndex].y * velocityScale;
 		particle->velZ = g_fanParticleVelocityFactors[fanIndex].z * velocityScale;
-		particle->rotSpeed = -0x100;
 		particle->groundAlignRot = 0xFFF - g_framePulsePhases.thirtyTwoTick * 0x40;
+		particle->rotSpeed = -0x100;
 	}
 }
 

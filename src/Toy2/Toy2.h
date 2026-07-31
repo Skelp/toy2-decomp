@@ -96,6 +96,7 @@ namespace Toy2
 			uint8_t thirtyTwoTick;
 			uint8_t sixtyFourTick;
 		};
+		uint8_t bytes[12];
 		uint32_t words[3];
 	};
 

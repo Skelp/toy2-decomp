@@ -110,6 +110,12 @@ namespace Toy2
 
 	namespace AirportInfiltration
 	{
+		enum FramePulseIndex
+		{
+			FRAME_PULSE_SEVEN_TICK = 7,
+			FRAME_PULSE_SIXTEEN_TICK = 9,
+		};
+
 		enum ProspectorState
 		{
 			PROSPECTOR_STATE_IDLE = 0,
@@ -198,15 +204,19 @@ namespace Toy2
 		// FUNCTION: TOY2 0x0042C810 [PROVISIONAL]
 		void SpawnFanParticle(const Vector3I* position, int32_t fanIndex)
 		{
-			if ((fanIndex == 4 ? g_framePulseOutputs.sevenTick : g_framePulseOutputs.sixteenTick) != 0)
+			int32_t pulseIndex = fanIndex == 4 ? FRAME_PULSE_SEVEN_TICK : FRAME_PULSE_SIXTEEN_TICK;
+			if (g_framePulseOutputs.bytes[pulseIndex] != 0)
 			{
-				Nu3D::Particles::ParticleInstance* particle =
-					Nu3D::Particles::SpawnFromPreset(position->x, position->y, position->z, fanIndex == 4 ? 0x4F : 0x4E, 2);
+				Nu3D::Particles::ParticleInstance* particle;
+				if (fanIndex != 4)
+					particle = Nu3D::Particles::SpawnFromPreset(position->x, position->y, position->z, 0x4E, 2);
+				else
+					particle = Nu3D::Particles::SpawnFromPreset(position->x, position->y, position->z, 0x4F, 2);
 				particle->velX = g_fanParticleVelocities[fanIndex].x;
 				particle->velY = g_fanParticleVelocities[fanIndex].y;
 				particle->velZ = g_fanParticleVelocities[fanIndex].z;
-				particle->rotSpeed = -0x100;
 				particle->groundAlignRot = 0xFFF - g_framePulsePhases.thirtyTwoTick * 0x40;
+				particle->rotSpeed = -0x100;
 			}
 		}
 
