@@ -1538,7 +1538,7 @@ namespace Toy2
 				&g_creatureActors[actorIndex], preset->encodedSoundIndex - 1, preset->baseFrequency, preset->leftVolume, &g_creatureActors[actorIndex], 0);
 		}
 
-		// FUNCTION: TOY2 0x00414A80 [PROVISIONAL]
+		// FUNCTION: TOY2 0x00414A80 [TOOL]
 		void GetCreatureList(uint8_t* creatureIdList)
 		{
 			InitCreatureRam();
@@ -1553,7 +1553,7 @@ namespace Toy2
 					index++;
 				}
 				creatureId += sizeof(Toy2Actor) / sizeof(int16_t);
-			} while (creatureId < &g_creatureActors[64].creatureId);
+			} while (reinterpret_cast<int32_t>(creatureId) < reinterpret_cast<int32_t>(&g_creatureActors[64].creatureId));
 			creatureIdList[index] = 0xff;
 		}
 

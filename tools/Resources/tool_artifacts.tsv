@@ -7,6 +7,7 @@
 # address	artifact-id	last-score	verified-date	note
 0x00402610	TOOL-SYMBOL	98.15	2026-07-30	The one-past token-table bound and the subtitle color immediate resolve to unrelated nearby data labels. The instruction bytes match.
 0x004027F0	TOOL-SYMBOL	99.21	2026-07-29	The literal color value resolves to an unrelated data label. The instruction bytes match.
+0x00414A80	TOOL-SYMBOL	94.12	2026-07-31	The one-past creature actor field bound resolves to an unrelated nearby data label. The instruction bytes match.
 0x0041C100	TOOL-SYMBOL	97.96	2026-07-30	The one-past hidden-collectible state bound resolves to an unrelated nearby data label. The instruction bytes match.
 0x0041E300	TOOL-SYMBOL	97.96	2026-07-30	The one-past hidden-collectible state bound resolves to an unrelated nearby data label. The instruction bytes match.
 0x00429CE0	TOOL-SYMBOL	97.96	2026-07-30	The one-past hidden-collectible state bound resolves to an unrelated nearby data label. The instruction bytes match.
