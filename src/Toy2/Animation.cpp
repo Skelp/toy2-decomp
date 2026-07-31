@@ -183,13 +183,13 @@ namespace Toy2
 					g_keyframeRotation.angles.x = (int16_t)((packedRotation >> 18) & 0xffc) | (sample->translationX & 3);
 					g_keyframeRotation.angles.y = (int16_t)((packedRotation >> 8) & 0xffc) | (sample->translationY & 3);
 					g_keyframeRotation.angles.z = (int16_t)((packedRotation & 0x3ff) << 2) | (sample->translationZ & 3);
-					Nu3D::Math::EulerToRotationMatrix(&g_keyframeRotation.angles, &g_keyframeRotation.matrix);
+					Nu3D::Math::SetRotationXYZ(&g_keyframeRotation.angles, &g_keyframeRotation.matrix);
 
 					packedRotation = nextSample->packedRotationLow | (nextSample->packedRotationHigh << 16);
 					g_nextKeyframeRotation.angles.x = (int16_t)((packedRotation >> 18) & 0xffc) | (nextSample->translationX & 3);
 					g_nextKeyframeRotation.angles.y = (int16_t)((packedRotation >> 8) & 0xffc) | (nextSample->translationY & 3);
 					g_nextKeyframeRotation.angles.z = (int16_t)((packedRotation & 0x3ff) << 2) | (nextSample->translationZ & 3);
-					Nu3D::Math::EulerToRotationMatrix(&g_nextKeyframeRotation.angles, &g_nextKeyframeRotation.matrix);
+					Nu3D::Math::SetRotationXYZ(&g_nextKeyframeRotation.angles, &g_nextKeyframeRotation.matrix);
 
 					transform->rotation.m00 =
 						(int16_t)(((g_nextKeyframeRotation.matrix.m00 - g_keyframeRotation.matrix.m00) * fraction >> 16) + g_keyframeRotation.matrix.m00);
@@ -219,7 +219,7 @@ namespace Toy2
 					transform->rotationAngles.x = (int16_t)((packedRotation >> 18) & 0xffc) | (sample->translationX & 3);
 					transform->rotationAngles.y = (int16_t)((packedRotation >> 8) & 0xffc) | (sample->translationY & 3);
 					transform->rotationAngles.z = (int16_t)((packedRotation & 0x3ff) << 2) | (sample->translationZ & 3);
-					Nu3D::Math::EulerToRotationMatrix(&transform->rotationAngles, &transform->rotation);
+					Nu3D::Math::SetRotationXYZ(&transform->rotationAngles, &transform->rotation);
 				}
 
 				if (g_clipHasNegativeHeader && clip->offsetNode == (int16_t)baseBoneIndex)

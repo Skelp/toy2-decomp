@@ -4117,7 +4117,7 @@ namespace SoftwareRenderer
 			int32_t cosYaw = Numerics::g_sinCosLUT[0x400 - yaw & 0xFFF];
 
 			Matrix3x3I16 rotation;
-			Nu3D::Math::EulerToRotationMatrix(&Toy2::Camera::g_renderCameraTransform.rotation.vector, &rotation);
+			Nu3D::Math::SetRotationXYZ(&Toy2::Camera::g_renderCameraTransform.rotation.vector, &rotation);
 
 			int32_t transformed = rotation.m02 * cosYaw + rotation.m00 * sinYaw;
 			g_backdropViewX = (transformed + ((transformed >> 31) & 0xFFF)) >> 12;

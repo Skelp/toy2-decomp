@@ -21,11 +21,21 @@ namespace Toy2
 	extern int32_t g_destRectHalfWidth;
 }
 
+namespace SoftwareRenderer
+{
+	struct SoftwareRasterVertex;
+}
+
 namespace Nu3D
 {
 	namespace Camera
 	{
 		static __forceinline int32_t ShiftFixedTowardZero(int32_t value, int32_t bits) { return (value + ((value >> 31) & ((1 << bits) - 1))) >> bits; }
+
+		// STUB: TOY2 0x00450E50
+		int32_t ProjectTriangle(
+			const Vector3I16* point0, const Vector3I16* point1, const Vector3I16* point2, SoftwareRenderer::SoftwareRasterVertex* projectedVertices)
+		{ return 0; }
 
 		struct ViewRotationHistoryEntry
 		{
@@ -307,7 +317,7 @@ namespace Nu3D
 
 		static __forceinline void BuildBlendedViewTransform(FixedViewTransform* transform, int32_t rotationIndex, int32_t row0ScaleIndex)
 		{
-			Math::EulerToRotationMatrix(&g_viewMatrixHistory[rotationIndex].angles, &transform->rotation);
+			Math::SetRotationXYZ(&g_viewMatrixHistory[rotationIndex].angles, &transform->rotation);
 
 			int32_t blend = abs((int32_t)g_viewHeightHistory[rotationIndex]);
 			int32_t row0Scale = ShiftFixedTowardZero(g_viewHeightHistory[row0ScaleIndex], 4) + 0xF80;
@@ -347,7 +357,7 @@ namespace Nu3D
 			g_zoneViewportRightOffset = 0;
 			g_zoneViewportBottomOffset = 0;
 
-			Math::EulerToRotationMatrix(&viewAngles.angles, &g_workingFixedViewTransform.rotation);
+			Math::SetRotationXYZ(&viewAngles.angles, &g_workingFixedViewTransform.rotation);
 
 			if (g_renderMode == RENDERMODE_SOFTWARE)
 			{

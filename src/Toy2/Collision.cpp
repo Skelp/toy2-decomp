@@ -1037,7 +1037,7 @@ namespace Toy2
 					Animation::g_nextKeyframeRotation.angles.x = platform.rotationAnglesFixed.x >> 2;
 					Animation::g_nextKeyframeRotation.angles.y = platform.rotationAnglesFixed.y >> 2;
 					Animation::g_nextKeyframeRotation.angles.z = platform.rotationAnglesFixed.z >> 2;
-					Nu3D::Math::EulerToRotationMatrix(&Animation::g_nextKeyframeRotation.angles, &Animation::g_keyframeRotation.matrix);
+					Nu3D::Math::SetRotationXYZ(&Animation::g_nextKeyframeRotation.angles, &Animation::g_keyframeRotation.matrix);
 
 					int32_t deltaX = queryPosition.x - mesh.origin.x;
 					int32_t deltaY = queryPosition.y - mesh.origin.y;

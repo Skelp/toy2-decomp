@@ -873,7 +873,7 @@ namespace Toy2
 							l_typeData->animPtr += g_levelDataBase;
 						}
 
-						Nu3D::Math::EulerToRotationMatrix(&l_typeData->rotation, l_sectionStorage);
+						Nu3D::Math::SetRotationXYZ(&l_typeData->rotation, l_sectionStorage);
 
 						l_mat_21 = l_sectionStorage->mat_21;
 						l_sectionStorage->mat_11 = l_typeData->scaleX * l_sectionStorage->mat_11 / 4096;
@@ -912,7 +912,7 @@ namespace Toy2
 							l_typeData2->animPtr += g_levelDataBase;
 						}
 
-						Nu3D::Math::EulerToRotationMatrix(&l_typeData2->rotation, l_sectionStorage);
+						Nu3D::Math::SetRotationXYZ(&l_typeData2->rotation, l_sectionStorage);
 
 						l_sectionStorage->modelPtr = l_typeData2;
 						l_sectionStorage->animPtr = 0;
@@ -965,7 +965,7 @@ namespace Toy2
 							l_modelA2->animPtr += g_levelDataBase;
 						}
 
-						Nu3D::Math::EulerToRotationMatrix(&l_modelA2->rotation, l_sectionStorage);
+						Nu3D::Math::SetRotationXYZ(&l_modelA2->rotation, l_sectionStorage);
 						l_secMat21 = l_sectionStorage->mat_21;
 						l_sectionStorage->mat_11 = l_modelA2->scaleX * l_sectionStorage->mat_11 / 4096;
 						l_sectionStorage->mat_21 = l_secMat21 * l_modelA2->scaleX / 4096;
@@ -1001,7 +1001,7 @@ namespace Toy2
 							l_modelB2->animPtr += g_levelDataBase;
 						}
 
-						Nu3D::Math::EulerToRotationMatrix(&l_modelB2->rotation, l_sectionStorage);
+						Nu3D::Math::SetRotationXYZ(&l_modelB2->rotation, l_sectionStorage);
 						l_sectionStorage->modelPtr = l_modelB2;
 						l_sectionStorage->animPtr = 0;
 						*(l_secondInstance + 2) = l_sectionStorage;

@@ -1188,7 +1188,7 @@ namespace Toy2
 			Animation::g_keyframeRotation.angles.x = actor->pitchAngle;
 			Animation::g_keyframeRotation.angles.y = actor->yawAngle + 0x800;
 			Animation::g_keyframeRotation.angles.z = actor->rollAngle;
-			Nu3D::Math::EulerToRotationMatrix(&Animation::g_keyframeRotation.angles, &Animation::g_keyframeRotation.matrix);
+			Nu3D::Math::SetRotationXYZ(&Animation::g_keyframeRotation.angles, &Animation::g_keyframeRotation.matrix);
 
 			if (actor->scalePivotHeight != 0)
 			{
@@ -1974,7 +1974,7 @@ namespace Toy2
 			Animation::g_keyframeRotation.angles.y = (int16_t)yaw;
 			Animation::g_keyframeRotation.angles.z = (int16_t)roll;
 
-			Nu3D::Math::EulerToRotationMatrix(&Animation::g_keyframeRotation.angles, &transform->rotation);
+			Nu3D::Math::SetRotationXYZ(&Animation::g_keyframeRotation.angles, &transform->rotation);
 			Actor::SetNodeAngle(actor, nodeIndex, pitch, yaw, roll);
 		}
 

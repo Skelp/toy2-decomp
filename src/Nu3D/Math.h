@@ -15,7 +15,7 @@ namespace Nu3D
 	{
 		extern Vector3F g_matrixScale;
 
-		Matrix3x3I16* EulerToRotationMatrix(const Vector3I16* angles, Matrix3x3I16* output);
+		Matrix3x3I16* SetRotationXYZ(const Vector3I16* angles, Matrix3x3I16* output);
 		int32_t Cross2D(Point2I16 point1, Point2I16 point2, Point2I16 point3);
 		int32_t NormalizeToFixedPoint(const Vector3I* input, Vector3I* output);
 		int32_t NormalizeToFixedPoint16(const Vector3I16* input, Vector3I16* output);
