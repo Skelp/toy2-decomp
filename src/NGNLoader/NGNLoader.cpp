@@ -556,37 +556,28 @@ namespace NGNLoader
 		if (! portalCount)
 			return;
 
-		Nu3D::Portal::AreaPortal** portalAlloc = (Nu3D::Portal::AreaPortal**)malloc(sizeof(void*) * portalCount);
+		Nu3D::Portal::AreaPortal** portalAlloc = (Nu3D::Portal::AreaPortal**)malloc(sizeof(Nu3D::Portal::AreaPortal*) * portalCount);
 		ngnImage->areaPortals = portalAlloc;
 
 		if (! portalAlloc)
 			return;
 
-		int32_t portalId = 0;
-
-		if (portalCount > 0)
+		for (int32_t portalId = 0; portalId < portalCount; ++portalId)
 		{
-			while (true)
+			int32_t vertexCount;
+			fread(&vertexCount, sizeof(int32_t), 1, stream);
+
+			ngnImage->areaPortals[portalId] = AllocPortalVertices(vertexCount);
+
+			if (! ngnImage->areaPortals[portalId])
 			{
-				int32_t vertexCount;
-				fread(&vertexCount, sizeof(int32_t), 1, stream);
-
-				ngnImage->areaPortals[portalId] = AllocPortalVertices(vertexCount);
-
-				Nu3D::Portal::AreaPortal* portal = ngnImage->areaPortals[portalId];
-
-				if (! portal)
-					break;
-
-				portal->portalId = portalId;
-
-				fread(ngnImage->areaPortals[portalId++]->vertices, sizeof(Vector3F), vertexCount, stream);
-
-				if (portalId >= portalCount)
-					return;
+				ngnImage->actualPortalCount = portalId;
+				return;
 			}
 
-			ngnImage->actualPortalCount = portalId;
+			ngnImage->areaPortals[portalId]->portalId = portalId;
+
+			fread(ngnImage->areaPortals[portalId]->vertices, sizeof(Vector3F), vertexCount, stream);
 		}
 	}
 
