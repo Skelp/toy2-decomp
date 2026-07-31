@@ -212,44 +212,43 @@ namespace Nu3D
 		int32_t theta, int32_t phi, int32_t enabled)
 	{
 		Light* light = Alloc();
-
-		if (!light)
-			return 0;
-
-		if (DrawingDevice::CreateLight(&light->direct3DLight) != 0)
+		if (light)
 		{
+			if (DrawingDevice::CreateLight(&light->direct3DLight) == 0)
+			{
+				light->transform = *transform;
+				light->theta = theta;
+				light->phi = phi;
+				light->range = range;
+				light->type = TYPE_SPOT;
+				light->color = *color;
+
+				light->typedDescription.dwSize = sizeof(light->typedDescription);
+				int32_t active = enabled != 0;
+				light->enabled = active;
+				light->typedDescription.dltType = D3DLIGHT_SPOT;
+				light->typedDescription.dcvColor.r = light->color.r;
+				light->typedDescription.dcvColor.g = light->color.g;
+				light->typedDescription.dcvColor.b = light->color.b;
+				light->typedDescription.dcvColor.a = light->color.a;
+				Math::GetPositionVector(&light->transform, &light->typedDescription.dvPosition);
+				Math::GetForwardVector(&light->transform, &light->typedDescription.dvDirection);
+				light->typedDescription.dvRange = range;
+				light->typedDescription.dvFalloff = 1.0f;
+				light->typedDescription.dvAttenuation0 = 1.0f;
+				light->typedDescription.dvAttenuation1 = 1.0f;
+				light->typedDescription.dvAttenuation2 = 1.0f;
+				light->typedDescription.dvTheta = (float)theta * 3.14159265358979323846f / 32768.0f;
+				light->typedDescription.dvPhi = (float)phi * 3.14159265358979323846f / 32768.0f;
+				light->typedDescription.dwFlags = active;
+
+				DrawingDevice::SetLight(light->direct3DLight, &light->direct3DDescription);
+				DrawingDevice::AddLight(light->direct3DLight);
+				return light;
+			}
 			Free(light);
 			return 0;
 		}
-
-		light->transform = *transform;
-		light->color = *color;
-		light->type = TYPE_SPOT;
-		light->range = range;
-		light->theta = theta;
-		light->phi = phi;
-		light->enabled = enabled != 0;
-
-		Direct3DLightDescriptionView& description = light->typedDescription;
-		description.dwSize = sizeof(description);
-		description.dltType = D3DLIGHT_SPOT;
-		description.dcvColor.r = light->color.r;
-		description.dcvColor.g = light->color.g;
-		description.dcvColor.b = light->color.b;
-		description.dcvColor.a = light->color.a;
-		Math::GetPositionVector(&light->transform, &description.dvPosition);
-		Math::GetForwardVector(&light->transform, &description.dvDirection);
-		description.dvRange = light->range;
-		description.dvFalloff = 1.0f;
-		description.dvAttenuation0 = 1.0f;
-		description.dvAttenuation1 = 1.0f;
-		description.dvAttenuation2 = 1.0f;
-		description.dvTheta = (float)light->theta * 3.14159265358979323846f / 32768.0f;
-		description.dvPhi = (float)light->phi * 3.14159265358979323846f / 32768.0f;
-		description.dwFlags = light->enabled;
-
-		DrawingDevice::SetLight(light->direct3DLight, &light->direct3DDescription);
-		DrawingDevice::AddLight(light->direct3DLight);
 		return light;
 	}
 
