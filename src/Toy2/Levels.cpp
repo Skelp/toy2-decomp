@@ -324,6 +324,7 @@ namespace Toy2
 			zoneData++;
 		} while (zoneData < g_zoneRenderData + 20);
 
+		int32_t highestZoneIndex;
 		int32_t zoneIndex = -1;
 		if (Levels::g_instanceSection->flags != 0)
 		{
@@ -335,22 +336,24 @@ namespace Toy2
 					if (zoneIndex != -1)
 						g_zoneRenderData[zoneIndex].primaryInstanceBytes = instanceCount * sizeof(Levels::InstanceSection);
 
-					instanceCount = 0;
 					zoneIndex = (uint8_t)instance->category;
+					instanceCount = 0;
 				}
 
 				instanceCount++;
 				instance++;
 			} while (instance->flags != 0);
-
-			if (zoneIndex != -1)
-			{
-				g_zoneRenderData[zoneIndex].primaryInstanceBytes = instanceCount * sizeof(Levels::InstanceSection);
-				g_zoneCount = zoneIndex;
-			}
 		}
 
-		int32_t highestZoneIndex = g_zoneCount;
+		if (zoneIndex != -1)
+		{
+			g_zoneRenderData[zoneIndex].primaryInstanceBytes = instanceCount * sizeof(Levels::InstanceSection);
+			highestZoneIndex = zoneIndex;
+			g_zoneCount = highestZoneIndex;
+		}
+		else
+			highestZoneIndex = g_zoneCount;
+
 		zoneIndex = -1;
 		if (Levels::g_secondInstanceSection->flags != 0)
 		{
@@ -362,8 +365,8 @@ namespace Toy2
 					if (zoneIndex != -1)
 						g_zoneRenderData[zoneIndex].secondaryInstanceBytes = instanceCount * sizeof(Levels::InstanceSection);
 
-					instanceCount = 0;
 					zoneIndex = (uint8_t)instance->category;
+					instanceCount = 0;
 				}
 
 				instanceCount++;
