@@ -1087,10 +1087,10 @@ namespace NGNLoader
 			Renderer::Glue::SetBackdrop(Toy2::g_nextBackdropId);
 	}
 
-	// FUNCTION: TOY2 0x004CE2C0 [PROVISIONAL]
-	int32_t GetTextureDataIndex(uint32_t textureIndex)
+	// FUNCTION: TOY2 0x004CE2C0 [MATCHED]
+	int32_t GetTextureDataIndex(int32_t textureIndex)
 	{
-		if (g_ngnImage && textureIndex < 64)
+		if (g_ngnImage && textureIndex >= 0 && textureIndex < 64)
 			return g_ngnImage->textureEntries[textureIndex].textureDataIndex;
 		else
 			return 0;
