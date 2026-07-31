@@ -305,13 +305,15 @@ namespace Nu3D
 		// FUNCTION: TOY2 0x00438910 [PROVISIONAL]
 		void FollowWaypointPath(int32_t linkId, int32_t pathTableIdx, int32_t* progress)
 		{
-			*progress += 0x40;
-			if ((*progress >> 8) > Toy2::Levels::g_recordData[pathTableIdx]->recordCount - 5)
+			int32_t pathProgress = *progress + 0x40;
+			*progress = pathProgress;
+			if ((pathProgress >> 8) > Toy2::Levels::g_recordData[pathTableIdx]->recordCount - 5)
 				*progress = 0;
 
+			pathProgress = *progress;
 			Toy2::Levels::RecordData* path = Toy2::Levels::g_recordData[pathTableIdx];
-			int32_t waypointIndex = *progress >> 8;
-			int32_t blend = *progress & 0xFF;
+			int32_t waypointIndex = pathProgress >> 8;
+			int32_t blend = pathProgress & 0xFF;
 			int32_t inverseBlend = 0xFF - blend;
 
 			int32_t pathX = (path->data[waypointIndex].x * inverseBlend + path->data[waypointIndex + 1].x * blend) / 8;
@@ -326,10 +328,10 @@ namespace Nu3D
 
 			int32_t targetRotation = Math::CartesianToFixedAngle(pathZ - currentPosition.z, currentPosition.x - pathX);
 			int32_t rotationDelta = (rotation.y - targetRotation - 0x800) & 0xFFF;
-			if (rotationDelta <= 0x800)
-				rotation.y -= rotationDelta >> 2;
-			else
+			if (rotationDelta > 0x800)
 				rotation.y += (0x1000 - rotationDelta) >> 2;
+			else
+				rotation.y -= rotationDelta >> 2;
 
 			SetRotationAbsolute8bit(linkId, 0, rotation.y, 0);
 			SetPositionRawAndCommit(linkId, pathX >> 5, pathY >> 5, pathZ >> 5);
