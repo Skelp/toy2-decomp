@@ -978,13 +978,15 @@ int32_t SortDisplayModes(const void* modeA, const void* modeB)
 		return -1;
 }
 
-// FUNCTION: TOY2 0x00409360 [PROVISIONAL]
+// FUNCTION: TOY2 0x00409360 [MATCHED]
 LRESULT WINAPI ProfileWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-	if (msg == WM_DESTROY)
+	switch (msg)
 	{
-		g_windowData.mainHwnd = 0;
-		::PostQuitMessage(0);
+		case WM_DESTROY:
+			g_windowData.mainHwnd = 0;
+			::PostQuitMessage(0);
+			break;
 	}
 
 	return DefWindowProcA(hWnd, msg, wParam, lParam);
