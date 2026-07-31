@@ -6,6 +6,7 @@
 0x004106C0	-	The complete burst-ring flow stays at 87.60%. Declaration order is neutral, and only a dead parameter slot and pointer-compare opcode differ.
 0x00412FF0	-	The typed resource creation and cleanup flow is complete at 88.89%. Only block placement and scratch-register selection remain.
 0x00414550	-	The complete record fixup stays at 71.75%. Declaration order is neutral, and cursor advance before height regresses to 70.03%.
+0x004157E0	-	The byte edge test and state update are complete; two natural forms leave only the prior-state byte register home and score at most 42.86%.
 0x0041BEE0	-	The complete link update stays at 81.58%. Reusing the dead vector matches retail lifetime reuse but shrinks the frame and regresses to 78.42%.
 0x0041E020	-	The typed interpolation body stays at 89.08% and matches after setup. Fraction-first declaration order regresses to 65.52%.
 0x00425A80	-	The loop bounds, actor layout, unsigned speed guard, coordinate transform, and roll store are established. Relative-Z and preserved-Z forms score 63.64% and 55.32%; the remaining best-form diff is boundary.y CSE versus a retail reload (CAP-15), which also adds EDI.
@@ -13,15 +14,26 @@
 0x0042C200	-	The typed interpolation is complete at 89.08%. Four natural fraction and index forms only alter register allocation.
 0x0042E790	-	A complete typed level interaction model reached 61.44%; the retail function's shared local and flare-loop layout did not follow the natural structured form, so the target remains below the validation gate.
 0x0042FC50	-	Complete typed level interaction controller reached 71.29% after explicit floor-link rotations, fixed-point separation truncation, direct actor accesses, and typed flare/light records. Remaining differences span register and local lifetimes across the 3296-byte body; validation requires 75%, and lowering the data model to raw record indexing would conceal established types.
+0x004343D0	-	The complete fixed-angle movement update scores 70.90%; nine natural forms leave only the two long-lived speed register homes unresolved.
+0x00434550	-	Collision and footing behavior are complete at 70.48%; direct, inverted, and switch forms leave only CAP-12 cold-block placement and scratch registers.
+0x00434990	-	The complete gun-fire update scores 46.18%; three structured forms preserve input, timing, weapon dispatch, effects, sounds, and state but leave the CAP-09 FPO frame and register homes unresolved.
 0x004398B0	-	2176-byte post-game screen loop depends on an undeclared 64-entry particle record, several unresolved globals, and intertwined animation/input/fade state; no reference analogue or reconstructed sibling
 0x0043C750	-	The function cyclically reorders 0x30-byte animation track records, but metadata fields at +0x0A/+0x12/+0x1A/+0x22 and +0x24..+0x2F have no corroborated roles or typed readers; completing it would require guessed layout names
+0x00445720	-	The complete typed shadow draw path scores 54.43%; six forms preserve the quad data and call but leave stack-slot and assignment scheduling differences.
 0x00447D40	-	Natural cursor initialization and fallback-store ordering preserve the 87.32% result; the remaining differences are pointer-address folding and independent store scheduling, with behavior and data model already established.
+0x0044EB90	-	The complete typed kite-tail draw path remains below 50%; three structural forms leave the CAP-03 register homes and one packed-colour stack slot unresolved.
+0x0044F010	-	The complete precipitation draw path scores 37.84%; four forms preserve the layout and draw call but leave the FPO frame and conversion schedule unresolved.
 0x00451280	-	Semantics and ABI are recovered, but VC6 eliminates the retail dead transformed-X fields. Direct locals scored 36.05%, address helper 34.76%, volatile outputs 29.98%, Vector4 results 32.41%, and in-place Vector4 results 32.62%. Needs evidence for the original transform idiom before promotion.
 0x00461D20	-	The complete RasterizeTexturedRect555 analogue has the same 626-instruction structure but measures only 24.90%; cloning its 565 constants would create a new sub-threshold target without a resolved shared rasterizer source model
 0x0047B170	-	5776-byte RNC Method 2 decompressor has seven interdependent decode-loop gotos and no reference implementation; current 16.99% body requires an algorithm-level reconstruction, not a local control-flow cleanup
+0x0047D120	-	Retail uses an EBP frame with five locals; the complete one-shot clear uses an FPO frame, and a for-loop form emits the wrong REP STOSD body.
+0x0047D4E0	-	Retail uses an EBP frame and scaled index; natural for and do-while forms both use FPO and a reverse pointer at 13.04%.
+0x0047D650	-	Retail uses an EBP frame and duplicate EDI save; the typed 0x4C-stride loop is complete, and no natural source form reproduces the frame.
 0x00480660	0x00482A00	The ABI and CollisionSweep layout are understood, but two natural complete implementations scored 15.65% and 10.37%. The shared low score indicates the sweep source model or intermediate-width model is wrong; ResolveSubstep remains unstarted, so more caller reconstruction is required before banking this target.
 0x00480AE0	-	needs an exact Nu3D analogue or source evidence for the dominant-axis local lifetime and fixed-point evaluation order
+0x00481140	-	Typed projection semantics are complete; four natural forms leave the retail expanded no-frame layout unresolved, and the clearest form scores 19.61%.
 0x004813B0	-	Complete behavior and ABI recovered, but natural structured body scored 55.26% and function-scope scalar form scored 68.26%. Remaining diff depends on unproven original local lifetimes and stack spills; needs source-model evidence before promotion.
+0x00481D00	-	needs original collision-sweep source evidence for the scalar lifetimes and 0x2C stack-frame model; vertex reuse scored 50.23% and named-distance and early-return forms scored 49.65% against the current 53.00%
 0x00483EF0	0x00482A00,0x00484380	Depends directly on unstarted ResolveSubstep and unfinished Buzz::ResolveCollisions; it also consumes packed collision-face normals and secondary-face state across unresolved parameters, so the full typed ABI and control flow are not yet supported.
 0x00486520	-	A complete typed shared geometry model preserved behavior but measured 4.19%; retail hand-specializes static and rotated triangle and quad paths, so the original source structure remains unresolved and the target is below the validation gate
 0x00487B20	0x0048B750	Two complete natural forms scored 19.41% and 19.31%. Together with SweepWallSegments at 15.65%/10.37%, the repeated sub-50 result rejects the shared edge-sweep source model despite a confirmed ABI and behavior; reconstruct SweepAgainstCandidates or the original intermediate-width model first.
@@ -33,6 +45,8 @@
 0x00490B90	-	All six natural temporary orders and right-first product spelling compile to the same 65.71% or 32.50% regalloc patterns; ABI, alias-safe temporaries, arithmetic, and stores are otherwise confirmed
 0x00490EE0	-	No callers or x-refs are known, and Ghidra cannot form a function body at the authoritative map start; the many-argument ABI is not recoverable from raw disassembly alone
 0x00491F20	-	No callers or x-refs are known, and Ghidra cannot form a function body at the authoritative map start; the many-argument ABI is not recoverable from raw disassembly alone
+0x004946A0	-	The typed tiled-sprite path scores 56.00%; four credible forms leave the verified CAP-24 x87 divisor spill and evaluation schedule.
+0x00494820	-	The typed virtual-width sprite path scores 57.14%; four credible forms leave the verified CAP-24 x87 divisor spill and evaluation schedule.
 0x0049EBA0	-	signed int16 global is confirmed by matched GetCurButtonsPressed; cached-reference baseline scores 51.85%, while direct-table forms with a local or split assignment score 14.81% and leave an unsupported load-width/address-mode mismatch
 0x0049EE50	-	The complete light selection stays at 50.67%. Typed structure and lifetime cursors only change the cursor register, bound form, or saved x register.
 0x0049F350	-	The complete light initializer stays at 63.41%. Direct level-index reads regress to 56.41%, and only zero-store selection and data labels remain.
@@ -41,10 +55,15 @@
 0x004A0F80	-	Complete natural switch model scored 44.59%; distinct branch vectors and corrected exit-launch yaw scored 47.71%. Retail stack lifetime and shared gadget-case control flow remain unresolved.
 0x004A2C20	-	the indexed token loop emits retail's exact zero-store widths; replacing it with a constant-size memset regresses 22.86% to 6.25%, while the remaining difference is whole-body EAX/EDX allocation plus lazy EDI-save scheduling
 0x004A3E60	-	do-while, structured while, and explicit-break search forms all score 76.47%; sibling UpdateChannels confirms the remaining pointer-bound JL/JB difference, while this function also retains the known forward-exit JAE+JMP inversion and tail-return merge
+0x004A4F80	-	The complete rocket-boots camera update scores 70.97%; a typed yaw pointer and reversed local declaration order are neutral, leaving only whole-function register allocation.
+0x004A5870	-	The complete typed segment-versus-actor sweep remains below 50%; two natural forms preserve filters, transforms, intersection, movement, and damage but leave the stack and register model unresolved.
 0x004ABF00	-	local-before-if, branch-local, condition-assignment, and direct-global forms leave only lazy ESI-save scheduling plus an operator-delete label mismatch
 0x004B3A20	-	The complete allocation, zeroing, list insertion, default type, and ID behavior is established. Natural post-increment and assignment-order forms remain at 78.87%; the residual diff is register allocation around independent 16-bit loads and stores.
 0x004B89B0	-	The typed allocation flow is complete at 89.47%. Early failure handling regresses, and only callee-saved register scheduling remains.
+0x004BA1F0	-	The complete typed frustum test scores 60.18%; the remaining result, center, and plane-index register homes match CAP-03.
 0x004BCB60	-	the two warning globals are write-only zeroed state with no readers, strings, or cross-function role evidence
 0x004BE0B0	-	Retail is a 7890-byte four-edge polygon clipper; the two scratch-buffer layouts and original pass structure are not corroborated, so a generic clipper would not establish code fidelity
 0x004C0320	0x004BD040	4480-byte projection/splitting routine depends on unresolved 0x004BD040 and multiple unnamed constants; not a session-sized prerequisite
 0x004C2A70	-	retail materializes the previous-link address, but direct, pointer, and reference source forms compile identically; no supported nested list abstraction is known
+0x004CDC20	-	The complete typed actor render loop scores 58.06%; parameter reuse regresses to 55.28%, and a combined guard is neutral. The remaining lazy register saves and loop register homes require original source evidence.
+0x004CE380	-	The complete typed DirectDraw flow scores 60.10%; the remaining retail C-interface CreateSurface expansion cannot be expressed with the repository's supported C++ interface form.

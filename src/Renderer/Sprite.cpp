@@ -903,19 +903,21 @@ namespace Renderer
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x00493DC0 [PROVISIONAL]
+		// FUNCTION: TOY2 0x00493DC0 [MATCHED]
 		int16_t DrawColouredFixed(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue)
 		{
 			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
+			int32_t textureDataIndex;
+			Vector2F uvTopLeft;
+			Vector2F uvBottomRight;
+			uint32_t bitmapWidth;
+			uint32_t bitmapHeight;
+			RGBA color;
 			if (sheet)
 			{
-				int32_t textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
-				Vector2F uvTopLeft;
-				Vector2F uvBottomRight;
+				textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
 				if (textureDataIndex != 0)
 				{
-					uint32_t bitmapWidth;
-					uint32_t bitmapHeight;
 					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
 
 					uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;
@@ -924,7 +926,10 @@ namespace Renderer
 					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
 				}
 
-				RGBA color = { blue, green, red, 255 };
+				color.a = 255;
+				color.r = red;
+				color.g = green;
+				color.b = blue;
 				Queue2DSprite((float)xPos * (1.0f / 320.0f),
 					(float)yPos * (1.0f / g_virtualScreenHeight),
 					(float)sheet->tileWidth * (1.0f / 320.0f),
