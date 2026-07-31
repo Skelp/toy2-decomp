@@ -4488,17 +4488,19 @@ namespace SoftwareRenderer
 			< 0.0;
 	}
 
-	// FUNCTION: TOY2 0x004BCFA0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004BCFA0 [MATCHED]
 	void ProjectVertex(Nu3D::VertexTL* vertex)
 	{
+		float halfScreenV = (float)(g_screenDimV * 0.5);
+		float halfScreenH = (float)(g_screenDimH * 0.5);
 		vertex->specular.value = (uint32_t)(int32_t)vertex->position.x;
 		vertex->rhw = vertex->position.y;
 		if (vertex->position.z > 0.0)
 		{
-			vertex->position.x =
-				(float)(g_screenDimV / 2) + g_screenDimV * 0.5 * vertex->position.x / (vertex->position.z + 1.0f) * g_zoomScaleV * k_viewportScaleV;
-			vertex->position.y =
-				(float)(g_screenDimH / 2) + g_screenDimH * 0.5 * vertex->position.y / (vertex->position.z + 1.0f) * g_zoomScaleH * k_viewportScaleH;
+			float centerV = (float)(g_screenDimV / 2);
+			vertex->position.x = centerV + halfScreenV * vertex->position.x / (vertex->position.z + 1.0f) * g_zoomScaleV * k_viewportScaleV;
+			float centerH = (float)(g_screenDimH / 2);
+			vertex->position.y = centerH + halfScreenH * vertex->position.y / (vertex->position.z + 1.0f) * g_zoomScaleH * k_viewportScaleH;
 		}
 	}
 
