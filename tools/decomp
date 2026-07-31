@@ -237,9 +237,9 @@ Commands:
   score <addr>...   Print only the similarity verdict for one or more addresses
   bc <addr>         Build toy2.exe, then compare one address verbosely
   candidates [ns]   Rank reconstruction candidates (no Ghidra, no reccmp run)
-  defer <addr> ...  Record a local blocker or prerequisite
-  undefer <addr>    Clear all local blockers for one target
-  blockers [addr]   Show local blockers
+  defer <addr> ...  Record a committed blocker or prerequisite
+  undefer <addr>    Clear all committed blockers for one target
+  blockers [addr]   Show committed blockers
   evidence <addr>   Collect bounded evidence for one target in a single call
   audit [args]      Rank audits, show completion, or refresh the audit ledger
   baseline          Save a fresh parent-state comparison before source edits

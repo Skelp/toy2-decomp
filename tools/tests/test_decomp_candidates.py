@@ -247,6 +247,7 @@ class SelectTests(unittest.TestCase):
             "debt_only": False,
             "new_work_only": False,
             "include_deferred": False,
+            "allow_large": False,
         }
         arguments.update(kwargs)
         return [item.name for item in candidates.select(list(self.pool), **arguments)]
@@ -265,12 +266,15 @@ class SelectTests(unittest.TestCase):
     def test_debt_only_keeps_just_the_lint_failures(self):
         self.assertEqual(self.choose(debt_only=True), ["N::Debt"])
 
-    def test_new_work_excludes_implemented_functions_and_keeps_large_work(self):
+    def test_new_work_excludes_implemented_functions_and_large_goals(self):
         chosen = self.choose(new_work_only=True)
         self.assertNotIn("N::Near", chosen)
         self.assertNotIn("N::Debt", chosen)
-        self.assertIn("N::Big", chosen)
+        self.assertNotIn("N::Big", chosen)
         self.assertIn("N::Fresh", chosen)
+
+    def test_allow_large_includes_a_ready_large_goal(self):
+        self.assertIn("N::Big", self.choose(new_work_only=True, allow_large=True))
 
     def test_deferrals_are_hidden_unless_requested(self):
         self.assertNotIn("N::Deferred", self.choose())
@@ -306,7 +310,7 @@ class SelectTests(unittest.TestCase):
 
 
 class DependencySelectionTests(unittest.TestCase):
-    def choose(self, pool, include_deferred=False):
+    def choose(self, pool, include_deferred=False, allow_large=False):
         return candidates.select(
             pool,
             namespace=None,
@@ -317,6 +321,7 @@ class DependencySelectionTests(unittest.TestCase):
             exclude_capped=True,
             new_work_only=True,
             include_deferred=include_deferred,
+            allow_large=allow_large,
         )
 
     @staticmethod
@@ -336,7 +341,11 @@ class DependencySelectionTests(unittest.TestCase):
     def test_large_dependency_ready_target_is_new_work(self):
         target = make(0x401000, "N::Large", size=5000, state="STUB")
         candidates.add_dependency_evidence([target], self.graph())
-        self.assertEqual([item.name for item in self.choose([target])], ["N::Large"])
+        self.assertEqual(self.choose([target]), [])
+        self.assertEqual(
+            [item.name for item in self.choose([target], allow_large=True)],
+            ["N::Large"],
+        )
 
     def test_frontier_recurses_to_the_unresolved_leaf(self):
         goal = make(0x401000, "N::Goal", size=3000, state="STUB")
@@ -367,7 +376,7 @@ class DependencySelectionTests(unittest.TestCase):
         )
         self.assertEqual(self.choose(pool)[0].name, "N::Shared")
         self.assertEqual(shared.immediate_unlocks, 2)
-        self.assertEqual(shared.large_goal_reach, 3)
+        self.assertEqual(shared.large_goal_reach, 2)
 
     def test_recursive_group_does_not_block_its_members(self):
         first = make(0x401000, "N::First", size=200, state="NOT_STARTED")
@@ -384,7 +393,7 @@ class DependencySelectionTests(unittest.TestCase):
             {first.address, second.address},
         )
 
-    def test_declared_prerequisite_reactivates_automatically(self):
+    def test_declared_prerequisite_reactivates_after_acceptance(self):
         target = make(
             0x401000,
             "N::Target",
@@ -399,6 +408,7 @@ class DependencySelectionTests(unittest.TestCase):
         self.assertFalse(target.dependency_ready)
 
         dependency.state = "FUNCTION"
+        dependency.match = 0.75
         candidates.add_dependency_evidence(pool, self.graph())
         self.assertTrue(target.dependency_ready)
 
@@ -416,7 +426,7 @@ class DependencySelectionTests(unittest.TestCase):
         self.assertEqual(self.choose([target], include_deferred=True), [target])
 
     def test_manual_blocked_caller_does_not_raise_dependency_impact(self):
-        target = make(0x401000, "N::Target", size=100, state="NOT_STARTED")
+        target = make(0x401000, "N::Target", size=100, state="FUNCTION", match=0.6)
         blocked_caller = make(
             0x402000,
             "N::BlockedCaller",
@@ -429,18 +439,87 @@ class DependencySelectionTests(unittest.TestCase):
         candidates.add_dependency_evidence(
             pool, self.graph({blocked_caller.address: {target.address}})
         )
+        self.assertFalse(target.quality_prerequisite)
         self.assertEqual(target.immediate_unlocks, 0)
         self.assertEqual(target.large_goal_reach, 0)
 
-    def test_low_score_function_is_weak_but_resolved(self):
+    def test_low_score_function_blocks_a_large_target_and_is_promoted(self):
         target = make(0x401000, "N::Target", size=3000, state="STUB")
         weak = make(0x402000, "N::Weak", size=100, state="FUNCTION", match=0.6)
         pool = [target, weak]
         candidates.add_dependency_evidence(
             pool, self.graph({target.address: {weak.address}})
         )
-        self.assertTrue(target.dependency_ready)
+        self.assertFalse(target.dependency_ready)
         self.assertEqual(target.weak_dependencies, (weak.address,))
+        self.assertTrue(weak.quality_prerequisite)
+        self.assertTrue(weak.dependency_ready)
+        self.assertEqual(
+            candidates.dependency_frontier_for(target.address, pool),
+            {weak.address},
+        )
+        self.assertEqual([item.name for item in self.choose(pool)], ["N::Weak"])
+
+    def test_accepted_function_does_not_block_a_large_target(self):
+        target = make(0x401000, "N::Target", size=3000, state="STUB")
+        accepted = make(
+            0x402000, "N::Accepted", size=100, state="FUNCTION", match=0.75
+        )
+        pool = [target, accepted]
+        candidates.add_dependency_evidence(
+            pool, self.graph({target.address: {accepted.address}})
+        )
+        self.assertTrue(target.dependency_ready)
+        self.assertFalse(accepted.quality_prerequisite)
+
+    def test_weak_function_does_not_block_a_small_target(self):
+        target = make(0x401000, "N::Target", size=600, state="STUB")
+        weak = make(0x402000, "N::Weak", size=100, state="FUNCTION", match=0.6)
+        pool = [target, weak]
+        candidates.add_dependency_evidence(
+            pool, self.graph({target.address: {weak.address}})
+        )
+        self.assertTrue(target.dependency_ready)
+        self.assertFalse(weak.quality_prerequisite)
+
+    def test_declared_weak_function_blocks_a_small_target(self):
+        weak = make(0x402000, "N::Weak", size=100, state="FUNCTION", match=0.6)
+        target = make(
+            0x401000,
+            "N::Target",
+            size=600,
+            state="STUB",
+            declared_dependencies=(weak.address,),
+        )
+        pool = [target, weak]
+        candidates.add_dependency_evidence(pool, self.graph())
+        self.assertFalse(target.dependency_ready)
+        self.assertTrue(weak.quality_prerequisite)
+
+    def test_quality_frontier_recurses_through_a_large_weak_function(self):
+        target = make(0x401000, "N::Target", size=3000, state="STUB")
+        weak_large = make(
+            0x402000, "N::WeakLarge", size=1600, state="FUNCTION", match=0.5
+        )
+        weak_leaf = make(
+            0x403000, "N::WeakLeaf", size=100, state="FUNCTION", match=0.5
+        )
+        pool = [target, weak_large, weak_leaf]
+        candidates.add_dependency_evidence(
+            pool,
+            self.graph(
+                {
+                    target.address: {weak_large.address},
+                    weak_large.address: {weak_leaf.address},
+                }
+            ),
+        )
+        self.assertTrue(weak_large.quality_prerequisite)
+        self.assertTrue(weak_leaf.quality_prerequisite)
+        self.assertEqual(
+            candidates.dependency_frontier_for(target.address, pool),
+            {weak_leaf.address},
+        )
 
 
 if __name__ == "__main__":

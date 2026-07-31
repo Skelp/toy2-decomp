@@ -22,6 +22,7 @@ NORMATIVE_INPUTS = (
     ".notes/lint-baseline.tsv",
     ".notes/lint-rules.md",
     "tools/Resources/audit-ledger.tsv",
+    "tools/Resources/decomp-blockers.tsv",
     "tools/Resources/tool_artifacts.tsv",
 )
 
@@ -64,6 +65,34 @@ class NormativeInputTests(unittest.TestCase):
         }
         self.assertEqual(addresses, annotated)
         self.assertNotIn(0x00414320, addresses)
+
+    def test_blocker_addresses_are_sorted_and_mapped(self):
+        mapped = {
+            int(line.split(None, 1)[0], 16)
+            for line in (ROOT / "tools/Resources/functions_map.txt")
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if line and not line.startswith("#")
+        }
+        with (ROOT / "tools/Resources/decomp-blockers.tsv").open(
+            encoding="utf-8", newline=""
+        ) as handle:
+            rows = [
+                row
+                for row in csv.reader(handle, delimiter="\t")
+                if row and not row[0].startswith("#")
+            ]
+        targets = [int(row[0], 16) for row in rows]
+        dependencies = {
+            int(value, 16)
+            for row in rows
+            for value in row[1].split(",")
+            if value != "-"
+        }
+        self.assertEqual(targets, sorted(set(targets)))
+        self.assertTrue(set(targets) <= mapped)
+        self.assertTrue(dependencies <= mapped)
+        self.assertFalse([row for row in rows if len(row) < 3 or not row[2].strip()])
 
     def test_every_provisional_function_is_in_the_audit_ledger(self):
         provisional = {

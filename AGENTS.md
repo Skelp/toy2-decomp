@@ -132,9 +132,10 @@ list.
 tools/decomp candidates              # ranked targets; no Ghidra, no reccmp run
 tools/decomp candidates Nu3D --stubs --why
 tools/decomp candidates --for 0x00401230 --why # dependency frontier for one goal
+tools/decomp candidates --new-work --allow-large --why # include ready large goals
 tools/decomp defer 0x00401230 --blocked-by 0x00405670 --reason "needs the producer layout"
-tools/decomp blockers                # show local blockers
-tools/decomp undefer 0x00401230      # clear local blockers for one target
+tools/decomp blockers                # show committed blockers
+tools/decomp undefer 0x00401230      # clear committed blockers for one target
 tools/decomp audit --legacy-caps --why # review old mismatch claims
 tools/decomp audit --status             # show freeze-audit completion
 tools/decomp audit --refresh-ledger     # refresh scores and preserve audit notes
@@ -221,20 +222,21 @@ groups before it finds the dependency frontier.
 
 The new-work ranking implements this order:
 
-1. A dependency-frontier function that immediately unlocks unfinished callers.
+1. A quality prerequisite that immediately unlocks unfinished callers.
 2. A frontier function that contributes to several large unfinished callers.
 3. A `STUB`, then an unannotated function, with stronger dependency evidence first.
 4. A smaller body when two candidates have the same dependency impact.
 
-`--new-work` has no function-size limit. A large function becomes eligible when
-its unresolved function dependencies are complete. Use `candidates --for
-<address> --why` to inspect one goal. The command returns its recursive
-dependency frontier, or the goal itself when it is ready.
+`--new-work` omits a large goal that does not unlock another function. Use
+`--allow-large` only after you review that goal. Use `candidates --for <address>
+--why` to inspect one goal. This command returns its recursive dependency
+frontier, or the goal itself when it is ready.
 
 The graph contains direct function dependencies only. It reports indirect
 calls and jumps as uncertainty. Use evidence and explicit blockers for type,
-global, and indirect-dispatch dependencies. A provisional dependency below 75
-percent is weak evidence, but it is not an unresolved function.
+global, and indirect-dispatch dependencies. A provisional function below 75
+percent is a quality prerequisite for a large direct caller. The frontier
+promotes that function until it reaches the normal acceptance threshold.
 
 The tool cannot decide whether a source model is plausible. Use `--why`, then
 confirm the top candidate with `tools/decomp evidence`. A legacy CAP claim does
@@ -265,11 +267,13 @@ evidence. Do not fill an opaque body with guessed fields to replace a `STUB`.
 
 Record a function prerequisite with `tools/decomp defer <target> --blocked-by
 <prerequisite> --reason <text>`. You can repeat `--blocked-by`. The command
-writes to the ignored local blocker record under `build/`.
+writes to the committed blocker record under `tools/Resources/`.
 
 A reason without `--blocked-by` creates a manual blocker. Use `tools/decomp
 undefer <target>` to clear it. Use `--include-blocked` only to inspect blocked
-targets. `--include-deferred` remains as a compatibility alias.
+targets. `--include-deferred` remains as a compatibility alias. Keep the
+blocker record after you restore rejected source. Commit the record before the
+session ends.
 
 Choose the TU by subsystem and ownership, not simply by address proximity. Use
 the namespace and name in `functions_map.txt`, existing declarations, callers,
@@ -450,6 +454,14 @@ Use this loop on the selected function or cluster:
 inspect evidence -> write plausible source -> format -> build -> compare the
 target address -> explain the diff -> revise the source model
 ```
+
+For a body larger than 1000 bytes, use an early source-model checkpoint. Write
+one bounded region that includes the local layout and one representative
+branch or loop. Keep the `STUB` annotation and run `tools/decomp bc`. The total
+score will be low because the body is incomplete. Inspect only the implemented
+region and its frame. Continue only when that code supports the source model or
+the diff identifies one concrete correction. Record a blocker when the region
+shows broad lifetime, frame, or control-flow differences.
 
 Run `tools/decomp bc <address>` after each meaningful revision. It builds and
 then prints the verbose comparison for that address. Use `tools/decomp score

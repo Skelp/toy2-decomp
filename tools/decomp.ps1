@@ -129,9 +129,9 @@ Commands:
   compare [args]    Run reccmp against the reference and recompiled EXEs
   score <addr>...   Show exact/effective/tool/provisional verdicts
   candidates [args] Rank reconstruction candidates
-  defer <addr> ...  Record a local blocker or prerequisite
-  undefer <addr>    Clear all local blockers for one target
-  blockers [addr]   Show local blockers
+  defer <addr> ...  Record a committed blocker or prerequisite
+  undefer <addr>    Clear all committed blockers for one target
+  blockers [addr]   Show committed blockers
   audit [args]      Review audits, show completion, or refresh the ledger
   validate [args]   Build and reject comparison or source-quality regressions
   experiment [args] Store and compare one source-form experiment
@@ -168,7 +168,7 @@ if ($Command -eq "undefer") {
         throw "Usage: tools/decomp.ps1 undefer <address>"
     }
     & $VenvPython (Join-Path $Root "tools\decomp_candidates.py") --clear-deferral $CommandArgs[0]
-    Assert-LastExit "Clearing the local blockers"
+    Assert-LastExit "Clear the committed blockers"
     exit 0
 }
 if ($Command -eq "blockers") {
@@ -176,7 +176,7 @@ if ($Command -eq "blockers") {
         throw "Usage: tools/decomp.ps1 blockers [address]"
     }
     & $VenvPython (Join-Path $Root "tools\decomp_candidates.py") --list-blockers @CommandArgs
-    Assert-LastExit "Showing the local blockers"
+    Assert-LastExit "Show the committed blockers"
     exit 0
 }
 if ($Command -eq "session-summary") {

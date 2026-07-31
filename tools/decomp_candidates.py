@@ -10,7 +10,7 @@ no Ghidra call and no reccmp run:
   the owning translation unit.
 - `build/decomp-report-data.json` supplies the current match percent when a
   comparison is available.
-- `build/decomp-deferrals.tsv` supplies local supported deferrals.
+- `tools/Resources/decomp-blockers.tsv` supplies committed supported blockers.
 - `.notes/caps-registry.tsv` supplies legacy mismatch claims for the audit queue.
 - `tools/Resources/tool_artifacts.tsv` supplies the narrow tool-only allowlist.
 - `tools/decomp_lint.py` supplies the source-plausibility errors, so a function
@@ -42,7 +42,7 @@ CAPS_REGISTRY = ROOT / ".notes" / "caps-registry.tsv"
 TOOL_ARTIFACTS = ROOT / "tools" / "Resources" / "tool_artifacts.tsv"
 AUDIT_FREEZE = ROOT / "tools" / "Resources" / "audit-freeze.txt"
 AUDIT_LEDGER = ROOT / "tools" / "Resources" / "audit-ledger.tsv"
-DEFERRALS = ROOT / "build" / "decomp-deferrals.tsv"
+DEFERRALS = ROOT / "tools" / "Resources" / "decomp-blockers.tsv"
 
 sys.path.insert(0, str(ROOT))
 from tools.decomp_annotations import read_source_annotations  # noqa: E402
@@ -63,6 +63,7 @@ from tools.decomp_dependencies import (  # noqa: E402
 LEAF_MAX_SIZE = 200
 CLUSTER_MAX_SIZE = 600
 LARGE_GOAL_MIN_SIZE = 1000
+WEAK_MATCH_THRESHOLD = 0.75
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,7 @@ class Candidate:
     direct_dependencies: tuple[int, ...] = ()
     unresolved_dependencies: tuple[int, ...] = ()
     weak_dependencies: tuple[int, ...] = ()
+    quality_prerequisite: bool = False
     direct_unfinished_callers: tuple[int, ...] = ()
     immediate_unlocks: int = 0
     large_goal_reach: int = 0
@@ -261,7 +263,7 @@ def clear_deferral(address: int, path: Path = DEFERRALS) -> bool:
 def print_blockers(
     records: dict[int, Deferral],
     names: dict[int, str],
-    states: dict[int, tuple[str, str]],
+    candidates: dict[int, Candidate],
     address: int | None = None,
 ) -> None:
     selected = [
@@ -278,7 +280,9 @@ def print_blockers(
         if blocker.manual:
             state = "manual"
         elif all(
-            states.get(item, ("NOT_STARTED", ""))[0] == "FUNCTION"
+            item in candidates
+            and _is_resolved(candidates[item])
+            and not _is_weak(candidates[item])
             for item in blocker.blocked_by
         ):
             state = "resolved"
@@ -408,7 +412,7 @@ def _is_weak(candidate: Candidate) -> bool:
         return False
     if candidate.match == 1.0 or candidate.effective or candidate.tool_artifact:
         return False
-    return candidate.match is None or candidate.match < 0.75
+    return candidate.match is None or candidate.match < WEAK_MATCH_THRESHOLD
 
 
 def add_dependency_evidence(
@@ -422,6 +426,13 @@ def add_dependency_evidence(
     }
     edges: dict[int, set[int]] = {}
     for candidate in candidates:
+        candidate.quality_prerequisite = False
+        candidate.unresolved_dependencies = ()
+        candidate.direct_unfinished_callers = ()
+        candidate.immediate_unlocks = 0
+        candidate.large_goal_reach = 0
+        candidate.dependency_ready = False
+        candidate.dependency_component = -1
         targets = set(graph.callees.get(candidate.address, ()))
         targets.update(candidate.declared_dependencies)
         edges[candidate.address] = {
@@ -434,17 +445,41 @@ def add_dependency_evidence(
         candidate.indirect_calls = graph.indirect_calls.get(candidate.address, 0)
         candidate.indirect_jumps = graph.indirect_jumps.get(candidate.address, 0)
 
+    # Large callers need strong function evidence. A weak implemented callee
+    # stays on the work frontier until it reaches the acceptance threshold.
+    quality_prerequisites: set[int] = set()
+    while True:
+        new_prerequisites = {
+            dependency
+            for candidate in candidates
+            if (
+                candidate.address in unfinished | quality_prerequisites
+                and not candidate.manual_blocker
+            )
+            for dependency in candidate.weak_dependencies
+            if (
+                candidate.size > LARGE_GOAL_MIN_SIZE
+                or dependency in candidate.declared_dependencies
+            )
+        }
+        if new_prerequisites <= quality_prerequisites:
+            break
+        quality_prerequisites.update(new_prerequisites)
+    for address in quality_prerequisites:
+        by_address[address].quality_prerequisite = True
+
+    work = unfinished | quality_prerequisites
     unfinished_edges = {
-        source: {target for target in targets if target in unfinished}
+        source: {target for target in targets if target in work}
         for source, targets in edges.items()
-        if source in unfinished
+        if source in work
     }
     reverse_edges: dict[int, set[int]] = defaultdict(set)
     for source, targets in edges.items():
         for target in targets:
             reverse_edges[target].add(source)
     component_by_node, components = strongly_connected_components(
-        unfinished, unfinished_edges
+        work, unfinished_edges
     )
     component_edges: dict[int, set[int]] = defaultdict(set)
     reverse_component_edges: dict[int, set[int]] = defaultdict(set)
@@ -459,7 +494,7 @@ def add_dependency_evidence(
     manual_components = {
         component_by_node[candidate.address]
         for candidate in candidates
-        if candidate.address in unfinished and candidate.manual_blocker
+        if candidate.address in work and candidate.manual_blocker
     }
 
     for candidate in candidates:
@@ -470,7 +505,7 @@ def add_dependency_evidence(
                 if caller in unfinished
             )
         )
-        if candidate.address not in unfinished:
+        if candidate.address not in work:
             continue
         component = component_by_node[candidate.address]
         candidate.dependency_component = component
@@ -506,7 +541,7 @@ def add_dependency_evidence(
                 queue.append(caller_component)
         candidate.large_goal_reach = sum(
             by_address[address].size > LARGE_GOAL_MIN_SIZE
-            for reached in reached_components
+            for reached in reached_components - {component}
             for address in components[reached]
         )
 
@@ -517,7 +552,10 @@ def dependency_frontier_for(
     """Return ready unfinished prerequisites for one target."""
 
     by_address = {candidate.address: candidate for candidate in candidates}
-    if target not in by_address or _is_resolved(by_address[target]):
+    if target not in by_address or by_address[target].manual_blocker or (
+        _is_resolved(by_address[target])
+        and not by_address[target].quality_prerequisite
+    ):
         return set()
     frontier: set[int] = set()
     visited_components: set[int] = set()
@@ -646,6 +684,8 @@ def score(candidate: Candidate) -> None:
         reasons.append(f"{blocker_state}: {candidate.deferred_reason}")
 
     if candidate.dependency_component >= 0:
+        if candidate.quality_prerequisite:
+            reasons.append("quality prerequisite for a large caller")
         if candidate.dependency_ready:
             reasons.append("dependency frontier")
         elif candidate.manual_blocker:
@@ -684,16 +724,24 @@ def select(
     debt_only: bool = False,
     new_work_only: bool = False,
     include_deferred: bool = False,
+    allow_large: bool = False,
 ) -> list[Candidate]:
     chosen: list[Candidate] = []
     for candidate in candidates:
         if new_work_only:
-            if candidate.state == "FUNCTION":
+            if candidate.state == "FUNCTION" and not candidate.quality_prerequisite:
                 continue
             if (
                 candidate.dependency_component >= 0
                 and not include_deferred
                 and not candidate.dependency_ready
+            ):
+                continue
+            if (
+                not allow_large
+                and not include_deferred
+                and candidate.size > LARGE_GOAL_MIN_SIZE
+                and candidate.immediate_unlocks == 0
             ):
                 continue
         elif candidate.deferred_reason and not include_deferred:
@@ -806,6 +854,8 @@ def print_dependency_summary(target: Candidate, names: dict[int, str]) -> None:
         print("Weak implemented dependencies:")
         for address in target.weak_dependencies:
             print(f"  0x{address:08X}  {names.get(address, '(not in map)')}")
+    if target.quality_prerequisite:
+        print("Quality prerequisite: yes")
     if target.manual_blocker:
         print(f"Manual blocker: {target.deferred_reason}")
     print()
@@ -901,6 +951,11 @@ def main() -> int:
     parser.add_argument("--reason", help=argparse.SUPPRESS)
     parser.add_argument("--max-size", type=int, help="drop candidates larger than this many bytes")
     parser.add_argument(
+        "--allow-large",
+        action="store_true",
+        help="include ready large goals that do not unlock another function",
+    )
+    parser.add_argument(
         "--include-capped",
         action="store_true",
         help="deprecated alias: include verified tool-only artifacts",
@@ -954,7 +1009,10 @@ def main() -> int:
         except ValueError:
             parser.error("--list-blockers address must be hexadecimal")
         print_blockers(
-            read_deferrals(), names, read_annotation_states(), blocker_address
+            read_deferrals(),
+            names,
+            {candidate.address: candidate for candidate in build_candidates()},
+            blocker_address,
         )
         return 0
 
@@ -1001,6 +1059,7 @@ def main() -> int:
         debt_only=args.debt or args.quality,
         new_work_only=dependency_mode,
         include_deferred=include_blocked,
+        allow_large=args.allow_large or args.target_address is not None,
     )
     if args.target_address is not None:
         frontier = dependency_frontier_for(args.target_address, candidates)
@@ -1053,6 +1112,7 @@ def main() -> int:
                     "weak_dependencies": [
                         f"0x{address:08X}" for address in item.weak_dependencies
                     ],
+                    "quality_prerequisite": item.quality_prerequisite,
                     "direct_unfinished_callers": [
                         f"0x{address:08X}" for address in item.direct_unfinished_callers
                     ],

@@ -55,6 +55,7 @@ tools/decomp audit --status                   # show the required audit scope
 tools/decomp candidates --limit 15 --why      # show required pending audits
 tools/decomp candidates --new-work --why      # dependency-frontier new work
 tools/decomp candidates --for 0x004XXXXX --why # frontier for one goal
+tools/decomp candidates --new-work --allow-large --why # reviewed large goals
 tools/decomp evidence 0x004XXXXX              # the single best candidate
 ```
 
@@ -67,12 +68,15 @@ For a source-debt audit, use the order in `.notes/refactor-debt.md`. The file
 starts with the smallest supported fixes.
 
 `candidates` implements the dependency rubric in `AGENTS.md`. It promotes a
-frontier function when that function unlocks unfinished callers. It promotes a
-large goal after its function prerequisites are complete. Size resolves ties.
+frontier function when that function unlocks unfinished callers. A weak
+function below 75 percent blocks a large direct caller and becomes a quality
+prerequisite. Size resolves ties.
 
-The command reports weak implemented dependencies and indirect transfers. Use
-the evidence command to judge these items. Useful filters are `--debt`,
-`--stubs`, `--leaves`, `--near`, `--max-size N`, and `<namespace>`.
+The default new-work list omits a large goal that has no downstream unlock.
+Use `--allow-large` only after you review the goal and its frontier. The command
+also reports indirect transfers. Use the evidence command to judge them.
+Useful filters are `--debt`, `--stubs`, `--leaves`, `--near`, `--max-size N`,
+and `<namespace>`.
 
 After an audit, replace the placeholder uncertainty and revisit trigger. Set
 `audit-state` to `audited`. Then run `tools/decomp audit --refresh-ledger`.
@@ -96,8 +100,10 @@ item. Defer the target when its ABI, data model, or control flow stays unclear.
 
 If a function can resolve the blocker, record it with `tools/decomp defer
 <target> --blocked-by <address> --reason <text>`. The target returns after the
-prerequisite becomes a `FUNCTION`. Omit `--blocked-by` only for a manual
-blocker. Clear a manual blocker with `tools/decomp undefer <target>`.
+prerequisite reaches the acceptance threshold. Omit `--blocked-by` only for a
+manual blocker. Clear a manual blocker with `tools/decomp undefer <target>`.
+Keep the blocker-ledger change after you restore rejected source. Commit these
+records before the session ends.
 
 ## 4. Get on the branch — immediately after selection
 
@@ -141,6 +147,12 @@ tools/decomp experiment try 0x004XXXXX natural-form
 - Write the simplest supported form when the evidence is sufficient. Then use
   the comparison to test the source model. Do not write a complete body only to
   satisfy a time, tool-call, or commit target.
+- For a body larger than 1000 bytes, write one bounded region first. Include
+  the local layout and one representative branch or loop. Keep the `STUB`
+  annotation and run `tools/decomp bc` before you complete the body. Inspect
+  the implemented region and its frame, not the incomplete total score.
+  Continue only when the checkpoint supports the source model or identifies
+  one concrete correction.
 - **When two forms both fit the evidence, pick the simpler one, build it, and
   note the alternative in the final report.** Do not choose between them by thinking.
   If the simpler form regresses, that is your answer; `git restore` and take the
@@ -173,10 +185,12 @@ tools/decomp experiment try 0x004XXXXX natural-form
 - If the first frontier target is not supported, record its blocker and select
   the next frontier target. Fix type, layout, or lint debt when it unlocks that
   frontier. Stop when all frontier targets have blockers.
-- Do not audit a provisional function as fallback work. Audit it only when the
-  evidence identifies a source defect.
-- If a large function is dependency-ready and passes the evidence gate,
-  reconstruct it completely before the session ends.
+- Do not audit a provisional function as fallback work. A promoted quality
+  prerequisite is dependency work, but it still needs a supported source
+  defect. Do not change only register allocation to cross the threshold.
+- Use `--allow-large` only after all quality prerequisites pass the threshold.
+  Stop after the early checkpoint when the source model has broad structural
+  differences.
 
 **Debt items invert the order: write, build, compare, then judge.** A debt item
 already matches the retail code, so you have a known-good baseline that ordinary
