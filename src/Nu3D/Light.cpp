@@ -140,15 +140,15 @@ namespace Nu3D
 		light->phi = 0x8000;
 		light->enabled = enabled != 0;
 
-		D3DLIGHT2& description = light->direct3DDescription;
+		Direct3DLightDescriptionView& description = light->typedDescription;
 		description.dwSize = sizeof(description);
 		description.dltType = D3DLIGHT_POINT;
 		description.dcvColor.r = light->color.r;
 		description.dcvColor.g = light->color.g;
 		description.dcvColor.b = light->color.b;
 		description.dcvColor.a = light->color.a;
-		Math::GetPositionVector(&light->transform, (Vector3F*)&description.dvPosition);
-		Math::GetForwardVector(&light->transform, (Vector3F*)&description.dvDirection);
+		Math::GetPositionVector(&light->transform, &description.dvPosition);
+		Math::GetForwardVector(&light->transform, &description.dvDirection);
 		description.dvRange = light->range;
 		description.dvFalloff = 1.0f;
 		description.dvAttenuation0 = 1.0f;
@@ -158,7 +158,7 @@ namespace Nu3D
 		description.dvPhi = 0.0f;
 		description.dwFlags = light->enabled;
 
-		DrawingDevice::SetLight(light->direct3DLight, &description);
+		DrawingDevice::SetLight(light->direct3DLight, &light->direct3DDescription);
 		DrawingDevice::AddLight(light->direct3DLight);
 		return light;
 	}
@@ -185,15 +185,15 @@ namespace Nu3D
 		light->phi = 0x8000;
 		light->enabled = enabled != 0;
 
-		D3DLIGHT2& description = light->direct3DDescription;
+		Direct3DLightDescriptionView& description = light->typedDescription;
 		description.dwSize = sizeof(description);
 		description.dltType = D3DLIGHT_DIRECTIONAL;
 		description.dcvColor.r = light->color.r;
 		description.dcvColor.g = light->color.g;
 		description.dcvColor.b = light->color.b;
 		description.dcvColor.a = light->color.a;
-		Math::GetPositionVector(&light->transform, (Vector3F*)&description.dvPosition);
-		Math::GetForwardVector(&light->transform, (Vector3F*)&description.dvDirection);
+		Math::GetPositionVector(&light->transform, &description.dvPosition);
+		Math::GetForwardVector(&light->transform, &description.dvDirection);
 		description.dvRange = light->range;
 		description.dvFalloff = 1.0f;
 		description.dvAttenuation0 = 1.0f;
@@ -203,7 +203,7 @@ namespace Nu3D
 		description.dvPhi = 0.0f;
 		description.dwFlags = light->enabled;
 
-		DrawingDevice::SetLight(light->direct3DLight, &description);
+		DrawingDevice::SetLight(light->direct3DLight, &light->direct3DDescription);
 		DrawingDevice::AddLight(light->direct3DLight);
 		return light;
 	}
@@ -231,15 +231,15 @@ namespace Nu3D
 		light->phi = phi;
 		light->enabled = enabled != 0;
 
-		D3DLIGHT2& description = light->direct3DDescription;
+		Direct3DLightDescriptionView& description = light->typedDescription;
 		description.dwSize = sizeof(description);
 		description.dltType = D3DLIGHT_SPOT;
 		description.dcvColor.r = light->color.r;
 		description.dcvColor.g = light->color.g;
 		description.dcvColor.b = light->color.b;
 		description.dcvColor.a = light->color.a;
-		Math::GetPositionVector(&light->transform, (Vector3F*)&description.dvPosition);
-		Math::GetForwardVector(&light->transform, (Vector3F*)&description.dvDirection);
+		Math::GetPositionVector(&light->transform, &description.dvPosition);
+		Math::GetForwardVector(&light->transform, &description.dvDirection);
 		description.dvRange = light->range;
 		description.dvFalloff = 1.0f;
 		description.dvAttenuation0 = 1.0f;
@@ -249,7 +249,7 @@ namespace Nu3D
 		description.dvPhi = (float)light->phi * 3.14159265358979323846f / 32768.0f;
 		description.dwFlags = light->enabled;
 
-		DrawingDevice::SetLight(light->direct3DLight, &description);
+		DrawingDevice::SetLight(light->direct3DLight, &light->direct3DDescription);
 		DrawingDevice::AddLight(light->direct3DLight);
 		return light;
 	}
@@ -259,10 +259,10 @@ namespace Nu3D
 	{
 		if (light->type != TYPE_AMBIENT)
 		{
-			D3DLIGHT2& description = light->direct3DDescription;
+			Direct3DLightDescriptionView& description = light->typedDescription;
 
-			Math::GetPositionVector(&light->transform, (Vector3F*)&description.dvPosition);
-			Math::GetForwardVector(&light->transform, (Vector3F*)&description.dvDirection);
+			Math::GetPositionVector(&light->transform, &description.dvPosition);
+			Math::GetForwardVector(&light->transform, &description.dvDirection);
 			description.dcvColor.r = light->color.r;
 			description.dcvColor.g = light->color.g;
 			description.dcvColor.b = light->color.b;
@@ -271,7 +271,7 @@ namespace Nu3D
 			description.dvTheta = (float)light->theta * 3.14159265358979323846f / 32768.0f;
 			description.dvPhi = (float)light->phi * 3.14159265358979323846f / 32768.0f;
 			description.dwFlags = light->enabled & D3DLIGHT_ACTIVE;
-			DrawingDevice::SetLight(light->direct3DLight, &description);
+			DrawingDevice::SetLight(light->direct3DLight, &light->direct3DDescription);
 		}
 		else if (light->enabled & D3DLIGHT_ACTIVE)
 		{

@@ -3,6 +3,7 @@
 #include "Common.h"
 #include "Numerics.h"
 #include <directx6/d3d.h>
+#include <stddef.h>
 
 namespace Nu3D
 {
@@ -12,6 +13,23 @@ namespace Nu3D
 		float g;
 		float r;
 		float a;
+	};
+
+	struct Direct3DLightDescriptionView
+	{
+		DWORD dwSize;
+		D3DLIGHTTYPE dltType;
+		D3DCOLORVALUE dcvColor;
+		Vector3F dvPosition;
+		Vector3F dvDirection;
+		D3DVALUE dvRange;
+		D3DVALUE dvFalloff;
+		D3DVALUE dvAttenuation0;
+		D3DVALUE dvAttenuation1;
+		D3DVALUE dvAttenuation2;
+		D3DVALUE dvTheta;
+		D3DVALUE dvPhi;
+		DWORD dwFlags;
 	};
 
 	struct Light
@@ -34,7 +52,11 @@ namespace Nu3D
 		Light* previous;
 		Light* next;
 		LPDIRECT3DLIGHT direct3DLight;
-		D3DLIGHT2 direct3DDescription;
+		union
+		{
+			D3DLIGHT2 direct3DDescription;
+			Direct3DLightDescriptionView typedDescription;
+		};
 
 		static void Destroy(Light* light);
 		static void Free(Light* light);
@@ -54,5 +76,8 @@ namespace Nu3D
 	};
 
 	STATIC_ASSERT(sizeof(LightColor) == 0x10);
+	STATIC_ASSERT(sizeof(Direct3DLightDescriptionView) == sizeof(D3DLIGHT2));
+	STATIC_ASSERT(offsetof(Direct3DLightDescriptionView, dvPosition) == offsetof(D3DLIGHT2, dvPosition));
+	STATIC_ASSERT(offsetof(Direct3DLightDescriptionView, dvDirection) == offsetof(D3DLIGHT2, dvDirection));
 	STATIC_ASSERT(sizeof(Light) == 0xC0);
 }

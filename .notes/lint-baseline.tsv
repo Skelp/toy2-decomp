@@ -8,14 +8,6 @@ src/NGNLoader/NGNTypes.h	placeholder-field	unkVar6	71fe3eebba7b	src/NGNLoader/NG
 src/NGNLoader/NGNTypes.h	placeholder-field	unkVar7	c4e96513da34	src/NGNLoader/NGNTypes.h
 0x004cbc90	unstructured-control-flow	goto-count	4c11133ca3eb	src/NGNLoader/ObjectLoad.cpp
 src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNode.h
-0x004c2ab0	signature-concealment	GetPositionVector:arg2	c06c22f8bbfb	src/Nu3D/Light.cpp
-0x004c2ab0	signature-concealment	GetForwardVector:arg2	0111be2a6b73	src/Nu3D/Light.cpp
-0x004c2be0	signature-concealment	GetPositionVector:arg2	c06c22f8bbfb	src/Nu3D/Light.cpp
-0x004c2be0	signature-concealment	GetForwardVector:arg2	0111be2a6b73	src/Nu3D/Light.cpp
-0x004c2d20	signature-concealment	GetPositionVector:arg2	c06c22f8bbfb	src/Nu3D/Light.cpp
-0x004c2d20	signature-concealment	GetForwardVector:arg2	0111be2a6b73	src/Nu3D/Light.cpp
-0x004c2e70	signature-concealment	GetPositionVector:arg2	c06c22f8bbfb	src/Nu3D/Light.cpp
-0x004c2e70	signature-concealment	GetForwardVector:arg2	0111be2a6b73	src/Nu3D/Light.cpp
 0x0047b170	unstructured-control-flow	goto-count	af283beb99ab	src/RawLoader.cpp
 0x004bcb60	address-named-symbol	g_unkB7FBB8	d45cabe36754	src/SoftwareRenderer.cpp
 0x004bcb60	unknown-symbol	g_unkB7FBB8	d45cabe36754	src/SoftwareRenderer.cpp
