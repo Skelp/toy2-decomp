@@ -2481,10 +2481,8 @@ namespace Toy2
 				PoleRecord* pole = reinterpret_cast<PoleRecord*>(records->data);
 				int32_t poleIndex = 0;
 				int32_t poleCount = records->recordCount >> 1;
-				if (poleCount == 0)
-					return 0;
 
-				for (;;)
+				while (poleIndex < poleCount)
 				{
 					if (pole->type != POLE_TYPE_DISABLED)
 					{
@@ -2493,16 +2491,16 @@ namespace Toy2
 						if (distanceX * distanceX + distanceZ * distanceZ < 0x200)
 						{
 							int32_t heightDelta = pole->position.y - buzz->posAngles.pos.y;
-							if (heightDelta >= -0x1E00 && heightDelta > pole->height - 0x3600)
+							if (heightDelta >= -0x1E00 && heightDelta <= pole->height - 0x3600)
 								break;
 						}
 					}
 
 					poleIndex++;
 					pole++;
-					if (poleIndex >= poleCount)
-						return 0;
 				}
+				if (poleIndex >= poleCount)
+					return 0;
 
 				g_poleRecordOffset = poleIndex * 6;
 				g_poleClimbState = POLE_CLIMB_ATTACHING;
