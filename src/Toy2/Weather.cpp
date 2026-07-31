@@ -56,6 +56,7 @@ namespace Toy2
 				fallSpeed += g_buzzActor.velocity.vertical * 2;
 
 			int32_t inactiveCount = 0;
+			int32_t* inactiveIndex = g_inactiveParticleIndices;
 			for (int32_t i = 0; i < 64; i++)
 			{
 				if (g_precipitationParticles[i].terminalY != 0)
@@ -66,15 +67,18 @@ namespace Toy2
 				}
 				else
 				{
-					if (inactiveCount < 8)
-						g_inactiveParticleIndices[inactiveCount++] = i;
+					if (inactiveIndex < g_inactiveParticleIndices + 8)
+					{
+						*inactiveIndex = i;
+						inactiveCount++;
+						inactiveIndex++;
+					}
 				}
 			}
 
 			g_precipitationSpriteSheetIndex = spriteSheetIndex;
 			g_spawnAccumulator += Renderer::g_frameDelta * spawnRate;
 			fallSpeed = inactiveCount;
-			int32_t* inactiveIndex = &g_inactiveParticleIndices[inactiveCount];
 
 			while (g_spawnAccumulator > 0xFF)
 			{
