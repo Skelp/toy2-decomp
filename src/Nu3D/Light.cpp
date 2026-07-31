@@ -342,26 +342,36 @@ namespace Nu3D
 		Update(g_directionalLight);
 	}
 
-	// FUNCTION: TOY2 0x004CE910 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004CE910 [EFFECTIVE]
 	void Light::BuildGlobalLights()
 	{
 		InitPool(8);
 
-		LightColor ambientColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-		g_ambientLight = BuildAmbient(&ambientColor, 1);
+		LightColor color;
+		color.a = 1.0f;
+		color.r = 0.0f;
+		color.g = 0.0f;
+		color.b = 0.0f;
+		g_ambientLight = BuildAmbient(&color, 1);
 
-		LightColor white = { 1.0f, 1.0f, 1.0f, 1.0f };
-		D3DMATRIX firstTransform;
-		D3DMATRIX secondTransform;
-		D3DMATRIX thirdTransform;
+		color.a = 1.0f;
+		color.r = 1.0f;
+		color.g = 1.0f;
+		color.b = 1.0f;
 
-		Math::SetRotationYFromU16AngleLUT(&firstTransform, 0x0000);
-		g_defaultDirectionalLight1 = BuildDirectional(&firstTransform, &white, 1);
-		Math::SetRotationYFromU16AngleLUT(&secondTransform, 0x5555);
-		g_defaultDirectionalLight2 = BuildDirectional(&secondTransform, &white, 1);
-		Math::SetRotationYFromU16AngleLUT(&thirdTransform, 0xAAAA);
-		g_defaultDirectionalLight3 = BuildDirectional(&thirdTransform, &white, 1);
-		g_directionalLight = BuildDirectional(&firstTransform, &white, 1);
+		D3DMATRIX transform;
+		Math::SetRotationYFromU16AngleLUT(&transform, 0x0000);
+		g_defaultDirectionalLight1 = BuildDirectional(&transform, &color, 1);
+		Math::SetRotationYFromU16AngleLUT(&transform, 0x5555);
+		g_defaultDirectionalLight2 = BuildDirectional(&transform, &color, 1);
+		Math::SetRotationYFromU16AngleLUT(&transform, 0xAAAA);
+		g_defaultDirectionalLight3 = BuildDirectional(&transform, &color, 1);
+
+		color.a = 1.0f;
+		color.r = 0.0f;
+		color.g = 0.0f;
+		color.b = 0.0f;
+		g_directionalLight = BuildDirectional(&transform, &color, 1);
 	}
 
 	// FUNCTION: TOY2 0x004CEA50 [PROVISIONAL]
