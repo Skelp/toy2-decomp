@@ -204,7 +204,7 @@ namespace Toy2
 	// GLOBAL: TOY2 0x004F73C8
 	int32_t g_groundColorBlue = 40;
 
-	// FUNCTION: TOY2 0x00498140 [PROVISIONAL]
+	// FUNCTION: TOY2 0x00498140 [MATCHED]
 	int16_t InitDirect3DMaterials()
 	{
 		if (g_renderMode != RENDERMODE_D3D)
@@ -221,8 +221,10 @@ namespace Toy2
 			Logger::LogDDError("d3dappi.lpD3D->CreateMaterial(&d3dappi.lpSkyMat, 0)", result);
 
 		D3DMATERIAL mat;
+		uint32_t materialSize = sizeof(mat);
+		uint32_t defaultRampSize = 1;
 		memset(&mat, 0, sizeof(mat));
-		mat.dwSize = sizeof(mat);
+		mat.dwSize = materialSize;
 		mat.diffuse.r = g_skyColorRed * (1.0f / 255.0f);
 		mat.diffuse.g = g_skyColorGreen * (1.0f / 255.0f);
 		mat.diffuse.b = g_skyColorBlue * (1.0f / 255.0f);
@@ -232,11 +234,11 @@ namespace Toy2
 		mat.specular.r = 0.0f;
 		mat.specular.g = 0.0f;
 		mat.specular.b = 0.0f;
+		mat.dwRampSize = defaultRampSize;
 		mat.emissive.r = 20.0f;
 		mat.emissive.g = 20.0f;
 		mat.emissive.b = 20.0f;
 		mat.power = 0.0f;
-		mat.dwRampSize = 1;
 		d3dappi.lpSkyMat->SetMaterial(&mat);
 		d3dappi.lpSkyMat->GetHandle(d3dappi.lpD3DDevice, &d3dappi.lpSkyMatHandle);
 
@@ -251,7 +253,7 @@ namespace Toy2
 			Logger::LogDDError("d3dappi.lpD3D->CreateMaterial(&d3dappi.lpGroundMat, 0)", result);
 
 		memset(&mat, 0, sizeof(mat));
-		mat.dwSize = sizeof(mat);
+		mat.dwSize = materialSize;
 		mat.diffuse.r = g_groundColorRed * (1.0f / 255.0f);
 		mat.diffuse.g = g_groundColorGreen * (1.0f / 255.0f);
 		mat.diffuse.b = g_groundColorBlue * (1.0f / 255.0f);
@@ -261,15 +263,16 @@ namespace Toy2
 		mat.specular.r = 0.0f;
 		mat.specular.g = 0.0f;
 		mat.specular.b = 0.0f;
+		mat.dwRampSize = defaultRampSize;
 		mat.emissive.r = 20.0f;
 		mat.emissive.g = 20.0f;
 		mat.emissive.b = 20.0f;
 		mat.power = 0.0f;
-		mat.dwRampSize = 1;
 		d3dappi.lpGroundMat->SetMaterial(&mat);
 		d3dappi.lpGroundMat->GetHandle(d3dappi.lpD3DDevice, &d3dappi.lpGroundMatHandle);
 
-		for (int32_t i = 0; i < 64; ++i)
+		int32_t remainingMaterialCount = 64;
+		for (int32_t i = 0; remainingMaterialCount != 0; ++i, --remainingMaterialCount)
 		{
 			if (d3dappi.lpTextureMat[i])
 			{
@@ -290,7 +293,7 @@ namespace Toy2
 					Logger::LogDDError("d3dappi.lpD3D->CreateMaterial(&(d3dappi.lpTextureMat[i]), 0)", result);
 
 				memset(&mat, 0, sizeof(mat));
-				mat.dwSize = sizeof(mat);
+				mat.dwSize = materialSize;
 				mat.diffuse.r = 10.0f;
 				mat.diffuse.g = 10.0f;
 				mat.diffuse.b = 10.0f;
