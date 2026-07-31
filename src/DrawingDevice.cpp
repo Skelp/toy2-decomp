@@ -207,25 +207,23 @@ namespace DrawingDevice
 		if (DirectDrawCreate(lpGUID, &lpDD, 0) < 0)
 			return 0x82000001;
 
-		if (lpDD->QueryInterface(IID_IDirectDraw4, (LPVOID*)&m_pDD) >= 0)
-		{
-			lpDD->Release();
-
-			DWORD coopLevel = DDSCL_NORMAL;
-
-			if (m_bIsFullscreen)
-				coopLevel = DDSCL_FULLSCREEN | DDSCL_EXCLUSIVE | DDSCL_ALLOWREBOOT;
-
-			if ((flags & 16) == 0)
-				coopLevel |= DDSCL_FPUSETUP;
-
-			return m_pDD->SetCooperativeLevel(m_hWnd, coopLevel) >= 0 ? 0 : 0x82000002;
-		}
-		else
+		if (FAILED(lpDD->QueryInterface(IID_IDirectDraw4, (LPVOID*)&m_pDD)))
 		{
 			lpDD->Release();
 			return 0x82000001;
 		}
+
+		lpDD->Release();
+
+		DWORD coopLevel = DDSCL_NORMAL;
+
+		if (m_bIsFullscreen)
+			coopLevel = DDSCL_FULLSCREEN | DDSCL_EXCLUSIVE | DDSCL_ALLOWREBOOT;
+
+		if ((flags & 16) == 0)
+			coopLevel |= DDSCL_FPUSETUP;
+
+		return FAILED(m_pDD->SetCooperativeLevel(m_hWnd, coopLevel)) ? 0x82000002 : 0;
 	}
 
 	// FUNCTION: TOY2 0x004AEF80 [PROVISIONAL]
