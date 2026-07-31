@@ -1020,7 +1020,7 @@ namespace Nu3D
 		NGNLoader::NGNTextureData* textureData = NGNLoader::AllocateTextureData();
 		if (textureData)
 		{
-			textureData->isTex14 = 0;
+			textureData->textureFlags = 0;
 			textureData->color.b = 0;
 			textureData->color.g = 0;
 			textureData->color.r = 0;
@@ -1050,7 +1050,7 @@ namespace Nu3D
 		NGNLoader::NGNTextureData* textureData = NGNLoader::AllocateTextureData();
 		if (textureData)
 		{
-			textureData->isTex14 = 0;
+			textureData->textureFlags = 0;
 			textureData->color.b = 0;
 			textureData->color.g = 0;
 			textureData->color.r = 0;

@@ -21,10 +21,9 @@ now supplies the missing signal.
 
 ## Current state
 
-Sections 0, 1, and 4 are cleared, section 3 is mostly cleared, and section 2 is
-partly done. What remains in sections 3 and 5 is **blocked on reconstruction,
-not on naming**: those placeholder names sit in `STUB` signatures whose roles
-only the finished body reveals. Do not rename them speculatively.
+Sections 0 through 4 are cleared. Section 5 still has two reserved fields. More
+reconstruction evidence is necessary before these fields can have role-based
+names.
 
 So there is no cheap debt left. Take a `STUB` or an unannotated leaf from
 `tools/decomp candidates` instead of `--debt`. Note that this is how `c698aeb`
@@ -67,11 +66,8 @@ function stays at its current percentage.
 | 0x00490410 | `SoftwareRenderer::UnkFunc67` | 2 |
 | 0x004B5E40 | `SoftwareRenderer::SubmitSortedTriangle` | 2 |
 
-Deferred on purpose: the `STUB`s that carry `fieldNN` parameters
-(`UnkFunc35`, `UnkFunc34`, `UnkFunc8`, `UnkFunc22`,
-`Toy2::Animation::EvaluateClip`). Their signatures are guesses until the bodies
-are reconstructed, so fix those names as part of reconstructing each one. Do not
-rename them speculatively now.
+Later reconstruction sessions cleared the deferred signature names. Section 3
+records the evidence that supported those changes.
 
 ## 1. The `drawb` / `drawtranb` draw buffers — DONE
 
@@ -188,18 +184,12 @@ no retail cross-references to their addresses. They are now part of the unknown
 padding before `lpD3D`. Offset assertions pin all named members after this
 padding. Do not split this padding without new cross-reference evidence.
 
-## 3. `SoftwareRenderer` placeholder parameters
+## 3. `SoftwareRenderer` placeholder parameters — DONE
 
-`fieldNN` reached function **signatures**, where it is never acceptable: the
-caller already proves each argument's role.
-
-- `UnkFunc22` — `param5`, `param6`
-- `UnkFunc8` — `param1`, `param2`
-- `Toy2::Animation` — `arg2`, `arg3`, `arg4`
-
-Done: `SubmitSortedTriangle` (`field10`, `fieldC`) in `a0968c2`, `UnkFunc67`
-(`param1`, `param2` -> `x`, `y`) in `62a2aa6`, and `UnkFunc35`, `UnkFunc34`,
-`UnkFunc29` in `c698aeb`.
+`a0968c2` renamed the `SubmitSortedTriangle` parameters. `62a2aa6` renamed the
+two `UnkFunc67` parameters to `x` and `y`. `c698aeb` cleared the parameters in
+`UnkFunc35`, `UnkFunc34`, and `UnkFunc29`. Later sessions cleared the remaining
+placeholder parameters and renamed `UnkFunc8` to `RenderSoftwareFrame`.
 
 **The method for the `c698aeb` group is reusable, so prefer it over guessing.**
 `field80` and `field88` were already declared correctly on a *sibling*:
@@ -211,20 +201,10 @@ names. So: **before you rename a placeholder, grep the other functions that
 receive the same value.** The name is often already recovered somewhere else in
 the repository, which costs one grep instead of an investigation.
 
-`field94` became `useAlternateSpans` a different way. `UnkFunc35` *ignores* that
-argument, so its role is invisible there; the sibling `UnkFunc34` branches on it
-to swap in alternate rasterizers. When a parameter is dead in the function you
-are reconstructing, the caller and the sibling supply the role.
-
-Fix the rest when you reconstruct the callee, which is what reveals each role.
-
-`UnkFunc8` (0x0047D210) is a special case worth knowing before you spend time
-on it. Its body **ignores both parameters**: every `%ebp` reference in
-0x0047D210-0x0047D4D0 is negative, so nothing reads the argument slots. Its one
-caller passes `g_unk839278`, which holds 0x27F or 0x3FF. `ddaf204` corrected the
-first parameter's *type* to `int32_t` on that evidence, but left both names
-alone, because a name needs a role and the retail body supplies none. Settle
-these names while reconstructing the body, not before.
+`field94` became `useAlternateSpans` through different evidence. `UnkFunc35`
+ignores that argument. Its sibling `UnkFunc34` uses it to select alternate
+rasterizers. The caller and the sibling can identify a parameter that the
+selected function does not use.
 
 ## 4. `Toy2::UpdateD3DState` names the arithmetic, not the role — DONE
 
@@ -265,16 +245,16 @@ owns a different clip rectangle at 0x00B7FBBC, and the shorter name collides.
 | 0x008828D8 | `g_destRectHalfWidthCopy` | `g_softWindowHalfWidth` |
 
 The two lint errors in the body are also gone. `g_unk839278` is `int32_t`, not
-a pointer: it holds 0x27F and 0x3FF, and its only reader passes it to
-`SoftwareRenderer::UnkFunc8`, which ignores the argument entirely. The
+a pointer. It holds 0x27F and 0x3FF. Its only reader passes it to
+`SoftwareRenderer::RenderSoftwareFrame`, which ignores the argument. The
 `+0x9fdd8` cast became `g_drawBuffer->VerticePoolCount`; see item 1.
 
 ## 5. `RenderCommand` metadata fields
 
-`SoftwareRenderer::RenderCommand` holds `field80`, `field88`, `field90`,
-`field94`, `field98`. These stay warnings, not errors, because the layout is
-still being recovered. Name them when `UnkFunc29` and `UnkFunc35` are
-reconstructed. Do not leave them once both sides are known.
+`SoftwareRenderer::RenderCommand` now names the fields at offsets 0x80, 0x88,
+and 0x94. The fields at offsets 0x90 and 0x98 remain `reserved90` and
+`reserved98`. Current code does not read them. Do not assign a more specific
+role without new evidence.
 
 ## Also worth doing
 

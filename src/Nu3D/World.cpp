@@ -62,7 +62,7 @@ namespace NGNLoader
 			if (afterOffset - beforeOffset != dataOffset)
 				Logger::GetErrorHandler("C:\\projects\\nu3d\\world.c", 573)("bitmap parsed incorrectly in file %s", g_curFileName);
 
-			texParams.isTex14 = strcmpi("tex14", rawTexStr) == 0;
+			texParams.textureFlags = strcmpi("tex14", rawTexStr) == 0;
 
 			int32_t index = GetOrAllocateTexture(&texParams);
 

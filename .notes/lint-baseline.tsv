@@ -1,9 +1,5 @@
 # owner	rule	subject	fingerprint	path
 0x00432020	unstructured-control-flow	goto-count	5ec26f3099de	src/ModeSelect.cpp
-src/NGNLoader/NGNTypes.h	placeholder-field	unkVar4	d2630a10c3c2	src/NGNLoader/NGNTypes.h
-src/NGNLoader/NGNTypes.h	placeholder-field	unkVar5	5a5642c18ca9	src/NGNLoader/NGNTypes.h
-src/NGNLoader/NGNTypes.h	placeholder-field	unkVar6	71fe3eebba7b	src/NGNLoader/NGNTypes.h
-src/NGNLoader/NGNTypes.h	placeholder-field	unkVar7	c4e96513da34	src/NGNLoader/NGNTypes.h
 0x004cbc90	unstructured-control-flow	goto-count	4c11133ca3eb	src/NGNLoader/ObjectLoad.cpp
 src/Nu3D/BmpDataNode.h	placeholder-field	unkVar5	5a5642c18ca9	src/Nu3D/BmpDataNode.h
 0x0047b170	unstructured-control-flow	goto-count	af283beb99ab	src/RawLoader.cpp

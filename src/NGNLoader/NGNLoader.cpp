@@ -274,20 +274,20 @@ namespace NGNLoader
 
 			if (textureData)
 			{
-				textureData->isTex14 = texParams->isTex14;
+				textureData->textureFlags = texParams->textureFlags;
 				textureData->color.r = texParams->color.r;
 				textureData->color.g = texParams->color.g;
 				textureData->color.b = texParams->color.b;
 
-				uint32_t isTex14 = texParams->isTex14;
+				uint32_t textureFlags = texParams->textureFlags;
 				strcpy(rawTexStrBuffer, texParams->rawTexStr);
 
 				int32_t flags;
 
-				if ((isTex14 & 2) != 0)
+				if ((textureFlags & TEXTURE_FLAG_ALPHA_BITMAP) != 0)
 					flags = 1;
 				else
-					flags = 2 * (isTex14 & 4);
+					flags = 2 * (textureFlags & TEXTURE_FLAG_COLOR_KEY);
 
 				textureData->bmpDataNode = LoadLocalBmpTexture(rawTexStrBuffer, flags);
 				textureData->textureCacheIndex = textureCache->textureIndex;

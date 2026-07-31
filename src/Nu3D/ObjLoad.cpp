@@ -144,7 +144,7 @@ namespace NGNLoader
 
 					NGNTextureParams texParams;
 					texParams.rawTexStr = g_nameTableEntries[nameIdx];
-					fread(&texParams.isTex14, sizeof(NGNTextureParams) - sizeof(char*), 1, stream);
+					fread(&texParams.textureFlags, sizeof(NGNTextureParams) - sizeof(char*), 1, stream);
 
 					if (nameTableLength != 26)
 						fseek(stream, (uint8_t)(nameTableLength - 26), SEEK_CUR);

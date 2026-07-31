@@ -16,6 +16,13 @@
 
 namespace NGNLoader
 {
+	enum TextureFlags
+	{
+		TEXTURE_FLAG_TEX14_OVERLAY = 0x1,
+		TEXTURE_FLAG_ALPHA_BITMAP = 0x2,
+		TEXTURE_FLAG_COLOR_KEY = 0x4
+	};
+
 	struct TextureEntry
 	{
 		int32_t isBGR;
@@ -34,12 +41,9 @@ namespace NGNLoader
 	struct NGNTextureParams
 	{
 		char* rawTexStr;
-		uint32_t isTex14;
+		uint32_t textureFlags;
 		RGBA color;
-		uint32_t unkVar4;
-		uint32_t unkVar5;
-		uint32_t unkVar6;
-		uint32_t unkVar7;
+		uint32_t cacheKey[4];
 	};
 
 	struct NGNImage
@@ -83,7 +87,7 @@ namespace NGNLoader
 	{
 		NGNTextureData* next;
 		NGNTextureData* prev;
-		uint32_t isTex14;
+		uint32_t textureFlags;
 		uint32_t textureIndex;
 		Nu3D::BmpDataNode* bmpDataNode;
 		RGBA color;
@@ -112,6 +116,10 @@ namespace NGNLoader
 	};
 
 	STATIC_ASSERT(sizeof(NGNImage) == 0x67C);
+	STATIC_ASSERT(sizeof(NGNTextureParams) == 0x1C);
+	STATIC_ASSERT(offsetof(NGNTextureParams, textureFlags) == 0x4);
+	STATIC_ASSERT(offsetof(NGNTextureParams, color) == 0x8);
+	STATIC_ASSERT(offsetof(NGNTextureParams, cacheKey) == 0xC);
 	STATIC_ASSERT(sizeof(NGNTextureData) == 0x1C);
 	STATIC_ASSERT(sizeof(NGNTextureDataSentinal) == 0x8);
 	STATIC_ASSERT(sizeof(NGNTextureCache) == 0x128);

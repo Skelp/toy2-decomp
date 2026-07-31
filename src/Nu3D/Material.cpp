@@ -239,8 +239,8 @@ namespace Nu3D
 		NGNLoader::NGNTextureData* textureData = NGNLoader::GetTextureDataByIndex(texDataIndex);
 
 		material->texDataIndex = texDataIndex;
-		material->metadata |= (textureData->isTex14 & 1) << 2;
-		material->metadata |= (textureData->isTex14 & 2) != 0 ? 3 : 0;
+		material->metadata |= (textureData->textureFlags & NGNLoader::TEXTURE_FLAG_TEX14_OVERLAY) << 2;
+		material->metadata |= (textureData->textureFlags & NGNLoader::TEXTURE_FLAG_ALPHA_BITMAP) != 0 ? 3 : 0;
 
 		Unlink(material);
 		InsertSorted(material);
