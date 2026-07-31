@@ -31,45 +31,29 @@ namespace Nu3D
 		// the calculation matters more than incidental instruction differences; do not
 		// distort otherwise plausible source solely to raise a similarity score.
 
-		static __forceinline int32_t ShiftFixedTowardZero(int32_t value, int32_t bits) { return (value + ((value >> 31) & ((1 << bits) - 1))) >> bits; }
-
-		static __forceinline int32_t MultiplyFixed12(int32_t left, int32_t right) { return ShiftFixedTowardZero(left * right, 12); }
-
-		// FUNCTION: TOY2 0x00450C70 [PROVISIONAL]
+		// FUNCTION: TOY2 0x00450C70 [MATCHED]
 		Matrix3x3I16* SetRotationXYZ(const Vector3I16* angles, Matrix3x3I16* output)
 		{
-			int32_t cosineX = Numerics::g_sinCosLUT[(angles->x + 0x400) & 0xFFF];
-			cosineX = ShiftFixedTowardZero(cosineX, 2);
-			int32_t sineX = Numerics::g_sinCosLUT[angles->x & 0xFFF];
-			sineX += (sineX >> 31) & 3;
+			int32_t sineX = Numerics::g_sinCosLUT[angles->x & 0xFFF] / 4;
+			int32_t cosineX = Numerics::g_sinCosLUT[(angles->x + 0x400) & 0xFFF] / 4;
+			int32_t sineY = Numerics::g_sinCosLUT[angles->y & 0xFFF] / 4;
+			int32_t cosineY = Numerics::g_sinCosLUT[(angles->y + 0x400) & 0xFFF] / 4;
+			int32_t sineZ = Numerics::g_sinCosLUT[angles->z & 0xFFF] / 4;
+			int32_t cosineZ = Numerics::g_sinCosLUT[(angles->z + 0x400) & 0xFFF] / 4;
 
-			int32_t cosineY = Numerics::g_sinCosLUT[(angles->y + 0x400) & 0xFFF];
-			cosineY += (cosineY >> 31) & 3;
-			int32_t sineY = Numerics::g_sinCosLUT[angles->y & 0xFFF];
-			sineY = ShiftFixedTowardZero(sineY, 2);
-
-			int32_t cosineZ = Numerics::g_sinCosLUT[(angles->z + 0x400) & 0xFFF];
-			cosineZ = ShiftFixedTowardZero(cosineZ, 2);
-			int32_t sineZ = Numerics::g_sinCosLUT[angles->z & 0xFFF];
-			sineZ += (sineZ >> 31) & 3;
-
-			cosineY >>= 2;
-			sineZ >>= 2;
-
-			output->m00 = (int16_t)MultiplyFixed12(cosineZ, cosineY);
-			output->m01 = (int16_t)-MultiplyFixed12(sineZ, cosineY);
+			output->m00 = (int16_t)(cosineZ * cosineY / 4096);
+			output->m01 = (int16_t)-(sineZ * cosineY / 4096);
 			output->m02 = (int16_t)sineY;
 
-			sineX >>= 2;
-			int32_t sineXsineY = MultiplyFixed12(sineY, sineX);
-			output->m10 = (int16_t)ShiftFixedTowardZero(sineXsineY * cosineZ + sineZ * cosineX, 12);
-			output->m11 = (int16_t)ShiftFixedTowardZero(cosineZ * cosineX - sineXsineY * sineZ, 12);
-			output->m12 = (int16_t)-MultiplyFixed12(cosineY, sineX);
+			int32_t sineXsineY = sineY * sineX / 4096;
+			output->m10 = (int16_t)((sineXsineY * cosineZ + sineZ * cosineX) / 4096);
+			output->m11 = (int16_t)((cosineZ * cosineX - sineXsineY * sineZ) / 4096);
+			output->m12 = (int16_t)-(cosineY * sineX / 4096);
 
-			int32_t cosineXsineY = MultiplyFixed12(sineY, cosineX);
-			output->m20 = (int16_t)ShiftFixedTowardZero(sineZ * sineX - cosineXsineY * cosineZ, 12);
-			output->m21 = (int16_t)ShiftFixedTowardZero(cosineXsineY * sineZ + cosineZ * sineX, 12);
-			output->m22 = (int16_t)MultiplyFixed12(cosineY, cosineX);
+			int32_t cosineXsineY = sineY * cosineX / 4096;
+			output->m20 = (int16_t)((sineZ * sineX - cosineXsineY * cosineZ) / 4096);
+			output->m21 = (int16_t)((cosineXsineY * sineZ + cosineZ * sineX) / 4096);
+			output->m22 = (int16_t)(cosineY * cosineX / 4096);
 
 			return output;
 		}
