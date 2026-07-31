@@ -856,7 +856,7 @@ HRESULT WINAPI ExamineDDModesEnumCallback(LPDDSURFACEDESC surfaceDesc, LPVOID co
 {
 	ExamineDevice* examineContext = (ExamineDevice*)context;
 
-	int32_t dwWidth = surfaceDesc->dwWidth;
+	DWORD dwWidth = surfaceDesc->dwWidth;
 
 	if (dwWidth < 320 || surfaceDesc->dwHeight < 200)
 		return 1;

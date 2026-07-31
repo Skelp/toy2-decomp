@@ -7,9 +7,9 @@
 
 struct DisplayMode
 {
-	DWORD w;
-	DWORD h;
-	DWORD bpp;
+	int32_t w;
+	int32_t h;
+	int32_t bpp;
 };
 
 struct D3DTextureFormat
