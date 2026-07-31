@@ -37,6 +37,8 @@ namespace Nu3D
 
 namespace Toy2
 {
+	int32_t WriteCfg();
+
 	namespace Levels
 	{
 		extern int32_t g_type64Count;
@@ -564,7 +566,7 @@ namespace Toy2
 			Renderer::Cleanup();
 		}
 
-		// FUNCTION: TOY2 0x004CE8B0 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004CE8B0 [MATCHED]
 		int32_t InitLevelDefaults()
 		{
 			Renderer::Init();
@@ -584,15 +586,7 @@ namespace Toy2
 
 			SaveManager::SaveToFile(0, "default.cfg");
 
-			FILE* fd = fopen("toy2.cfg", "wb");
-
-			if (! fd)
-				return 0;
-
-			fwrite(&g_toyCfgData, 1, sizeof(g_toyCfgData), fd);
-			fclose(fd);
-
-			return 1;
+			return WriteCfg();
 		}
 
 		// FUNCTION: TOY2 0x0043E6E0 [PROVISIONAL]
