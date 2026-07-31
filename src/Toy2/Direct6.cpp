@@ -948,7 +948,7 @@ ExamineD3DEnumCallback(LPGUID guid, LPSTR deviceDesc, LPSTR deviceName, LPD3DDEV
 	return 1;
 }
 
-// FUNCTION: TOY2 0x00408CD0 [PROVISIONAL]
+// FUNCTION: TOY2 0x00408CD0 [MATCHED]
 int32_t SortDisplayModes(const void* modeA, const void* modeB)
 {
 	DisplayMode* displayModeA = (DisplayMode*)modeA;
@@ -958,24 +958,38 @@ int32_t SortDisplayModes(const void* modeA, const void* modeB)
 	int32_t bitCountB = displayModeB->bpp;
 
 	if (bitCountB > bitCountA)
+	{
 		return -1;
-
-	if (bitCountB < bitCountA)
+	}
+	else if (bitCountB < bitCountA)
+	{
 		return 1;
-
-	if (displayModeB->w > displayModeA->w)
-		return -1;
-
-	if (displayModeB->w < displayModeA->w)
-		return 1;
-
-	int32_t heightA = displayModeA->h;
-	int32_t heightB = displayModeB->h;
-
-	if (heightA >= heightB)
-		return heightB < heightA;
+	}
 	else
-		return -1;
+	{
+		int32_t widthA = displayModeA->w;
+		int32_t widthB = displayModeB->w;
+
+		if (widthB > widthA)
+		{
+			return -1;
+		}
+		else if (widthB < widthA)
+		{
+			return 1;
+		}
+		else
+		{
+			int32_t heightA = displayModeA->h;
+			int32_t heightB = displayModeB->h;
+
+			if (heightA < heightB)
+			{
+				return -1;
+			}
+			return heightB < heightA;
+		}
+	}
 }
 
 // FUNCTION: TOY2 0x00409360 [MATCHED]
