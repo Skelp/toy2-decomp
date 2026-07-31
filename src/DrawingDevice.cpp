@@ -521,53 +521,47 @@ namespace DrawingDevice
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004AFA20 [PROVISIONAL]
-	int32_t CD3DFramework::GetSlotSurfaceByIndex(int32_t index, LPDIRECTDRAWSURFACE4* surfaceOut)
+	// FUNCTION: TOY2 0x004AFA20 [MATCHED]
+	int32_t CD3DFramework::GetSlotSurfaceByIndex(uint32_t index, LPDIRECTDRAWSURFACE4* surfaceOut)
 	{
 		if (index > 8)
 			return 0x8200000F;
 
-		DrawingDeviceSlot* slot = &m_slots[index];
-
-		if (! slot->valid)
+		if (! m_slots[index].valid)
 			return 0x8200000F;
 
 		int32_t result = 0;
 
-		*surfaceOut = slot->surface1;
+		*surfaceOut = m_slots[index].surface1;
 
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x004AFA60 [PROVISIONAL]
-	int32_t CD3DFramework::GetSlotSurfaceCaps(int32_t index, uint32_t* capsOut)
+	// FUNCTION: TOY2 0x004AFA60 [MATCHED]
+	int32_t CD3DFramework::GetSlotSurfaceCaps(uint32_t index, uint32_t* capsOut)
 	{
 		if (index > 8)
 			return 0x8200000F;
 
-		DrawingDeviceSlot* slot = &m_slots[index];
-
-		if (! slot->valid)
+		if (! m_slots[index].valid)
 			return 0x8200000F;
 
-		slot->surface1->GetCaps((LPDDSCAPS2)capsOut);
+		m_slots[index].surface1->GetCaps((LPDDSCAPS2)capsOut);
 
 		return 0;
 	}
 
-	// FUNCTION: TOY2 0x004AFAA0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004AFAA0 [MATCHED]
 	int32_t CD3DFramework::GetSlotTexSize(uint32_t index, int32_t* widthOut, int32_t* heightOut)
 	{
 		if (index > 8)
 			return 0x8200000F;
 
-		DrawingDeviceSlot* slot = &m_slots[index];
-
-		if (! slot->valid)
+		if (! m_slots[index].valid)
 			return 0x8200000F;
 
-		*widthOut = slot->width;
-		*heightOut = slot->height;
+		*widthOut = m_slots[index].width;
+		*heightOut = m_slots[index].height;
 
 		return 0;
 	}
@@ -677,10 +671,10 @@ namespace DrawingDevice
 	LPDIRECTDRAWSURFACE4 GetBackBuffer() { return g_drawingDevice->m_pddsBackBuffer; }
 
 	// FUNCTION: TOY2 0x004ABE30 [MATCHED]
-	int32_t GetSlotSurfaceByIndex(int32_t index, LPDIRECTDRAWSURFACE4* surfaceOut) { return g_drawingDevice->GetSlotSurfaceByIndex(index, surfaceOut); }
+	int32_t GetSlotSurfaceByIndex(uint32_t index, LPDIRECTDRAWSURFACE4* surfaceOut) { return g_drawingDevice->GetSlotSurfaceByIndex(index, surfaceOut); }
 
 	// FUNCTION: TOY2 0x004ABE50 [MATCHED]
-	int32_t GetSlotSurfaceCaps(int32_t index, uint32_t* capsOut) { return g_drawingDevice->GetSlotSurfaceCaps(index, capsOut); }
+	int32_t GetSlotSurfaceCaps(uint32_t index, uint32_t* capsOut) { return g_drawingDevice->GetSlotSurfaceCaps(index, capsOut); }
 
 	// FUNCTION: TOY2 0x004ABE70 [MATCHED]
 	int32_t GetSlotTexSize(uint32_t index, int32_t* widthOut, int32_t* heightOut) { return g_drawingDevice->GetSlotTexSize(index, widthOut, heightOut); }

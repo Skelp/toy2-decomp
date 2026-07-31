@@ -96,8 +96,8 @@ namespace DrawingDevice
 		HRESULT PresentFrame();
 		int32_t RestoreLostSurfaces();
 		int32_t RestoreToGDISurface(int32_t refreshWindow);
-		int32_t GetSlotSurfaceByIndex(int32_t index, LPDIRECTDRAWSURFACE4* surfaceOut);
-		int32_t GetSlotSurfaceCaps(int32_t index, uint32_t* capsOut);
+		int32_t GetSlotSurfaceByIndex(uint32_t index, LPDIRECTDRAWSURFACE4* surfaceOut);
+		int32_t GetSlotSurfaceCaps(uint32_t index, uint32_t* capsOut);
 		int32_t GetSlotTexSize(uint32_t index, int32_t* widthOut, int32_t* heightOut);
 
 		static HRESULT Build(HWND hWnd, GUID* guid, DDAppDevice* device, DDAppDevice::DisplayMode* displayMode, uint8_t flags);
@@ -122,9 +122,9 @@ namespace DrawingDevice
 	int32_t GetDestWidth();
 	int32_t GetDestHeight();
 	LPDIRECTDRAWSURFACE4 GetBackBuffer();
-	int32_t GetSlotSurfaceByIndex(int32_t index, LPDIRECTDRAWSURFACE4* surfaceOut);
+	int32_t GetSlotSurfaceByIndex(uint32_t index, LPDIRECTDRAWSURFACE4* surfaceOut);
 	int32_t GetSlotTexSize(uint32_t index, int32_t* widthOut, int32_t* heightOut);
-	int32_t GetSlotSurfaceCaps(int32_t index, uint32_t* capsOut);
+	int32_t GetSlotSurfaceCaps(uint32_t index, uint32_t* capsOut);
 	int32_t SetViewport(LPD3DVIEWPORT2 viewport);
 	int32_t BuildFreshViewport(LPD3DVIEWPORT2 viewport);
 	HRESULT CreateMaterial(LPDIRECT3DMATERIAL3* outMaterial);
