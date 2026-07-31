@@ -1942,6 +1942,7 @@ namespace Renderer
 	{
 		Vector2F uvTopLeft;
 		Vector2F uvBottomRight;
+		RGBA overlayColor;
 
 		if (Nu3D::Camera::g_cameraTintBlue == 128 && Nu3D::Camera::g_cameraTintGreen == 128 && Nu3D::Camera::g_cameraTintRed == 128)
 			return;
@@ -1949,16 +1950,16 @@ namespace Renderer
 		if (Nu3D::Camera::g_cameraTintBlue > 128 || Nu3D::Camera::g_cameraTintGreen > 128 || Nu3D::Camera::g_cameraTintRed > 128)
 		{
 			int32_t brightenGreen = 2 * Nu3D::Camera::g_cameraTintGreen - 256;
-			int32_t brightenBlue = 2 * Nu3D::Camera::g_cameraTintBlue - 256;
-			int32_t brightenRed = 2 * Nu3D::Camera::g_cameraTintRed - 256;
+			int32_t brightenRed = 2 * Nu3D::Camera::g_cameraTintBlue - 256;
+			int32_t brightenBlue = 2 * Nu3D::Camera::g_cameraTintRed - 256;
 
-			if (brightenBlue > 255)
+			if (brightenRed > 255)
 			{
-				brightenBlue = 255;
+				brightenRed = 255;
 			}
-			else if (brightenBlue < 0)
+			else if (brightenRed < 0)
 			{
-				brightenBlue = 0;
+				brightenRed = 0;
 			}
 
 			if (brightenGreen > 255)
@@ -1970,20 +1971,19 @@ namespace Renderer
 				brightenGreen = 0;
 			}
 
-			if (brightenRed > 255)
+			if (brightenBlue > 255)
 			{
-				brightenRed = 255;
+				brightenBlue = 255;
 			}
-			else if (brightenRed < 0)
+			else if (brightenBlue < 0)
 			{
-				brightenRed = 0;
+				brightenBlue = 0;
 			}
 
-			RGBA brightenColor;
-			brightenColor.b = brightenBlue;
-			brightenColor.g = brightenGreen;
-			brightenColor.a = -1 - brightenGreen;
-			brightenColor.r = brightenRed;
+			overlayColor.b = brightenBlue;
+			overlayColor.g = brightenGreen;
+			overlayColor.a = -1 - brightenGreen;
+			overlayColor.r = brightenRed;
 
 			uvTopLeft.x = 0.0;
 			uvTopLeft.y = 0.0;
@@ -1991,24 +1991,21 @@ namespace Renderer
 			uvBottomRight.x = 1.0;
 			uvBottomRight.y = 1.0;
 
-			Sprite::Queue2DSprite(0.0, 0.0, 1.0, 1.0, &uvTopLeft, &uvBottomRight, 0, brightenColor, RENDER_PRESET_COLOR_OVERLAY);
-
-			if (g_renderMode == RENDERMODE_SOFTWARE && SoftwareRenderer::g_bitsPerPixel == 8)
-				SoftwareRenderer::UpdatePaletteTint();
+			Sprite::Queue2DSprite(0.0, 0.0, 1.0, 1.0, &uvTopLeft, &uvBottomRight, 0, overlayColor, RENDER_PRESET_COLOR_OVERLAY);
 		}
 		else
 		{
-			int32_t darkenBlue = 2 * (128 - Nu3D::Camera::g_cameraTintBlue);
+			int32_t darkenRed = 2 * (128 - Nu3D::Camera::g_cameraTintBlue);
 			int32_t darkenGreen = 2 * (128 - Nu3D::Camera::g_cameraTintGreen);
-			int32_t darkenRed = 2 * (128 - Nu3D::Camera::g_cameraTintRed);
+			int32_t darkenBlue = 2 * (128 - Nu3D::Camera::g_cameraTintRed);
 
-			if (darkenBlue > 255)
+			if (darkenRed > 255)
 			{
-				darkenBlue = 255;
+				darkenRed = 255;
 			}
-			else if (darkenBlue < 0)
+			else if (darkenRed < 0)
 			{
-				darkenBlue = 0;
+				darkenRed = 0;
 			}
 
 			if (darkenGreen > 255)
@@ -2020,13 +2017,13 @@ namespace Renderer
 				darkenGreen = 0;
 			}
 
-			if (darkenRed > 255)
+			if (darkenBlue > 255)
 			{
-				darkenRed = 255;
+				darkenBlue = 255;
 			}
-			else if (darkenRed < 0)
+			else if (darkenBlue < 0)
 			{
-				darkenRed = 0;
+				darkenBlue = 0;
 			}
 
 			uvTopLeft.x = 0.0;
@@ -2035,36 +2032,35 @@ namespace Renderer
 			uvBottomRight.x = 1.0;
 			uvBottomRight.y = 1.0;
 
-			RGBA darkenColor;
-			darkenColor.a = -1 - darkenGreen;
-			darkenColor.b = darkenBlue;
-			darkenColor.g = darkenGreen;
-			darkenColor.r = darkenRed;
+			overlayColor.a = -1 - darkenGreen;
+			overlayColor.b = darkenBlue;
+			overlayColor.g = darkenGreen;
+			overlayColor.r = darkenRed;
 
-			int32_t texDataIndex;
+			int32_t textureDataIndex;
 
-			if (darkenBlue == darkenGreen && darkenBlue == darkenRed)
+			if (darkenRed == darkenGreen && darkenRed == darkenBlue)
 			{
-				texDataIndex = NGNLoader::GetTextureDataIndex(14);
+				textureDataIndex = NGNLoader::GetTextureDataIndex(14);
 
-				if (! texDataIndex)
+				if (! textureDataIndex)
 				{
-					texDataIndex = NGNLoader::GetTextureDataIndex(36);
+					textureDataIndex = NGNLoader::GetTextureDataIndex(36);
 
-					if (! texDataIndex)
-						texDataIndex = NGNLoader::GetTextureDataIndex(37);
+					if (! textureDataIndex)
+						textureDataIndex = NGNLoader::GetTextureDataIndex(37);
 				}
 			}
 			else
 			{
-				texDataIndex = 0;
+				textureDataIndex = 0;
 			}
 
-			Sprite::Queue2DSprite(0.0, 0.0, 1.0, 1.0, &uvTopLeft, &uvBottomRight, texDataIndex, darkenColor, RENDER_PRESET_FADE_OVERLAY);
-
-			if (g_renderMode == RENDERMODE_SOFTWARE && SoftwareRenderer::g_bitsPerPixel == 8)
-				SoftwareRenderer::UpdatePaletteTint();
+			Sprite::Queue2DSprite(0.0, 0.0, 1.0, 1.0, &uvTopLeft, &uvBottomRight, textureDataIndex, overlayColor, RENDER_PRESET_FADE_OVERLAY);
 		}
+
+		if (g_renderMode == RENDERMODE_SOFTWARE && SoftwareRenderer::g_bitsPerPixel == 8)
+			SoftwareRenderer::UpdatePaletteTint();
 	}
 
 	// FUNCTION: TOY2 0x0048F230 [PROVISIONAL]
