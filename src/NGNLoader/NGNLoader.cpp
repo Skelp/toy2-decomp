@@ -995,27 +995,24 @@ namespace NGNLoader
 	{
 		FreeAllBmpDataNodes();
 
-		// $TODO: This method is really confusing because of some compiler optimizations
-		// It works as of right now but needs attention when we go instruction match
-
 		uint32_t textureDataCount = 1;
-		NGNTextureData* dataFreeListPtr = &g_textureDataFreeList[1];
+		NGNTextureData* dataFreeListPtr = g_textureDataFreeList;
 
 		do
 		{
-			++textureDataCount;
 			dataFreeListPtr->next = dataFreeListPtr + 1;
+			++textureDataCount;
 			dataFreeListPtr[1].prev = dataFreeListPtr;
 			dataFreeListPtr[1].textureIndex = textureDataCount;
 			++dataFreeListPtr;
 
-		} while (dataFreeListPtr < &g_textureDataFreeList[1999]);
+		} while (reinterpret_cast<int32_t>(dataFreeListPtr) < reinterpret_cast<int32_t>(&g_textureDataFreeList[1999]));
 
-		g_textureDataFreeList[1].textureIndex = 1;
-		g_textureDataFreeList[1].prev = 0;
-		g_textureDataFreeList[textureDataCount].next = 0;
+		g_textureDataFreeList[0].textureIndex = 1;
+		g_textureDataFreeList[0].prev = 0;
+		g_textureDataFreeList[textureDataCount - 1].next = 0;
 
-		g_textureData.freeList = &g_textureDataFreeList[1];
+		g_textureData.freeList = g_textureDataFreeList;
 		g_textureData.activeList = 0;
 
 		uint32_t textureCacheCount = 1;
@@ -1029,7 +1026,7 @@ namespace NGNLoader
 			++cacheFreeListPtr;
 			++textureCacheCount;
 
-		} while (cacheFreeListPtr < &g_textureCacheFreeList[999]);
+		} while (reinterpret_cast<int32_t>(cacheFreeListPtr) < reinterpret_cast<int32_t>(&g_textureCacheFreeList[999]));
 
 		g_textureCacheFreeList[0].textureIndex = textureCacheCount;
 		g_textureCacheFreeList[0].prev = 0;
@@ -1037,7 +1034,7 @@ namespace NGNLoader
 		g_textureCache.freeList = g_textureCacheFreeList;
 		g_textureCache.activeList = 0;
 
-		g_textureDataFreeList[1999].next = 0;
+		g_textureCacheFreeList[textureCacheCount - 1].next = 0;
 	}
 
 	// FUNCTION: TOY2 0x0044FF50 [MATCHED]
