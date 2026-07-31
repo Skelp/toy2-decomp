@@ -106,11 +106,10 @@ namespace Nu3D
 			RebuildMatrixAndCommit(link);
 		}
 
-		// FUNCTION: TOY2 0x004CCBE0 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004CCBE0 [MATCHED]
 		void RebuildMatrixAndCommit(Linker* link)
 		{
-			DynamicScaler* scaler = link->dynamicScaler;
-			D3DMATRIX* transform = &scaler->transformMatrix;
+			D3DMATRIX* transform = &link->dynamicScaler->transformMatrix;
 
 			Math::BuildIdentityMatrix(transform);
 			Math::ScaleMatrixByVector(transform, &link->currentScale);
@@ -119,10 +118,10 @@ namespace Nu3D
 			Math::PostRotateXFromLut(transform, link->currentRot.x);
 			Math::AddWorldSpaceTransform(transform, &link->currentPos);
 
-			Primitive* primitive = NGNLoader::g_ngnImage->primitives[scaler->shapeId];
-			Math::TransformVectorByMatrix(&scaler->boundsCenterWorld, &primitive->boundsCenter, transform);
-			scaler->translation = link->currentPos;
-			Spatial::UnlinkScalerThenReinsert(scaler, NGNLoader::g_ngnImage);
+			Primitive* primitive = NGNLoader::g_ngnImage->primitives[link->dynamicScaler->shapeId];
+			Math::TransformVectorByMatrix(&link->dynamicScaler->boundsCenterWorld, &primitive->boundsCenter, transform);
+			link->dynamicScaler->translation = link->currentPos;
+			Spatial::UnlinkScalerThenReinsert(link->dynamicScaler, NGNLoader::g_ngnImage);
 		}
 
 		// FUNCTION: TOY2 0x004CCC70 [MATCHED]
@@ -175,7 +174,7 @@ namespace Nu3D
 			output->z = link->currentRot.z >> 4;
 		}
 
-		// FUNCTION: TOY2 0x004CCDA0 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004CCDA0 [MATCHED]
 		void TransformVectorInt3x3(int32_t linkId, Vector4I* vector)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
@@ -186,19 +185,18 @@ namespace Nu3D
 			if (! link->dynamicScaler)
 				return;
 
-			Vector3F input;
-			input.x = (float)vector->x;
-			input.y = (float)vector->y;
-			input.z = (float)vector->z;
-
 			Vector3F transformed;
-			Math::TransformVectorByMatrix(&transformed, &input, &link->dynamicScaler->transformMatrix);
+			transformed.x = (float)vector->x;
+			transformed.y = (float)vector->y;
+			transformed.z = (float)vector->z;
+
+			Math::TransformVectorByMatrix(&transformed, &transformed, &link->dynamicScaler->transformMatrix);
 			vector->x = (int32_t)transformed.x;
 			vector->y = (int32_t)transformed.y;
 			vector->z = (int32_t)transformed.z;
 		}
 
-		// FUNCTION: TOY2 0x004CCE30 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004CCE30 [MATCHED]
 		void SetPositionRawAndCommit(int32_t linkId, int32_t x, int32_t y, int32_t z)
 		{
 			NGNLoader::NGNImage* image = NGNLoader::g_ngnImage;
@@ -206,11 +204,10 @@ namespace Nu3D
 				return;
 
 			Linker* link = &image->links[linkId];
-			DynamicScaler* scaler = link->dynamicScaler;
-			if (! scaler)
+			if (! link->dynamicScaler)
 				return;
 
-			if (scaler->gscaleType)
+			if (link->dynamicScaler->gscaleType)
 			{
 				x <<= 2;
 				y <<= 2;
@@ -220,11 +217,14 @@ namespace Nu3D
 			link->currentPos.x = (float)x;
 			link->currentPos.y = (float)y;
 			link->currentPos.z = (float)z;
-			scaler->transformMatrix._41 = link->currentPos.x;
-			scaler->transformMatrix._42 = link->currentPos.y;
-			scaler->transformMatrix._43 = link->currentPos.z;
-			scaler->translation = link->currentPos;
-			Spatial::UnlinkScalerThenReinsert(scaler, image);
+			{
+				DynamicScaler* scaler = link->dynamicScaler;
+				scaler->transformMatrix._41 = link->currentPos.x;
+				scaler->transformMatrix._42 = link->currentPos.y;
+				scaler->transformMatrix._43 = link->currentPos.z;
+			}
+			link->dynamicScaler->translation = link->currentPos;
+			Spatial::UnlinkScalerThenReinsert(link->dynamicScaler, NGNLoader::g_ngnImage);
 		}
 
 		// FUNCTION: TOY2 0x004CCEF0 [MATCHED]
