@@ -17,10 +17,9 @@ no Ghidra call and no reccmp run:
   that matches the machine code but still states byte offsets is still offered
   as work. A 100% match is not the finish line.
 
-The ranking follows the candidate rubric in `AGENTS.md`: a marked `STUB`
-first, then a small unannotated function in a namespace that already has
-reconstructed siblings, then a larger unannotated function, then an
-implemented function that still needs verification.
+New-work ranking starts with the retail dependency frontier. It favors a
+function that unlocks unfinished callers or contributes to large targets.
+Audit and source-debt modes keep their existing evidence ranking.
 """
 
 from __future__ import annotations
@@ -29,6 +28,7 @@ import argparse
 import csv
 import json
 import sys
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -51,11 +51,28 @@ from tools.decomp_status import (  # noqa: E402
     read_match_statuses,
     read_tool_artifacts,
 )
+from tools.decomp_dependencies import (  # noqa: E402
+    DependencyGraph,
+    DependencyUnavailable,
+    build_call_graph,
+    strongly_connected_components,
+)
 
 # A leaf-sized function is small enough that one decompilation shows the whole
 # body. The threshold is a heuristic on the gap to the next map address.
 LEAF_MAX_SIZE = 200
 CLUSTER_MAX_SIZE = 600
+LARGE_GOAL_MIN_SIZE = 1000
+
+
+@dataclass(frozen=True)
+class Deferral:
+    blocked_by: tuple[int, ...] = ()
+    reason: str = ""
+
+    @property
+    def manual(self) -> bool:
+        return not self.blocked_by
 
 
 @dataclass
@@ -77,6 +94,18 @@ class Candidate:
     audit_scope: str = ""
     nearby_provisional_scores: tuple[float, ...] = ()
     deferred_reason: str = ""
+    declared_dependencies: tuple[int, ...] = ()
+    manual_blocker: bool = False
+    direct_dependencies: tuple[int, ...] = ()
+    unresolved_dependencies: tuple[int, ...] = ()
+    weak_dependencies: tuple[int, ...] = ()
+    direct_unfinished_callers: tuple[int, ...] = ()
+    immediate_unlocks: int = 0
+    large_goal_reach: int = 0
+    indirect_calls: int = 0
+    indirect_jumps: int = 0
+    dependency_ready: bool = False
+    dependency_component: int = -1
     reasons: list[str] = field(default_factory=list)
     rank: float = 0.0
 
@@ -156,30 +185,110 @@ def read_audit_ledger(path: Path = AUDIT_LEDGER) -> dict[int, tuple[str, str]]:
     return records
 
 
-def read_deferrals(path: Path = DEFERRALS) -> dict[int, str]:
+def read_deferrals(path: Path = DEFERRALS) -> dict[int, Deferral]:
     if not path.exists():
         return {}
-    records = {}
+    records: dict[int, Deferral] = {}
     with path.open(encoding="utf-8", newline="") as handle:
         for row in csv.reader(handle, delimiter="\t"):
             if not row or row[0].lstrip().startswith("#"):
                 continue
             try:
-                records[int(row[0].strip(), 16)] = row[1].strip()
+                address = int(row[0].strip(), 16)
             except (IndexError, ValueError):
                 continue
+            if len(row) == 2:
+                records[address] = Deferral(reason=row[1].strip())
+                continue
+            blocked_by = []
+            for value in row[1].split(",") if len(row) > 1 else []:
+                value = value.strip()
+                if not value or value == "-":
+                    continue
+                try:
+                    blocked_by.append(int(value, 16))
+                except ValueError:
+                    continue
+            records[address] = Deferral(
+                blocked_by=tuple(sorted(set(blocked_by))),
+                reason=row[2].strip() if len(row) > 2 else "",
+            )
     return records
 
 
-def write_deferral(address: int, reason: str, path: Path = DEFERRALS) -> None:
+def write_deferral(
+    address: int,
+    reason: str,
+    blocked_by: tuple[int, ...] | Path = (),
+    path: Path = DEFERRALS,
+) -> None:
+    if isinstance(blocked_by, Path):
+        path = blocked_by
+        blocked_by = ()
     records = read_deferrals(path)
-    records[address] = reason.strip()
+    records[address] = Deferral(
+        blocked_by=tuple(sorted(set(blocked_by))),
+        reason=reason.strip(),
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-        writer.writerow(("# address", "reason"))
-        for item_address, item_reason in sorted(records.items()):
-            writer.writerow((f"0x{item_address:08X}", item_reason))
+        writer.writerow(("# address", "blocked-by", "reason"))
+        for item_address, deferral in sorted(records.items()):
+            dependencies = ",".join(
+                f"0x{dependency:08X}" for dependency in deferral.blocked_by
+            ) or "-"
+            writer.writerow((f"0x{item_address:08X}", dependencies, deferral.reason))
+
+
+def clear_deferral(address: int, path: Path = DEFERRALS) -> bool:
+    records = read_deferrals(path)
+    removed = records.pop(address, None) is not None
+    if not removed:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+        writer.writerow(("# address", "blocked-by", "reason"))
+        for item_address, deferral in sorted(records.items()):
+            dependencies = ",".join(
+                f"0x{dependency:08X}" for dependency in deferral.blocked_by
+            ) or "-"
+            writer.writerow((f"0x{item_address:08X}", dependencies, deferral.reason))
+    return True
+
+
+def print_blockers(
+    records: dict[int, Deferral],
+    names: dict[int, str],
+    states: dict[int, tuple[str, str]],
+    address: int | None = None,
+) -> None:
+    selected = [
+        (target, blocker)
+        for target, blocker in sorted(records.items())
+        if address is None or target == address
+    ]
+    if not selected:
+        print("No blocker matches the given address.")
+        return
+    print("TARGET      STATE     BLOCKED BY                         REASON")
+    print("-" * 98)
+    for target, blocker in selected:
+        if blocker.manual:
+            state = "manual"
+        elif all(
+            states.get(item, ("NOT_STARTED", ""))[0] == "FUNCTION"
+            for item in blocker.blocked_by
+        ):
+            state = "resolved"
+        else:
+            state = "open"
+        dependencies = ", ".join(
+            f"0x{item:08X} {names.get(item, '(not in map)')}"
+            for item in blocker.blocked_by
+        ) or "manual"
+        print(f"0x{target:08X}  {state:<9} {dependencies:<34} {blocker.reason}")
 
 
 def namespace_of(name: str) -> str:
@@ -259,6 +368,7 @@ def build_candidates() -> list[Candidate]:
                 and not nearby_status.effective
             ):
                 nearby_scores.append(nearby_status.matching)
+        deferral = deferrals.get(address, Deferral())
         candidates.append(
             Candidate(
                 address=address,
@@ -281,10 +391,155 @@ def build_candidates() -> list[Candidate]:
                 audit_state=audit_ledger.get(address, ("", ""))[0],
                 audit_scope=audit_ledger.get(address, ("", ""))[1],
                 nearby_provisional_scores=tuple(nearby_scores),
-                deferred_reason=deferrals.get(address, ""),
+                deferred_reason=deferral.reason,
+                declared_dependencies=deferral.blocked_by,
+                manual_blocker=bool(deferral.reason and deferral.manual),
             )
         )
     return candidates
+
+
+def _is_resolved(candidate: Candidate) -> bool:
+    return candidate.state == "FUNCTION"
+
+
+def _is_weak(candidate: Candidate) -> bool:
+    if not _is_resolved(candidate):
+        return False
+    if candidate.match == 1.0 or candidate.effective or candidate.tool_artifact:
+        return False
+    return candidate.match is None or candidate.match < 0.75
+
+
+def add_dependency_evidence(
+    candidates: list[Candidate], graph: DependencyGraph
+) -> None:
+    """Add dependency readiness and reverse unlock impact to each candidate."""
+
+    by_address = {candidate.address: candidate for candidate in candidates}
+    unfinished = {
+        candidate.address for candidate in candidates if not _is_resolved(candidate)
+    }
+    edges: dict[int, set[int]] = {}
+    for candidate in candidates:
+        targets = set(graph.callees.get(candidate.address, ()))
+        targets.update(candidate.declared_dependencies)
+        edges[candidate.address] = {
+            target for target in targets if target in by_address and target != candidate.address
+        }
+        candidate.direct_dependencies = tuple(sorted(edges[candidate.address]))
+        candidate.weak_dependencies = tuple(
+            sorted(target for target in edges[candidate.address] if _is_weak(by_address[target]))
+        )
+        candidate.indirect_calls = graph.indirect_calls.get(candidate.address, 0)
+        candidate.indirect_jumps = graph.indirect_jumps.get(candidate.address, 0)
+
+    unfinished_edges = {
+        source: {target for target in targets if target in unfinished}
+        for source, targets in edges.items()
+        if source in unfinished
+    }
+    reverse_edges: dict[int, set[int]] = defaultdict(set)
+    for source, targets in edges.items():
+        for target in targets:
+            reverse_edges[target].add(source)
+    component_by_node, components = strongly_connected_components(
+        unfinished, unfinished_edges
+    )
+    component_edges: dict[int, set[int]] = defaultdict(set)
+    reverse_component_edges: dict[int, set[int]] = defaultdict(set)
+    for source, targets in unfinished_edges.items():
+        source_component = component_by_node[source]
+        for target in targets:
+            target_component = component_by_node[target]
+            if source_component == target_component:
+                continue
+            component_edges[source_component].add(target_component)
+            reverse_component_edges[target_component].add(source_component)
+    manual_components = {
+        component_by_node[candidate.address]
+        for candidate in candidates
+        if candidate.address in unfinished and candidate.manual_blocker
+    }
+
+    for candidate in candidates:
+        candidate.direct_unfinished_callers = tuple(
+            sorted(
+                caller
+                for caller in reverse_edges.get(candidate.address, ())
+                if caller in unfinished
+            )
+        )
+        if candidate.address not in unfinished:
+            continue
+        component = component_by_node[candidate.address]
+        candidate.dependency_component = component
+        unresolved_components = component_edges.get(component, set())
+        candidate.unresolved_dependencies = tuple(
+            sorted(
+                target
+                for target in unfinished_edges.get(candidate.address, set())
+                if component_by_node[target] != component
+            )
+        )
+        candidate.dependency_ready = not unresolved_components and not candidate.manual_blocker
+
+        immediate_callers: set[int] = set()
+        for caller_component in reverse_component_edges.get(component, set()):
+            if caller_component in manual_components:
+                continue
+            if component_edges.get(caller_component, set()) == {component}:
+                immediate_callers.update(components[caller_component])
+        candidate.immediate_unlocks = len(immediate_callers)
+
+        reached_components = {component}
+        queue = deque([component])
+        while queue:
+            current = queue.popleft()
+            for caller_component in reverse_component_edges.get(current, set()):
+                if (
+                    caller_component in reached_components
+                    or caller_component in manual_components
+                ):
+                    continue
+                reached_components.add(caller_component)
+                queue.append(caller_component)
+        candidate.large_goal_reach = sum(
+            by_address[address].size > LARGE_GOAL_MIN_SIZE
+            for reached in reached_components
+            for address in components[reached]
+        )
+
+
+def dependency_frontier_for(
+    target: int, candidates: list[Candidate]
+) -> set[int]:
+    """Return ready unfinished prerequisites for one target."""
+
+    by_address = {candidate.address: candidate for candidate in candidates}
+    if target not in by_address or _is_resolved(by_address[target]):
+        return set()
+    frontier: set[int] = set()
+    visited_components: set[int] = set()
+
+    def visit(address: int) -> None:
+        candidate = by_address[address]
+        component = candidate.dependency_component
+        if component in visited_components:
+            return
+        visited_components.add(component)
+        members = [
+            item for item in candidates if item.dependency_component == component
+        ]
+        if all(item.dependency_ready for item in members):
+            frontier.update(item.address for item in members)
+            return
+        for member in members:
+            for dependency in member.unresolved_dependencies:
+                visit(dependency)
+
+    visit(target)
+    return frontier
 
 
 def score(candidate: Candidate) -> None:
@@ -382,7 +637,36 @@ def score(candidate: Candidate) -> None:
         reasons.append(f"tool-only artifact: {candidate.tool_artifact}")
 
     if candidate.deferred_reason:
-        reasons.append(f"supported deferral: {candidate.deferred_reason}")
+        if candidate.manual_blocker:
+            blocker_state = "manual blocker"
+        elif candidate.dependency_ready:
+            blocker_state = "resolved prerequisite record"
+        else:
+            blocker_state = "declared prerequisite"
+        reasons.append(f"{blocker_state}: {candidate.deferred_reason}")
+
+    if candidate.dependency_component >= 0:
+        if candidate.dependency_ready:
+            reasons.append("dependency frontier")
+        elif candidate.manual_blocker:
+            reasons.append("manual blocker is open")
+        else:
+            reasons.append(
+                f"{len(candidate.unresolved_dependencies)} unresolved direct prerequisite(s)"
+            )
+        if candidate.immediate_unlocks:
+            reasons.append(f"immediately unlocks {candidate.immediate_unlocks} caller(s)")
+        if candidate.large_goal_reach:
+            reasons.append(
+                f"contributes to {candidate.large_goal_reach} large unfinished target(s)"
+            )
+        if candidate.weak_dependencies:
+            reasons.append(f"{len(candidate.weak_dependencies)} weak implemented dependency(ies)")
+        if candidate.indirect_calls or candidate.indirect_jumps:
+            reasons.append(
+                f"{candidate.indirect_calls} indirect call(s), "
+                f"{candidate.indirect_jumps} indirect jump(s)"
+            )
 
     candidate.rank = rank
     candidate.reasons = reasons
@@ -403,17 +687,24 @@ def select(
 ) -> list[Candidate]:
     chosen: list[Candidate] = []
     for candidate in candidates:
-        if candidate.deferred_reason and not include_deferred:
-            continue
-        if new_work_only and candidate.state == "FUNCTION":
-            continue
-        if new_work_only and candidate.size > CLUSTER_MAX_SIZE:
+        if new_work_only:
+            if candidate.state == "FUNCTION":
+                continue
+            if (
+                candidate.dependency_component >= 0
+                and not include_deferred
+                and not candidate.dependency_ready
+            ):
+                continue
+        elif candidate.deferred_reason and not include_deferred:
             continue
         if namespace and not candidate.name.startswith(namespace + "::"):
             continue
         if stubs_only and candidate.state != "STUB":
             continue
-        if leaves_only and not (candidate.state == "NOT_STARTED" and 0 < candidate.size <= LEAF_MAX_SIZE):
+        if leaves_only and not (
+            candidate.state == "NOT_STARTED" and 0 < candidate.size <= LEAF_MAX_SIZE
+        ):
             continue
         if near_only and not (
             candidate.state == "FUNCTION"
@@ -429,7 +720,10 @@ def select(
             continue
         if debt_only and not (candidate.lint_errors or candidate.lint_warnings):
             continue
-        if not (stubs_only or leaves_only or near_only or debt_only) and candidate.state == "FUNCTION":
+        if (
+            not (stubs_only or leaves_only or near_only or debt_only)
+            and candidate.state == "FUNCTION"
+        ):
             # A fully matched function is finished work only when its source also
             # reads like source. Lint errors keep it in the list.
             if (
@@ -445,7 +739,23 @@ def select(
 
     for candidate in chosen:
         score(candidate)
-    chosen.sort(key=lambda item: (-item.rank, item.size, item.address))
+    if new_work_only:
+        chosen.sort(
+            key=lambda item: (
+                not item.dependency_ready,
+                item.manual_blocker,
+                -item.immediate_unlocks,
+                -item.large_goal_reach,
+                item.state != "STUB",
+                len(item.weak_dependencies),
+                item.indirect_calls + item.indirect_jumps,
+                -item.rank,
+                item.size,
+                item.address,
+            )
+        )
+    else:
+        chosen.sort(key=lambda item: (-item.rank, item.size, item.address))
     return chosen
 
 
@@ -457,19 +767,48 @@ def print_table(chosen: list[Candidate], limit: int, show_reasons: bool) -> None
     shown = chosen[:limit] if limit else chosen
     name_width = min(max(len(item.name) for item in shown), 52)
 
-    print(f"{'ADDRESS':<11}{'NAME':<{name_width + 2}}{'STATE':<13}{'SIZE':>6}  {'MATCH':>7}  TU")
-    print("-" * (11 + name_width + 2 + 13 + 6 + 9 + 4))
+    show_dependencies = any(item.dependency_component >= 0 for item in shown)
+    dependency_header = f"  {'DEPS':>7}  {'UNLOCK':>6}" if show_dependencies else ""
+    print(
+        f"{'ADDRESS':<11}{'NAME':<{name_width + 2}}{'STATE':<13}{'SIZE':>6}  "
+        f"{'MATCH':>7}{dependency_header}  TU"
+    )
+    print("-" * (11 + name_width + 2 + 13 + 6 + 9 + len(dependency_header) + 4))
     for item in shown:
         name = item.name if len(item.name) <= name_width else item.name[: name_width - 1] + "~"
+        dependency_text = ""
+        if show_dependencies:
+            status = "ready" if item.dependency_ready else str(len(item.unresolved_dependencies))
+            dependency_text = f"  {status:>7}  {item.immediate_unlocks:>6}"
         print(
             f"{item.address_text:<11}{name:<{name_width + 2}}{item.state:<13}"
-            f"{item.size:>6}  {item.match_text:>7}  {item.source or '-'}"
+            f"{item.size:>6}  {item.match_text:>7}{dependency_text}  {item.source or '-'}"
         )
         if show_reasons:
             print(f"{'':<11}rank {item.rank:.0f}: {'; '.join(item.reasons)}")
 
     if limit and len(chosen) > limit:
         print(f"... {len(chosen) - limit} more (raise --limit to see them)")
+
+
+def print_dependency_summary(target: Candidate, names: dict[int, str]) -> None:
+    print(f"Dependency goal: {target.address_text} {target.name}")
+    if target.state == "FUNCTION":
+        state = "implemented"
+    else:
+        state = "ready" if target.dependency_ready else "blocked"
+    print(f"State: {state}")
+    if target.unresolved_dependencies:
+        print("Unresolved direct prerequisites:")
+        for address in target.unresolved_dependencies:
+            print(f"  0x{address:08X}  {names.get(address, '(not in map)')}")
+    if target.weak_dependencies:
+        print("Weak implemented dependencies:")
+        for address in target.weak_dependencies:
+            print(f"  0x{address:08X}  {names.get(address, '(not in map)')}")
+    if target.manual_blocker:
+        print(f"Manual blocker: {target.deferred_reason}")
+    print()
 
 
 def main() -> int:
@@ -513,14 +852,52 @@ def main() -> int:
     parser.add_argument(
         "--new-work",
         action="store_true",
-        help="show only small STUB and unannotated work and bypass the audit freeze",
+        help="show dependency-ready STUB and unannotated work and bypass the audit freeze",
+    )
+    parser.add_argument(
+        "--for",
+        dest="target_address",
+        type=parse_address,
+        metavar="ADDRESS",
+        help="show the dependency frontier for one unfinished target",
     )
     parser.add_argument(
         "--include-deferred",
         action="store_true",
-        help="include targets from the local supported-deferral record",
+        help="deprecated alias for --include-blocked",
     )
-    parser.add_argument("--record-deferral", type=parse_address, metavar="ADDRESS", help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--include-blocked",
+        action="store_true",
+        help="include non-frontier targets and targets with open blockers",
+    )
+    parser.add_argument(
+        "--record-deferral",
+        type=parse_address,
+        metavar="ADDRESS",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--blocked-by",
+        type=parse_address,
+        action="append",
+        default=[],
+        metavar="ADDRESS",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--clear-deferral",
+        type=parse_address,
+        metavar="ADDRESS",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--list-blockers",
+        nargs="?",
+        const="",
+        metavar="ADDRESS",
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument("--reason", help=argparse.SUPPRESS)
     parser.add_argument("--max-size", type=int, help="drop candidates larger than this many bytes")
     parser.add_argument(
@@ -536,20 +913,72 @@ def main() -> int:
     if args.record_deferral is not None:
         if not args.reason or not args.reason.strip():
             parser.error("--record-deferral needs --reason")
-        write_deferral(args.record_deferral, args.reason)
-        print(f"Deferred 0x{args.record_deferral:08X}: {args.reason.strip()}")
+        known_addresses = {address for address, _ in parse_map()} if MAP_PATH.exists() else set()
+        if args.record_deferral not in known_addresses:
+            parser.error("the deferred target is not in functions_map.txt")
+        unknown_dependencies = [
+            address for address in args.blocked_by if address not in known_addresses
+        ]
+        if unknown_dependencies:
+            parser.error(
+                f"0x{unknown_dependencies[0]:08X} is not in functions_map.txt"
+            )
+        if args.record_deferral in args.blocked_by:
+            parser.error("a target cannot depend on itself")
+        write_deferral(args.record_deferral, args.reason, tuple(args.blocked_by))
+        dependencies = "".join(
+            f", blocked by 0x{address:08X}" for address in args.blocked_by
+        )
+        print(
+            f"Deferred 0x{args.record_deferral:08X}{dependencies}: "
+            f"{args.reason.strip()}"
+        )
+        return 0
+
+    if args.clear_deferral is not None:
+        if clear_deferral(args.clear_deferral):
+            print(f"Cleared blockers for 0x{args.clear_deferral:08X}.")
+        else:
+            print(f"No blockers exist for 0x{args.clear_deferral:08X}.")
         return 0
 
     if not MAP_PATH.exists():
         print(f"error: {MAP_PATH} not found", file=sys.stderr)
         return 2
 
+    entries = parse_map()
+    names = dict(entries)
+    if args.list_blockers is not None:
+        try:
+            blocker_address = int(args.list_blockers, 16) if args.list_blockers else None
+        except ValueError:
+            parser.error("--list-blockers address must be hexadecimal")
+        print_blockers(
+            read_deferrals(), names, read_annotation_states(), blocker_address
+        )
+        return 0
+
+    if args.target_address is not None and args.namespace:
+        parser.error("--for cannot be combined with a namespace filter")
+    if args.target_address is not None and args.target_address not in names:
+        parser.error(f"0x{args.target_address:08X} is not in functions_map.txt")
+
+    dependency_mode = args.new_work or args.target_address is not None
+    candidates = build_candidates()
+    if dependency_mode:
+        try:
+            graph = build_call_graph(entries)
+        except DependencyUnavailable as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 2
+        add_dependency_evidence(candidates, graph)
+
     audit_default = (
         AUDIT_FREEZE.exists()
-        and not args.new_work
+        and not dependency_mode
         and not (args.stubs or args.leaves or args.near or args.audit or args.debt or args.quality)
     )
-    freeze_queue = AUDIT_FREEZE.exists() and not args.new_work and (
+    freeze_queue = AUDIT_FREEZE.exists() and not dependency_mode and (
         audit_default
         or (
             args.audit
@@ -560,8 +989,9 @@ def main() -> int:
             and not args.near
         )
     )
+    include_blocked = args.include_deferred or args.include_blocked
     chosen = select(
-        build_candidates(),
+        candidates,
         namespace=args.namespace,
         stubs_only=args.stubs,
         leaves_only=args.leaves,
@@ -569,9 +999,14 @@ def main() -> int:
         max_size=args.max_size,
         exclude_capped=not args.include_capped,
         debt_only=args.debt or args.quality,
-        new_work_only=args.new_work,
-        include_deferred=args.include_deferred,
+        new_work_only=dependency_mode,
+        include_deferred=include_blocked,
     )
+    if args.target_address is not None:
+        frontier = dependency_frontier_for(args.target_address, candidates)
+        if include_blocked and not frontier:
+            frontier = {args.target_address}
+        chosen = [item for item in chosen if item.address in frontier]
     if args.legacy_caps:
         chosen = [item for item in chosen if item.cap]
     if args.score_below is not None:
@@ -605,6 +1040,27 @@ def main() -> int:
                     "audit_scope": item.audit_scope,
                     "nearby_provisional_scores": item.nearby_provisional_scores,
                     "deferred_reason": item.deferred_reason,
+                    "declared_dependencies": [
+                        f"0x{address:08X}" for address in item.declared_dependencies
+                    ],
+                    "manual_blocker": item.manual_blocker,
+                    "direct_dependencies": [
+                        f"0x{address:08X}" for address in item.direct_dependencies
+                    ],
+                    "unresolved_dependencies": [
+                        f"0x{address:08X}" for address in item.unresolved_dependencies
+                    ],
+                    "weak_dependencies": [
+                        f"0x{address:08X}" for address in item.weak_dependencies
+                    ],
+                    "direct_unfinished_callers": [
+                        f"0x{address:08X}" for address in item.direct_unfinished_callers
+                    ],
+                    "dependency_ready": item.dependency_ready,
+                    "immediate_unlocks": item.immediate_unlocks,
+                    "large_goal_reach": item.large_goal_reach,
+                    "indirect_calls": item.indirect_calls,
+                    "indirect_jumps": item.indirect_jumps,
                     "rank": item.rank,
                     "reasons": item.reasons,
                 }
@@ -620,6 +1076,9 @@ def main() -> int:
         print("note: build/decomp-report-data.json is absent, so no match percent is shown.")
         print("      Run `tools/decomp report` to populate it.")
 
+    if args.target_address is not None:
+        target = next(item for item in candidates if item.address == args.target_address)
+        print_dependency_summary(target, names)
     print_table(chosen, args.limit, args.why)
     return 0
 

@@ -131,7 +131,10 @@ list.
 ```sh
 tools/decomp candidates              # ranked targets; no Ghidra, no reccmp run
 tools/decomp candidates Nu3D --stubs --why
-tools/decomp defer 0x00401230 --reason "unknown dispatch table and two unnamed callees"
+tools/decomp candidates --for 0x00401230 --why # dependency frontier for one goal
+tools/decomp defer 0x00401230 --blocked-by 0x00405670 --reason "needs the producer layout"
+tools/decomp blockers                # show local blockers
+tools/decomp undefer 0x00401230      # clear local blockers for one target
 tools/decomp audit --legacy-caps --why # review old mismatch claims
 tools/decomp audit --status             # show freeze-audit completion
 tools/decomp audit --refresh-ledger     # refresh scores and preserve audit notes
@@ -164,9 +167,10 @@ command updates scores and source debt, but preserves manual audit evidence.
 Remove `tools/Resources/audit-freeze.txt` only when `tools/decomp audit --status
 --check` succeeds.
 
-Start selection with `candidates` and evidence with `evidence`. Both read only
-committed files and the build report, so they are fast. Do not hand-roll map
-greps or shell loops over `ghidra decompile` when these cover the need.
+Start selection with `candidates` and evidence with `evidence`. Candidate
+selection reads the retail binary, committed files, and build reports. It does
+not call Ghidra or reccmp. The evidence command makes bounded Ghidra queries.
+Do not replace these commands with map greps or repeated decompiler calls.
 
 The tools print no environment banner and no driver warning. When you filter
 their output, filter for what you want, and do not add noise filters.
@@ -174,8 +178,8 @@ their output, filter for what you want, and do not add noise filters.
 ## Autonomous work selection
 
 Do not choose work by address order, function size alone, or the largest
-apparent progress gain. Choose a small coherent slice. The repository must
-already contain enough evidence to recover plausible source for that slice.
+apparent progress gain. Choose a coherent dependency-frontier function. The
+repository must contain enough evidence to recover plausible source for it.
 
 At the start of a session:
 
@@ -210,30 +214,32 @@ candidate address, ownership, inferred ABI, callers and callees, relevant
 fields, reference analogue, and unresolved questions. Keep it in agent working
 notes. Do not add speculative analysis files to the repository.
 
-Build a candidate list with `tools/decomp candidates`. It ranks every map
-address from the map, the source annotations, the build report, and the legacy
-mismatch audit queue in `.notes/caps-registry.tsv`. Its ranking implements this
-order:
+Build a candidate list with `tools/decomp candidates`. For new work, the tool
+extracts direct calls and tail jumps from the retail binary. It combines these
+edges with source state and declared prerequisites. It collapses recursive
+groups before it finds the dependency frontier.
 
-1. An explicitly marked `STUB` whose types, callers, and callees are mostly
-   understood.
-2. An unannotated leaf or small helper adjacent to reconstructed functions in
-   the same namespace or subsystem.
-3. A cluster of related unannotated functions that share one type or data
-   structure. Reconstructing a small cluster is often better than inventing a
-   bad interface to finish one isolated function.
-4. An already implemented function with a clear semantic or readability defect.
-   Or a comparison diff that indicates a real type, signature, or control-flow
-   error.
+The new-work ranking implements this order:
 
-The tool ranks by evidence it can measure: annotation state, body size,
-reconstructed siblings in the same namespace, and legacy mismatch claims. It cannot judge
-whether a body is tractable. Use `--why` to see the rank's evidence, then
+1. A dependency-frontier function that immediately unlocks unfinished callers.
+2. A frontier function that contributes to several large unfinished callers.
+3. A `STUB`, then an unannotated function, with stronger dependency evidence first.
+4. A smaller body when two candidates have the same dependency impact.
+
+`--new-work` has no function-size limit. A large function becomes eligible when
+its unresolved function dependencies are complete. Use `candidates --for
+<address> --why` to inspect one goal. The command returns its recursive
+dependency frontier, or the goal itself when it is ready.
+
+The graph contains direct function dependencies only. It reports indirect
+calls and jumps as uncertainty. Use evidence and explicit blockers for type,
+global, and indirect-dispatch dependencies. A provisional dependency below 75
+percent is weak evidence, but it is not an unresolved function.
+
+The tool cannot decide whether a source model is plausible. Use `--why`, then
 confirm the top candidate with `tools/decomp evidence`. A legacy CAP claim does
-not prove that a mismatch is acceptable. It raises the candidate's audit rank.
-Only a row in `tools/Resources/tool_artifacts.tsv` can suppress a mismatch, and
-the verifier accepts that row only when the diff changes data-symbol rendering
-without changing instructions, registers, stack use, control flow, or order.
+not prove that a mismatch is acceptable. Only a verified tool-artifact row can
+suppress a mismatch.
 
 Prefer candidates with several of these properties:
 
@@ -248,17 +254,22 @@ Prefer candidates with several of these properties:
 - When you finish the function, it unlocks neighboring functions or replaces a
   widely used stub.
 
-Defer a candidate when its behavior depends on an unknown large structure,
-unresolved virtual or indirect dispatch, exception or compiler-runtime
-machinery, or several unnamed callees. Work on the smallest missing
-prerequisite instead. Also defer very large orchestration functions until you
-understand their leaf operations and types. Do not fill an opaque body with
-guessed fields merely to replace a `STUB`.
+Defer a candidate when its behavior depends on an unknown structure, indirect
+dispatch, runtime machinery, or unnamed callees. If one function can resolve
+the problem, record its address with `--blocked-by`. The candidate system then
+promotes that prerequisite and reactivates the target after it becomes a
+`FUNCTION`.
 
-Record a supported deferral with `tools/decomp defer <address> --reason
-<text>`. The command writes to the ignored local deferral record under
-`build/`. Candidate lists hide these targets by default. Use
-`--include-deferred` when new evidence can resolve a recorded reason.
+Use a manual blocker only when no function address represents the missing
+evidence. Do not fill an opaque body with guessed fields to replace a `STUB`.
+
+Record a function prerequisite with `tools/decomp defer <target> --blocked-by
+<prerequisite> --reason <text>`. You can repeat `--blocked-by`. The command
+writes to the ignored local blocker record under `build/`.
+
+A reason without `--blocked-by` creates a manual blocker. Use `tools/decomp
+undefer <target>` to clear it. Use `--include-blocked` only to inspect blocked
+targets. `--include-deferred` remains as a compatibility alias.
 
 Choose the TU by subsystem and ownership, not simply by address proximity. Use
 the namespace and name in `functions_map.txt`, existing declarations, callers,
@@ -311,9 +322,9 @@ build-compare loop resolves the rest.
 One `tools/decomp evidence` call answers most of these. If the answers are
 mostly unknown after that call, skip the function. Do not improvise.
 
-A supported deferral is a valid session result. Do not implement an opaque body
-to meet a time, tool-call, progress, or commit target. Record the reason in the
-handoff and select a smaller prerequisite when one exists.
+A supported blocker is a valid session result. Do not implement an opaque body
+to meet a time, tool-call, progress, or commit target. Record a prerequisite
+address when one exists.
 
 You do **not** need every field type confirmed, every callee resolved, or the
 complete struct layout before you start. Surveying candidates without
@@ -322,13 +333,14 @@ nothing.
 
 If the preferred new work is not supported, use this fallback order:
 
-1. Select another small, evidence-backed new target.
+1. Select the next evidence-backed dependency-frontier target.
 2. Fix a supported type, layout, or lint debt item.
-3. Improve a 50 to 90 percent leaf only when evidence identifies a source defect.
-4. Stop with a supported deferral.
+3. Record a function or manual blocker.
+4. Stop when every frontier target has a supported blocker.
 
-Do not select a large orchestration function only because small work is not
-available.
+Do not use provisional-score polishing as a fallback. Select a dependency-ready
+large function when its evidence checklist passes. Complete that function in
+the same uninterrupted session. Keep it as a `STUB` until the body is complete.
 
 ## Function map and Ghidra project
 

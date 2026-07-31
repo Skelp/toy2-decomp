@@ -111,7 +111,7 @@ fi
 # patches below take effect. The submodule is pinned to
 # upstream master (commit 21416ad1), which carries the evolved Ghidra importer
 # used by `tools/decomp sync`.
-"$TOOLING/venv/bin/python" -m pip install -e "$RECCMP_SUBMODULE" colorama==0.4.6
+"$TOOLING/venv/bin/python" -m pip install -e "$RECCMP_SUBMODULE" colorama==0.4.6 capstone==5.0.9
 
 # Apply local reccmp patches against the submodule worktree.
 # 1. WANT_CURLY parser fix: the state silently gets stuck on one-line function

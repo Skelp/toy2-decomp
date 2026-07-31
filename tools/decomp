@@ -237,7 +237,9 @@ Commands:
   score <addr>...   Print only the similarity verdict for one or more addresses
   bc <addr>         Build toy2.exe, then compare one address verbosely
   candidates [ns]   Rank reconstruction candidates (no Ghidra, no reccmp run)
-  defer <addr> ...  Record a supported local deferral
+  defer <addr> ...  Record a local blocker or prerequisite
+  undefer <addr>    Clear all local blockers for one target
+  blockers [addr]   Show local blockers
   evidence <addr>   Collect bounded evidence for one target in a single call
   audit [args]      Rank audits, show completion, or refresh the audit ledger
   baseline          Save a fresh parent-state comparison before source edits
@@ -253,9 +255,11 @@ Commands:
   shell             Start a shell with the decompilation environment active
   sync [args]       Import matched functions/types/globals into Ghidra via reccmp
 
-`candidates` and `evidence` read only committed files plus the build report, so
-they are fast and safe to run first:
+`candidates` reads the retail binary, committed files, and build reports. It
+does not call Ghidra or reccmp. `evidence` makes bounded Ghidra queries:
   tools/decomp candidates --limit 15 --why    # pending freeze audits
+  tools/decomp candidates --new-work --why
+  tools/decomp candidates --for 0x00401230 --why
   tools/decomp candidates --stubs --limit 10
   tools/decomp candidates Nu3D --leaves --why
   tools/decomp evidence 0x00403640
@@ -313,13 +317,30 @@ case "$command" in
         exec python tools/decomp_candidates.py "$@"
         ;;
     defer)
-        if [[ $# -lt 3 || ${2:-} != "--reason" ]]; then
-            echo "Usage: tools/decomp defer <address> --reason <text>" >&2
+        if [[ $# -lt 3 ]]; then
+            echo "Usage: tools/decomp defer <address> [--blocked-by <address> ...] --reason <text>" >&2
             exit 2
         fi
         address="$1"
-        shift 2
-        exec python tools/decomp_candidates.py --record-deferral "$address" --reason "$*"
+        shift
+        exec python tools/decomp_candidates.py --record-deferral "$address" "$@"
+        ;;
+    undefer)
+        if [[ $# -ne 1 ]]; then
+            echo "Usage: tools/decomp undefer <address>" >&2
+            exit 2
+        fi
+        exec python tools/decomp_candidates.py --clear-deferral "$1"
+        ;;
+    blockers)
+        if [[ $# -gt 1 ]]; then
+            echo "Usage: tools/decomp blockers [address]" >&2
+            exit 2
+        fi
+        if [[ $# -eq 1 ]]; then
+            exec python tools/decomp_candidates.py --list-blockers "$1"
+        fi
+        exec python tools/decomp_candidates.py --list-blockers
         ;;
     audit)
         if [[ ${1:-} == "--status" ]]; then

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("configure", "build", "compare", "score", "candidates", "defer", "audit", "baseline", "validate", "experiment", "lint", "report", "session-summary", "progress", "run", "shell", "help")]
+    [ValidateSet("configure", "build", "compare", "score", "candidates", "defer", "undefer", "blockers", "audit", "baseline", "validate", "experiment", "lint", "report", "session-summary", "progress", "run", "shell", "help")]
     [string] $Command = "help",
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -15,6 +15,7 @@ $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $Tooling = Join-Path $Root ".tooling"
 $MsvcBase = Join-Path $Tooling "msvc600-8168"
 $VenvScripts = Join-Path $Tooling "venv\Scripts"
+$VenvPython = Join-Path $VenvScripts "python.exe"
 $Vcvars = Join-Path $MsvcBase "VC98\Bin\VCVARS32.BAT"
 
 function Assert-LastExit([string] $Action) {
@@ -128,7 +129,9 @@ Commands:
   compare [args]    Run reccmp against the reference and recompiled EXEs
   score <addr>...   Show exact/effective/tool/provisional verdicts
   candidates [args] Rank reconstruction candidates
-  defer <addr> ...  Record a supported local deferral
+  defer <addr> ...  Record a local blocker or prerequisite
+  undefer <addr>    Clear all local blockers for one target
+  blockers [addr]   Show local blockers
   audit [args]      Review audits, show completion, or refresh the ledger
   validate [args]   Build and reject comparison or source-quality regressions
   experiment [args] Store and compare one source-form experiment
@@ -152,13 +155,28 @@ if ($Command -eq "lint") {
     exit 0
 }
 if ($Command -eq "defer") {
-    if ($CommandArgs.Count -lt 3 -or $CommandArgs[1] -ne "--reason") {
-        throw "Usage: tools/decomp.ps1 defer <address> --reason <text>"
+    if ($CommandArgs.Count -lt 3) {
+        throw "Usage: tools/decomp.ps1 defer <address> [--blocked-by <address> ...] --reason <text>"
     }
-    $Reason = ($CommandArgs[2..($CommandArgs.Count - 1)] -join " ")
-    & python (Join-Path $Root "tools\decomp_candidates.py") `
-        --record-deferral $CommandArgs[0] --reason $Reason
+    $DeferralArgs = @("--record-deferral") + $CommandArgs
+    & $VenvPython (Join-Path $Root "tools\decomp_candidates.py") @DeferralArgs
     Assert-LastExit "Recording the supported deferral"
+    exit 0
+}
+if ($Command -eq "undefer") {
+    if ($CommandArgs.Count -ne 1) {
+        throw "Usage: tools/decomp.ps1 undefer <address>"
+    }
+    & $VenvPython (Join-Path $Root "tools\decomp_candidates.py") --clear-deferral $CommandArgs[0]
+    Assert-LastExit "Clearing the local blockers"
+    exit 0
+}
+if ($Command -eq "blockers") {
+    if ($CommandArgs.Count -gt 1) {
+        throw "Usage: tools/decomp.ps1 blockers [address]"
+    }
+    & $VenvPython (Join-Path $Root "tools\decomp_candidates.py") --list-blockers @CommandArgs
+    Assert-LastExit "Showing the local blockers"
     exit 0
 }
 if ($Command -eq "session-summary") {
@@ -189,7 +207,7 @@ if ($Command -in @("candidates", "audit")) {
     $CandidateArgs = @()
     if ($Command -eq "audit") { $CandidateArgs += "--audit" }
     $CandidateArgs += $CommandArgs
-    & python (Join-Path $Root "tools\decomp_candidates.py") @CandidateArgs
+    & $VenvPython (Join-Path $Root "tools\decomp_candidates.py") @CandidateArgs
     Assert-LastExit "Ranking decompilation candidates"
     exit 0
 }

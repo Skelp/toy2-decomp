@@ -100,6 +100,23 @@ def file_offset(address: int) -> int | None:
     return None
 
 
+def read_bytes(address: int, size: int) -> bytes | None:
+    """Read bytes from one mapped section without crossing its raw extent."""
+
+    if size < 0:
+        raise ValueError("size must not be negative")
+    data = _image()[0]
+    for section in sections():
+        section_end = section.virtual_address + section.raw_size
+        if section.virtual_address <= address <= section_end:
+            available_size = section_end - address
+            if size > available_size:
+                return None
+            offset = section.raw_pointer + (address - section.virtual_address)
+            return data[offset : offset + size]
+    return None
+
+
 def read_string(address: int, limit: int = 400) -> str | None:
     """Read a NUL-terminated printable string at a virtual address."""
 

@@ -5,7 +5,10 @@ on:
     paths:
       - "src/**"
       - "tools/decomp_lint.py"
+      - "tools/decomp_binary.py"
       - "tools/decomp_candidates.py"
+      - "tools/decomp_dependencies.py"
+      - "tools/decomp_evidence.py"
       - "tools/generate-decomp-report.py"
       - "tools/tests/**"
       - ".notes/lint-baseline.tsv"
@@ -14,7 +17,10 @@ on:
     paths:
       - "src/**"
       - "tools/decomp_lint.py"
+      - "tools/decomp_binary.py"
       - "tools/decomp_candidates.py"
+      - "tools/decomp_dependencies.py"
+      - "tools/decomp_evidence.py"
       - "tools/generate-decomp-report.py"
       - "tools/tests/**"
       - ".notes/lint-baseline.tsv"

@@ -31,9 +31,15 @@ sys.path.insert(0, str(ROOT))
 from tools import decomp_binary  # noqa: E402
 from tools.decomp_annotations import read_source_annotations  # noqa: E402
 from tools.decomp_candidates import (  # noqa: E402
+    add_dependency_evidence,
+    build_candidates,
     parse_map,
     read_caps,
     read_match_percentages,
+)
+from tools.decomp_dependencies import (  # noqa: E402
+    DependencyUnavailable,
+    build_call_graph,
 )
 
 NEIGHBOR_COUNT = 3
@@ -132,7 +138,10 @@ def main() -> int:
 
     if address not in names:
         print(f"error: 0x{address:08X} is not in {MAP_PATH.relative_to(ROOT)}", file=sys.stderr)
-        print("       The map holds every real function start. Check the address.", file=sys.stderr)
+        print(
+            "       The map holds every real function start. Check the address.",
+            file=sys.stderr,
+        )
         return 1
 
     index = addresses.index(address)
@@ -146,6 +155,35 @@ def main() -> int:
     print(f"current match    {'-' if match is None else f'{match * 100:.2f}%'}")
     if caps.get(address):
         print(f"known cap        {caps[address]}  (see .notes/codegen-caps.md)")
+
+    section("dependency readiness")
+    try:
+        dependency_candidates = build_candidates()
+        dependency_graph = build_call_graph(entries)
+        add_dependency_evidence(dependency_candidates, dependency_graph)
+        dependency_target = next(
+            item for item in dependency_candidates if item.address == address
+        )
+        if dependency_target.state == "FUNCTION":
+            print("implemented source. Dependency readiness applies to unfinished targets")
+        else:
+            print("ready" if dependency_target.dependency_ready else "blocked")
+        for dependency in dependency_target.unresolved_dependencies:
+            print(f"  unresolved  0x{dependency:08X}  {names.get(dependency, '(not in map)')}")
+        for dependency in dependency_target.weak_dependencies:
+            print(f"  weak        0x{dependency:08X}  {names.get(dependency, '(not in map)')}")
+        if dependency_target.manual_blocker:
+            print(f"  manual      {dependency_target.deferred_reason}")
+        print(
+            f"  impact      immediately unlocks {dependency_target.immediate_unlocks}, "
+            f"reaches {dependency_target.large_goal_reach} large target(s)"
+        )
+        print(
+            f"  indirect    {dependency_target.indirect_calls} call(s), "
+            f"{dependency_target.indirect_jumps} jump(s)"
+        )
+    except (DependencyUnavailable, StopIteration) as error:
+        print(f"unavailable: {error}")
 
     section("map neighbors")
     low = max(index - NEIGHBOR_COUNT, 0)

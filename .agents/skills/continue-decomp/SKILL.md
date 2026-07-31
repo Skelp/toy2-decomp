@@ -53,25 +53,26 @@ tools/decomp baseline              # saved comparison and build identity
 ```sh
 tools/decomp audit --status                   # show the required audit scope
 tools/decomp candidates --limit 15 --why      # show required pending audits
-tools/decomp candidates --new-work --why      # small evidence-backed new work
+tools/decomp candidates --new-work --why      # dependency-frontier new work
+tools/decomp candidates --for 0x004XXXXX --why # frontier for one goal
 tools/decomp evidence 0x004XXXXX              # the single best candidate
 ```
 
 **Complete the required audits before new work.** During the freeze, the
 default list contains pending former CAP, sub-50 percent, and verified-code
-debt audits. Use `--new-work` only when the evidence supports a complete body
-that can reach at least 75 percent. Exact, effective, and tool results also pass.
+debt audits. Use `--new-work` when the audit queue is complete. The list can
+contain large functions with resolved function dependencies.
 
 For a source-debt audit, use the order in `.notes/refactor-debt.md`. The file
 starts with the smallest supported fixes.
 
-`candidates` implements the rubric in `AGENTS.md`: `STUB` first, then a small
-unannotated function with reconstructed siblings, then a larger one, then an
-implemented function still below a match. It ranks a function with lint errors
-as real work even at 100%. It gives legacy CAP claims a higher audit rank. It
-hides only verifier-confirmed rows from `tools/Resources/tool_artifacts.tsv`.
-Useful filters are `--debt`, `--stubs`, `--leaves`, `--near`, `--max-size N`,
-and `<namespace>`.
+`candidates` implements the dependency rubric in `AGENTS.md`. It promotes a
+frontier function when that function unlocks unfinished callers. It promotes a
+large goal after its function prerequisites are complete. Size resolves ties.
+
+The command reports weak implemented dependencies and indirect transfers. Use
+the evidence command to judge these items. Useful filters are `--debt`,
+`--stubs`, `--leaves`, `--near`, `--max-size N`, and `<namespace>`.
 
 After an audit, replace the placeholder uncertainty and revisit trigger. Set
 `audit-state` to `audited`. Then run `tools/decomp audit --refresh-ledger`.
@@ -92,9 +93,11 @@ byte offsets.
 **Gate.** Use the "Minimal candidate checklist" in `AGENTS.md` after the first
 `evidence` call. Get more evidence when one focused query can answer a missing
 item. Defer the target when its ABI, data model, or control flow stays unclear.
-A correct deferral is useful work and does not require a commit.
-Record it with `tools/decomp defer <address> --reason <text>`. Candidate lists
-hide it until you use `--include-deferred`.
+
+If a function can resolve the blocker, record it with `tools/decomp defer
+<target> --blocked-by <address> --reason <text>`. The target returns after the
+prerequisite becomes a `FUNCTION`. Omit `--blocked-by` only for a manual
+blocker. Clear a manual blocker with `tools/decomp undefer <target>`.
 
 ## 4. Get on the branch — immediately after selection
 
@@ -111,9 +114,9 @@ git rev-parse --verify agent/continuous >/dev/null 2>&1 \
   ends. Do **not** create a per-function branch.
 - Make sure the working tree is clean before you start a new function. If `main`
   has advanced, `git rebase main` first.
-- Session scope: one function, or one tightly coupled cluster plus the required
-  header and layout changes. Choose the TU by subsystem ownership, not by
-  address proximity.
+- Session scope is one complete function, or one tightly coupled cluster with
+  its required types. A dependency-ready large function is valid session work.
+  Do not commit a partial large-function body.
 - Make reasonably sized commits. A one- or two-line code change does not justify
   its own commit. Group small changes only when they form one coherent
   reconstruction slice in the same subsystem. Do not combine unrelated changes
@@ -167,10 +170,13 @@ tools/decomp experiment try 0x004XXXXX natural-form
 - Stop a related cluster when two siblings remain below 50 percent under the
   same source model. Investigate the common layout, macro, or control flow
   before you implement another sibling.
-- If small new work is not supported, fix type, layout, or lint debt next.
-  After that, select a 50 to 90 percent leaf with a known source defect.
-  Otherwise, stop with a supported deferral. Do not select a large orchestration
-  function only because the small candidates are exhausted.
+- If the first frontier target is not supported, record its blocker and select
+  the next frontier target. Fix type, layout, or lint debt when it unlocks that
+  frontier. Stop when all frontier targets have blockers.
+- Do not audit a provisional function as fallback work. Audit it only when the
+  evidence identifies a source defect.
+- If a large function is dependency-ready and passes the evidence gate,
+  reconstruct it completely before the session ends.
 
 **Debt items invert the order: write, build, compare, then judge.** A debt item
 already matches the retail code, so you have a known-good baseline that ordinary
@@ -217,11 +223,11 @@ minutes and returns nothing.
 
 ## Gotchas
 
-- Use `candidates` and `evidence` before custom discovery work. Defer a target
-  when focused evidence does not support its source model.
+- Use `candidates` and `evidence` before custom discovery work. Record a
+  prerequisite address when focused evidence finds one.
 - **Do not polish near-matches.** Cycling functions above 90% for a
-  source-fixable diff produces no reconstruction. The priority is `STUB`s and
-  unannotated leaves.
+  source-fixable diff produces no reconstruction. The priority is the
+  dependency frontier.
 - **The score is a metric, not the goal.** It is measured every cycle, so it is
   the easiest thing to optimize and the easiest trap. Source plausibility is
   measured only by `tools/decomp lint` and by your own judgment. A session of

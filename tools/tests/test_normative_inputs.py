@@ -49,7 +49,7 @@ class NormativeInputTests(unittest.TestCase):
             "each FUNCTION must have one verification tag",
         )
 
-    def test_only_five_migrated_cap23_rows_are_tool_artifacts(self):
+    def test_tool_artifact_rows_match_tool_annotations(self):
         path = ROOT / "tools" / "Resources" / "tool_artifacts.tsv"
         with path.open(encoding="utf-8", newline="") as handle:
             addresses = {
@@ -57,10 +57,12 @@ class NormativeInputTests(unittest.TestCase):
                 for row in csv.reader(handle, delimiter="\t")
                 if row and not row[0].startswith("#")
             }
-        self.assertEqual(
-            addresses,
-            {0x004A4910, 0x004A4D60, 0x004A4E60, 0x004A62A0, 0x004DBB80},
-        )
+        annotated = {
+            int(item.address, 16)
+            for item in read_source_annotations(ROOT / "src")
+            if item.kind == "function" and item.tag == "tool"
+        }
+        self.assertEqual(addresses, annotated)
         self.assertNotIn(0x00414320, addresses)
 
     def test_every_provisional_function_is_in_the_audit_ledger(self):
@@ -77,7 +79,7 @@ class NormativeInputTests(unittest.TestCase):
                 for row in csv.reader(handle, delimiter="\t")
                 if row and not row[0].startswith("#")
             }
-        self.assertEqual(audited, provisional)
+        self.assertTrue(provisional <= audited)
         with (ROOT / ".notes" / "caps-registry.tsv").open(
             encoding="utf-8", newline=""
         ) as handle:

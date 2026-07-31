@@ -118,7 +118,7 @@ if (-not (Test-Path (Join-Path $ReccmpSubmodule ".git"))) {
 # patches below take effect. The submodule is pinned to
 # upstream master (commit 21416ad1), which carries the evolved Ghidra importer
 # used by `tools/decomp sync`.
-& $VenvPython -m pip install -e $ReccmpSubmodule colorama==0.4.6
+& $VenvPython -m pip install -e $ReccmpSubmodule colorama==0.4.6 capstone==5.0.9
 Assert-LastExit "Installing reccmp"
 
 # Apply local reccmp patches against the submodule worktree.

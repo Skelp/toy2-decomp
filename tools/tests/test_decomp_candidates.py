@@ -101,13 +101,33 @@ class ReadCapsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "deferrals.tsv"
             candidates.write_deferral(0x402000, "unknown dispatch table", path)
-            candidates.write_deferral(0x401000, "unknown structure layout", path)
+            candidates.write_deferral(
+                0x401000,
+                "unknown structure layout",
+                (0x403000, 0x404000),
+                path,
+            )
             self.assertEqual(
                 candidates.read_deferrals(path),
                 {
-                    0x401000: "unknown structure layout",
-                    0x402000: "unknown dispatch table",
+                    0x401000: candidates.Deferral(
+                        blocked_by=(0x403000, 0x404000),
+                        reason="unknown structure layout",
+                    ),
+                    0x402000: candidates.Deferral(reason="unknown dispatch table"),
                 },
+            )
+
+    def test_legacy_deferral_is_a_manual_blocker(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "deferrals.tsv"
+            path.write_text(
+                "# address\treason\n0x00401000\tunknown structure layout\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                candidates.read_deferrals(path)[0x401000],
+                candidates.Deferral(reason="unknown structure layout"),
             )
 
 
@@ -245,11 +265,11 @@ class SelectTests(unittest.TestCase):
     def test_debt_only_keeps_just_the_lint_failures(self):
         self.assertEqual(self.choose(debt_only=True), ["N::Debt"])
 
-    def test_new_work_excludes_implemented_functions(self):
+    def test_new_work_excludes_implemented_functions_and_keeps_large_work(self):
         chosen = self.choose(new_work_only=True)
         self.assertNotIn("N::Near", chosen)
         self.assertNotIn("N::Debt", chosen)
-        self.assertNotIn("N::Big", chosen)
+        self.assertIn("N::Big", chosen)
         self.assertIn("N::Fresh", chosen)
 
     def test_deferrals_are_hidden_unless_requested(self):
@@ -283,6 +303,144 @@ class SelectTests(unittest.TestCase):
 
     def test_the_best_candidate_sorts_first(self):
         self.assertEqual(self.choose()[0], "N::Capped")
+
+
+class DependencySelectionTests(unittest.TestCase):
+    def choose(self, pool, include_deferred=False):
+        return candidates.select(
+            pool,
+            namespace=None,
+            stubs_only=False,
+            leaves_only=False,
+            near_only=False,
+            max_size=None,
+            exclude_capped=True,
+            new_work_only=True,
+            include_deferred=include_deferred,
+        )
+
+    @staticmethod
+    def graph(edges=None, indirect_calls=None, indirect_jumps=None):
+        edges = edges or {}
+        callers = {}
+        for source, targets in edges.items():
+            for target in targets:
+                callers.setdefault(target, set()).add(source)
+        return candidates.DependencyGraph(
+            callees={source: frozenset(targets) for source, targets in edges.items()},
+            callers={target: frozenset(sources) for target, sources in callers.items()},
+            indirect_calls=indirect_calls or {},
+            indirect_jumps=indirect_jumps or {},
+        )
+
+    def test_large_dependency_ready_target_is_new_work(self):
+        target = make(0x401000, "N::Large", size=5000, state="STUB")
+        candidates.add_dependency_evidence([target], self.graph())
+        self.assertEqual([item.name for item in self.choose([target])], ["N::Large"])
+
+    def test_frontier_recurses_to_the_unresolved_leaf(self):
+        goal = make(0x401000, "N::Goal", size=3000, state="STUB")
+        dependency = make(0x402000, "N::Dependency", size=800, state="NOT_STARTED")
+        leaf = make(0x403000, "N::Leaf", size=100, state="NOT_STARTED")
+        pool = [goal, dependency, leaf]
+        candidates.add_dependency_evidence(
+            pool,
+            self.graph({goal.address: {dependency.address}, dependency.address: {leaf.address}}),
+        )
+        self.assertEqual(candidates.dependency_frontier_for(goal.address, pool), {leaf.address})
+        self.assertEqual([item.name for item in self.choose(pool)], ["N::Leaf"])
+
+    def test_unlock_impact_outranks_an_unrelated_leaf(self):
+        goal_a = make(0x401000, "N::GoalA", size=3000, state="STUB")
+        goal_b = make(0x402000, "N::GoalB", size=3000, state="STUB")
+        shared = make(0x403000, "N::Shared", size=1200, state="NOT_STARTED")
+        unrelated = make(0x404000, "N::Unrelated", size=80, state="NOT_STARTED")
+        pool = [goal_a, goal_b, shared, unrelated]
+        candidates.add_dependency_evidence(
+            pool,
+            self.graph(
+                {
+                    goal_a.address: {shared.address},
+                    goal_b.address: {shared.address},
+                }
+            ),
+        )
+        self.assertEqual(self.choose(pool)[0].name, "N::Shared")
+        self.assertEqual(shared.immediate_unlocks, 2)
+        self.assertEqual(shared.large_goal_reach, 3)
+
+    def test_recursive_group_does_not_block_its_members(self):
+        first = make(0x401000, "N::First", size=200, state="NOT_STARTED")
+        second = make(0x402000, "N::Second", size=200, state="NOT_STARTED")
+        pool = [first, second]
+        candidates.add_dependency_evidence(
+            pool,
+            self.graph({first.address: {second.address}, second.address: {first.address}}),
+        )
+        self.assertTrue(first.dependency_ready)
+        self.assertTrue(second.dependency_ready)
+        self.assertEqual(
+            candidates.dependency_frontier_for(first.address, pool),
+            {first.address, second.address},
+        )
+
+    def test_declared_prerequisite_reactivates_automatically(self):
+        target = make(
+            0x401000,
+            "N::Target",
+            size=3000,
+            state="STUB",
+            declared_dependencies=(0x402000,),
+            deferred_reason="needs the producer layout",
+        )
+        dependency = make(0x402000, "N::Producer", size=100, state="NOT_STARTED")
+        pool = [target, dependency]
+        candidates.add_dependency_evidence(pool, self.graph())
+        self.assertFalse(target.dependency_ready)
+
+        dependency.state = "FUNCTION"
+        candidates.add_dependency_evidence(pool, self.graph())
+        self.assertTrue(target.dependency_ready)
+
+    def test_manual_blocker_stays_out_of_the_frontier(self):
+        target = make(
+            0x401000,
+            "N::Target",
+            size=3000,
+            state="STUB",
+            manual_blocker=True,
+            deferred_reason="unknown indirect dispatch",
+        )
+        candidates.add_dependency_evidence([target], self.graph())
+        self.assertEqual(self.choose([target]), [])
+        self.assertEqual(self.choose([target], include_deferred=True), [target])
+
+    def test_manual_blocked_caller_does_not_raise_dependency_impact(self):
+        target = make(0x401000, "N::Target", size=100, state="NOT_STARTED")
+        blocked_caller = make(
+            0x402000,
+            "N::BlockedCaller",
+            size=3000,
+            state="STUB",
+            manual_blocker=True,
+            deferred_reason="unknown dispatch table",
+        )
+        pool = [target, blocked_caller]
+        candidates.add_dependency_evidence(
+            pool, self.graph({blocked_caller.address: {target.address}})
+        )
+        self.assertEqual(target.immediate_unlocks, 0)
+        self.assertEqual(target.large_goal_reach, 0)
+
+    def test_low_score_function_is_weak_but_resolved(self):
+        target = make(0x401000, "N::Target", size=3000, state="STUB")
+        weak = make(0x402000, "N::Weak", size=100, state="FUNCTION", match=0.6)
+        pool = [target, weak]
+        candidates.add_dependency_evidence(
+            pool, self.graph({target.address: {weak.address}})
+        )
+        self.assertTrue(target.dependency_ready)
+        self.assertEqual(target.weak_dependencies, (weak.address,))
 
 
 if __name__ == "__main__":
