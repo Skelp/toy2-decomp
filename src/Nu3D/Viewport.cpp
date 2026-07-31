@@ -299,13 +299,13 @@ namespace Nu3D
 			}
 		}
 
-		// FUNCTION: TOY2 0x004BABE0 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004BABE0 [MATCHED]
 		void CacheViewport(ViewportCache* cache)
 		{
 			memcpy(cache->frustumPlanes, g_frustumPlanes, sizeof(cache->frustumPlanes));
 			cache->clipTop = g_viewClipRect.top;
-			cache->clipLeft = g_viewClipRect.bottom;
-			cache->clipBottom = g_viewClipRect.left;
+			cache->clipLeft = g_viewClipRect.left;
+			cache->clipBottom = g_viewClipRect.bottom;
 			cache->clipRight = g_viewClipRect.right;
 			cache->frustumPlaneCount = g_frustumPlaneCount;
 		}
@@ -319,19 +319,19 @@ namespace Nu3D
 			output->right = g_viewClipRect.right;
 		}
 
-		// FUNCTION: TOY2 0x004BAC70 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004BAC70 [MATCHED]
 		void RestoreViewportCache(const ViewportCache* cache)
 		{
 			memcpy(g_frustumPlanes, cache->frustumPlanes, sizeof(cache->frustumPlanes));
 			g_viewClipRect.top = cache->clipTop;
-			g_viewClipRect.bottom = cache->clipLeft;
-			g_viewClipRect.left = cache->clipBottom;
+			g_viewClipRect.left = cache->clipLeft;
+			g_viewClipRect.bottom = cache->clipBottom;
 			g_viewClipRect.right = cache->clipRight;
 			g_frustumPlaneCount = cache->frustumPlaneCount;
 
 			if (g_viewportClippingEnabled)
 			{
-				SetClipRect(g_viewClipRect.bottom, g_viewClipRect.top, g_viewClipRect.right, g_viewClipRect.left);
+				SetClipRect(g_viewClipRect.top, g_viewClipRect.left, g_viewClipRect.bottom, g_viewClipRect.right);
 			}
 
 			Camera::RebuildTransformPipeline();

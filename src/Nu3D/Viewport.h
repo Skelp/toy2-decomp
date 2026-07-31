@@ -2,6 +2,7 @@
 
 #include "Common.h"
 #include "Numerics.h"
+#include <stddef.h>
 #include <directx6/d3d.h>
 
 namespace Nu3D
@@ -28,8 +29,8 @@ namespace Nu3D
 		{
 			Plane frustumPlanes[32];
 			float clipTop;
-			float clipLeft;
 			float clipBottom;
+			float clipLeft;
 			float clipRight;
 			int32_t frustumPlaneCount;
 		};
@@ -74,4 +75,13 @@ namespace Nu3D
 
 	STATIC_ASSERT(sizeof(Viewport::ViewportRect) == 0x10);
 	STATIC_ASSERT(sizeof(Viewport::ViewportCache) == 0x214);
+
+	namespace Viewport
+	{
+		STATIC_ASSERT(offsetof(ViewportCache, clipTop) == 0x200);
+		STATIC_ASSERT(offsetof(ViewportCache, clipBottom) == 0x204);
+		STATIC_ASSERT(offsetof(ViewportCache, clipLeft) == 0x208);
+		STATIC_ASSERT(offsetof(ViewportCache, clipRight) == 0x20C);
+		STATIC_ASSERT(offsetof(ViewportCache, frustumPlaneCount) == 0x210);
+	}
 }
