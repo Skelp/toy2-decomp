@@ -280,8 +280,8 @@ namespace AudioManager
 						pchEndRead = info.pchEndRead;
 						if (info.pchNext == pchEndRead)
 						{
-							*outRead = 0;
-							return 0xe103;
+							result = 0xe103;
+							goto fail;
 						}
 					}
 					((char*)buffer)[count++] = *info.pchNext++;
@@ -2157,7 +2157,7 @@ namespace AudioManager
 						result = 0xe102;
 						goto cleanup;
 					}
-					uint32_t cbSize;
+					uint16_t cbSize;
 					if (format.wf.wFormatTag == WAVE_FORMAT_PCM)
 					{
 						cbSize = 0;
@@ -2170,19 +2170,17 @@ namespace AudioManager
 							goto cleanup;
 						}
 					}
-					HGLOBAL h;
-					h = GlobalAlloc(GMEM_FIXED, (cbSize & 0xffff) + sizeof(WAVEFORMATEX));
-					*outFormatHandle = h;
-					if (h == NULL)
+					*outFormatHandle = GlobalAlloc(GMEM_FIXED, cbSize + sizeof(WAVEFORMATEX));
+					if (*outFormatHandle == NULL)
 					{
 						result = 0xe000;
 						goto cleanup;
 					}
-					*(PCMWAVEFORMAT*)h = format;
-					((WAVEFORMATEX*)*outFormatHandle)->cbSize = (uint16_t)cbSize;
+					*(PCMWAVEFORMAT*)*outFormatHandle = format;
+					((WAVEFORMATEX*)*outFormatHandle)->cbSize = cbSize;
 					if (cbSize != 0)
 					{
-						if (mmioRead(hmmio, (HPSTR)((char*)h + sizeof(WAVEFORMATEX)), cbSize & 0xffff) != (cbSize & 0xffff))
+						if (mmioRead(hmmio, (HPSTR)((char*)*outFormatHandle + sizeof(WAVEFORMATEX)), cbSize) != cbSize)
 						{
 							result = 0xe101;
 							goto cleanup;
