@@ -1,4 +1,5 @@
 #include "NGNLoader/NGNLoader.h"
+#include "Nu3D/CreatureFlags.h"
 #include "Nu3D/Portal.h"
 #include "Toy2/Toy2.h"
 #include "Nu3D/BmpDataNode.h"
@@ -100,12 +101,12 @@ namespace NGNLoader
 								creature->nodeMetadata[index] = 0;
 								fread(&creature->nodeMetadata[index], sizeof(uint16_t), 1, stream);
 
-								if (nodeFlags & 1)
+								if (nodeFlags & Nu3D::CREATURE_NODE_DATA_HAS_PRIMITIVE)
 								{
-									if (nodeFlags & 2)
-										creature->flagsList[index] |= 2;
-									if (nodeFlags & 4)
-										creature->flagsList[index] |= 4;
+									if (nodeFlags & Nu3D::CREATURE_NODE_DATA_BILLBOARD)
+										creature->flagsList[index] |= Nu3D::CREATURE_NODE_BILLBOARD;
+									if (nodeFlags & Nu3D::CREATURE_NODE_DATA_VERTEX_LIGHTING)
+										creature->flagsList[index] |= Nu3D::CREATURE_NODE_VERTEX_LIGHTING;
 
 									creature->primitives[index] = ObjectLoad::ExtractShapeData(stream);
 									Nu3D::Primitive::CreateAllVertexBuffers(creature->primitives[index], 3);

@@ -1,4 +1,5 @@
 #include "NGNLoader/NGNLoader.h"
+#include "Nu3D/CreatureFlags.h"
 #include "Nu3D/Portal.h"
 #include "Toy2/Toy2.h"
 #include "Nu3D/BmpDataNode.h"
@@ -1155,11 +1156,11 @@ namespace Nu3D
 		if (nodeIndex >= 0 && nodeIndex < creature->nodeCount && nodeFlags != 0)
 		{
 			int32_t flags = nodeFlags[nodeIndex];
-			nodeFlags[nodeIndex] = flags & ~1;
-			wasVisible = ~flags & 1;
+			nodeFlags[nodeIndex] = flags & ~CREATURE_NODE_HIDDEN;
+			wasVisible = ~flags & CREATURE_NODE_HIDDEN;
 			if (visible == 0)
 			{
-				creature->flagsList[nodeIndex] |= 1;
+				creature->flagsList[nodeIndex] |= CREATURE_NODE_HIDDEN;
 			}
 		}
 		return wasVisible;

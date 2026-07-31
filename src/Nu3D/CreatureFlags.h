@@ -1,0 +1,18 @@
+#pragma once
+
+namespace Nu3D
+{
+	enum CreatureNodeFlags
+	{
+		CREATURE_NODE_HIDDEN = 0x1,
+		CREATURE_NODE_BILLBOARD = 0x2,
+		CREATURE_NODE_VERTEX_LIGHTING = 0x4,
+	};
+
+	enum CreatureNodeDataFlags
+	{
+		CREATURE_NODE_DATA_HAS_PRIMITIVE = 0x1,
+		CREATURE_NODE_DATA_BILLBOARD = 0x2,
+		CREATURE_NODE_DATA_VERTEX_LIGHTING = 0x4,
+	};
+}

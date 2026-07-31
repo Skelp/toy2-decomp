@@ -3,6 +3,7 @@
 #include "NGNLoader/NGNLoader.h"
 #include "NGNLoader/NGNTypes.h"
 #include "Nu3D/Camera.h"
+#include "Nu3D/CreatureFlags.h"
 #include "Nu3D/Link.h"
 #include "Nu3D/Math.h"
 #include "Nu3D/Portal.h"
@@ -17,13 +18,6 @@ namespace Nu3D
 {
 	namespace Scene
 	{
-		enum CreatureNodeFlags
-		{
-			CREATURE_NODE_HIDDEN = 0x1,
-			CREATURE_NODE_BILLBOARD = 0x2,
-			CREATURE_NODE_VERTEX_LIGHTING = 0x4,
-		};
-
 		// GLOBAL: TOY2 0x00508D04
 		float g_secondaryFarClip = 48000.0f;
 
