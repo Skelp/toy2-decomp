@@ -1410,15 +1410,12 @@ namespace Toy2
 		// FUNCTION: TOY2 0x004343D0 [PROVISIONAL]
 		void UpdateHorizontalMovement(Toy2BuzzActor* buzz, MovementRates* movementRates, int32_t forwardInput)
 		{
-			int32_t forwardSpeed;
-			int32_t lateralSpeed;
-			{
-				int32_t yaw = buzz->posAngles.angles.yaw;
-				int32_t backwardSine = Numerics::g_sinCosLUT[(yaw - 0x800) & 0xFFF] >> 2;
-				int32_t cosine = Numerics::g_sinCosLUT[(yaw + 0x400) & 0xFFF] >> 2;
-				lateralSpeed = (buzz->velocity.forward * backwardSine + buzz->velocity.lateral * cosine) / 0x1000;
-				forwardSpeed = (buzz->velocity.forward * cosine - buzz->velocity.lateral * backwardSine) / 0x1000;
-			}
+			int32_t yaw = (int16_t)buzz->posAngles.angles.yaw;
+			int32_t backwardSine = Numerics::g_sinCosLUT[(yaw - 0x800) & 0xFFF] >> 2;
+			const int16_t* cosine = &Numerics::g_sinCosLUT[(yaw + 0x400) & 0xFFF];
+			int32_t cosineValue = *cosine >> 2;
+			int32_t lateralSpeed = (buzz->velocity.forward * backwardSine + buzz->velocity.lateral * cosineValue) / 0x1000;
+			int32_t forwardSpeed = (buzz->velocity.forward * cosineValue - buzz->velocity.lateral * backwardSine) / 0x1000;
 
 			if ((buzz->actorFlags & ACTOR_FLAG_PRESERVE_HORIZONTAL_MOMENTUM) != 0)
 			{
@@ -1492,11 +1489,11 @@ namespace Toy2
 
 			buzz->forwardSpeed = forwardSpeed;
 			buzz->lateralSpeed = lateralSpeed;
-			int32_t yaw = buzz->posAngles.angles.yaw;
+			yaw = (int16_t)buzz->posAngles.angles.yaw;
 			int32_t sine = Numerics::g_sinCosLUT[yaw] >> 2;
-			int32_t cosine = Numerics::g_sinCosLUT[(yaw + 0x400) & 0xFFF] >> 2;
-			buzz->velocity.lateral = (lateralSpeed * cosine + forwardSpeed * sine) / 0x1000;
-			buzz->velocity.forward = (forwardSpeed * cosine - lateralSpeed * sine) / 0x1000;
+			cosineValue = *cosine >> 2;
+			buzz->velocity.lateral = (lateralSpeed * cosineValue + forwardSpeed * sine) / 0x1000;
+			buzz->velocity.forward = (forwardSpeed * cosineValue - lateralSpeed * sine) / 0x1000;
 		}
 
 		static __inline void StopRocketBoots()
