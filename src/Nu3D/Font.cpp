@@ -475,13 +475,6 @@ namespace Nu3D
 		return (clipDY2 & clipDY1 & clipDX2 & clipDX1) & 0x80000000;
 	}
 
-	// Draws a single unscaled glyph as a two-triangle quad (vertices 0..2 and
-	// 3..5). The fast path selected by ComputeUnscaledCharClip when the glyph is
-	// fully inside the clip rect. The cursor Y is offset by the font ascent to
-	// get the glyph's top edge; the bottom edge additionally subtracts 1.0 to
-	// keep the quad within the glyph's texel bounds. Note g_textCursorOffsetX is
-	// applied to the top edge only -- the bottom edge uses the raw cursor X,
-	// matching the retail vertex setup.
 	// FUNCTION: TOY2 0x004B4DE0 [EFFECTIVE]
 	int32_t Font::DrawUnscaledGlyph(char c)
 	{
@@ -526,22 +519,6 @@ namespace Nu3D
 		return 0;
 	}
 
-	// Draws a single unscaled glyph as a two-triangle quad, clipping each edge
-	// against the per-character clip deltas written by ComputeUnscaledCharClip.
-	// Each of the four edges is handled independently: when the delta is positive
-	// the edge is outside the clip rect and is moved inwards, interpolating the
-	// glyph UV so the visible slice still maps to the correct atlas region. The
-	// vertex layout and the g_textCursorOffsetX top-edge-only asymmetry match
-	// DrawUnscaledGlyph; only the per-edge position/UV differ. Note the render
-	// flags are a fixed 0x444 here -- unlike the unscaled sibling the clipped
-	// path does not OR in g_fontRenderFlags, matching the retail code.
-	//
-	// The generated code differs from retail in register allocation: MSVC keeps
-	// g_currentFont in EDI (callee-saved) for this function rather than in ECX
-	// (caller-saved) as the shorter DrawUnscaledGlyph does, which shifts the
-	// callee-saved-register saves earlier and offsets the scratch stack slots
-	// (esp+0xc/0x14 vs retail's esp+0x10/0x18). The per-edge vertex logic is
-	// otherwise identical (confirmed against the not-clipped-left block).
 	// FUNCTION: TOY2 0x004B4FA0 [PROVISIONAL]
 	int32_t Font::DrawClippedUnscaledGlyph(char c)
 	{
@@ -647,10 +624,6 @@ namespace Nu3D
 		return 0;
 	}
 
-	// Scaled twin of ComputeUnscaledCharClip: the glyph width and the font
-	// ascent/descent are taken from the precomputed scaled float globals
-	// (g_fontScaleX * glyph->width, g_scaledFontAscent, g_scaledFontHeight) and
-	// truncated back to int via __ftol before the same four clip-delta tests.
 	// FUNCTION: TOY2 0x004B4C10 [PROVISIONAL]
 	int32_t Font::ComputeScaledCharClip(char c)
 	{

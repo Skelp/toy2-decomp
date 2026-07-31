@@ -44,17 +44,6 @@ namespace DevDraw
 		return 1;
 	}
 
-	// Flushes one slot of the opaque indexed draw buffer: binds the slot's
-	// texture, issues an indexed triangle-list DrawIndexedPrimitive,
-	// accumulates the vertex count, and resets the slot's vertex and index
-	// counts. The texture name is built as "LOADTEXT_texXX" where XX is the
-	// zero-padded slot index.
-	//
-	// The slot parameter stays in a 16-bit register (for the current-slot word
-	// store) while a sign-extended copy drives the array indexing. The draw
-	// buffer pointer is re-read from the global before each use (the string
-	// building and the COM calls clobber the holding register), so no local
-	// caches it.
 	// FUNCTION: TOY2 0x00490470 [MATCHED]
 	int16_t FlushDrawBufferSlot(int16_t slot)
 	{
@@ -98,20 +87,6 @@ namespace DevDraw
 		return 1;
 	}
 
-	// Flushes one slot of the transparent indexed draw buffer: binds the
-	// slot's texture, issues an indexed triangle-list DrawIndexedPrimitive,
-	// accumulates the vertex count, resets the render state, and clears the
-	// slot's vertex and index counts. The texture name is built as
-	// "LOADTEXT_texXX" where XX is the zero-padded slot index.
-	//
-	// Only slots 0..31 are valid (the transparent pool is half the opaque
-	// pool's 64 slots).
-	//
-	// The slot parameter stays in a 16-bit register (BX) while a sign-extended
-	// copy (slotIndex) drives the array indexing. The draw buffer pointer is
-	// re-read from the global before each use (no local cache, so the reloads
-	// match retail). The render state is set to 0x400 before the draw and
-	// reset to 0 after it.
 	// FUNCTION: TOY2 0x004905C0 [MATCHED]
 	int16_t FlushTransparentDrawBufferSlot(int16_t slot)
 	{

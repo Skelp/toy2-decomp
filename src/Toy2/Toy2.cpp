@@ -5830,20 +5830,6 @@ namespace Toy2
 	// FUNCTION: TOY2 0x0047D7C0 [MATCHED]
 	void UpdateAudioChannels() { AudioManager::UpdateChannels(); }
 
-	// Updates the Direct3D render-target state from the current destination
-	// rectangle. Computes the dest width and height, derives several scaled
-	// half-width / fixed-point variants used by the rasterizer, resets a few
-	// frame-local flags, points SoftwareRenderer::g_softwareRenderBuckets at its
-	// shared bucket storage, empties the shared vertex pool, and records the
-	// frame start time. Called on the hardware (D3D) render path (g_renderMode == 2); the
-	// software path uses InitSoftwareRenderer.
-	//
-	// The halfWidth/halfHeight locals and the store interleaving (width store
-	// before the height field-loads; width-1 before height-1) reproduce
-	// retail's register assignment: width/2 in EDI (callee-saved) and the
-	// frame zero in EBX. The only residual is instruction scheduling of the
-	// SHL/SAR/DEC block against the E4/halfWidth stores, which reccmp treats
-	// as a behavior-neutral effective match.
 	// FUNCTION: TOY2 0x00490BF0 [EFFECTIVE]
 	int16_t UpdateD3DState()
 	{

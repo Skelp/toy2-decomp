@@ -1533,8 +1533,6 @@ namespace Renderer
 			}
 		}
 
-		// Dispatches the shared render-list header. Sprite items use the full
-		// Nu3D::Sprite payload. Geometry and patch entries use Renderer::RenderEntry.
 		// FUNCTION: TOY2 0x004B6AD0 [MATCHED]
 		void DispatchCommand(Nu3D::Sprite* command)
 		{

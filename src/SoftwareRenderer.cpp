@@ -4821,9 +4821,6 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// Untextured opaque span for a 16-bit 555 surface. The rasterizer writes two
-	// pixels at a time with one interpolated colour. It writes a single pixel at
-	// each unaligned end of the span.
 	// FUNCTION: TOY2 0x004C48E0 [PROVISIONAL]
 	void RasterizeOpaqueSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
@@ -4910,8 +4907,6 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// The 565 twin of RasterizeOpaqueSpan555. It uses the same paired-pixel walk, but places
-	// the five interpolated green bits at bit 6 and red at bit 11.
 	// FUNCTION: TOY2 0x004C4A60 [PROVISIONAL]
 	void RasterizeOpaqueSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
@@ -4998,8 +4993,6 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// Textured additive span for a 16-bit 555 surface. A texel with a zero
-	// high byte is transparent. Other texels brighten the destination channels.
 	// FUNCTION: TOY2 0x004C4BE0 [PROVISIONAL]
 	void RasterizeTexturedAdditiveSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
@@ -5130,19 +5123,6 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// Untextured additive span for a 16-bit 555 surface.
-	//
-	// The span brightens what is already on the surface: for every pixel it reads
-	// the destination, adds the interpolated span colour to each five-bit channel,
-	// saturates each result at 0x1f, and writes the pixel back. This is the
-	// RENDER_ALPHA_CUSTOM path with no texture bound, which the selector reaches
-	// for glow, muzzle-flash, and light-bloom primitives. texData is unused here;
-	// the walker passes it because every span variant shares one signature.
-	//
-	// The accumulators carry a five-bit channel in the high half of a 16-bit
-	// fixed-point value, so each read shifts down by 11. Unlike the subtractive
-	// siblings this one keeps them in full 32-bit registers, so retail uses a
-	// dword load and a logical shift rather than a word load.
 	// FUNCTION: TOY2 0x004C4E00 [PROVISIONAL]
 	void RasterizeAdditiveSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
@@ -5230,10 +5210,6 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// The 16-bit 565 twin of RasterizeAdditiveSpan555. Only the channel
-	// positions move. Green starts at bit 6 and red at bit 11, and the rasterizer
-	// still takes five bits per channel, so it uses the high five bits of the
-	// six-bit green field.
 	// FUNCTION: TOY2 0x004C4F30 [PROVISIONAL]
 	void RasterizeAdditiveSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
@@ -5321,8 +5297,6 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// The 565 twin of RasterizeTexturedAdditiveSpan555 uses the same texture sampling and additive
-	// blend, but reads green at bit 6 and red at bit 11.
 	// FUNCTION: TOY2 0x004C5060 [PROVISIONAL]
 	void RasterizeTexturedAdditiveSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
@@ -5453,8 +5427,6 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// Textured subtractive span for a 16-bit 555 surface. A texel with a zero
-	// high byte is transparent. Other texels darken the destination channels.
 	// FUNCTION: TOY2 0x004C5280 [PROVISIONAL]
 	void RasterizeTexturedSubtractiveSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
@@ -5585,18 +5557,6 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// Untextured subtractive span for a 16-bit 555 surface.
-	//
-	// The span darkens what is already on the surface: for every pixel it reads
-	// the destination, subtracts the interpolated span colour from each five-bit
-	// channel, clamps each result at zero, and writes the pixel back. This is the
-	// RENDER_ALPHA_ALT path with no texture bound, which the selector reaches for
-	// shadow and darkening primitives. texData is unused here; the walker passes
-	// it because every span variant shares one signature.
-	//
-	// The accumulators carry a five-bit channel in the high half of a 16-bit
-	// fixed-point value, so each read truncates to 16 bits and shifts down by 11.
-	// That is why retail uses a word load and needs no mask.
 	// FUNCTION: TOY2 0x004C5490 [PROVISIONAL]
 	void RasterizeSubtractiveSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
@@ -5682,10 +5642,6 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// The 16-bit 565 twin of RasterizeSubtractiveSpan555 changes only the
-	// channel positions. Green starts at bit 6 and red at bit 11, and the
-	// rasterizer still takes five bits per channel, so it uses the high five bits
-	// of the six-bit green field.
 	// FUNCTION: TOY2 0x004C55B0 [PROVISIONAL]
 	void RasterizeSubtractiveSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
@@ -5771,8 +5727,6 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// The 565 twin of RasterizeTexturedSubtractiveSpan555 uses the same texture sampling and
-	// subtractive blend, but reads green at bit 6 and red at bit 11.
 	// FUNCTION: TOY2 0x004C56D0 [PROVISIONAL]
 	void RasterizeTexturedSubtractiveSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
@@ -5903,9 +5857,6 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// Converts a textured span to the active 16-bit surface format. A texel
-	// with a zero high byte is transparent. The colour table entries already
-	// contain their packed destination-channel bits.
 	// FUNCTION: TOY2 0x004C58E0 [PROVISIONAL]
 	void RasterizeTexturedOpaqueSpan(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
@@ -6113,8 +6064,6 @@ namespace SoftwareRenderer
 		} while (width != 0);
 	}
 
-	// Blends an untextured span with a 555 destination. The source and
-	// destination factors are in g_spanAlpha and g_spanInvAlpha.
 	// FUNCTION: TOY2 0x004C5D80 [PROVISIONAL]
 	void RasterizeAlphaBlendSpan555(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
@@ -6192,8 +6141,6 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// The alternate-format twin of RasterizeAlphaBlendSpan555 uses the same blend and
-	// interpolation, but extracts and packs channels for the other surface mode.
 	// FUNCTION: TOY2 0x004C5F00 [PROVISIONAL]
 	void RasterizeAlphaBlendSpan565(Nu3D::VertexTL* edgeA,
 		Nu3D::VertexTL* edgeB,
@@ -8518,11 +8465,6 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// Rebuilds the live palette entries (1..255) by tinting the source palette
-	// (0..254) by the camera tint colour in fixed point (/128), preserving
-	// entry 0, then commits the tinted range to the DirectDraw palette. Called
-	// from Renderer::DrawTintOverlay.
-	//
 	// FUNCTION: TOY2 0x00470C70 [MATCHED]
 	void UpdatePaletteTint()
 	{
@@ -8823,17 +8765,7 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// Converts the viewport rect (passed as top/bottom/left/right matching the
-	// ViewportRect field order; GetViewClipRect stores the left value in the
-	// bottom field and the bottom value in the left field) into the integer
-	// clip rect g_clipTop/Bottom/Left/Right. Each edge is recomputed only when
-	// its source field changes since the last call. The vertical pair (top,
-	// left-field) scales through g_screenDimV; the horizontal pair (bottom-field,
-	// right) scales through g_screenDimH.
-	//
-	// Residual diff is CAP-15: the build CSEs the right param load into ECX
-	// where retail re-reads [esp+0x20] at each use, which reorders the V/H
-	// conditional blocks. The scale and clamp blocks all match.
+	// ViewportRect stores the source left edge in bottom and its bottom edge in left.
 	// FUNCTION: TOY2 0x004BCC70 [PROVISIONAL]
 	void UpdateViewportClipBounds(int32_t top, int32_t bottom, int32_t left, int32_t right)
 	{
@@ -8902,21 +8834,6 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// This function resolves the current texture with GetCurrentTextureData.
-	// It groups the index stream into one triple for each triangle.
-	// It sends each triple and the selected texture pointer to SubmitDepthCheckedPrimitive.
-	// Each index selects one 32-byte VertexTL from lpvVertices.
-	//
-	// dwFlags is unused by the retail body.
-	//
-	// Residual is CAP-19: MSVC assigns maskedTexData to EBP and keeps the
-	// triangle count in EBX, where retail assigns maskedTexData to EBX and
-	// spills the count to EBP (pushed inside the loop guard). The loop body
-	// also takes a negative-offset early-increment index strip
-	// ([esi-4]/[esi-2]/[esi] then add esi,6) where retail reads
-	// [esi]/[esi+2] then bumps twice before [esi]. Both compute identical
-	// vertices; the divergence is register allocation plus the pointer-walk
-	// transformation. Robust across 5 source forms (34.8-36.5%).
 	// FUNCTION: TOY2 0x004C14A0 [PROVISIONAL]
 	void ProcessIndexedTriangleList(LPVOID lpvVertices, LPWORD lpwIndices, DWORD dwIndexCount, DWORD dwFlags)
 	{
@@ -9012,10 +8929,6 @@ namespace SoftwareRenderer
 		g_reverseDepthSortEnabled = 0;
 	}
 
-	// Locks the DirectDraw back buffer, clears it when the frame state requires
-	// a clear, drains all software-render depth buckets from far to near, then
-	// unlocks and presents the surface. The caller passes the display maximum x
-	// and a zero clear value. Retail does not read either parameter.
 	// FUNCTION: TOY2 0x0047D210 [PROVISIONAL]
 	void RenderSoftwareFrame(int32_t displayMaxX, int32_t clearValue)
 	{
@@ -9144,23 +9057,6 @@ namespace SoftwareRenderer
 		D3DAppShowBackBuffer();
 	}
 
-	// Queues a transformed triangle for sorted (back-to-front) transparency
-	// rasterization. Claims a slot from Renderer::g_primitiveBuffer, copies the
-	// three transformed vertices and the per-call flags, derives the depth key
-	// as the minimum vertex z scaled into the 1024-entry bucket range, and
-	// inserts the slot into the Renderer::g_renderBuckets[depthKey & 0x3ff]
-	// singly-linked list kept in descending depthKey order so the drain pass
-	// renders farthest triangles first.
-	//
-	// The two early-out guards are written as separate sequential returns
-	// (not a single &&) so the callee-saved register pushes are deferred past
-	// them, matching retail (FIX-14). The depth key uses a MIN macro with no
-	// intermediate local so MSVC keeps the candidate on the FPU stack and
-	// recomputes the inner min in the else branch (FIX-14); the inline nested
-	// ternary lowers to FCOMP-from-memory instead of retail's FLD/FCOMPP. The
-	// for(;;) walk lowers to retail's single-body rotated loop, and the
-	// splice/set-head if/else shares the record->next store rather than an
-	// early return (an early return forces eager callee-saved pushes).
 #define NU_FMIN(a, b) ((a) < (b) ? (a) : (b))
 	// FUNCTION: TOY2 0x004B5E40 [MATCHED]
 	void SubmitSortedTriangle(
@@ -9213,18 +9109,6 @@ namespace SoftwareRenderer
 	}
 #undef NU_FMIN
 
-	// Submits a triangle list (indexCount/3 independent triangles) for sorted
-	// transparency rasterization. Locks the vertex buffer, walks the index list
-	// back-to-front in groups of three, and forwards each triangle to
-	// SubmitSortedTriangle with textureIndex=0 (SubmitQuad instead passes textureIndex=
-	// texture index and no render entry. The indexed submitters retain the render entry
-	// and use texture index zero. The index buffer is read
-	// via a pointer centered on the middle index of each triple so the three
-	// vertex pointers come from p[-1], p[0], p[1] as p walks backward. The
-	// count guard is written as an explicit if around a do-while so the pointer
-	// setup (the indices load and the LEA) is deferred past the guard, matching
-	// retail's callee-saved register scheduling; a plain while hoists the
-	// pointer init before the guard.
 	// FUNCTION: TOY2 0x004B5FB0 [MATCHED]
 	void SubmitTriangleList(int32_t renderFlags, LPDIRECT3DVERTEXBUFFER vertexBuffer, Renderer::RenderEntry* renderEntry, WORD* indices, int32_t indexCount)
 	{
@@ -9245,15 +9129,6 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// Submits a triangle strip (indexCount-2 triangles) for sorted transparency
-	// rasterization. Locks the vertex buffer, emits the first triangle from
-	// indices[0..2], then walks the remaining indices keeping a rolling triple of
-	// the last three indices (a,b,c) and flipping the vertex order on odd
-	// iterations to preserve strip winding. It forwards texture index zero and the render entry to
-	// SubmitSortedTriangle (same slot assignment as SubmitTriangleList, opposite
-	// to SubmitQuad). Residual ~3% is CAP-17: MSVC hoists the loop-invariant
-	// `remaining = indexCount - 3` init as `LEA EBX,[edx-3]` with an early count
-	// load, where retail loads count into EBX late and SUBtracts in place.
 	// FUNCTION: TOY2 0x004B6040 [PROVISIONAL]
 	void SubmitTriangleStrip(int32_t renderFlags, LPDIRECT3DVERTEXBUFFER vertexBuffer, Renderer::RenderEntry* renderEntry, WORD* indices, int32_t indexCount)
 	{
@@ -9285,14 +9160,6 @@ namespace SoftwareRenderer
 		}
 	}
 
-	// Submits a triangle strip (indexCount-2 triangles) for sorted transparency
-	// rasterization using an already-locked vertex buffer. The caller (RenderType8)
-	// locks the vertex buffer and passes the locked base pointer directly, so this
-	// variant performs no Lock/Unlock. It uses the same strip logic, render entry, and zero texture-index
-	// assignment as SubmitTriangleStrip: emit the first triangle from
-	// indices[0..2], then walk the remaining indices keeping a rolling triple
-	// (a,b,c) and flipping the vertex order on odd iterations to preserve strip
-	// winding.
 	// FUNCTION: TOY2 0x004B6140 [MATCHED]
 	void SubmitTriangleStripRaw(int32_t renderFlags, Nu3D::VertexTL* lockedVertices, Renderer::RenderEntry* renderEntry, WORD* indices, int32_t indexCount)
 	{

@@ -6,8 +6,7 @@
 
 namespace Nu3D
 {
-	// The later Nu3D source names this lifecycle hook NuMtlClose.
-	// The Toy Story 2 retail function has an empty body.
+	// Retail leaves this later-Nu3D lifecycle hook empty.
 	// FUNCTION: TOY2 0x004C2990 [MATCHED]
 	void Material::Close() {}
 
