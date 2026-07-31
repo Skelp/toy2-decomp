@@ -133,13 +133,14 @@ BOOL D3DAppICreateBuffers(HWND hwnd, int width, int height, int bpp, BOOL fullsc
 	return TRUE;
 }
 
-// FUNCTION: TOY2 0x0040B670 [PROVISIONAL]
+// FUNCTION: TOY2 0x0040B670 [TOOL]
 BOOL D3DAppICheckForPalettized()
 {
+	LPDIRECTDRAWSURFACE3 backBuffer = d3dappi.lpBackBuffer;
 	DDSURFACEDESC surfaceDesc;
 	memset(&surfaceDesc, 0, sizeof(surfaceDesc));
 	surfaceDesc.dwSize = sizeof(surfaceDesc);
-	HRESULT result = d3dappi.lpBackBuffer->GetSurfaceDesc(&surfaceDesc);
+	HRESULT result = backBuffer->GetSurfaceDesc(&surfaceDesc);
 	if (result < 0)
 		Logger::LogDDError("D3DAppIGetSurfDesc(&ddsd, d3dappi.lpBackBuffer)", result);
 
@@ -182,11 +183,9 @@ BOOL D3DAppICheckForPalettized()
 	return TRUE;
 }
 
-// FUNCTION: TOY2 0x0040B7E0 [PROVISIONAL]
+// FUNCTION: TOY2 0x0040B7E0 [TOOL]
 BOOL D3DAppICreateZBuffer(int width, int height)
 {
-	LPDIRECTDRAWSURFACE surface;
-
 	if (d3dappi.lpZBuffer)
 	{
 		d3dappi.lpZBuffer->Release();
@@ -195,61 +194,62 @@ BOOL D3DAppICreateZBuffer(int width, int height)
 
 	if (! PC.D3D->hasZBuffer)
 		return TRUE;
-
-	DDSURFACEDESC surfaceDesc;
-	memset(&surfaceDesc, 0, sizeof(surfaceDesc));
-	surfaceDesc.dwSize = sizeof(surfaceDesc);
-	surfaceDesc.dwFlags = DDSD_WIDTH | DDSD_HEIGHT | DDSD_CAPS | DDSD_ZBUFFERBITDEPTH;
-	surfaceDesc.ddsCaps.dwCaps = DDSCAPS_ZBUFFER;
-	surfaceDesc.dwHeight = height;
-	surfaceDesc.dwWidth = width;
-	if (PC.D3D->isHardwareAccelerated)
-		surfaceDesc.ddsCaps.dwCaps |= DDSCAPS_VIDEOMEMORY | DDSCAPS_LOCALVIDMEM;
-	else
-		surfaceDesc.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
-
-	DWORD deviceDepth = PC.D3D->hwDeviceDesc.dwDeviceZBufferBitDepth;
-	if (deviceDepth & DDBD_32)
-		surfaceDesc.dwZBufferBitDepth = 32;
-	else if (deviceDepth & DDBD_24)
-		surfaceDesc.dwZBufferBitDepth = 24;
-	else if (deviceDepth & DDBD_16)
-		surfaceDesc.dwZBufferBitDepth = 16;
-	else if (deviceDepth & DDBD_8)
-		surfaceDesc.dwZBufferBitDepth = 8;
 	else
 	{
-		Logger::Log("Unsupported Z-buffer depth requested by device.\n");
-		return FALSE;
-	}
+		DDSURFACEDESC surfaceDesc;
+		memset(&surfaceDesc, 0, sizeof(surfaceDesc));
+		surfaceDesc.dwSize = sizeof(surfaceDesc);
+		surfaceDesc.dwFlags = DDSD_WIDTH | DDSD_HEIGHT | DDSD_CAPS | DDSD_ZBUFFERBITDEPTH;
+		surfaceDesc.ddsCaps.dwCaps = DDSCAPS_ZBUFFER;
+		surfaceDesc.dwHeight = height;
+		surfaceDesc.dwWidth = width;
+		surfaceDesc.ddsCaps.dwCaps |= PC.D3D->isHardwareAccelerated ? DDSCAPS_VIDEOMEMORY | DDSCAPS_LOCALVIDMEM : DDSCAPS_SYSTEMMEMORY;
 
-	HRESULT result = d3dappi.lpDD->CreateSurface(&surfaceDesc, &surface, NULL);
-	if (result < 0)
-		Logger::LogDDError("d3dappi.lpDD->CreateSurface(&ddsd, &surf, 0)", result);
-	result = surface->QueryInterface(IID_IDirectDrawSurface3, (void**)&d3dappi.lpZBuffer);
-	if (result < 0)
-		Logger::LogDDError("surf->QueryInterface(IID_IDirectDrawSurface3,(void**) &d3dappi.lpZBuffer)", result);
-	surface->Release();
-
-	result = d3dappi.lpBackBuffer->AddAttachedSurface(d3dappi.lpZBuffer);
-	if (result < 0)
-		Logger::LogDDError("d3dappi.lpBackBuffer->AddAttachedSurface(d3dappi.lpZBuffer)", result);
-	memset(&surfaceDesc, 0, sizeof(surfaceDesc));
-	surfaceDesc.dwSize = sizeof(surfaceDesc);
-	result = d3dappi.lpZBuffer->GetSurfaceDesc(&surfaceDesc);
-	if (result < 0)
-		Logger::LogDDError("D3DAppIGetSurfDesc(&ddsd, d3dappi.lpZBuffer)", result);
-	d3dappi.bZBufferInVideo = (surfaceDesc.ddsCaps.dwCaps & DDSCAPS_VIDEOMEMORY) != 0;
-
-	if (PC.D3D->isHardwareAccelerated && ! d3dappi.bZBufferInVideo)
-	{
-		D3DAppISetErrorString("Could not fit the Z-buffer in video memory for this hardware device.\n");
-		if (d3dappi.lpZBuffer)
+		DWORD deviceDepth = PC.D3D->hwDeviceDesc.dwDeviceZBufferBitDepth;
+		if (deviceDepth & DDBD_32)
+			surfaceDesc.dwZBufferBitDepth = 32;
+		else if (deviceDepth & DDBD_24)
+			surfaceDesc.dwZBufferBitDepth = 24;
+		else if (deviceDepth & DDBD_16)
+			surfaceDesc.dwZBufferBitDepth = 16;
+		else if (deviceDepth & DDBD_8)
+			surfaceDesc.dwZBufferBitDepth = 8;
+		else
 		{
-			d3dappi.lpZBuffer->Release();
-			d3dappi.lpZBuffer = NULL;
+			Logger::Log("Unsupported Z-buffer depth requested by device.\n");
+			return FALSE;
 		}
-		return FALSE;
+
+		LPDIRECTDRAWSURFACE surface;
+		HRESULT result = d3dappi.lpDD->CreateSurface(&surfaceDesc, &surface, NULL);
+		if (result < 0)
+			Logger::LogDDError("d3dappi.lpDD->CreateSurface(&ddsd, &surf, 0)", result);
+		result = surface->QueryInterface(IID_IDirectDrawSurface3, (void**)&d3dappi.lpZBuffer);
+		if (result < 0)
+			Logger::LogDDError("surf->QueryInterface(IID_IDirectDrawSurface3,(void**) &d3dappi.lpZBuffer)", result);
+		surface->Release();
+
+		result = d3dappi.lpBackBuffer->AddAttachedSurface(d3dappi.lpZBuffer);
+		if (result < 0)
+			Logger::LogDDError("d3dappi.lpBackBuffer->AddAttachedSurface(d3dappi.lpZBuffer)", result);
+		LPDIRECTDRAWSURFACE3 zBuffer = d3dappi.lpZBuffer;
+		memset(&surfaceDesc, 0, sizeof(surfaceDesc));
+		surfaceDesc.dwSize = sizeof(surfaceDesc);
+		result = zBuffer->GetSurfaceDesc(&surfaceDesc);
+		if (result < 0)
+			Logger::LogDDError("D3DAppIGetSurfDesc(&ddsd, d3dappi.lpZBuffer)", result);
+		d3dappi.bZBufferInVideo = (surfaceDesc.ddsCaps.dwCaps & DDSCAPS_VIDEOMEMORY) != 0;
+
+		if (PC.D3D->isHardwareAccelerated && ! d3dappi.bZBufferInVideo)
+		{
+			D3DAppISetErrorString("Could not fit the Z-buffer in video memory for this hardware device.\n");
+			if (d3dappi.lpZBuffer)
+			{
+				d3dappi.lpZBuffer->Release();
+				d3dappi.lpZBuffer = NULL;
+			}
+			return FALSE;
+		}
 	}
 	return TRUE;
 }
