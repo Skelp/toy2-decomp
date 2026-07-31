@@ -102,14 +102,14 @@ namespace Nu3D
 		int32_t Cross2D(Point2I16 point1, Point2I16 point2, Point2I16 point3)
 		{ return (point1.y - point2.y) * (point3.x - point2.x) - (point3.y - point2.y) * (point1.x - point2.x); }
 
-		// FUNCTION: TOY2 0x00451FD0 [PROVISIONAL]
+		// FUNCTION: TOY2 0x00451FD0 [MATCHED]
 		int32_t NormalizeToFixedPoint(const Vector3I* input, Vector3I* output)
 		{
-			float x = (float)input->x;
-			float y = (float)input->y;
 			float z = (float)input->z;
+			float y = (float)input->y;
+			float x = (float)input->x;
 			float magnitude = (float)sqrt(x * x + y * y + z * z);
-			output->x = (int32_t)((float)input->x * 4096.0f / magnitude);
+			output->x = (int32_t)(x * 4096.0f / magnitude);
 			output->y = (int32_t)((float)input->y * 4096.0f / magnitude);
 			output->z = (int32_t)((float)input->z * 4096.0f / magnitude);
 			return 0;
@@ -133,9 +133,16 @@ namespace Nu3D
 			return 0;
 		}
 
-		// FUNCTION: TOY2 0x004520D0 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004520D0 [MATCHED]
 		int32_t CartesianToFixedAngle(int32_t x, int32_t y)
-		{ return (int32_t)(atan2(x * 0.000244140625 * 6.283185308, y * 0.000244140625 * 6.283185308) * 0.15915494307111402 * 4096.0); }
+		{
+			double xRadians = x * 6.283185308;
+			xRadians *= 0.000244140625;
+			double yRadians = y * 6.283185308;
+			yRadians *= 0.000244140625;
+			double fixedAngle = atan2(xRadians, yRadians) * 4096.0;
+			return (int32_t)(fixedAngle * 0.15915494307111402);
+		}
 
 		// FUNCTION: TOY2 0x00480AE0 [PROVISIONAL]
 		int16_t PointIntersectsTriangle(int32_t pointX,
