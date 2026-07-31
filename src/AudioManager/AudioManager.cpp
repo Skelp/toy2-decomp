@@ -1451,15 +1451,11 @@ namespace AudioManager
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x004A3BC0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004A3BC0 [TOOL]
 	void ResetChannelsTable()
 	{
-		int16_t* p = &g_loopingSoundChannels[0][0];
-		do
-		{
-			*p = -1;
-			p += 5;
-		} while (p < &g_loopingSoundChannels[32][0]);
+		for (int32_t i = 0; i < 32; i++)
+			g_loopingSoundChannels[i][0] = -1;
 	}
 
 	// FUNCTION: TOY2 0x004A3BE0 [PROVISIONAL]
