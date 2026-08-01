@@ -22,6 +22,11 @@
 
 namespace Toy2
 {
+	namespace MoveableObject
+	{
+		void Update(Buzz::Toy2BuzzActor* buzz);
+	}
+
 	namespace Collision
 	{
 		struct SurfaceCollisionResult
@@ -94,6 +99,7 @@ namespace Toy2
 		extern int16_t g_rotatedCollisionTriangleMeshIndices[32];
 		extern int32_t g_rotatedCollisionTriangleCount;
 		extern int32_t g_hadGroundResponse;
+		extern int32_t g_collisionWorldMaxX;
 
 		int32_t ResolveSubstep(CollisionStepMotion* motion,
 			Vector3I* position,
@@ -164,6 +170,18 @@ namespace Toy2
 	extern int32_t g_gunFireTimer;
 	extern int32_t g_gunChargeTimer;
 	extern int32_t g_airborneTimer;
+	extern int32_t g_turnRecoveryTimer;
+	extern int32_t g_movementLockTimer;
+	extern int32_t g_movementInputLockTimer;
+	extern int32_t g_ledgeClimbTimer;
+	extern int32_t g_ziplineState;
+	extern int32_t g_swingTimer;
+	extern int32_t g_spinCancelRequested;
+	extern int32_t g_outOfBoundsLifeGranted;
+	extern int32_t g_damageBlinkCounter;
+	extern int32_t g_damageRegistered;
+	extern uint32_t g_actionStateFlags;
+	extern int32_t g_slipperySurfaceAngle;
 	namespace Camera
 	{
 		extern int32_t g_forwardInputDisabled;
@@ -173,6 +191,42 @@ namespace Toy2
 
 	namespace Buzz
 	{
+		int32_t UpdateFacing(Toy2BuzzActor* buzz, MovementRates* movementRates);
+		void UpdateJumpAndGravity(Toy2BuzzActor* buzz, int32_t jumpVelocity, int32_t suppressJumpInput);
+		int32_t HandleSwing(Toy2BuzzActor* buzz);
+		int32_t HandlePoleClimb(Toy2BuzzActor* buzz);
+		int32_t HandleLedgeClimb(Toy2BuzzActor* buzz);
+
+		const int16_t ACTOR_FLAG_VISIBLE = 0x1;
+		const uint32_t MOVEMENT_UPDATE_WITHOUT_INPUT = 0x8;
+		const uint32_t ACTION_STATE_AIR_CONTROL = 0x1;
+		const uint32_t ACTION_STATE_SPIN_HOVER = 0x2;
+		const uint32_t ACTION_STATE_LEDGE_CLIMB = 0x4;
+		const uint32_t ACTION_STATE_ZIPLINE = 0x8;
+		const uint32_t ACTION_STATE_POLE_CLIMB = 0x10;
+		const uint32_t ACTION_STATE_AIRBORNE_RECOVERY = 0x20;
+		const uint32_t ACTION_STATE_GROUND_SLAM = 0x40;
+		const uint32_t ACTION_STATE_GUN_FIRE = 0x80;
+		const uint32_t ACTION_STATE_CAMERA = 0x100;
+		const uint32_t ACTION_STATE_FORCED_FACING = 0x200;
+		const uint32_t ACTION_STATE_SWING = 0x400;
+		const uint32_t ACTION_STATE_COSMIC_SHIELD = 0x800;
+		const uint32_t ACTION_STATE_ROCKET_BOOTS = 0x1000;
+		const uint32_t ACTION_STATE_GRAPPLE = 0x2000;
+		const uint32_t ACTION_STATE_GRAVITY_BOOTS = 0x4000;
+		const uint32_t ACTION_STATE_SPIN_CANCEL = 0x8000;
+		const uint32_t ACTION_STATE_SLIPPERY_SURFACE = 0x10000;
+		const uint32_t VISOR_START_ACTION_MASK = 0xFFF7F;
+		const uint32_t AIRBORNE_TIMER_RESET_ACTIONS = 0x18010;
+
+		enum TraversalState
+		{
+			TRAVERSAL_INACTIVE = 0,
+			TRAVERSAL_UPDATE_MOVEMENT = 1,
+			TRAVERSAL_HANDLED = 2,
+			TRAVERSAL_UPDATE_WITHOUT_INPUT = 3,
+		};
+
 		enum AnimationEventFlag
 		{
 			ANIMATION_EVENT_RIGHT_FOOT = 0x1,
@@ -338,8 +392,428 @@ namespace Toy2
 			}
 		}
 
-		// STUB: TOY2 0x00436220
-		void HandleGameplay(Toy2BuzzActor* buzz) {}
+		// FUNCTION: TOY2 0x00436220 [PROVISIONAL]
+		void HandleGameplay(Toy2BuzzActor* buzz)
+		{
+			g_animationEventFlags = 0;
+			RefreshDiscAmmo();
+
+			MovementRates movementRates;
+			movementRates.lateralSpeedLimit = 0x380;
+			movementRates.forwardSpeedLimit = 0x400;
+			movementRates.verticalAcceleration = -0x600;
+			movementRates.turnRateLimit = 0x300;
+			movementRates.forwardAcceleration = Renderer::g_frameDelta * 0xA0 / 4;
+			movementRates.lateralDeceleration = Renderer::g_frameDelta * 0x200 / 4;
+			movementRates.forwardDeceleration = Renderer::g_frameDelta * 0xC0 / 4;
+
+			if (g_rocketBootsTimer != 0)
+				movementRates.verticalAcceleration = -0x640;
+
+			if (buzz->cosmicShieldTimer > 0)
+			{
+				movementRates.verticalAcceleration = -0x3C0;
+				movementRates.lateralDeceleration = Renderer::g_frameDelta * 0x40 / 4;
+				movementRates.forwardDeceleration = Renderer::g_frameDelta * 0x20 / 4;
+				movementRates.forwardAcceleration = Renderer::g_frameDelta * 0x50 / 4;
+			}
+
+			buzz->actorFlags &= ~ACTOR_FLAG_BLOCK_EDGE_IDLE;
+			if (g_environmentEffectType == 1)
+			{
+				if (buzz->posAngles.pos.y > g_environmentSurfaceY + 0x2000)
+					buzz->actorFlags |= ACTOR_FLAG_BLOCK_EDGE_IDLE;
+			}
+			else if (g_environmentEffectType > 1 && g_environmentEffectType < 4 && buzz->posAngles.pos.y > g_environmentSurfaceY)
+			{
+				buzz->actorFlags |= ACTOR_FLAG_BLOCK_EDGE_IDLE;
+			}
+
+			if ((g_footingType & ~3) == 4)
+			{
+				movementRates.lateralDeceleration = Renderer::g_frameDelta * 0x40 / 4;
+				movementRates.forwardDeceleration = Renderer::g_frameDelta * 0x20 / 4;
+				movementRates.forwardAcceleration = Renderer::g_frameDelta * 0x50 / 4;
+			}
+
+			if (g_slipperySurfaceState != 0)
+			{
+				g_buzzActor.actorFlags &= ~ACTOR_FLAG_LOCK_FACING;
+				movementRates.turnRateLimit = 0;
+				movementRates.lateralDeceleration = Renderer::g_frameDelta * 0x10 / 4;
+
+				uint32_t facingDelta = g_slipperySurfaceAngle - (int16_t)buzz->posAngles.angles.yaw;
+				int32_t accelerationScale;
+				if (((facingDelta + 0x400) & 0xFFF) < 0x801)
+					accelerationScale = Renderer::g_frameDelta * 5;
+				else
+					accelerationScale = -Renderer::g_frameDelta;
+				movementRates.forwardAcceleration = accelerationScale * 8 / 4;
+
+				if ((InputManager::g_directionInputState & (INPUT_UP | INPUT_RIGHT | INPUT_DOWN | INPUT_LEFT)) == 0)
+				{
+					facingDelta &= 0xFFF;
+					if (facingDelta > 0x800)
+						facingDelta -= 0x1000;
+					uint16_t facingAngle = ((int32_t)facingDelta >> 3) + buzz->posAngles.angles.yaw;
+					facingAngle &= 0xFFF;
+					buzz->posAngles.angles.yaw = facingAngle;
+					buzz->facingAngle = facingAngle;
+				}
+				else
+				{
+					movementRates.turnRateLimit = 0x100;
+				}
+
+				movementRates.forwardDeceleration = movementRates.lateralDeceleration;
+				if (buzz->specialAirState != 0)
+					g_animationEventFlags |= ANIMATION_EVENT_MOVEMENT;
+			}
+
+			if (g_forcedFacingActive != 0)
+				movementRates.lateralSpeedLimit = 0x180;
+
+			buzz->surfaceClampY = (int32_t)0x80000000;
+			if ((buzz->actorFlags & ACTOR_FLAG_BLOCK_EDGE_IDLE) != 0)
+			{
+				if (g_environmentEffectType == 1)
+				{
+					movementRates.lateralSpeedLimit = 0x280;
+					movementRates.verticalAcceleration = -0x300;
+					movementRates.lateralDeceleration = Renderer::g_frameDelta * 0x200 / 16;
+					movementRates.forwardDeceleration = Renderer::g_frameDelta * 0x80 / 16;
+					if (movementRates.forwardAcceleration >= 0)
+						movementRates.forwardAcceleration = Renderer::g_frameDelta * 0xA0 / 16;
+				}
+				else if (g_environmentEffectType > 1)
+				{
+					movementRates.lateralSpeedLimit = 0x100;
+					movementRates.verticalAcceleration = -0x300;
+					movementRates.lateralDeceleration = Renderer::g_frameDelta * 0x40 / 4;
+					movementRates.forwardDeceleration = Renderer::g_frameDelta * 0x20 / 4;
+					movementRates.forwardAcceleration = Renderer::g_frameDelta * 0x50 / 4;
+					buzz->surfaceClampY = g_environmentSurfaceY;
+				}
+			}
+
+			g_actionStateFlags = buzz->specialAirState != 0;
+			if (g_spinHoverTimer < 0)
+				g_actionStateFlags |= ACTION_STATE_SPIN_HOVER;
+			if (g_ledgeClimbTimer != 0)
+				g_actionStateFlags |= ACTION_STATE_LEDGE_CLIMB;
+			if (g_ziplineState != 0)
+				g_actionStateFlags |= ACTION_STATE_ZIPLINE;
+			if (g_poleClimbState > 0)
+				g_actionStateFlags |= ACTION_STATE_POLE_CLIMB;
+			if (g_airborneTimer < 0 || g_airborneTimer == 0x50)
+				g_actionStateFlags |= ACTION_STATE_AIRBORNE_RECOVERY;
+			if (g_groundSlamTimer != 0)
+				g_actionStateFlags |= ACTION_STATE_GROUND_SLAM;
+			if (g_gunFireTimer != 0)
+				g_actionStateFlags |= ACTION_STATE_GUN_FIRE;
+			if (Camera::g_scriptedCameraState != 0)
+				g_actionStateFlags |= ACTION_STATE_CAMERA;
+			if (g_forcedFacingActive != 0)
+				g_actionStateFlags |= ACTION_STATE_FORCED_FACING;
+			if (g_swingTimer > 15)
+				g_actionStateFlags |= ACTION_STATE_SWING;
+			if (buzz->cosmicShieldTimer > 0)
+				g_actionStateFlags |= ACTION_STATE_COSMIC_SHIELD;
+			if (g_rocketBootsTimer != 0)
+				g_actionStateFlags |= ACTION_STATE_ROCKET_BOOTS;
+			if (g_grappleState != 0)
+				g_actionStateFlags |= ACTION_STATE_GRAPPLE;
+			if (g_gravityBootsTimer != 0)
+				g_actionStateFlags |= ACTION_STATE_GRAVITY_BOOTS;
+			if (g_spinCancelRequested != 0)
+				g_actionStateFlags |= ACTION_STATE_SPIN_CANCEL;
+			if (g_slipperySurfaceState != 0)
+				g_actionStateFlags |= ACTION_STATE_SLIPPERY_SURFACE;
+
+			if (buzz->specialAirState == 0)
+			{
+				movementRates.forwardDeceleration = Renderer::g_frameDelta * 0x40 / 4;
+			}
+			else if (g_spinCancelRequested != 0)
+			{
+				g_spinCancelRequested = 0;
+				g_actionStateFlags &= ~ACTION_STATE_SPIN_CANCEL;
+			}
+
+			if (g_turnRecoveryTimer > 0)
+			{
+				g_turnRecoveryTimer -= Renderer::g_frameDelta;
+				if (g_turnRecoveryTimer < 0)
+					g_turnRecoveryTimer = 0;
+				if ((InputManager::g_directionInputState & (INPUT_UP | INPUT_RIGHT | INPUT_DOWN | INPUT_LEFT)) != 0)
+				{
+					movementRates.forwardDeceleration = Renderer::g_frameDelta * 0x10 / 4;
+					movementRates.lateralDeceleration = Renderer::g_frameDelta * 0x40 / 4;
+				}
+			}
+
+			if (buzz->stunTimer != 0)
+			{
+				if (buzz->collisionFlags != 0)
+					buzz->actorFlags &= ~ACTOR_FLAG_DAMAGE_REACTION;
+				if ((buzz->actorFlags & ACTOR_FLAG_DAMAGE_REACTION) != 0)
+				{
+					movementRates.lateralDeceleration = 0;
+					movementRates.forwardDeceleration = 0;
+				}
+
+				if (buzz->stunTimer > 0)
+				{
+					buzz->stunTimer -= (int16_t)Renderer::g_frameDelta;
+					if (buzz->stunTimer < 1)
+					{
+						buzz->stunTimer = 0;
+						buzz->actorFlags &= ~ACTOR_FLAG_STUNNED;
+					}
+				}
+				if (buzz->stunTimer < 0)
+				{
+					buzz->stunTimer += (int16_t)Renderer::g_frameDelta;
+					if (buzz->stunTimer >= 0)
+					{
+						buzz->actorFlags &= ~ACTOR_FLAG_STUNNED;
+						buzz->stunTimer = 0;
+					}
+				}
+			}
+
+			if ((buzz->actorFlags & ACTOR_FLAG_STUNNED) == 0)
+			{
+				buzz->actorFlags |= ACTOR_FLAG_VISIBLE;
+			}
+			else
+			{
+				g_damageBlinkCounter++;
+				if (g_damageBlinkCounter < 3)
+					buzz->actorFlags |= ACTOR_FLAG_VISIBLE;
+				else
+				{
+					g_damageBlinkCounter = 0;
+					buzz->actorFlags &= ~ACTOR_FLAG_VISIBLE;
+				}
+			}
+
+			if ((buzz->actorFlags & ACTOR_FLAG_UNCONTROLLED_MOMENTUM) != 0)
+			{
+				if (buzz->collisionFlags == 0)
+				{
+					movementRates.lateralDeceleration = 0;
+					movementRates.lateralSpeedLimit = 0xB80;
+					movementRates.forwardSpeedLimit = 0xB80;
+					movementRates.forwardDeceleration = 0;
+				}
+				else
+				{
+					buzz->actorFlags &= ~(ACTOR_FLAG_UNCONTROLLED_MOMENTUM | ACTOR_FLAG_LOCK_FACING);
+				}
+			}
+
+			if (buzz->cosmicShieldTimer > 0)
+			{
+				buzz->cosmicShieldTimer -= (int16_t)Renderer::g_frameDelta;
+				if (buzz->cosmicShieldTimer < 1)
+				{
+					RespawnCosmicShield();
+					buzz->cosmicShieldTimer = 0;
+				}
+			}
+
+			if (buzz->specialAirState != 0 || (buzz->stunTimer < 1 && buzz->health >= 0))
+				g_damageRegistered = 0;
+
+			g_movementInputLockTimer -= Renderer::g_frameDelta;
+			if (g_movementInputLockTimer < 0)
+				g_movementInputLockTimer = 0;
+
+			if ((InputManager::g_directionInputState & INPUT_VISOR_TOGGLE) != 0 && (InputManager::g_prevDirectionInputState & INPUT_VISOR_TOGGLE) == 0
+				&& (g_actionStateFlags & VISOR_START_ACTION_MASK) == ACTION_STATE_AIR_CONTROL)
+			{
+				Camera::g_scriptedCameraState = CAMERA_STATE_TARGETING;
+				g_actionStateFlags |= ACTION_STATE_CAMERA;
+				InputManager::g_prevDirectionInputState |= INPUT_VISOR_TOGGLE;
+				buzz->velocity.lateral = 0;
+				buzz->velocity.vertical = 0;
+				buzz->velocity.forward = 0;
+				g_spinHoverTimer = 0;
+			}
+
+			bool cameraActive = Camera::g_scriptedCameraState != 0;
+			TickGunFire(buzz);
+			uint32_t movementLocks = TickGroundSlam(buzz);
+			TickSpinHover(buzz);
+
+			int32_t traversalState = HandleZipline(buzz);
+			if (traversalState == TRAVERSAL_INACTIVE)
+				traversalState = HandleSwing(buzz);
+			if (traversalState == TRAVERSAL_INACTIVE)
+				traversalState = HandlePoleClimb(buzz);
+
+			if (traversalState == TRAVERSAL_INACTIVE)
+			{
+				movementLocks |= HandleLedgeClimb(buzz) | (cameraActive ? MOVEMENT_UPDATE_WITHOUT_INPUT : 0);
+				if (g_airborneTimer < 0)
+				{
+					buzz->actorFlags |= ACTOR_FLAG_LOCK_FACING;
+					g_airborneTimer += Renderer::g_frameDelta;
+					if (g_airborneTimer >= 0)
+					{
+						g_airborneTimer = 0;
+						buzz->actorFlags &= ~ACTOR_FLAG_LOCK_FACING;
+					}
+				}
+
+				if (g_grappleState == GRAPPLE_PULLING)
+				{
+					movementLocks = 0;
+				}
+				else if (movementLocks == 0)
+				{
+					if (g_movementLockTimer > 0)
+					{
+						g_movementLockTimer -= Renderer::g_frameDelta;
+						buzz->velocity.lateral = 0;
+						buzz->velocity.forward = 0;
+					}
+					if (g_gravityBootsTimer == 0)
+						UpdateJumpAndGravity(buzz, movementRates.verticalAcceleration, 0);
+					else
+						Camera::UpdateGravityBoots(buzz);
+					traversalState = TRAVERSAL_UPDATE_MOVEMENT;
+				}
+
+				if ((movementLocks & MOVEMENT_LOCK_LATERAL) != 0)
+					buzz->velocity.lateral = 0;
+				if ((movementLocks & MOVEMENT_LOCK_VERTICAL) != 0)
+					buzz->velocity.vertical = 0;
+				if ((movementLocks & MOVEMENT_LOCK_FORWARD) != 0)
+					buzz->velocity.forward = 0;
+				if ((movementLocks & MOVEMENT_UPDATE_WITHOUT_INPUT) != 0)
+				{
+					UpdateJumpAndGravity(buzz, movementRates.verticalAcceleration, 0);
+					traversalState = TRAVERSAL_UPDATE_WITHOUT_INPUT;
+				}
+			}
+
+			if (traversalState == TRAVERSAL_UPDATE_MOVEMENT || traversalState == TRAVERSAL_UPDATE_WITHOUT_INPUT)
+			{
+				int32_t forwardInput;
+				if (traversalState == TRAVERSAL_UPDATE_WITHOUT_INPUT)
+					forwardInput = 0;
+				else if (g_rocketBootsTimer == 0)
+					forwardInput = UpdateFacing(buzz, &movementRates);
+				else
+					forwardInput = Camera::UpdateRocketBoots(buzz, &movementRates);
+
+				if (g_slipperySurfaceState != 0 && movementRates.forwardAcceleration != 0)
+				{
+					forwardInput = 1;
+					if (movementRates.forwardAcceleration < 0)
+					{
+						forwardInput = -1;
+						movementRates.forwardAcceleration = -movementRates.forwardAcceleration;
+					}
+				}
+				UpdateHorizontalMovement(buzz, &movementRates, forwardInput);
+			}
+
+			buzz->motionTargetPos = buzz->posAngles.pos;
+			g_previousVerticalVelocity = buzz->velocity.vertical;
+			buzz->velocity.lateral *= Renderer::g_frameDelta;
+			buzz->velocity.vertical *= Renderer::g_frameDelta;
+			buzz->velocity.forward *= Renderer::g_frameDelta;
+			MoveableObject::Update(buzz);
+			ResolveFooting(buzz);
+			buzz->velocity.lateral /= Renderer::g_frameDelta;
+			buzz->velocity.vertical /= Renderer::g_frameDelta;
+			buzz->velocity.forward /= Renderer::g_frameDelta;
+
+			if (buzz->collisionFlags == 0)
+			{
+				if (buzz->specialAirState > 0)
+				{
+					buzz->specialAirState -= (int16_t)Renderer::g_frameDelta;
+					if (buzz->specialAirState < 1)
+						buzz->specialAirState = 0;
+				}
+			}
+			else
+			{
+				buzz->specialAirState = 6;
+			}
+
+			Shadow::QueueStretchedForBuzz(buzz->posAngles.pos.x, buzz->floorYPos, buzz->posAngles.pos.z, 100);
+			if (g_slipperySurfaceState != 0 && buzz->collisionFlags != 0 && abs(buzz->floorYPos - buzz->posAngles.pos.y) < 0x1000)
+			{
+				g_slipperySurfaceAngle = Nu3D::Math::CartesianToFixedAngle(Collision::g_groundNormal.x, Collision::g_groundNormal.z) & 0xFFF;
+			}
+
+			if ((g_actionStateFlags & AIRBORNE_TIMER_RESET_ACTIONS) != 0)
+			{
+				g_airborneTimer = 0;
+			}
+			else if (g_airborneTimer < 0)
+			{
+				goto check_world_bounds;
+			}
+
+			if (buzz->velocity.vertical < 0x81 || buzz->collisionFlags != 0)
+			{
+				if (buzz->specialAirState == 0)
+				{
+					if (g_airborneTimer != 0x50)
+						g_airborneTimer = 0;
+				}
+				else
+				{
+					if (g_airborneTimer == 0x50)
+					{
+						g_animationEventFlags |= ANIMATION_EVENT_FORCE_EFFECT;
+						g_airborneTimer = -0x46;
+						AudioManager::PlaySoundEffect(0x2F, &buzz->posAngles.pos);
+						buzz->velocity.lateral = 0;
+						buzz->velocity.vertical = 0;
+						buzz->velocity.forward = 0;
+					}
+					if (g_airborneTimer > 0)
+					{
+						g_airborneTimer = 0;
+						g_animationEventFlags |= ANIMATION_EVENT_FORCE_EFFECT;
+					}
+				}
+			}
+			else
+			{
+				g_airborneTimer += Renderer::g_frameDelta;
+				if (g_airborneTimer > 0x3C)
+				{
+					AudioManager::PlaySoundEffect(0x16, &buzz->posAngles.pos);
+					g_buzzActor.actorFlags &= ~ACTOR_FLAG_LOCK_FACING;
+					g_airborneTimer = 0x50;
+					g_spinHoverTimer = 0;
+					g_groundSlamTimer = 0;
+					DeactivateRocketBoots();
+				}
+			}
+
+		check_world_bounds:
+			if (buzz->collisionFlags != 0)
+				g_outOfBoundsLifeGranted = 0;
+			if (buzz->posAngles.pos.y > Collision::g_collisionWorldMaxX + 0x2000 && g_levelTransition == 0)
+			{
+				if (g_outOfBoundsLifeGranted < 1)
+				{
+					g_outOfBoundsLifeGranted++;
+					if (buzz->lives < 9)
+						buzz->lives++;
+				}
+				HandleDamage(0, DAMAGE_FORCE_DEATH);
+			}
+		}
 
 		// FUNCTION: TOY2 0x004A2D80 [PROVISIONAL]
 		void UpdateContactEffects()
@@ -758,6 +1232,9 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x0053C810
 	int32_t g_previousVerticalVelocity;
+
+	// GLOBAL: TOY2 0x0053C814
+	int32_t g_slipperySurfaceAngle;
 
 	// GLOBAL: TOY2 0x0053C62C
 	int32_t g_outOfBoundsLifeGranted;
@@ -1361,20 +1838,16 @@ namespace Toy2
 		const uint32_t GUN_IDLE_BLOCKING_ACTIONS = 0xFBE3C;
 		const uint32_t GUN_START_BLOCKING_ACTIONS = 0xFBEFE;
 		const uint32_t GUN_REPEAT_BLOCKING_ACTIONS = 0xFBE7E;
-		const uint32_t ACTION_STATE_GUN_FIRE = 0x80;
 		const int32_t SURFACE_DAMAGE_GROUP = 0;
 		const int32_t SURFACE_DEATH_GROUP = 4;
 		const int32_t SLIPPERY_SURFACE_QUALITY = 13;
-		const uint32_t ACTION_STATE_GROUND_SLAM = 0x40;
 		const uint32_t CLEAR_ACTION_STATE_GUN_FIRE = 0xFF7F;
-		const uint32_t ACTION_STATE_SPIN_HOVER = 0x2;
 		const uint32_t SPIN_START_BLOCKING_ACTIONS = 0xFFF7F;
 		const uint32_t SPIN_CHARGE_BLOCKING_ACTIONS = 0xFFFFE;
 		const uint32_t SPIN_HOVER_BLOCKING_ACTIONS = 0xFFF7E;
 		const uint32_t LEDGE_CLIMB_BLOCKING_ACTIONS = 0xFFF7F;
 		const uint32_t POLE_CLIMB_BLOCKING_ACTIONS = 0xFFF6E;
 		const uint32_t SWING_BLOCKING_ACTIONS = 0xFFB7E;
-		const uint32_t ACTION_STATE_SWING = 0x400;
 		const int16_t SWING_START_ANIMATION_STATE = 26;
 		const uint32_t TURN_RECOVERY_ACTION_MASK = 0xFF481;
 		const int16_t GROUND_SLAM_ANIMATION_STATE = 8;
