@@ -91,6 +91,38 @@ namespace Nu3D
 			return (transformed0.z + transformed1.z + transformed2.z) / 12;
 		}
 
+		static __forceinline int16_t ProjectSoftwarePointY(const SoftwareProjectionPoint& point)
+		{
+			g_softwareProjectionDepth = point.z;
+			if (g_softwareProjectionDepth == 0)
+				g_softwareProjectionDepth = 1;
+
+			return (int16_t)((Toy2::g_destRectHeight + point.y * g_softwareProjectionScaleY / g_softwareProjectionDepth) * 0.5f);
+		}
+
+		// FUNCTION: TOY2 0x00451280 [PROVISIONAL]
+		int32_t ProjectQuad(const SoftwareProjectionPoint* point0,
+			const SoftwareProjectionPoint* point1,
+			const SoftwareProjectionPoint* point2,
+			const SoftwareProjectionPoint* point3,
+			int32_t* projected0,
+			int32_t* projected1,
+			int32_t* projected2,
+			int32_t* projected3)
+		{
+			SoftwareProjectionPoint transformed0 = TransformSoftwarePoint(*point0);
+			SoftwareProjectionPoint transformed1 = TransformSoftwarePoint(*point1);
+			SoftwareProjectionPoint transformed2 = TransformSoftwarePoint(*point2);
+			SoftwareProjectionPoint transformed3 = TransformSoftwarePoint(*point3);
+
+			projected0[0] = ProjectSoftwarePointY(transformed0);
+			projected1[1] = ProjectSoftwarePointY(transformed1);
+			projected2[2] = ProjectSoftwarePointY(transformed2);
+			projected3[3] = ProjectSoftwarePointY(transformed3);
+
+			return (transformed0.z + transformed1.z + transformed2.z + transformed3.z) / 16;
+		}
+
 		struct ViewRotationHistoryEntry
 		{
 			Vector3I16 angles;
