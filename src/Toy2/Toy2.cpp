@@ -80,6 +80,26 @@ namespace Nu3D
 {
 	namespace Camera
 	{
+		struct SoftwareProjectionPoint
+		{
+			int16_t x;
+			int16_t y;
+			int16_t z;
+			int16_t reserved;
+		};
+		STATIC_ASSERT(sizeof(SoftwareProjectionPoint) == 0x8);
+
+		int32_t ProjectQuad(const SoftwareProjectionPoint* point0,
+			const SoftwareProjectionPoint* point1,
+			const SoftwareProjectionPoint* point2,
+			const SoftwareProjectionPoint* point3,
+			int32_t* projected0,
+			int32_t* projected1,
+			int32_t* projected2,
+			int32_t* projected3,
+			int32_t* unused0,
+			int32_t* unused1);
+		void WorldToView(const Vector3I16* source, Vector3I* destination, int32_t* viewDistance);
 		int32_t IsActorSpawnVisible(const Vector3I* cameraPosition, const Toy2::Actor::Toy2Actor* actor);
 	}
 }
@@ -3377,6 +3397,182 @@ namespace Toy2
 
 	namespace Portal
 	{
+		struct ClipRect
+		{
+			int16_t minX;
+			int16_t minY;
+			int16_t maxX;
+			int16_t maxY;
+		};
+
+		extern int32_t g_backdropClipCount;
+		extern ClipRect g_backdropClipRects[12];
+
+		enum PortalClipFlags
+		{
+			PORTAL_CLIP_NEAR_SCREEN = 1,
+			PORTAL_CLIP_PARTIAL_MASK = 3,
+			PORTAL_CLIP_BEHIND_CAMERA = 8,
+			PORTAL_CLIP_REJECTED = 32,
+			PROJECT_QUAD_NEEDS_NEAR_CLIP = 0x20000,
+		};
+
+		static __forceinline int32_t PackScreenPoint(int32_t x, int32_t y) { return (uint16_t)x | (y << 16); }
+
+		static __forceinline int32_t ClipPortalPoint(const Vector3I& point, const Vector3I& next, const Vector3I& previous, int32_t& clipFlags)
+		{
+			if (point.z > 10)
+				return PackScreenPoint(point.x * 160 / point.z + 256, point.y * 160 / point.z + 128);
+
+			if (point.z < 0)
+				clipFlags += PORTAL_CLIP_BEHIND_CAMERA;
+
+			int32_t clippedX;
+			int32_t clippedY;
+			if (next.z > 10 && next.z > previous.z)
+			{
+				clippedX = (point.x - next.x) * next.z / (next.z - point.z) + next.x;
+				clippedY = (point.y - next.y) * next.z / (next.z - point.z) + next.y;
+			}
+			else if (previous.z > 10)
+			{
+				clippedX = (point.x - previous.x) * previous.z / (previous.z - point.z) + previous.x;
+				clippedY = (point.y - previous.y) * previous.z / (previous.z - point.z) + previous.y;
+			}
+			else
+			{
+				clippedX = point.x;
+				clippedY = point.y;
+			}
+
+			if (abs(clippedX) < 512 || abs(clippedY) < 512)
+				clipFlags += PORTAL_CLIP_NEAR_SCREEN;
+
+			int32_t screenX = clippedX < 0 ? 0 : 512;
+			int32_t screenY = clippedY < 0 ? 0 : 512;
+			return PackScreenPoint(screenX, screenY);
+		}
+
+		// FUNCTION: TOY2 0x0043F3D0 [PROVISIONAL]
+		void FloodVisibility(Levels::PortalZone* portalZone, int32_t minX, int32_t maxX, int32_t minY, int32_t maxY, int32_t depth)
+		{
+			Levels::PortalEntry* entry = portalZone->entries;
+			while (entry->recordIdx != 0xFF)
+			{
+				Levels::PortalRecord* portal = reinterpret_cast<Levels::PortalRecord*>(Levels::g_recordData[entry->recordIdx]);
+				ZoneRenderData& zone = g_zoneRenderData[entry->categoryIdx];
+				if (portal != NULL && zone.visibilityDepth < depth)
+				{
+					int32_t* projected = reinterpret_cast<int32_t*>(&Collision::g_mathScratch[0]);
+					int32_t projectionFlags;
+					int32_t projectionScratch;
+					Nu3D::Camera::ProjectQuad(reinterpret_cast<Nu3D::Camera::SoftwareProjectionPoint*>(&portal->origin),
+						reinterpret_cast<Nu3D::Camera::SoftwareProjectionPoint*>(&portal->vertices[0]),
+						reinterpret_cast<Nu3D::Camera::SoftwareProjectionPoint*>(&portal->vertices[2]),
+						reinterpret_cast<Nu3D::Camera::SoftwareProjectionPoint*>(&portal->vertices[1]),
+						&projected[0],
+						&projected[1],
+						&projected[2],
+						&projected[3],
+						&projectionFlags,
+						&projectionScratch);
+
+					bool overlapsX = (int16_t)projected[0] <= maxX || (int16_t)projected[1] <= maxX || (int16_t)projected[2] <= maxX
+						|| (int16_t)projected[3] <= maxX;
+					overlapsX = overlapsX
+						&& (minX <= (int16_t)projected[0] || minX <= (int16_t)projected[1] || minX <= (int16_t)projected[2] || minX <= (int16_t)projected[3]);
+					bool overlapsY = (int16_t)(projected[0] >> 16) <= maxY || (int16_t)(projected[1] >> 16) <= maxY || (int16_t)(projected[2] >> 16) <= maxY
+						|| (int16_t)(projected[3] >> 16) <= maxY;
+					overlapsY = overlapsY
+						&& (minY <= (int16_t)(projected[0] >> 16) || minY <= (int16_t)(projected[1] >> 16) || minY <= (int16_t)(projected[2] >> 16)
+							|| minY <= (int16_t)(projected[3] >> 16));
+
+					if (overlapsX && overlapsY)
+					{
+						int32_t clipFlags = 0;
+						if ((projectionFlags & PROJECT_QUAD_NEEDS_NEAR_CLIP) != 0 && (g_levelFileIndex != 7 || entry->categoryIdx != 15))
+						{
+							zone.isProcessed = 1;
+							Vector3I* view0 = &Collision::g_mathScratch[1].value;
+							Vector3I* view1 = &Collision::g_mathScratch[2].value;
+							Vector3I* view2 = &Collision::g_mathScratch[3].value;
+							Vector3I* view3 = &Collision::g_mathScratch[4].value;
+							Nu3D::Camera::WorldToView(&portal->origin, view0, &projectionFlags);
+							Nu3D::Camera::WorldToView(&portal->vertices[0].position, view1, &projectionFlags);
+							Nu3D::Camera::WorldToView(&portal->vertices[1].position, view2, &projectionFlags);
+							Nu3D::Camera::WorldToView(&portal->vertices[2].position, view3, &projectionFlags);
+
+							projected[0] = ClipPortalPoint(*view0, *view1, *view3, clipFlags);
+							projected[1] = ClipPortalPoint(*view1, *view2, *view0, clipFlags);
+							projected[3] = ClipPortalPoint(*view2, *view3, *view1, clipFlags);
+							projected[2] = ClipPortalPoint(*view3, *view0, *view2, clipFlags);
+						}
+
+						if (Nu3D::Math::Cross2D(projected[0], projected[1], projected[2]) >= 0
+							|| Nu3D::Math::Cross2D(projected[1], projected[3], projected[2]) >= 0 || clipFlags != 0)
+						{
+							if (clipFlags < PORTAL_CLIP_REJECTED)
+							{
+								zone.visibilityDepth = (uint8_t)depth;
+								zone.portalRecordIndex = (zone.portalRecordIndex & 0xFF00) | entry->recordIdx;
+								if ((clipFlags & PORTAL_CLIP_PARTIAL_MASK) == 0)
+								{
+									int32_t portalMinX = (int16_t)projected[0];
+									int32_t portalMaxX = portalMinX;
+									int32_t portalMinY = (int16_t)(projected[0] >> 16);
+									int32_t portalMaxY = portalMinY;
+									for (int32_t i = 1; i < 4; i++)
+									{
+										int32_t x = (int16_t)projected[i];
+										int32_t y = (int16_t)(projected[i] >> 16);
+										if (x < portalMinX)
+											portalMinX = x;
+										if (x > portalMaxX)
+											portalMaxX = x;
+										if (y < portalMinY)
+											portalMinY = y;
+										if (y > portalMaxY)
+											portalMaxY = y;
+									}
+									zone.minX = (int16_t)(portalMinX < minX ? minX : portalMinX);
+									zone.minY = (int16_t)(portalMinY < minY ? minY : portalMinY);
+									zone.maxX = (int16_t)(portalMaxX > maxX ? maxX : portalMaxX);
+									zone.maxY = (int16_t)(portalMaxY > maxY ? maxY : portalMaxY);
+								}
+								else
+								{
+									zone.minX = (int16_t)minX;
+									zone.minY = (int16_t)minY;
+									zone.maxX = (int16_t)maxX;
+									zone.maxY = (int16_t)maxY;
+								}
+
+								if (entry->categoryIdx == 15 && g_hasBackdrop != 0 && g_backdropClipCount < 12)
+								{
+									g_zoneRenderData[15].visibilityDepth = 0;
+									g_backdropClipRects[g_backdropClipCount].minX = zone.minX;
+									g_backdropClipRects[g_backdropClipCount].maxX = zone.maxX;
+									g_backdropClipRects[g_backdropClipCount].minY = zone.minY;
+									g_backdropClipCount++;
+									g_backdropClipRects[g_backdropClipCount - 1].maxY = zone.maxY;
+								}
+								else
+								{
+									FloodVisibility(&Levels::g_portalZones[entry->categoryIdx], zone.minX, zone.maxX, zone.minY, zone.maxY, depth - 1);
+								}
+							}
+							else
+								zone.visibilityDepth = 0;
+						}
+					}
+					else
+						zone.visibilityDepth = 0;
+				}
+
+				entry++;
+			}
+		}
+
 		// GLOBAL: TOY2 0x0054D920
 		Vector3I g_previousSectorPosition;
 
@@ -6795,5 +6991,14 @@ namespace Toy2
 			*textureType = D3DTEXTURE_STATUS_DESTROY;
 			D3DAppIReleaseAllTextures();
 		}
+	}
+
+	namespace Portal
+	{
+		// GLOBAL: TOY2 0x0054DD74
+		int32_t g_backdropClipCount;
+
+		// GLOBAL: TOY2 0x00557BB0
+		ClipRect g_backdropClipRects[12];
 	}
 }

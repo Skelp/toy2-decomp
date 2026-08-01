@@ -108,7 +108,9 @@ namespace Nu3D
 			int32_t* projected0,
 			int32_t* projected1,
 			int32_t* projected2,
-			int32_t* projected3)
+			int32_t* projected3,
+			int32_t*,
+			int32_t*)
 		{
 			SoftwareProjectionPoint transformed0 = TransformSoftwarePoint(*point0);
 			SoftwareProjectionPoint transformed1 = TransformSoftwarePoint(*point1);
