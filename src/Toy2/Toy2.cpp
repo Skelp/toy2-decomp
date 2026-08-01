@@ -1,5 +1,6 @@
 #include "Toy2/Toy2.h"
 #include "Toy2/Gadget.h"
+#include "Toy2/Ini.h"
 #include "D3DApp/d3dapp.h"
 #include "D3DApp/d3dappi.h"
 #include "Toy2/Direct6.h"
@@ -999,13 +1000,6 @@ namespace Toy2
 		{
 			ControlTextEntry entry;
 			int32_t reserved2;
-		};
-
-		struct MessageTextEntry
-		{
-			int32_t x;
-			int32_t y;
-			const char* text;
 		};
 
 		struct PaddedMessageTextEntry
