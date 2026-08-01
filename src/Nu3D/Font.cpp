@@ -957,6 +957,17 @@ namespace Nu3D
 		return maxWidth > width ? maxWidth : width;
 	}
 
+	// FUNCTION: TOY2 0x004B53A0 [MATCHED]
+	void DrawFormattedText(const char* format, ...)
+	{
+		char text[512];
+		va_list arguments;
+
+		va_start(arguments, format);
+		vsprintf(text, format, arguments);
+		g_drawTextStringFunc(text);
+	}
+
 	// FUNCTION: TOY2 0x004B53D0 [PROVISIONAL]
 	int32_t Font::CalculateScaledTextSize(const char* text)
 	{

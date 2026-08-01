@@ -914,6 +914,7 @@
 0x004B4DE0 Nu3D::Font::DrawUnscaledGlyph
 0x004B4FA0 Nu3D::Font::DrawClippedUnscaledGlyph
 0x004B5310 Nu3D::Font::ComputeUnscaledCharClip
+0x004B53A0 Nu3D::DrawFormattedText
 0x004B53D0 Nu3D::Font::CalculateScaledTextSize
 0x004B5480 Nu3D::Font::CalculateUnscaledTextSize
 0x004B5590 Nu3D::Viewport::GetViewportRect
