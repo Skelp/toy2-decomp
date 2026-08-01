@@ -433,6 +433,7 @@
 0x00477EB0 SoftwareRenderer::UnkRenderAPI34
 0x0047B170 RawLoader::DecompressBuffer
 0x0047B6B0 Toy2::LoadGameSaveSlot
+0x0047B8A0 Toy2::SaveGameSaveSlot
 0x0047BAC0 InputManager::BeginControlMenuExitOnEscape
 0x0047C800 SoftwareRenderer::LockBackBuffer
 0x0047C870 SoftwareRenderer::UnlockBackBuffer

@@ -4350,6 +4350,57 @@ namespace Toy2
 		return result;
 	}
 
+	// FUNCTION: TOY2 0x0047B8A0 [PROVISIONAL]
+	int32_t SaveGameSaveSlot(GameSaveSlot* slot)
+	{
+		char fileName[10] = "game0.sav";
+		char savePath[4096];
+		char fullPath[8192];
+		int32_t result = 0;
+
+		memset(savePath, 0, sizeof(savePath));
+		strcat(savePath, Ini::g_iniInstallSearchPath);
+		strcat(savePath, "\\cd");
+		strcat(savePath, "\\save\\");
+
+		if (g_selectedGameSaveSlotIndex < 10)
+		{
+			fileName[4] = (char)(g_selectedGameSaveSlotIndex + '0');
+			Logger::Log("SAVE : Attempting to save file %s in path %s.\n", fileName, savePath);
+
+			memset(fullPath, 0, sizeof(fullPath));
+			strcat(fullPath, savePath);
+			strcat(fullPath, fileName);
+
+			FILE* file = fopen(fullPath, "wb");
+			if (file != NULL)
+			{
+				int32_t writeCount = fwrite(slot, sizeof(GameSaveSlot), 1, file);
+				if (writeCount == 1)
+				{
+					result = writeCount;
+				}
+				else
+				{
+					Logger::Log("ERROR - %s.\n", strerror(errno));
+				}
+				fclose(file);
+			}
+		}
+
+		switch (result)
+		{
+			case 0:
+				Logger::Log("SAVE : Failed to save file %s.\n", fullPath);
+				break;
+			case 1:
+				Logger::Log("SAVE : Successfully save file %s.\n", fullPath);
+				break;
+		}
+
+		return result;
+	}
+
 	// FUNCTION: TOY2 0x0049B9E0 [PROVISIONAL]
 	int32_t TickSaveMenuMachine(int32_t postGameSave)
 	{
