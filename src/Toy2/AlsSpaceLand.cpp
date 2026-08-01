@@ -150,10 +150,9 @@ namespace Toy2
 				if (g_laserPathPoints[laserIndex] >= targetPath->recordCount)
 					g_laserPathPoints[laserIndex] -= targetPath->recordCount;
 
-				Vector3I& targetPoint = targetPath->data[g_laserPathPoints[laserIndex]];
-				g_laserPositions[laserIndex].point.x = targetPoint.x << 5;
-				g_laserPositions[laserIndex].point.y = targetPoint.y << 5;
-				g_laserPositions[laserIndex].point.z = targetPoint.z << 5;
+				g_laserPositions[laserIndex].point.x = targetPath->data[g_laserPathPoints[laserIndex]].x << 5;
+				g_laserPositions[laserIndex].point.y = targetPath->data[g_laserPathPoints[laserIndex]].y << 5;
+				g_laserPositions[laserIndex].point.z = targetPath->data[g_laserPathPoints[laserIndex]].z << 5;
 
 				if (g_buzzActor.posAngles.pos.y > -0x150F)
 				{
@@ -170,11 +169,10 @@ namespace Toy2
 			}
 
 			Levels::RecordData* sourcePath = Levels::g_recordData[15 - laserIndex];
-			Vector3I& sourcePoint = sourcePath->data[g_laserPathPoints[laserIndex]];
 			Vector4I beamDirection;
-			beamDirection.x = (sourcePoint.x << 5) - g_laserPositions[laserIndex].point.x;
-			beamDirection.y = (sourcePoint.y << 5) - g_laserPositions[laserIndex].point.y;
-			beamDirection.z = (sourcePoint.z << 5) - g_laserPositions[laserIndex].point.z;
+			beamDirection.x = (sourcePath->data[g_laserPathPoints[laserIndex]].x << 5) - g_laserPositions[laserIndex].point.x;
+			beamDirection.y = (sourcePath->data[g_laserPathPoints[laserIndex]].y << 5) - g_laserPositions[laserIndex].point.y;
+			beamDirection.z = (sourcePath->data[g_laserPathPoints[laserIndex]].z << 5) - g_laserPositions[laserIndex].point.z;
 			beamDirection.x = g_laserCooldowns[laserIndex] * beamDirection.x / g_laserTravelDurations[laserIndex];
 			beamDirection.y = g_laserCooldowns[laserIndex] * beamDirection.y / g_laserTravelDurations[laserIndex];
 			beamDirection.z = g_laserCooldowns[laserIndex] * beamDirection.z / g_laserTravelDurations[laserIndex];
