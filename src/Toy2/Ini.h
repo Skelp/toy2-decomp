@@ -36,6 +36,7 @@ namespace Toy2
 		extern MessageTextEntry* g_messageTextTable[25];
 		extern ControlTextEntry* g_keyTextTable[15];
 		extern ControlTextEntry* g_joyTextTable[11];
+		extern char g_iniInstallSearchPath[512];
 
 		STATIC_ASSERT(offsetof(ControlTextEntry, glyphIndex) == 0x10);
 		STATIC_ASSERT(offsetof(ControlTextEntry, inputCode) == 0x11);

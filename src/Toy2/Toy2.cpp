@@ -1847,6 +1847,21 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0072E354
 	char g_saveSlotDescriptions[8][256];
 
+	struct GameSaveSlot
+	{
+		int32_t x;
+		int32_t y;
+		int32_t occupied;
+		char label[12];
+		SaveManager::Save0Data saveData;
+	};
+
+	STATIC_ASSERT(offsetof(GameSaveSlot, saveData) == 0x18);
+	STATIC_ASSERT(sizeof(GameSaveSlot) == 0x1A0);
+
+	// GLOBAL: TOY2 0x00704E5C
+	int32_t g_selectedGameSaveSlotIndex;
+
 	// GLOBAL: TOY2 0x0072EF94
 	int32_t g_movieTimingRate;
 
@@ -4282,6 +4297,57 @@ namespace Toy2
 		}
 
 		g_levelFileIndex = prevLevelFileIdx;
+	}
+
+	// FUNCTION: TOY2 0x0047B6B0 [PROVISIONAL]
+	int32_t LoadGameSaveSlot(GameSaveSlot* slot)
+	{
+		char fileName[10] = "game0.sav";
+		char savePath[4096];
+		char fullPath[8192];
+		int32_t result = 0;
+
+		memset(savePath, 0, sizeof(savePath));
+		strcat(savePath, Ini::g_iniInstallSearchPath);
+		strcat(savePath, "\\cd");
+		strcat(savePath, "\\save\\");
+
+		if (g_selectedGameSaveSlotIndex < 10)
+		{
+			fileName[4] = (char)(g_selectedGameSaveSlotIndex + '0');
+			Logger::Log("SAVE : Attempting to load file %s in path %s.\n", fileName, savePath);
+
+			memset(fullPath, 0, sizeof(fullPath));
+			strcat(fullPath, savePath);
+			strcat(fullPath, fileName);
+
+			FILE* file = fopen(fullPath, "rb");
+			if (file != NULL)
+			{
+				int32_t readCount = fread(slot, sizeof(GameSaveSlot), 1, file);
+				if (readCount == 1)
+				{
+					result = readCount;
+				}
+				else
+				{
+					Logger::Log("ERROR - %s.\n", strerror(errno));
+				}
+				fclose(file);
+			}
+		}
+
+		switch (result)
+		{
+			case 0:
+				Logger::Log("LOAD : Failed to load file %s.\n", fullPath);
+				break;
+			case 1:
+				Logger::Log("SAVE : Successfully loaded file %s.\n", fullPath);
+				break;
+		}
+
+		return result;
 	}
 
 	// FUNCTION: TOY2 0x0049B9E0 [PROVISIONAL]
