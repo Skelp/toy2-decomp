@@ -5019,6 +5019,42 @@ namespace Toy2
 		}
 	}
 
+	// FUNCTION: TOY2 0x00437A50 [MATCHED]
+	void ShowTimedBackdrop(int32_t backdropIndex, int32_t displayFrames, int32_t minimumDisplayFrames)
+	{
+		InputManager::g_curButtonsPressed = 0;
+		InputManager::g_prevButtonsPressed = 0;
+		MainMenu::g_fadeTimer = 0;
+		MainMenu::g_nextScreen = 0;
+		Nu3D::Camera::g_cameraTintBlue = 0;
+		Nu3D::Camera::g_cameraTintGreen = 0;
+		Nu3D::Camera::g_cameraTintRed = 0;
+		Nu3D::Camera::SetTint(128, 128, 128, 12);
+		SoftwareRenderer::SetBackdropScrollOverride(0, 0);
+		Renderer::g_frameDelta = 1;
+		SetBackdropByIndex(backdropIndex);
+
+		int32_t skipThreshold = displayFrames - minimumDisplayFrames;
+		while (displayFrames != 0)
+		{
+			Nu3D::Camera::FadeToTargetTint();
+
+			int32_t frameDelta = Renderer::g_frameDelta;
+			if (displayFrames > 0)
+			{
+				displayFrames -= frameDelta;
+				if (displayFrames <= 0)
+					displayFrames = 0;
+			}
+
+			if (displayFrames <= 23 && frameDelta + displayFrames > 23)
+				Nu3D::Camera::SetTint(0, 0, 0, 12);
+
+			if ((InputManager::g_curButtonsPressed & 0xF000) != 0 && displayFrames < skipThreshold && displayFrames > 23)
+				displayFrames = 24;
+		}
+	}
+
 	// FUNCTION: TOY2 0x00438520 [MATCHED]
 	int32_t ShowStaticScreen(int32_t backdropIndex)
 	{

@@ -288,6 +288,7 @@
 0x00436D80 AudioManager::FillBuffer
 0x00437010 AudioManager::Stream::ThreadProc
 0x004371B0 Toy2::MainMenu::ShowSettings
+0x00437A50 Toy2::ShowTimedBackdrop
 0x00437B20 Toy2::GameOver::Tick
 0x00437C40 Toy2::MainMenu::Draw
 0x00437FB0 Toy2::MainMenu::Tick
