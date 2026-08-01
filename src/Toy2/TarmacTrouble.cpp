@@ -17,6 +17,7 @@
 #include "Toy2/LevelLogic.h"
 #include "Toy2/Buzz.h"
 #include "Toy2/Levels.h"
+#include "Toy2/Lighting.h"
 #include "Toy2/MainMenu.h"
 #include "Toy2/Actor.h"
 #include "Toy2/Camera.h"
@@ -54,6 +55,8 @@ namespace Toy2
 		{
 			SMITH_ENCOUNTER_ACTIVE = 2,
 			SMITH_ENCOUNTER_DEFEATED = 3,
+			SMITH_ENCOUNTER_TOKEN_DELAY_END = 120,
+			SMITH_ENCOUNTER_TOKEN_AWARDED = 200,
 		};
 
 		enum LightPuzzleStateBits
@@ -84,6 +87,11 @@ namespace Toy2
 			{ 150 }, { 30 }, { reinterpret_cast<int32_t>(g_lightPuzzleInstructions) }, { 0x800 }, { -1 }
 		};
 
+		// GLOBAL: TOY2 0x004F4C54
+		char* g_rotatingHintSubtitles[] = {
+#include "TarmacTroubleHint.inc"
+		};
+
 		// GLOBAL: TOY2 0x004F4C68
 		int16_t g_tokenLinkIds[] = { 0x77, 0x76, 0x75, 0x74, 0x73, 0 };
 
@@ -91,6 +99,8 @@ namespace Toy2
 		int32_t g_pressedButtonLink;
 		// GLOBAL: TOY2 0x0052FF4C
 		int32_t g_smithTintToggle;
+		// GLOBAL: TOY2 0x0052FF50
+		Vector3I g_platformSoundPosition;
 		// GLOBAL: TOY2 0x0052FF60
 		Vector3I g_turntableCenter;
 		// GLOBAL: TOY2 0x0052FF70
@@ -105,20 +115,28 @@ namespace Toy2
 		Vector3I g_turntableRotation;
 		// GLOBAL: TOY2 0x0052FF90
 		int32_t g_buttonResetTimer;
+		// GLOBAL: TOY2 0x0052FF98
+		Vector3I g_turntableSoundPosition;
 		// GLOBAL: TOY2 0x0052FFA8
 		int32_t g_lightningFlashTimer;
 		// GLOBAL: TOY2 0x0052FFAC
 		int32_t g_smithEncounterState;
+		// GLOBAL: TOY2 0x0052FFB0
+		int32_t g_thunderTimer;
 		// GLOBAL: TOY2 0x0052FFB4
 		int32_t g_lightPuzzleInitialized;
 		// GLOBAL: TOY2 0x0052FFB8
 		Vector3I g_turntableOrigin;
+		// GLOBAL: TOY2 0x0052FFC8
+		int32_t g_puzzleCutsceneTimer;
 		// GLOBAL: TOY2 0x0052FFCC
 		int32_t g_puzzleTokenPickupIndex;
 		// GLOBAL: TOY2 0x0052FFD0
 		int32_t g_lightPuzzleState;
 		// GLOBAL: TOY2 0x0052FFD4
 		int32_t g_indicatorWobbleAngle;
+		// GLOBAL: TOY2 0x0052FFD8
+		Vector3I g_lightningSoundPosition;
 		// GLOBAL: TOY2 0x0052FFE8
 		int32_t g_smithAttackTimer;
 		// GLOBAL: TOY2 0x0052FFEC
@@ -562,8 +580,363 @@ namespace Toy2
 			Weather::Init();
 		}
 
-		// STUB: TOY2 0x0042E790
-		void Interactions() {}
+		// FUNCTION: TOY2 0x0042E790 [PROVISIONAL]
+		void Interactions()
+		{
+			AudioManager::PlaySoundEffect(0x6F, 0);
+			UpdateTurntable();
+
+			PosAndAngles position;
+			position.pos.x = -0xD2AC0;
+			position.pos.y = -0xF9F7;
+			position.pos.z = -0x98D72;
+			if (Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &position.pos, 500) != 0)
+			{
+				if (g_lightPuzzleInitialized == 0)
+					ResetLightPuzzle();
+
+				int8_t previousPuzzleState = (int8_t)g_lightPuzzleState;
+				g_lightPuzzleInitialized = 1;
+				if ((g_lightPuzzleState & LIGHT_PUZZLE_TOP_ROW) == (g_lightPuzzleState & LIGHT_PUZZLE_BOTTOM_ROW) * 0x10 && g_remainingButtonPresses >= 0)
+				{
+					g_remainingButtonPresses = (g_remainingButtonPresses + Renderer::g_frameDelta) & 0x3F;
+					if ((uint32_t)g_remainingButtonPresses > 20 && previousPuzzleState == 0)
+					{
+						g_lightPuzzleState = 0xFF;
+						UpdateBottomPuzzleLights();
+						UpdateTopPuzzleLights();
+						previousPuzzleState = g_lightPuzzleState;
+					}
+					if (g_remainingButtonPresses < 20 && previousPuzzleState != 0)
+					{
+						g_lightPuzzleState = 0;
+						UpdateBottomPuzzleLights();
+						UpdateTopPuzzleLights();
+					}
+					if (g_platformLiftOffset < 48000)
+						g_platformLiftOffset += Renderer::g_frameDelta * 0x80;
+
+					if (g_puzzleCutsceneTimer >= 0)
+					{
+						if (g_puzzleCutsceneTimer == 0)
+						{
+							Nu3D::Link::GetCurrentPosFixed(0x74, &position.pos);
+							Camera::BeginScriptedCutsceneAtPoint(&position.pos, 300, 0x20);
+							Camera::g_cutsceneCameraPosition.y += 0x8000;
+							AudioManager::StartSoundSequenceOnActor(-5, &g_buzzActor.posAngles.pos);
+						}
+						Nu3D::Link::GetCurrentPosFixed(0x74, &position.pos);
+						Camera::g_cutsceneFocusPosition = position.pos;
+						g_puzzleCutsceneTimer += Renderer::g_frameDelta;
+						Nu3D::Link::GetCurrentPosFixed(0x74, &position.pos);
+						if (g_puzzleCutsceneTimer > 299)
+							g_puzzleCutsceneTimer = -1;
+					}
+				}
+				else if (g_remainingButtonPresses <= 0)
+				{
+					if (g_remainingButtonPresses == 0)
+					{
+						g_lightPuzzleState = 0;
+						UpdateBottomPuzzleLights();
+						UpdateTopPuzzleLights();
+					}
+					g_remainingButtonPresses -= Renderer::g_frameDelta;
+					if (g_remainingButtonPresses < -60)
+					{
+						ResetLightPuzzle();
+						if (Camera::g_cutsceneDuration == 0)
+							AudioManager::StartSoundSequenceOnActor(-6, &g_buzzActor.posAngles.pos);
+					}
+				}
+				else if (g_groundSlamTimer == -40 && g_footingType > 0x1F && g_footingType < 0x24)
+				{
+					g_remainingButtonPresses--;
+					for (int32_t linkId = 0x36; linkId < 0x3A; linkId++)
+					{
+						int32_t scale = linkId == g_remainingButtonPresses + 0x36 ? 0x1000 : 0;
+						Nu3D::Link::SetScaleFromFixedOffsets(linkId, scale, scale, scale);
+					}
+					Levels::DeactivateAmbientEmitter(0, 1);
+					Levels::DeactivateAmbientEmitter(1, 1);
+					Levels::DeactivateAmbientEmitter(2, 1);
+					Levels::DeactivateAmbientEmitter(3, 1);
+					if (g_remainingButtonPresses >= 0)
+					{
+						PressLightPuzzleButton(g_footingType - 0x20);
+						UpdateBottomPuzzleLights();
+					}
+				}
+			}
+
+			if (g_buttonResetTimer > 0)
+			{
+				g_buttonResetTimer -= Renderer::g_frameDelta;
+				if (g_buttonResetTimer < 1)
+				{
+					Nu3D::Link::SetScaleFromFixedOffsets(g_pressedButtonLink, 0x1000, 0x1000, 0x1000);
+					Nu3D::Link::SetScaleFromFixedOffsets(g_pressedButtonLink + 4, 0, 0, 0);
+				}
+			}
+
+			UpdatePlatforms();
+			g_indicatorWobbleAngle += Renderer::g_frameDelta;
+			int32_t wobbleX = Numerics::g_sinCosLUT[g_indicatorWobbleAngle * 7 & 0xFFF] * Numerics::g_sinCosLUT[g_indicatorWobbleAngle * 11 & 0xFFF];
+			int32_t wobbleY = Numerics::g_sinCosLUT[g_indicatorWobbleAngle * 17 & 0xFFF] * Numerics::g_sinCosLUT[g_indicatorWobbleAngle * 11 & 0xFFF];
+			Nu3D::Link::SetRotationRelative8bit(0x45, 0, wobbleY / 0x200000, wobbleX / 0x400000);
+			wobbleX = Numerics::g_sinCosLUT[g_indicatorWobbleAngle * 7 & 0xFFF] * Numerics::g_sinCosLUT[g_indicatorWobbleAngle * 11 & 0xFFF];
+			wobbleY = Numerics::g_sinCosLUT[g_indicatorWobbleAngle * 17 & 0xFFF] * Numerics::g_sinCosLUT[g_indicatorWobbleAngle * 11 & 0xFFF];
+			Nu3D::Link::SetRotationRelative8bit(0x46, 0, wobbleY / 0x200000, wobbleX / 0x400000);
+
+			Actor::CollectQuestReward(0x27, 2, -1, 0, 0);
+			Actor::RotatingHint(0x2F, 10, g_rotatingHintSubtitles);
+			Actor::Toy2Actor* luggageOwner = &Actor::g_creatureActors[0x28];
+			if ((luggageOwner->actorFlags & Actor::ACTOR_FLAG_INTERACTION_REQUESTED) != 0)
+			{
+				luggageOwner->actorFlags &= ~Actor::ACTOR_FLAG_INTERACTION_REQUESTED;
+				if (g_levelObjectiveProgress >= 0)
+				{
+					if (g_levelObjectiveProgress == 5)
+					{
+						Dialogue::Begin(0x28, 3, "thanks for finding my ^luggage^ buzz! here is a pizza planet ^token^!", -1, 0, 1);
+						g_levelObjectiveProgress = -1;
+					}
+					else
+					{
+						Dialogue::Begin(0x28,
+							3,
+							"hi buzz! i have lost ^five^ pieces of ^luggage^. if you can find them for me, i will give you a pizza planet ^token^.",
+							-1,
+							0,
+							-1);
+					}
+				}
+			}
+
+			Actor::PlayPeriodicHintSound(0x26, 0xB5);
+			Actor::Toy2Actor* challengeActor = &Actor::g_creatureActors[0x26];
+			if ((challengeActor->actorFlags & Actor::ACTOR_FLAG_INTERACTION_REQUESTED) != 0)
+			{
+				challengeActor->actorFlags &= ~Actor::ACTOR_FLAG_INTERACTION_REQUESTED;
+				if (Collectables::g_tokenStates[2].active != 2)
+				{
+					if (HUD::g_challengeState == HUD::CHALLENGE_STATE_INACTIVE)
+					{
+						AudioManager::Preset::PlayOneShotSound2(0xB6, challengeActor);
+						Dialogue::Begin(0x26,
+							4,
+							"hi buzz! if you can reach the end of this path without ^jumping^ or touching the ^green^ slime, i will give you a pizza planet "
+							"^token^.",
+							-1,
+							0,
+							2);
+						HUD::g_challengeState = HUD::CHALLENGE_STATE_WAITING_FOR_CAMERA;
+					}
+					else
+					{
+						Dialogue::Begin(0x26, 4, "quick! you can still reach the token!", -1, 0, -1);
+					}
+				}
+			}
+			if (HUD::g_challengeState == HUD::CHALLENGE_STATE_WAITING_FOR_CAMERA && Nu3D::Camera::g_viewHistoryInitialized == 0)
+			{
+				HUD::g_challengeState = HUD::CHALLENGE_STATE_ACTIVE;
+				AndysHouse::g_raceCheckpointPassCount = 170;
+			}
+			if (HUD::g_challengeState == HUD::CHALLENGE_STATE_ACTIVE)
+			{
+				if (Collectables::g_tokenStates[2].active == 2)
+				{
+					HUD::g_challengeState = HUD::CHALLENGE_STATE_INACTIVE;
+				}
+				else
+				{
+					if ((g_buzzActor.airborneMode > 0 && g_buzzActor.airborneMode < 5) || g_footingType == 0)
+						AndysHouse::g_raceCheckpointPassCount = 99;
+					if (g_framePulseOutputs.sixtyFourTick != 0)
+						AndysHouse::g_raceCheckpointPassCount--;
+					if (AndysHouse::g_raceCheckpointPassCount < 100)
+					{
+						AndysHouse::g_raceCheckpointPassCount = 100;
+						HUD::g_challengeState = HUD::CHALLENGE_STATE_INACTIVE;
+						Collectables::Deactivate(2);
+					}
+				}
+			}
+
+			Nu3D::Link::GetCurrentPosFixed(0, &position.pos);
+			Actor::Toy2Actor* turntableActor = &Actor::g_creatureActors[0x2B];
+			turntableActor->boundary.x = position.pos.x;
+			turntableActor->pos.x = position.pos.x;
+			turntableActor->boundary.y = position.pos.y;
+			turntableActor->boundary.z = position.pos.z;
+			turntableActor->pos.z = position.pos.z;
+
+			Actor::Toy2Actor* smith = &Actor::g_creatureActors[0x2E];
+			if (g_smithEncounterState == 0 && Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &smith->pos, 300) != 0)
+			{
+				g_smithEncounterState = 1;
+				Dialogue::Begin(0x2E, 1, "ha ha ha ha ... defeat the ^blacksmith^ boss to get a pizza planet ^token^!", -1, 0, -1);
+			}
+			if (g_smithEncounterState == 1 && Nu3D::Camera::g_viewHistoryInitialized == 0)
+			{
+				smith->movementData = CreatureBehaviour::g_smithMovementData + 14;
+				g_levelInteractionTimer = 180;
+				g_smithEncounterState = SMITH_ENCOUNTER_ACTIVE;
+				smith->movementCommandTimer = 0;
+				smith->creatureRam->initialFacingAngle = 0;
+			}
+			if (g_smithEncounterState > SMITH_ENCOUNTER_ACTIVE)
+			{
+				if (g_smithEncounterState < SMITH_ENCOUNTER_TOKEN_DELAY_END)
+					g_smithEncounterState += Renderer::g_frameDelta;
+				else if (g_smithEncounterState != SMITH_ENCOUNTER_TOKEN_AWARDED)
+				{
+					Collectables::Activate(4, 0);
+					g_smithEncounterState = SMITH_ENCOUNTER_TOKEN_AWARDED;
+				}
+			}
+
+			Nu3D::Link::GetCurrentPosFixed(0, &position.pos);
+			g_turntableSoundPosition.x = (Camera::g_renderCameraTransform.pos.x - position.pos.x) * 3 / 4 + position.pos.x;
+			g_turntableSoundPosition.y = (Camera::g_renderCameraTransform.pos.y - position.pos.y) * 3 / 4 + position.pos.y;
+			g_turntableSoundPosition.z = (Camera::g_renderCameraTransform.pos.z - position.pos.z) * 3 / 4 + position.pos.z;
+			AudioManager::PlaySoundEffect(0x9C, &g_turntableSoundPosition);
+			Nu3D::Link::GetCurrentPosFixed(0x44, &position.pos);
+			g_platformSoundPosition.x = (Camera::g_renderCameraTransform.pos.x - position.pos.x) * 3 / 4 + position.pos.x;
+			g_platformSoundPosition.y = (Camera::g_renderCameraTransform.pos.y - position.pos.y) * 3 / 4 + position.pos.y;
+			g_platformSoundPosition.z = (Camera::g_renderCameraTransform.pos.z - position.pos.z) * 3 / 4 + position.pos.z;
+			AudioManager::PlaySoundEffect(0x9B, &g_platformSoundPosition);
+
+			Weather::StepPrecipitation(0x100, 0x1000, 0x33);
+			if (g_framePulseOutputs.eightTick != 0)
+			{
+				position.pos.x = (*g_randDatBufferPtr - 0x80) * 0x100 + Numerics::g_sinCosLUT[Camera::g_renderCameraTransform.rotation.euler.angles.yaw] * 3
+					+ Camera::g_renderCameraTransform.pos.x;
+				position.pos.y = Camera::g_renderCameraTransform.pos.y - 0x8000;
+				position.pos.z = (g_randDatBufferPtr[1] - 0x80) * 0x100
+					+ Numerics::g_sinCosLUT[(Camera::g_renderCameraTransform.rotation.euler.angles.yaw + 0x400) & 0xFFF] * 3
+					+ Camera::g_renderCameraTransform.pos.z;
+				g_randDatBufferPtr += 2;
+				int32_t groundHeight = Nu3D::Collision::GetGroundHeight(&position, 0);
+				if (groundHeight != INT_MIN && Camera::g_renderCameraTransform.pos.y < groundHeight)
+					Nu3D::Particles::SpawnFromPreset(position.pos.x, groundHeight, position.pos.z, 0x1B, 2);
+			}
+
+			int32_t flashTimer = g_lightningFlashTimer - Renderer::g_frameDelta;
+			if (flashTimer < 0x20)
+			{
+				if (g_lightningFlashTimer > 0x1F)
+				{
+					g_thunderTimer = *g_randDatBufferPtr;
+					uint32_t lightningAngle = (Camera::g_renderCameraTransform.rotation.euler.angles.yaw - 0x80 + g_randDatBufferPtr[1]) & 0xFFF;
+					g_randDatBufferPtr += 2;
+					g_lightningSoundPosition.x = (Numerics::g_sinCosLUT[lightningAngle] * g_thunderTimer >> 5) + Camera::g_renderCameraTransform.pos.x;
+					g_lightningSoundPosition.y = Camera::g_renderCameraTransform.pos.y;
+					g_lightningSoundPosition.z =
+						(Numerics::g_sinCosLUT[(lightningAngle + 0x400) & 0xFFF] * g_thunderTimer >> 5) + Camera::g_renderCameraTransform.pos.z;
+				}
+				if (Nu3D::Camera::g_targetTintFadeSpeed == 0)
+				{
+					if (flashTimer < 0)
+						flashTimer = *g_randDatBufferPtr++ * 2 + 0x20;
+					else if (Nu3D::Camera::g_cameraTintRed > 0x40)
+					{
+						Nu3D::Camera::g_cameraTintRed = (int16_t)flashTimer * 3 + 0x80;
+						Nu3D::Camera::g_cameraTintBlue = Nu3D::Camera::g_cameraTintRed;
+						Nu3D::Camera::g_cameraTintGreen = Nu3D::Camera::g_cameraTintRed;
+					}
+				}
+				else
+				{
+					Nu3D::Camera::g_cameraTintBlue = 0x80;
+					Nu3D::Camera::g_cameraTintGreen = 0x80;
+					Nu3D::Camera::g_cameraTintRed = 0x80;
+					g_lightningFlashTimer = 10000;
+					flashTimer = g_lightningFlashTimer;
+				}
+			}
+			g_lightningFlashTimer = flashTimer;
+			g_thunderTimer -= Renderer::g_frameDelta;
+			if (g_thunderTimer < 1)
+			{
+				g_thunderTimer = 20000;
+				AudioManager::PlaySoundEffect(0x70, &g_lightningSoundPosition);
+			}
+
+			Levels::RecordData* flareRecords = Levels::g_recordData[0x28];
+			int32_t nearestDistanceSquared = INT_MAX;
+			int32_t nearestFlareIndex = 0;
+			int32_t flareIndex;
+			int32_t flareCount;
+			int32_t buzzRadiusSquared = (g_buzzActor.posAngles.pos.z >> 8) * (g_buzzActor.posAngles.pos.z >> 8)
+				+ (g_buzzActor.posAngles.pos.x >> 8) * (g_buzzActor.posAngles.pos.x >> 8);
+			if (buzzRadiusSquared < 0x8E5144)
+			{
+				flareIndex = 0;
+				flareCount = 16;
+			}
+			else
+			{
+				flareIndex = 16;
+				flareCount = flareRecords->recordCount;
+			}
+
+			for (; flareIndex < flareCount; flareIndex++)
+			{
+				Vector3I* flare = &flareRecords->data[flareIndex];
+				int32_t cameraOffsetY = (Camera::g_renderCameraTransform.pos.y - flare->y * 0x20) >> 8;
+				int32_t cameraOffsetZ = (Camera::g_renderCameraTransform.pos.z - flare->z * 0x20) >> 8;
+				int32_t cameraOffsetX = (Camera::g_renderCameraTransform.pos.x - flare->x * 0x20) >> 8;
+				int32_t cameraDistanceSquared = cameraOffsetX * cameraOffsetX + cameraOffsetY * cameraOffsetY + cameraOffsetZ * cameraOffsetZ;
+				if (cameraDistanceSquared < 0x40000)
+				{
+					int32_t brightness = 0x80 - (int32_t)sqrt((double)cameraDistanceSquared) / 4;
+					if (brightness > 0)
+					{
+						int32_t red = flareIndex < 16 ? brightness : 0;
+						int32_t blue = flareIndex < 16 ? 0 : brightness;
+						Renderer::LensFlare::RegisterLight(flare->x * 0x20, flare->y * 0x20, flare->z * 0x20, red, brightness, blue, 0x80);
+					}
+					int32_t buzzOffsetY = (g_buzzActor.posAngles.pos.y - flare->y * 0x20 - 0x2000) >> 8;
+					int32_t buzzOffsetZ = (g_buzzActor.posAngles.pos.z - flare->z * 0x20) >> 8;
+					int32_t buzzOffsetX = (g_buzzActor.posAngles.pos.x - flare->x * 0x20) >> 8;
+					int32_t distanceSquared = buzzOffsetX * buzzOffsetX + buzzOffsetZ * buzzOffsetZ + buzzOffsetY * buzzOffsetY;
+					if (distanceSquared < nearestDistanceSquared)
+					{
+						nearestDistanceSquared = distanceSquared;
+						nearestFlareIndex = flareIndex;
+					}
+				}
+			}
+
+			if (nearestDistanceSquared < 0x10000)
+			{
+				Vector3I* nearestFlare = &flareRecords->data[nearestFlareIndex];
+				Lighting::DynamicLight* light = &Lighting::g_lightingState.dynamicLights[1];
+				light->sourceId = reinterpret_cast<int32_t>(nearestFlare);
+				light->position.x = nearestFlare->x << 5;
+				light->position.y = nearestFlare->y << 5;
+				light->position.z = nearestFlare->z << 5;
+				if (nearestFlareIndex < 16)
+				{
+					light->colour.r = 0xFF;
+					light->colour.b = 0;
+				}
+				else
+				{
+					light->colour.r = 0;
+					light->colour.b = 0xFF;
+				}
+				light->colour.g = 0xFF;
+				light->lifetime = 1;
+			}
+			else
+			{
+				Lighting::g_lightingState.dynamicLights[1].lifetime = 0;
+			}
+			PlayLevelMusic();
+		}
 	}
 }
 

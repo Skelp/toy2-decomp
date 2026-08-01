@@ -106,6 +106,7 @@ set(TOY2_SOURCES
     src/Toy2/VisorInstructions.inc
     src/Toy2/StompInstructions.inc
     src/Toy2/LightPuzzleInstructions.inc
+    src/Toy2/TarmacTroubleHint.inc
     src/Toy2/AndysHouse.cpp
     src/Toy2/AndysNeighborhood.cpp
     src/Toy2/BombsAway.cpp

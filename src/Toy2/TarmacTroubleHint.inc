@@ -1,0 +1,5 @@
+	"i think i saw ^hamm^ in zone ^5^.",
+	"the ^airport little tike^ has lost his ^luggage^. he is in zone ^3^.",
+	"^slinky^ has a ^challenge^ for you. he is in the middle of the airport next to the central pole. by the way, you can jump on the plane from the central pole.",
+	"there is a ^token^ being carried by the ^helicopter^. signal the ^helicopter^ to land by solving the ^lights^ puzzle in zone ^1^. you can use the ^zipline^ at the end of this trolley to reach the puzzle area.",
+	"the ^blacksmith^ boss is on the roof of the building in zone ^7^. he is near the radar tower. try and reach it by running down the wings of the ^plane^.",

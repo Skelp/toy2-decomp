@@ -91,6 +91,8 @@ namespace Toy2
 		extern int32_t g_cutsceneInputLockTimer;
 		extern int32_t g_cutsceneTransitionTimer;
 		extern int32_t g_cutsceneDuration;
+		extern Vector3I g_cutsceneFocusPosition;
+		extern Vector3I g_cutsceneCameraPosition;
 		extern int32_t g_shakeTimer;
 		extern int32_t g_cutsceneRecordType;
 		extern const int32_t* g_cutsceneCommandCursor;
