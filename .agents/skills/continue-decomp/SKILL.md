@@ -40,7 +40,7 @@ After the worker returns:
 5. If `close_agent` is available, close the worker. Otherwise, list agents and
    interrupt a worker that is still active. Require `Done` before you start its
    successor. A completed entry can remain visible.
-6. If the worker made progress, use `tools/decomp report` to regenerate the user-report.
+6. If the worker made progress, use `tools/decomp report` to regenerate the user-report and `tools/decomp sync` to sync changes to ghidra.
 
 Start the next fresh campaign after a success. Stop after three consecutive
 campaigns that produce no source progress. Do not count metadata, notes,
