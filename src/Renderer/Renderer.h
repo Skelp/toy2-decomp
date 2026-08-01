@@ -352,6 +352,9 @@ namespace DevDraw
 		int16_t IndexCount[32];
 	};
 
+	extern DrawBuffer g_drawBufferStorage;
+	extern TransparentDrawBuffer g_transparentDrawBufferStorage;
+
 	STATIC_ASSERT(offsetof(DrawBuffer, VerticeCount) == 0x104);
 	STATIC_ASSERT(offsetof(DrawBuffer, Index) == 0x186);
 	STATIC_ASSERT(offsetof(DrawBuffer, IndexCount) == 0x1FD56);
@@ -366,4 +369,5 @@ namespace DevDraw
 
 	int16_t FlushDrawBufferSlot(int16_t slot);
 	int16_t FlushTransparentDrawBufferSlot(int16_t slot);
+	void SetVertexBufferAllocation(int16_t slot, int32_t allocate);
 }

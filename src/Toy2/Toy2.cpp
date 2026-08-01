@@ -1831,10 +1831,10 @@ namespace Toy2
 	int32_t g_softWindowHeight;
 
 	// GLOBAL: TOY2 0x00500A10
-	DevDraw::DrawBuffer* drawb;
+	DevDraw::DrawBuffer* drawb = &DevDraw::g_drawBufferStorage;
 
 	// GLOBAL: TOY2 0x00500A14
-	DevDraw::TransparentDrawBuffer* drawtranb;
+	DevDraw::TransparentDrawBuffer* drawtranb = &DevDraw::g_transparentDrawBufferStorage;
 
 	// GLOBAL: TOY2 0x00500A28
 	int16_t g_currentDrawSlot;

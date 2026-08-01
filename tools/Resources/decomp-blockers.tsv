@@ -55,7 +55,7 @@
 0x00490B90	-	All six natural temporary orders and right-first product spelling compile to the same 65.71% or 32.50% regalloc patterns; ABI, alias-safe temporaries, arithmetic, and stores are otherwise confirmed
 0x00490EE0	-	No callers or x-refs are known, and Ghidra cannot form a function body at the authoritative map start; the many-argument ABI is not recoverable from raw disassembly alone
 0x00491F20	-	No callers or x-refs are known, and Ghidra cannot form a function body at the authoritative map start; the many-argument ABI is not recoverable from raw disassembly alone
-0x00492F70	-	The function has no direct callers, and its ten-argument ABI, render-state globals, and helper at 0x00497FE0 have no source evidence. The current evidence cannot identify a complete source interface.
+0x00492F70	-	The function has no direct callers. Its ten-argument ABI and render-state globals do not identify a complete source interface.
 0x004946A0	-	The typed tiled-sprite path scores 56.00%; four credible forms leave the verified CAP-24 x87 divisor spill and evaluation schedule.
 0x00494820	-	The typed virtual-width sprite path scores 57.14%; four credible forms leave the verified CAP-24 x87 divisor spill and evaluation schedule.
 0x0049EBA0	-	signed int16 global is confirmed by matched GetCurButtonsPressed; cached-reference baseline scores 51.85%, while direct-table forms with a local or split assignment score 14.81% and leave an unsupported load-width/address-mode mismatch

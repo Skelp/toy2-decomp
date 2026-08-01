@@ -13,6 +13,53 @@ namespace DevDraw
 	// GLOBAL: TOY2 0x00732FBC
 	int32_t g_vertexCount;
 
+	// GLOBAL: TOY2 0x00732FC8
+	DrawBuffer g_drawBufferStorage;
+
+	// GLOBAL: TOY2 0x007D2DA8
+	TransparentDrawBuffer g_transparentDrawBufferStorage;
+
+	// FUNCTION: TOY2 0x00497FE0 [MATCHED]
+	void SetVertexBufferAllocation(int16_t slot, int32_t allocate)
+	{
+		int16_t slotNumber = slot;
+		if (slotNumber >= 0x40)
+			return;
+
+		if (allocate)
+		{
+			if (g_drawBufferStorage.Vertice[slotNumber] == NULL)
+			{
+				g_drawBufferStorage.Vertice[slotNumber] = malloc(sizeof(Nu3D::VertexTL) * 500);
+				Logger::Log("MEM : Vertex buffer for tpage %d created.\n", slotNumber);
+			}
+
+			if (slotNumber < 0x20 && g_transparentDrawBufferStorage.Vertice[slotNumber] == NULL)
+			{
+				int32_t vertexCount = slotNumber == 14 ? 1000 : 500;
+				g_transparentDrawBufferStorage.Vertice[slotNumber] = malloc(sizeof(Nu3D::VertexTL) * vertexCount);
+				Logger::Log("MEM : Trans vertex buffer for tpage %d created.\n", slotNumber);
+			}
+		}
+		else
+		{
+			if (g_drawBufferStorage.Vertice[slotNumber] != NULL)
+			{
+				free(g_drawBufferStorage.Vertice[slotNumber]);
+				Logger::Log("MEM : Vertex buffer for tpage %d destroyed.\n", slotNumber);
+			}
+
+			if (slotNumber < 0x20 && g_transparentDrawBufferStorage.Vertice[slotNumber] != NULL)
+			{
+				free(g_transparentDrawBufferStorage.Vertice[slotNumber]);
+				Logger::Log("MEM : Trans vertex buffer for tpage %d destroyed.\n", slotNumber);
+			}
+
+			g_drawBufferStorage.Vertice[slotNumber] = NULL;
+			g_transparentDrawBufferStorage.Vertice[slotNumber] = NULL;
+		}
+	}
+
 	// FUNCTION: TOY2 0x004907E0 [MATCHED]
 	int16_t DrawSlots()
 	{
