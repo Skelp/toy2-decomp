@@ -22,6 +22,10 @@ Do not select targets, inspect disassembly, edit source, build, commit, or push.
 
 Spawn exactly one subagent for one coherent slice. Do not start another worker while this worker is active.
 
+Call `spawn_agent` with `fork_turns: "none"`. Do not copy the supervisor's
+conversation into a worker. The worker must receive one self-contained handoff
+of at most 6 KiB.
+
 Use this worker prompt:
 
 ```text
@@ -30,13 +34,26 @@ Do not spawn subagents.
 Preserve the supervisor's startup worktree state.
 Validate, commit, synchronize, report, and push successful work.
 Return the required worker result block.
+
+MODE: reconstruction | meta-resolution
+BASE_COMMIT: <supervisor-verified commit>
+STARTUP_STATUS: <exact allowed worktree state>
+TARGETS: <addresses or normal-selection>
+PROOF_TARGET: <one claim to prove or none>
+SUPPORTED_EVIDENCE: <bounded facts from the prior result or none>
+DO_NOT_REPEAT: <bounded rejected approaches or none>
+EXPECTED_RESULT: <source, map, blocker-model, tooling, or stalemate>
 ```
 
-Add a bounded handoff from the prior worker when one exists. Include useful addresses, completed work, and rejected approaches.
+Include only facts that the worker needs. Do not include the supervisor
+transcript, commentary, raw logs, or old plans. Carry forward at most 16
+addresses and eight rejected approaches.
 
 Wait for the worker to finish. Do not perform reconstruction work while it runs.
 
-Use a 60-second wait window. A timeout is only a poll result. If nothing changed, wait again without analysis or commentary.
+Use a 60-second wait window. A timeout is only a poll result. If nothing
+changed, wait again immediately without analysis, commentary, or a status
+message. A wait timeout does not stop or cancel the worker.
 
 ## Check the handoff
 
@@ -59,15 +76,24 @@ A worker stalemate is a supervisor input. It is not a final result.
 
 Classify the cause from the handoff. Then delegate one untried meta-resolution slice. Use this order when it applies:
 
-1. Find an evidence-provider function for a semantic, layout, ABI, or dispatch blocker.
-2. Resolve one discovery candidate's identity, ownership, boundary, or call contract.
-3. Find a type, name, lint, or source-ownership debt item that blocks useful reconstruction.
-4. Diagnose a candidate, blocker, discovery, or evidence-tool blind spot.
-5. Improve committed metadata or tooling when the current tools hide supported work.
+1. Resolve a contradiction between candidate readiness and committed blockers.
+2. Find an evidence-provider function for a semantic, layout, ABI, or dispatch blocker.
+3. Resolve one discovery candidate's identity, ownership, boundary, or call contract.
+4. Find a type, name, lint, or source-ownership debt item that blocks useful reconstruction.
+5. Diagnose a candidate, blocker, discovery, or evidence-tool blind spot.
+6. Improve committed metadata or tooling when the current tools hide supported work.
 
 Give the next worker one specific blocking class and one proof target. Do not ask it to rerun the complete fallback sequence.
 
-A meta-resolution slice must add durable evidence, improve the workflow, or prove that one external fact is missing. Commit useful blocker, map, note, or tooling changes.
+A meta-resolution slice must add durable evidence, improve the workflow, or
+prove that one external fact is missing. A changed evidence fingerprint alone
+is not a material result. Commit it only when the same slice also changes a
+dependency, blocker kind, semantic state, supported conclusion, source, map, or
+tool behavior.
+
+Batch two to four related metadata items in one worker when they share one
+provider, blocker class, or tool defect. Do not dispatch one worker per hash.
+Keep unrelated metadata in separate slices.
 
 Do not count repeated empty queries as separate blocked audits. Each audit must test a different evidence source, blocker class, or tool assumption.
 
@@ -87,6 +113,12 @@ Also require all these conditions:
 - the goal has enough remaining budget for another complete slice
 
 After `stalemate`, apply the meta-resolution procedure. Do not accept a worker's `MORE_SUPPORTED_WORK: no` without this review.
+
+Prefer dependency-ready reconstruction over metadata maintenance. Before more
+fingerprint work, find readiness contradictions. Resolve each target that
+`candidates` reports as ready while its committed blocker names an unresolved
+prerequisite. Do not assign an address again unless its evidence or dependency
+state changed.
 
 Stop on `failed` after one corrective follow-up. Report the repository state and the failure.
 

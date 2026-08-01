@@ -7,6 +7,10 @@ description: Complete one Toy Story 2 reconstruction or meta-resolution slice fo
 
 Own one coherent reconstruction or meta-resolution slice through push. Do not spawn subagents.
 
+The supervisor does not pass its conversation history. Treat the bounded
+handoff and the repository as the complete input. Do not reconstruct missing
+history from old Codex transcripts.
+
 `AGENTS.md` defines evidence, naming, source quality, work selection, and repository rules.
 
 ## Select the slice mode
@@ -29,6 +33,12 @@ Do not replace a specific meta-resolution task with the general fallback sequenc
 8. Select one supported frontier target, one tightly coupled group, or one meta-resolution result.
 
 Use the supervisor handoff first when it names a supported target. Confirm the handoff against current repository evidence.
+
+Before you edit a selected target, compare its candidate readiness with its
+committed blocker record. Stop reconstruction if the candidate tool reports
+readiness while an unresolved blocker applies. Diagnose the contradiction as a
+meta-resolution slice. Correct the causal model, metadata, or tool. Do not
+bypass the blocker.
 
 Use bounded commands before full output:
 
@@ -71,6 +81,17 @@ Test the assigned cause, not the general symptom. Useful meta-resolution results
 Do not return a command transcript as a result. Explain what the evidence changed.
 
 Bank useful metadata and tooling changes with the same validation and push discipline as source changes.
+
+A fingerprint, timestamp, or reworded reason is not useful by itself. A
+material metadata result must correct the causal model or repository behavior.
+Examples include a dependency, blocker kind, semantic state, supported
+conclusion, map fact, or tool behavior. If current evidence only confirms the
+existing record, leave the repository unchanged. Return a stalemate with the
+next distinct proof target.
+
+Group related stale records when they share one evidence provider, blocker
+class, or tool defect. Review two to four in the same slice. Commit one coherent
+correction. Do not make one commit for each refreshed fingerprint.
 
 ## Reconstruct and compare
 
@@ -117,6 +138,7 @@ WORKER_RESULT: banked | stalemate | failed
 COMMIT: <full SHA or none>
 ADDRESSES: <comma-separated addresses or none>
 SCORES: <address and verdict or none>
+MATERIAL_CHANGE: source | map | blocker-model | tooling | none
 MORE_SUPPORTED_WORK: yes | no | unknown
 BLOCKING_CLASS: <specific class or none>
 NEXT_META_ACTION: <one untried action or none>
@@ -124,7 +146,9 @@ SUMMARY: <bounded factual handoff>
 DO_NOT_REPEAT: <rejected approaches or none>
 ```
 
-Use `banked` only after a clean pushed commit. Use `stalemate` only when the assigned proof target cannot produce useful work.
+Use `banked` only after a clean pushed commit with a material change. Use
+`stalemate` when the assigned proof target cannot produce useful work, including
+when it only produces a fingerprint refresh.
 
 For `stalemate`, name the blocking class and one untried meta-action. Use `none` only after you test all applicable routes.
 

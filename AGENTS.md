@@ -733,13 +733,34 @@ The root agent supervises only. It must not reconstruct source, run comparison w
 
 Start exactly one `decomp-worker` subagent at a time. A worker must complete one coherent slice and must not delegate work.
 
-Wait for the worker to finish. Then verify the branch, worktree baseline, commit, and remote branch before another worker starts.
+Spawn each worker with `fork_turns: "none"`. Give it a self-contained handoff
+of at most 6 KiB. Include only the mode, base commit, startup status, targets,
+proof target, supported evidence, and rejected approaches. Do not pass the
+supervisor transcript or raw logs.
+
+Wait up to 60 seconds for each poll. A timeout does not stop the worker. Wait
+again immediately without analysis or commentary. After the worker finishes,
+verify the branch, worktree baseline, commit, and remote branch before another
+worker starts.
 
 If a check fails, send a corrective task to the same worker. Do not start a replacement worker for that slice.
 
 Start another worker only after the prior slice restores the startup state. Bank and push all useful changes first.
 
 A worker stalemate starts supervisor analysis. Delegate distinct blocker, discovery, evidence, metadata, or tooling work before you stop.
+
+Resolve a contradiction between candidate readiness and committed blockers
+before more metadata maintenance. Prefer dependency-ready reconstruction over
+fingerprint review.
+
+A changed fingerprint alone is not a coherent slice. Commit metadata only when
+the same work also changes the causal model or repository behavior. Examples
+include a dependency, blocker kind, semantic state, supported conclusion, map
+fact, or tool behavior. Batch two to four related records when they share one
+provider, blocker class, or tool defect.
+
+Do not assign the same address again unless its evidence or dependency state
+changed.
 
 Do not repeat an unchanged fallback search to satisfy the Goal blocked threshold. Each blocked audit must test a different cause.
 
