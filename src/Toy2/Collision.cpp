@@ -23,6 +23,7 @@ namespace Toy2
 	namespace Levels
 	{
 		extern void* g_cachedAllBuffer;
+		extern int32_t g_hasZoneData;
 
 		void BuildLevelPath(int32_t level, char* output, const char* suffix);
 	}
@@ -2600,6 +2601,130 @@ namespace Toy2
 				return 1;
 			}
 			return 0;
+		}
+	}
+}
+
+namespace Toy2
+{
+	namespace Level
+	{
+		// FUNCTION: TOY2 0x004885C0 [PROVISIONAL]
+		int32_t GetSectorAtPosition(const Vector3I* position)
+		{
+			if (Levels::g_hasZoneData == 0)
+				return 0;
+
+			Collision::g_collisionTriangleCount = 0;
+			int32_t queryX = Collision::ShiftTowardZero(position->x, 2);
+			int32_t queryY = Collision::ShiftTowardZero(position->y, 2);
+			int32_t queryZ = Collision::ShiftTowardZero(position->z, 2);
+			int32_t nearestSurfaceY = 0x7FFFFFFF;
+
+			Collision::CollisionGridCell& movingCell = Collision::g_collisionGrid[255];
+			int16_t* meshList = &Collision::g_collisionGridMeshIndices[movingCell.meshListStart];
+			for (int32_t meshListIndex = 0; meshListIndex < movingCell.meshCount; meshListIndex++, meshList++)
+			{
+				int32_t meshIndex = *meshList;
+				Collision::CollisionMeshRecord& mesh = reinterpret_cast<Collision::CollisionMeshRecord*>(Collision::g_collisionMeshInstances)[meshIndex];
+				int32_t maximumX = queryX + 0x1000;
+				int32_t maximumZ = queryZ + 0x1000;
+				if (maximumX - mesh.boundsMin.x >= mesh.boundsExt.x + 0x2000
+					|| maximumZ - mesh.boundsMin.z >= mesh.boundsExt.z + 0x2000 || mesh.typeFlags == 0)
+				{
+					continue;
+				}
+
+				int32_t localMaximumX = Collision::ShiftTowardZero(maximumX - mesh.origin.x, 5);
+				int32_t localMaximumZ = Collision::ShiftTowardZero(maximumZ - mesh.origin.z, 5);
+				int32_t localX = (queryX - mesh.origin.x) >> 5;
+				int32_t localZ = (queryZ - mesh.origin.z) >> 5;
+				Collision::CollisionTreeGroup* group = mesh.collisionTree;
+
+				while (group->marker >= 0)
+				{
+					int32_t faceCount = group->faceCount;
+					Collision::PackedCollisionFace* face = reinterpret_cast<Collision::PackedCollisionFace*>(group + 1);
+					if ((uint32_t)(localMaximumX - group->boundsMinX) >= (uint32_t)(group->boundsExtentX + 0x100)
+						|| (uint32_t)(localMaximumZ - group->boundsMinZ) >= (uint32_t)(group->boundsExtentZ + 0x100))
+					{
+						face += faceCount;
+						group = reinterpret_cast<Collision::CollisionTreeGroup*>(face);
+						continue;
+					}
+
+					for (int32_t faceIndex = 0; faceIndex < faceCount; faceIndex++, face++)
+					{
+						if ((uint32_t)(localMaximumX - face->boundsMinX) >= (uint32_t)(face->boundsExtentX + 0x100)
+							|| (uint32_t)(localMaximumZ - face->boundsMinZBlock * 0x40 - face->vertex0.z)
+								>= (uint32_t)((face->boundsExtentZBlock + 4) * 0x40))
+						{
+							continue;
+						}
+
+						int32_t vertex0X = face->vertex0.x;
+						int32_t vertex0Z = face->vertex0.z;
+						int32_t vertex1X = vertex0X + face->vertex1Offset.x;
+						int32_t vertex1Z = vertex0Z + face->vertex1Offset.z;
+						int32_t vertex2X = vertex0X + face->vertex2Offset.x;
+						int32_t vertex2Z = vertex0Z + face->vertex2Offset.z;
+
+						if (-face->vertex1Offset.x * (localZ - vertex0Z) + face->vertex1Offset.z * (localX - vertex0X) < 0
+							|| (localZ - vertex2Z) * face->vertex2Offset.x + (vertex0Z - vertex2Z) * (localX - vertex2X) < 0)
+						{
+							continue;
+						}
+
+						bool useFirstPlane = false;
+						if (face->secondPlaneNormal.y == 0x7FFF)
+						{
+							useFirstPlane = (face->vertex1Offset.x - face->vertex2Offset.x) * (localZ - vertex1Z)
+								+ (vertex2Z - vertex1Z) * (localX - vertex1X) >= 0;
+						}
+						else
+						{
+							int32_t vertex3X = vertex0X + face->vertex3Offset.x;
+							int32_t vertex3Z = vertex0Z + face->vertex3Offset.z;
+							if ((face->vertex1Offset.x - face->vertex3Offset.x) * (localZ - vertex1Z)
+								+ (vertex3Z - vertex1Z) * (localX - vertex1X) < 0
+								|| (face->vertex3Offset.x - face->vertex2Offset.x) * (localZ - vertex3Z)
+									+ (vertex2Z - vertex3Z) * (localX - vertex3X) < 0)
+							{
+								continue;
+							}
+
+							useFirstPlane = (face->vertex1Offset.x - face->vertex2Offset.x) * (localZ - vertex1Z)
+								+ (vertex2Z - vertex1Z) * (localX - vertex1X) >= 0 || face->secondPlaneNormal.y == 0;
+						}
+
+						int32_t surfaceY;
+						if (useFirstPlane)
+						{
+							int32_t heightOffset = ((localX - vertex0X) * face->firstPlaneNormal.z
+								+ (localZ - vertex0Z) * face->firstPlaneNormal.x) * 8 / face->firstPlaneNormal.y;
+							surfaceY = mesh.origin.y + (face->vertex0.y * 8 - heightOffset) * 4;
+						}
+						else
+						{
+							int32_t heightOffset = ((localX - vertex0X - face->vertex3Offset.x) * face->secondPlaneNormal.z
+								+ (localZ - vertex0Z - face->vertex3Offset.z) * face->secondPlaneNormal.x) * 8 / face->secondPlaneNormal.y;
+							surfaceY = mesh.origin.y + ((face->vertex0.y + face->vertex3Offset.y) * 8 - heightOffset) * 4;
+						}
+
+						if (queryY <= surfaceY && surfaceY < nearestSurfaceY)
+						{
+							Collision::g_groundCollisionMeshIndex = *meshList;
+							nearestSurfaceY = surfaceY;
+						}
+					}
+					group = reinterpret_cast<Collision::CollisionTreeGroup*>(face);
+				}
+			}
+
+			if (nearestSurfaceY == 0x7FFFFFFF)
+				return -1;
+			return (uint8_t)reinterpret_cast<Collision::CollisionMeshRecord*>(Collision::g_collisionMeshInstances)
+				[Collision::g_groundCollisionMeshIndex].flags;
 		}
 	}
 }
