@@ -1094,14 +1094,16 @@ namespace AudioManager
 
 			if (abs((int32_t)position) < 0x100)
 			{
+				int32_t rightVolume = preset.rightVolume;
+				int32_t leftVolume = preset.leftVolume;
 				if (selectedSoundIndex > 0)
 				{
-					PlayOneShotSoundGlobal(selectedSoundIndex - 1, frequency, preset.leftVolume, preset.rightVolume);
+					PlayOneShotSoundGlobal(selectedSoundIndex - 1, frequency, leftVolume, rightVolume);
 				}
 				else
 				{
 					PlayLoopingSound3D(
-						(void*)(int32_t)preset.baseFrequency, (encodedSoundIndex & 0x7fff) - 1, frequency, preset.leftVolume, preset.rightVolume);
+						(void*)(int32_t)preset.baseFrequency, (encodedSoundIndex & 0x7fff) - 1, frequency, leftVolume, rightVolume);
 				}
 			}
 			else if (selectedSoundIndex > 0)
