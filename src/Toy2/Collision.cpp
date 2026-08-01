@@ -3616,21 +3616,25 @@ namespace Toy2
 			int16_t* candidateWrite = candidateMeshIndices;
 			int32_t candidateMeshCount = 0;
 
-			for (int32_t cellIndex = 0; cellIndex < Collision::g_activeCollisionGridCellCount; cellIndex++)
+			Collision::CollisionGridCell* cell = Collision::g_collisionGrid;
+			int32_t remainingCellCount = Collision::g_activeCollisionGridCellCount;
+			while (remainingCellCount > 0)
 			{
-				Collision::CollisionGridCell& cell = Collision::g_collisionGrid[cellIndex];
-				if ((uint32_t)(maximumX - cell.boundsMinX) < (uint32_t)(cell.boundsExtentX + querySizeX)
-					&& (uint32_t)(maximumZ - cell.boundsMinZ) < (uint32_t)(cell.boundsExtentZ + querySizeZ))
+				if ((uint32_t)(maximumX - cell->boundsMinX) < (uint32_t)(cell->boundsExtentX + querySizeX)
+					&& (uint32_t)(maximumZ - cell->boundsMinZ) < (uint32_t)(cell->boundsExtentZ + querySizeZ))
 				{
-					int32_t meshCount = cell.meshCount;
-					int16_t* meshList = &Collision::g_collisionGridMeshIndices[cell.meshListStart];
-					while (meshCount > 0)
+					int32_t meshCount = cell->meshCount;
+					int16_t* meshList = &Collision::g_collisionGridMeshIndices[cell->meshListStart];
+					int32_t remainingMeshCount = meshCount;
+					while (remainingMeshCount > 0)
 					{
 						*candidateWrite++ = *meshList++;
-						meshCount--;
+						remainingMeshCount--;
 					}
-					candidateMeshCount += cell.meshCount;
+					candidateMeshCount += meshCount;
 				}
+				cell++;
+				remainingCellCount--;
 			}
 
 			Collision::CollisionMeshRecord* collisionMeshes = reinterpret_cast<Collision::CollisionMeshRecord*>(Collision::g_collisionMeshInstances);
