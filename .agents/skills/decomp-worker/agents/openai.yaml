@@ -1,4 +1,4 @@
 interface:
   display_name: "Decomp Worker"
-  short_description: "Complete one validated reconstruction slice"
-  default_prompt: "Use $decomp-worker to complete one Toy Story 2 reconstruction slice."
+  short_description: "Complete a reconstruction or research slice"
+  default_prompt: "Use $decomp-worker to complete one delegated Toy Story 2 reconstruction or meta-resolution slice."

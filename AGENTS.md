@@ -737,7 +737,13 @@ Wait for the worker to finish. Then verify the branch, worktree baseline, commit
 
 If a check fails, send a corrective task to the same worker. Do not start a replacement worker for that slice.
 
-Start another worker only after the prior slice is clean, committed, synchronized, reported, and pushed. Stop when supported work does not remain.
+Start another worker only after the prior slice restores the startup state. Bank and push all useful changes first.
+
+A worker stalemate starts supervisor analysis. Delegate distinct blocker, discovery, evidence, metadata, or tooling work before you stop.
+
+Do not repeat an unchanged fallback search to satisfy the Goal blocked threshold. Each blocked audit must test a different cause.
+
+Stop only when all applicable meta-resolution routes require unavailable external evidence or new user authority.
 
 Do not use an MCP server, an external supervisor, or a repository command that starts Codex for this workflow.
 

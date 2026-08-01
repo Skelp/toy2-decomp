@@ -1,13 +1,21 @@
 ---
 name: decomp-worker
-description: Complete exactly one Toy Story 2 reconstruction slice for a supervising agent. Use only when a supervisor delegates one bounded decompilation task, target, audit, discovery candidate, or blocker investigation.
+description: Complete one Toy Story 2 reconstruction or meta-resolution slice for a supervising agent. Use only when a supervisor delegates a bounded target, audit, discovery, blocker, evidence, metadata, or tooling task.
 ---
 
-# Complete one reconstruction slice
+# Complete one delegated slice
 
-Own one coherent slice from selection through push. Do not spawn subagents.
+Own one coherent reconstruction or meta-resolution slice through push. Do not spawn subagents.
 
 `AGENTS.md` defines evidence, naming, source quality, work selection, and repository rules.
+
+## Select the slice mode
+
+Use reconstruction mode when the handoff names a supported target or requests normal selection.
+
+Use meta-resolution mode when the handoff names a blocking class, proof target, discovery question, or tool blind spot.
+
+Do not replace a specific meta-resolution task with the general fallback sequence.
 
 ## Start the slice
 
@@ -16,8 +24,9 @@ Own one coherent slice from selection through push. Do not spawn subagents.
 3. Require the `agent/continuous` branch.
 4. Run `tools/decomp progress`.
 5. Run `tools/decomp baseline` before source edits.
-6. Run `tools/decomp candidates --why`.
-7. Select one supported frontier target or one tightly coupled group.
+6. In reconstruction mode, run `tools/decomp candidates --why`.
+7. In meta-resolution mode, run only the commands that test the assigned proof target.
+8. Select one supported frontier target, one tightly coupled group, or one meta-resolution result.
 
 Use the supervisor handoff first when it names a supported target. Confirm the handoff against current repository evidence.
 
@@ -46,7 +55,22 @@ Before an edit, record these facts in working memory:
 
 Read the applicable `AGENTS.md` sections before you name a symbol or change a type.
 
-If evidence remains insufficient, select the next supported target. Record a blocker when one missing fact blocks useful work.
+If reconstruction evidence remains insufficient, select the next supported target. Record a blocker when one missing fact blocks useful work.
+
+## Resolve a meta-issue
+
+Test the assigned cause, not the general symptom. Useful meta-resolution results include:
+
+- a confirmed evidence-provider function
+- a supported discovery name, owner, boundary, or contract
+- a corrected blocker dependency or semantic state
+- a type, name, lint, or ownership fix that unlocks source work
+- a candidate or evidence-tool fix that exposes supported work
+- proof that one required fact is external and unavailable
+
+Do not return a command transcript as a result. Explain what the evidence changed.
+
+Bank useful metadata and tooling changes with the same validation and push discipline as source changes.
 
 ## Reconstruct and compare
 
@@ -65,8 +89,10 @@ Keep clear source when the remaining difference is compiler-incidental.
 
 ## Validate and bank
 
+For a meta-resolution slice without a function target, run the focused tool tests and applicable repository checks. Do not invent a target address.
+
 1. Stage only the intended files.
-2. Run `tools/decomp validate --target <address> --staged` for each target.
+2. Run `tools/decomp validate --target <address> --staged` for each function target.
 3. Run `tools/decomp compare`.
 4. Run `tools/decomp lint`.
 5. Run `tools/decomp progress` when annotations changed.
@@ -92,10 +118,14 @@ COMMIT: <full SHA or none>
 ADDRESSES: <comma-separated addresses or none>
 SCORES: <address and verdict or none>
 MORE_SUPPORTED_WORK: yes | no | unknown
+BLOCKING_CLASS: <specific class or none>
+NEXT_META_ACTION: <one untried action or none>
 SUMMARY: <bounded factual handoff>
 DO_NOT_REPEAT: <rejected approaches or none>
 ```
 
-Use `banked` only after a clean pushed commit. Use `stalemate` when the fallback search proves no supported work.
+Use `banked` only after a clean pushed commit. Use `stalemate` only when the assigned proof target cannot produce useful work.
+
+For `stalemate`, name the blocking class and one untried meta-action. Use `none` only after you test all applicable routes.
 
 Use `failed` when required validation or repository recovery did not succeed. Do not request a fresh run.

@@ -8,11 +8,13 @@ Start Codex in the repository. Then continue the persistent reconstruction goal:
 
 The root agent uses the `continue-decomp` skill as a supervisor. It does not reconstruct functions itself.
 
-The supervisor starts one `decomp-worker` subagent at a time. Each worker completes one bounded reconstruction slice.
+The supervisor starts one `decomp-worker` subagent at a time. Each worker completes one bounded reconstruction or meta-resolution slice.
 
-After each worker, the supervisor checks the branch, worktree, submodule pointer, commit, and remote state. It starts another worker only after these checks pass.
+After each worker, the supervisor checks the branch, worktree, submodule pointer, commit, and remote state. It starts another worker after these checks pass.
 
-The supervisor stops when work reaches a supported stalemate. It also stops when the user requests a stop or the goal lacks enough budget.
+A worker stalemate starts meta-resolution work. The supervisor delegates distinct blocker, discovery, evidence, metadata, or tooling tasks.
+
+The supervisor stops only after all applicable routes require unavailable external evidence or new user authority.
 
 Use the Codex subagent controls to inspect the active worker. In the CLI, use `/agent` to view agent threads.
 
