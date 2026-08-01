@@ -1416,6 +1416,9 @@ namespace Nu3D
 {
 	namespace Collision
 	{
+		// STUB: TOY2 0x0048B750
+		int32_t SweepAgainstCandidates(const Vector4I* movement, Vector4I* position, int32_t radius);
+
 		// FUNCTION: TOY2 0x00481140 [PROVISIONAL]
 		int16_t IsPointInTriangle(int32_t pointX,
 			int32_t pointY,
