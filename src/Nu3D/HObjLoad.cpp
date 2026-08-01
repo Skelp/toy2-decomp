@@ -10,6 +10,7 @@
 #include "Nu3D/ObjLoad.h"
 
 #include <windows.h>
+#include <string.h>
 
 namespace NGNLoader
 {
@@ -254,8 +255,38 @@ namespace NGNLoader
 
 namespace Nu3D
 {
-	struct NamedTrackSet;
+	struct NamedTrackKey;
 
-	// STUB: TOY2 0x004CAED0
-	int32_t FindNamedTrackIndex(NamedTrackSet* trackSet, const char* trackName);
+	struct NamedTrackSet
+	{
+		int32_t sampleCount;
+		uint8_t formatData04[4];
+		int32_t keyframeCount;
+		int32_t trackCount;
+		uint8_t formatData10[4];
+		char** trackNames;
+		NamedTrackKey** trackKeys;
+	};
+
+	STATIC_ASSERT(sizeof(NamedTrackSet) == 0x1C);
+
+	// STUB: TOY2 0x004CABD0
+	NamedTrackSet* LoadNamedTrackSet(const char* filename);
+
+	// STUB: TOY2 0x004CAE40
+	void DestroyNamedTrackSet(NamedTrackSet* trackSet);
+
+	// FUNCTION: TOY2 0x004CAED0 [MATCHED]
+	int32_t FindNamedTrackIndex(NamedTrackSet* trackSet, const char* trackName)
+	{
+		int32_t trackIndex = trackSet->trackCount;
+		while (trackIndex)
+		{
+			--trackIndex;
+			if (trackSet->trackNames[trackIndex] && strcmpi(trackSet->trackNames[trackIndex], trackName) == 0)
+				return trackIndex;
+		}
+
+		return -1;
+	}
 }

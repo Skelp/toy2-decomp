@@ -1169,6 +1169,8 @@
 0x004CA420 NGNLoader::ExtractCreatureData
 0x004CAA60 Nu3D::Scene::RenderActor
 0x004CAB80 Nu3D::Creature::SetNodeVisible
+0x004CABD0 Nu3D::LoadNamedTrackSet
+0x004CAE40 Nu3D::DestroyNamedTrackSet
 0x004CAED0 Nu3D::FindNamedTrackIndex
 0x004CB270 NGNLoader::ObjectLoad::PrepareGlobals
 0x004CB2A0 Nu3D::SetDefaultPrimFlags
