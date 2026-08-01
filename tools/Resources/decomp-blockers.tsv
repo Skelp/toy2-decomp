@@ -38,7 +38,7 @@
 0x00461D20	-	The complete RasterizeTexturedRect555 analogue has the same 626-instruction structure but measures only 24.90%; cloning its 565 constants would create a new sub-threshold target without a resolved shared rasterizer source model
 0x0047B170	-	5776-byte RNC Method 2 decompressor has seven interdependent decode-loop gotos and no reference implementation; current 16.99% body requires an algorithm-level reconstruction, not a local control-flow cleanup
 0x0047D120	-	Retail uses an EBP frame with five locals; the complete one-shot clear uses an FPO frame, and a for-loop form emits the wrong REP STOSD body.
-0x0047D4E0	-	Retail uses an EBP frame and scaled index; natural for and do-while forms both use FPO and a reverse pointer at 13.04%.
+0x0047D4E0	-	Retail uses an EBP frame and a scaled index. For, do-while, and while loops all produce the same 13.04% FPO reverse-pointer body.
 0x0047D650	-	Retail uses an EBP frame and duplicate EDI save; the typed 0x4C-stride loop is complete, and no natural source form reproduces the frame.
 0x00480660	0x00482A00	The ABI and CollisionSweep layout are understood, but two natural complete implementations scored 15.65% and 10.37%. The shared low score indicates the sweep source model or intermediate-width model is wrong; ResolveSubstep remains unstarted, so more caller reconstruction is required before banking this target.
 0x00480AE0	-	needs an exact Nu3D analogue or source evidence for the dominant-axis local lifetime and fixed-point evaluation order
