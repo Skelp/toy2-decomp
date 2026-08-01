@@ -2,10 +2,12 @@
 #include "FileUtils.h"
 #include "Nu3D/Link.h"
 #include "Nu3D/Math.h"
+#include "Random.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/Shadows.h"
 #include "Toy2/Animation.h"
 #include "Toy2/Buzz.h"
+#include "Toy2/Levels.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -1398,6 +1400,308 @@ namespace Toy2
 				platformIndex++;
 				platformCount--;
 			} while (platformCount != 0);
+		}
+
+		// FUNCTION: TOY2 0x0048ACC0 [PROVISIONAL]
+		void StepMotionScript(int32_t platformIndex,
+			int32_t linkId,
+			int16_t** scriptPosition,
+			int32_t* waitTimer,
+			int32_t* speedScale)
+		{
+			int16_t* command = *scriptPosition;
+			Vector3I targetPosition;
+			Vector3I platformPosition;
+
+			switch (command[0])
+			{
+			case 0:
+				*scriptPosition -= command[1];
+				*waitTimer = 0;
+				return;
+
+			case 1:
+			{
+				Nu3D::Link::GetTargetPosFixed(linkId, &targetPosition);
+				int16_t collisionMeshIndex = g_platformStates[platformIndex].collisionMeshIndex;
+				if (collisionMeshIndex != 0)
+				{
+					platformPosition.x = Collision::g_collisionMeshInstances[collisionMeshIndex].origin.x;
+					platformPosition.y = Collision::g_collisionMeshInstances[collisionMeshIndex].origin.y;
+					platformPosition.z = Collision::g_collisionMeshInstances[collisionMeshIndex].origin.z;
+				}
+				targetPosition.x = (targetPosition.x >> 5) + command[1];
+				targetPosition.y = (targetPosition.y >> 5) + command[2];
+				targetPosition.z = (targetPosition.z >> 5) + command[3];
+				platformPosition.x >>= 5;
+				platformPosition.y >>= 5;
+				platformPosition.z >>= 5;
+				Nu3D::Link::SetPositionRawAndCommit(
+					linkId, platformPosition.x, platformPosition.y, platformPosition.z);
+
+				int32_t distanceX = abs(platformPosition.x - targetPosition.x);
+				int32_t distanceY = abs(platformPosition.y - targetPosition.y);
+				int32_t distanceZ = abs(platformPosition.z - targetPosition.z);
+				int32_t speed = command[4];
+				int32_t slowDistance = speed * 4 + 0x30;
+				if (distanceX < slowDistance && distanceY < slowDistance && distanceZ < slowDistance && *speedScale > 0)
+					*speedScale = -0x40;
+
+				if (*speedScale < 0)
+				{
+					*speedScale += Renderer::g_frameDelta * 2;
+					if (*speedScale > 0)
+						*speedScale = 0;
+				}
+				else if (*speedScale < 0x40)
+				{
+					*speedScale += Renderer::g_frameDelta * 2;
+				}
+
+				if (*speedScale != 0)
+				{
+					if (distanceX >= speed + 8 || distanceY >= speed + 8 || distanceZ >= speed + 8)
+					{
+						if (*speedScale < 0)
+							speed = -(*speedScale * speed / 0x40);
+						else if (*speedScale < 0x40)
+							speed = *speedScale * speed / 0x40;
+						if (speed < 1)
+							speed = 1;
+
+						targetPosition.x -= platformPosition.x;
+						targetPosition.y -= platformPosition.y;
+						targetPosition.z -= platformPosition.z;
+						Nu3D::Math::NormalizeToFixedPoint(&targetPosition, &targetPosition);
+						int32_t frameSpeed = Renderer::g_frameDelta * speed;
+						int32_t movementX = frameSpeed * targetPosition.x;
+						int32_t movementY = frameSpeed * targetPosition.y;
+						int32_t movementZ = frameSpeed * targetPosition.z;
+						if (g_platformStates[platformIndex].collisionMeshIndex != 0)
+						{
+							if ((movementX >> 7) == 0 && (movementY >> 7) == 0 && (movementZ >> 7) == 0)
+							{
+								g_platformStates[platformIndex].flags &= ~PLATFORM_FLAG_TRANSLATING;
+								g_platformStates[platformIndex].velocity.x = 0;
+								g_platformStates[platformIndex].velocity.y = 0;
+								g_platformStates[platformIndex].velocity.z = 0;
+								return;
+							}
+							g_platformStates[platformIndex].flags |= PLATFORM_FLAG_TRANSLATING;
+							g_platformStates[platformIndex].velocity.x = movementX >> 7;
+							g_platformStates[platformIndex].velocity.y = movementY >> 7;
+							g_platformStates[platformIndex].velocity.z = movementZ >> 7;
+						}
+						return;
+					}
+				}
+
+				*speedScale = 0;
+				*waitTimer = 0;
+				*scriptPosition += 5;
+				if (g_platformStates[platformIndex].collisionMeshIndex != 0)
+				{
+					g_platformStates[platformIndex].flags &= ~PLATFORM_FLAG_TRANSLATING;
+					g_platformStates[platformIndex].velocity.x = 0;
+					g_platformStates[platformIndex].velocity.y = 0;
+					g_platformStates[platformIndex].velocity.z = 0;
+				}
+				return;
+			}
+
+			case 2:
+				if (*waitTimer == 0)
+				{
+					*waitTimer = command[1];
+					return;
+				}
+				*waitTimer -= Renderer::g_frameDelta;
+				if (*waitTimer < 1)
+				{
+					*waitTimer = 0;
+					*scriptPosition += 2;
+				}
+				return;
+
+			case 3:
+				if (*waitTimer == 0)
+				{
+					*waitTimer = (command[1] & *g_randDatBufferPtr) + command[2];
+					g_randDatBufferPtr++;
+					return;
+				}
+				*waitTimer -= Renderer::g_frameDelta;
+				if (*waitTimer < 1)
+				{
+					*waitTimer = 0;
+					*scriptPosition += 3;
+				}
+				return;
+
+			case 4:
+			{
+				int16_t collisionMeshIndex = g_platformStates[platformIndex].collisionMeshIndex;
+				if (collisionMeshIndex != 0)
+				{
+					platformPosition.x = Collision::g_collisionMeshInstances[collisionMeshIndex].origin.x;
+					platformPosition.y = Collision::g_collisionMeshInstances[collisionMeshIndex].origin.y;
+					platformPosition.z = Collision::g_collisionMeshInstances[collisionMeshIndex].origin.z;
+				}
+				platformPosition.x >>= 5;
+				platformPosition.y >>= 5;
+				platformPosition.z >>= 5;
+				targetPosition = Levels::g_recordData[command[1]]->data[command[2]];
+				Nu3D::Link::SetPositionRawAndCommit(
+					linkId, platformPosition.x, platformPosition.y, platformPosition.z);
+
+				int32_t distanceX = abs(platformPosition.x - targetPosition.x);
+				int32_t distanceY = abs(platformPosition.y - targetPosition.y);
+				int32_t distanceZ = abs(platformPosition.z - targetPosition.z);
+				int32_t speed = command[3];
+				int32_t slowDistance = speed * 4 + 0x30;
+				if (distanceX < slowDistance && distanceY < slowDistance && distanceZ < slowDistance && *speedScale > 0)
+					*speedScale = -0x40;
+
+				if (*speedScale < 0)
+				{
+					*speedScale += Renderer::g_frameDelta * 2;
+					if (*speedScale > 0)
+						*speedScale = 0;
+				}
+				else if (*speedScale < 0x40)
+				{
+					*speedScale += Renderer::g_frameDelta * 2;
+				}
+
+				if (*speedScale != 0)
+				{
+					if (distanceX >= speed + 8 || distanceY >= speed + 8 || distanceZ >= speed + 8)
+					{
+						if (*speedScale < 0)
+							speed = -(*speedScale * speed / 0x40);
+						else if (*speedScale < 0x40)
+							speed = *speedScale * speed / 0x40;
+						if (speed < 1)
+							speed = 1;
+
+						targetPosition.x -= platformPosition.x;
+						targetPosition.y -= platformPosition.y;
+						targetPosition.z -= platformPosition.z;
+						Nu3D::Math::NormalizeToFixedPoint(&targetPosition, &targetPosition);
+						int32_t frameSpeed = Renderer::g_frameDelta * speed;
+						int32_t movementX = frameSpeed * targetPosition.x;
+						int32_t movementY = frameSpeed * targetPosition.y;
+						int32_t movementZ = frameSpeed * targetPosition.z;
+						if (g_platformStates[platformIndex].collisionMeshIndex != 0)
+						{
+							if ((movementX >> 7) == 0 && (movementY >> 7) == 0 && (movementZ >> 7) == 0)
+							{
+								g_platformStates[platformIndex].flags &= ~PLATFORM_FLAG_TRANSLATING;
+								g_platformStates[platformIndex].velocity.x = 0;
+								g_platformStates[platformIndex].velocity.y = 0;
+								g_platformStates[platformIndex].velocity.z = 0;
+								return;
+							}
+							g_platformStates[platformIndex].flags |= PLATFORM_FLAG_TRANSLATING;
+							g_platformStates[platformIndex].velocity.x = movementX >> 7;
+							g_platformStates[platformIndex].velocity.y = movementY >> 7;
+							g_platformStates[platformIndex].velocity.z = movementZ >> 7;
+						}
+						return;
+					}
+				}
+
+				*speedScale = 0;
+				*waitTimer = 0;
+				*scriptPosition += 4;
+				if (g_platformStates[platformIndex].collisionMeshIndex != 0)
+				{
+					g_platformStates[platformIndex].flags &= ~PLATFORM_FLAG_TRANSLATING;
+					g_platformStates[platformIndex].velocity.x = 0;
+					g_platformStates[platformIndex].velocity.y = 0;
+					g_platformStates[platformIndex].velocity.z = 0;
+				}
+				return;
+			}
+
+			case 6:
+				if ((command[1] & Collision::g_motionScriptEntryCount) != 0)
+					*scriptPosition += 2;
+				return;
+
+			case 7:
+				if ((command[1] & Collision::g_motionScriptEntryCount) == 0)
+					*scriptPosition += 2;
+				return;
+
+			case 8:
+				Collision::g_motionScriptEntryCount |= command[1];
+				*scriptPosition += 2;
+				return;
+
+			case 9:
+				Collision::g_motionScriptEntryCount &= ~command[1];
+				*scriptPosition += 2;
+				return;
+
+			case 10:
+			{
+				int16_t collisionMeshIndex = g_platformStates[platformIndex].collisionMeshIndex;
+				if (collisionMeshIndex != 0)
+				{
+					platformPosition.x = Collision::g_collisionMeshInstances[collisionMeshIndex].origin.x;
+					platformPosition.y = Collision::g_collisionMeshInstances[collisionMeshIndex].origin.y;
+					platformPosition.z = Collision::g_collisionMeshInstances[collisionMeshIndex].origin.z;
+				}
+				platformPosition.x >>= 5;
+				platformPosition.y >>= 5;
+				platformPosition.z >>= 5;
+				targetPosition = Levels::g_recordData[command[1]]->data[command[2]];
+				Nu3D::Link::SetPositionRawAndCommit(
+					linkId, platformPosition.x, platformPosition.y, platformPosition.z);
+
+				int32_t speed = command[3];
+				if (abs(platformPosition.x - targetPosition.x) < speed + 8
+					&& abs(platformPosition.y - targetPosition.y) < speed + 8
+					&& abs(platformPosition.z - targetPosition.z) < speed + 8)
+				{
+					*waitTimer = 0;
+					*scriptPosition += 4;
+					if (g_platformStates[platformIndex].collisionMeshIndex != 0)
+					{
+						g_platformStates[platformIndex].flags &= ~PLATFORM_FLAG_TRANSLATING;
+						g_platformStates[platformIndex].velocity.x = 0;
+						g_platformStates[platformIndex].velocity.y = 0;
+						g_platformStates[platformIndex].velocity.z = 0;
+					}
+					return;
+				}
+
+				targetPosition.x -= platformPosition.x;
+				targetPosition.y -= platformPosition.y;
+				targetPosition.z -= platformPosition.z;
+				Nu3D::Math::NormalizeToFixedPoint(&targetPosition, &targetPosition);
+				int32_t movementX = speed * Renderer::g_frameDelta * targetPosition.x >> 7;
+				int32_t movementY = speed * Renderer::g_frameDelta * targetPosition.y >> 7;
+				int32_t movementZ = speed * Renderer::g_frameDelta * targetPosition.z >> 7;
+				if (g_platformStates[platformIndex].collisionMeshIndex != 0)
+				{
+					if (movementX == 0 && movementY == 0 && movementZ == 0)
+					{
+						g_platformStates[platformIndex].flags &= ~PLATFORM_FLAG_TRANSLATING;
+						g_platformStates[platformIndex].velocity.x = 0;
+						g_platformStates[platformIndex].velocity.y = 0;
+						g_platformStates[platformIndex].velocity.z = 0;
+						return;
+					}
+					g_platformStates[platformIndex].flags |= PLATFORM_FLAG_TRANSLATING;
+					g_platformStates[platformIndex].velocity.x = movementX;
+					g_platformStates[platformIndex].velocity.y = movementY;
+					g_platformStates[platformIndex].velocity.z = movementZ;
+				}
+				return;
+			}
+			}
 		}
 
 		// FUNCTION: TOY2 0x0048B640 [MATCHED]
