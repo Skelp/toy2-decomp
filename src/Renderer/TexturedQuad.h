@@ -42,4 +42,5 @@ namespace DevDraw
 
 	int16_t SubmitTexturedQuad(TexturedQuad* quad);
 	int16_t SubmitColouredTexturedQuad(TexturedQuad* quad);
+	int16_t DrawFullScreenTexturePair(int16_t leftTextureSlot, int16_t rightTextureSlot);
 }

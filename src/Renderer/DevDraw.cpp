@@ -315,6 +315,128 @@ namespace DevDraw
 		return 1;
 	}
 
+	// FUNCTION: TOY2 0x004957C0 [PROVISIONAL]
+	int16_t DrawFullScreenTexturePair(int16_t leftTextureSlot, int16_t rightTextureSlot)
+	{
+		TexturedQuad leftQuad;
+		TexturedQuad rightQuad;
+
+		leftQuad.drawSlot = leftTextureSlot;
+		if (d3dappi.TextureType[leftQuad.drawSlot] != 3)
+		{
+			return 1;
+		}
+
+		leftQuad.points[0].x = (int16_t)Toy2::g_screenClipLeft;
+		leftQuad.points[0].y = (int16_t)Toy2::g_screenClipTop;
+		leftQuad.points[1].x = (int16_t)((Toy2::g_softWindowWidth << 8) / 320) + (int16_t)Toy2::g_screenClipLeft;
+		leftQuad.points[2].y = (int16_t)((Toy2::g_softWindowHeight << 8) / 256) + (int16_t)Toy2::g_screenClipTop;
+		leftQuad.points[1].y = (int16_t)Toy2::g_screenClipTop;
+		leftQuad.points[2].x = (int16_t)Toy2::g_screenClipLeft;
+		leftQuad.points[3].x = leftQuad.points[1].x;
+		leftQuad.points[3].y = leftQuad.points[2].y;
+		leftQuad.depth = 0xfff;
+
+		if ((leftQuad.points[0].x > Toy2::g_screenClipRight && leftQuad.points[1].x > Toy2::g_screenClipRight)
+			|| (leftQuad.points[0].x < Toy2::g_screenClipLeft && leftQuad.points[1].x < Toy2::g_screenClipLeft)
+			|| (leftQuad.points[0].y > Toy2::g_screenClipBottom && leftQuad.points[1].y > Toy2::g_screenClipBottom)
+			|| (leftQuad.points[0].y < Toy2::g_screenClipTop && leftQuad.points[1].y < Toy2::g_screenClipTop))
+		{
+			return 0;
+		}
+
+		switch (g_renderMode)
+		{
+			case RENDERMODE_SOFTWARE:
+				leftQuad.texCoords[2].u = 0;
+				leftQuad.texCoords[0].u = 0;
+				leftQuad.texCoords[1].v = 0;
+				leftQuad.texCoords[0].v = 0;
+				leftQuad.texCoords[3].u = 0xffffff;
+				leftQuad.texCoords[1].u = 0xffffff;
+				leftQuad.texCoords[3].v = 0xffffff;
+				leftQuad.texCoords[2].v = 0xffffff;
+				break;
+			case RENDERMODE_D3D:
+				leftQuad.texCoords[2].u = 0;
+				leftQuad.texCoords[0].u = 0;
+				leftQuad.texCoords[1].v = 0;
+				leftQuad.texCoords[0].v = 0;
+				leftQuad.texCoords[3].u = 0x100;
+				leftQuad.texCoords[1].u = 0x100;
+				leftQuad.texCoords[3].v = 0x100;
+				leftQuad.texCoords[2].v = 0x100;
+				break;
+			default:
+				break;
+		}
+
+		leftQuad.textureWidth = g_textureDimensions[leftQuad.drawSlot].width;
+		leftQuad.textureHeight = g_textureDimensions[leftQuad.drawSlot].height;
+		SubmitTexturedQuad(&leftQuad);
+
+		rightQuad.drawSlot = rightTextureSlot;
+		if (d3dappi.TextureType[rightQuad.drawSlot] != 3)
+		{
+			return 1;
+		}
+
+		rightQuad.points[0].x = leftQuad.points[1].x;
+		rightQuad.points[0].y = (int16_t)Toy2::g_screenClipTop;
+		rightQuad.points[1].x = (int16_t)Toy2::g_screenClipRight;
+		rightQuad.points[1].y = (int16_t)Toy2::g_screenClipTop;
+		rightQuad.points[2].x = leftQuad.points[1].x;
+		rightQuad.points[2].y = (int16_t)((Toy2::g_softWindowHeight << 8) / 256) + (int16_t)Toy2::g_screenClipTop;
+		rightQuad.points[3].x = rightQuad.points[1].x;
+		rightQuad.points[3].y = rightQuad.points[2].y;
+		rightQuad.depth = 0xfff;
+
+		if ((leftQuad.points[0].x > Toy2::g_screenClipRight && leftQuad.points[1].x > Toy2::g_screenClipRight)
+			|| (leftQuad.points[0].x < Toy2::g_screenClipLeft && leftQuad.points[1].x < Toy2::g_screenClipLeft)
+			|| (leftQuad.points[0].y > Toy2::g_screenClipBottom && leftQuad.points[1].y > Toy2::g_screenClipBottom)
+			|| (leftQuad.points[0].y < Toy2::g_screenClipTop && leftQuad.points[1].y < Toy2::g_screenClipTop))
+		{
+			return 0;
+		}
+
+		switch (g_renderMode)
+		{
+			case RENDERMODE_SOFTWARE:
+				rightQuad.texCoords[2].u = 0;
+				rightQuad.texCoords[3].u = 0x400000;
+				rightQuad.texCoords[1].u = 0x400000;
+				rightQuad.texCoords[0].u = 0;
+				rightQuad.texCoords[1].v = 0;
+				rightQuad.texCoords[0].v = 0;
+				rightQuad.texCoords[3].v = 0xffffff;
+				rightQuad.texCoords[2].v = 0xffffff;
+				break;
+			case RENDERMODE_D3D:
+				rightQuad.texCoords[2].u = 0;
+				rightQuad.texCoords[3].u = 0x40;
+				rightQuad.texCoords[1].u = 0x40;
+				rightQuad.texCoords[0].u = 0;
+				rightQuad.texCoords[1].v = 0;
+				rightQuad.texCoords[0].v = 0;
+				rightQuad.texCoords[3].v = 0x100;
+				rightQuad.texCoords[2].v = 0x100;
+				break;
+			default:
+				break;
+		}
+
+		rightQuad.textureWidth = g_textureDimensions[rightQuad.drawSlot].width;
+		rightQuad.textureHeight = g_textureDimensions[rightQuad.drawSlot].height;
+		SubmitTexturedQuad(&rightQuad);
+
+		if (g_renderMode == RENDERMODE_SOFTWARE && SoftwareRenderer::g_pendingBackBufferClears == 0)
+		{
+			SoftwareRenderer::g_pendingBackBufferClears = 1;
+		}
+
+		return 1;
+	}
+
 	// FUNCTION: TOY2 0x00497FE0 [MATCHED]
 	void SetVertexBufferAllocation(int16_t slot, int32_t allocate)
 	{
