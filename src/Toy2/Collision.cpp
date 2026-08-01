@@ -3280,6 +3280,152 @@ namespace Nu3D
 			return side1 <= 0 && side2 <= 0 && side3 <= 0;
 		}
 
+		// FUNCTION: TOY2 0x00487B20 [PROVISIONAL]
+		int32_t SweepAgainstEdges(int32_t* nearestFraction,
+			int32_t* startDistance,
+			int32_t* endDistance,
+			Vector3I16* hitNormal,
+			const Vector3I* start,
+			const Vector3I* movement,
+			int32_t radius)
+		{
+			if (Toy2::Collision::g_collisionEdgeVertexCount == 0)
+				return 0;
+
+			int32_t foundHit = 0;
+			Vector3I16 normal;
+			normal.y = 0;
+			int32_t expandedRadius = (radius + 0x2000) >> 5;
+
+			for (int32_t vertexIndex = 0; vertexIndex < Toy2::Collision::g_collisionEdgeVertexCount; vertexIndex += 2)
+			{
+				const Vector3I& edgeStart = Toy2::Collision::g_collisionEdgeVertices[vertexIndex];
+				const Vector3I& edgeEnd = Toy2::Collision::g_collisionEdgeVertices[vertexIndex + 1];
+
+				normal.x = (int16_t)edgeStart.z - (int16_t)edgeEnd.z;
+				normal.z = (int16_t)edgeEnd.x - (int16_t)edgeStart.x;
+				Nu3D::Math::NormalizeToFixedPoint16(&normal, &normal);
+
+				int32_t startDistanceFromEdge;
+				if (abs(movement->x) < 0x2000 && abs(movement->z) < 0x2000)
+				{
+					startDistanceFromEdge = (((start->x - edgeStart.x * 0x20) * normal.x
+						+ (start->z - edgeStart.z * 0x20) * normal.z)
+						>> 12)
+						- radius;
+				}
+				else
+				{
+					startDistanceFromEdge = (((start->x >> 5) - edgeStart.x) * normal.x
+						+ ((start->z >> 5) - edgeStart.z) * normal.z)
+						>> 12;
+					startDistanceFromEdge -= Toy2::Collision::ShiftTowardZero(radius, 5);
+				}
+
+				if (startDistanceFromEdge >= 0)
+				{
+					int32_t endDistanceFromEdge;
+					if (abs(movement->x) < 0x2000 && abs(movement->z) < 0x2000)
+					{
+						endDistanceFromEdge = (((start->x - edgeStart.x * 0x20 + movement->x) * normal.x
+							+ (start->z - edgeStart.z * 0x20 + movement->z) * normal.z)
+							>> 12)
+							- radius;
+					}
+					else
+					{
+						endDistanceFromEdge = ((((start->x + movement->x) >> 5) - edgeStart.x) * normal.x
+							+ (((start->z + movement->z) >> 5) - edgeStart.z) * normal.z)
+							>> 12;
+						endDistanceFromEdge -= Toy2::Collision::ShiftTowardZero(radius, 5);
+					}
+
+					if (endDistanceFromEdge < 0)
+					{
+						int16_t edgeDeltaX = (int16_t)edgeEnd.x - (int16_t)edgeStart.x;
+						int16_t edgeDeltaZ = (int16_t)edgeEnd.z - (int16_t)edgeStart.z;
+						int32_t distanceRange = startDistanceFromEdge - endDistanceFromEdge;
+						int32_t hitX = start->x + movement->x * startDistanceFromEdge / distanceRange
+							- (normal.x * radius >> 12);
+						int32_t hitZ = start->z + movement->z * startDistanceFromEdge / distanceRange
+							- (normal.z * radius >> 12);
+						int32_t fromStart = (hitX - edgeStart.x * 0x20) * edgeDeltaX
+							+ (hitZ - edgeStart.z * 0x20) * edgeDeltaZ;
+						int32_t fromEnd = (hitX - edgeEnd.x * 0x20) * edgeDeltaX + (hitZ - edgeEnd.z * 0x20) * edgeDeltaZ;
+
+						if (fromStart >= -0x2000 && fromEnd <= 0x2000)
+						{
+							int32_t fraction = (startDistanceFromEdge << 14) / distanceRange;
+							if (fraction < *nearestFraction)
+							{
+								*startDistance = startDistanceFromEdge;
+								*endDistance = endDistanceFromEdge;
+								normal.x *= 4;
+								normal.z *= 4;
+								*hitNormal = normal;
+								*nearestFraction = fraction;
+								foundHit = 1;
+							}
+						}
+					}
+				}
+
+				int32_t edgeOffsetX = edgeStart.x - (start->x >> 5);
+				int32_t edgeOffsetZ = edgeStart.z - (start->z >> 5);
+				int32_t movementX = movement->x >> 5;
+				int32_t movementZ = movement->z >> 5;
+				if (edgeOffsetX * edgeOffsetX + edgeOffsetZ * edgeOffsetZ
+					< movementX * movementX + movementZ * movementZ + expandedRadius * expandedRadius)
+				{
+					Vector3I16 direction = { (int16_t)movementX, 0, (int16_t)movementZ };
+					Nu3D::Math::NormalizeToFixedPoint16(&direction, &direction);
+
+					int32_t projectedDistance = ((edgeStart.z - (start->z >> 5)) * direction.z
+						+ (edgeStart.x - (start->x >> 5)) * direction.x)
+						>> 12;
+					if (projectedDistance >= 0)
+					{
+						int32_t closestX = edgeStart.x - ((start->x + (direction.x * projectedDistance >> 7)) >> 5);
+						int32_t closestZ = edgeStart.z - ((start->z + (direction.z * projectedDistance >> 7)) >> 5);
+						int32_t closestDistanceSquared = closestX * closestX + closestZ * closestZ;
+						int32_t nearRadius = (radius + 0x20) >> 5;
+						if (closestDistanceSquared <= nearRadius * nearRadius)
+						{
+							int32_t hitRadius = (radius + 0x40) >> 5;
+							int32_t hitDistance = projectedDistance
+								- (int32_t)sqrt((double)(hitRadius * hitRadius - closestDistanceSquared));
+							int32_t movementLengthSquared = movementX * movementX + movementZ * movementZ;
+							if (hitDistance >= -2 && hitDistance * hitDistance <= movementLengthSquared)
+							{
+								if (hitDistance < 0)
+									hitDistance = 0;
+
+								int32_t movementLength = (int32_t)sqrt((double)movementLengthSquared);
+								int32_t fraction = (hitDistance << 14) / movementLength;
+								if (fraction < *nearestFraction)
+								{
+									normal.x = (int16_t)(direction.x * hitDistance >> 7) - (int16_t)edgeStart.x * 0x20
+										+ (int16_t)start->x;
+									normal.z = (int16_t)(direction.z * hitDistance >> 7) - (int16_t)edgeStart.z * 0x20
+										+ (int16_t)start->z;
+									Nu3D::Math::NormalizeToFixedPoint16(&normal, &normal);
+
+									*startDistance = hitDistance;
+									*endDistance = hitDistance - movementLength;
+									normal.x *= 4;
+									normal.z *= 4;
+									*hitNormal = normal;
+									*nearestFraction = fraction;
+									foundHit = 1;
+								}
+							}
+						}
+					}
+				}
+			}
+			return foundHit;
+		}
+
 		// FUNCTION: TOY2 0x004882F0 [PROVISIONAL]
 		int32_t RaycastAgainstEdges(int32_t* nearestFraction,
 			int32_t* startDistance,
