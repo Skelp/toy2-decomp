@@ -5412,6 +5412,212 @@ namespace Toy2
 #pragma optimize("", on)
 #pragma intrinsic(abs)
 
+	// FUNCTION: TOY2 0x0047F250 [PROVISIONAL]
+	void LoadSwitchWallpaper()
+	{
+		Logger::Log("LoadSwitchWallpaper\n");
+
+		void* buffer = malloc(0xE1000);
+		FileUtils::LoadFile("sky1.raw", buffer);
+
+		for (int32_t textureIndex = 0; textureIndex < 6; ++textureIndex)
+		{
+			if (! SoftwareRenderer::g_softwareTextureData[textureIndex])
+				SoftwareRenderer::g_softwareTextureData[textureIndex] = malloc(0x20000);
+		}
+
+		uint8_t* sourcePixel = (uint8_t*)buffer;
+		uint16_t* destinationPixels = (uint16_t*)SoftwareRenderer::g_softwareTextureData[0];
+		int32_t rowsRemaining = 0x100;
+		if (SoftwareRenderer::g_bitsPerPixel == 16)
+		{
+			do
+			{
+				int32_t pixelsRemaining = 0x100;
+				do
+				{
+					*destinationPixels++ =
+						(((uint16_t)(sourcePixel[0] & 0xF8) << 5 | ((uint16_t)sourcePixel[1] & 0xFFFC)) << 3) | (uint16_t)(sourcePixel[2] >> 3);
+					sourcePixel += 3;
+				} while (--pixelsRemaining != 0);
+				sourcePixel += 0x480;
+			} while (--rowsRemaining != 0);
+
+			sourcePixel = (uint8_t*)buffer + 0x300;
+			destinationPixels = (uint16_t*)SoftwareRenderer::g_softwareTextureData[1];
+			rowsRemaining = 0x100;
+			do
+			{
+				int32_t pixelsRemaining = 0x100;
+				do
+				{
+					*destinationPixels++ =
+						(((uint16_t)(sourcePixel[0] & 0xF8) << 5 | ((uint16_t)sourcePixel[1] & 0xFFFC)) << 3) | (uint16_t)(sourcePixel[2] >> 3);
+					sourcePixel += 3;
+				} while (--pixelsRemaining != 0);
+				sourcePixel += 0x480;
+			} while (--rowsRemaining != 0);
+
+			sourcePixel = (uint8_t*)buffer + 0x600;
+			destinationPixels = (uint16_t*)SoftwareRenderer::g_softwareTextureData[2];
+			rowsRemaining = 0x100;
+			do
+			{
+				int32_t pixelsRemaining = 0x80;
+				do
+				{
+					*destinationPixels++ =
+						(((uint16_t)(sourcePixel[0] & 0xF8) << 5 | ((uint16_t)sourcePixel[1] & 0xFFFC)) << 3) | (uint16_t)(sourcePixel[2] >> 3);
+					sourcePixel += 3;
+				} while (--pixelsRemaining != 0);
+				sourcePixel += 0x600;
+				destinationPixels += 0x80;
+			} while (--rowsRemaining != 0);
+
+			sourcePixel = (uint8_t*)buffer + 0x78000;
+			destinationPixels = (uint16_t*)SoftwareRenderer::g_softwareTextureData[3];
+			rowsRemaining = 0xE0;
+			do
+			{
+				int32_t pixelsRemaining = 0x100;
+				do
+				{
+					*destinationPixels++ =
+						(((uint16_t)(sourcePixel[0] & 0xF8) << 5 | ((uint16_t)sourcePixel[1] & 0xFFFC)) << 3) | (uint16_t)(sourcePixel[2] >> 3);
+					sourcePixel += 3;
+				} while (--pixelsRemaining != 0);
+				sourcePixel += 0x480;
+			} while (--rowsRemaining != 0);
+
+			sourcePixel = (uint8_t*)buffer + 0x78300;
+			destinationPixels = (uint16_t*)SoftwareRenderer::g_softwareTextureData[4];
+			rowsRemaining = 0xE0;
+			do
+			{
+				int32_t pixelsRemaining = 0x100;
+				do
+				{
+					*destinationPixels++ =
+						(((uint16_t)(sourcePixel[0] & 0xF8) << 5 | ((uint16_t)sourcePixel[1] & 0xFFFC)) << 3) | (uint16_t)(sourcePixel[2] >> 3);
+					sourcePixel += 3;
+				} while (--pixelsRemaining != 0);
+				sourcePixel += 0x480;
+			} while (--rowsRemaining != 0);
+
+			sourcePixel = (uint8_t*)buffer + 0x78600;
+			destinationPixels = (uint16_t*)SoftwareRenderer::g_softwareTextureData[5];
+			rowsRemaining = 0xE0;
+			do
+			{
+				int32_t pixelsRemaining = 0x80;
+				do
+				{
+					*destinationPixels++ =
+						(((uint16_t)(sourcePixel[0] & 0xF8) << 5 | ((uint16_t)sourcePixel[1] & 0xFFFC)) << 3) | (uint16_t)(sourcePixel[2] >> 3);
+					sourcePixel += 3;
+				} while (--pixelsRemaining != 0);
+				sourcePixel += 0x600;
+				destinationPixels += 0x80;
+			} while (--rowsRemaining != 0);
+
+			free(buffer);
+			return;
+		}
+		else
+		{
+			do
+			{
+				int32_t pixelsRemaining = 0x100;
+				do
+				{
+					*destinationPixels++ =
+						((((uint16_t)sourcePixel[0] & 0xFFF8) << 5 | ((uint16_t)sourcePixel[1] & 0xFFF8)) << 2) | (uint16_t)(sourcePixel[2] >> 3);
+					sourcePixel += 3;
+				} while (--pixelsRemaining != 0);
+				sourcePixel += 0x480;
+			} while (--rowsRemaining != 0);
+
+			sourcePixel = (uint8_t*)buffer + 0x300;
+			destinationPixels = (uint16_t*)SoftwareRenderer::g_softwareTextureData[1];
+			rowsRemaining = 0x100;
+			do
+			{
+				int32_t pixelsRemaining = 0x100;
+				do
+				{
+					*destinationPixels++ =
+						((((uint16_t)sourcePixel[0] & 0xFFF8) << 5 | ((uint16_t)sourcePixel[1] & 0xFFF8)) << 2) | (uint16_t)(sourcePixel[2] >> 3);
+					sourcePixel += 3;
+				} while (--pixelsRemaining != 0);
+				sourcePixel += 0x480;
+			} while (--rowsRemaining != 0);
+
+			sourcePixel = (uint8_t*)buffer + 0x600;
+			destinationPixels = (uint16_t*)SoftwareRenderer::g_softwareTextureData[2];
+			rowsRemaining = 0x100;
+			do
+			{
+				int32_t pixelsRemaining = 0x80;
+				do
+				{
+					*destinationPixels++ =
+						((((uint16_t)sourcePixel[0] & 0xFFF8) << 5 | ((uint16_t)sourcePixel[1] & 0xFFF8)) << 2) | (uint16_t)(sourcePixel[2] >> 3);
+					sourcePixel += 3;
+				} while (--pixelsRemaining != 0);
+				sourcePixel += 0x600;
+				destinationPixels += 0x80;
+			} while (--rowsRemaining != 0);
+
+			sourcePixel = (uint8_t*)buffer + 0x78000;
+			destinationPixels = (uint16_t*)SoftwareRenderer::g_softwareTextureData[3];
+			rowsRemaining = 0xE0;
+			do
+			{
+				int32_t pixelsRemaining = 0x100;
+				do
+				{
+					*destinationPixels++ =
+						((((uint16_t)sourcePixel[0] & 0xFFF8) << 5 | ((uint16_t)sourcePixel[1] & 0xFFF8)) << 2) | (uint16_t)(sourcePixel[2] >> 3);
+					sourcePixel += 3;
+				} while (--pixelsRemaining != 0);
+				sourcePixel += 0x480;
+			} while (--rowsRemaining != 0);
+
+			sourcePixel = (uint8_t*)buffer + 0x78300;
+			destinationPixels = (uint16_t*)SoftwareRenderer::g_softwareTextureData[4];
+			rowsRemaining = 0xE0;
+			do
+			{
+				int32_t pixelsRemaining = 0x100;
+				do
+				{
+					*destinationPixels++ =
+						((((uint16_t)sourcePixel[0] & 0xFFF8) << 5 | ((uint16_t)sourcePixel[1] & 0xFFF8)) << 2) | (uint16_t)(sourcePixel[2] >> 3);
+					sourcePixel += 3;
+				} while (--pixelsRemaining != 0);
+				sourcePixel += 0x480;
+			} while (--rowsRemaining != 0);
+
+			sourcePixel = (uint8_t*)buffer + 0x78600;
+			destinationPixels = (uint16_t*)SoftwareRenderer::g_softwareTextureData[5];
+			rowsRemaining = 0xE0;
+			do
+			{
+				int32_t pixelsRemaining = 0x80;
+				do
+				{
+					*destinationPixels++ =
+						((((uint16_t)sourcePixel[0] & 0xFFF8) << 5 | ((uint16_t)sourcePixel[1] & 0xFFF8)) << 2) | (uint16_t)(sourcePixel[2] >> 3);
+					sourcePixel += 3;
+				} while (--pixelsRemaining != 0);
+				sourcePixel += 0x600;
+				destinationPixels += 0x80;
+			} while (--rowsRemaining != 0);
+		}
+
+		free(buffer);
+	}
+
 	// FUNCTION: TOY2 0x0047F6B0 [PROVISIONAL]
 	void LoadSwitchTPage()
 	{
