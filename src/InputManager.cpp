@@ -2,6 +2,9 @@
 #include "Toy2/Win95.h"
 #include "SaveManager.h"
 #include "Nu3D/Nu3D.h"
+#include "Renderer/TexturedQuad.h"
+#include "Toy2/Direct6.h"
+#include "Toy2/Toy2.h"
 
 #include <DINPUT.H>
 #include <stddef.h>
@@ -10,7 +13,7 @@ namespace InputManager
 {
 	struct KeyboardGlyph
 	{
-		uint32_t renderData[19];
+		DevDraw::TexturedQuad renderData;
 		int32_t width;
 		int32_t height;
 	};
@@ -403,6 +406,45 @@ namespace InputManager
 		}
 
 		return 0;
+	}
+
+	// FUNCTION: TOY2 0x00415F80 [MATCHED]
+	void DrawKeyboardGlyph(int32_t x, int32_t y, int8_t glyphIndex)
+	{
+		DevDraw::TexturedQuad quad;
+
+		if (glyphIndex == -1)
+			return;
+
+		g_selectedKeyboardGlyph = &g_keyboardGlyphs[glyphIndex];
+		quad = g_selectedKeyboardGlyph->renderData;
+
+		quad.points[0].x = (Toy2::g_softWindowWidth * x) / 320 + Toy2::g_screenClipLeft;
+		quad.points[0].y = (Toy2::g_softWindowHeight * y) / 256 + Toy2::g_screenClipTop;
+		quad.points[1].x = (Toy2::g_softWindowWidth * g_selectedKeyboardGlyph->width) / 320 + quad.points[0].x;
+		quad.points[1].y = quad.points[0].y;
+		quad.points[2].x = quad.points[0].x;
+		quad.points[2].y = (Toy2::g_softWindowHeight * g_selectedKeyboardGlyph->height) / 256 + quad.points[0].y;
+		quad.points[3].x = quad.points[1].x;
+		quad.points[3].y = quad.points[2].y;
+
+		switch (g_renderMode)
+		{
+			case RENDERMODE_SOFTWARE:
+				quad.texCoords[0].u <<= 16;
+				quad.texCoords[0].v <<= 16;
+				quad.texCoords[1].u <<= 16;
+				quad.texCoords[1].v <<= 16;
+				quad.texCoords[2].u <<= 16;
+				quad.texCoords[2].v <<= 16;
+				quad.texCoords[3].u <<= 16;
+				quad.texCoords[3].v <<= 16;
+				break;
+			default:
+				break;
+		}
+
+		DevDraw::SubmitTexturedQuad(&quad);
 	}
 
 	// FUNCTION: TOY2 0x004157D0 [MATCHED]

@@ -211,6 +211,7 @@ set(TOY2_SOURCES
     src/Renderer/Renderer.h
     src/Renderer/Renderer.cpp
     src/Renderer/DevDraw.cpp
+    src/Renderer/TexturedQuad.h
     src/Renderer/RenderType.h
     src/Renderer/Sprite.h
     src/Renderer/Sprite.cpp

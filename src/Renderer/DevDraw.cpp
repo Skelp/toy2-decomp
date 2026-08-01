@@ -1,4 +1,5 @@
 #include "Renderer/Renderer.h"
+#include "Renderer/TexturedQuad.h"
 #include "SoftwareRenderer.h"
 #include "DrawingDevice.h"
 #include "Nu3D/BmpDataNode.h"
@@ -18,6 +19,9 @@ namespace DevDraw
 
 	// GLOBAL: TOY2 0x007D2DA8
 	TransparentDrawBuffer g_transparentDrawBufferStorage;
+
+	// STUB: TOY2 0x00494C30
+	int16_t SubmitTexturedQuad(TexturedQuad* quad) { return 1; }
 
 	// FUNCTION: TOY2 0x00497FE0 [MATCHED]
 	void SetVertexBufferAllocation(int16_t slot, int32_t allocate)
