@@ -282,8 +282,8 @@ namespace Nu3D
 					font->atlasWidth = (int16_t)pow2;
 					font->atlasHeight = (int16_t)pow2;
 					font->numGlyphs = (int16_t)numGlyphs;
-					int32_t penX = 1;
 					int32_t penY = 1;
+					int32_t penX = 1;
 					int32_t i = 0;
 					if (numGlyphs > 0)
 					{
