@@ -14,6 +14,9 @@ namespace Nu3D
 	// GLOBAL: TOY2 0x00883FE0
 	int64_t g_cpuTicksPerSecond;
 
+	// GLOBAL: TOY2 0x00884004
+	int32_t g_cpuTicksPerSecondInitialized;
+
 	// GLOBAL: TOY2 0x00508A68
 	int32_t g_useAsDiffuseModulation = 1;
 
@@ -169,6 +172,18 @@ namespace Nu3D
 		{
 			Sleep(delayMs);
 		}
+	}
+
+	// FUNCTION: TOY2 0x004ABA10 [MATCHED]
+	uint32_t GetCPUTicksPerSecond()
+	{
+		if (! g_cpuTicksPerSecondInitialized)
+		{
+			g_cpuTicksPerSecondInitialized = 1;
+			CalibrateTimestampCounter();
+		}
+
+		return g_hasTimeStampCounter ? (uint32_t)g_cpuTicksPerSecond : 1;
 	}
 
 	// FUNCTION: TOY2 0x0047D520 [MATCHED]
