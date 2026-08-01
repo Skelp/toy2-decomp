@@ -338,7 +338,8 @@ namespace Toy2
 		// FUNCTION: TOY2 0x00428BA0 [MATCHED]
 		void UpdateObjectGroupFlash()
 		{
-			int32_t phase = Renderer::g_frameDelta;
+			// Keep this read before the phase read. VC6 can reverse commutative global reads after unrelated source changes.
+			int32_t phase = *reinterpret_cast<volatile int32_t*>(&Renderer::g_frameDelta);
 			phase += g_objectGroupFlashPhase;
 			g_objectGroupFlashPhase = phase & 0x1F;
 
