@@ -1,5 +1,6 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/TexturedQuad.h"
+#include "D3DApp/d3dappi.h"
 #include "SoftwareRenderer.h"
 #include "DrawingDevice.h"
 #include "Nu3D/BmpDataNode.h"
@@ -16,6 +17,13 @@ namespace DevDraw
 
 	// GLOBAL: TOY2 0x00732FC0
 	int16_t g_texturedQuadCount;
+
+	// Extra software-render flags applied to coloured textured quads.
+	// GLOBAL: TOY2 0x00559C5A
+	uint16_t g_texturedQuadRenderFlags;
+
+	// GLOBAL: TOY2 0x0072EFD0
+	int16_t g_currentDrawAlpha;
 
 	// GLOBAL: TOY2 0x00732FC8
 	DrawBuffer g_drawBufferStorage;
@@ -114,21 +122,188 @@ namespace DevDraw
 					item->vertices[2].v = quad->texCoords[3].v;
 					item->vertices[3].v = quad->texCoords[2].v;
 
-					item->vertices[0].blue = 0x80000;
-					item->vertices[1].blue = 0x80000;
-					item->vertices[2].blue = 0x80000;
 					item->vertices[3].blue = 0x80000;
-					item->vertices[0].green = 0x80000;
-					item->vertices[1].green = 0x80000;
-					item->vertices[2].green = 0x80000;
+					item->vertices[2].blue = 0x80000;
+					item->vertices[1].blue = 0x80000;
+					item->vertices[0].blue = 0x80000;
 					item->vertices[3].green = 0x80000;
-					item->vertices[0].red = 0x80000;
-					item->vertices[1].red = 0x80000;
-					item->vertices[2].red = 0x80000;
+					item->vertices[2].green = 0x80000;
+					item->vertices[1].green = 0x80000;
+					item->vertices[0].green = 0x80000;
 					item->vertices[3].red = 0x80000;
+					item->vertices[2].red = 0x80000;
+					item->vertices[1].red = 0x80000;
+					item->vertices[0].red = 0x80000;
 
 					item->renderFlags = SoftwareRenderer::SOFTWARE_RENDER_HIGH_PRIORITY;
 					item->textureIndex = (uint8_t)quad->drawSlot;
+					item->next = SoftwareRenderer::g_softwareRenderBuckets[quad->depth];
+					SoftwareRenderer::g_softwareRenderBuckets[quad->depth] = item;
+				}
+				break;
+			default:
+				break;
+		}
+
+		return 1;
+	}
+
+	// FUNCTION: TOY2 0x00495060 [PROVISIONAL]
+	int16_t SubmitColouredTexturedQuad(TexturedQuad* quad)
+	{
+		int32_t blue = quad->blue * Nu3D::Camera::g_cameraTintBlue / 128;
+		int32_t green = quad->green * Nu3D::Camera::g_cameraTintGreen / 128;
+		int32_t red = quad->red * Nu3D::Camera::g_cameraTintRed / 128;
+
+		switch (g_renderMode)
+		{
+			case RENDERMODE_D3D: {
+				Nu3D::VertexTL* vertex;
+				int16_t firstVertex;
+
+				if (g_currentDrawAlpha == 255)
+				{
+					if (Toy2::drawb->Vertice[quad->drawSlot] == NULL)
+					{
+						SetVertexBufferAllocation((int16_t)quad->drawSlot, 1);
+						g_textureDimensions[quad->drawSlot].width = g_textureDimensions[quad->drawSlot].height = 256;
+					}
+
+					if (Toy2::drawb->VerticeCount[quad->drawSlot] >= 494)
+					{
+						FlushDrawBufferSlot((int16_t)quad->drawSlot);
+					}
+
+					firstVertex = Toy2::drawb->VerticeCount[quad->drawSlot];
+					Toy2::drawb->Index[quad->drawSlot][Toy2::drawb->IndexCount[quad->drawSlot]++] = firstVertex;
+					Toy2::drawb->Index[quad->drawSlot][Toy2::drawb->IndexCount[quad->drawSlot]++] = firstVertex + 1;
+					Toy2::drawb->Index[quad->drawSlot][Toy2::drawb->IndexCount[quad->drawSlot]++] = firstVertex + 2;
+					Toy2::drawb->Index[quad->drawSlot][Toy2::drawb->IndexCount[quad->drawSlot]++] = firstVertex + 1;
+					Toy2::drawb->Index[quad->drawSlot][Toy2::drawb->IndexCount[quad->drawSlot]++] = firstVertex + 3;
+					Toy2::drawb->Index[quad->drawSlot][Toy2::drawb->IndexCount[quad->drawSlot]++] = firstVertex + 2;
+
+					vertex = static_cast<Nu3D::VertexTL*>(Toy2::drawb->Vertice[quad->drawSlot]) + firstVertex;
+					Toy2::drawb->VerticeCount[quad->drawSlot] += 4;
+				}
+				else
+				{
+					if (Toy2::drawtranb->Vertice[quad->drawSlot] == NULL)
+					{
+						SetVertexBufferAllocation((int16_t)quad->drawSlot, 1);
+						g_textureDimensions[quad->drawSlot].width = g_textureDimensions[quad->drawSlot].height = 256;
+					}
+
+					if (Toy2::drawtranb->VerticeCount[quad->drawSlot] >= 994)
+					{
+						FlushTransparentDrawBufferSlot((int16_t)quad->drawSlot);
+					}
+
+					firstVertex = Toy2::drawtranb->VerticeCount[quad->drawSlot];
+					Toy2::drawtranb->Index[quad->drawSlot][Toy2::drawtranb->IndexCount[quad->drawSlot]++] = firstVertex;
+					Toy2::drawtranb->Index[quad->drawSlot][Toy2::drawtranb->IndexCount[quad->drawSlot]++] = firstVertex + 1;
+					Toy2::drawtranb->Index[quad->drawSlot][Toy2::drawtranb->IndexCount[quad->drawSlot]++] = firstVertex + 2;
+					Toy2::drawtranb->Index[quad->drawSlot][Toy2::drawtranb->IndexCount[quad->drawSlot]++] = firstVertex + 1;
+					Toy2::drawtranb->Index[quad->drawSlot][Toy2::drawtranb->IndexCount[quad->drawSlot]++] = firstVertex + 3;
+					Toy2::drawtranb->Index[quad->drawSlot][Toy2::drawtranb->IndexCount[quad->drawSlot]++] = firstVertex + 2;
+
+					vertex = static_cast<Nu3D::VertexTL*>(Toy2::drawtranb->Vertice[quad->drawSlot]) + firstVertex;
+					Toy2::drawtranb->VerticeCount[quad->drawSlot] += 4;
+				}
+
+				quad->textureWidth = 256;
+				quad->textureHeight = 256;
+				uint32_t diffuse = (((g_currentDrawAlpha << 8 | blue) << 8 | green) << 8 | red);
+
+				vertex->position.x = quad->points[0].x;
+				vertex->position.y = quad->points[0].y;
+				vertex->position.z = ((float)(int16_t)quad->depth - Nu3D::Camera::g_currentCamera->nearClip) * Nu3D::Camera::g_currentCamera->farClip
+					/ ((Nu3D::Camera::g_currentCamera->farClip - Nu3D::Camera::g_currentCamera->nearClip) * (float)(int16_t)quad->depth);
+				vertex->rhw = 1.0f;
+				vertex->diffuse.value = diffuse;
+				vertex->specular.value = 0;
+				vertex->uv.x = (float)quad->texCoords[0].u / quad->textureWidth;
+				vertex->uv.y = (float)quad->texCoords[0].v / quad->textureHeight;
+				vertex++;
+
+				vertex->position.x = quad->points[1].x;
+				vertex->position.y = quad->points[1].y;
+				vertex->position.z = ((float)(int16_t)quad->depth - Nu3D::Camera::g_currentCamera->nearClip) * Nu3D::Camera::g_currentCamera->farClip
+					/ ((Nu3D::Camera::g_currentCamera->farClip - Nu3D::Camera::g_currentCamera->nearClip) * (float)(int16_t)quad->depth);
+				vertex->rhw = 1.0f;
+				vertex->diffuse.value = diffuse;
+				vertex->specular.value = 0;
+				vertex->uv.x = (float)quad->texCoords[1].u / quad->textureWidth;
+				vertex->uv.y = (float)quad->texCoords[1].v / quad->textureHeight;
+				vertex++;
+
+				vertex->position.x = quad->points[2].x;
+				vertex->position.y = quad->points[2].y;
+				vertex->position.z = ((float)(int16_t)quad->depth - Nu3D::Camera::g_currentCamera->nearClip) * Nu3D::Camera::g_currentCamera->farClip
+					/ ((Nu3D::Camera::g_currentCamera->farClip - Nu3D::Camera::g_currentCamera->nearClip) * (float)(int16_t)quad->depth);
+				vertex->rhw = 1.0f;
+				vertex->diffuse.value = diffuse;
+				vertex->specular.value = 0;
+				vertex->uv.x = (float)quad->texCoords[2].u / quad->textureWidth;
+				vertex->uv.y = (float)quad->texCoords[2].v / quad->textureHeight;
+				vertex++;
+
+				vertex->position.x = quad->points[3].x;
+				vertex->position.y = quad->points[3].y;
+				vertex->position.z = ((float)(int16_t)quad->depth - Nu3D::Camera::g_currentCamera->nearClip) * Nu3D::Camera::g_currentCamera->farClip
+					/ ((Nu3D::Camera::g_currentCamera->farClip - Nu3D::Camera::g_currentCamera->nearClip) * (float)(int16_t)quad->depth);
+				vertex->rhw = 1.0f;
+				vertex->diffuse.value = diffuse;
+				vertex->specular.value = 0;
+				vertex->uv.x = (float)quad->texCoords[3].u / quad->textureWidth;
+				vertex->uv.y = (float)quad->texCoords[3].v / quad->textureHeight;
+
+				g_texturedQuadCount++;
+				g_currentDrawAlpha = 255;
+				break;
+			}
+			case RENDERMODE_SOFTWARE:
+				if (SoftwareRenderer::g_softwareRenderItemCount < SoftwareRenderer::g_softwareRendererBufferBlockCount)
+				{
+					SoftwareRenderer::SoftwareRenderItem* items =
+						static_cast<SoftwareRenderer::SoftwareRenderItem*>(SoftwareRenderer::g_softwareRendererBuffer);
+					SoftwareRenderer::SoftwareRenderItem* item = &items[SoftwareRenderer::g_softwareRenderItemCount++];
+
+					item->vertices[0].x = quad->points[0].x;
+					item->vertices[1].x = quad->points[1].x;
+					item->vertices[2].x = quad->points[3].x;
+					item->vertices[3].x = quad->points[2].x;
+					item->vertices[0].y = quad->points[0].y;
+					item->vertices[1].y = quad->points[1].y;
+					item->vertices[2].y = quad->points[3].y;
+					item->vertices[3].y = quad->points[2].y;
+					item->vertices[0].u = quad->texCoords[0].u;
+					item->vertices[1].u = quad->texCoords[1].u;
+					item->vertices[2].u = quad->texCoords[3].u;
+					item->vertices[3].u = quad->texCoords[2].u;
+					item->vertices[0].v = quad->texCoords[0].v;
+					item->vertices[1].v = quad->texCoords[1].v;
+					item->vertices[2].v = quad->texCoords[3].v;
+					item->vertices[3].v = quad->texCoords[2].v;
+
+					blue <<= 13;
+					item->vertices[3].blue = blue;
+					item->vertices[2].blue = blue;
+					item->vertices[1].blue = blue;
+					item->vertices[0].blue = blue;
+					green <<= 13;
+					item->vertices[3].green = green;
+					item->vertices[2].green = green;
+					item->vertices[1].green = green;
+					item->vertices[0].green = green;
+					red <<= 13;
+					item->vertices[3].red = red;
+					item->vertices[2].red = red;
+					item->vertices[1].red = red;
+					item->vertices[0].red = red;
+
+					item->textureIndex = (uint8_t)quad->drawSlot;
+					item->renderFlags =
+						g_texturedQuadRenderFlags | SoftwareRenderer::SOFTWARE_RENDER_COLOUR_OFFSET | SoftwareRenderer::SOFTWARE_RENDER_HIGH_PRIORITY;
 					item->next = SoftwareRenderer::g_softwareRenderBuckets[quad->depth];
 					SoftwareRenderer::g_softwareRenderBuckets[quad->depth] = item;
 				}

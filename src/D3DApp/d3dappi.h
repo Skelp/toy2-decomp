@@ -10,6 +10,14 @@
 
 struct InterfaceDevice;
 
+struct TextureDimensions
+{
+	int16_t width;
+	int16_t height;
+};
+
+STATIC_ASSERT(sizeof(TextureDimensions) == 4);
+
 extern "C"
 {
 	HRESULT D3DAppIGetSurfDesc(LPDDSURFACEDESC surfaceDesc, LPDIRECTDRAWSURFACE3 surface);
@@ -107,6 +115,7 @@ extern LPVOID g_masterTextureData[64];
 extern LPVOID g_textureData[64];
 extern int32_t g_masterTextureFlags[64];
 extern int32_t g_textureFlags[64];
+extern TextureDimensions g_textureDimensions[64];
 extern int32_t g_masterTexturePaletteState[32];
 extern int32_t g_texturePaletteState[32];
 

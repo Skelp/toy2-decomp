@@ -29,7 +29,9 @@ namespace DevDraw
 			int32_t drawSlot;
 			int32_t textureWidth;
 			int32_t textureHeight;
-			int32_t reserved[3];
+			int32_t blue;
+			int32_t green;
+			int32_t red;
 		};
 	};
 
@@ -39,4 +41,5 @@ namespace DevDraw
 	STATIC_ASSERT(sizeof(TexturedQuad) == 0x4C);
 
 	int16_t SubmitTexturedQuad(TexturedQuad* quad);
+	int16_t SubmitColouredTexturedQuad(TexturedQuad* quad);
 }

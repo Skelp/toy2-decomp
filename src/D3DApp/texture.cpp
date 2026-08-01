@@ -5,13 +5,6 @@
 
 #include <stdlib.h>
 
-struct TextureDimensions
-{
-	int16_t width;
-	int16_t height;
-};
-STATIC_ASSERT(sizeof(TextureDimensions) == 4);
-
 namespace SoftwareRenderer
 {
 	extern void* g_softwareTextureData[64];
