@@ -10,6 +10,7 @@
 #include "Nu3D/ObjLoad.h"
 
 #include <windows.h>
+#include <math.h>
 #include <string.h>
 
 namespace NGNLoader
@@ -255,11 +256,27 @@ namespace NGNLoader
 
 namespace Nu3D
 {
+	struct Quaternion
+	{
+		float x;
+		float y;
+		float z;
+		float w;
+	};
+
+	union NamedTrackTransform
+	{
+		D3DMATRIX matrix;
+		Quaternion rotation;
+	};
+
 	struct NamedTrackKey
 	{
 		NamedTrackKey* previous;
 		NamedTrackKey* next;
-		uint8_t formatData08[0x48];
+		int32_t sampleIndex;
+		int32_t trackIndex;
+		NamedTrackTransform transform;
 	};
 
 	STATIC_ASSERT(sizeof(NamedTrackKey) == 0x50);
@@ -277,8 +294,133 @@ namespace Nu3D
 
 	STATIC_ASSERT(sizeof(NamedTrackSet) == 0x1C);
 
-	// STUB: TOY2 0x004CABD0
-	NamedTrackSet* LoadNamedTrackSet(const char* filename);
+	static int32_t GetFileLength(const char* filename)
+	{
+		if (! filename || ! *filename)
+			return -1;
+
+		FILE* stream = fopen(filename, "rb");
+		if (! stream)
+			return -1;
+
+		fseek(stream, 0, SEEK_END);
+		int32_t length = ftell(stream);
+		fclose(stream);
+		return length;
+	}
+
+	static void MatrixToQuaternion(D3DMATRIX* matrix, Quaternion* quaternion)
+	{
+		float trace = matrix->_11 + matrix->_22 + matrix->_33;
+		int32_t nextIndex[3] = { 1, 2, 0 };
+
+		if (trace <= 0.0)
+		{
+			int32_t index = matrix->_11 < matrix->_22;
+			float* diagonal = &matrix->_11;
+			if (diagonal[index * 5] < matrix->_33)
+				index = 2;
+
+			int32_t next = nextIndex[index];
+			int32_t last = nextIndex[next];
+			Quaternion result;
+			float scale = (float)sqrt((diagonal[index * 5] - (diagonal[next * 5] + diagonal[last * 5])) + 1.0f);
+			float* values = &result.x;
+			values[index] = scale * 0.5f;
+			if (scale != 0.0f)
+				scale = 0.5f / scale;
+
+			result.w = (diagonal[next * 4 + last] - diagonal[last * 4 + next]) * scale;
+			values[next] = (diagonal[index * 4 + next] + diagonal[next * 4 + index]) * scale;
+			values[last] = (diagonal[index * 4 + last] + diagonal[last * 4 + index]) * scale;
+			*quaternion = result;
+		}
+		else
+		{
+			float root = (float)sqrt(trace + 1.0f);
+			trace = 0.5f / root;
+			quaternion->w = root * 0.5f;
+			quaternion->x = (matrix->_23 - matrix->_32) * trace;
+			quaternion->y = (matrix->_31 - matrix->_13) * trace;
+			quaternion->z = (matrix->_12 - matrix->_21) * trace;
+		}
+	}
+
+	// FUNCTION: TOY2 0x004CABD0 [PROVISIONAL]
+	NamedTrackSet* LoadNamedTrackSet(const char* filename)
+	{
+		if (GetFileLength(filename) <= 0)
+			return 0;
+
+		FILE* stream = fopen(filename, "rb");
+		if (! stream)
+			return 0;
+
+		NamedTrackSet* trackSet = (NamedTrackSet*)malloc(sizeof(NamedTrackSet));
+		if (trackSet)
+		{
+			uint16_t fileHeader[4];
+			fread(fileHeader, sizeof(uint16_t), 4, stream);
+			fread(&trackSet->sampleCount, sizeof(trackSet->sampleCount), 1, stream);
+			fread(trackSet->formatData04, sizeof(trackSet->formatData04), 1, stream);
+			fread(trackSet->formatData10, sizeof(trackSet->formatData10), 1, stream);
+			fread(&trackSet->trackCount, sizeof(trackSet->trackCount), 1, stream);
+
+			trackSet->trackNames = (char**)malloc(sizeof(char*) * trackSet->trackCount);
+			for (int32_t trackIndex = 0; trackIndex < trackSet->trackCount; ++trackIndex)
+			{
+				uint8_t nameLength;
+				fread(&nameLength, sizeof(nameLength), 1, stream);
+				trackSet->trackNames[trackIndex] = (char*)malloc(nameLength + 1);
+				if (nameLength)
+					fread(trackSet->trackNames[trackIndex], sizeof(char), nameLength, stream);
+				trackSet->trackNames[trackIndex][nameLength] = '\0';
+			}
+
+			trackSet->trackKeys = (NamedTrackKey**)malloc(sizeof(NamedTrackKey*) * trackSet->trackCount);
+			int32_t keyframeCount = 0;
+			if (trackSet->trackKeys)
+			{
+				memset(trackSet->trackKeys, 0, sizeof(NamedTrackKey*) * trackSet->trackCount);
+
+				int32_t trackIndex;
+				while (fread(&trackIndex, sizeof(trackIndex), 1, stream))
+				{
+					int32_t keyCount;
+					fread(&keyCount, sizeof(keyCount), 1, stream);
+					for (int32_t keyIndex = 0; keyIndex < keyCount; ++keyIndex)
+					{
+						NamedTrackKey* key = (NamedTrackKey*)malloc(sizeof(NamedTrackKey));
+						if (key)
+						{
+							fread(&key->sampleIndex, sizeof(key->sampleIndex), 1, stream);
+							fread(&key->transform.matrix, sizeof(key->transform.matrix), 1, stream);
+							MatrixToQuaternion(&key->transform.matrix, &key->transform.rotation);
+
+							key->next = 0;
+							key->trackIndex = trackIndex;
+							key->previous = trackSet->trackKeys[trackIndex];
+							if (! key->previous)
+							{
+								trackSet->trackKeys[trackIndex] = key;
+							}
+							else
+							{
+								while (key->previous->next)
+									key->previous = key->previous->next;
+								key->previous->next = key;
+							}
+						}
+					}
+					++keyframeCount;
+				}
+			}
+			trackSet->keyframeCount = keyframeCount;
+		}
+
+		fclose(stream);
+		return trackSet;
+	}
 
 	// FUNCTION: TOY2 0x004CAE40 [MATCHED]
 	void DestroyNamedTrackSet(NamedTrackSet* trackSet)
