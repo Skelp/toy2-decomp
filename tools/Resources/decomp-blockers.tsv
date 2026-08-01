@@ -7,7 +7,7 @@
 0x00410410	-	The particle and light flow is complete at 61.40 percent. Four natural loop and random-cursor forms change only register allocation.	compiler-codegen	ready	-	4dc4afbdea54f034
 0x004106C0	-	The burst-ring flow is complete at 87.60 percent. Declaration order is neutral, and only a dead parameter slot and pointer-compare opcode differ.	compiler-codegen	ready	-	af8fd3dfc3ea6681
 0x00410F40	-	A complete natural reconstruction reached 61.09% similarity; unresolved stack-frame, register-lifetime, and switch-shape differences leave the source model unconfirmed.	semantic	uncertain	-	8e24288456fd918c
-0x00412FF0	-	The typed resource creation and cleanup flow is complete at 88.89%. Only block placement and scratch-register selection remain.
+0x00412FF0	-	The typed resource acquisition, thread startup, and cleanup flow is complete at 88.89 percent. Only failure-block placement and scratch-register selection remain.	compiler-codegen	ready	-	4bd5b9147c9c4379
 0x00414550	-	The complete record fixup stays at 71.75%. Declaration order is neutral, and cursor advance before height regresses to 70.03%.
 0x004157E0	-	The byte edge test and state update are complete; two natural forms leave only the prior-state byte register home and score at most 42.86%.
 0x0041BEE0	-	The complete link update stays at 81.58%. Reusing the dead vector matches retail lifetime reuse but shrinks the frame and regresses to 78.42%.
