@@ -522,6 +522,7 @@
 0x0048E1B0 Toy2::Collision::IsMeshMoving
 0x0048E1D0 Toy2::Collision::GetGroundContactIdx
 0x0048E200 Toy2::Platform::CopyVelocity
+0x0048E2B0 Toy2::InitScreenTextSurface
 0x0048E730 Toy2::OneInit
 0x0048F1B0 Toy2::SetBackdropByIndex
 0x0048F230 Renderer::UpdateBackgroundScroll

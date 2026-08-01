@@ -5691,6 +5691,54 @@ namespace Toy2
 		free(buffer);
 	}
 
+	struct ScreenTextSurfaceState
+	{
+		void* textLines[64];
+		int32_t reservedCount;
+		int32_t lineCount;
+		int32_t currentLine;
+		uint32_t reserved[3];
+		LPDIRECTDRAWSURFACE3 surface;
+		DDSURFACEDESC surfaceDesc;
+		DDCOLORKEY colorKey;
+		int32_t width;
+		int32_t height;
+	};
+
+	STATIC_ASSERT(sizeof(ScreenTextSurfaceState) == 0x198);
+	STATIC_ASSERT(offsetof(ScreenTextSurfaceState, surface) == 0x118);
+	STATIC_ASSERT(offsetof(ScreenTextSurfaceState, surfaceDesc) == 0x11C);
+	STATIC_ASSERT(offsetof(ScreenTextSurfaceState, colorKey) == 0x188);
+
+	// FUNCTION: TOY2 0x0048E2B0 [EFFECTIVE]
+	ScreenTextSurfaceState* __fastcall InitScreenTextSurface(ScreenTextSurfaceState* screenText)
+	{
+		screenText->lineCount = 0;
+		screenText->currentLine = 0;
+		screenText->width = g_screenClipRight;
+		screenText->height = 4 - g_d3dAppLogFont.lfHeight;
+
+		memset(screenText->textLines, 0, sizeof(screenText->textLines));
+
+		screenText->surfaceDesc.dwSize = sizeof(screenText->surfaceDesc);
+		screenText->surfaceDesc.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH;
+		screenText->surfaceDesc.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN | DDSCAPS_SYSTEMMEMORY;
+		screenText->surfaceDesc.dwWidth = screenText->width;
+		screenText->surfaceDesc.dwHeight = screenText->height;
+
+		HRESULT result = D3DAppICreateSurface(&screenText->surfaceDesc, &screenText->surface);
+		if (result < 0)
+			Logger::LogDDError("D3DAppCreateSurface(&ddsd, &Surface)", result);
+
+		DDCOLORKEY* colorKey = &screenText->colorKey;
+		memset(colorKey, 0, sizeof(*colorKey));
+		LPDIRECTDRAWSURFACE3 surface = screenText->surface;
+		surface->SetColorKey(DDCKEY_SRCBLT, colorKey);
+		++screenText->lineCount;
+
+		return screenText;
+	}
+
 	// FUNCTION: TOY2 0x0048E730 [PROVISIONAL]
 	void OneInit()
 	{
