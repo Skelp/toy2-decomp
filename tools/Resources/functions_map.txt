@@ -402,7 +402,7 @@
 0x0045D110 SoftwareRenderer::RasterizeAdditiveTexturedPolygon555
 0x0045DB80 SoftwareRenderer::RasterizeTexturedRect555
 0x0045E390 SoftwareRenderer::UnkRenderAPI13
-0x00461D20 SoftwareRenderer::UnkRenderAPI14
+0x00461D20 SoftwareRenderer::RasterizeTexturedRect565
 0x00463090 SoftwareRenderer::RasterizeTexturedPolygon565
 0x00463B80 SoftwareRenderer::RasterizeBlend25TexturedPolygon565
 0x00464690 SoftwareRenderer::RasterizeBlend50TexturedPolygon565

@@ -990,8 +990,300 @@ namespace SoftwareRenderer
 	void UnkRenderAPI8(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x0045E390
 	void UnkRenderAPI13(SoftwareRenderItem* item) {}
-	// STUB: TOY2 0x00461D20
-	void UnkRenderAPI14(SoftwareRenderItem* item) {}
+	// FUNCTION: TOY2 0x00461D20 [PROVISIONAL]
+	void RasterizeTexturedRect565(SoftwareRenderItem* item)
+	{
+		uint16_t flags = item->renderFlags;
+		uint16_t useColourOffset = flags & SOFTWARE_RENDER_COLOUR_OFFSET;
+		int32_t rightU = --item->vertices[2].u;
+		int32_t bottomV = --item->vertices[2].v;
+
+		int32_t redRampOffset;
+		int32_t greenRampOffset;
+		int32_t blueRampOffset;
+		if (useColourOffset != 0)
+		{
+			redRampOffset = item->vertices[0].blue >> 16;
+			greenRampOffset = item->vertices[0].green >> 15;
+			blueRampOffset = item->vertices[0].red >> 16;
+		}
+
+		int32_t right = item->vertices[2].x;
+		int32_t left = item->vertices[0].x;
+		int32_t top = item->vertices[0].y;
+		int32_t width = right - left;
+		if (width == 0)
+			width = 1;
+
+		int32_t bottom = item->vertices[2].y;
+		int32_t height = bottom - top;
+		if (height == 0)
+			height = 1;
+
+		int32_t u = item->vertices[0].u;
+		int32_t v = item->vertices[0].v;
+		int32_t uStep = (rightU - u) / width;
+		int32_t vStep = (bottomV - v) / height;
+		width++;
+		height++;
+
+		uint16_t* destination = (uint16_t*)g_lockedBackBuffer + g_backBufferPitchPixels * Toy2::g_screenClipTop + Toy2::g_screenClipLeft;
+		uint16_t* texture = (uint16_t*)g_softwareTextureData[item->textureIndex];
+		if (top < Toy2::g_screenClipTop)
+		{
+			v += (Toy2::g_screenClipTop - top) * vStep;
+			height += top - Toy2::g_screenClipTop;
+		}
+		else
+		{
+			destination += (top - Toy2::g_screenClipTop) * g_backBufferPitchPixels;
+		}
+		if (bottom > Toy2::g_screenClipBottom)
+			height += Toy2::g_screenClipBottom - bottom;
+		if (left < Toy2::g_screenClipLeft)
+		{
+			u += (Toy2::g_screenClipLeft - left) * uStep;
+			width += left - Toy2::g_screenClipLeft;
+		}
+		else
+		{
+			destination += left - Toy2::g_screenClipLeft;
+		}
+		if (right >= Toy2::g_screenClipRight)
+			width += Toy2::g_screenClipRight - right;
+
+		if (flags & SOFTWARE_RENDER_ADDITIVE)
+		{
+			if (useColourOffset != 0)
+			{
+				do
+				{
+					int32_t rowU = u;
+					int32_t remaining = width;
+					do
+					{
+						uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+						if (texel != 0x7C0)
+						{
+							uint16_t destinationPixel = *destination;
+							uint16_t litTexel = g_redRampFull[(texel >> 11) + redRampOffset] + g_greenRampFull[((texel >> 5) & 0x3F) + greenRampOffset]
+								+ g_blueRampFull[(texel & 0x1F) + blueRampOffset];
+							uint32_t red = (destinationPixel & 0xF800) + (litTexel & 0xF800);
+							if (red > 0xF800)
+								red = 0xF800;
+							uint32_t green = (destinationPixel & 0x7E0) + (litTexel & 0x7E0);
+							if (green > 0x7E0)
+								green = 0x7E0;
+							uint32_t blue = (destinationPixel & 0x1F) + (litTexel & 0x1F);
+							if (blue > 0x1F)
+								blue = 0x1F;
+							*destination = red | green | blue;
+						}
+						destination++;
+						rowU += uStep;
+						remaining--;
+					} while (remaining != 0);
+					destination += g_backBufferPitchPixels - width;
+					v += vStep;
+					height--;
+				} while (height != 0);
+				return;
+			}
+
+			do
+			{
+				int32_t rowU = u;
+				int32_t remaining = width;
+				do
+				{
+					uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					if (texel != 0x7C0)
+					{
+						uint16_t destinationPixel = *destination;
+						uint32_t red = (destinationPixel & 0xF800) + (texel & 0xF800);
+						if (red > 0xF800)
+							red = 0xF800;
+						uint32_t green = (destinationPixel & 0x7E0) + (texel & 0x7E0);
+						if (green > 0x7E0)
+							green = 0x7E0;
+						uint32_t blue = (destinationPixel & 0x1F) + (texel & 0x1F);
+						if (blue > 0x1F)
+							blue = 0x1F;
+						*destination = red | green | blue;
+					}
+					destination++;
+					rowU += uStep;
+					remaining--;
+				} while (remaining != 0);
+				destination += g_backBufferPitchPixels - width;
+				v += vStep;
+				height--;
+			} while (height != 0);
+			return;
+		}
+
+		if (flags & SOFTWARE_RENDER_SUBTRACTIVE)
+		{
+			if (useColourOffset != 0)
+			{
+				do
+				{
+					int32_t rowU = u;
+					int32_t remaining = width;
+					do
+					{
+						uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+						if (texel != 0x7C0)
+						{
+							uint32_t destinationPixel = *destination;
+							uint32_t sourcePixel = g_redRampFull[(texel >> 11) + redRampOffset] + g_greenRampFull[((texel >> 5) & 0x3F) + greenRampOffset]
+								+ g_blueRampFull[(texel & 0x1F) + blueRampOffset];
+							int32_t red = (destinationPixel & 0xF800) - (sourcePixel & 0xF800);
+							if (red < 0x800)
+								red = 0;
+							int32_t green = (destinationPixel & 0x7E0) - (sourcePixel & 0x7E0);
+							if (green < 0x20)
+								green = 0;
+							int32_t blue = (destinationPixel & 0x1F) - (sourcePixel & 0x1F);
+							if (blue < 1)
+								blue = 0;
+							*destination = (uint16_t)(red | green | blue);
+						}
+						destination++;
+						rowU += uStep;
+						remaining--;
+					} while (remaining != 0);
+					destination += g_backBufferPitchPixels - width;
+					v += vStep;
+					height--;
+				} while (height != 0);
+				return;
+			}
+
+			do
+			{
+				int32_t rowU = u;
+				int32_t remaining = width;
+				do
+				{
+					uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					if (texel != 0x7C0)
+					{
+						uint32_t destinationPixel = *destination;
+						uint32_t sourcePixel = texel;
+						int32_t red = (destinationPixel & 0xF800) - (sourcePixel & 0xF800);
+						if (red < 0x800)
+							red = 0;
+						int32_t green = (destinationPixel & 0x7E0) - (sourcePixel & 0x7E0);
+						if (green < 0x20)
+							green = 0;
+						int32_t blue = (destinationPixel & 0x1F) - (sourcePixel & 0x1F);
+						if (blue < 1)
+							blue = 0;
+						*destination = (uint16_t)(red | green | blue);
+					}
+					destination++;
+					rowU += uStep;
+					remaining--;
+				} while (remaining != 0);
+				destination += g_backBufferPitchPixels - width;
+				v += vStep;
+				height--;
+			} while (height != 0);
+			return;
+		}
+
+		if (flags & SOFTWARE_RENDER_BLEND_50)
+		{
+			if (useColourOffset != 0)
+			{
+				do
+				{
+					int32_t rowU = u;
+					int32_t remaining = width;
+					do
+					{
+						uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+						if (texel != 0x7C0)
+						{
+							uint16_t litTexel = g_redRampFull[(texel >> 11) + redRampOffset] + g_greenRampFull[((texel >> 5) & 0x3F) + greenRampOffset]
+								+ g_blueRampFull[(texel & 0x1F) + blueRampOffset];
+							*destination = (*destination >> 1 & 0x7BEF) + (litTexel >> 1 & 0x7BEF);
+						}
+						destination++;
+						rowU += uStep;
+						remaining--;
+					} while (remaining != 0);
+					destination += g_backBufferPitchPixels - width;
+					v += vStep;
+					height--;
+				} while (height != 0);
+				return;
+			}
+
+			do
+			{
+				int32_t rowU = u;
+				int32_t remaining = width;
+				do
+				{
+					uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					if (texel != 0x7C0)
+						*destination = (*destination >> 1 & 0x7BEF) + (texel >> 1 & 0x7BEF);
+					destination++;
+					rowU += uStep;
+					remaining--;
+				} while (remaining != 0);
+				destination += g_backBufferPitchPixels - width;
+				v += vStep;
+				height--;
+			} while (height != 0);
+			return;
+		}
+
+		if (useColourOffset != 0)
+		{
+			do
+			{
+				int32_t rowU = u;
+				int32_t remaining = width;
+				do
+				{
+					uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					if (texel != 0x7C0)
+					{
+						*destination = g_redRampFull[(texel >> 11) + redRampOffset] + g_greenRampFull[((texel >> 5) & 0x3F) + greenRampOffset]
+							+ g_blueRampFull[(texel & 0x1F) + blueRampOffset];
+					}
+					destination++;
+					rowU += uStep;
+					remaining--;
+				} while (remaining != 0);
+				destination += g_backBufferPitchPixels - width;
+				v += vStep;
+				height--;
+			} while (height != 0);
+			return;
+		}
+
+		do
+		{
+			int32_t rowU = u;
+			int32_t remaining = width;
+			do
+			{
+				uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+				if (texel != 0x7C0)
+					*destination = texel;
+				destination++;
+				rowU += uStep;
+				remaining--;
+			} while (remaining != 0);
+			destination += g_backBufferPitchPixels - width;
+			v += vStep;
+			height--;
+		} while (height != 0);
+	}
 	// STUB: TOY2 0x00467080
 	void UnkRenderAPI17(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x00469900
@@ -3442,7 +3734,7 @@ namespace SoftwareRenderer
 
 	// GLOBAL: TOY2 0x004FCBB8
 	SoftwareRenderDispatchTable g_softwareRenderDispatch565 = {
-		UnkRenderAPI14,
+		RasterizeTexturedRect565,
 		RasterizeSolidQuad16,
 		RasterizeAdditiveTexturedPolygon565,
 		RasterizeSubtractiveTexturedPolygon565,
