@@ -522,6 +522,7 @@
 0x00494820 Renderer::Sprite::DrawTile
 0x004949B0 Renderer::Sprite::DrawClipped
 0x00497D70 InitD3DSettings
+0x00497DB0 AllocateTexturePixelBuffer
 0x00497FE0 DevDraw::SetVertexBufferAllocation
 0x00498140 Toy2::InitDirect3DMaterials
 0x00498470 SaveManager::SetLightShadowEffects
