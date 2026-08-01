@@ -236,84 +236,96 @@ namespace Nu3D
 			charSet = g_defaultCharSet;
 		int32_t numGlyphs = strlen(charSet);
 		HFONT hfont = CreateFontA(fontSize, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, fontName);
-		if (! hfont)
-			return font;
-		HDC hdc = CreateDC();
-		if (hdc)
+		HDC hdc;
+		if (hfont)
 		{
-			font = BuildObject(numGlyphs);
-			if (font)
+			hdc = CreateDC();
+			if (hdc)
 			{
-				HGDIOBJ oldBmp = SelectObject(hdc, hfont);
-				COLORREF oldFg = ::SetTextColor(hdc, 0xffffff);
-				COLORREF oldBg = SetBkColor(hdc, 0);
-				TEXTMETRICA tm;
-				GetTextMetricsA(hdc, &tm);
-				strcpy(font->fontName, fontName);
-				font->fontHeight = (int16_t)tm.tmHeight;
-				font->fontAscent = (int16_t)tm.tmAscent;
-				int32_t atlasSize = 0x200;
-				int32_t pow2;
-				do
+				font = BuildObject(numGlyphs);
+				if (font)
 				{
-					atlasSize >>= 1;
-					int32_t penX = 1;
-					int32_t rowY = 1;
-					for (int32_t i = 0; i < numGlyphs; i++)
+					HGDIOBJ oldBmp = SelectObject(hdc, hfont);
+					COLORREF oldFg = ::SetTextColor(hdc, 0xffffff);
+					COLORREF oldBg = SetBkColor(hdc, 0);
+					TEXTMETRICA tm;
+					GetTextMetricsA(hdc, &tm);
+					strcpy(font->fontName, fontName);
+					font->fontHeight = (int16_t)tm.tmHeight;
+					font->fontAscent = (int16_t)tm.tmAscent;
+					int32_t atlasSize = 0x200;
+					int32_t pow2;
+					do
 					{
-						glyphChar[0] = charSet[i];
-						SIZE size;
-						GetTextExtentPoint32A(hdc, glyphChar, 1, &size);
-						if (size.cx + penX + 1 >= atlasSize)
+						atlasSize >>= 1;
+						int32_t penX = 1;
+						int32_t rowY = 1;
+						for (int32_t i = 0; i < numGlyphs; i++)
 						{
-							penX = 1;
-							rowY = rowY + font->fontHeight + 1;
+							glyphChar[0] = charSet[i];
+							SIZE size;
+							GetTextExtentPoint32A(hdc, glyphChar, 1, &size);
+							if (size.cx + penX + 1 >= atlasSize)
+							{
+								penX = 1;
+								rowY = rowY + font->fontHeight + 1;
+							}
+							penX = penX + size.cx + 1;
 						}
-						penX = penX + size.cx + 1;
-					}
-					rowY = rowY + font->fontHeight + 1;
-					pow2 = 1;
-					while (pow2 < rowY)
-						pow2 <<= 1;
-				} while (pow2 < atlasSize);
-				g_fontDCReady = (int32_t)CreateAtlasBmp(pow2, pow2);
-				font->bmpHandle = (HBITMAP)g_fontDCReady;
-				font->atlasWidth = (int16_t)pow2;
-				font->atlasHeight = (int16_t)pow2;
-				font->numGlyphs = (int16_t)numGlyphs;
-				{
+						rowY = rowY + font->fontHeight + 1;
+						pow2 = 1;
+						while (pow2 < rowY)
+							pow2 <<= 1;
+					} while (pow2 < atlasSize);
+					g_fontDCReady = (int32_t)CreateAtlasBmp(pow2, pow2);
+					font->bmpHandle = (HBITMAP)g_fontDCReady;
+					font->atlasWidth = (int16_t)pow2;
+					font->atlasHeight = (int16_t)pow2;
+					font->numGlyphs = (int16_t)numGlyphs;
 					int32_t penX = 1;
 					int32_t penY = 1;
-					float invAtlas = (float)(pow2 - 1);
-					GlyphInfo* glyph = font->glyphs;
-					for (int32_t i = 0; i < numGlyphs; i++)
+					int32_t i = 0;
+					if (numGlyphs > 0)
 					{
-						glyphChar[0] = charSet[i];
-						SIZE size;
-						GetTextExtentPoint32A(hdc, glyphChar, 1, &size);
-						if (size.cx + penX + 1 >= pow2)
+						float invAtlas = (float)(pow2 - 1);
+						GlyphInfo* glyph = font->glyphs;
+						do
 						{
-							penX = 1;
-							penY = penY + font->fontHeight + 1;
-						}
-						TextOutA(hdc, penX, penY, glyphChar, 1);
-						glyph[i].uvMinX = (float)penX / invAtlas;
-						glyph[i].uvMaxX = (float)(size.cx + penX - 1) / invAtlas;
-						glyph[i].uvMinY = (float)penY / invAtlas;
-						glyph[i].uvMaxY = (float)(size.cy + penY - 1) / invAtlas;
-						glyph[i].width = (int16_t)size.cx;
-						glyph[i].height = (int16_t)size.cy;
-						penX = penX + size.cx + 1;
+							glyphChar[0] = charSet[i];
+							SIZE size;
+							GetTextExtentPoint32A(hdc, glyphChar, 1, &size);
+							if (size.cx + penX + 1 >= pow2)
+							{
+								penX = 1;
+								penY = penY + font->fontHeight + 1;
+							}
+							TextOutA(hdc, penX, penY, glyphChar, 1);
+							glyph[i].uvMinX = (float)penX / invAtlas;
+							glyph[i].uvMaxX = (float)(size.cx + penX - 1) / invAtlas;
+							glyph[i].uvMinY = (float)penY / invAtlas;
+							glyph[i].uvMaxY = (float)(size.cy + penY - 1) / invAtlas;
+							glyph[i].width = (int16_t)size.cx;
+							glyph[i].height = (int16_t)size.cy;
+							penX = penX + size.cx + 1;
+							i++;
+						} while (i < numGlyphs);
 					}
+					i = 0;
+					if (numGlyphs > 0)
+					{
+						do
+						{
+							font->charToGlyphIndex[(uint8_t)charSet[i]] = (uint8_t)i;
+							i++;
+						} while (i < numGlyphs);
+					}
+					SelectObject(hdc, oldBmp);
+					::SetTextColor(hdc, oldFg);
+					SetBkColor(hdc, oldBg);
 				}
-				for (int32_t i = 0; i < numGlyphs; i++)
-					font->charToGlyphIndex[(uint8_t)charSet[i]] = (uint8_t)i;
-				SelectObject(hdc, oldBmp);
-				::SetTextColor(hdc, oldFg);
-				SetBkColor(hdc, oldBg);
+				ResetContext();
+				BuildTexResource(font);
 			}
-			ResetContext();
-			BuildTexResource(font);
 		}
 		DeleteObject(hfont);
 		return font;
