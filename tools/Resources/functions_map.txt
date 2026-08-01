@@ -134,7 +134,10 @@
 0x004157D0 InputManager::ResetInputHistory
 0x004157E0 InputManager::IsKeyPressed
 0x00415800 InputManager::FindKeyPressed
+0x00415840 InputManager::IsKeyReleased
 0x00415860 InputManager::FindKeyReleased
+0x00415F50 InputManager::GetKeyboardGlyphWidth
+0x00415F80 InputManager::DrawKeyboardGlyph
 0x00416A60 Toy2::CreatureBehaviour::Sheep
 0x00416AB0 Toy2::CreatureBehaviour::TinMan
 0x00416F30 Toy2::CreatureBehaviour::RCCarLevel1

@@ -393,6 +393,18 @@ namespace InputManager
 		return width;
 	}
 
+	// FUNCTION: TOY2 0x00415F50 [MATCHED]
+	int32_t GetKeyboardGlyphWidth(int8_t glyphIndex)
+	{
+		if (glyphIndex != -1)
+		{
+			g_selectedKeyboardGlyph = &g_keyboardGlyphs[glyphIndex];
+			return g_selectedKeyboardGlyph->width;
+		}
+
+		return 0;
+	}
+
 	// FUNCTION: TOY2 0x004157D0 [MATCHED]
 	void ResetInputHistory(int32_t inputCode) { g_previousInputStates[inputCode] = 0xFF; }
 }
