@@ -725,6 +725,9 @@ namespace Renderer
 	// GLOBAL: TOY2 0x009F2EA0
 	Nu3D::Sprite g_instanceSpriteTemplate;
 
+	// FUNCTION: TOY2 0x004B92C0 [MATCHED]
+	void SetInstanceSpriteTemplate(const Nu3D::Sprite* sprite) { g_instanceSpriteTemplate = *sprite; }
+
 	// GLOBAL: TOY2 0x009F5FB0
 	Nu3D::Patch::PatchVertices g_FVF_14C_Buffer_2;
 

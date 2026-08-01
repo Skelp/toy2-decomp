@@ -18,6 +18,7 @@ namespace Nu3D
 	struct InstanceData;
 	struct VertexTL;
 	struct Patch;
+	struct Sprite;
 }
 
 namespace DrawingAPI
@@ -258,6 +259,7 @@ namespace Renderer
 	void FlushRenderQueues();
 	RGBA ModulateColorByAlpha(RGBA color, int32_t flags);
 	int32_t SetAdditionalRenderFlags(int32_t flags);
+	void SetInstanceSpriteTemplate(const Nu3D::Sprite* sprite);
 	void SetVertexColorModulation(int32_t red, int32_t green, int32_t blue);
 	int32_t EnableVertexColorModulation(int32_t enable);
 	int32_t Set508718(int32_t value);

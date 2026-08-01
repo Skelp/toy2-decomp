@@ -994,6 +994,7 @@
 0x004B9100 Renderer::Sprite::QueueQuadSpriteFromVerts
 0x004B9210 Renderer::Sprite::QueueType10
 0x004B92B0 Renderer::SetAdditionalRenderFlags
+0x004B92C0 Renderer::SetInstanceSpriteTemplate
 0x004B92E0 Renderer::SetVertexColorModulation
 0x004B9300 Renderer::EnableVertexColorModulation
 0x004B9600 Renderer::DrawSingleTexturedTriangle
