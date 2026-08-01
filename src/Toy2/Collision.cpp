@@ -3593,14 +3593,14 @@ namespace Toy2
 			}
 
 			int32_t scaledRadius = radius * diagonalScale;
-			int32_t maximumPadding = scaledRadius / 0x1000;
-			int32_t sizePadding = scaledRadius / 0x800;
-			maximumX += maximumPadding;
-			maximumY += maximumPadding;
-			maximumZ += maximumPadding;
-			querySizeX += sizePadding;
-			querySizeY += sizePadding;
-			querySizeZ += sizePadding;
+			int32_t padding = scaledRadius / 0x1000;
+			maximumX += padding;
+			maximumY += padding;
+			maximumZ += padding;
+			padding = scaledRadius / 0x800;
+			querySizeX += padding;
+			querySizeY += padding;
+			querySizeZ += padding;
 
 			Terrain::g_collisionWorkspace->slots[workspaceSlotIndex].queryBounds.maximum.x = maximumX;
 			Terrain::g_collisionWorkspace->slots[workspaceSlotIndex].queryBounds.maximum.y = maximumY;
