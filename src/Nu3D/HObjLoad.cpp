@@ -255,7 +255,14 @@ namespace NGNLoader
 
 namespace Nu3D
 {
-	struct NamedTrackKey;
+	struct NamedTrackKey
+	{
+		NamedTrackKey* previous;
+		NamedTrackKey* next;
+		uint8_t formatData08[0x48];
+	};
+
+	STATIC_ASSERT(sizeof(NamedTrackKey) == 0x50);
 
 	struct NamedTrackSet
 	{
@@ -273,8 +280,36 @@ namespace Nu3D
 	// STUB: TOY2 0x004CABD0
 	NamedTrackSet* LoadNamedTrackSet(const char* filename);
 
-	// STUB: TOY2 0x004CAE40
-	void DestroyNamedTrackSet(NamedTrackSet* trackSet);
+	// FUNCTION: TOY2 0x004CAE40 [MATCHED]
+	void DestroyNamedTrackSet(NamedTrackSet* trackSet)
+	{
+		if (trackSet->trackNames)
+		{
+			for (int32_t trackIndex = 0; trackIndex < trackSet->trackCount; ++trackIndex)
+			{
+				if (trackSet->trackNames[trackIndex])
+					free(trackSet->trackNames[trackIndex]);
+			}
+			free(trackSet->trackNames);
+		}
+
+		if (trackSet->trackKeys)
+		{
+			for (int32_t trackIndex = 0; trackIndex < trackSet->trackCount; ++trackIndex)
+			{
+				NamedTrackKey* trackKey = trackSet->trackKeys[trackIndex];
+				while (trackKey)
+				{
+					NamedTrackKey* nextTrackKey = trackKey->next;
+					free(trackKey);
+					trackKey = nextTrackKey;
+				}
+			}
+			free(trackSet->trackKeys);
+		}
+
+		free(trackSet);
+	}
 
 	// FUNCTION: TOY2 0x004CAED0 [MATCHED]
 	int32_t FindNamedTrackIndex(NamedTrackSet* trackSet, const char* trackName)
