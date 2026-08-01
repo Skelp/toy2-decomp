@@ -5,54 +5,57 @@ description: Supervise continuous Toy Story 2 source reconstruction through fres
 
 # Continue decompilation
 
-Act as the supervisor. Do not reconstruct functions yourself. Do not invoke a
-Codex executable, start an external supervisor, use MCP rotation, or use Goal
-mode inside a worker.
+Act as the supervisor. Do not reconstruct functions yourself. Do not start an
+external supervisor or use Goal mode inside a worker.
 
 ## Start
 
 1. Read `AGENTS.md`.
-2. Run `git status --short`, `git branch --show-current`, and
-   `tools/decomp progress --json`.
-3. Require branch `agent/continuous`. Preserve unrelated changes and the
-   unchanged reccmp submodule pointer.
-4. Record the initial implemented count and `HEAD`.
+2. Run `git status --short` and `git branch --show-current`.
+3. Run `tools/decomp progress --json`.
+4. Require branch `agent/continuous`.
+5. Preserve unrelated changes and the unchanged reccmp pointer drift.
+6. Record `HEAD`, implemented count, terminal count, and byte metrics.
+7. Inspect `tools/decomp candidates --coverage --why`.
+8. Inspect `tools/decomp candidates --refine --why`.
 
 ## Run campaigns
 
-Spawn one fresh worker with `fork_turns: "none"` for each campaign. Tell it to
-use `decomp-expert`. Give it the repository path, branch, current `HEAD`, the
-baseline implemented count, and useful output from the prior campaign. Never
-use `followup_task` to reuse a worker. Use a new task name such as
-`campaign_001`, `campaign_002`, and so on.
+Assign each campaign as `COVERAGE` or `REFINEMENT`. Alternate modes when both
+queues have credible work. Continue the available mode when one queue has no
+credible work.
 
-Wait for completion with the longest practical wait interval. Frequent polling
-wastes supervisor context and does not help the worker. Check status only after
-a long wait or when the user asks.
+Spawn one fresh worker with `fork_turns: "none"` for each campaign. Tell it to
+use `decomp-expert`. Give it the repository path, branch, current `HEAD`, mode,
+global baseline, and useful prior output. Never reuse a worker. Use a new task
+name such as `campaign_001`.
+
+Wait with the longest practical interval. Check status after a long wait or
+when the user asks.
 
 After the worker returns:
 
 1. Inspect its result and `git status --short`.
 2. Confirm its commits are on `agent/continuous` and pushed.
-3. Run `tools/decomp progress --json`.
-4. Count success only when the campaign changed C++ and increased the
-   implemented count.
-5. If `close_agent` is available, close the worker. Otherwise, list agents and
-   interrupt a worker that is still active. Require `Done` before you start its
-   successor. A completed entry can remain visible.
-6. If the worker made progress, use `tools/decomp report` to regenerate the user-report and `tools/decomp sync` to sync changes to ghidra.
+3. Rebuild and run the mode-specific validation independently.
+4. Run `tools/decomp progress --json` and verify each reported metric.
+5. Count a valid coverage or refinement result as source progress.
+6. Close or interrupt the worker before the next campaign.
+7. Run `tools/decomp report` after source progress.
+8. Run `tools/decomp sync` after source progress.
 
-Start the next fresh campaign after a success. Stop after three consecutive
-campaigns that produce no source progress. Do not count metadata, notes,
-blockers, or tool-only commits as reconstruction progress.
+Keep separate no-source counts for coverage and refinement. Switch modes after
+a failure. Reset both counts after source progress. Stop only when both counts
+reach three without intervening progress. Do not count metadata, notes, or
+blocker-only commits as source progress.
 
-Resolve workflow failures. If a build, tool, or evidence problem prevents all
-source work, assign a fresh expert a bounded meta-resolution campaign. Resume
-source campaigns after the fix. Do not merely observe the failure.
+Resolve workflow failures. Assign a fresh expert a bounded meta-resolution
+campaign when a tool problem prevents all source work. Resume source campaigns
+after the fix.
 
 ## Stop
 
-Stop immediately when the user asks. Interrupt the active worker and do not
-start a successor. Report the last pushed commit, implemented-count delta,
-addresses reconstructed, consecutive no-source count, and unresolved workflow
-failures.
+Stop immediately when the user asks. Interrupt the active worker. Do not start
+a successor. Report the last pushed commit and changed addresses. Report both
+queue failure counts. Report implemented, terminal, effective-byte, and
+source-debt deltas. Report unresolved workflow failures.

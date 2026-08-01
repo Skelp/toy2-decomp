@@ -47,7 +47,23 @@ def tree_hash(root: Path) -> str:
     return digest.hexdigest()
 
 
-def metadata(report: Path | None = None) -> dict[str, str]:
+def source_state(source_root: Path) -> dict[str, object]:
+    annotations = read_source_annotations(source_root)
+    return {
+        "implemented_addresses": sorted(
+            int(item.address, 16) for item in annotations if item.kind == "function"
+        ),
+        "stub_addresses": sorted(
+            int(item.address, 16) for item in annotations if item.kind == "stub"
+        ),
+        "source_debt": {
+            str(address): sorted(set(rules))
+            for address, rules in read_source_debt(source_root).items()
+        },
+    }
+
+
+def metadata(report: Path | None = None) -> dict[str, object]:
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, capture_output=True, check=True
     ).stdout.strip()
@@ -68,6 +84,7 @@ def metadata(report: Path | None = None) -> dict[str, str]:
         ROOT / ".tooling" / "msvc600-8168" / "VC98" / "Include"
     )
     values["source_dependency_sha256"] = tree_hash(ROOT / "src")
+    values.update(source_state(ROOT / "src"))
     reccmp_head = subprocess.run(
         ["git", "-C", "external/submodules/reccmp", "rev-parse", "HEAD"],
         cwd=ROOT,
@@ -135,6 +152,24 @@ def validate_metadata(metadata_path: Path, baseline_path: Path) -> list[str]:
         if saved.get(key) != current.get(key):
             problems.append(f"baseline {key} does not match the current build context")
     return problems
+
+
+def read_baseline_state(metadata_path: Path | None) -> dict[str, object]:
+    if metadata_path is None or not metadata_path.exists():
+        return {}
+    try:
+        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def effective_score(status) -> float:
+    return 1.0 if status.exact or status.effective else status.matching
+
+
+def is_terminal(status, debt: list[str] | None = None) -> bool:
+    return bool(status and (status.exact or status.effective) and not debt)
 
 
 VERIFICATION_TAG = {
@@ -384,6 +419,8 @@ def validate(
     metadata_path: Path | None = None,
     source_root: Path = ROOT / "src",
     check_annotation_tags: bool = True,
+    mode: str = "coverage",
+    meta_resolution: bool = False,
 ) -> int:
     baseline = read_match_statuses(baseline_path)
     current = read_match_statuses(current_path)
@@ -392,6 +429,23 @@ def validate(
     if metadata_path is not None:
         problems.extend(validate_metadata(metadata_path, baseline_path))
     source_debt = read_source_debt(source_root)
+    current_state = source_state(source_root)
+    baseline_state = read_baseline_state(metadata_path)
+    baseline_implemented = {
+        int(address) for address in baseline_state.get("implemented_addresses", [])
+    }
+    has_baseline_state = "implemented_addresses" in baseline_state
+    current_implemented = {
+        int(address) for address in current_state.get("implemented_addresses", [])
+    }
+    baseline_debt = {
+        int(address): list(rules)
+        for address, rules in baseline_state.get("source_debt", {}).items()
+    }
+    if allow_target_regression and not meta_resolution:
+        problems.append(
+            "--allow-target-regression requires explicit meta-resolution work"
+        )
     if check_annotation_tags:
         problems.extend(check_annotations(current_path, source_root))
     for address, before in baseline.items():
@@ -401,18 +455,20 @@ def validate(
             continue
         before_tool = address in artifacts and is_symbol_only_diff(before)
         after_tool = address in artifacts and is_symbol_only_diff(after)
-        before_verified = verification_status(before, tool_artifact=before_tool)
-        after_verified = verification_status(after, tool_artifact=after_tool)
-        if before_verified in ("exact", "effective", "tool") and after_verified not in (
-            "exact",
-            "effective",
-            "tool",
+        before_verified = verification_status(
+            before, tool_artifact=before_tool, source_clean=address not in baseline_debt
+        )
+        after_verified = verification_status(
+            after, tool_artifact=after_tool, source_clean=address not in source_debt
+        )
+        if is_terminal(before, baseline_debt.get(address)) and not is_terminal(
+            after, source_debt.get(address)
         ):
             problems.append(
                 f"0x{address:08X}: {before_verified} regressed to {after_verified} "
                 f"({before.matching * 100:.2f}% -> {after.matching * 100:.2f}%)"
             )
-        elif after.matching + 1e-12 < before.matching and (
+        elif effective_score(after) + 1e-12 < effective_score(before) and (
             address not in targets or not allow_target_regression
         ):
             scope = "target" if address in targets else "untouched function"
@@ -433,9 +489,76 @@ def validate(
             f"0x{address:08X}  {verified:<11} raw {status.matching * 100:6.2f}%"
             + ("  reccmp-effective" if status.effective else "")
         )
+        final_acceptable = status.matching >= 0.5 or status.exact or status.effective
+        if not final_acceptable:
+            problems.append(
+                f"0x{address:08X}: target finishes below 50% similarity"
+            )
         if debt:
             problems.append(
-                f"0x{address:08X}: target has source debt: {', '.join(sorted(set(debt)))}"
+                f"0x{address:08X}: target has source debt: "
+                f"{', '.join(sorted(set(debt)))}"
+            )
+
+        before = baseline.get(address)
+        before_rules = baseline_debt.get(address, [])
+        promoted = bool(
+            before
+            and not is_terminal(before, before_rules)
+            and is_terminal(status, debt)
+        )
+        debt_removed = bool(
+            before
+            and before_rules
+            and not debt
+            and (before.exact or before.effective)
+            and (status.exact or status.effective)
+        )
+        improved = bool(
+            before
+            and status.matching > before.matching + 1e-12
+            and final_acceptable
+        )
+
+        if mode == "coverage" and not meta_resolution:
+            if has_baseline_state and address in baseline_implemented:
+                problems.append(
+                    f"0x{address:08X}: coverage target was already implemented at baseline"
+                )
+            if has_baseline_state and address not in current_implemented:
+                problems.append(
+                    f"0x{address:08X}: coverage target is not a FUNCTION"
+                )
+        elif mode == "refinement" and not meta_resolution:
+            if has_baseline_state and address not in baseline_implemented:
+                problems.append(
+                    f"0x{address:08X}: refinement target was not implemented at baseline"
+                )
+            if not (improved or promoted or debt_removed):
+                problems.append(
+                    f"0x{address:08X}: refinement did not improve similarity, "
+                    "reach terminal status, or remove terminal source debt"
+                )
+
+    if mode == "coverage" and has_baseline_state:
+        if len(current_implemented) <= len(baseline_implemented):
+            problems.append("coverage did not increase the implemented-function count")
+
+    newly_implemented = (
+        current_implemented - baseline_implemented if has_baseline_state else set()
+    )
+    for address in sorted(newly_implemented - targets):
+        status = current.get(address)
+        if status is None or not (
+            status.matching >= 0.5 or status.exact or status.effective
+        ):
+            problems.append(
+                f"0x{address:08X}: newly integrated function finishes below 50% similarity"
+            )
+        if source_debt.get(address):
+            problems.append(
+                f"0x{address:08X}: newly integrated function has source debt: "
+                f"{', '.join(sorted(set(source_debt[address])))}"
             )
 
     for address, artifact in artifacts.items():
@@ -483,6 +606,8 @@ def main() -> int:
     validate_parser.add_argument("current", type=Path)
     validate_parser.add_argument("targets", nargs="+", type=parse_address)
     validate_parser.add_argument("--allow-target-regression", action="store_true")
+    validate_parser.add_argument("--mode", choices=("coverage", "refinement"), default="coverage")
+    validate_parser.add_argument("--meta-resolution", action="store_true")
     validate_parser.add_argument("--metadata", type=Path)
     validate_parser.add_argument("--source-root", type=Path, default=ROOT / "src")
     validate_parser.add_argument("--skip-annotation-check", action="store_true")
@@ -531,6 +656,8 @@ def main() -> int:
         args.metadata,
         args.source_root,
         not args.skip_annotation_check,
+        args.mode,
+        args.meta_resolution,
     )
 
 

@@ -5,6 +5,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SCRIPT = Path(__file__).parents[1] / "decomp_verify.py"
 SPEC = importlib.util.spec_from_file_location("decomp_verify", SCRIPT)
@@ -19,18 +20,31 @@ class VerifyRegressionTests(unittest.TestCase):
         path.write_text(json.dumps({"data": rows}), encoding="utf-8")
         return path
 
-    def validate(self, baseline, current, targets, allow=False, source_root=None):
+    def validate(
+        self,
+        baseline,
+        current,
+        targets,
+        allow=False,
+        source_root=None,
+        mode="coverage",
+        metadata=None,
+    ):
         old_artifacts = VERIFY.TOOL_ARTIFACTS
         VERIFY.TOOL_ARTIFACTS = baseline.parent / "none.tsv"
         try:
-            return VERIFY.validate(
-                baseline,
-                current,
-                set(targets),
-                allow,
-                source_root=source_root or baseline.parent / "src",
-                check_annotation_tags=False,
-            )
+            with mock.patch.object(VERIFY, "validate_metadata", return_value=[]):
+                return VERIFY.validate(
+                    baseline,
+                    current,
+                    set(targets),
+                    allow,
+                    metadata_path=metadata,
+                    source_root=source_root or baseline.parent / "src",
+                    check_annotation_tags=False,
+                    mode=mode,
+                    meta_resolution=allow,
+                )
         finally:
             VERIFY.TOOL_ARTIFACTS = old_artifacts
 
@@ -61,7 +75,7 @@ class VerifyRegressionTests(unittest.TestCase):
             self.assertEqual(self.validate(baseline, current, {0x401000}), 1)
             self.assertEqual(self.validate(baseline, current, {0x401000}, True), 0)
 
-    def test_new_target_below_75_is_advisory(self):
+    def test_coverage_rejects_49_percent_and_accepts_50_percent(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "src").mkdir()
@@ -69,7 +83,11 @@ class VerifyRegressionTests(unittest.TestCase):
                 {"address": "0x401000", "matching": 0.0, "stub": True}
             ])
             current = self.write_report(root, "after.json", [
-                {"address": "0x401000", "matching": 0.4}
+                {"address": "0x401000", "matching": 0.49}
+            ])
+            self.assertEqual(self.validate(baseline, current, {0x401000}), 1)
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.5}
             ])
             self.assertEqual(self.validate(baseline, current, {0x401000}), 0)
 
@@ -140,6 +158,134 @@ class VerifyRegressionTests(unittest.TestCase):
                 )
             self.assertEqual(result, 0)
             self.assertIn("2 (1 new, 1 exact)", output.getvalue())
+
+    def test_refinement_requires_a_strict_increase(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 0.6}
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.6}
+            ])
+            self.assertEqual(
+                self.validate(baseline, current, {0x401000}, mode="refinement"), 1
+            )
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.6001}
+            ])
+            self.assertEqual(
+                self.validate(baseline, current, {0x401000}, mode="refinement"), 0
+            )
+
+    def test_refinement_below_50_must_cross_the_gate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 0.2}
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.49}
+            ])
+            self.assertEqual(
+                self.validate(baseline, current, {0x401000}, mode="refinement"), 1
+            )
+
+    def test_refinement_promotion_to_effective_passes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 0.8}
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.8, "effective": True}
+            ])
+            self.assertEqual(
+                self.validate(baseline, current, {0x401000}, mode="refinement"), 0
+            )
+
+    def test_source_debt_removal_requires_terminal_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src"
+            source.mkdir()
+            (source / "test.cpp").write_text(
+                "// FUNCTION: TOY2 0x00401000 [MATCHED]\nvoid Test() {}\n",
+                encoding="utf-8",
+            )
+            metadata = root / "meta.json"
+            metadata.write_text(json.dumps({
+                "implemented_addresses": [0x401000],
+                "source_debt": {str(0x401000): ["raw-layout-access"]},
+            }), encoding="utf-8")
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 1.0}
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.9, "effective": True}
+            ])
+            self.assertEqual(
+                self.validate(
+                    baseline,
+                    current,
+                    {0x401000},
+                    source_root=source,
+                    mode="refinement",
+                    metadata=metadata,
+                ),
+                0,
+            )
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.9}
+            ])
+            self.assertEqual(
+                self.validate(
+                    baseline,
+                    current,
+                    {0x401000},
+                    source_root=source,
+                    mode="refinement",
+                    metadata=metadata,
+                ),
+                1,
+            )
+
+    def test_newly_integrated_function_must_meet_50_percent_gate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src"
+            source.mkdir()
+            (source / "test.cpp").write_text(
+                "// FUNCTION: TOY2 0x00401000 [PROVISIONAL]\nvoid First() {}\n"
+                "// FUNCTION: TOY2 0x00402000 [PROVISIONAL]\nvoid Second() {}\n",
+                encoding="utf-8",
+            )
+            metadata = root / "meta.json"
+            metadata.write_text(json.dumps({
+                "implemented_addresses": [0x401000],
+                "source_debt": {},
+            }), encoding="utf-8")
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 0.6}
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.7},
+                {"address": "0x402000", "matching": 0.49},
+            ])
+            self.assertEqual(
+                self.validate(
+                    baseline,
+                    current,
+                    {0x401000},
+                    source_root=source,
+                    mode="refinement",
+                    metadata=metadata,
+                ),
+                1,
+            )
 
 
 if __name__ == "__main__":

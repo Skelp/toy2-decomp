@@ -1070,12 +1070,12 @@ namespace AudioManager
 		uint16_t encodedSoundIndex = preset.encodedSoundIndex;
 		if ((encodedSoundIndex & 0x4000) != 0)
 		{
-			LevelSoundMapping* mapping = &g_levelSoundMappings[(encodedSoundIndex & 0x3fff) / 2];
-			while (mapping->levelFileIndex != Toy2::g_levelFileIndex)
+			int16_t* mapping = &g_levelSoundMappings[0].levelFileIndex + (encodedSoundIndex & 0x3fff);
+			while (*mapping != Toy2::g_levelFileIndex)
 			{
-				mapping++;
+				mapping += 2;
 			}
-			encodedSoundIndex = mapping->soundIndex;
+			encodedSoundIndex = mapping[1];
 		}
 
 		int16_t selectedSoundIndex = (int16_t)encodedSoundIndex;

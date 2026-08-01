@@ -7,10 +7,17 @@ campaign procedure.
 ## Project goal
 
 Reconstruct the Windows release of *Toy Story 2: Buzz Lightyear to the Rescue*
-as readable C++. Prefer source that the original developers could have
-maintained: coherent types, descriptive names, natural control flow, and
-engine-level concepts. Machine-code similarity is evidence. It is not the
-objective by itself.
+as readable C++. Prefer source that the original developers could maintain.
+Use coherent types, descriptive names, natural control flow, and engine-level
+concepts. Machine-code similarity is evidence. It is not the only objective.
+
+A function is terminal only when all these conditions are true:
+
+- reccmp classifies it as exact or effective.
+- it has no unsuppressed source-debt finding.
+- its C++ is plausible and evidence-backed.
+
+Tool-only, provisional, `STUB`, and unstarted functions remain active work.
 
 ## Evidence and names
 
@@ -39,21 +46,28 @@ Start with:
 ```sh
 git status --short
 tools/decomp progress --json
-tools/decomp candidates --why
+tools/decomp candidates --coverage --why
+tools/decomp candidates --refine --why
 tools/decomp baseline
 ```
 
-The default candidate list is the source-work queue. It contains `STUB` and
-unstarted functions. Dependency readiness and blockers affect rank, but do not
-hide targets. Select one coherent campaign: one large function or at most
-three related functions in one subsystem.
+Use two campaign queues. A `COVERAGE` campaign reconstructs a `STUB` or an
+unstarted function. A `REFINEMENT` campaign improves provisional source,
+resolves a tool-only result, or removes source debt. Alternate the queues when
+both have credible work. Continue the available queue when the other queue has
+no credible work.
+
+Rank work by unresolved retail bytes, evidence readiness, dependency impact,
+and source debt. A provisional callee can support behavior reconstruction.
+Treat it as a high-priority refinement prerequisite. Select one large function
+or at most three related functions in one subsystem.
 
 Use `tools/decomp evidence ADDRESS` before editing. Confirm most of these facts:
 
-- subsystem and translation unit;
-- calling convention, return type, and parameter roles;
-- callers, callees, important constants, and side effects;
-- global and structure accesses;
+- subsystem and translation unit.
+- calling convention, return type, and parameter roles.
+- callers, callees, important constants, and side effects.
+- global and structure accesses.
 - a plausible source-level control-flow shape.
 
 If the first target lacks evidence, pivot within the same subsystem. Make no
@@ -108,12 +122,13 @@ evidence -> plausible source -> format -> build and compare -> explain -> revise
 
 Run `tools/decomp bc ADDRESS` after each meaningful source-model change. It
 saves the full diff and prints a bounded summary. Search compiler guidance with
-`tools/decomp notes QUERY --source codegen`; do not read large note files.
+`tools/decomp notes QUERY --source codegen`. Do not read large note files.
 
-Similarity below 75 percent is a warning, not a rejection. A low score often
-shows that a source model is wrong, so inspect structural differences. Keep a
-complete, evidence-backed, readable model when the ABI, behavior, side effects,
-and data model are supported. Do not keep an opaque or guessed body.
+The final similarity must be at least 50 percent unless reccmp marks the
+function exact or effective. A low score often shows an incorrect source
+model. Inspect structural differences. Keep a complete, evidence-backed,
+readable model when the ABI, behavior, side effects, and data model are
+supported. Do not keep an opaque or guessed body.
 
 Use `tools/decomp experiment` for distinct source-form trials. Stop when trials
 no longer test a concrete model question. Do not polish functions above about
@@ -124,23 +139,31 @@ no longer test a concrete model question. Do not polish functions above about
 Before a source commit, run:
 
 ```sh
-tools/decomp validate --target ADDRESS --staged
+tools/decomp validate --mode coverage --target ADDRESS --staged
+tools/decomp validate --mode refinement --target ADDRESS --staged
 tools/decomp check
 git diff --check
 ```
 
-Validation rejects ABI, annotation, source-quality, verified-state, and
-untouched-function regressions. It reports target similarity without enforcing
-a minimum score. Use `--allow-target-regression` only when a clearer supported
-source model explains the target regression.
+Use the mode that matches the campaign. Validation rejects ABI, annotation,
+source-quality, terminal-state, and untouched-function regressions. It also
+rejects targets below 50 percent. Normal campaigns must not use
+`--allow-target-regression`. Use it only with `--meta-resolution` for an
+explicit workflow repair.
 
-A successful reconstruction campaign must change C++ and increase the
-implemented-function count. Use `tools/decomp progress --json` before and after
-the campaign. Do not create a metadata-only success commit.
+A successful coverage campaign must change C++, convert a target to
+`FUNCTION`, and increase the implemented count. A successful refinement
+campaign must improve similarity, reach terminal status, or remove source
+debt while terminal status remains. Both campaign types are source progress.
+Use `tools/decomp progress --json` before and after each campaign. Record the
+target score and the global metrics. Do not create a metadata-only success
+commit.
 
-Run the full comparison, sync, and report once at the end of a successful
-campaign. Run tool unit tests only when tool code changed. Commit the coherent
-source slice, sync with `origin/agent/continuous`, and push it.
+Run the full comparison, sync, and report once after a successful campaign.
+Run tool unit tests only when tool code changed. Integrate current
+`origin/agent/continuous`, then rebuild and validate the integrated tree.
+Reject a push when an integrated function violates the 50 percent or terminal
+gate. Commit the coherent source slice and push it.
 
 Do not stage unrelated work. The existing `external/submodules/reccmp` pointer
 drift is allowed only while it stays unchanged. Never add generated `build/`

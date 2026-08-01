@@ -314,6 +314,30 @@ def enrich_report(
         if item.get("verification") in ("exact", "effective", "tool")
     ]
     verified_bytes = sum(int(item.get("original_size") or 0) for item in verified_project)
+    terminal_project = [
+        item for item in project_entities
+        if item.get("verification") in ("exact", "effective")
+    ]
+    terminal_bytes = sum(int(item.get("original_size") or 0) for item in terminal_project)
+    coverage_gap_bytes = sum(
+        int(item.get("original_size") or 0)
+        for item in project_entities
+        if item.get("annotation") != "function"
+    )
+    refinement_gap_bytes = sum(
+        int(item.get("original_size") or 0)
+        * max(
+            0.0,
+            1.0
+            - (
+                1.0
+                if item.get("binary_status") in ("exact", "effective")
+                else float(item.get("matching", 0))
+            ),
+        )
+        for item in project_entities
+        if item.get("annotation") == "function"
+    )
     summary.update(
         {
             "exact": sum(item["status"] == "exact" for item in comparable),
@@ -365,6 +389,20 @@ def enrich_report(
             "verified_byte_progress": (
                 verified_bytes / project_original_bytes * 100 if project_original_bytes else 0.0
             ),
+            "terminal_functions": len(terminal_project),
+            "terminal_function_progress": (
+                len(terminal_project) / len(mapped_addresses) * 100
+                if mapped_addresses
+                else 0.0
+            ),
+            "terminal_bytes": terminal_bytes,
+            "terminal_byte_progress": (
+                terminal_bytes / project_original_bytes * 100
+                if project_original_bytes
+                else 0.0
+            ),
+            "coverage_gap_bytes": coverage_gap_bytes,
+            "refinement_gap_bytes": refinement_gap_bytes,
             "provisional_functions": sum(
                 item.get("verification") == "provisional" and not item.get("stub")
                 for item in project_entities

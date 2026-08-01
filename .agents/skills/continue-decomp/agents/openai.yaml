@@ -1,0 +1,4 @@
+interface:
+  display_name: "Continue Decompilation"
+  short_description: "Supervise alternating decompilation campaigns"
+  default_prompt: "Use $continue-decomp to supervise continuous Toy Story 2 coverage and refinement campaigns."

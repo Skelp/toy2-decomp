@@ -11,18 +11,17 @@ SPEC.loader.exec_module(REPORT)
 
 
 class ReportMetricTests(unittest.TestCase):
-    def test_top_cards_show_change_gate_and_verified_progress(self):
+    def test_top_cards_lead_with_terminal_and_effective_bytes(self):
         template = (SCRIPT.parent / "decomp-report-template.html").read_text(
             encoding="utf-8"
         )
         cards = template[template.index("const cards = [") : template.index(
             "];", template.index("const cards = [")
         )]
+        self.assertLess(cards.index('"Terminal bytes"'), cards.index('"Effective bytes"'))
+        self.assertLess(cards.index('"Effective bytes"'), cards.index('"Implementation coverage"'))
         self.assertIn('"Change gate"', cards)
         self.assertIn('"Source debt"', cards)
-        self.assertIn('"Binary fidelity"', cards)
-        self.assertIn('"Verified functions"', cards)
-        self.assertIn('"Verified bytes"', cards)
         self.assertNotIn('"Project progress"', cards)
         self.assertNotIn('"Project coverage"', cards)
         self.assertNotIn('"Project accuracy"', cards)
@@ -101,6 +100,10 @@ class ReportMetricTests(unittest.TestCase):
         self.assertAlmostEqual(metrics["project_effective_byte_progress"], 100 / 3)
         self.assertTrue(metrics["change_gate_passed"])
         self.assertEqual(metrics["verified_functions"], 0)
+        self.assertEqual(metrics["terminal_functions"], 0)
+        self.assertEqual(metrics["terminal_bytes"], 0)
+        self.assertEqual(metrics["coverage_gap_bytes"], 32)
+        self.assertEqual(metrics["refinement_gap_bytes"], 0)
         self.assertEqual(metrics["provisional_functions"], 1)
         self.assertEqual(metrics["source_debt_functions"], 1)
         self.assertEqual(metrics["binary_effective_functions"], 1)
@@ -130,6 +133,41 @@ class ReportMetricTests(unittest.TestCase):
             )
             quality, _ = REPORT.read_lint_quality(source)
             self.assertIn("0x401000", quality)
+
+    def test_terminal_metrics_exclude_tool_only_matches(self):
+        symbol_diff = [[0, [{
+            "orig": [[0, "mov eax, (OFFSET) g_first"]],
+            "recomp": [[0, "mov eax, (DATA) g_second"]],
+        }]]]
+        report = {
+            "file": "toy2.exe",
+            "timestamp": 0,
+            "data": [
+                {"address": "0x401000", "matching": 1.0},
+                {"address": "0x402000", "matching": 0.8, "effective": True},
+                {"address": "0x403000", "matching": 0.9, "diff": symbol_diff},
+            ],
+        }
+        annotations = {
+            address: {"kind": "function", "source": "Game.cpp", "line": index}
+            for index, address in enumerate(
+                ("0x401000", "0x402000", "0x403000"), 1
+            )
+        }
+        result = REPORT.enrich_report(
+            report,
+            annotations,
+            {address: address for address in annotations},
+            {"implemented": 3, "total": 3},
+            function_sizes={address: 10 for address in annotations},
+            tool_artifacts={0x403000: "symbol display"},
+        )
+        metrics = result["metrics"]
+        self.assertEqual(metrics["verified_functions"], 3)
+        self.assertEqual(metrics["terminal_functions"], 2)
+        self.assertEqual(metrics["terminal_bytes"], 20)
+        self.assertEqual(metrics["project_effective_bytes"], 29)
+        self.assertAlmostEqual(metrics["refinement_gap_bytes"], 1)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
 interface:
   display_name: "Decomp Expert"
-  short_description: "Reconstruct a coherent source campaign"
-  default_prompt: "Use $decomp-expert to reconstruct one coherent Toy Story 2 source campaign."
+  short_description: "Complete one bounded decompilation campaign"
+  default_prompt: "Use $decomp-expert to complete the assigned Toy Story 2 coverage or refinement campaign."

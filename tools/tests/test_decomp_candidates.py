@@ -128,7 +128,7 @@ class CandidateTests(unittest.TestCase):
         self.assertFalse(goal.dependency_ready)
         self.assertTrue(leaf.dependency_ready)
 
-    def test_low_similarity_implemented_dependency_is_resolved(self):
+    def test_low_similarity_implemented_dependency_is_weak_prerequisite(self):
         goal = make(0x401000, "N::Goal", size=1200, state="STUB")
         dependency = make(
             0x402000, "N::Dependency", size=100, state="FUNCTION", match=0.2
@@ -139,7 +139,8 @@ class CandidateTests(unittest.TestCase):
         )
         candidates.add_dependency_evidence([goal, dependency], dependency_graph)
         self.assertTrue(goal.dependency_ready)
-        self.assertFalse(dependency.quality_prerequisite)
+        self.assertTrue(dependency.quality_prerequisite)
+        self.assertEqual(goal.weak_dependencies, (0x402000,))
 
     def test_default_source_filter_excludes_implemented_functions(self):
         source = make(0x401000, "N::Source", size=80, state="STUB")
@@ -172,6 +173,104 @@ class CandidateTests(unittest.TestCase):
             exclude_capped=True,
         )
         self.assertEqual([item.address for item in chosen], [0x401000])
+
+    def test_coverage_excludes_implemented_functions(self):
+        source = make(0x401000, "N::Source", size=80, state="STUB")
+        unstarted = make(0x402000, "N::New", size=120, state="NOT_STARTED")
+        implemented = make(
+            0x403000, "N::Done", size=200, state="FUNCTION", match=0.6
+        )
+        chosen = candidates.select(
+            [source, unstarted, implemented],
+            namespace=None,
+            stubs_only=False,
+            leaves_only=False,
+            near_only=False,
+            max_size=None,
+            exclude_capped=True,
+            queue="coverage",
+        )
+        self.assertEqual({item.address for item in chosen}, {0x401000, 0x402000})
+
+    def test_refinement_includes_each_nonterminal_source_class(self):
+        provisional = make(
+            0x401000, "N::Partial", size=100, state="FUNCTION", match=0.6
+        )
+        tool = make(
+            0x402000,
+            "N::Tool",
+            size=100,
+            state="FUNCTION",
+            match=0.99,
+            tool_artifact="symbol display",
+        )
+        debt = make(
+            0x403000,
+            "N::Debt",
+            size=100,
+            state="FUNCTION",
+            match=1.0,
+            lint_warnings=1,
+        )
+        terminal = make(
+            0x404000, "N::Terminal", size=100, state="FUNCTION", effective=True
+        )
+        chosen = candidates.select(
+            [provisional, tool, debt, terminal],
+            namespace=None,
+            stubs_only=False,
+            leaves_only=False,
+            near_only=False,
+            max_size=None,
+            exclude_capped=True,
+            queue="refinement",
+        )
+        self.assertEqual(
+            {item.address for item in chosen}, {0x401000, 0x402000, 0x403000}
+        )
+
+    def test_refinement_ranks_weak_prerequisite_before_larger_opportunity(self):
+        goal = make(0x401000, "N::Goal", size=1200, state="STUB")
+        prerequisite = make(
+            0x402000, "N::Prerequisite", size=80, state="FUNCTION", match=0.6
+        )
+        other = make(
+            0x403000, "N::Other", size=400, state="FUNCTION", match=0.1
+        )
+        pool = [goal, prerequisite, other]
+        candidates.add_dependency_evidence(
+            pool, graph(callees={0x401000: {0x402000}})
+        )
+        chosen = candidates.select(
+            pool,
+            namespace=None,
+            stubs_only=False,
+            leaves_only=False,
+            near_only=False,
+            max_size=None,
+            exclude_capped=True,
+            queue="refinement",
+        )
+        self.assertEqual(chosen[0].address, 0x402000)
+
+    def test_refinement_uses_unresolved_byte_opportunity(self):
+        small = make(
+            0x401000, "N::Small", size=100, state="FUNCTION", match=0.1
+        )
+        large = make(
+            0x402000, "N::Large", size=500, state="FUNCTION", match=0.6
+        )
+        chosen = candidates.select(
+            [small, large],
+            namespace=None,
+            stubs_only=False,
+            leaves_only=False,
+            near_only=False,
+            max_size=None,
+            exclude_capped=True,
+            queue="refinement",
+        )
+        self.assertEqual(chosen[0].address, 0x402000)
 
 
 if __name__ == "__main__":

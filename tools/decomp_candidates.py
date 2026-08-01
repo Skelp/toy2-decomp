@@ -18,7 +18,7 @@ no Ghidra call and no reccmp run:
 
 New-work ranking starts with the retail dependency frontier. It favors a
 function that unlocks unfinished callers or contributes to large targets.
-The default queue contains source work. Provisional-score review is opt-in.
+The default queue contains coverage work. Refinement work is opt-in.
 """
 
 from __future__ import annotations
@@ -117,6 +117,29 @@ class Candidate:
     dependency_component: int = -1
     reasons: list[str] = field(default_factory=list)
     rank: float = 0.0
+
+    @property
+    def source_debt(self) -> bool:
+        return bool(self.lint_errors or self.lint_warnings)
+
+    @property
+    def binary_terminal(self) -> bool:
+        return self.match == 1.0 or self.effective
+
+    @property
+    def terminal(self) -> bool:
+        return (
+            self.state == "FUNCTION"
+            and self.binary_terminal
+            and not self.source_debt
+        )
+
+    @property
+    def unresolved_bytes(self) -> float:
+        if self.state != "FUNCTION" or self.match is None:
+            return float(self.size)
+        effective_match = 1.0 if self.binary_terminal else self.match
+        return self.size * max(0.0, 1.0 - effective_match)
 
     @property
     def address_text(self) -> str:
@@ -455,7 +478,7 @@ def _dependency_resolved(candidate: Candidate) -> bool:
 
 
 def _is_weak(candidate: Candidate) -> bool:
-    return False
+    return candidate.state == "FUNCTION" and not candidate.terminal
 
 
 def add_dependency_evidence(
@@ -490,11 +513,23 @@ def add_dependency_evidence(
         candidate.indirect_calls = graph.indirect_calls.get(candidate.address, 0)
         candidate.indirect_jumps = graph.indirect_jumps.get(candidate.address, 0)
 
-    quality_prerequisites: set[int] = set()
+    quality_prerequisites = {
+        dependency
+        for address in unfinished
+        for dependency in edges.get(address, ())
+        if _is_weak(by_address[dependency])
+    }
+    for address in quality_prerequisites:
+        by_address[address].quality_prerequisite = True
 
     work = unfinished | quality_prerequisites
     unfinished_edges = {
-        source: {target for target in targets if target in work}
+        source: {
+            target
+            for target in targets
+            if target in work
+            and not (source in unfinished and target in quality_prerequisites)
+        }
         for source, targets in edges.items()
         if source in work
     }
@@ -622,6 +657,11 @@ def score(candidate: Candidate) -> None:
     rank = 0.0
     reasons: list[str] = []
 
+    if candidate.size:
+        opportunity = candidate.unresolved_bytes
+        rank += min(opportunity / 16.0, 160.0)
+        reasons.append(f"{opportunity:.0f} unresolved retail byte(s)")
+
     if candidate.state == "STUB":
         if candidate.match == 1.0 or candidate.effective:
             # An empty stub body that already matches means retail is also
@@ -712,7 +752,8 @@ def score(candidate: Candidate) -> None:
 
     if candidate.dependency_component >= 0:
         if candidate.quality_prerequisite:
-            reasons.append("quality prerequisite for a large caller")
+            rank += 180.0
+            reasons.append("provisional prerequisite for unfinished caller")
         if candidate.dependency_ready:
             reasons.append("dependency frontier")
         elif candidate.manual_blocker:
@@ -752,9 +793,16 @@ def select(
     new_work_only: bool = False,
     include_deferred: bool = False,
     allow_large: bool = False,
+    queue: str | None = None,
 ) -> list[Candidate]:
     chosen: list[Candidate] = []
     for candidate in candidates:
+        if queue == "coverage" and candidate.state not in ("STUB", "NOT_STARTED"):
+            continue
+        if queue == "refinement" and (
+            candidate.state != "FUNCTION" or candidate.terminal
+        ):
+            continue
         if new_work_only:
             if candidate.state == "FUNCTION" and not candidate.quality_prerequisite:
                 continue
@@ -776,12 +824,13 @@ def select(
             continue
         if max_size is not None and candidate.size > max_size:
             continue
-        if exclude_capped and candidate.tool_artifact:
+        if exclude_capped and candidate.tool_artifact and queue != "refinement":
             continue
         if debt_only and not (candidate.lint_errors or candidate.lint_warnings):
             continue
         if (
-            not (stubs_only or leaves_only or near_only or debt_only)
+            queue is None
+            and not (stubs_only or leaves_only or near_only or debt_only)
             and candidate.state == "FUNCTION"
         ):
             # A fully matched function is finished work only when its source also
@@ -799,7 +848,17 @@ def select(
 
     for candidate in chosen:
         score(candidate)
-    if new_work_only:
+    if queue == "refinement":
+        chosen.sort(
+            key=lambda item: (
+                not item.quality_prerequisite,
+                -item.unresolved_bytes,
+                not item.source_debt,
+                -item.rank,
+                item.address,
+            )
+        )
+    elif new_work_only:
         chosen.sort(
             key=lambda item: (
                 not item.dependency_ready,
@@ -809,6 +868,7 @@ def select(
                 item.state != "STUB",
                 len(item.weak_dependencies),
                 item.indirect_calls + item.indirect_jumps,
+                -item.unresolved_bytes,
                 -item.rank,
                 item.size,
                 item.address,
@@ -884,6 +944,16 @@ def main() -> int:
     parser.add_argument("namespace", nargs="?", help="restrict to one map namespace, e.g. Nu3D")
     parser.add_argument("--stubs", action="store_true", help="only functions marked STUB in src/")
     parser.add_argument("--leaves", action="store_true", help="only small unannotated functions")
+    parser.add_argument(
+        "--coverage",
+        action="store_true",
+        help="only STUB and unstarted functions",
+    )
+    parser.add_argument(
+        "--refine",
+        action="store_true",
+        help="only provisional, tool-only, or source-debt functions",
+    )
     parser.add_argument(
         "--near",
         action="store_true",
@@ -971,6 +1041,8 @@ def main() -> int:
     parser.add_argument("--why", action="store_true", help="print the rank and its evidence")
     parser.add_argument("--json", action="store_true", help="emit JSON instead of a table")
     args = parser.parse_args()
+    if args.coverage and args.refine:
+        parser.error("--coverage and --refine cannot be combined")
     limit_explicit = args.limit is not None or args.all
     if args.all:
         args.limit = 0
@@ -1044,7 +1116,8 @@ def main() -> int:
     if args.target_address is not None and args.target_address not in names:
         parser.error(f"0x{args.target_address:08X} is not in functions_map.txt")
 
-    dependency_mode = not (args.near or args.debt or args.quality)
+    queue = "refinement" if args.refine else "coverage"
+    dependency_mode = not (args.near or args.debt or args.quality) or args.refine
     candidates = build_candidates()
     if dependency_mode:
         try:
@@ -1071,6 +1144,7 @@ def main() -> int:
         new_work_only=dependency_mode,
         include_deferred=include_blocked,
         allow_large=True,
+        queue=queue if not (args.near or args.debt or args.quality) else None,
     )
     if args.target_address is not None:
         frontier = dependency_frontier_for(args.target_address, candidates)
@@ -1121,6 +1195,8 @@ def main() -> int:
                     "indirect_calls": item.indirect_calls,
                     "indirect_jumps": item.indirect_jumps,
                     "rank": item.rank,
+                    "unresolved_bytes": item.unresolved_bytes,
+                    "terminal": item.terminal,
                     "reasons": item.reasons,
                 }
                 for item in (chosen[: args.limit] if args.limit else chosen)

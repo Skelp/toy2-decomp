@@ -11,7 +11,12 @@ init(autoreset=True)
 
 import build as build_script
 from tools.decomp_annotations import read_source_annotations
-from tools.decomp_status import read_match_statuses
+from tools.decomp_status import (
+    is_symbol_only_diff,
+    read_match_statuses,
+    read_tool_artifacts,
+)
+from tools.decomp_verify import read_source_debt
 
 # Templates
 #
@@ -133,6 +138,76 @@ def progress_breakdown(source_functions, implemented_addresses, match_statuses):
     return counts
 
 
+def read_mapped_sizes(
+    functions_map_path, sizes_path=Path("build/decomp-function-sizes.json")
+):
+    entries = sorted(
+        (int(address, 16), address) for address in parse_functions_map(functions_map_path)
+    )
+    sizes = {}
+    if sizes_path.exists():
+        try:
+            payload = json.loads(sizes_path.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError):
+            payload = []
+        rows = payload.get("data", []) if isinstance(payload, dict) else payload
+        for row in rows if isinstance(rows, list) else []:
+            try:
+                address = int(str(row.get("address", "")), 16)
+                size = int(row.get("original_size", row.get("size", 0)))
+            except (AttributeError, TypeError, ValueError):
+                continue
+            if size > 1:
+                sizes[address] = size
+    for index, (address, _) in enumerate(entries[:-1]):
+        sizes.setdefault(address, entries[index + 1][0] - address)
+    if entries:
+        sizes.setdefault(entries[-1][0], 0)
+    return sizes
+
+
+def convergence_metrics(
+    mapped_addresses,
+    implemented_addresses,
+    match_statuses,
+    sizes,
+    source_debt,
+    tool_artifacts,
+):
+    terminal_addresses = set()
+    effective_bytes = 0.0
+    coverage_gap_bytes = 0.0
+    refinement_gap_bytes = 0.0
+    for address_text in mapped_addresses:
+        address = int(address_text, 16)
+        size = sizes.get(address, 0)
+        if address_text not in implemented_addresses:
+            coverage_gap_bytes += size
+            continue
+        status = match_statuses.get(address)
+        if status is None:
+            refinement_gap_bytes += size
+            continue
+        effective = 1.0 if status.exact or status.effective else status.matching
+        effective_bytes += size * effective
+        tool_only = address in tool_artifacts and is_symbol_only_diff(status)
+        if (status.exact or status.effective) and address not in source_debt and not tool_only:
+            terminal_addresses.add(address)
+        refinement_gap_bytes += size * max(0.0, 1.0 - effective)
+    terminal_bytes = sum(sizes.get(address, 0) for address in terminal_addresses)
+    return {
+        "terminal": len(terminal_addresses),
+        "terminal_bytes": terminal_bytes,
+        "effective_bytes": effective_bytes,
+        "coverage_gap_bytes": coverage_gap_bytes,
+        "refinement_gap_bytes": refinement_gap_bytes,
+        "source_debt_functions": sum(
+            address in source_debt
+            for address in (int(item, 16) for item in mapped_addresses)
+        ),
+    }
+
+
 def count_progress(namespace_filter=None, verbose=False, json_output=False):
     functions_map_path = Path("tools/Resources/functions_map.txt")
     if not functions_map_path.exists():
@@ -210,6 +285,18 @@ def count_progress(namespace_filter=None, verbose=False, json_output=False):
     breakdown = progress_breakdown(source_functions, implemented_addresses, match_statuses)
     verified_count = breakdown["matched"] + breakdown["effective"] + breakdown["tool"]
     provisional_count = implemented_count - verified_count
+    sizes = read_mapped_sizes(functions_map_path)
+    source_debt = read_source_debt(Path("src"))
+    tool_artifacts = read_tool_artifacts(Path("tools/Resources/tool_artifacts.tsv"))
+    convergence = convergence_metrics(
+        ida_addresses,
+        implemented_addresses,
+        match_statuses,
+        sizes,
+        source_debt,
+        tool_artifacts,
+    )
+    mapped_bytes = sum(sizes.get(int(address, 16), 0) for address in ida_addresses)
 
     if json_output:
         json.dump({
@@ -220,6 +307,19 @@ def count_progress(namespace_filter=None, verbose=False, json_output=False):
             "implementation_percent": round(implemented_percentage, 1),
             "started_percent": round(started_percentage, 1),
             "verified": verified_count,
+            "terminal": convergence["terminal"],
+            "terminal_bytes": convergence["terminal_bytes"],
+            "terminal_byte_percent": round(
+                convergence["terminal_bytes"] / mapped_bytes * 100, 2
+            ) if mapped_bytes else 0.0,
+            "effective_bytes": convergence["effective_bytes"],
+            "effective_byte_percent": round(
+                convergence["effective_bytes"] / mapped_bytes * 100, 2
+            ) if mapped_bytes else 0.0,
+            "mapped_bytes": mapped_bytes,
+            "coverage_gap_bytes": convergence["coverage_gap_bytes"],
+            "refinement_gap_bytes": convergence["refinement_gap_bytes"],
+            "source_debt_functions": convergence["source_debt_functions"],
             "exact": breakdown["matched"],
             "effective": breakdown["effective"],
             "tool": breakdown["tool"],
@@ -246,6 +346,12 @@ def count_progress(namespace_filter=None, verbose=False, json_output=False):
     print(f"Implemented vs Overall:     {implemented_count}/{total_ida_functions}")
     print("-" * 60)
     print(f"Verified functions:         {verified_count}")
+    print(f"Terminal functions:         {convergence['terminal']}")
+    print(f"Terminal bytes:             {convergence['terminal_bytes']:.0f}/{mapped_bytes}")
+    print(f"Effective bytes:            {convergence['effective_bytes']:.1f}/{mapped_bytes}")
+    print(f"Coverage-gap bytes:         {convergence['coverage_gap_bytes']:.0f}")
+    print(f"Refinement-gap bytes:       {convergence['refinement_gap_bytes']:.1f}")
+    print(f"Source-debt functions:      {convergence['source_debt_functions']}")
     print(f"  Exact matches:            {breakdown['matched']}")
     print(f"  Effective matches:        {breakdown['effective']}")
     print(f"  Tool artifacts:           {breakdown['tool']}")

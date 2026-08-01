@@ -80,6 +80,8 @@ baseline() {
 
 validate() {
     local allow_target_regression=0
+    local meta_resolution=0
+    local mode=""
     local staged=0
     local targets=()
     while [[ $# -gt 0 ]]; do
@@ -91,6 +93,15 @@ validate() {
                 ;;
             --allow-target-regression)
                 allow_target_regression=1
+                shift
+                ;;
+            --mode)
+                [[ $# -ge 2 ]] || { echo "error: --mode needs coverage or refinement" >&2; return 2; }
+                mode="$2"
+                shift 2
+                ;;
+            --meta-resolution)
+                meta_resolution=1
                 shift
                 ;;
             --staged)
@@ -105,6 +116,14 @@ validate() {
     done
     if [[ ${#targets[@]} -eq 0 ]]; then
         echo "error: validate needs at least one --target address" >&2
+        return 2
+    fi
+    if [[ $meta_resolution -eq 0 && $mode != coverage && $mode != refinement ]]; then
+        echo "error: validate needs --mode coverage or --mode refinement" >&2
+        return 2
+    fi
+    if [[ $allow_target_regression -eq 1 && $meta_resolution -eq 0 ]]; then
+        echo "error: --allow-target-regression requires --meta-resolution" >&2
         return 2
     fi
     if [[ ! -f build/decomp-baseline-report.json ]]; then
@@ -123,6 +142,11 @@ validate() {
     )
     if [[ $allow_target_regression -eq 1 ]]; then
         verify_args+=(--allow-target-regression)
+    fi
+    if [[ $meta_resolution -eq 1 ]]; then
+        verify_args+=(--meta-resolution)
+    else
+        verify_args+=(--mode "$mode")
     fi
     python tools/decomp_verify.py "${verify_args[@]}"
     if [[ $staged -eq 1 ]]; then
@@ -231,7 +255,7 @@ Commands:
   blockers [addr]   Show committed blockers
   evidence <addr>   Collect bounded evidence for one target in a single call
   baseline          Save a fresh parent-state comparison before source edits
-  validate [args]   Build and reject verification or score regressions
+  validate [args]   Enforce coverage or refinement success and regressions
   experiment [...] Record labeled source-form comparison trials
   lint [files]      Check reconstructed source for decompiler residue
   names             Re-extract .notes/original-names.md from the retail binary
@@ -246,6 +270,8 @@ Commands:
 `candidates` reads the retail binary, committed files, and build reports. It
 does not call Ghidra or reccmp. `evidence` makes bounded Ghidra queries:
   tools/decomp candidates --why
+  tools/decomp candidates --coverage --why
+  tools/decomp candidates --refine --why
   tools/decomp candidates --diagnose
   tools/decomp candidates --for 0x00401230 --why
   tools/decomp candidates --stubs --limit 10

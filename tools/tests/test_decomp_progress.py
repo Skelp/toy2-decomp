@@ -79,6 +79,40 @@ class ProgressBreakdownTests(unittest.TestCase):
             self.assertEqual(payload["unfinished"], 1)
             self.assertEqual(payload["not_started"], 1)
 
+    def test_terminal_and_effective_byte_metrics_exclude_tool_and_debt(self):
+        statuses = {
+            0x401000: MatchStatus(1.0),
+            0x402000: MatchStatus(0.8, effective=True),
+            0x403000: MatchStatus(
+                0.9,
+                diff=[[0, [{
+                    "orig": [[0, "mov eax, (OFFSET) g_first"]],
+                    "recomp": [[0, "mov eax, (DATA) g_second"]],
+                }]]],
+            ),
+            0x404000: MatchStatus(1.0),
+        }
+        metrics = decomp_utils.convergence_metrics(
+            {"00401000", "00402000", "00403000", "00404000", "00405000"},
+            {"00401000", "00402000", "00403000", "00404000"},
+            statuses,
+            {
+                0x401000: 10,
+                0x402000: 20,
+                0x403000: 30,
+                0x404000: 40,
+                0x405000: 50,
+            },
+            {0x404000: ["raw-layout-access"]},
+            {0x403000: "symbol display"},
+        )
+        self.assertEqual(metrics["terminal"], 2)
+        self.assertEqual(metrics["terminal_bytes"], 30)
+        self.assertEqual(metrics["effective_bytes"], 97)
+        self.assertEqual(metrics["coverage_gap_bytes"], 50)
+        self.assertAlmostEqual(metrics["refinement_gap_bytes"], 3)
+        self.assertEqual(metrics["source_debt_functions"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
