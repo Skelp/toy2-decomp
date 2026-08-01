@@ -78,6 +78,7 @@
 0x004ABF00	-	local-before-if, branch-local, condition-assignment, and direct-global forms leave only lazy ESI-save scheduling plus an operator-delete label mismatch
 0x004B3A20	-	The complete allocation, zeroing, list insertion, default type, and ID behavior is established. Natural post-increment and assignment-order forms remain at 78.87%; the residual diff is register allocation around independent 16-bit loads and stores.
 0x004B89B0	-	The typed allocation flow is complete at 89.47%. Early failure handling regresses, and only callee-saved register scheduling remains.
+0x004B9D70	-	The loop reuses one stack slot as integer input and floating-point output across its back edge. The supported source type and intended recurrence are not known.	semantic	uncertain	-	f64dd98cf9d1aae3
 0x004BA1F0	-	The complete typed frustum test scores 60.18%; the remaining result, center, and plane-index register homes match CAP-03.
 0x004BCB60	-	the two warning globals are write-only zeroed state with no readers, strings, or cross-function role evidence
 0x004BE0B0	-	Retail is a 7890-byte four-edge polygon clipper; the two scratch-buffer layouts and original pass structure are not corroborated, so a generic clipper would not establish code fidelity

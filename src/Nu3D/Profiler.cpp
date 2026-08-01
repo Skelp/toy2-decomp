@@ -14,4 +14,7 @@ namespace Nu3D
 		vertex->specular.value = color;
 		vertex->diffuse.value = color;
 	}
+
+	// STUB: TOY2 0x004B9D70
+	void DrawTimingGraph();
 }
