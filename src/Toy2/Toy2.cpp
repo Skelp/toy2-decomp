@@ -22,6 +22,7 @@
 #include "Toy2/Levels.h"
 #include "Toy2/MainMenu.h"
 #include "Toy2/Actor.h"
+#include "Toy2/Animation.h"
 #include "Toy2/Camera.h"
 #include "Toy2/Collision.h"
 #include "Toy2/Collectables.h"
@@ -80,6 +81,12 @@ namespace Nu3D
 {
 	namespace Camera
 	{
+		extern Vector3I g_sectorViewPosition;
+		extern int32_t g_zoneViewportLeftOffset;
+		extern int32_t g_zoneViewportTopOffset;
+		extern int32_t g_zoneViewportRightOffset;
+		extern int32_t g_zoneViewportBottomOffset;
+
 		struct SoftwareProjectionPoint
 		{
 			int16_t x;
@@ -106,6 +113,18 @@ namespace Nu3D
 
 namespace Toy2
 {
+	extern int32_t g_zoneCount;
+
+	namespace Level
+	{
+		int32_t GetSectorAtPosition(const Vector3I* position);
+	}
+
+	namespace Levels
+	{
+		extern int32_t g_hasZoneData;
+	}
+
 	extern int32_t g_forcedFacingActive;
 	extern int32_t g_forcedFacingAngle;
 	extern uint32_t g_actionStateFlags;
@@ -3689,6 +3708,234 @@ namespace Toy2
 			g_buzzActor.posAngles.pos.x = previousX;
 			g_buzzActor.posAngles.pos.y = previousY;
 			g_buzzActor.posAngles.pos.z = previousZ;
+		}
+	}
+
+	namespace Sector
+	{
+		struct SectorZoneRenderData
+		{
+			uint8_t visibilityDepth;
+			uint8_t isProcessed;
+			uint8_t portalRecordIndex;
+			uint8_t hasViewTransform;
+			int16_t minX;
+			int16_t minY;
+			int16_t maxX;
+			int16_t maxY;
+			int16_t viewAngleX;
+			int16_t viewAngleY;
+			int16_t primaryInstanceBytes;
+			int16_t secondaryInstanceBytes;
+			Matrix3x3I16 viewTransform;
+			uint8_t reserved26[14];
+		};
+
+		struct ViewFrustumScratch
+		{
+			Vector3I leftEdge;
+			int32_t reservedLeft;
+			Vector3I rightEdge;
+			int32_t reservedRight;
+			Vector3I normalizedLeft;
+			int32_t reservedNormalizedLeft;
+			union
+			{
+				Vector3I normalizedRight;
+				Vector3I16 viewAngles;
+			};
+		};
+
+		static __forceinline int32_t ShiftFixedTowardZero(int32_t value, int32_t bits)
+		{
+			return (value + ((value >> 31) & ((1 << bits) - 1))) >> bits;
+		}
+
+		STATIC_ASSERT(sizeof(SectorZoneRenderData) == sizeof(ZoneRenderData));
+		STATIC_ASSERT(offsetof(SectorZoneRenderData, viewAngleX) == 0xC);
+		STATIC_ASSERT(offsetof(SectorZoneRenderData, viewTransform) == 0x14);
+
+		// FUNCTION: TOY2 0x004402B0 [PROVISIONAL]
+		void UpdateLighting()
+		{
+			SectorZoneRenderData* zoneData = reinterpret_cast<SectorZoneRenderData*>(g_zoneRenderData);
+			g_buzzActor.posAngles.pos.y -= 0x2000;
+			if (g_currentSectorIndex == -1 || g_levelFileIndex == 2)
+				g_currentSectorIndex = Level::GetSectorAtPosition(&g_buzzActor.posAngles.pos);
+			else
+				Portal::UpdateActiveSector();
+
+			Portal::g_previousSectorPosition = g_buzzActor.posAngles.pos;
+			g_buzzActor.posAngles.pos.y += 0x2000;
+
+			Vector3I cameraPosition = {
+				Nu3D::Camera::g_fixedViewPosition.x,
+				Nu3D::Camera::g_fixedViewPosition.y,
+				Nu3D::Camera::g_fixedViewPosition.z,
+			};
+			int32_t cameraSector = Level::GetSectorAtPosition(&cameraPosition);
+			int32_t selectedSector = cameraSector;
+			if (g_currentSectorIndex == cameraSector || Camera::g_cutsceneTransitionTimer != 0)
+			{
+				g_activeSectorIndex = selectedSector;
+			}
+			else
+			{
+				selectedSector = g_currentSectorIndex;
+				if (cameraSector >= 0 && g_currentSectorIndex >= 0)
+				{
+					Levels::PortalEntry* entry = Levels::g_portalZones[g_currentSectorIndex].entries;
+					if (entry->recordIdx != 0xFF)
+					{
+						bool sectorNotFound = true;
+						do
+						{
+							if (entry->categoryIdx == cameraSector)
+							{
+								g_activeSectorIndex = cameraSector;
+								sectorNotFound = false;
+							}
+							entry++;
+						} while (entry->recordIdx != 0xFF);
+						if (!sectorNotFound)
+							selectedSector = cameraSector;
+					}
+				}
+				g_activeSectorIndex = selectedSector;
+			}
+
+			if (g_activeSectorIndex == 0xFF)
+				g_activeSectorIndex = 1;
+
+			if (g_levelFileIndex == 2)
+			{
+				if (g_activeSectorIndex == 3)
+				{
+					if (Nu3D::Camera::g_fixedViewPosition.y < -0x19640)
+						goto show_all_zones;
+				}
+				else if (Nu3D::Camera::g_fixedViewPosition.y < -74000)
+				{
+				show_all_zones:
+					if (g_zoneCount > 0)
+					{
+						Portal::g_backdropClipCount = 0;
+						for (int32_t i = 0; i < g_zoneCount; i++)
+						{
+							zoneData[g_activeSectorIndex].visibilityDepth = 0xFF;
+							zoneData[i].visibilityDepth = 0xFF;
+							zoneData[g_activeSectorIndex].minX = 0;
+							zoneData[i].minX = 0;
+							zoneData[g_activeSectorIndex].minY = 0;
+							zoneData[i].minY = 0;
+							zoneData[g_activeSectorIndex].maxX = 0x200;
+							zoneData[i].maxX = 0x200;
+							zoneData[g_activeSectorIndex].maxY = 0x100;
+							zoneData[i].maxY = 0x100;
+						}
+					}
+					goto calculate_zone_views;
+				}
+			}
+
+			{
+				for (int32_t i = 0; i < g_zoneCount; i++)
+				{
+					zoneData[i].visibilityDepth = 0;
+					zoneData[i].isProcessed = 0;
+				}
+
+				SectorZoneRenderData& activeZone = zoneData[g_activeSectorIndex];
+				activeZone.visibilityDepth = 0xFF;
+				zoneData[0].visibilityDepth = 0xFF;
+				activeZone.minX = zoneData[0].minX = 0;
+				activeZone.minY = zoneData[0].minY = 0;
+				activeZone.maxX = zoneData[0].maxX = 0x200;
+				activeZone.maxY = zoneData[0].maxY = 0x100;
+				Portal::g_backdropClipCount = 0;
+
+				Nu3D::Camera::FixedViewTransform& view = Nu3D::Camera::g_fixedViewTransform;
+				const Vector3I& position = Nu3D::Camera::g_sectorViewPosition;
+				view.position.x = -ShiftFixedTowardZero(view.rotation.m00 * position.x + view.rotation.m01 * position.y + view.rotation.m02 * position.z, 14);
+				view.position.y = -ShiftFixedTowardZero(view.rotation.m10 * position.x + view.rotation.m11 * position.y + view.rotation.m12 * position.z, 14);
+				view.position.z = -ShiftFixedTowardZero(view.rotation.m20 * position.x + view.rotation.m21 * position.y + view.rotation.m22 * position.z, 14);
+				Nu3D::Camera::SetObjectViewPosition(&view);
+				Nu3D::Camera::SetObjectViewMatrix(&view);
+				Portal::FloodVisibility(&Levels::g_portalZones[g_activeSectorIndex], 0, 0x200, 0, 0x100, 0xFE);
+			}
+
+		calculate_zone_views:
+			Nu3D::Math::SetRotationXYZ(&g_viewRotation, &Animation::g_nextKeyframeRotation.matrix);
+			ViewFrustumScratch* scratch = reinterpret_cast<ViewFrustumScratch*>(&Collision::g_mathScratch[42].value.z);
+			for (int32_t i = 0; i < g_zoneCount; i++)
+			{
+				SectorZoneRenderData& zone = zoneData[i];
+				if (zone.visibilityDepth == 0)
+					continue;
+
+				if (zone.minX < 3 && zone.maxX > 0x1FD && zone.minY < 3 && zone.maxY > 0xFD)
+				{
+					zone.hasViewTransform = 0;
+					continue;
+				}
+
+				scratch->leftEdge.x = (zone.minX - 0x100) * 0x140 / 0x200;
+				scratch->leftEdge.y = zone.minY - 0x80;
+				scratch->leftEdge.z = 0xA0;
+				scratch->rightEdge.x = (zone.maxX - 0x100) * 0x140 / 0x200;
+				scratch->rightEdge.y = zone.maxY - 0x80;
+				scratch->rightEdge.z = 0xA0;
+				Nu3D::Math::NormalizeToFixedPoint(&scratch->leftEdge, &scratch->normalizedLeft);
+				Nu3D::Math::NormalizeToFixedPoint(&scratch->rightEdge, &scratch->normalizedRight);
+				scratch->normalizedLeft.x += scratch->normalizedRight.x;
+				scratch->normalizedLeft.y += scratch->normalizedRight.y;
+				scratch->normalizedLeft.z += scratch->normalizedRight.z;
+
+				const Matrix3x3I16& rotation = Animation::g_nextKeyframeRotation.matrix;
+				Portal::g_portalIntersectionPoint.x = ShiftFixedTowardZero(rotation.m00 * scratch->normalizedLeft.x
+					+ rotation.m10 * scratch->normalizedLeft.y + rotation.m20 * scratch->normalizedLeft.z, 12);
+				Portal::g_portalIntersectionPoint.y = ShiftFixedTowardZero(rotation.m01 * scratch->normalizedLeft.x
+					+ rotation.m11 * scratch->normalizedLeft.y + rotation.m21 * scratch->normalizedLeft.z, 12);
+				Portal::g_portalIntersectionPoint.z = ShiftFixedTowardZero(rotation.m02 * scratch->normalizedLeft.x
+					+ rotation.m12 * scratch->normalizedLeft.y + rotation.m22 * scratch->normalizedLeft.z, 12);
+
+				Vector3I& direction = Portal::g_portalIntersectionPoint;
+				int16_t yaw = (int16_t)-Nu3D::Math::CartesianToFixedAngle(direction.x, direction.z);
+				int32_t sine = Numerics::g_sinCosLUT[yaw & 0xFFF];
+				int32_t cosine = Numerics::g_sinCosLUT[(yaw + 0x400) & 0xFFF];
+				int32_t x = direction.x;
+				direction.x = (direction.z * sine + x * cosine) >> 14;
+				direction.z = (direction.z * cosine - x * sine) >> 14;
+
+				Vector3I16& viewAngles = scratch->viewAngles;
+				viewAngles.x = (int16_t)Nu3D::Math::CartesianToFixedAngle(direction.y, direction.z);
+				viewAngles.y = yaw;
+				viewAngles.z = 0;
+
+				int32_t leftYaw = Nu3D::Math::CartesianToFixedAngle(scratch->rightEdge.x, 0xA0)
+					- Nu3D::Math::CartesianToFixedAngle(scratch->leftEdge.x, 0xA0);
+				zone.viewAngleX = (int16_t)(Numerics::g_sinCosLUT[leftYaw & 0xFFF] * 3 >> 2);
+				int32_t topPitch = Nu3D::Math::CartesianToFixedAngle(scratch->rightEdge.y, 0xA0)
+					- Nu3D::Math::CartesianToFixedAngle(scratch->leftEdge.y, 0xA0);
+				zone.viewAngleY = (int16_t)(Numerics::g_sinCosLUT[topPitch & 0xFFF] * 3 >> 2);
+				zone.viewAngleX += (int16_t)Nu3D::Math::CartesianToFixedAngle(scratch->rightEdge.x, 0xA0)
+					- (int16_t)Nu3D::Math::CartesianToFixedAngle(scratch->leftEdge.x, 0xA0);
+				zone.viewAngleY += (int16_t)Nu3D::Math::CartesianToFixedAngle(scratch->rightEdge.y, 0xA0)
+					- (int16_t)Nu3D::Math::CartesianToFixedAngle(scratch->leftEdge.y, 0xA0);
+				zone.viewAngleX = (int16_t)(zone.viewAngleX * 0xA0 / 0xA0);
+				zone.viewAngleY = (int16_t)(zone.viewAngleY * 0x80 / 0xA0);
+				zone.hasViewTransform = 1;
+				Nu3D::Math::SetRotationXYZ(&viewAngles, &zone.viewTransform);
+			}
+
+			if (Levels::g_hasZoneData != 0)
+			{
+				SectorZoneRenderData& activeZone = zoneData[g_activeSectorIndex];
+				activeZone.minX = (int16_t)Nu3D::Camera::g_zoneViewportLeftOffset;
+				activeZone.minY = (int16_t)Nu3D::Camera::g_zoneViewportTopOffset;
+				activeZone.maxX = (int16_t)(Nu3D::Camera::g_zoneViewportRightOffset + 0x200);
+				activeZone.maxY = (int16_t)(Nu3D::Camera::g_zoneViewportBottomOffset + 0x100);
+			}
 		}
 	}
 
