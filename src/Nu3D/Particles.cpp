@@ -35,10 +35,10 @@ namespace Nu3D
 		void Update()
 		{
 			ParticleInstance* particle = g_particleInstances;
+			int32_t colourMode = 0;
 			int32_t particleIndex = 0;
 			do
 			{
-				int32_t colourMode = 0;
 				if (particle->lifetime > 0)
 				{
 					particle->lifetime -= (int16_t)Renderer::g_frameDelta;
@@ -868,6 +868,7 @@ namespace Nu3D
 							break;
 					}
 
+					colourMode = 0;
 					if (particle->lifetime == 0)
 					{
 						particle->lifetime = -1;
@@ -877,16 +878,19 @@ namespace Nu3D
 				particleIndex++;
 			} while (particleIndex < 64);
 
-			for (int32_t cleanupIndex = 0; cleanupIndex < 64; cleanupIndex++)
+			particle = g_particleInstances;
+			int32_t cleanupCount = 64;
+			do
 			{
-				ParticleInstance* particle = &g_particleInstances[cleanupIndex];
 				if (particle->lifetime == -1)
 				{
 					particle->lifetime = 0;
 					particle->spriteSheet = 0;
 					DeathEffect(particle);
 				}
-			}
+				particle++;
+				cleanupCount--;
+			} while (cleanupCount != 0);
 		}
 
 		// GLOBAL: TOY2 0x004EC948
