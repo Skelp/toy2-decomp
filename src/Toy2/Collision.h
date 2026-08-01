@@ -160,6 +160,7 @@ namespace Nu3D
 {
 	namespace Collision
 	{
+		int32_t SweepAgainstCandidates(const Vector4I* movement, Vector4I* position, int32_t radius);
 		int16_t IsPointInTriangle(int32_t pointX,
 			int32_t pointY,
 			int32_t pointZ,
