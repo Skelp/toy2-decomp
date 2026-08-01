@@ -37,6 +37,7 @@ from tools.decomp_candidates import (  # noqa: E402
     parse_map,
     read_caps,
     read_match_percentages,
+    read_original_sizes,
 )
 from tools.decomp_dependencies import (  # noqa: E402
     DependencyUnavailable,
@@ -167,6 +168,7 @@ def main() -> int:
     functions, annotated_globals = annotation_index()
     global_names = global_symbol_names()
     matches = read_match_percentages()
+    original_sizes = read_original_sizes()
     caps = read_caps()
 
     unmapped = address not in names
@@ -204,7 +206,10 @@ def main() -> int:
         print(f"Ghidra body size {following - address} bytes")
         print("name status      local hint only; verify a durable name before map insertion")
     else:
-        print(f"approximate size {following - address} bytes (gap to the next map address)")
+        if address in original_sizes:
+            print(f"retail body size  {original_sizes[address]} bytes")
+        else:
+            print(f"approximate size  {following - address} bytes (map-gap fallback)")
     print(f"current match    {'-' if match is None else f'{match * 100:.2f}%'}")
     if caps.get(address):
         print(f"known cap        {caps[address]}  (see .notes/codegen-caps.md)")
@@ -224,10 +229,16 @@ def main() -> int:
                 print("implemented source. Dependency readiness applies to unfinished targets")
             else:
                 print("ready" if dependency_target.dependency_ready else "blocked")
+            print(f"  semantic   {dependency_target.semantic_state}")
+            if dependency_target.blocker_kind:
+                print(f"  blocker    {dependency_target.blocker_kind}")
             for dependency in dependency_target.unresolved_dependencies:
                 print(f"  unresolved  0x{dependency:08X}  {names.get(dependency, '(not in map)')}")
             for dependency in dependency_target.weak_dependencies:
-                print(f"  weak        0x{dependency:08X}  {names.get(dependency, '(not in map)')}")
+                print(
+                    f"  uncertain   0x{dependency:08X}  "
+                    f"{names.get(dependency, '(not in map)')}"
+                )
             if dependency_target.manual_blocker:
                 print(f"  manual      {dependency_target.deferred_reason}")
             print(

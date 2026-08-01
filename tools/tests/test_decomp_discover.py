@@ -10,6 +10,7 @@ from tools.decomp_discover import (
     discover,
     import_thunk_addresses,
     parse_ghidra_functions,
+    scan_data_references,
     scan_transfers,
 )
 
@@ -92,6 +93,28 @@ class TransferTests(unittest.TestCase):
         ):
             self.assertEqual(import_thunk_addresses(functions), frozenset({0x401000}))
 
+    def test_finds_aligned_function_pointers_in_data(self):
+        functions = [GhidraFunction(0x401000, 8, "callback")]
+        section = decomp_discover.decomp_binary.Section(
+            ".data", 0x500000, 8, 0, 8
+        )
+        with (
+            patch.object(
+                decomp_discover.decomp_binary,
+                "sections",
+                return_value=(section,),
+            ),
+            patch.object(
+                decomp_discover.decomp_binary,
+                "read_bytes",
+                return_value=b"\x00\x10\x40\x00\x78\x56\x34\x12",
+            ),
+        ):
+            self.assertEqual(
+                scan_data_references(functions),
+                {0x401000: frozenset({0x500000})},
+            )
+
 
 class DiscoveryTests(unittest.TestCase):
     def setUp(self):
@@ -122,6 +145,16 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(
             [item.address for item in results], [0x402000, 0x403000, 0x403800]
         )
+
+    def test_outbound_project_call_promotes_an_unmapped_caller(self):
+        transfers = dict(self.transfers)
+        transfers[0x403800] = TransferEvidence(
+            frozenset(), frozenset(), frozenset({0x401000})
+        )
+        results = discover(self.entries, self.functions, transfers)
+        promoted = next(item for item in results if item.address == 0x403800)
+        self.assertEqual(promoted.confidence, "medium")
+        self.assertEqual(promoted.called_project_targets, (0x401000,))
 
 
 if __name__ == "__main__":

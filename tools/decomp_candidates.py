@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import sys
 from collections import defaultdict, deque
@@ -38,6 +39,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MAP_PATH = ROOT / "tools" / "Resources" / "functions_map.txt"
 SOURCE_ROOT = ROOT / "src"
 REPORT_JSON = ROOT / "build" / "decomp-report-data.json"
+FUNCTION_SIZES_JSON = ROOT / "build" / "decomp-function-sizes.json"
 CAPS_REGISTRY = ROOT / ".notes" / "caps-registry.tsv"
 TOOL_ARTIFACTS = ROOT / "tools" / "Resources" / "tool_artifacts.tsv"
 AUDIT_FREEZE = ROOT / "tools" / "Resources" / "audit-freeze.txt"
@@ -64,12 +66,27 @@ LEAF_MAX_SIZE = 200
 CLUSTER_MAX_SIZE = 600
 LARGE_GOAL_MIN_SIZE = 1000
 WEAK_MATCH_THRESHOLD = 0.75
+BLOCKER_KINDS = (
+    "semantic",
+    "layout",
+    "abi",
+    "indirect-dispatch",
+    "ownership",
+    "source-form",
+    "compiler-codegen",
+    "tooling",
+)
+SEMANTIC_STATES = ("unknown", "uncertain", "ready")
 
 
 @dataclass(frozen=True)
 class Deferral:
     blocked_by: tuple[int, ...] = ()
     reason: str = ""
+    kind: str = "semantic"
+    semantic_state: str = "unknown"
+    evidence_providers: tuple[int, ...] = ()
+    fingerprint: str = ""
 
     @property
     def manual(self) -> bool:
@@ -81,6 +98,8 @@ class Candidate:
     address: int
     name: str
     size: int
+    map_size: int = 0
+    size_source: str = "map-gap"
     state: str = "NOT_STARTED"
     source: str = ""
     match: float | None = None
@@ -97,6 +116,12 @@ class Candidate:
     deferred_reason: str = ""
     declared_dependencies: tuple[int, ...] = ()
     manual_blocker: bool = False
+    blocker_kind: str = ""
+    semantic_state: str = "unknown"
+    evidence_providers: tuple[int, ...] = ()
+    blocker_fingerprint: str = ""
+    current_fingerprint: str = ""
+    blocker_evidence_changed: bool = False
     direct_dependencies: tuple[int, ...] = ()
     unresolved_dependencies: tuple[int, ...] = ()
     weak_dependencies: tuple[int, ...] = ()
@@ -108,6 +133,8 @@ class Candidate:
     indirect_jumps: int = 0
     dependency_ready: bool = False
     dependency_component: int = -1
+    research_targets: tuple[int, ...] = ()
+    research_roles: tuple[str, ...] = ()
     reasons: list[str] = field(default_factory=list)
     rank: float = 0.0
 
@@ -154,6 +181,30 @@ def read_match_percentages(path: Path = REPORT_JSON) -> dict[int, float]:
         address: status.matching
         for address, status in read_match_statuses(path).items()
     }
+
+
+def read_original_sizes(path: Path = FUNCTION_SIZES_JSON) -> dict[int, int]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    sizes: dict[int, int] = {}
+    rows = payload.get("data", []) if isinstance(payload, dict) else payload
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict):
+            continue
+        try:
+            address = int(str(row.get("address", "")), 16)
+            size = int(row.get("original_size", row.get("size", 0)))
+        except (TypeError, ValueError):
+            continue
+        # Source-created placeholder functions can have a one-byte Ghidra body.
+        # The map gap is a safer estimate until analysis recovers the extent.
+        if size > 1:
+            sizes[address] = size
+    return sizes
 
 
 def read_caps(path: Path = CAPS_REGISTRY) -> dict[int, str]:
@@ -214,6 +265,28 @@ def read_deferrals(path: Path = DEFERRALS) -> dict[int, Deferral]:
             records[address] = Deferral(
                 blocked_by=tuple(sorted(set(blocked_by))),
                 reason=row[2].strip() if len(row) > 2 else "",
+                kind=row[3].strip() if len(row) > 3 and row[3].strip() else "semantic",
+                semantic_state=(
+                    row[4].strip()
+                    if len(row) > 4 and row[4].strip() in SEMANTIC_STATES
+                    else "unknown"
+                ),
+                evidence_providers=tuple(
+                    sorted(
+                        {
+                            int(value.strip(), 16)
+                            for value in row[5].split(",")
+                            if value.strip() and value.strip() != "-"
+                        }
+                    )
+                )
+                if len(row) > 5
+                else (),
+                fingerprint=(
+                    row[6].strip()
+                    if len(row) > 6 and row[6].strip() != "-"
+                    else ""
+                ),
             )
     return records
 
@@ -223,6 +296,11 @@ def write_deferral(
     reason: str,
     blocked_by: tuple[int, ...] | Path = (),
     path: Path = DEFERRALS,
+    *,
+    kind: str = "semantic",
+    semantic_state: str = "unknown",
+    evidence_providers: tuple[int, ...] = (),
+    fingerprint: str = "",
 ) -> None:
     if isinstance(blocked_by, Path):
         path = blocked_by
@@ -231,16 +309,43 @@ def write_deferral(
     records[address] = Deferral(
         blocked_by=tuple(sorted(set(blocked_by))),
         reason=reason.strip(),
+        kind=kind,
+        semantic_state=semantic_state,
+        evidence_providers=tuple(sorted(set(evidence_providers))),
+        fingerprint=fingerprint.strip(),
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-        writer.writerow(("# address", "blocked-by", "reason"))
+        writer.writerow(
+            (
+                "# address",
+                "blocked-by",
+                "reason",
+                "kind",
+                "semantic-state",
+                "evidence-providers",
+                "fingerprint",
+            )
+        )
         for item_address, deferral in sorted(records.items()):
             dependencies = ",".join(
                 f"0x{dependency:08X}" for dependency in deferral.blocked_by
             ) or "-"
-            writer.writerow((f"0x{item_address:08X}", dependencies, deferral.reason))
+            providers = ",".join(
+                f"0x{provider:08X}" for provider in deferral.evidence_providers
+            ) or "-"
+            writer.writerow(
+                (
+                    f"0x{item_address:08X}",
+                    dependencies,
+                    deferral.reason,
+                    deferral.kind,
+                    deferral.semantic_state,
+                    providers,
+                    deferral.fingerprint or "-",
+                )
+            )
 
 
 def clear_deferral(address: int, path: Path = DEFERRALS) -> bool:
@@ -251,12 +356,35 @@ def clear_deferral(address: int, path: Path = DEFERRALS) -> bool:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-        writer.writerow(("# address", "blocked-by", "reason"))
+        writer.writerow(
+            (
+                "# address",
+                "blocked-by",
+                "reason",
+                "kind",
+                "semantic-state",
+                "evidence-providers",
+                "fingerprint",
+            )
+        )
         for item_address, deferral in sorted(records.items()):
             dependencies = ",".join(
                 f"0x{dependency:08X}" for dependency in deferral.blocked_by
             ) or "-"
-            writer.writerow((f"0x{item_address:08X}", dependencies, deferral.reason))
+            providers = ",".join(
+                f"0x{provider:08X}" for provider in deferral.evidence_providers
+            ) or "-"
+            writer.writerow(
+                (
+                    f"0x{item_address:08X}",
+                    dependencies,
+                    deferral.reason,
+                    deferral.kind,
+                    deferral.semantic_state,
+                    providers,
+                    deferral.fingerprint or "-",
+                )
+            )
     return True
 
 
@@ -277,12 +405,13 @@ def print_blockers(
     print("TARGET      STATE     BLOCKED BY                         REASON")
     print("-" * 98)
     for target, blocker in selected:
-        if blocker.manual:
+        if blocker.semantic_state == "ready":
+            state = "deferred"
+        elif blocker.manual:
             state = "manual"
         elif all(
             item in candidates
-            and _is_resolved(candidates[item])
-            and not _is_weak(candidates[item])
+            and _dependency_resolved(candidates[item])
             for item in blocker.blocked_by
         ):
             state = "resolved"
@@ -292,7 +421,11 @@ def print_blockers(
             f"0x{item:08X} {names.get(item, '(not in map)')}"
             for item in blocker.blocked_by
         ) or "manual"
-        print(f"0x{target:08X}  {state:<9} {dependencies:<34} {blocker.reason}")
+        metadata = f"{blocker.kind}/{blocker.semantic_state}"
+        print(
+            f"0x{target:08X}  {state:<9} {dependencies:<34} "
+            f"[{metadata}] {blocker.reason}"
+        )
 
 
 def namespace_of(name: str) -> str:
@@ -343,6 +476,7 @@ def build_candidates() -> list[Candidate]:
     lint_findings = read_lint_findings()
     audit_ledger = read_audit_ledger()
     deferrals = read_deferrals()
+    original_sizes = read_original_sizes()
 
     reconstructed_per_namespace: dict[str, int] = {}
     for address, name in entries:
@@ -353,6 +487,7 @@ def build_candidates() -> list[Candidate]:
     candidates: list[Candidate] = []
     for index, (address, name) in enumerate(entries):
         following = entries[index + 1][0] if index + 1 < len(entries) else address
+        map_size = max(following - address, 0)
         state, source = states.get(address, ("NOT_STARTED", ""))
         namespace = namespace_of(name)
         nearby_scores: list[float] = []
@@ -373,11 +508,27 @@ def build_candidates() -> list[Candidate]:
             ):
                 nearby_scores.append(nearby_status.matching)
         deferral = deferrals.get(address, Deferral())
+        match_status = matches.get(address)
+        if deferral.semantic_state != "unknown":
+            semantic_state = deferral.semantic_state
+        elif not deferral.reason and state == "FUNCTION" and match_status is not None and (
+            match_status.matching >= WEAK_MATCH_THRESHOLD
+            or match_status.effective
+            or address in tool_artifacts
+        ):
+            semantic_state = "ready"
+        else:
+            semantic_state = "unknown"
+        size = original_sizes.get(address, map_size)
         candidates.append(
             Candidate(
                 address=address,
                 name=name,
-                size=max(following - address, 0),
+                size=size,
+                map_size=map_size,
+                size_source=(
+                    "ghidra-snapshot" if address in original_sizes else "map-gap"
+                ),
                 state=state,
                 source=source,
                 match=matches[address].matching if address in matches else None,
@@ -398,6 +549,10 @@ def build_candidates() -> list[Candidate]:
                 deferred_reason=deferral.reason,
                 declared_dependencies=deferral.blocked_by,
                 manual_blocker=bool(deferral.reason and deferral.manual),
+                blocker_kind=deferral.kind if deferral.reason else "",
+                semantic_state=semantic_state,
+                evidence_providers=deferral.evidence_providers,
+                blocker_fingerprint=deferral.fingerprint,
             )
         )
     return candidates
@@ -407,12 +562,62 @@ def _is_resolved(candidate: Candidate) -> bool:
     return candidate.state == "FUNCTION"
 
 
+def _dependency_resolved(candidate: Candidate) -> bool:
+    if candidate.semantic_state == "ready":
+        return True
+    if candidate.semantic_state == "uncertain":
+        return False
+    return _is_resolved(candidate) and not _is_weak(candidate)
+
+
 def _is_weak(candidate: Candidate) -> bool:
     if not _is_resolved(candidate):
         return False
+    if candidate.semantic_state == "ready":
+        return False
+    if candidate.semantic_state == "uncertain":
+        return True
     if candidate.match == 1.0 or candidate.effective or candidate.tool_artifact:
         return False
     return candidate.match is None or candidate.match < WEAK_MATCH_THRESHOLD
+
+
+def evidence_fingerprint(
+    address: int,
+    candidates: dict[int, Candidate],
+    graph: DependencyGraph,
+) -> str:
+    """Hash the evidence that can change a committed blocker."""
+
+    target = candidates[address]
+    related = (
+        set(graph.callers.get(address, ()))
+        | set(graph.callees.get(address, ()))
+        | set(target.declared_dependencies)
+        | set(target.evidence_providers)
+    )
+    target_match_band = (
+        "none" if target.match is None else str(int(target.match * 20))
+    )
+    parts = [
+        f"target={address:08X}:{target.state}:"
+        f"{target.semantic_state}:{target_match_band}"
+    ]
+    for related_address in sorted(related):
+        related_candidate = candidates.get(related_address)
+        if related_candidate is None:
+            parts.append(f"{related_address:08X}:unmapped")
+            continue
+        match_band = (
+            "none"
+            if related_candidate.match is None
+            else str(int(related_candidate.match * 20))
+        )
+        parts.append(
+            f"{related_address:08X}:{related_candidate.state}:"
+            f"{related_candidate.semantic_state}:{match_band}"
+        )
+    return hashlib.sha256("|".join(parts).encode("ascii")).hexdigest()[:16]
 
 
 def add_dependency_evidence(
@@ -422,7 +627,9 @@ def add_dependency_evidence(
 
     by_address = {candidate.address: candidate for candidate in candidates}
     unfinished = {
-        candidate.address for candidate in candidates if not _is_resolved(candidate)
+        candidate.address
+        for candidate in candidates
+        if not _is_resolved(candidate) and not _dependency_resolved(candidate)
     }
     edges: dict[int, set[int]] = {}
     for candidate in candidates:
@@ -433,6 +640,8 @@ def add_dependency_evidence(
         candidate.large_goal_reach = 0
         candidate.dependency_ready = False
         candidate.dependency_component = -1
+        candidate.research_targets = ()
+        candidate.research_roles = ()
         targets = set(graph.callees.get(candidate.address, ()))
         targets.update(candidate.declared_dependencies)
         edges[candidate.address] = {
@@ -545,6 +754,15 @@ def add_dependency_evidence(
             for address in components[reached]
         )
 
+    for candidate in candidates:
+        candidate.current_fingerprint = evidence_fingerprint(
+            candidate.address, by_address, graph
+        )
+        stored = candidate.blocker_fingerprint
+        candidate.blocker_evidence_changed = bool(
+            stored and stored != "-" and stored != candidate.current_fingerprint
+        )
+
 
 def dependency_frontier_for(
     target: int, candidates: list[Candidate]
@@ -578,6 +796,117 @@ def dependency_frontier_for(
 
     visit(target)
     return frontier
+
+
+def select_research_candidates(
+    candidates: list[Candidate], graph: DependencyGraph
+) -> list[Candidate]:
+    """Rank functions that can produce evidence for a semantic blocker."""
+
+    by_address = {candidate.address: candidate for candidate in candidates}
+    roles_by_provider: dict[int, set[str]] = defaultdict(set)
+    targets_by_provider: dict[int, set[int]] = defaultdict(set)
+
+    for target in candidates:
+        is_semantic_blocker = target.semantic_state != "ready" and (
+            target.manual_blocker
+            or target.quality_prerequisite
+            or target.semantic_state == "uncertain"
+        )
+        if not is_semantic_blocker:
+            continue
+        providers = set(target.evidence_providers)
+        for provider in graph.callers.get(target.address, ()):
+            providers.add(provider)
+            roles_by_provider[provider].add("caller")
+        for provider in graph.callees.get(target.address, ()):
+            providers.add(provider)
+            roles_by_provider[provider].add("callee")
+        for provider in target.evidence_providers:
+            roles_by_provider[provider].add("declared-provider")
+        if target.blocker_evidence_changed:
+            providers.add(target.address)
+            roles_by_provider[target.address].add("changed-evidence")
+        for provider in providers:
+            if provider in by_address:
+                targets_by_provider[provider].add(target.address)
+
+    selected: list[Candidate] = []
+    for provider, targets in targets_by_provider.items():
+        candidate = by_address[provider]
+        if candidate.manual_blocker and provider not in targets:
+            continue
+        explicitly_declared = any(
+            provider in by_address[target].evidence_providers for target in targets
+        )
+        changed_self = provider in targets and candidate.blocker_evidence_changed
+        if (
+            candidate.state == "FUNCTION"
+            and candidate.semantic_state == "ready"
+            and not explicitly_declared
+            and not changed_self
+        ):
+            continue
+        candidate.research_targets = tuple(sorted(targets))
+        candidate.research_roles = tuple(sorted(roles_by_provider[provider]))
+        score(candidate)
+        candidate.rank += 120.0 * len(targets)
+        if explicitly_declared:
+            candidate.rank += 100.0
+        if candidate.state != "FUNCTION":
+            candidate.rank += 35.0
+        if candidate.size > LARGE_GOAL_MIN_SIZE:
+            candidate.rank -= 30.0
+        candidate.reasons.append(
+            f"can inform {len(targets)} semantic blocker(s) as "
+            f"{', '.join(candidate.research_roles)}"
+        )
+        selected.append(candidate)
+    return sorted(
+        selected,
+        key=lambda item: (
+            "declared-provider" not in item.research_roles,
+            "changed-evidence" not in item.research_roles,
+            item.size > LARGE_GOAL_MIN_SIZE,
+            -len(item.research_targets),
+            -item.rank,
+            item.size,
+            item.address,
+        ),
+    )
+
+
+def print_frontier_diagnostics(candidates: list[Candidate]) -> None:
+    unfinished = [item for item in candidates if not _is_resolved(item)]
+    codegen_ready = [
+        item
+        for item in candidates
+        if item.semantic_state == "ready"
+        and item.blocker_kind in ("compiler-codegen", "source-form")
+    ]
+    semantic_blockers = [
+        item
+        for item in candidates
+        if item.semantic_state != "ready"
+        and item.deferred_reason
+        and (item.manual_blocker or not item.dependency_ready)
+    ]
+    changed = [item for item in candidates if item.blocker_evidence_changed]
+    ready = [item for item in unfinished if item.dependency_ready]
+
+    print("Dependency frontier diagnosis")
+    print(f"  unfinished functions             {len(unfinished)}")
+    print(f"  dependency-ready unfinished      {len(ready)}")
+    print(f"  semantic blockers                {len(semantic_blockers)}")
+    print(f"  codegen-only ready dependencies  {len(codegen_ready)}")
+    print(f"  blockers with changed evidence   {len(changed)}")
+    kinds: dict[str, int] = defaultdict(int)
+    for item in semantic_blockers:
+        kinds[item.blocker_kind or "legacy-unclassified"] += 1
+    if kinds:
+        print("  semantic blocker kinds")
+        for kind, count in sorted(kinds.items(), key=lambda item: (-item[1], item[0])):
+            print(f"    {kind:<24} {count}")
 
 
 def score(candidate: Candidate) -> None:
@@ -637,6 +966,10 @@ def score(candidate: Candidate) -> None:
     else:
         rank -= 125.0
         reasons.append("oversized body")
+    if candidate.size_source == "ghidra-snapshot" and candidate.map_size != candidate.size:
+        reasons.append(
+            f"retail body size replaces {candidate.map_size}-byte map gap"
+        )
 
     if candidate.siblings >= 3:
         rank += 20.0
@@ -682,6 +1015,12 @@ def score(candidate: Candidate) -> None:
         else:
             blocker_state = "declared prerequisite"
         reasons.append(f"{blocker_state}: {candidate.deferred_reason}")
+        reasons.append(
+            f"blocker kind {candidate.blocker_kind or 'legacy-unclassified'}, "
+            f"semantic state {candidate.semantic_state}"
+        )
+        if candidate.blocker_evidence_changed:
+            reasons.append("blocker evidence fingerprint changed")
 
     if candidate.dependency_component >= 0:
         if candidate.quality_prerequisite:
@@ -729,6 +1068,8 @@ def select(
     chosen: list[Candidate] = []
     for candidate in candidates:
         if new_work_only:
+            if candidate.manual_blocker and not include_deferred:
+                continue
             if candidate.state == "FUNCTION" and not candidate.quality_prerequisite:
                 continue
             if (
@@ -851,7 +1192,7 @@ def print_dependency_summary(target: Candidate, names: dict[int, str]) -> None:
         for address in target.unresolved_dependencies:
             print(f"  0x{address:08X}  {names.get(address, '(not in map)')}")
     if target.weak_dependencies:
-        print("Weak implemented dependencies:")
+        print("Semantically uncertain dependencies:")
         for address in target.weak_dependencies:
             print(f"  0x{address:08X}  {names.get(address, '(not in map)')}")
     if target.quality_prerequisite:
@@ -905,6 +1246,16 @@ def main() -> int:
         help="show dependency-ready STUB and unannotated work and bypass the audit freeze",
     )
     parser.add_argument(
+        "--research",
+        action="store_true",
+        help="rank callers, callees, and declared providers that can resolve semantic blockers",
+    )
+    parser.add_argument(
+        "--diagnose",
+        action="store_true",
+        help="summarize why the dependency frontier is empty or blocked",
+    )
+    parser.add_argument(
         "--for",
         dest="target_address",
         type=parse_address,
@@ -949,6 +1300,22 @@ def main() -> int:
         help=argparse.SUPPRESS,
     )
     parser.add_argument("--reason", help=argparse.SUPPRESS)
+    parser.add_argument("--kind", choices=BLOCKER_KINDS, default="semantic", help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--semantic-state",
+        choices=SEMANTIC_STATES,
+        default="unknown",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--evidence-provider",
+        type=parse_address,
+        action="append",
+        default=[],
+        metavar="ADDRESS",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument("--fingerprint", default="", help=argparse.SUPPRESS)
     parser.add_argument("--max-size", type=int, help="drop candidates larger than this many bytes")
     parser.add_argument(
         "--allow-large",
@@ -965,6 +1332,11 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="emit JSON instead of a table")
     args = parser.parse_args()
 
+    if args.research and (args.new_work or args.target_address is not None):
+        parser.error("--research cannot be combined with --new-work or --for")
+    if args.diagnose and args.json:
+        parser.error("--diagnose cannot be combined with --json")
+
     if args.record_deferral is not None:
         if not args.reason or not args.reason.strip():
             parser.error("--record-deferral needs --reason")
@@ -972,7 +1344,9 @@ def main() -> int:
         if args.record_deferral not in known_addresses:
             parser.error("the deferred target is not in functions_map.txt")
         unknown_dependencies = [
-            address for address in args.blocked_by if address not in known_addresses
+            address
+            for address in args.blocked_by + args.evidence_provider
+            if address not in known_addresses
         ]
         if unknown_dependencies:
             parser.error(
@@ -980,7 +1354,32 @@ def main() -> int:
             )
         if args.record_deferral in args.blocked_by:
             parser.error("a target cannot depend on itself")
-        write_deferral(args.record_deferral, args.reason, tuple(args.blocked_by))
+        fingerprint = args.fingerprint
+        if fingerprint == "auto":
+            fingerprint_candidates = build_candidates()
+            fingerprint_graph = build_call_graph(parse_map())
+            fingerprint_target = next(
+                item
+                for item in fingerprint_candidates
+                if item.address == args.record_deferral
+            )
+            fingerprint_target.semantic_state = args.semantic_state
+            fingerprint_target.declared_dependencies = tuple(args.blocked_by)
+            fingerprint_target.evidence_providers = tuple(args.evidence_provider)
+            fingerprint = evidence_fingerprint(
+                args.record_deferral,
+                {item.address: item for item in fingerprint_candidates},
+                fingerprint_graph,
+            )
+        write_deferral(
+            args.record_deferral,
+            args.reason,
+            tuple(args.blocked_by),
+            kind=args.kind,
+            semantic_state=args.semantic_state,
+            evidence_providers=tuple(args.evidence_provider),
+            fingerprint=fingerprint,
+        )
         dependencies = "".join(
             f", blocked by 0x{address:08X}" for address in args.blocked_by
         )
@@ -1021,7 +1420,12 @@ def main() -> int:
     if args.target_address is not None and args.target_address not in names:
         parser.error(f"0x{args.target_address:08X} is not in functions_map.txt")
 
-    dependency_mode = args.new_work or args.target_address is not None
+    dependency_mode = (
+        args.new_work
+        or args.research
+        or args.diagnose
+        or args.target_address is not None
+    )
     candidates = build_candidates()
     if dependency_mode:
         try:
@@ -1030,6 +1434,11 @@ def main() -> int:
             print(f"error: {error}", file=sys.stderr)
             return 2
         add_dependency_evidence(candidates, graph)
+
+    if args.diagnose:
+        print_frontier_diagnostics(candidates)
+        if not args.research and not args.new_work and args.target_address is None:
+            return 0
 
     audit_default = (
         AUDIT_FREEZE.exists()
@@ -1048,19 +1457,28 @@ def main() -> int:
         )
     )
     include_blocked = args.include_deferred or args.include_blocked
-    chosen = select(
-        candidates,
-        namespace=args.namespace,
-        stubs_only=args.stubs,
-        leaves_only=args.leaves,
-        near_only=args.near or (args.audit and not (args.debt or args.quality)),
-        max_size=args.max_size,
-        exclude_capped=not args.include_capped,
-        debt_only=args.debt or args.quality,
-        new_work_only=dependency_mode,
-        include_deferred=include_blocked,
-        allow_large=args.allow_large or args.target_address is not None,
-    )
+    if args.research:
+        chosen = select_research_candidates(candidates, graph)
+        if args.namespace:
+            chosen = [
+                item for item in chosen if item.name.startswith(args.namespace + "::")
+            ]
+        if args.max_size is not None:
+            chosen = [item for item in chosen if item.size <= args.max_size]
+    else:
+        chosen = select(
+            candidates,
+            namespace=args.namespace,
+            stubs_only=args.stubs,
+            leaves_only=args.leaves,
+            near_only=args.near or (args.audit and not (args.debt or args.quality)),
+            max_size=args.max_size,
+            exclude_capped=not args.include_capped,
+            debt_only=args.debt or args.quality,
+            new_work_only=dependency_mode,
+            include_deferred=include_blocked,
+            allow_large=args.allow_large or args.target_address is not None,
+        )
     if args.target_address is not None:
         frontier = dependency_frontier_for(args.target_address, candidates)
         if include_blocked and not frontier:
@@ -1087,6 +1505,8 @@ def main() -> int:
                     "name": item.name,
                     "state": item.state,
                     "size": item.size,
+                    "map_size": item.map_size,
+                    "size_source": item.size_source,
                     "match": item.match,
                     "effective": item.effective,
                     "tool_artifact": item.tool_artifact,
@@ -1103,6 +1523,14 @@ def main() -> int:
                         f"0x{address:08X}" for address in item.declared_dependencies
                     ],
                     "manual_blocker": item.manual_blocker,
+                    "blocker_kind": item.blocker_kind,
+                    "semantic_state": item.semantic_state,
+                    "evidence_providers": [
+                        f"0x{address:08X}" for address in item.evidence_providers
+                    ],
+                    "blocker_fingerprint": item.blocker_fingerprint,
+                    "current_fingerprint": item.current_fingerprint,
+                    "blocker_evidence_changed": item.blocker_evidence_changed,
                     "direct_dependencies": [
                         f"0x{address:08X}" for address in item.direct_dependencies
                     ],
@@ -1121,6 +1549,10 @@ def main() -> int:
                     "large_goal_reach": item.large_goal_reach,
                     "indirect_calls": item.indirect_calls,
                     "indirect_jumps": item.indirect_jumps,
+                    "research_targets": [
+                        f"0x{address:08X}" for address in item.research_targets
+                    ],
+                    "research_roles": item.research_roles,
                     "rank": item.rank,
                     "reasons": item.reasons,
                 }

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import bisect
 import json
+import struct
 import subprocess
 import sys
 from collections import defaultdict
@@ -37,6 +38,7 @@ class GhidraFunction:
 class TransferEvidence:
     call_callers: frozenset[int]
     jump_callers: frozenset[int]
+    called_targets: frozenset[int] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -47,6 +49,8 @@ class Discovery:
     ghidra_name: str
     call_callers: tuple[int, ...]
     jump_callers: tuple[int, ...]
+    called_project_targets: tuple[int, ...]
+    data_references: tuple[int, ...]
     previous_map_address: int | None
     previous_map_name: str
     next_map_address: int | None
@@ -60,6 +64,12 @@ class Discovery:
         if self.jump_callers:
             count = len(self.jump_callers)
             return f"{count} cross-function retail JMP caller{'s' if count != 1 else ''}"
+        if self.data_references:
+            count = len(self.data_references)
+            return f"{count} aligned retail data reference{'s' if count != 1 else ''}"
+        if self.called_project_targets:
+            count = len(self.called_project_targets)
+            return f"calls {count} mapped project function{'s' if count != 1 else ''}"
         return "Ghidra function start only"
 
 
@@ -161,6 +171,7 @@ def scan_transfers(functions: list[GhidraFunction]) -> dict[int, TransferEvidenc
     starts = {function.address for function in functions}
     calls: dict[int, set[int]] = defaultdict(set)
     jumps: dict[int, set[int]] = defaultdict(set)
+    called: dict[int, set[int]] = defaultdict(set)
 
     for function in functions:
         code = decomp_binary.read_bytes(function.address, function.size)
@@ -179,15 +190,39 @@ def scan_transfers(functions: list[GhidraFunction]) -> dict[int, TransferEvidenc
                 continue
             if mnemonic == "call":
                 calls[target].add(function.address)
+                called[function.address].add(target)
             elif not function.address <= target < end:
                 jumps[target].add(function.address)
 
     return {
-        target: TransferEvidence(
-            frozenset(calls.get(target, set())),
-            frozenset(jumps.get(target, set())),
+        address: TransferEvidence(
+            frozenset(calls.get(address, set())),
+            frozenset(jumps.get(address, set())),
+            frozenset(called.get(address, set())),
         )
-        for target in calls.keys() | jumps.keys()
+        for address in calls.keys() | jumps.keys() | called.keys()
+    }
+
+
+def scan_data_references(
+    functions: list[GhidraFunction],
+) -> dict[int, frozenset[int]]:
+    """Find aligned data words that point to Ghidra function starts."""
+
+    starts = {function.address for function in functions}
+    references: dict[int, set[int]] = defaultdict(set)
+    for section in decomp_binary.sections():
+        if section.name == ".text" or section.raw_size < 4:
+            continue
+        code = decomp_binary.read_bytes(section.virtual_address, section.raw_size)
+        if code is None:
+            continue
+        for offset in range(0, len(code) - 3, 4):
+            target = struct.unpack_from("<I", code, offset)[0]
+            if target in starts:
+                references[target].add(section.virtual_address + offset)
+    return {
+        target: frozenset(addresses) for target, addresses in references.items()
     }
 
 
@@ -211,6 +246,7 @@ def discover(
     minimum_confidence: str = "medium",
     exclusions: tuple[tuple[int, int], ...] = (),
     excluded_addresses: frozenset[int] = frozenset(),
+    data_references: dict[int, frozenset[int]] | None = None,
 ) -> list[Discovery]:
     """Return ranked unmapped starts inside the confirmed game/engine range."""
 
@@ -238,6 +274,7 @@ def discover(
     ]
     threshold = CONFIDENCE_ORDER[minimum_confidence]
     results: list[Discovery] = []
+    data_references = data_references or {}
 
     for function in functions:
         if function.address in mapped_names:
@@ -253,9 +290,13 @@ def discover(
         evidence = transfers.get(
             function.address, TransferEvidence(frozenset(), frozenset())
         )
+        project_calls = tuple(
+            sorted(target for target in evidence.called_targets if target in mapped_names)
+        )
+        referenced_at = tuple(sorted(data_references.get(function.address, ())))
         if evidence.call_callers:
             confidence = "high"
-        elif evidence.jump_callers:
+        elif evidence.jump_callers or referenced_at or project_calls:
             confidence = "medium"
         else:
             confidence = "low"
@@ -275,6 +316,8 @@ def discover(
                 ghidra_name=function.name,
                 call_callers=tuple(sorted(evidence.call_callers)),
                 jump_callers=tuple(sorted(evidence.jump_callers)),
+                called_project_targets=project_calls,
+                data_references=referenced_at,
                 previous_map_address=previous[0],
                 previous_map_name=previous[1],
                 next_map_address=following[0],
@@ -299,6 +342,12 @@ def json_row(item: Discovery) -> dict[str, object]:
     row["address"] = f"0x{item.address:08X}"
     row["call_callers"] = [f"0x{address:08X}" for address in item.call_callers]
     row["jump_callers"] = [f"0x{address:08X}" for address in item.jump_callers]
+    row["called_project_targets"] = [
+        f"0x{address:08X}" for address in item.called_project_targets
+    ]
+    row["data_references"] = [
+        f"0x{address:08X}" for address in item.data_references
+    ]
     for key in ("previous_map_address", "next_map_address"):
         value = row[key]
         row[key] = None if value is None else f"0x{value:08X}"
@@ -342,6 +391,7 @@ def main() -> int:
         minimum,
         exclusions,
         import_thunk_addresses(functions),
+        scan_data_references(functions),
     )
     shown = results if args.limit == 0 else results[: args.limit]
 

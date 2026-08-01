@@ -56,8 +56,11 @@ tools/decomp candidates --limit 15 --why      # show required pending audits
 tools/decomp candidates --new-work --why      # dependency-frontier new work
 tools/decomp candidates --for 0x004XXXXX --why # frontier for one goal
 tools/decomp candidates --new-work --allow-large --why # reviewed large goals
+tools/decomp candidates --diagnose            # summarize frontier blockers
+tools/decomp candidates --research --why      # rank blocker evidence providers
 tools/decomp evidence 0x004XXXXX              # the single best candidate
 tools/decomp discover                         # use when mapped work is blocked
+tools/decomp discover --all                   # include lower-confidence starts
 tools/decomp evidence --unmapped 0x004XXXXX   # verify a discovery result
 ```
 
@@ -70,9 +73,10 @@ For a source-debt audit, use the order in `.notes/refactor-debt.md`. The file
 starts with the smallest supported fixes.
 
 `candidates` implements the dependency rubric in `AGENTS.md`. It promotes a
-frontier function when that function unlocks unfinished callers. A weak
-function below 75 percent blocks a large direct caller and becomes a quality
-prerequisite. Size resolves ties.
+frontier function when that function unlocks unfinished callers. A function
+below 75 percent blocks a large direct caller when its semantic state is
+`unknown` or `uncertain`. A semantically `ready` dependency does not block the
+caller, even when its source has a code-generation blocker. Size resolves ties.
 
 The default new-work list omits a large goal that has no downstream unlock.
 Use `--allow-large` only after you review the goal and its frontier. The command
@@ -101,17 +105,33 @@ byte offsets.
 item. Defer the target when its ABI, data model, or control flow stays unclear.
 
 If a function can resolve the blocker, record it with `tools/decomp defer
-<target> --blocked-by <address> --reason <text>`. The target returns after the
-prerequisite reaches the acceptance threshold. Omit `--blocked-by` only for a
-manual blocker. Clear a manual blocker with `tools/decomp undefer <target>`.
-Keep the blocker-ledger change after you restore rejected source. Commit these
-records before the session ends.
+<target> --blocked-by <address> --kind <kind> --semantic-state uncertain
+--fingerprint auto --reason <text>`. Use `--evidence-provider` for a related
+function that can supply evidence but is not a direct prerequisite. The target
+returns after the prerequisite becomes semantically `ready`.
 
-If all mapped frontier targets have supported blockers, run `tools/decomp
-discover`. Inspect high-confidence results first. Confirm the function start,
-ABI, ownership, and name with `evidence --unmapped`. Then add the confirmed map
-entry and a `STUB` before normal candidate selection. Do not copy a Ghidra name
-without separate evidence.
+Use `compiler-codegen/ready` or `source-form/ready` only when the ABI, behavior,
+side effects, and data model are supported. These records defer more work on
+the dependency without blocking its callers. Use `unknown` or `uncertain` when
+new evidence can change the contract. Omit `--blocked-by` only for a manual
+blocker. Clear it with `tools/decomp undefer <target>`. Keep the blocker-ledger
+change after you restore rejected source. Commit these records before the
+session ends.
+
+If all mapped frontier targets have supported blockers, do one fallback pass:
+
+1. Run `candidates --new-work --allow-large --why`.
+2. Run `discover` and verify high-confidence results.
+3. Run `candidates --research --why`.
+4. Run `discover --all` and verify supported medium-confidence results.
+5. Run `candidates --diagnose` and revisit changed fingerprints.
+
+Do not repeat an empty query. Stop with a supported stalemate if each check
+returns no work. Discovery can use inbound transfers, aligned code pointers,
+and outbound calls. Confirm the function start, ABI, ownership, and name with
+`evidence --unmapped`. Then add the confirmed map entry and a `STUB` before
+normal candidate selection. Do not copy a Ghidra name without separate
+evidence.
 
 ## 4. Get on the branch — immediately after selection
 

@@ -1,5 +1,6 @@
 import subprocess
 import csv
+import re
 import unittest
 from pathlib import Path
 
@@ -93,6 +94,35 @@ class NormativeInputTests(unittest.TestCase):
         self.assertTrue(set(targets) <= mapped)
         self.assertTrue(dependencies <= mapped)
         self.assertFalse([row for row in rows if len(row) < 3 or not row[2].strip()])
+
+        kinds = {
+            "semantic",
+            "layout",
+            "abi",
+            "indirect-dispatch",
+            "ownership",
+            "source-form",
+            "compiler-codegen",
+            "tooling",
+        }
+        states = {"unknown", "uncertain", "ready"}
+        extended = [row for row in rows if len(row) >= 7]
+        providers = {
+            int(value, 16)
+            for row in extended
+            for value in row[5].split(",")
+            if value != "-"
+        }
+        self.assertTrue(providers <= mapped)
+        self.assertFalse([row for row in extended if row[3] not in kinds])
+        self.assertFalse([row for row in extended if row[4] not in states])
+        self.assertFalse(
+            [
+                row
+                for row in extended
+                if row[6] != "-" and not re.fullmatch(r"[0-9a-f]{16}", row[6])
+            ]
+        )
 
     def test_every_provisional_function_is_in_the_audit_ledger(self):
         provisional = {

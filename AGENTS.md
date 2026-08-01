@@ -133,8 +133,12 @@ tools/decomp candidates              # ranked targets; no Ghidra, no reccmp run
 tools/decomp candidates Nu3D --stubs --why
 tools/decomp candidates --for 0x00401230 --why # dependency frontier for one goal
 tools/decomp candidates --new-work --allow-large --why # include ready large goals
+tools/decomp candidates --diagnose       # summarize frontier and blocker state
+tools/decomp candidates --research --why # find evidence providers for semantic blockers
 tools/decomp discover                # find credible function starts missing from the map
-tools/decomp defer 0x00401230 --blocked-by 0x00405670 --reason "needs the producer layout"
+tools/decomp discover --all          # include lower-confidence function starts
+tools/decomp defer 0x00401230 --blocked-by 0x00405670 --kind layout \
+  --semantic-state uncertain --fingerprint auto --reason "needs the producer layout"
 tools/decomp blockers                # show committed blockers
 tools/decomp undefer 0x00401230      # clear committed blockers for one target
 tools/decomp audit --legacy-caps --why # review old mismatch claims
@@ -176,9 +180,10 @@ not call Ghidra or reccmp. The evidence command makes bounded Ghidra queries.
 Do not replace these commands with map greps or repeated decompiler calls.
 
 Run `tools/decomp discover` when the mapped dependency frontier has no supported
-work. The command compares Ghidra starts with direct retail transfers and the
-committed map. It does not change the map. Verify a result with `evidence
---unmapped` before you add its address and a supported name.
+work. The command compares Ghidra starts with inbound transfers, outbound calls,
+aligned code pointers in data, and the committed map. It does not change the
+map. Verify a result with `evidence --unmapped` before you add its address and a
+supported name.
 
 The discovery command excludes known retail runtime ranges from
 `tools/Resources/function-discovery-exclusions.tsv`. Add a range only when the
@@ -243,17 +248,45 @@ The new-work ranking implements this order:
 --why` to inspect one goal. This command returns its recursive dependency
 frontier, or the goal itself when it is ready.
 
-The graph contains direct function dependencies only. It reports indirect
-calls and jumps as uncertainty. Use evidence and explicit blockers for type,
-global, and indirect-dispatch dependencies. A provisional function below 75
-percent is a quality prerequisite for a large direct caller. The frontier
-promotes that function until it reaches the normal acceptance threshold.
+The graph contains direct function dependencies only. It reports indirect calls
+and jumps as uncertainty. Use evidence and explicit blockers for type, global,
+and indirect-dispatch dependencies.
 
-If all frontier targets have supported blockers, run `tools/decomp discover`.
-Start with high-confidence results. A direct retail call and a clean Ghidra
-boundary support a function start. A Ghidra name is only a local hint. Confirm
-the ABI, body boundary, ownership, and name before you edit the map. Add a
-`STUB` when the start is valid but the body is not ready.
+Similarity and semantic readiness are separate facts. A low-score function can
+be semantically `ready` when its ABI, behavior, side effects, and data model are
+supported. A compiler-codegen or source-form blocker then defers work on that
+function, but it does not block callers that use its known contract. Do not mark
+a dependency `ready` because its score is low or because work on it was costly.
+Use `unknown` or `uncertain` while its contract can still change.
+
+A provisional function below 75 percent remains a quality prerequisite for a
+large direct caller unless its blocker record marks it semantically `ready`.
+The frontier promotes an uncertain prerequisite until its evidence is strong
+enough. Candidate size comes from the current Ghidra size snapshot when
+possible. The distance to the next map address is only a fallback. A one-byte
+Ghidra placeholder does not replace the map-gap estimate.
+
+When the normal frontier is empty, use this fallback order once:
+
+1. Run `candidates --new-work --allow-large --why`.
+2. Run `discover`, then verify high-confidence results.
+3. Run `candidates --research --why` to inspect callers, callees, and declared
+   evidence providers for semantic blockers.
+4. Run `discover --all`, then verify any lower-confidence result that has an
+   aligned data pointer or useful outbound calls.
+5. Run `candidates --diagnose`. Revisit blocker records whose evidence
+   fingerprint changed.
+
+Do not repeat the same empty query. A blocked review is new only when it checks
+a different blocker class or new evidence. Stop with a supported stalemate when
+all five checks return no work.
+
+Start discovery with high-confidence results. A direct retail call and a clean
+Ghidra boundary support a function start. An aligned code pointer or outbound
+calls to mapped project functions provide medium-confidence evidence. A Ghidra
+name is only a local hint. Confirm the ABI, body boundary, ownership, and name
+before you edit the map. Add a `STUB` when the start is valid but the body is not
+ready.
 
 The tool cannot decide whether a source model is plausible. Use `--why`, then
 confirm the top candidate with `tools/decomp evidence`. A legacy CAP claim does
@@ -276,15 +309,25 @@ Prefer candidates with several of these properties:
 Defer a candidate when its behavior depends on an unknown structure, indirect
 dispatch, runtime machinery, or unnamed callees. If one function can resolve
 the problem, record its address with `--blocked-by`. The candidate system then
-promotes that prerequisite and reactivates the target after it becomes a
-`FUNCTION`.
+promotes that prerequisite and reactivates the target when its semantic state
+is `ready`. It does not require an exact or high-score implementation.
 
 Use a manual blocker only when no function address represents the missing
 evidence. Do not fill an opaque body with guessed fields to replace a `STUB`.
 
 Record a function prerequisite with `tools/decomp defer <target> --blocked-by
-<prerequisite> --reason <text>`. You can repeat `--blocked-by`. The command
-writes to the committed blocker record under `tools/Resources/`.
+<prerequisite> --kind <kind> --semantic-state uncertain --fingerprint auto
+--reason <text>`. You can repeat `--blocked-by`. Use `--evidence-provider` for
+a caller, callee, or related function that can resolve a non-call dependency.
+The command writes to the committed blocker record under `tools/Resources/`.
+
+Use `--kind compiler-codegen --semantic-state ready` when the behavior and
+contract are supported but natural source still produces different code. Use
+`source-form/ready` only when the remaining question is the original source
+shape. Use `layout`, `abi`, `indirect-dispatch`, or `semantic` with `unknown` or
+`uncertain` when more evidence can change the reconstruction. The fingerprint
+records the related source state and score bands. `--diagnose` reports a change
+after a provider, caller, or callee gains new evidence.
 
 A reason without `--blocked-by` creates a manual blocker. Use `tools/decomp
 undefer <target>` to clear it. Use `--include-blocked` only to inspect blocked

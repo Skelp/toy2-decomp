@@ -69,6 +69,36 @@ class ReadMatchPercentagesTests(unittest.TestCase):
             )
             self.assertEqual(candidates.read_match_percentages(path), {0x401000: 0.5})
 
+    def test_report_supplies_exact_original_sizes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "report.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "data": [
+                            {"address": "0x401000", "original_size": 234},
+                            {"address": "0x402000", "original_size": None},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(candidates.read_original_sizes(path), {0x401000: 234})
+
+    def test_ghidra_size_snapshot_rejects_one_byte_placeholders(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sizes.json"
+            path.write_text(
+                json.dumps(
+                    [
+                        {"address": "00401000", "size": 234},
+                        {"address": "00402000", "size": 1},
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(candidates.read_original_sizes(path), {0x401000: 234})
+
 
 class ReadCapsTests(unittest.TestCase):
     def test_caps_registry_skips_comments_and_reads_the_id(self):
@@ -128,6 +158,26 @@ class ReadCapsTests(unittest.TestCase):
             self.assertEqual(
                 candidates.read_deferrals(path)[0x401000],
                 candidates.Deferral(reason="unknown structure layout"),
+            )
+
+    def test_extended_deferral_reads_semantic_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "deferrals.tsv"
+            path.write_text(
+                "# address\tblocked-by\treason\tkind\tsemantic-state\tproviders\tfingerprint\n"
+                "0x00401000\t-\tregister allocation\tcompiler-codegen\tready\t"
+                "0x00402000\tabc123\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                candidates.read_deferrals(path)[0x401000],
+                candidates.Deferral(
+                    reason="register allocation",
+                    kind="compiler-codegen",
+                    semantic_state="ready",
+                    evidence_providers=(0x402000,),
+                    fingerprint="abc123",
+                ),
             )
 
 
@@ -471,6 +521,103 @@ class DependencySelectionTests(unittest.TestCase):
         )
         self.assertTrue(target.dependency_ready)
         self.assertFalse(accepted.quality_prerequisite)
+
+    def test_semantically_ready_low_match_does_not_block_a_large_target(self):
+        target = make(0x401000, "N::Target", size=3000, state="STUB")
+        accepted = make(
+            0x402000,
+            "N::Accepted",
+            size=100,
+            state="FUNCTION",
+            match=0.36,
+            semantic_state="ready",
+            blocker_kind="compiler-codegen",
+            manual_blocker=True,
+            deferred_reason="frame allocation differs",
+        )
+        pool = [target, accepted]
+        graph = self.graph({target.address: {accepted.address}})
+        candidates.add_dependency_evidence(pool, graph)
+        self.assertTrue(target.dependency_ready)
+        self.assertFalse(accepted.quality_prerequisite)
+
+    def test_semantically_ready_unimplemented_dependency_does_not_block_caller(self):
+        target = make(0x401000, "N::Target", size=3000, state="STUB")
+        dependency = make(
+            0x402000,
+            "N::KnownContract",
+            size=400,
+            state="NOT_STARTED",
+            semantic_state="ready",
+            blocker_kind="compiler-codegen",
+            manual_blocker=True,
+            deferred_reason="natural source does not bank",
+        )
+        pool = [target, dependency]
+        graph = self.graph({target.address: {dependency.address}})
+        candidates.add_dependency_evidence(pool, graph)
+        self.assertTrue(target.dependency_ready)
+        self.assertFalse(dependency.quality_prerequisite)
+
+    def test_fingerprint_changes_when_an_evidence_provider_changes_state(self):
+        blocker = make(
+            0x401000,
+            "N::Blocked",
+            size=100,
+            state="STUB",
+            semantic_state="uncertain",
+            manual_blocker=True,
+            evidence_providers=(0x402000,),
+        )
+        provider = make(0x402000, "N::Provider", size=80, state="NOT_STARTED")
+        pool = [blocker, provider]
+        graph = self.graph()
+        candidates.add_dependency_evidence(pool, graph)
+        blocker.blocker_fingerprint = blocker.current_fingerprint
+        provider.state = "FUNCTION"
+        provider.match = 0.8
+        provider.semantic_state = "ready"
+        candidates.add_dependency_evidence(pool, graph)
+        self.assertTrue(blocker.blocker_evidence_changed)
+
+    def test_research_frontier_promotes_a_semantic_blockers_caller(self):
+        blocker = make(
+            0x401000,
+            "N::Blocked",
+            size=100,
+            state="FUNCTION",
+            match=0.2,
+            semantic_state="uncertain",
+            manual_blocker=True,
+            deferred_reason="unknown tolerance model",
+        )
+        caller = make(0x402000, "N::Caller", size=500, state="STUB")
+        pool = [blocker, caller]
+        graph = self.graph({caller.address: {blocker.address}})
+        candidates.add_dependency_evidence(pool, graph)
+        research = candidates.select_research_candidates(pool, graph)
+        self.assertEqual(research[0].address, caller.address)
+        self.assertEqual(research[0].research_targets, (blocker.address,))
+        self.assertIn("caller", research[0].research_roles)
+
+    def test_declared_evidence_provider_outranks_an_incidental_caller(self):
+        blocker = make(
+            0x401000,
+            "N::Blocked",
+            size=100,
+            state="STUB",
+            semantic_state="uncertain",
+            manual_blocker=True,
+            evidence_providers=(0x403000,),
+        )
+        caller = make(0x402000, "N::Caller", size=80, state="STUB")
+        provider = make(0x403000, "N::Provider", size=900, state="STUB")
+        pool = [blocker, caller, provider]
+        graph = self.graph({caller.address: {blocker.address}})
+        candidates.add_dependency_evidence(pool, graph)
+        research = candidates.select_research_candidates(pool, graph)
+        self.assertEqual(research[0].address, provider.address)
+        self.assertIn("declared-provider", research[0].research_roles)
 
     def test_weak_function_does_not_block_a_small_target(self):
         target = make(0x401000, "N::Target", size=600, state="STUB")
