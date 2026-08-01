@@ -109,6 +109,7 @@ set(TOY2_SOURCES
     src/Toy2/BombsAway.cpp
     src/Toy2/ConstructionYard.cpp
     src/Toy2/AlleysAndGullies.cpp
+    src/Toy2/AlleysAndGulliesHint.inc
     src/Toy2/SlimeTime.cpp
     src/Toy2/AlsToyBarn.cpp
     src/Toy2/HayBaleRideInstructions.inc

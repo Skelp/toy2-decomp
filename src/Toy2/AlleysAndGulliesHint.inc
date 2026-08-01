@@ -1,0 +1,5 @@
+"i saw ^hamm^ in the market place near an ^umbrella^.",
+"the ^mother duck^ has lost her ^ducklings^. she is near the central drain.",
+"^slinky^ has a ^challenge^ for you. he is on the island in the middle of the ^gully^ over this fence.",
+"there is a ^token^ on the table in the market place. you need to float over to it on a ^balloon^.",
+"the ^clown top^ boss is on the roof of the apartment building. you need a ^grappling hook^ to climb up. help ^mr. potato head^ on another level to open the ^grappling hook^.",

@@ -12,6 +12,9 @@ namespace Toy2
 	extern int32_t g_groundSlamTimer;
 	extern int32_t g_footingType;
 	extern int32_t g_ledgeClimbPlatformIndex;
+	extern int32_t g_forcedFacingActive;
+	extern int32_t g_poleClimbState;
+	extern int32_t g_poleRecordOffset;
 	extern int32_t g_previousVerticalVelocity;
 
 	namespace Buzz

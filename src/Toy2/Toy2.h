@@ -50,6 +50,8 @@ namespace Toy2
 			int16_t pathRecordType;
 		};
 
+		extern State g_objects[10];
+
 		void ComputeSegment(int32_t pathRecordType, State* object);
 		void InitTable(const InitEntry* initTable);
 
