@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "discover", "evidence", "notes", "agent", "defer", "undefer", "blockers", "audit", "baseline", "validate", "experiment", "lint", "report", "session-summary", "progress", "run", "shell", "help")]
+    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "discover", "evidence", "notes", "defer", "undefer", "blockers", "audit", "baseline", "validate", "experiment", "lint", "report", "session-summary", "progress", "run", "shell", "help")]
     [string] $Command = "help",
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -132,7 +132,6 @@ Commands:
   discover [args]   Find credible Ghidra starts absent from the function map
   evidence <addr>   Collect bounded evidence for a mapped or discovered target
   notes <query>     Search bounded codegen, debt, and original-name notes
-  agent <command>   Run or control the fresh-thread decompilation supervisor
   defer <addr> ...  Record a committed blocker or prerequisite
   undefer <addr>    Clear all committed blockers for one target
   blockers [addr]   Show committed blockers
@@ -162,10 +161,9 @@ if ($Command -eq "lint") {
     Assert-LastExit "Checking source plausibility"
     exit 0
 }
-if ($Command -in @("notes", "agent")) {
-    $Script = if ($Command -eq "notes") { "tools\decomp_notes.py" } else { "tools\decomp_agent.py" }
-    & python (Join-Path $Root $Script) @CommandArgs
-    Assert-LastExit "Running $Command"
+if ($Command -eq "notes") {
+    & python (Join-Path $Root "tools\decomp_notes.py") @CommandArgs
+    Assert-LastExit "Searching reconstruction notes"
     exit 0
 }
 if ($Command -in @("discover", "evidence")) {

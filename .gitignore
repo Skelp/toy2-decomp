@@ -50,3 +50,7 @@ __pycache__/
 .agents/skills/*
 !.agents/skills/continue-decomp/
 !.agents/skills/continue-decomp/SKILL.md
+!.agents/skills/decomp-worker/
+!.agents/skills/decomp-worker/SKILL.md
+!.agents/skills/decomp-worker/agents/
+!.agents/skills/decomp-worker/agents/openai.yaml

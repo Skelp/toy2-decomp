@@ -1,100 +1,70 @@
 ---
 name: continue-decomp
-description: Start or continue one Toy Story 2 reconstruction slice. Select evidence-backed work, reconstruct it, validate it, and bank it.
+description: Supervise continuous Toy Story 2 reconstruction through serial worker subagents. Use when a root session starts or continues the decompilation goal, including `/goal continue`, or when asked to supervise continued reconstruction work.
 ---
 
-# Continue decompilation
+# Supervise decompilation
 
-Use this procedure for one coherent reconstruction slice. `AGENTS.md` defines source quality, evidence precedence, work selection, and repository rules.
+Act only as the supervisor. Delegate reconstruction to serial worker subagents.
 
-## Start the slice
+Do not select targets, inspect disassembly, edit source, build, commit, or push. Run Git commands only to enforce the handoff checks.
+
+## Establish the run state
 
 1. Run `git status --short`.
-2. Preserve unrelated changes. The unchanged `external/submodules/reccmp` pointer can remain dirty.
-3. Confirm the current branch. For agent runs, use `agent/continuous`.
-4. Run `tools/decomp progress`.
-5. Run `tools/decomp baseline` before source edits.
-6. Run `tools/decomp candidates --why`.
-7. During the audit freeze, complete one required audit.
-8. Otherwise, select one dependency-frontier target or one tightly coupled group.
+2. Require the `agent/continuous` branch.
+3. Record the complete startup status.
+4. If the reccmp submodule is dirty, record its current `HEAD`.
+5. Require local `HEAD` to equal `origin/agent/continuous`.
+6. Stop if any startup drift exists except the unchanged reccmp submodule pointer.
 
-Use bounded commands first:
+## Dispatch one worker
 
-```sh
-tools/decomp candidates --new-work --why
-tools/decomp candidates --for 0x00401230 --why
-tools/decomp evidence 0x00401230
-tools/decomp notes QUERY --source codegen
-tools/decomp notes QUERY --source debt
-tools/decomp notes QUERY --source names
+Spawn exactly one subagent for one coherent slice. Do not start another worker while this worker is active.
+
+Use this worker prompt:
+
+```text
+Use $decomp-worker to complete exactly one coherent reconstruction slice.
+Do not spawn subagents.
+Preserve the supervisor's startup worktree state.
+Validate, commit, synchronize, report, and push successful work.
+Return the required worker result block.
 ```
 
-Use `--limit 0`, `--all`, or `--full` only when the bounded result omits required evidence.
+Add a bounded handoff from the prior worker when one exists. Include useful addresses, completed work, and rejected approaches.
 
-## Confirm the target
+Wait for the worker to finish. Do not perform reconstruction work while it runs.
 
-Before an edit, record a short working summary outside the repository. Include these facts:
+## Check the handoff
 
-- the target address, subsystem, and translation unit
-- the calling convention, return type, and parameter roles
-- callers, callees, globals, fields, and important constants
-- the applicable OpenCrashWOC analogue
-- confirmed facts, hypotheses, and unresolved questions
+After each worker, run these checks:
 
-Read `AGENTS.md` before you name a symbol or change a type. Retail strings have the highest naming priority.
+1. Confirm that the branch is `agent/continuous`.
+2. Confirm that the worktree matches the recorded startup status.
+3. Confirm that the reccmp submodule `HEAD` did not change.
+4. Confirm that local `HEAD` equals `origin/agent/continuous`.
+5. Confirm that a banked result advanced `HEAD`.
+6. Confirm that a stalemate result did not leave source edits.
 
-If evidence remains insufficient, select the next supported target. Record a blocker when one function or missing fact blocks useful work.
+If a check fails, send the same worker a corrective follow-up. Do not repair the worker's slice yourself.
 
-## Reconstruct and compare
+Wait for that worker again. Stop the goal turn if the worker cannot restore the required state.
 
-1. Recover the ABI and observable behavior.
-2. Reuse supported repository types.
-3. Write the simplest plausible C++ control flow.
-4. Preserve a `STUB` annotation until the full body is complete.
-5. Format each changed C or C++ file.
-6. Run `tools/decomp bc <address>` after each meaningful source-model change.
-7. Use `tools/decomp bc --full <address>` only when the concise mismatch windows omit required data.
-8. Change one source-level idea in each comparison attempt.
-9. Use `tools/decomp experiment` for competing natural source forms.
+## Continue or stop
 
-For a body larger than 1000 bytes, compare one representative region first. Stop if the frame or control flow disproves the source model.
+Spawn the next worker only when all these conditions are true:
 
-Do not chase register allocation or labels after the behavior and structure agree. Keep clear source when the remaining difference is compiler-incidental.
+- the prior result is `banked`
+- the repository checks pass
+- the worker reports more supported work
+- the user did not request a stop
+- the goal has enough remaining budget for another complete slice
 
-## Validate the slice
+Stop on `stalemate`. Do not ask another worker to repeat the same discovery or blocker search.
 
-1. Stage only the intended files.
-2. Run `tools/decomp validate --target <address> --staged` for each target.
-3. Run `tools/decomp compare`.
-4. Run `tools/decomp lint`.
-5. Use `tools/decomp lint --show all` only to inspect the legacy backlog.
-6. Run `tools/decomp progress` when annotations changed.
-7. Run `tools/decomp check` when the function map or annotations changed.
-8. Run `git diff --check`.
-9. Review the staged diff and working-tree state.
+Stop on `failed` after one corrective follow-up. Report the repository state and the failure.
 
-Do not mark a function as matched without a fresh exact comparison and clean lint result.
+Before a planned goal-turn boundary, wait for the active worker. Do not leave a worker unobserved.
 
-## Bank the slice
-
-1. Commit the validated slice with a focused message.
-2. Run `tools/decomp sync` once after the final commit.
-3. Run `tools/decomp report` once after the final commit.
-4. Push `agent/continuous` to `origin` during an agent run.
-5. Confirm that `HEAD` equals `origin/agent/continuous`.
-6. Confirm that the working-tree state matches the slice startup state.
-7. Report the addresses, evidence, scores, validation, types, raw offsets, regressions, and uncertainties.
-
-## Fresh-run lifecycle
-
-The foreground runner gives each thread exactly one root turn. Do not use Goal mode for unattended work.
-
-Call `request_fresh_run` only after a coherent slice is committed, synchronized, reported, and pushed. Request a new run only when supported work remains.
-
-Do not request a new run for a stalemate. End the turn with the supported blockers instead.
-
-After the tool accepts a request, provide the final response immediately. Do not call another tool.
-
-At a safe-boundary stop request, bank recoverable work or preserve the current state. Do not request a successor.
-
-Use `context_pressure_after_bank` only after you bank a complete slice. Never use context pressure to hand off an uncommitted edit.
+Return a concise supervisor summary. Include each commit, changed address, score, validation result, and final blocker state.

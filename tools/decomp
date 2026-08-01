@@ -237,7 +237,6 @@ Commands:
   score <addr>...   Print only the similarity verdict for one or more addresses
   bc <addr>         Build toy2.exe, then compare one address verbosely
   notes <query>     Search bounded codegen, debt, and original-name notes
-  agent <command>   Run or control the fresh-thread decompilation supervisor
   candidates [ns]   Rank reconstruction candidates (no Ghidra, no reccmp run)
   discover [args]   Find credible Ghidra starts absent from the function map
   defer <addr> ...  Record a committed blocker or prerequisite
@@ -378,9 +377,6 @@ case "$command" in
         ;;
     notes)
         exec python tools/decomp_notes.py "$@"
-        ;;
-    agent)
-        exec python tools/decomp_agent.py "$@"
         ;;
     lint)
         exec python tools/decomp_lint.py "$@"

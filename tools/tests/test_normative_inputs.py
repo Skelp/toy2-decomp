@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[2]
 NORMATIVE_INPUTS = (
     "AGENTS.md",
     ".agents/skills/continue-decomp/SKILL.md",
+    ".agents/skills/decomp-worker/SKILL.md",
+    ".agents/skills/decomp-worker/agents/openai.yaml",
     ".notes/README.md",
     ".notes/codegen-index.md",
     ".notes/codegen-rules.md",

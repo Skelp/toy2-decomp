@@ -2,8 +2,8 @@
 
 This file is the normative reference for **judgment**: what good reconstructed
 source looks like, how to choose work, and what the evidence rules are. The
-`continue-decomp` skill holds the **procedure**. The two do not repeat each
-other.
+The `continue-decomp` and `decomp-worker` skills hold the supervisor and worker
+**procedures**. This file does not repeat those procedures.
 
 ## How to read this file
 
@@ -27,6 +27,7 @@ is independent.
 | Ghidra sync | A sync fails or you change the vendored reccmp. |
 | Validation | Before every handoff. |
 | Repository hygiene | You add a file or touch build configuration. |
+| Goal supervisor lifecycle | Always when you use `/goal continue`. |
 
 ## Project goal
 
@@ -724,17 +725,21 @@ to reproduce original behavior.
   that macro globally.
 - Follow `CONTRIBUTING.md` for submission and runtime-testing requirements.
 
-## Agent runner lifecycle
+## Goal supervisor lifecycle
 
-Use `tools/decomp agent run` for unattended reconstruction. The runner keeps App Server in the foreground and gives each thread one root turn.
+Use `/goal continue` to start unattended reconstruction. The root agent must follow the `continue-decomp` supervisor skill.
 
-Do not use Goal mode for unattended reconstruction. Do not infer a successor from unfinished work.
+The root agent supervises only. It must not reconstruct source, run comparison work, or edit repository files.
 
-Request a fresh run only after you validate, commit, synchronize, report, and push one coherent slice. The pushed commit must be `origin/agent/continuous`.
+Start exactly one `decomp-worker` subagent at a time. A worker must complete one coherent slice and must not delegate work.
 
-Do not request a fresh run after a supported stalemate. Report the blockers and let the run stop.
+Wait for the worker to finish. Then verify the branch, worktree baseline, commit, and remote branch before another worker starts.
 
-The first stop request asks the agent to stop at a safe boundary. A second request interrupts the active turn.
+If a check fails, send a corrective task to the same worker. Do not start a replacement worker for that slice.
+
+Start another worker only after the prior slice is clean, committed, synchronized, reported, and pushed. Stop when supported work does not remain.
+
+Do not use an MCP server, an external supervisor, or a repository command that starts Codex for this workflow.
 
 ## Concise tool output
 
