@@ -236,6 +236,8 @@ Commands:
   compare [args]    Run reccmp against the reference and recompiled EXEs
   score <addr>...   Print only the similarity verdict for one or more addresses
   bc <addr>         Build toy2.exe, then compare one address verbosely
+  notes <query>     Search bounded codegen, debt, and original-name notes
+  agent <command>   Run or control the fresh-thread decompilation supervisor
   candidates [ns]   Rank reconstruction candidates (no Ghidra, no reccmp run)
   discover [args]   Find credible Ghidra starts absent from the function map
   defer <addr> ...  Record a committed blocker or prerequisite
@@ -274,18 +276,27 @@ does not call Ghidra or reccmp. `evidence` makes bounded Ghidra queries:
   tools/decomp evidence 0x00403640
   tools/decomp evidence --unmapped 0x00403640
   tools/decomp evidence 0x00403640 --disasm
+  tools/decomp evidence 0x00403640 --decomp-range 80:160
+  tools/decomp evidence 0x00403640 --full
   tools/decomp audit --legacy-caps --limit 20
   tools/decomp audit --status
 
 `score` avoids the assembly diff when you only need the percentage:
   tools/decomp score 0x00403640 0x004B99F0
 
+Routine output is bounded. `candidates` and `discover` show 10 rows.
+`blockers` shows 20 rows. Use `--limit 0` or `--all` for all rows.
+`evidence` shows 12 rows per category and 120 decompilation lines. Use
+`--full` for all evidence. `bc` saves the complete diff in
+build/decomp-diffs and prints three mismatch windows. Use `bc --full` or
+`compare --verbose` for the complete comparison. `notes` shows eight matches.
+
 `lint` measures source plausibility, which the comparison cannot see. An exact
 match that still states byte offsets is a transliteration, not a
 reconstruction:
   tools/decomp lint                 # all of src/
   tools/decomp lint --staged        # only what you are about to commit
-  tools/decomp lint --show new      # only findings that are not in the baseline
+  tools/decomp lint --show all      # include the reviewed legacy backlog
   tools/decomp lint --explain RULE  # rationale and required source form
   tools/decomp lint --format json   # structured findings for other tools
 
@@ -346,14 +357,9 @@ case "$command" in
         exec python tools/decomp_candidates.py --clear-deferral "$1"
         ;;
     blockers)
-        if [[ $# -gt 1 ]]; then
-            echo "Usage: tools/decomp blockers [address]" >&2
-            exit 2
-        fi
-        if [[ $# -eq 1 ]]; then
-            exec python tools/decomp_candidates.py --list-blockers "$1"
-        fi
-        exec python tools/decomp_candidates.py --list-blockers
+        address=""
+        if [[ $# -gt 0 && $1 != --* ]]; then address="$1"; shift; fi
+        exec python tools/decomp_candidates.py --list-blockers "$address" "$@"
         ;;
     audit)
         if [[ ${1:-} == "--status" ]]; then
@@ -369,6 +375,12 @@ case "$command" in
         ;;
     evidence)
         exec python tools/decomp_evidence.py "$@"
+        ;;
+    notes)
+        exec python tools/decomp_notes.py "$@"
+        ;;
+    agent)
+        exec python tools/decomp_agent.py "$@"
         ;;
     lint)
         exec python tools/decomp_lint.py "$@"
@@ -390,12 +402,29 @@ case "$command" in
         score "$@"
         ;;
     bc)
+        full=0
+        bc_args=()
+        for argument in "$@"; do
+            if [[ $argument == "--full" ]]; then full=1; else bc_args+=("$argument"); fi
+        done
+        set -- "${bc_args[@]}"
         if [[ $# -ne 1 ]]; then
-            echo "Usage: tools/decomp bc <address>" >&2
+            echo "Usage: tools/decomp bc [--full] <address>" >&2
+            exit 2
+        fi
+        if [[ ! $1 =~ ^0x[0-9A-Fa-f]{8}$ ]]; then
+            echo "error: bc needs an address such as 0x00401230" >&2
             exit 2
         fi
         build_game
-        (cd build && reccmp-reccmp --target TOY2 --verbose "$1")
+        mkdir -p build/decomp-diffs
+        diff_path="build/decomp-diffs/${1}.txt"
+        (cd build && reccmp-reccmp --target TOY2 --no-color --verbose "$1") > "$diff_path"
+        if [[ $full -eq 1 ]]; then
+            python tools/decomp_diff.py "$diff_path" --full
+        else
+            python tools/decomp_diff.py "$diff_path"
+        fi
         ;;
     baseline)
         baseline "$@"

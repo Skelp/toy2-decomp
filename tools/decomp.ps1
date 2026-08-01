@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("configure", "build", "compare", "score", "candidates", "discover", "evidence", "defer", "undefer", "blockers", "audit", "baseline", "validate", "experiment", "lint", "report", "session-summary", "progress", "run", "shell", "help")]
+    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "discover", "evidence", "notes", "agent", "defer", "undefer", "blockers", "audit", "baseline", "validate", "experiment", "lint", "report", "session-summary", "progress", "run", "shell", "help")]
     [string] $Command = "help",
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -131,6 +131,8 @@ Commands:
   candidates [args] Rank reconstruction candidates
   discover [args]   Find credible Ghidra starts absent from the function map
   evidence <addr>   Collect bounded evidence for a mapped or discovered target
+  notes <query>     Search bounded codegen, debt, and original-name notes
+  agent <command>   Run or control the fresh-thread decompilation supervisor
   defer <addr> ...  Record a committed blocker or prerequisite
   undefer <addr>    Clear all committed blockers for one target
   blockers [addr]   Show committed blockers
@@ -143,6 +145,10 @@ Commands:
   progress [scope]  Show annotation progress, optionally for a namespace
   run [args]        Run the recompiled toy2.exe
   shell             Start cmd.exe with the VC6 environment active
+
+Routine output is bounded. Use --limit 0, --all, or --full when a command
+reports omitted evidence. The bc command saves its complete output under
+build\decomp-diffs.
 "@
 }
 
@@ -154,6 +160,12 @@ if ($Command -eq "help") {
 if ($Command -eq "lint") {
     & python (Join-Path $Root "tools\decomp_lint.py") @CommandArgs
     Assert-LastExit "Checking source plausibility"
+    exit 0
+}
+if ($Command -in @("notes", "agent")) {
+    $Script = if ($Command -eq "notes") { "tools\decomp_notes.py" } else { "tools\decomp_agent.py" }
+    & python (Join-Path $Root $Script) @CommandArgs
+    Assert-LastExit "Running $Command"
     exit 0
 }
 if ($Command -in @("discover", "evidence")) {
@@ -180,10 +192,15 @@ if ($Command -eq "undefer") {
     exit 0
 }
 if ($Command -eq "blockers") {
-    if ($CommandArgs.Count -gt 1) {
-        throw "Usage: tools/decomp.ps1 blockers [address]"
+    $BlockerArgs = @("--list-blockers")
+    if ($CommandArgs.Count -gt 0 -and -not $CommandArgs[0].StartsWith("--")) {
+        $BlockerArgs += $CommandArgs[0]
+        if ($CommandArgs.Count -gt 1) { $BlockerArgs += $CommandArgs[1..($CommandArgs.Count - 1)] }
+    } else {
+        $BlockerArgs += ""
+        $BlockerArgs += $CommandArgs
     }
-    & $VenvPython (Join-Path $Root "tools\decomp_candidates.py") --list-blockers @CommandArgs
+    & $VenvPython (Join-Path $Root "tools\decomp_candidates.py") @BlockerArgs
     Assert-LastExit "Show the committed blockers"
     exit 0
 }
@@ -240,6 +257,32 @@ switch ($Command) {
         Write-ComparisonReport $Report
         & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") score $Report @CommandArgs
         Assert-LastExit "Classifying comparison results"
+    }
+    "bc" {
+        $Full = $false
+        $BcArgs = @()
+        foreach ($Argument in $CommandArgs) {
+            if ($Argument -eq "--full") { $Full = $true } else { $BcArgs += $Argument }
+        }
+        $CommandArgs = $BcArgs
+        if ($CommandArgs.Count -ne 1 -or $CommandArgs[0] -notmatch '^0x[0-9A-Fa-f]{8}$') {
+            throw "Usage: tools/decomp.ps1 bc [--full] <address>"
+        }
+        Build-Project
+        $DiffDirectory = Join-Path $Root "build\decomp-diffs"
+        New-Item -ItemType Directory -Force $DiffDirectory | Out-Null
+        $Diff = Join-Path $DiffDirectory "$($CommandArgs[0]).txt"
+        Push-Location (Join-Path $Root "build")
+        try {
+            & reccmp-reccmp --target TOY2 --no-color --verbose $CommandArgs[0] | Set-Content -Encoding utf8 $Diff
+            Assert-LastExit "Comparing the target"
+        } finally {
+            Pop-Location
+        }
+        $DiffArgs = @($Diff)
+        if ($Full) { $DiffArgs += "--full" }
+        & python (Join-Path $Root "tools\decomp_diff.py") @DiffArgs
+        Assert-LastExit "Formatting the comparison"
     }
     "baseline" {
         Build-Project

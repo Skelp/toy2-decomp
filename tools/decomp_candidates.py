@@ -393,6 +393,7 @@ def print_blockers(
     names: dict[int, str],
     candidates: dict[int, Candidate],
     address: int | None = None,
+    limit: int = 20,
 ) -> None:
     selected = [
         (target, blocker)
@@ -404,7 +405,8 @@ def print_blockers(
         return
     print("TARGET      STATE     BLOCKED BY                         REASON")
     print("-" * 98)
-    for target, blocker in selected:
+    shown = selected[:limit] if limit else selected
+    for target, blocker in shown:
         if blocker.semantic_state == "ready":
             state = "deferred"
         elif blocker.manual:
@@ -426,6 +428,8 @@ def print_blockers(
             f"0x{target:08X}  {state:<9} {dependencies:<34} "
             f"[{metadata}] {blocker.reason}"
         )
+    if limit and len(selected) > limit:
+        print(f"... {len(selected) - limit} more (use --limit 0 or --all)")
 
 
 def namespace_of(name: str) -> str:
@@ -1180,7 +1184,7 @@ def print_table(chosen: list[Candidate], limit: int, show_reasons: bool) -> None
         print(f"... {len(chosen) - limit} more (raise --limit to see them)")
 
 
-def print_dependency_summary(target: Candidate, names: dict[int, str]) -> None:
+def print_dependency_summary(target: Candidate, names: dict[int, str], limit: int = 12) -> None:
     print(f"Dependency goal: {target.address_text} {target.name}")
     if target.state == "FUNCTION":
         state = "implemented"
@@ -1189,12 +1193,16 @@ def print_dependency_summary(target: Candidate, names: dict[int, str]) -> None:
     print(f"State: {state}")
     if target.unresolved_dependencies:
         print("Unresolved direct prerequisites:")
-        for address in target.unresolved_dependencies:
+        for address in target.unresolved_dependencies[:limit]:
             print(f"  0x{address:08X}  {names.get(address, '(not in map)')}")
+        if len(target.unresolved_dependencies) > limit:
+            print(f"  ... {len(target.unresolved_dependencies) - limit} more (use --limit 0)")
     if target.weak_dependencies:
         print("Semantically uncertain dependencies:")
-        for address in target.weak_dependencies:
+        for address in target.weak_dependencies[:limit]:
             print(f"  0x{address:08X}  {names.get(address, '(not in map)')}")
+        if len(target.weak_dependencies) > limit:
+            print(f"  ... {len(target.weak_dependencies) - limit} more (use --limit 0)")
     if target.quality_prerequisite:
         print("Quality prerequisite: yes")
     if target.manual_blocker:
@@ -1327,10 +1335,16 @@ def main() -> int:
         action="store_true",
         help="deprecated alias: include verified tool-only artifacts",
     )
-    parser.add_argument("--limit", type=int, default=20, help="rows to print (0 = all)")
+    parser.add_argument("--limit", type=int, help="rows to print (0 = all; default: 10)")
+    parser.add_argument("--all", action="store_true", help="show all rows")
     parser.add_argument("--why", action="store_true", help="print the rank and its evidence")
     parser.add_argument("--json", action="store_true", help="emit JSON instead of a table")
     args = parser.parse_args()
+    limit_explicit = args.limit is not None or args.all
+    if args.all:
+        args.limit = 0
+    elif args.limit is None:
+        args.limit = 20 if args.list_blockers is not None else 10
 
     if args.research and (args.new_work or args.target_address is not None):
         parser.error("--research cannot be combined with --new-work or --for")
@@ -1412,6 +1426,7 @@ def main() -> int:
             names,
             {candidate.address: candidate for candidate in build_candidates()},
             blocker_address,
+            args.limit,
         )
         return 0
 
@@ -1570,7 +1585,8 @@ def main() -> int:
 
     if args.target_address is not None:
         target = next(item for item in candidates if item.address == args.target_address)
-        print_dependency_summary(target, names)
+        dependency_limit = (args.limit or sys.maxsize) if limit_explicit else 12
+        print_dependency_summary(target, names, dependency_limit)
     print_table(chosen, args.limit, args.why)
     return 0
 

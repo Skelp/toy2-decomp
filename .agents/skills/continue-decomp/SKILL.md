@@ -1,306 +1,100 @@
 ---
 name: continue-decomp
-description: Start or continue a Toy Story 2 decompilation session. Use at the start of a session or when asked to continue decompilation, pick the next function to decompile, make progress, or reconstruct a target. Establishes baseline, selects a target, works on the persistent agent/continuous branch (creating it from main if absent), and drives the validate-sync-report loop.
+description: Start or continue one Toy Story 2 reconstruction slice. Select evidence-backed work, reconstruct it, validate it, and bank it.
 ---
 
-# Continue Decompilation
+# Continue decompilation
 
-This is the **procedure**. The judgment rules (ABI recovery, struct layouts,
-naming, anti-score-chasing) live in `AGENTS.md`. This file does not repeat them.
+Use this procedure for one coherent reconstruction slice. `AGENTS.md` defines source quality, evidence precedence, work selection, and repository rules.
 
-Run from the repository root: `/run/media/skelp/1TB/venvs/toy2-decomp`.
+## Start the slice
 
-**The discipline: select promptly, test early, and commit after the quality
-review.** The most common failure mode is surveying candidates without a
-source-model test. The build-compare loop supplies the test.
+1. Run `git status --short`.
+2. Preserve unrelated changes. The unchanged `external/submodules/reccmp` pointer can remain dirty.
+3. Confirm the current branch. For agent runs, use `agent/continuous`.
+4. Run `tools/decomp progress`.
+5. Run `tools/decomp baseline` before source edits.
+6. Run `tools/decomp candidates --why`.
+7. During the audit freeze, complete one required audit.
+8. Otherwise, select one dependency-frontier target or one tightly coupled group.
 
-## 1. Read this much, and no more
-
-| Read | When |
-| --- | --- |
-| This file | Always. |
-| `.notes/codegen-index.md` | Always. It is one line per known symptom. |
-| `.notes/original-names.md` | Before you name any structure, field, or global. |
-| `AGENTS.md` sections | On demand. Its table of contents says which. |
-| `.notes/refactor-debt.md` | Always. Clear this list before new reconstruction. |
-| `.notes/codegen-rules.md` §`FIX-nn` | A diff matches that index row. |
-| `.notes/codegen-caps.md` §`CAP-nn` | A diff matches that index row. |
-| `.notes/reccmp-mechanics.md` §`TOOL-nn` | An annotation or tool problem. |
-| `.notes/shared-globals.md` | Your target reads an unfamiliar data address. |
-| `.notes/README.md` | You want to add a note. |
-
-Do **not** read the detail note files end to end. They are reference, indexed
-by ID from `codegen-index.md`. Reading them in full costs about 20 000 tokens
-and returns almost nothing you will use for one function.
-
-## 2. Establish the baseline
+Use bounded commands first:
 
 ```sh
-git status --short                 # no overlapping unrelated local changes
-tools/decomp check                 # functions_map.txt invariant, must exit 0
-tools/decomp progress              # the denominator
-tools/decomp baseline              # saved comparison and build identity
+tools/decomp candidates --new-work --why
+tools/decomp candidates --for 0x00401230 --why
+tools/decomp evidence 0x00401230
+tools/decomp notes QUERY --source codegen
+tools/decomp notes QUERY --source debt
+tools/decomp notes QUERY --source names
 ```
 
-- If `check` fails, **fix the map first**. That is the prerequisite, not your
-  target.
-- If `build/decomp-report-data.json` is absent or stale, run `tools/decomp
-  build` and `tools/decomp report`. `candidates` reads that file for the match
-  percentages.
+Use `--limit 0`, `--all`, or `--full` only when the bounded result omits required evidence.
 
-## 3. Select a target
+## Confirm the target
 
-```sh
-tools/decomp audit --status                   # show the required audit scope
-tools/decomp candidates --limit 15 --why      # show required pending audits
-tools/decomp candidates --new-work --why      # dependency-frontier new work
-tools/decomp candidates --for 0x004XXXXX --why # frontier for one goal
-tools/decomp candidates --new-work --allow-large --why # reviewed large goals
-tools/decomp candidates --diagnose            # summarize frontier blockers
-tools/decomp candidates --research --why      # rank blocker evidence providers
-tools/decomp evidence 0x004XXXXX              # the single best candidate
-tools/decomp discover                         # use when mapped work is blocked
-tools/decomp discover --all                   # include lower-confidence starts
-tools/decomp evidence --unmapped 0x004XXXXX   # verify a discovery result
-```
+Before an edit, record a short working summary outside the repository. Include these facts:
 
-**Complete the required audits before new work.** During the freeze, the
-default list contains pending former CAP, sub-50 percent, and verified-code
-debt audits. Use `--new-work` when the audit queue is complete. The list can
-contain large functions with resolved function dependencies.
+- the target address, subsystem, and translation unit
+- the calling convention, return type, and parameter roles
+- callers, callees, globals, fields, and important constants
+- the applicable OpenCrashWOC analogue
+- confirmed facts, hypotheses, and unresolved questions
 
-For a source-debt audit, use the order in `.notes/refactor-debt.md`. The file
-starts with the smallest supported fixes.
+Read `AGENTS.md` before you name a symbol or change a type. Retail strings have the highest naming priority.
 
-`candidates` implements the dependency rubric in `AGENTS.md`. It promotes a
-frontier function when that function unlocks unfinished callers. A function
-below 75 percent blocks a large direct caller when its semantic state is
-`unknown` or `uncertain`. A semantically `ready` dependency does not block the
-caller, even when its source has a code-generation blocker. Size resolves ties.
+If evidence remains insufficient, select the next supported target. Record a blocker when one function or missing fact blocks useful work.
 
-The default new-work list omits a large goal that has no downstream unlock.
-Use `--allow-large` only after you review the goal and its frontier. The command
-also reports indirect transfers. Use the evidence command to judge them.
-Useful filters are `--debt`, `--stubs`, `--leaves`, `--near`, `--max-size N`,
-and `<namespace>`.
+## Reconstruct and compare
 
-After an audit, replace the placeholder uncertainty and revisit trigger. Set
-`audit-state` to `audited`. Then run `tools/decomp audit --refresh-ledger`.
-The refresh preserves manual evidence and updates the measured state.
+1. Recover the ABI and observable behavior.
+2. Reuse supported repository types.
+3. Write the simplest plausible C++ control flow.
+4. Preserve a `STUB` annotation until the full body is complete.
+5. Format each changed C or C++ file.
+6. Run `tools/decomp bc <address>` after each meaningful source-model change.
+7. Use `tools/decomp bc --full <address>` only when the concise mismatch windows omit required data.
+8. Change one source-level idea in each comparison attempt.
+9. Use `tools/decomp experiment` for competing natural source forms.
 
-`evidence` returns the map neighbors, the annotation state and owning TU, the
-decompilation, the callers, the callees, the referenced **strings**, and the
-referenced data addresses in one call. Add `--disasm` only when the
-decompilation looks wrong.
+For a body larger than 1000 bytes, compare one representative region first. Stop if the frame or control flow disproves the source model.
 
-**Read the strings section first.** The retail build kept its assert text, which
-quotes the developers' own expressions. A line such as `drawb->VerticeCount[i]`
-hands you a structure name, a field name, and proof the member is an array. A
-`C:\projects\...` path names the original translation unit. Those names outrank
-anything you would invent, and missing them is how a function ends up stating
-byte offsets.
+Do not chase register allocation or labels after the behavior and structure agree. Keep clear source when the remaining difference is compiler-incidental.
 
-**Gate.** Use the "Minimal candidate checklist" in `AGENTS.md` after the first
-`evidence` call. Get more evidence when one focused query can answer a missing
-item. Defer the target when its ABI, data model, or control flow stays unclear.
+## Validate the slice
 
-If a function can resolve the blocker, record it with `tools/decomp defer
-<target> --blocked-by <address> --kind <kind> --semantic-state uncertain
---fingerprint auto --reason <text>`. Use `--evidence-provider` for a related
-function that can supply evidence but is not a direct prerequisite. The target
-returns after the prerequisite becomes semantically `ready`.
+1. Stage only the intended files.
+2. Run `tools/decomp validate --target <address> --staged` for each target.
+3. Run `tools/decomp compare`.
+4. Run `tools/decomp lint`.
+5. Use `tools/decomp lint --show all` only to inspect the legacy backlog.
+6. Run `tools/decomp progress` when annotations changed.
+7. Run `tools/decomp check` when the function map or annotations changed.
+8. Run `git diff --check`.
+9. Review the staged diff and working-tree state.
 
-Use `compiler-codegen/ready` or `source-form/ready` only when the ABI, behavior,
-side effects, and data model are supported. These records defer more work on
-the dependency without blocking its callers. Use `unknown` or `uncertain` when
-new evidence can change the contract. Omit `--blocked-by` only for a manual
-blocker. Clear it with `tools/decomp undefer <target>`. Keep the blocker-ledger
-change after you restore rejected source. Commit these records before the
-session ends.
+Do not mark a function as matched without a fresh exact comparison and clean lint result.
 
-If all mapped frontier targets have supported blockers, do one fallback pass:
+## Bank the slice
 
-1. Run `candidates --new-work --allow-large --why`.
-2. Run `discover` and verify high-confidence results.
-3. Run `candidates --research --why`.
-4. Run `discover --all` and verify supported medium-confidence results.
-5. Run `candidates --diagnose` and revisit changed fingerprints.
+1. Commit the validated slice with a focused message.
+2. Run `tools/decomp sync` once after the final commit.
+3. Run `tools/decomp report` once after the final commit.
+4. Push `agent/continuous` to `origin` during an agent run.
+5. Confirm that `HEAD` equals `origin/agent/continuous`.
+6. Confirm that the working-tree state matches the slice startup state.
+7. Report the addresses, evidence, scores, validation, types, raw offsets, regressions, and uncertainties.
 
-Do not repeat an empty query. Stop with a supported stalemate if each check
-returns no work. Discovery can use inbound transfers, aligned code pointers,
-and outbound calls. Confirm the function start, ABI, ownership, and name with
-`evidence --unmapped`. Then add the confirmed map entry and a `STUB` before
-normal candidate selection. Do not copy a Ghidra name without separate
-evidence.
+## Fresh-run lifecycle
 
-## 4. Get on the branch — immediately after selection
+The foreground runner gives each thread exactly one root turn. Do not use Goal mode for unattended work.
 
-Use the **persistent** branch `agent/continuous`. Reuse it if it exists; create
-it from `main` only if it does not.
+Call `request_fresh_run` only after a coherent slice is committed, synchronized, reported, and pushed. Request a new run only when supported work remains.
 
-```sh
-git rev-parse --verify agent/continuous >/dev/null 2>&1 \
-  && git checkout agent/continuous \
-  || { git checkout main && git checkout -b agent/continuous; }
-```
+Do not request a new run for a stalemate. End the turn with the supported blockers instead.
 
-- One shared branch across sessions. Push completed work before the session
-  ends. Do **not** create a per-function branch.
-- Make sure the working tree is clean before you start a new function. If `main`
-  has advanced, `git rebase main` first.
-- Session scope is one complete function, or one tightly coupled cluster with
-  its required types. A dependency-ready large function is valid session work.
-  Do not commit a partial large-function body.
-- Make reasonably sized commits. A one- or two-line code change does not justify
-  its own commit. Group small changes only when they form one coherent
-  reconstruction slice in the same subsystem. Do not combine unrelated changes
-  to inflate a commit.
+After the tool accepts a request, provide the final response immediately. Do not call another tool.
 
-## 5. Reconstruct — on the branch
+At a safe-boundary stop request, bank recoverable work or preserve the current state. Do not request a successor.
 
-Follow `AGENTS.md`, "Reconstructing plausible source" and "Using compiler
-comparison productively".
-
-```sh
-clang-format -i <touched files>
-tools/decomp bc 0x004XXXXX          # build, then the verbose comparison
-tools/decomp score 0x004XXXXX ...   # percentages only, for a cluster check
-tools/decomp experiment start 0x004XXXXX
-tools/decomp experiment try 0x004XXXXX natural-form
-```
-
-- Change **one** source-level idea per cycle, so the result confirms or rejects
-  that idea. If an idea does not move the diff toward a structural match,
-  revert it. Do not accumulate speculative edits.
-- Write the simplest supported form when the evidence is sufficient. Then use
-  the comparison to test the source model. Do not write a complete body only to
-  satisfy a time, tool-call, or commit target.
-- For a body larger than 1000 bytes, write one bounded region first. Include
-  the local layout and one representative branch or loop. Keep the `STUB`
-  annotation and run `tools/decomp bc` before you complete the body. Inspect
-  the implemented region and its frame, not the incomplete total score.
-  Continue only when the checkpoint supports the source model or identifies
-  one concrete correction.
-- **When two forms both fit the evidence, pick the simpler one, build it, and
-  note the alternative in the final report.** Do not choose between them by thinking.
-  If the simpler form regresses, that is your answer; `git restore` and take the
-  other one. Two builds cost about 45 seconds.
-- **A small inconsistency in the evidence is normal.** An array with one more
-  entry than its loop bound, an oversized buffer, an unused slot: retail is full
-  of these. Do not treat one as proof that your whole model is wrong. Record it,
-  choose the reading that satisfies the arithmetic, and let the build test it.
-- **Before you theorize about a diff, match it against `.notes/codegen-index.md`.**
-  A `FIX-nn` row suggests a source form to test. A `CAP-nn` row is a legacy
-  observation that requires an audit.
-- Change one source-level idea in each experiment. Stop when another form no
-  longer tests a source-model question. The number of attempts does not prove
-  that a compiler quirk caused the mismatch.
-- Do not add rows to `.notes/caps-registry.tsv`. A mismatch stays provisional
-  unless it is exact, reccmp-effective, or a verified tool artifact.
-- **An exact match is not the finish line.** `tools/decomp lint` must report no
-  new error. A 100% match that states byte offsets where a name belongs, or
-  carries a `fieldNN` parameter, is a matched transliteration. Declare the
-  structure, or leave the function a `STUB` for a session that can. The score
-  cannot see this, which is exactly why the lint exists.
-- Keep the verification tag from the fresh report. Use `[MATCHED]` for exact
-  clean source, `[EFFECTIVE]` for reccmp-effective clean source, `[TOOL]` for a
-  verified tool artifact, and `[PROVISIONAL]` for all other `FUNCTION` bodies.
-- If reconstruction shows the candidate was genuinely opaque, `git restore` and
-  take the next candidate. Do not delete the shared branch.
-- Stop a related cluster when two siblings remain below 50 percent under the
-  same source model. Investigate the common layout, macro, or control flow
-  before you implement another sibling.
-- If the first frontier target is not supported, record its blocker and select
-  the next frontier target. Fix type, layout, or lint debt when it unlocks that
-  frontier. Stop when all frontier targets have blockers.
-- Do not audit a provisional function as fallback work. A promoted quality
-  prerequisite is dependency work, but it still needs a supported source
-  defect. Do not change only register allocation to cross the threshold.
-- Use `--allow-large` only after all quality prerequisites pass the threshold.
-  Stop after the early checkpoint when the source model has broad structural
-  differences.
-
-**Debt items invert the order: write, build, compare, then judge.** A debt item
-already matches the retail code, so you have a known-good baseline that ordinary
-reconstruction lacks. Declare the type, build, and read the score. If it holds,
-your layout is right. If it drops, it is wrong, and you know within a minute.
-Do not settle a type design by reasoning when a build will decide it for you.
-`.notes/refactor-debt.md` gives the layouts and states which form to use.
-
-## 6. Validate and commit — per function
-
-1. Format the touched files with the repo `.clang-format`.
-2. Stage the intended source. Run `tools/decomp validate --target 0x004XXXXX
-   --staged`.
-   Validation rejects a new target below 75 percent by default. Keep that target
-   as a `STUB` unless a maintainer reviews it. A maintainer can set the ledger
-   origin to `maintainer-review` and use `--allow-low-score`. Each new
-   provisional target also needs a complete ledger row. Record the current
-   score, tested forms, measured scores, uncertainty, and a conditional trigger.
-3. `tools/decomp compare` and inspect the target's differences.
-4. `tools/decomp lint` — no new error. This is a gate, not advice.
-5. `tools/decomp check` — only if a map entry or an annotation changed.
-6. `tools/decomp progress` — only if annotations changed.
-7. `git diff --check`, then review `git diff` and `git status --short`.
-8. **Commit** to `agent/continuous` with a clear message
-   (`Implement <Namespace>::<Function>`). Do not commit a one- or two-line code
-   change by itself. Extend the coherent target or cluster until the commit has
-   enough substantive reconstruction work to stand on its own.
-
-## 7. Finish the session — once, not per commit
-
-These four steps are per **session**. Running them after every commit spends
-minutes and returns nothing.
-
-1. `tools/decomp sync` — reccmp's headless importer pushes every matched
-   function's name, signature, and types into Ghidra in one transaction. The
-   `ghidra` CLI bridge stops for the import and restarts afterwards.
-2. `tools/decomp report` — writes `build/decomp-report.html` and
-   `build/decomp-report-data.json`. The next session's `candidates` reads the
-   JSON, so this step is what keeps selection accurate.
-3. `tools/decomp session-summary <address>...` — report the new target count,
-   exact count, score distribution, and global accuracy change.
-4. `git push origin agent/continuous` (use `-u` on the first push; rebase first
-   if the remote has advanced).
-
-## Gotchas
-
-- Use `candidates`, `discover`, and `evidence` before custom discovery work.
-  Record a prerequisite address when focused evidence finds one.
-- **Do not polish near-matches.** Cycling functions above 90% for a
-  source-fixable diff produces no reconstruction. The priority is the
-  dependency frontier.
-- **The score is a metric, not the goal.** It is measured every cycle, so it is
-  the easiest thing to optimize and the easiest trap. Source plausibility is
-  measured only by `tools/decomp lint` and by your own judgment. A session of
-  exact matches full of `g_unkNNNNNN` and byte offsets is a bad session.
-- **The binary documents itself.** Assert strings carry field names, struct
-  names, and original file paths. `.notes/original-names.md` has the extraction.
-  Check it before inventing a name, and read the strings section of
-  `tools/decomp evidence` before writing a byte offset.
-- **`[MATCHED]` follows reconstruction, not precedes it.** Tag it only after
-  *you* reconstructed the function to an exact match this session and confirmed
-  it. Do not bulk-retrofit `[MATCHED]` onto functions you did not work on.
-- **`agent/continuous` is shared.** Commit and push every completed task. Never
-  leave uncommitted work on it between sessions.
-- **`functions_map.txt` is hand-maintained, not generated.** Source annotations
-  do not update it. When you reconstruct, rename, or newly discover a function,
-  edit its map entry. `tools/decomp check` enforces the invariants.
-- **A higher diff percent can be a meaningless register-allocation change.**
-  Treat a gain as a better model only when the edit is credible original source
-  explaining a real structural idea.
-- **Decompiler output is not pasteable source.** `iVar1`, `puVar2`, and
-  offset-only fields are analysis artifacts. Ghidra also under-detects MSVC
-  functions, so its function set is not ground truth. Note that `ghidra
-  function calls` returns **callers**, not callees.
-- **Prefer the vendored SDK headers over hand-rolled COM vtables.** The repo
-  ships the DirectX 6 and 7 SDK under `external/include/directx6/` and
-  `external/include/directx7/` as gitignored local inputs. Include the real
-  header and use the C++ method syntax it declares. Do not rebuild a partial
-  vtable struct of `void*` slots.
-- **Map names are RE hypotheses, not original symbols.** No PDB ships and there
-  are no PE exports. Strong leads, not proof.
-- **The build must stay serial.** `TOY2_BUILD_JOBS` exists but only 1 works:
-  VC6 shares one `vc60.pdb` per target. See `docs/linux-decomp.md`.
-- **The tools are quiet now.** No `msvc600` banner and no `libEGL` warnings.
-  Do not add noise filters to your commands; filter only for what you want.
+Use `context_pressure_after_bank` only after you bank a complete slice. Never use context pressure to hand off an uncommitted edit.

@@ -359,7 +359,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Find credible Ghidra function starts absent from the committed map."
     )
-    parser.add_argument("--limit", type=int, default=20, help="maximum rows (0 = all)")
+    parser.add_argument("--limit", type=int, default=10, help="maximum rows (0 = all)")
     parser.add_argument(
         "--min-confidence",
         choices=("high", "medium", "low"),

@@ -1025,7 +1025,7 @@ def main() -> int:
     parser.add_argument("--warnings-as-errors", action="store_true", help="fail on new advice too")
     parser.add_argument("--quiet", action="store_true", help="print only the summary")
     parser.add_argument("--format", choices=("text", "json"), default="text")
-    parser.add_argument("--show", choices=("legacy", "new", "all"), default="all")
+    parser.add_argument("--show", choices=("legacy", "new", "all"), default="new")
     parser.add_argument("--explain", metavar="RULE", help="explain one rule and exit")
     parser.add_argument(
         "--print-baseline", action="store_true",

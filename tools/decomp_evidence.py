@@ -45,6 +45,9 @@ from tools.decomp_dependencies import (  # noqa: E402
 )
 
 NEIGHBOR_COUNT = 3
+ROW_LIMIT = 12
+DECOMP_HEAD = 80
+DECOMP_TAIL = 40
 DATA_ADDRESS_RE = re.compile(r"0x(00[0-9a-fA-F]{6})")
 # A string pointer often appears as a bare `PUSH 0x5014f4` immediate, without
 # the leading zeroes the memory-operand form carries. Accept both widths and let
@@ -112,6 +115,37 @@ def section(title: str) -> None:
     print(f"\n== {title}")
 
 
+def bounded(items: list, limit: int, command: str) -> list:
+    """Return a display slice and report how to retrieve omitted rows."""
+
+    shown = items if limit == 0 else items[:limit]
+    if limit and len(items) > limit:
+        print(f"  ... {len(items) - limit} omitted. Run `{command}` for all rows.")
+    return shown
+
+
+def decomp_lines(body: str, full: bool, line_range: tuple[int, int] | None) -> list[str]:
+    lines = body.strip().splitlines()
+    if line_range:
+        start, end = line_range
+        return lines[start - 1 : end]
+    if full or len(lines) <= DECOMP_HEAD + DECOMP_TAIL:
+        return lines
+    omitted = len(lines) - DECOMP_HEAD - DECOMP_TAIL
+    return [*lines[:DECOMP_HEAD], f"... {omitted} lines omitted ...", *lines[-DECOMP_TAIL:]]
+
+
+def parse_range(value: str) -> tuple[int, int]:
+    try:
+        start_text, end_text = value.split(":", 1)
+        start, end = int(start_text), int(end_text)
+    except (ValueError, TypeError):
+        raise argparse.ArgumentTypeError("use START:END with positive line numbers")
+    if start < 1 or end < start:
+        raise argparse.ArgumentTypeError("use START:END with positive line numbers")
+    return start, end
+
+
 def ghidra_function_containing(address: int) -> tuple[int, int, str] | None:
     """Return the containing Ghidra function start, size, and local name."""
     payload = run_ghidra(["function", "get", f"0x{address:08X}"])
@@ -148,13 +182,21 @@ def main() -> int:
         help="inspect a discovered Ghidra start before it enters the map",
     )
     parser.add_argument("--disasm", action="store_true", help="also print the raw disassembly")
+    parser.add_argument("--full", action="store_true", help="print all evidence rows and text")
+    parser.add_argument(
+        "--decomp-range", type=parse_range, metavar="START:END",
+        help="print only this inclusive decompilation line range",
+    )
     parser.add_argument(
         "--disasm-limit",
         type=int,
-        default=120,
+        default=80,
         help="maximum disassembly instructions to print (0 = all)",
     )
     args = parser.parse_args()
+    row_limit = 0 if args.full else ROW_LIMIT
+    if args.full:
+        args.disasm_limit = 0
 
     try:
         address = int(args.address, 16)
@@ -232,9 +274,15 @@ def main() -> int:
             print(f"  semantic   {dependency_target.semantic_state}")
             if dependency_target.blocker_kind:
                 print(f"  blocker    {dependency_target.blocker_kind}")
-            for dependency in dependency_target.unresolved_dependencies:
+            unresolved = list(dependency_target.unresolved_dependencies)
+            for dependency in bounded(
+                unresolved, row_limit, f"tools/decomp evidence {args.address} --full"
+            ):
                 print(f"  unresolved  0x{dependency:08X}  {names.get(dependency, '(not in map)')}")
-            for dependency in dependency_target.weak_dependencies:
+            weak = list(dependency_target.weak_dependencies)
+            for dependency in bounded(
+                weak, row_limit, f"tools/decomp evidence {args.address} --full"
+            ):
                 print(
                     f"  uncertain   0x{dependency:08X}  "
                     f"{names.get(dependency, '(not in map)')}"
@@ -272,7 +320,10 @@ def main() -> int:
     if not callers:
         print("none reported by Ghidra (an indirect or table-dispatched call is still possible)")
     else:
-        for reference in callers if isinstance(callers, list) else []:
+        caller_rows = callers if isinstance(callers, list) else []
+        for reference in bounded(
+            caller_rows, row_limit, f"tools/decomp evidence {args.address} --full"
+        ):
             origin = reference.get("from", "")
             try:
                 origin_address = int(origin, 16)
@@ -316,7 +367,9 @@ def main() -> int:
                 targets.append(target_address)
     if not targets:
         print("none found (a leaf, or dispatch is indirect through a vtable or table)")
-    for target_address in targets:
+    for target_address in bounded(
+        targets, row_limit, f"tools/decomp evidence {args.address} --full"
+    ):
         if target_address in names:
             target_state = functions.get(target_address, ("NOT_STARTED", "", 0))[0]
             print(f"  0x{target_address:08X}  {names[target_address]:<46} [{target_state}]")
@@ -330,7 +383,16 @@ def main() -> int:
     body = ""
     if isinstance(decompiled, list) and decompiled:
         body = str(decompiled[0].get("code", ""))
-        print(body.strip() or "(empty)")
+        selected_lines = decomp_lines(body, args.full, args.decomp_range)
+        print("\n".join(selected_lines) or "(empty)")
+        total_lines = len(body.strip().splitlines())
+        if args.decomp_range:
+            print(
+                f"... showing lines {args.decomp_range[0]}:{args.decomp_range[1]} "
+                f"of {total_lines}. Run `tools/decomp evidence {args.address} --full` for all."
+            )
+        elif not args.full and total_lines > DECOMP_HEAD + DECOMP_TAIL:
+            print(f"Run `tools/decomp evidence {args.address} --full` for all decompilation lines.")
     else:
         print("unavailable; is the Ghidra bridge running? try `ghidra status`")
 
@@ -361,7 +423,9 @@ def main() -> int:
         section("referenced strings (original names outrank invented ones)")
         if not literals:
             print("none")
-        for literal in literals:
+        for literal in bounded(
+            literals, row_limit, f"tools/decomp evidence {args.address} --full"
+        ):
             print(f"  0x{literal.address:08X}  {literal.text!r}")
             for expression in literal.field_expressions:
                 print(f"{'':>14}^ original field name: {expression}")
@@ -384,7 +448,9 @@ def main() -> int:
     ]
     if not referenced:
         print("none found in the decompilation text")
-    for data_address in referenced:
+    for data_address in bounded(
+        referenced, row_limit, f"tools/decomp evidence {args.address} --full"
+    ):
         if data_address in annotated_globals:
             owner, owner_line = annotated_globals[data_address]
             symbol = global_names.get(data_address, "")
@@ -402,7 +468,10 @@ def main() -> int:
                 f"{instruction.get('mnemonic', ''):<8} {operands}"
             )
         if args.disasm_limit and len(rows) > args.disasm_limit:
-            print(f"  ... {len(rows) - args.disasm_limit} more (raise --disasm-limit)")
+            print(
+                f"  ... {len(rows) - args.disasm_limit} omitted. Run "
+                f"`tools/decomp evidence {args.address} --disasm --full` for all."
+            )
 
     return 0
 

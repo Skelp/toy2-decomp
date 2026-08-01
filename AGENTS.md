@@ -723,3 +723,30 @@ to reproduce original behavior.
   conveniences belong behind `APPLY_FIXES` in `patcher.dll`. Do not enable
   that macro globally.
 - Follow `CONTRIBUTING.md` for submission and runtime-testing requirements.
+
+## Agent runner lifecycle
+
+Use `tools/decomp agent run` for unattended reconstruction. The runner keeps App Server in the foreground and gives each thread one root turn.
+
+Do not use Goal mode for unattended reconstruction. Do not infer a successor from unfinished work.
+
+Request a fresh run only after you validate, commit, synchronize, report, and push one coherent slice. The pushed commit must be `origin/agent/continuous`.
+
+Do not request a fresh run after a supported stalemate. Report the blockers and let the run stop.
+
+The first stop request asks the agent to stop at a safe boundary. A second request interrupts the active turn.
+
+## Concise tool output
+
+Use concise defaults for routine work. Use an escape hatch only when omitted evidence is necessary.
+
+- `evidence` caps each evidence category at 12 rows. It shows the first 80 and last 40 decompilation lines.
+- Use `evidence --decomp-range START:END` for a focused line range. Use `evidence --full` for all evidence.
+- `evidence --disasm` shows 80 instructions. Use `--disasm-limit 0` or `--full` for all instructions.
+- `bc` saves the complete diff under `build/decomp-diffs/`. It prints at most three mismatch windows and 160 lines.
+- Use `bc --full` to print the saved diff. Use `compare --verbose` for direct raw reccmp output.
+- `candidates` and `discover` show 10 rows. Use `--limit 0` or `--all` for all rows.
+- Dependency categories show 12 entries. Use `--limit 0` for all entries.
+- `blockers` shows 20 rows. Use `--limit 0` or `--all` for all rows.
+- `lint` shows new findings. Use `lint --show all` for the reviewed legacy backlog.
+- `notes` shows eight ranked matches. Use `notes QUERY --limit 0` for all matches.
