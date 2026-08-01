@@ -35,7 +35,7 @@ namespace Toy2
 		struct MathScratchVector
 		{
 			Vector3I value;
-			int32_t reserved;
+			int32_t scalar;
 		};
 
 		struct CollisionMeshInstance

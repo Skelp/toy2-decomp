@@ -327,6 +327,8 @@ namespace Toy2
 			uint32_t contactFlags;
 			PackedCollisionFace* face;
 			CollisionNormal hitNormal;
+			Vector3I movementDirection;
+			int32_t movementLength;
 		};
 
 		const int16_t COLLISION_MESH_STATIC_A = 6;
@@ -355,9 +357,11 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(CollisionTreeGroup) == 0x0C);
 		STATIC_ASSERT(sizeof(CollisionGridCell) == 0x14);
 		STATIC_ASSERT(sizeof(CollisionMeshRecord) == sizeof(CollisionMeshInstance));
-		STATIC_ASSERT(sizeof(CollisionSweep) == 0x3C);
+		STATIC_ASSERT(sizeof(CollisionSweep) == 0x4C);
 		STATIC_ASSERT(offsetof(CollisionSweep, nearestFraction) == 0x20);
 		STATIC_ASSERT(offsetof(CollisionSweep, hitNormal) == 0x34);
+		STATIC_ASSERT(offsetof(CollisionSweep, movementDirection) == 0x3C);
+		STATIC_ASSERT(offsetof(CollisionSweep, movementLength) == 0x48);
 
 		// GLOBAL: TOY2 0x00729178
 		CollisionQueryResult g_collisionQueryResults[2];
@@ -882,6 +886,213 @@ namespace Toy2
 			return foundHit;
 		}
 
+		// FUNCTION: TOY2 0x004813B0 [PROVISIONAL]
+		int32_t SweepEdge(const Vector3I* start,
+			const Vector3I* end,
+			int32_t edgeX,
+			int32_t edgeY,
+			int32_t edgeZ,
+			CollisionSweep* sweep,
+			int32_t radius,
+			const Vector3I16* adjacentNormals)
+		{
+			Vector3I& movementDirection = g_mathScratch[1].value;
+			Vector3I& edgeDirection = g_mathScratch[2].value;
+			Vector3I& contactPoint = g_mathScratch[3].value;
+			Vector3I& perpendicular = g_mathScratch[4].value;
+			Vector3I& edgeCross = g_mathScratch[5].value;
+			Vector3I& planeNormal = g_mathScratch[6].value;
+			Vector3I& crossOffset = g_mathScratch[7].value;
+			Vector3I& hitNormal = g_mathScratch[8].value;
+
+			movementDirection = sweep->movementDirection;
+			g_mathScratch[1].scalar = sweep->movementLength;
+			edgeDirection.x = edgeX;
+			edgeDirection.y = edgeY;
+			edgeDirection.z = edgeZ;
+			Nu3D::Math::NormalizeToFixedPoint(&edgeDirection, &edgeDirection);
+			Nu3D::Math::CrossProduct3D(&movementDirection, &edgeDirection, &edgeCross);
+
+			if (abs(edgeCross.x) < 0x80000 && abs(edgeCross.y) < 0x80000 && abs(edgeCross.z) < 0x80000)
+			{
+				if (edgeCross.x == 0 && edgeCross.y == 0 && edgeCross.z == 0)
+					return 0;
+
+				planeNormal.x = (start->x + end->x) >> 1;
+				planeNormal.y = (start->y + end->y) >> 1;
+				planeNormal.z = (start->z + end->z) >> 1;
+				int32_t edgeLengthSquared = edgeX * edgeX + edgeY * edgeY + edgeZ * edgeZ;
+				int32_t scaledEdgeLengthSquared = edgeLengthSquared;
+				int32_t edgeProjection = planeNormal.x * edgeX + planeNormal.y * edgeY + planeNormal.z * edgeZ;
+				while (edgeProjection > 0x40000)
+				{
+					edgeProjection >>= 1;
+					scaledEdgeLengthSquared >>= 1;
+				}
+				if (scaledEdgeLengthSquared == 0)
+					return 0;
+
+				planeNormal.x -= edgeProjection * edgeX / scaledEdgeLengthSquared;
+				planeNormal.y -= edgeProjection * edgeY / scaledEdgeLengthSquared;
+				planeNormal.z -= edgeProjection * edgeZ / scaledEdgeLengthSquared;
+				while (abs(planeNormal.x) > 0x4000 || abs(planeNormal.y) > 0x4000 || abs(planeNormal.z) > 0x4000)
+				{
+					planeNormal.x >>= 2;
+					planeNormal.y >>= 2;
+					planeNormal.z >>= 2;
+				}
+				Nu3D::Math::NormalizeToFixedPoint(&planeNormal, &planeNormal);
+
+				int32_t startDistance = ((start->x * planeNormal.x + start->y * planeNormal.y + start->z * planeNormal.z) >> 12) - radius;
+				int32_t endDistance = ((end->x * planeNormal.x + end->y * planeNormal.y + end->z * planeNormal.z) >> 12) - radius;
+				if (startDistance < 0 || endDistance >= 0)
+					return 0;
+
+				int32_t distanceRange = startDistance - endDistance;
+				int32_t fraction = startDistance * 0x4000 / distanceRange;
+				if (fraction >= sweep->nearestFraction)
+					return 0;
+
+				contactPoint.x = start->x + (end->x - start->x) * startDistance / distanceRange;
+				contactPoint.y = start->y + (end->y - start->y) * startDistance / distanceRange;
+				contactPoint.z = start->z + (end->z - start->z) * startDistance / distanceRange;
+				int32_t alongEdge = contactPoint.x * edgeX + contactPoint.y * edgeY + contactPoint.z * edgeZ;
+				if (alongEdge < 0 || (alongEdge >> 5) > edgeLengthSquared)
+					return 0;
+
+				scaledEdgeLengthSquared = edgeLengthSquared;
+				while (alongEdge > 0x40000)
+				{
+					alongEdge >>= 1;
+					scaledEdgeLengthSquared >>= 1;
+				}
+				contactPoint.x -= alongEdge * edgeX / scaledEdgeLengthSquared;
+				contactPoint.y -= alongEdge * edgeY / scaledEdgeLengthSquared;
+				contactPoint.z -= alongEdge * edgeZ / scaledEdgeLengthSquared;
+				Nu3D::Math::NormalizeToFixedPoint(&contactPoint, &contactPoint);
+				contactPoint.x *= 4;
+				contactPoint.y *= 4;
+				contactPoint.z *= 4;
+
+				bool accepted = adjacentNormals[0].y != 0x7FFF
+					&& adjacentNormals[0].x * hitNormal.x + adjacentNormals[0].y * hitNormal.y + adjacentNormals[0].z * hitNormal.z > -0x80000;
+				if (! accepted)
+				{
+					accepted = adjacentNormals[1].y != 0x7FFF
+						&& adjacentNormals[1].x * hitNormal.x + adjacentNormals[1].y * hitNormal.y + adjacentNormals[1].z * hitNormal.z > -0x80000;
+				}
+				if (! accepted)
+					return 0;
+
+				sweep->startDistance = startDistance;
+				sweep->endDistance = endDistance;
+				sweep->nearestFraction = fraction;
+				sweep->hitNormal.direction.x = (int16_t)hitNormal.x;
+				sweep->hitNormal.direction.y = (int16_t)hitNormal.y;
+				sweep->hitNormal.direction.z = (int16_t)hitNormal.z;
+				return 1;
+			}
+
+			edgeCross.x >>= 10;
+			edgeCross.y >>= 10;
+			edgeCross.z >>= 10;
+			if (edgeCross.x == 0 && edgeCross.y == 0 && edgeCross.z == 0)
+				return 0;
+
+			planeNormal = edgeCross;
+			while (abs(planeNormal.x) > 0x4000 || abs(planeNormal.y) > 0x4000 || abs(planeNormal.z) > 0x4000)
+			{
+				planeNormal.x >>= 1;
+				planeNormal.y >>= 1;
+				planeNormal.z >>= 1;
+			}
+			Nu3D::Math::NormalizeToFixedPoint(&planeNormal, &planeNormal);
+
+			int32_t planeDistance = (start->x * planeNormal.x + start->y * planeNormal.y + start->z * planeNormal.z) >> 10;
+			if (abs(planeDistance) > radius * 4 + 0xC0)
+				return 0;
+			int32_t directionDot = (planeNormal.x * edgeCross.x + planeNormal.y * edgeCross.y + planeNormal.z * edgeCross.z) >> 12;
+			if (directionDot == 0)
+				return 0;
+
+			crossOffset.x = start->x >> 2;
+			crossOffset.y = start->y >> 2;
+			crossOffset.z = start->z >> 2;
+			Nu3D::Math::CrossProduct3D(&crossOffset, &edgeDirection, &crossOffset);
+			crossOffset.x >>= 10;
+			crossOffset.y >>= 10;
+			crossOffset.z >>= 10;
+			int32_t hitDistance = -4 * ((crossOffset.x * planeNormal.x + crossOffset.y * planeNormal.y + crossOffset.z * planeNormal.z) / directionDot);
+
+			Nu3D::Math::CrossProduct3D(&planeNormal, &edgeDirection, &perpendicular);
+			while (abs(perpendicular.x) > 0x10000 || abs(perpendicular.y) > 0x10000 || abs(perpendicular.z) > 0x10000)
+			{
+				perpendicular.x >>= 3;
+				perpendicular.y >>= 3;
+				perpendicular.z >>= 3;
+			}
+			while (abs(perpendicular.x) > 0x4000 || abs(perpendicular.y) > 0x4000 || abs(perpendicular.z) > 0x4000)
+			{
+				perpendicular.x >>= 1;
+				perpendicular.y >>= 1;
+				perpendicular.z >>= 1;
+			}
+			Nu3D::Math::NormalizeToFixedPoint(&perpendicular, &perpendicular);
+
+			int32_t approachRate = (movementDirection.x * perpendicular.x + movementDirection.y * perpendicular.y + movementDirection.z * perpendicular.z) >> 8;
+			if (approachRate == 0)
+				return 0;
+			int32_t radiusOffset = (int32_t)sqrt((double)abs(radius * radius * 16 - planeDistance * planeDistance));
+			radiusOffset = abs(radiusOffset * 0x4000 / approachRate);
+			hitDistance -= radiusOffset;
+			if (hitDistance < 0 || hitDistance >= sweep->movementLength)
+				return 0;
+
+			int32_t fraction = hitDistance * 0x4000 / sweep->movementLength;
+			if (fraction >= sweep->nearestFraction)
+				return 0;
+
+			contactPoint.x = start->x + (end->x - start->x) * hitDistance / sweep->movementLength;
+			contactPoint.y = start->y + (end->y - start->y) * hitDistance / sweep->movementLength;
+			contactPoint.z = start->z + (end->z - start->z) * hitDistance / sweep->movementLength;
+			int32_t alongEdge = contactPoint.x * edgeX + contactPoint.y * edgeY + contactPoint.z * edgeZ;
+			int32_t edgeLengthSquared = edgeX * edgeX + edgeY * edgeY + edgeZ * edgeZ;
+			if (alongEdge < 0 || (alongEdge >> 5) > edgeLengthSquared)
+				return 0;
+
+			int32_t scaledEdgeLengthSquared = edgeLengthSquared;
+			while (alongEdge > 0x40000)
+			{
+				alongEdge >>= 1;
+				scaledEdgeLengthSquared >>= 1;
+			}
+			hitNormal.x = contactPoint.x - alongEdge * edgeX / scaledEdgeLengthSquared;
+			hitNormal.y = contactPoint.y - alongEdge * edgeY / scaledEdgeLengthSquared;
+			hitNormal.z = contactPoint.z - alongEdge * edgeZ / scaledEdgeLengthSquared;
+			Nu3D::Math::NormalizeToFixedPoint(&hitNormal, &hitNormal);
+			hitNormal.x *= 4;
+			hitNormal.y *= 4;
+			hitNormal.z *= 4;
+
+			bool accepted = adjacentNormals[0].y != 0x7FFF
+				&& adjacentNormals[0].x * hitNormal.x + adjacentNormals[0].y * hitNormal.y + adjacentNormals[0].z * hitNormal.z > -0x80000;
+			if (! accepted)
+			{
+				accepted = adjacentNormals[1].y != 0x7FFF
+					&& adjacentNormals[1].x * hitNormal.x + adjacentNormals[1].y * hitNormal.y + adjacentNormals[1].z * hitNormal.z > -0x80000;
+			}
+			if (! accepted)
+				return 0;
+
+			sweep->startDistance = hitDistance;
+			sweep->endDistance = hitDistance - sweep->movementLength;
+			sweep->nearestFraction = fraction;
+			sweep->hitNormal.direction.x = (int16_t)hitNormal.x;
+			sweep->hitNormal.direction.y = (int16_t)hitNormal.y;
+			sweep->hitNormal.direction.z = (int16_t)hitNormal.z;
+			return 1;
+		}
+
 		// FUNCTION: TOY2 0x00481D00 [PROVISIONAL]
 		int32_t SweepVertex(Vector3I* start, Vector3I* end, CollisionSweep* sweep, int32_t radius, const Vector3I16* adjacentNormals)
 		{
@@ -957,6 +1168,281 @@ namespace Toy2
 				}
 			}
 			return 0;
+		}
+
+		// FUNCTION: TOY2 0x00481FB0 [PROVISIONAL]
+		int32_t SweepTriangle(PackedCollisionFace* face, CollisionSweep* sweep, int32_t radius, uint32_t contactFlags)
+		{
+			int32_t foundHit = 0;
+			const int32_t coordinateScale = 0x20;
+			const int32_t fractionScale = 0x4000;
+			const int32_t faceTolerance = 0x100;
+			const int32_t edgeContactFlag = 0x2000;
+			Vector3I localStart;
+			Vector3I localEnd;
+			Vector3I16 adjacentNormals[2];
+
+			int32_t firstStartDistance =
+				((sweep->start.x - face->vertex0.x * coordinateScale) * face->firstPlaneNormal.x
+					+ (sweep->start.y - face->vertex0.y * coordinateScale) * face->firstPlaneNormal.y
+					+ (sweep->start.z - face->vertex0.z * coordinateScale) * face->firstPlaneNormal.z)
+				>> 14;
+			firstStartDistance -= radius;
+			int32_t firstEndDistance =
+				((sweep->end.x - face->vertex0.x * coordinateScale) * face->firstPlaneNormal.x
+					+ (sweep->end.y - face->vertex0.y * coordinateScale) * face->firstPlaneNormal.y
+					+ (sweep->end.z - face->vertex0.z * coordinateScale) * face->firstPlaneNormal.z)
+				>> 14;
+			firstEndDistance -= radius;
+
+			if (firstStartDistance >= 0 && firstEndDistance < 0)
+			{
+				int32_t distanceRange = firstStartDistance - firstEndDistance;
+				Vector3I contactPoint;
+				contactPoint.x =
+					sweep->start.x + (sweep->end.x - sweep->start.x) * firstStartDistance / distanceRange - (face->firstPlaneNormal.x * radius >> 14);
+				contactPoint.y =
+					sweep->start.y + (sweep->end.y - sweep->start.y) * firstStartDistance / distanceRange - (face->firstPlaneNormal.y * radius >> 14);
+				contactPoint.z =
+					sweep->start.z + (sweep->end.z - sweep->start.z) * firstStartDistance / distanceRange - (face->firstPlaneNormal.z * radius >> 14);
+				if (Nu3D::Collision::IsPointInTriangle((contactPoint.x >> 5) - face->vertex0.x,
+						(contactPoint.y >> 5) - face->vertex0.y,
+						(contactPoint.z >> 5) - face->vertex0.z,
+						face->vertex1Offset.x,
+						face->vertex1Offset.y,
+						face->vertex1Offset.z,
+						face->vertex2Offset.x,
+						face->vertex2Offset.y,
+						face->vertex2Offset.z,
+						&face->firstPlaneNormal)
+					!= 0)
+				{
+					int32_t fraction = firstStartDistance * fractionScale / distanceRange;
+					if (fraction < sweep->nearestFraction)
+					{
+						sweep->startDistance = firstStartDistance;
+						sweep->endDistance = firstEndDistance;
+						sweep->nearestFraction = fraction;
+						sweep->hitNormal.direction = face->firstPlaneNormal;
+						sweep->face = face;
+						sweep->contactFlags = contactFlags;
+						foundHit = 1;
+					}
+				}
+			}
+
+			bool hasSecondFace = face->secondPlaneNormal.y != 0x7FFF;
+			int32_t secondStartDistance = 0;
+			int32_t secondEndDistance = 0;
+			bool checkSecondEdges = false;
+			if (hasSecondFace)
+			{
+				int32_t secondOriginX = face->vertex0.x + face->vertex3Offset.x;
+				int32_t secondOriginY = face->vertex0.y + face->vertex3Offset.y;
+				int32_t secondOriginZ = face->vertex0.z + face->vertex3Offset.z;
+				secondStartDistance =
+					((sweep->start.x - secondOriginX * coordinateScale) * face->secondPlaneNormal.x
+						+ (sweep->start.y - secondOriginY * coordinateScale) * face->secondPlaneNormal.y
+						+ (sweep->start.z - secondOriginZ * coordinateScale) * face->secondPlaneNormal.z)
+					>> 14;
+				secondStartDistance -= radius;
+				secondEndDistance =
+					((sweep->end.x - secondOriginX * coordinateScale) * face->secondPlaneNormal.x
+						+ (sweep->end.y - secondOriginY * coordinateScale) * face->secondPlaneNormal.y
+						+ (sweep->end.z - secondOriginZ * coordinateScale) * face->secondPlaneNormal.z)
+					>> 14;
+				secondEndDistance -= radius;
+
+				if (secondStartDistance >= 0 && secondEndDistance < 0)
+				{
+					int32_t distanceRange = secondStartDistance - secondEndDistance;
+					Vector3I contactPoint;
+					contactPoint.x =
+						sweep->start.x + (sweep->end.x - sweep->start.x) * secondStartDistance / distanceRange - (face->secondPlaneNormal.x * radius >> 14);
+					contactPoint.y =
+						sweep->start.y + (sweep->end.y - sweep->start.y) * secondStartDistance / distanceRange - (face->secondPlaneNormal.y * radius >> 14);
+					contactPoint.z =
+						sweep->start.z + (sweep->end.z - sweep->start.z) * secondStartDistance / distanceRange - (face->secondPlaneNormal.z * radius >> 14);
+					if (Nu3D::Collision::IsPointInTriangle((contactPoint.x >> 5) - secondOriginX,
+							(contactPoint.y >> 5) - secondOriginY,
+							(contactPoint.z >> 5) - secondOriginZ,
+							face->vertex2Offset.x - face->vertex3Offset.x,
+							face->vertex2Offset.y - face->vertex3Offset.y,
+							face->vertex2Offset.z - face->vertex3Offset.z,
+							face->vertex1Offset.x - face->vertex3Offset.x,
+							face->vertex1Offset.y - face->vertex3Offset.y,
+							face->vertex1Offset.z - face->vertex3Offset.z,
+							&face->secondPlaneNormal)
+						!= 0)
+					{
+						int32_t fraction = secondStartDistance * fractionScale / distanceRange;
+						if (fraction < sweep->nearestFraction)
+						{
+							sweep->startDistance = secondStartDistance;
+							sweep->endDistance = secondEndDistance;
+							sweep->nearestFraction = fraction;
+							sweep->hitNormal.direction = face->secondPlaneNormal;
+							sweep->face = face;
+							sweep->contactFlags = contactFlags | COLLISION_CONTACT_SECONDARY_FACE;
+							foundHit = 1;
+						}
+					}
+				}
+
+				int32_t minimumDistance = -faceTolerance - (radius >> 1);
+				checkSecondEdges = (secondStartDistance < faceTolerance + 1 || secondEndDistance < faceTolerance + 1)
+					&& (secondStartDistance >= minimumDistance || secondEndDistance >= minimumDistance);
+			}
+
+			int32_t minimumDistance = -faceTolerance - (radius >> 1);
+			bool checkFirstEdges = (firstStartDistance < faceTolerance + 1 || firstEndDistance < faceTolerance + 1)
+				&& (firstStartDistance >= minimumDistance || firstEndDistance >= minimumDistance);
+			if (! checkFirstEdges && ! checkSecondEdges)
+				return foundHit;
+
+			if (checkFirstEdges)
+				adjacentNormals[0] = face->firstPlaneNormal;
+			else
+				adjacentNormals[0].y = 0x7FFF;
+			if (checkSecondEdges)
+				adjacentNormals[1] = face->secondPlaneNormal;
+			else
+				adjacentNormals[1].y = 0x7FFF;
+
+			int32_t vertexRadius = radius + 0x40;
+			if (hasSecondFace && checkSecondEdges)
+			{
+				localStart.x = sweep->start.x - (face->vertex0.x + face->vertex3Offset.x) * coordinateScale;
+				localStart.y = sweep->start.y - (face->vertex0.y + face->vertex3Offset.y) * coordinateScale;
+				localStart.z = sweep->start.z - (face->vertex0.z + face->vertex3Offset.z) * coordinateScale;
+				localEnd.x = sweep->end.x - (face->vertex0.x + face->vertex3Offset.x) * coordinateScale;
+				localEnd.y = sweep->end.y - (face->vertex0.y + face->vertex3Offset.y) * coordinateScale;
+				localEnd.z = sweep->end.z - (face->vertex0.z + face->vertex3Offset.z) * coordinateScale;
+				if (SweepVertex(&localStart, &localEnd, sweep, vertexRadius, adjacentNormals) != 0)
+				{
+					sweep->face = face;
+					sweep->contactFlags = contactFlags | edgeContactFlag;
+					foundHit = 1;
+				}
+			}
+
+			localStart.x = sweep->start.x - (face->vertex0.x + face->vertex2Offset.x) * coordinateScale;
+			localStart.y = sweep->start.y - (face->vertex0.y + face->vertex2Offset.y) * coordinateScale;
+			localStart.z = sweep->start.z - (face->vertex0.z + face->vertex2Offset.z) * coordinateScale;
+			localEnd.x = sweep->end.x - (face->vertex0.x + face->vertex2Offset.x) * coordinateScale;
+			localEnd.y = sweep->end.y - (face->vertex0.y + face->vertex2Offset.y) * coordinateScale;
+			localEnd.z = sweep->end.z - (face->vertex0.z + face->vertex2Offset.z) * coordinateScale;
+			if (SweepVertex(&localStart, &localEnd, sweep, vertexRadius, adjacentNormals) != 0)
+			{
+				sweep->face = face;
+				sweep->contactFlags = contactFlags | edgeContactFlag;
+				foundHit = 1;
+			}
+
+			localStart.x = sweep->start.x - (face->vertex0.x + face->vertex1Offset.x) * coordinateScale;
+			localStart.y = sweep->start.y - (face->vertex0.y + face->vertex1Offset.y) * coordinateScale;
+			localStart.z = sweep->start.z - (face->vertex0.z + face->vertex1Offset.z) * coordinateScale;
+			localEnd.x = sweep->end.x - (face->vertex0.x + face->vertex1Offset.x) * coordinateScale;
+			localEnd.y = sweep->end.y - (face->vertex0.y + face->vertex1Offset.y) * coordinateScale;
+			localEnd.z = sweep->end.z - (face->vertex0.z + face->vertex1Offset.z) * coordinateScale;
+			if (SweepVertex(&localStart, &localEnd, sweep, vertexRadius, adjacentNormals) != 0)
+			{
+				sweep->face = face;
+				sweep->contactFlags = contactFlags | edgeContactFlag;
+				foundHit = 1;
+			}
+
+			int32_t edgeRadius = radius + 0x20;
+			if (checkFirstEdges)
+			{
+				localStart.x = sweep->start.x - face->vertex0.x * coordinateScale;
+				localStart.y = sweep->start.y - face->vertex0.y * coordinateScale;
+				localStart.z = sweep->start.z - face->vertex0.z * coordinateScale;
+				localEnd.x = sweep->end.x - face->vertex0.x * coordinateScale;
+				localEnd.y = sweep->end.y - face->vertex0.y * coordinateScale;
+				localEnd.z = sweep->end.z - face->vertex0.z * coordinateScale;
+				if (SweepVertex(&localStart, &localEnd, sweep, vertexRadius, adjacentNormals) != 0)
+				{
+					sweep->face = face;
+					sweep->contactFlags = contactFlags | edgeContactFlag;
+					foundHit = 1;
+				}
+				if (SweepEdge(&localStart, &localEnd, face->vertex1Offset.x, face->vertex1Offset.y, face->vertex1Offset.z, sweep, edgeRadius, adjacentNormals)
+					!= 0)
+				{
+					sweep->face = face;
+					sweep->contactFlags = contactFlags | edgeContactFlag;
+					foundHit = 1;
+				}
+				if (SweepEdge(&localStart, &localEnd, face->vertex2Offset.x, face->vertex2Offset.y, face->vertex2Offset.z, sweep, edgeRadius, adjacentNormals)
+					!= 0)
+				{
+					sweep->face = face;
+					sweep->contactFlags = contactFlags | edgeContactFlag;
+					foundHit = 1;
+				}
+			}
+
+			localStart.x = sweep->start.x - (face->vertex0.x + face->vertex1Offset.x) * coordinateScale;
+			localStart.y = sweep->start.y - (face->vertex0.y + face->vertex1Offset.y) * coordinateScale;
+			localStart.z = sweep->start.z - (face->vertex0.z + face->vertex1Offset.z) * coordinateScale;
+			localEnd.x = sweep->end.x - (face->vertex0.x + face->vertex1Offset.x) * coordinateScale;
+			localEnd.y = sweep->end.y - (face->vertex0.y + face->vertex1Offset.y) * coordinateScale;
+			localEnd.z = sweep->end.z - (face->vertex0.z + face->vertex1Offset.z) * coordinateScale;
+			if (SweepEdge(&localStart,
+					&localEnd,
+					face->vertex2Offset.x - face->vertex1Offset.x,
+					face->vertex2Offset.y - face->vertex1Offset.y,
+					face->vertex2Offset.z - face->vertex1Offset.z,
+					sweep,
+					edgeRadius,
+					adjacentNormals)
+				!= 0)
+			{
+				sweep->face = face;
+				sweep->contactFlags = contactFlags | edgeContactFlag;
+				foundHit = 1;
+			}
+
+			if (hasSecondFace && checkSecondEdges)
+			{
+				localStart.x = sweep->start.x - (face->vertex0.x + face->vertex3Offset.x) * coordinateScale;
+				localStart.y = sweep->start.y - (face->vertex0.y + face->vertex3Offset.y) * coordinateScale;
+				localStart.z = sweep->start.z - (face->vertex0.z + face->vertex3Offset.z) * coordinateScale;
+				localEnd.x = sweep->end.x - (face->vertex0.x + face->vertex3Offset.x) * coordinateScale;
+				localEnd.y = sweep->end.y - (face->vertex0.y + face->vertex3Offset.y) * coordinateScale;
+				localEnd.z = sweep->end.z - (face->vertex0.z + face->vertex3Offset.z) * coordinateScale;
+				if (SweepEdge(&localStart,
+						&localEnd,
+						face->vertex2Offset.x - face->vertex3Offset.x,
+						face->vertex2Offset.y - face->vertex3Offset.y,
+						face->vertex2Offset.z - face->vertex3Offset.z,
+						sweep,
+						edgeRadius,
+						adjacentNormals)
+					!= 0)
+				{
+					sweep->face = face;
+					sweep->contactFlags = contactFlags | edgeContactFlag;
+					foundHit = 1;
+				}
+				if (SweepEdge(&localStart,
+						&localEnd,
+						face->vertex1Offset.x - face->vertex3Offset.x,
+						face->vertex1Offset.y - face->vertex3Offset.y,
+						face->vertex1Offset.z - face->vertex3Offset.z,
+						sweep,
+						edgeRadius,
+						adjacentNormals)
+					!= 0)
+				{
+					sweep->face = face;
+					sweep->contactFlags = contactFlags | edgeContactFlag;
+					foundHit = 1;
+				}
+			}
+
+			return foundHit;
 		}
 
 		// FUNCTION: TOY2 0x00485940 [PROVISIONAL]
