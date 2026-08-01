@@ -32,10 +32,64 @@ namespace Nu3D
 	{
 		static __forceinline int32_t ShiftFixedTowardZero(int32_t value, int32_t bits) { return (value + ((value >> 31) & ((1 << bits) - 1))) >> bits; }
 
-		// STUB: TOY2 0x00450E50
+		struct SoftwareProjectionPoint
+		{
+			int16_t x;
+			int16_t y;
+			int16_t z;
+			int16_t reserved;
+		};
+
+		STATIC_ASSERT(sizeof(SoftwareProjectionPoint) == 8);
+
+		// GLOBAL: TOY2 0x0055A0F0
+		int32_t g_softwareProjectionDepth;
+		extern float g_softwareProjectionScaleX;
+		extern float g_softwareProjectionScaleY;
+
+		static __forceinline SoftwareProjectionPoint TransformSoftwarePoint(const SoftwareProjectionPoint& point)
+		{
+			SoftwareProjectionPoint transformed;
+			transformed.x = (int16_t)(ShiftFixedTowardZero(
+				point.x * g_objectViewTransform.m00 + point.y * g_objectViewTransform.m01 + point.z * g_objectViewTransform.m02, 12)
+				+ g_objectViewTransform.position.x);
+			transformed.y = (int16_t)(ShiftFixedTowardZero(
+				point.x * g_objectViewTransform.m10 + point.y * g_objectViewTransform.m11 + point.z * g_objectViewTransform.m12, 12)
+				+ g_objectViewTransform.position.y);
+			transformed.z = (int16_t)(ShiftFixedTowardZero(
+				point.x * g_objectViewTransform.m20 + point.y * g_objectViewTransform.m21 + point.z * g_objectViewTransform.m22, 12)
+				+ g_objectViewTransform.position.z);
+			transformed.reserved = point.reserved;
+			return transformed;
+		}
+
+		static __forceinline void ProjectSoftwarePoint(const SoftwareProjectionPoint& point, SoftwareRenderer::SoftwareRasterVertex* output)
+		{
+			g_softwareProjectionDepth = point.z;
+			if (g_softwareProjectionDepth == 0)
+				g_softwareProjectionDepth = 1;
+
+			output->x = (int16_t)((Toy2::g_destRectWidth + point.x * g_softwareProjectionScaleX / g_softwareProjectionDepth) * 0.5f);
+			output->y = (int16_t)((Toy2::g_destRectHeight + point.y * g_softwareProjectionScaleY / g_softwareProjectionDepth) * 0.5f);
+		}
+
+		// FUNCTION: TOY2 0x00450E50 [PROVISIONAL]
 		int32_t ProjectTriangle(
-			const Vector3I16* point0, const Vector3I16* point1, const Vector3I16* point2, SoftwareRenderer::SoftwareRasterVertex* projectedVertices)
-		{ return 0; }
+			const SoftwareProjectionPoint* point0,
+			const SoftwareProjectionPoint* point1,
+			const SoftwareProjectionPoint* point2,
+			SoftwareRenderer::SoftwareRasterVertex* projectedVertices)
+		{
+			SoftwareProjectionPoint transformed0 = TransformSoftwarePoint(*point0);
+			SoftwareProjectionPoint transformed1 = TransformSoftwarePoint(*point1);
+			SoftwareProjectionPoint transformed2 = TransformSoftwarePoint(*point2);
+
+			ProjectSoftwarePoint(transformed0, &projectedVertices[0]);
+			ProjectSoftwarePoint(transformed1, &projectedVertices[1]);
+			ProjectSoftwarePoint(transformed2, &projectedVertices[2]);
+
+			return (transformed0.z + transformed1.z + transformed2.z) / 12;
+		}
 
 		struct ViewRotationHistoryEntry
 		{
