@@ -18,6 +18,7 @@
 0x004343D0	-	The complete fixed-angle movement update scores 70.90%; nine natural forms leave only the two long-lived speed register homes unresolved.
 0x00434550	-	Collision and footing behavior are complete at 70.48%; direct, inverted, and switch forms leave only CAP-12 cold-block placement and scratch registers.
 0x00434990	-	The complete gun-fire update scores 46.18%; three structured forms preserve input, timing, weapon dispatch, effects, sounds, and state but leave the CAP-09 FPO frame and register homes unresolved.
+0x004354E0	-	The remaining scan loop needs source evidence for the selected-record lifetime order. Natural state and loop forms scored 49.16% to 55.15%.
 0x004359D0	-	The candidate scan needs source evidence for its local lifetimes. Direction reordering stayed at 60.08%. Branch-local position loads scored 53.32% and 40.43%.
 0x004398B0	-	2176-byte post-game screen loop depends on an undeclared 64-entry particle record, several unresolved globals, and intertwined animation/input/fade state; no reference analogue or reconstructed sibling
 0x0043C750	-	The function cyclically reorders 0x30-byte animation track records, but metadata fields at +0x0A/+0x12/+0x1A/+0x22 and +0x24..+0x2F have no corroborated roles or typed readers; completing it would require guessed layout names

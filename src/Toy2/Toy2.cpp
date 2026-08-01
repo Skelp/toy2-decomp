@@ -6035,10 +6035,12 @@ namespace Toy2
 	void InitSoftwareRenderer()
 	{
 		Logger::Log("INITSOFTRENDER : Start.\n");
-		g_destRectHalfWidth = d3dappi.szClient.cx / 2;
-		g_destRectWidth = d3dappi.szClient.cx;
-		g_destRectHeight = d3dappi.szClient.cy;
-		Logger::Log("SOFTRENDER : Screen set to %dx%d.\n", d3dappi.szClient.cx, d3dappi.szClient.cy);
+		int32_t width = d3dappi.szClient.cx;
+		int32_t height = d3dappi.szClient.cy;
+		g_destRectWidth = width;
+		g_destRectHeight = height;
+		g_destRectHalfWidth = width / 2;
+		Logger::Log("SOFTRENDER : Screen set to %dx%d.\n", width, height);
 
 		if (g_destRectHalfWidth != g_perspectiveTableHalfWidth)
 		{
@@ -6105,17 +6107,16 @@ namespace Toy2
 			uint32_t greenMask = surfaceDesc.ddpfPixelFormat.dwGBitMask;
 			while ((greenMask & 1) == 0)
 				greenMask >>= 1;
-			int32_t greenBits = 0;
+			SoftwareRenderer::g_greenShift = 0;
 			while (greenMask & 1)
 			{
 				greenMask >>= 1;
-				++greenBits;
+				++SoftwareRenderer::g_greenShift;
 			}
 
 			SoftwareRenderer::g_blueShift = 0;
-			SoftwareRenderer::g_greenShift = greenBits;
-			SoftwareRenderer::g_redShift = redBits + greenBits;
-			SoftwareRenderer::g_bitsPerPixel = greenBits == 6 ? 16 : 15;
+			SoftwareRenderer::g_redShift = redBits + SoftwareRenderer::g_greenShift;
+			SoftwareRenderer::g_bitsPerPixel = SoftwareRenderer::g_greenShift == 6 ? 16 : 15;
 		}
 
 		int32_t pitchPixels = surfaceDesc.lPitch;
