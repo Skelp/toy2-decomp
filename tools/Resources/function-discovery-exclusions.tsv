@@ -1,0 +1,2 @@
+# start	end	reason
+0x004CEB00	0x004DA850	statically linked CRT and compiler runtime

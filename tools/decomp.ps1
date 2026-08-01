@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("configure", "build", "compare", "score", "candidates", "defer", "undefer", "blockers", "audit", "baseline", "validate", "experiment", "lint", "report", "session-summary", "progress", "run", "shell", "help")]
+    [ValidateSet("configure", "build", "compare", "score", "candidates", "discover", "evidence", "defer", "undefer", "blockers", "audit", "baseline", "validate", "experiment", "lint", "report", "session-summary", "progress", "run", "shell", "help")]
     [string] $Command = "help",
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -129,6 +129,8 @@ Commands:
   compare [args]    Run reccmp against the reference and recompiled EXEs
   score <addr>...   Show exact/effective/tool/provisional verdicts
   candidates [args] Rank reconstruction candidates
+  discover [args]   Find credible Ghidra starts absent from the function map
+  evidence <addr>   Collect bounded evidence for a mapped or discovered target
   defer <addr> ...  Record a committed blocker or prerequisite
   undefer <addr>    Clear all committed blockers for one target
   blockers [addr]   Show committed blockers
@@ -152,6 +154,12 @@ if ($Command -eq "help") {
 if ($Command -eq "lint") {
     & python (Join-Path $Root "tools\decomp_lint.py") @CommandArgs
     Assert-LastExit "Checking source plausibility"
+    exit 0
+}
+if ($Command -in @("discover", "evidence")) {
+    $Script = if ($Command -eq "discover") { "tools\decomp_discover.py" } else { "tools\decomp_evidence.py" }
+    & python (Join-Path $Root $Script) @CommandArgs
+    Assert-LastExit "Reading decompilation evidence"
     exit 0
 }
 if ($Command -eq "defer") {

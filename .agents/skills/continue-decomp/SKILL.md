@@ -57,6 +57,8 @@ tools/decomp candidates --new-work --why      # dependency-frontier new work
 tools/decomp candidates --for 0x004XXXXX --why # frontier for one goal
 tools/decomp candidates --new-work --allow-large --why # reviewed large goals
 tools/decomp evidence 0x004XXXXX              # the single best candidate
+tools/decomp discover                         # use when mapped work is blocked
+tools/decomp evidence --unmapped 0x004XXXXX   # verify a discovery result
 ```
 
 **Complete the required audits before new work.** During the freeze, the
@@ -104,6 +106,12 @@ prerequisite reaches the acceptance threshold. Omit `--blocked-by` only for a
 manual blocker. Clear a manual blocker with `tools/decomp undefer <target>`.
 Keep the blocker-ledger change after you restore rejected source. Commit these
 records before the session ends.
+
+If all mapped frontier targets have supported blockers, run `tools/decomp
+discover`. Inspect high-confidence results first. Confirm the function start,
+ABI, ownership, and name with `evidence --unmapped`. Then add the confirmed map
+entry and a `STUB` before normal candidate selection. Do not copy a Ghidra name
+without separate evidence.
 
 ## 4. Get on the branch — immediately after selection
 
@@ -237,8 +245,8 @@ minutes and returns nothing.
 
 ## Gotchas
 
-- Use `candidates` and `evidence` before custom discovery work. Record a
-  prerequisite address when focused evidence finds one.
+- Use `candidates`, `discover`, and `evidence` before custom discovery work.
+  Record a prerequisite address when focused evidence finds one.
 - **Do not polish near-matches.** Cycling functions above 90% for a
   source-fixable diff produces no reconstruction. The priority is the
   dependency frontier.

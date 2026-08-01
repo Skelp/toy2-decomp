@@ -15,6 +15,7 @@ signature, odd casts, merged variables, or a suspicious `goto`.
 from __future__ import annotations
 
 import argparse
+import bisect
 import json
 import re
 import subprocess
@@ -110,9 +111,41 @@ def section(title: str) -> None:
     print(f"\n== {title}")
 
 
+def ghidra_function_containing(address: int) -> tuple[int, int, str] | None:
+    """Return the containing Ghidra function start, size, and local name."""
+    payload = run_ghidra(["function", "get", f"0x{address:08X}"])
+    rows = payload if isinstance(payload, list) else [payload]
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        raw_address = row.get("address", row.get("entry_point"))
+        try:
+            entry = int(str(raw_address), 16)
+            size = int(row.get("size", 0))
+        except (TypeError, ValueError):
+            continue
+        if size > 0 and entry <= address < entry + size:
+            return entry, size, str(row.get("name") or "")
+    return None
+
+
+def ghidra_function_at(address: int) -> tuple[int, str] | None:
+    """Return the exact Ghidra function size and its local name."""
+
+    result = ghidra_function_containing(address)
+    if result is None or result[0] != address:
+        return None
+    return result[1], result[2]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Collect bounded evidence for one target.")
     parser.add_argument("address", help="retail address, e.g. 0x00403640")
+    parser.add_argument(
+        "--unmapped",
+        action="store_true",
+        help="inspect a discovered Ghidra start before it enters the map",
+    )
     parser.add_argument("--disasm", action="store_true", help="also print the raw disassembly")
     parser.add_argument(
         "--disasm-limit",
@@ -136,61 +169,91 @@ def main() -> int:
     matches = read_match_percentages()
     caps = read_caps()
 
-    if address not in names:
+    unmapped = address not in names
+    ghidra_target = ghidra_function_at(address) if unmapped and args.unmapped else None
+    if unmapped and not args.unmapped:
         print(f"error: 0x{address:08X} is not in {MAP_PATH.relative_to(ROOT)}", file=sys.stderr)
         print(
-            "       The map holds every real function start. Check the address.",
+            "       Use tools/decomp discover, then pass --unmapped to inspect a result.",
+            file=sys.stderr,
+        )
+        return 1
+    if unmapped and ghidra_target is None:
+        print(
+            f"error: 0x{address:08X} is not an exact Ghidra function start",
             file=sys.stderr,
         )
         return 1
 
-    index = addresses.index(address)
-    following = addresses[index + 1] if index + 1 < len(addresses) else address
-    state, source, line = functions.get(address, ("NOT_STARTED", "", 0))
-    match = matches.get(address)
+    index = bisect.bisect_left(addresses, address)
+    if unmapped:
+        ghidra_size, ghidra_name = ghidra_target
+        following = address + ghidra_size
+        state, source, line = "UNMAPPED", "", 0
+        match = None
+        target_name = f"(Ghidra hint: {ghidra_name or '?'})"
+    else:
+        following = addresses[index + 1] if index + 1 < len(addresses) else address
+        state, source, line = functions.get(address, ("NOT_STARTED", "", 0))
+        match = matches.get(address)
+        target_name = names[address]
 
-    print(f"== target 0x{address:08X}  {names[address]}")
+    print(f"== target 0x{address:08X}  {target_name}")
     print(f"state            {state}" + (f"  ({source}:{line})" if source else ""))
-    print(f"approximate size {following - address} bytes (gap to the next map address)")
+    if unmapped:
+        print(f"Ghidra body size {following - address} bytes")
+        print("name status      local hint only; verify a durable name before map insertion")
+    else:
+        print(f"approximate size {following - address} bytes (gap to the next map address)")
     print(f"current match    {'-' if match is None else f'{match * 100:.2f}%'}")
     if caps.get(address):
         print(f"known cap        {caps[address]}  (see .notes/codegen-caps.md)")
 
     section("dependency readiness")
-    try:
-        dependency_candidates = build_candidates()
-        dependency_graph = build_call_graph(entries)
-        add_dependency_evidence(dependency_candidates, dependency_graph)
-        dependency_target = next(
-            item for item in dependency_candidates if item.address == address
-        )
-        if dependency_target.state == "FUNCTION":
-            print("implemented source. Dependency readiness applies to unfinished targets")
-        else:
-            print("ready" if dependency_target.dependency_ready else "blocked")
-        for dependency in dependency_target.unresolved_dependencies:
-            print(f"  unresolved  0x{dependency:08X}  {names.get(dependency, '(not in map)')}")
-        for dependency in dependency_target.weak_dependencies:
-            print(f"  weak        0x{dependency:08X}  {names.get(dependency, '(not in map)')}")
-        if dependency_target.manual_blocker:
-            print(f"  manual      {dependency_target.deferred_reason}")
-        print(
-            f"  impact      immediately unlocks {dependency_target.immediate_unlocks}, "
-            f"reaches {dependency_target.large_goal_reach} large target(s)"
-        )
-        print(
-            f"  indirect    {dependency_target.indirect_calls} call(s), "
-            f"{dependency_target.indirect_jumps} jump(s)"
-        )
-    except (DependencyUnavailable, StopIteration) as error:
-        print(f"unavailable: {error}")
+    if unmapped:
+        print("unavailable until the function start and map entry are confirmed")
+    else:
+        try:
+            dependency_candidates = build_candidates()
+            dependency_graph = build_call_graph(entries)
+            add_dependency_evidence(dependency_candidates, dependency_graph)
+            dependency_target = next(
+                item for item in dependency_candidates if item.address == address
+            )
+            if dependency_target.state == "FUNCTION":
+                print("implemented source. Dependency readiness applies to unfinished targets")
+            else:
+                print("ready" if dependency_target.dependency_ready else "blocked")
+            for dependency in dependency_target.unresolved_dependencies:
+                print(f"  unresolved  0x{dependency:08X}  {names.get(dependency, '(not in map)')}")
+            for dependency in dependency_target.weak_dependencies:
+                print(f"  weak        0x{dependency:08X}  {names.get(dependency, '(not in map)')}")
+            if dependency_target.manual_blocker:
+                print(f"  manual      {dependency_target.deferred_reason}")
+            print(
+                f"  impact      immediately unlocks {dependency_target.immediate_unlocks}, "
+                f"reaches {dependency_target.large_goal_reach} large target(s)"
+            )
+            print(
+                f"  indirect    {dependency_target.indirect_calls} call(s), "
+                f"{dependency_target.indirect_jumps} jump(s)"
+            )
+        except (DependencyUnavailable, StopIteration) as error:
+            print(f"unavailable: {error}")
 
     section("map neighbors")
     low = max(index - NEIGHBOR_COUNT, 0)
-    high = min(index + NEIGHBOR_COUNT + 1, len(entries))
-    for neighbor, name in entries[low:high]:
+    high = min(index + NEIGHBOR_COUNT + (0 if unmapped else 1), len(entries))
+    neighbors = list(entries[low:high])
+    if unmapped:
+        neighbors.insert(index - low, (address, "(unmapped candidate)"))
+    for neighbor, name in neighbors:
         marker = ">" if neighbor == address else " "
-        neighbor_state = functions.get(neighbor, ("NOT_STARTED", "", 0))[0]
+        neighbor_state = (
+            "UNMAPPED"
+            if unmapped and neighbor == address
+            else functions.get(neighbor, ("NOT_STARTED", "", 0))[0]
+        )
         print(f"{marker} 0x{neighbor:08X}  {name:<50} {neighbor_state}")
 
     section("callers (x-refs to this function)")
@@ -206,11 +269,17 @@ def main() -> int:
                 origin_address = None
             owner = "?"
             if origin_address is not None:
-                earlier = [item for item in addresses if item <= origin_address]
-                if earlier:
-                    owner_address = earlier[-1]
+                ghidra_owner = ghidra_function_containing(origin_address)
+                if ghidra_owner and ghidra_owner[0] in names:
+                    owner_address = ghidra_owner[0]
                     owner_state = functions.get(owner_address, ("NOT_STARTED", "", 0))[0]
                     owner = f"0x{owner_address:08X} {names[owner_address]} [{owner_state}]"
+                elif ghidra_owner:
+                    owner_address, _, owner_hint = ghidra_owner
+                    owner = (
+                        f"0x{owner_address:08X} (unmapped, Ghidra hint: "
+                        f"{owner_hint or '?'})"
+                    )
             print(f"  from 0x{origin:>8}  in {owner}  ({reference.get('ref_type', '')})")
 
     # The disassembly is fetched here for the callee list and the optional

@@ -133,6 +133,7 @@ tools/decomp candidates              # ranked targets; no Ghidra, no reccmp run
 tools/decomp candidates Nu3D --stubs --why
 tools/decomp candidates --for 0x00401230 --why # dependency frontier for one goal
 tools/decomp candidates --new-work --allow-large --why # include ready large goals
+tools/decomp discover                # find credible function starts missing from the map
 tools/decomp defer 0x00401230 --blocked-by 0x00405670 --reason "needs the producer layout"
 tools/decomp blockers                # show committed blockers
 tools/decomp undefer 0x00401230      # clear committed blockers for one target
@@ -140,6 +141,7 @@ tools/decomp audit --legacy-caps --why # review old mismatch claims
 tools/decomp audit --status             # show freeze-audit completion
 tools/decomp audit --refresh-ledger     # refresh scores and preserve audit notes
 tools/decomp evidence 0x00401230     # one bounded evidence bundle
+tools/decomp evidence --unmapped 0x00401230 # inspect a discovery result
 tools/decomp evidence 0x00401230 --disasm
 tools/decomp build
 tools/decomp baseline                # build and save the pre-edit comparison
@@ -172,6 +174,15 @@ Start selection with `candidates` and evidence with `evidence`. Candidate
 selection reads the retail binary, committed files, and build reports. It does
 not call Ghidra or reccmp. The evidence command makes bounded Ghidra queries.
 Do not replace these commands with map greps or repeated decompiler calls.
+
+Run `tools/decomp discover` when the mapped dependency frontier has no supported
+work. The command compares Ghidra starts with direct retail transfers and the
+committed map. It does not change the map. Verify a result with `evidence
+--unmapped` before you add its address and a supported name.
+
+The discovery command excludes known retail runtime ranges from
+`tools/Resources/function-discovery-exclusions.tsv`. Add a range only when the
+binary and project scope prove that it is not game or engine code.
 
 The tools print no environment banner and no driver warning. When you filter
 their output, filter for what you want, and do not add noise filters.
@@ -237,6 +248,12 @@ calls and jumps as uncertainty. Use evidence and explicit blockers for type,
 global, and indirect-dispatch dependencies. A provisional function below 75
 percent is a quality prerequisite for a large direct caller. The frontier
 promotes that function until it reaches the normal acceptance threshold.
+
+If all frontier targets have supported blockers, run `tools/decomp discover`.
+Start with high-confidence results. A direct retail call and a clean Ghidra
+boundary support a function start. A Ghidra name is only a local hint. Confirm
+the ABI, body boundary, ownership, and name before you edit the map. Add a
+`STUB` when the start is valid but the body is not ready.
 
 The tool cannot decide whether a source model is plausible. Use `--why`, then
 confirm the top candidate with `tools/decomp evidence`. A legacy CAP claim does
@@ -355,9 +372,9 @@ distinct name sources. Do not confuse them.**
   ledger. It originated as an IDA function-address dump, and maintainers apply
   its names as reverse-engineering labels. These names are not original
   symbols. No PDB ships with the binary. There are no PE exports. The names do
-  not appear in the Wrath of Cortex DWARF dump. Its **addresses are
-  authoritative**: real function starts that cover the game and engine `.text`
-  section, minus deliberately excluded CRT and imports. Its **names are working
+  not appear in the Wrath of Cortex DWARF dump. Its **recorded addresses are
+  authoritative** confirmed starts in the game and engine `.text` section.
+  A discovery result is not authoritative until evidence confirms it. Its **names are working
   hypotheses** that change as understanding deepens. There is no generator.
   When you reconstruct, rename, or newly discover a function, update its map
   entry to match the established sorted, deduplicated convention. Source
@@ -368,8 +385,8 @@ distinct name sources. Do not confuse them.**
   Durable naming happens in the map and, when matched, in source annotations.
   Names applied only to a local Ghidra session are lost on the next
   reconstruction. Naming flows source/map → Ghidra, never the reverse.
-- Consequently the map is **necessarily richer** than synced Ghidra state. It
-  holds every function address. This includes STUBs and addresses reccmp has
+- Consequently the map is **usually richer** than synced Ghidra state. It
+  holds confirmed starts, including STUBs and addresses reccmp has
   not yet paired. `sync` only imports matched functions. Run `tools/decomp
   check` after you edit the map. This verifies that the map stays sorted and
   deduplicated. It also verifies that every address is named and falls within
@@ -383,6 +400,10 @@ Treat Ghidra output as evidence, not source to paste.
 neighbors, the callers, the callees, and the referenced data addresses. Prefer
 it. Add `--disasm` when the decompilation looks wrong. Reach for the `ghidra`
 CLI directly only for a query the bundle does not cover:
+
+Use `tools/decomp evidence --unmapped <addr>` only for a result from
+`tools/decomp discover`. It requires an exact Ghidra function start. It labels
+the Ghidra name as a hint and does not grant map authority.
 
 ```sh
 ghidra decompile 0x00401230 --with-params --with-vars
