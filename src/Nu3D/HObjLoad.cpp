@@ -251,3 +251,11 @@ namespace NGNLoader
 	}
 
 }
+
+namespace Nu3D
+{
+	struct NamedTrackSet;
+
+	// STUB: TOY2 0x004CAED0
+	int32_t FindNamedTrackIndex(NamedTrackSet* trackSet, const char* trackName);
+}
