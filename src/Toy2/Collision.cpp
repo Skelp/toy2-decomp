@@ -440,6 +440,15 @@ namespace Toy2
 		// GLOBAL: TOY2 0x007284B4
 		int16_t g_collisionTriangleMeshIndices[240];
 
+		// GLOBAL: TOY2 0x007286A0
+		PackedCollisionFace* g_rotatedCollisionTriangles[32];
+
+		// GLOBAL: TOY2 0x00729134
+		int16_t g_rotatedCollisionTriangleMeshIndices[32];
+
+		// GLOBAL: TOY2 0x0072D2A8
+		int32_t g_rotatedCollisionTriangleCount;
+
 		// GLOBAL: TOY2 0x0072D2AC
 		int32_t g_collisionEdgeVertexCount;
 
