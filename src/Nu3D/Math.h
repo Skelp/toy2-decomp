@@ -20,7 +20,7 @@ namespace Nu3D
 		int32_t NormalizeToFixedPoint(const Vector3I* input, Vector3I* output);
 		int32_t NormalizeToFixedPoint16(const Vector3I16* input, Vector3I16* output);
 		int32_t CartesianToFixedAngle(int32_t x, int32_t y);
-		int16_t PointIntersectsTriangle(int32_t pointX,
+		int16_t InsidePolLines(int32_t pointX,
 			int32_t pointY,
 			int32_t pointZ,
 			int32_t edge1X,

@@ -461,7 +461,7 @@
 0x0047EDE0 AudioManager::Init
 0x0047EF80 Toy2::ProfileCPU
 0x00480660 Toy2::Collision::SweepWallSegments
-0x00480AE0 Nu3D::Math::PointIntersectsTriangle
+0x00480AE0 Nu3D::Math::InsidePolLines
 0x00481140 Nu3D::Collision::IsPointInTriangle
 0x004813B0 Toy2::Collision::SweepEdge
 0x00481D00 Toy2::Collision::SweepVertex

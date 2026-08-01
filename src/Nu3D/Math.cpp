@@ -107,8 +107,11 @@ namespace Nu3D
 			return (int32_t)(fixedAngle * 0.15915494307111402);
 		}
 
+		static __forceinline int16_t InsideLine(int32_t x, int32_t y, int32_t x0, int32_t y0, int32_t x1, int32_t y1)
+		{ return (x - x0) * (y1 - y0) + (y - y0) * (x0 - x1) >= 0; }
+
 		// FUNCTION: TOY2 0x00480AE0 [PROVISIONAL]
-		int16_t PointIntersectsTriangle(int32_t pointX,
+		int16_t InsidePolLines(int32_t pointX,
 			int32_t pointY,
 			int32_t pointZ,
 			int32_t edge1X,
@@ -129,40 +132,56 @@ namespace Nu3D
 			{
 				if (normalY < 0)
 				{
-					if (pointX * edge1Z - pointZ * edge1X >= 0 && (pointZ - edge2Z) * edge2X - (pointX - edge2X) * edge2Z >= 0
-						&& (pointZ - edge1Z) * (edge1X - edge2X) + (pointX - edge1X) * (edge2Z - edge1Z) >= 0)
-						return 1;
+					if (InsideLine(pointX, pointZ, 0, 0, edge1X, edge1Z))
+					{
+						if (InsideLine(pointX, pointZ, edge2X, edge2Z, 0, 0))
+						{
+							if (InsideLine(pointX, pointZ, edge1X, edge1Z, edge2X, edge2Z))
+								return 1;
+						}
+					}
 				}
-				else if ((pointZ - edge1Z) * edge1X - (pointX - edge1X) * edge1Z >= 0 && pointX * edge2Z - pointZ * edge2X >= 0
-					&& (edge2X - edge1X) * (pointZ - edge2Z) + (pointX - edge2X) * (edge1Z - edge2Z) >= 0)
+				else if (InsideLine(pointX, pointZ, edge1X, edge1Z, 0, 0))
 				{
-					return 1;
+					if (InsideLine(pointX, pointZ, 0, 0, edge2X, edge2Z))
+					{
+						if (InsideLine(pointX, pointZ, edge2X, edge2Z, edge1X, edge1Z))
+							return 1;
+					}
 				}
 			}
 			else if (absNormalX >= absNormalY && absNormalX >= abs((int32_t)normal->z))
 			{
 				if (normalX < 0)
 				{
-					if ((pointZ - edge1Z) * edge1Y - (pointY - edge1Y) * edge1Z >= 0 && pointY * edge2Z - pointZ * edge2Y >= 0
-						&& (edge2Y - edge1Y) * (pointZ - edge2Z) + (pointY - edge2Y) * (edge1Z - edge2Z) >= 0)
-						return 1;
+					if (InsideLine(pointY, pointZ, edge1Y, edge1Z, 0, 0))
+					{
+						if (InsideLine(pointY, pointZ, 0, 0, edge2Y, edge2Z))
+						{
+							if (InsideLine(pointY, pointZ, edge2Y, edge2Z, edge1Y, edge1Z))
+								return 1;
+						}
+					}
 				}
-				else if (pointY * edge1Z - pointZ * edge1Y >= 0 && (pointZ - edge2Z) * edge2Y - (pointY - edge2Y) * edge2Z >= 0
-					&& (pointY - edge1Y) * (edge2Z - edge1Z) + (pointZ - edge1Z) * (edge1Y - edge2Y) >= 0)
+				else if (InsideLine(pointY, pointZ, 0, 0, edge1Y, edge1Z))
 				{
-					return 1;
+					if (InsideLine(pointY, pointZ, edge2Y, edge2Z, 0, 0))
+					{
+						if (InsideLine(pointY, pointZ, edge1Y, edge1Z, edge2Y, edge2Z))
+							return 1;
+					}
 				}
 			}
 			else
 			{
 				if (normal->z < 0)
 				{
-					if (pointY * edge1X - pointX * edge1Y >= 0 && (pointX - edge2X) * edge2Y - (pointY - edge2Y) * edge2X >= 0
-						&& (pointY - edge1Y) * (edge2X - edge1X) + (pointX - edge1X) * (edge1Y - edge2Y) >= 0)
+					if (InsideLine(pointY, pointX, 0, 0, edge1Y, edge1X) && InsideLine(pointY, pointX, edge2Y, edge2X, 0, 0)
+						&& InsideLine(pointY, pointX, edge1Y, edge1X, edge2Y, edge2X))
 						return 1;
 				}
-				else if ((pointX - edge1X) * edge1Y - (pointY - edge1Y) * edge1X >= 0 && pointY * edge2X - pointX * edge2Y >= 0
-					&& (pointX - edge2X) * (edge2Y - edge1Y) + (pointY - edge2Y) * (edge1X - edge2X) >= 0)
+				else if (InsideLine(pointY, pointX, edge1Y, edge1X, 0, 0) && InsideLine(pointY, pointX, 0, 0, edge2Y, edge2X)
+					&& InsideLine(pointY, pointX, edge2Y, edge2X, edge1Y, edge1X))
 				{
 					return 1;
 				}

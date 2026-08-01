@@ -3375,7 +3375,7 @@ namespace Toy2
 										>> 7)
 									- portalRecords[entry->recordIdx]->origin.z;
 
-								if (Nu3D::Math::PointIntersectsTriangle(g_portalIntersectionPoint.x,
+								if (Nu3D::Math::InsidePolLines(g_portalIntersectionPoint.x,
 										g_portalIntersectionPoint.y,
 										g_portalIntersectionPoint.z,
 										portalRecords[entry->recordIdx]->vertices[0].position.x - portalRecords[entry->recordIdx]->origin.x,
@@ -3386,7 +3386,7 @@ namespace Toy2
 										portalRecords[entry->recordIdx]->vertices[1].position.z - portalRecords[entry->recordIdx]->origin.z,
 										&g_portalNormal,
 										400)
-									|| Nu3D::Math::PointIntersectsTriangle(g_portalIntersectionPoint.x,
+									|| Nu3D::Math::InsidePolLines(g_portalIntersectionPoint.x,
 										g_portalIntersectionPoint.y,
 										g_portalIntersectionPoint.z,
 										portalRecords[entry->recordIdx]->vertices[1].position.x - portalRecords[entry->recordIdx]->origin.x,
