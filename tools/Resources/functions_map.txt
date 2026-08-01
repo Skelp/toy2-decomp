@@ -130,6 +130,7 @@
 0x004155C0 InputManager::GlyphIndexToKeyName
 0x00415600 InputManager::ScancodeToKeyName
 0x00415640 InputManager::KeyNameToScancode
+0x00415750 InputManager::CalculateKeyboardGlyphTextWidth
 0x004157D0 InputManager::ResetInputHistory
 0x004157E0 InputManager::IsKeyPressed
 0x00415800 InputManager::FindKeyPressed

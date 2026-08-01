@@ -4,9 +4,20 @@
 #include "Nu3D/Nu3D.h"
 
 #include <DINPUT.H>
+#include <stddef.h>
 
 namespace InputManager
 {
+	struct KeyboardGlyph
+	{
+		uint32_t renderData[19];
+		int32_t width;
+		int32_t height;
+	};
+
+	STATIC_ASSERT(offsetof(KeyboardGlyph, width) == 0x4C);
+	STATIC_ASSERT(sizeof(KeyboardGlyph) == 0x54);
+
 	// GLOBAL: TOY2 0x0088279C
 	int16_t g_curButtonsPressed;
 
@@ -118,6 +129,9 @@ namespace InputManager
 	// GLOBAL: TOY2 0x00529D40
 	int32_t g_joystickDirectionFlags;
 
+	// GLOBAL: TOY2 0x0052F3D4
+	KeyboardGlyph* g_selectedKeyboardGlyph;
+
 	// clang-format off
 	// GLOBAL: TOY2 0x004ED398
 	InputMapping g_inputMapping[] =
@@ -168,6 +182,11 @@ namespace InputManager
 	// GLOBAL: TOY2 0x004EFCE0
 	KeyboardGlyphMapping g_keyboardGlyphMappings[] = {
 #include "InputManagerKeyGlyphMappings.inc"
+	};
+
+	// GLOBAL: TOY2 0x004EDC60
+	KeyboardGlyph g_keyboardGlyphs[] = {
+#include "InputManagerKeyboardGlyphs.inc"
 	};
 
 	// GLOBAL: TOY2 0x00503860
@@ -334,6 +353,44 @@ namespace InputManager
 		}
 
 		return -1;
+	}
+
+	// FUNCTION: TOY2 0x00415750 [MATCHED]
+	int32_t CalculateKeyboardGlyphTextWidth(const char* text)
+	{
+		int32_t width = 0;
+		uint8_t character = *text;
+
+		if (character != '\0')
+		{
+			do
+			{
+				if (character == ' ')
+				{
+					width += 8;
+				}
+				else
+				{
+					for (int32_t i = 0; g_keyboardGlyphMappings[i].scanCode != -1; i++)
+					{
+						if (g_keyboardGlyphMappings[i].character == character)
+						{
+							int16_t glyphIndex = g_keyboardGlyphMappings[i].glyphIndex;
+							if (glyphIndex != -1)
+							{
+								g_selectedKeyboardGlyph = &g_keyboardGlyphs[glyphIndex];
+								width += g_selectedKeyboardGlyph->width;
+							}
+							break;
+						}
+					}
+				}
+
+				character = *++text;
+			} while (character != '\0');
+		}
+
+		return width;
 	}
 
 	// FUNCTION: TOY2 0x004157D0 [MATCHED]

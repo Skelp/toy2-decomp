@@ -83,6 +83,7 @@ set(TOY2_SOURCES
     src/InputTypes.h
     src/InputManager.h
     src/InputManager.cpp
+    src/InputManagerKeyboardGlyphs.inc
     src/InputManagerKeyGlyphMappings.inc
 
     src/CharacterLoader.h
