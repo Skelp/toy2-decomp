@@ -1506,20 +1506,21 @@ namespace Nu3D
 				int32_t rayStartDistance = (((start->z >> 5) - edgeStart.z) * edgeNormal.z + ((start->x >> 5) - edgeStart.x) * edgeNormal.x) >> 12;
 				int32_t rayEndDistance =
 					((((start->z + movement->z) >> 5) - edgeStart.z) * edgeNormal.z + (((start->x + movement->x) >> 5) - edgeStart.x) * edgeNormal.x) >> 12;
-				bool rayReversed = rayStartDistance < rayEndDistance;
-				if (rayReversed)
+				int32_t rayReversed = 0;
+				if (rayStartDistance < rayEndDistance)
 				{
 					rayStartDistance = -rayStartDistance;
 					rayEndDistance = -rayEndDistance;
+					rayReversed = 1;
 				}
 
 				if (rayStartDistance >= 0 && rayEndDistance < 0)
 				{
 					int32_t distanceRange = rayStartDistance - rayEndDistance;
+					int16_t edgeDeltaX = edgeEnd.x - edgeStart.x;
+					int16_t edgeDeltaZ = edgeEnd.z - edgeStart.z;
 					int32_t hitX = start->x + movement->x * rayStartDistance / distanceRange;
 					int32_t hitZ = start->z + movement->z * rayStartDistance / distanceRange;
-					int32_t edgeDeltaX = edgeEnd.x - edgeStart.x;
-					int32_t edgeDeltaZ = edgeEnd.z - edgeStart.z;
 					int32_t fromStart = (hitX - edgeStart.x * 32) * edgeDeltaX + (hitZ - edgeStart.z * 32) * edgeDeltaZ;
 					int32_t fromEnd = (hitX - edgeEnd.x * 32) * edgeDeltaX + (hitZ - edgeEnd.z * 32) * edgeDeltaZ;
 					int32_t fraction = (rayStartDistance << 14) / distanceRange;
