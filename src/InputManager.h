@@ -43,6 +43,7 @@ namespace InputManager
 	int32_t GetJoystickButtonState(int32_t buttonIndex);
 	int32_t GetPressedInput();
 	char* GetGameControlName(int32_t inputCode);
+	void DrawColouredKeyboardGlyphText(int32_t x, int32_t y, const char* text, int32_t blue, int32_t green, int32_t red);
 	int16_t KeyNameToScancode(uint8_t keyName);
 	uint8_t IsKeyPressed(int32_t inputCode);
 	int32_t FindKeyPressed();

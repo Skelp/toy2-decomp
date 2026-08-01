@@ -139,6 +139,9 @@ namespace InputManager
 	// GLOBAL: TOY2 0x0052F464
 	int32_t g_renderedKeyboardGlyphTextWidth;
 
+	// GLOBAL: TOY2 0x0052F460
+	int32_t g_unusedColouredTextState;
+
 	// GLOBAL: TOY2 0x004EDC58
 	int32_t g_keyboardGlyphTextureSlot = 1;
 
@@ -474,6 +477,80 @@ namespace InputManager
 	{
 		Toy2::Ini::MessageTextEntry* message = Toy2::Ini::g_messageTextTable[messageIndex];
 		DrawKeyboardGlyphText(message->x, message->y, message->text);
+	}
+
+	// FUNCTION: TOY2 0x00415AE0 [MATCHED]
+	void DrawColouredKeyboardGlyphText(int32_t x, int32_t y, const char* text, int32_t blue, int32_t green, int32_t red)
+	{
+		DevDraw::TexturedQuad quad;
+		g_unusedColouredTextState = 0;
+		g_renderedKeyboardGlyphTextWidth = 0;
+		uint8_t character = *text;
+
+		if (character != '\0')
+		{
+			do
+			{
+				if (character == ' ')
+				{
+					x += 8;
+					g_renderedKeyboardGlyphTextWidth += 8;
+				}
+				else
+				{
+					for (int32_t i = 0; g_keyboardGlyphMappings[i].scanCode != -1; i++)
+					{
+						if (g_keyboardGlyphMappings[i].character == character)
+						{
+							int16_t glyphIndex = g_keyboardGlyphMappings[i].glyphIndex;
+							if (glyphIndex != -1)
+							{
+								int32_t windowHeight = Toy2::g_softWindowHeight;
+								g_selectedKeyboardGlyph = &g_keyboardGlyphs[glyphIndex];
+								quad = g_selectedKeyboardGlyph->renderData;
+
+								quad.points[0].x = (Toy2::g_softWindowWidth * x) / 320 + Toy2::g_screenClipLeft;
+								quad.points[0].y = (windowHeight * y) / 256 + Toy2::g_screenClipTop;
+								quad.points[1].x = (Toy2::g_softWindowWidth * g_selectedKeyboardGlyph->width) / 320 + quad.points[0].x;
+								quad.points[1].y = quad.points[0].y;
+								quad.points[2].x = quad.points[0].x;
+								quad.points[2].y = (windowHeight * g_selectedKeyboardGlyph->height) / 256 + quad.points[0].y;
+								quad.points[3].x = quad.points[1].x;
+								quad.points[3].y = quad.points[2].y;
+								quad.depth = 0;
+								quad.drawSlot = g_keyboardGlyphTextureSlot;
+								quad.blue = blue;
+								quad.green = green;
+								quad.red = red;
+								g_renderedKeyboardGlyphTextWidth += g_selectedKeyboardGlyph->width;
+
+								switch (g_renderMode)
+								{
+									case RENDERMODE_SOFTWARE:
+										quad.texCoords[0].u <<= 16;
+										quad.texCoords[0].v <<= 16;
+										quad.texCoords[1].u <<= 16;
+										quad.texCoords[1].v <<= 16;
+										quad.texCoords[2].u <<= 16;
+										quad.texCoords[2].v <<= 16;
+										quad.texCoords[3].u <<= 16;
+										quad.texCoords[3].v <<= 16;
+										break;
+									default:
+										break;
+								}
+
+								DevDraw::SubmitColouredTexturedQuad(&quad);
+								x += g_selectedKeyboardGlyph->width;
+							}
+							break;
+						}
+					}
+				}
+
+				character = *++text;
+			} while (character != '\0');
+		}
 	}
 
 	// FUNCTION: TOY2 0x00415F50 [MATCHED]

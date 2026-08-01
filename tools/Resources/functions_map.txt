@@ -138,6 +138,7 @@
 0x00415860 InputManager::FindKeyReleased
 0x004158A0 InputManager::DrawKeyboardGlyphText
 0x00415AC0 InputManager::DrawMessageTextByIndex
+0x00415AE0 InputManager::DrawColouredKeyboardGlyphText
 0x00415F50 InputManager::GetKeyboardGlyphWidth
 0x00415F80 InputManager::DrawKeyboardGlyph
 0x00416A60 Toy2::CreatureBehaviour::Sheep
