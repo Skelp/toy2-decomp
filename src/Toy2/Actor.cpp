@@ -978,6 +978,7 @@ namespace Toy2
 		// FUNCTION: TOY2 0x00405D20 [PROVISIONAL]
 		void Kill(Toy2Actor* actor, uint8_t killFlags)
 		{
+			int32_t effectCount = 0;
 			if ((killFlags & KILL_EFFECTS) != 0)
 			{
 				if ((actor->actorFlags & ACTOR_FLAG_BOSS) == 0)
@@ -998,7 +999,6 @@ namespace Toy2
 				actor->velForward = 0;
 				actor->gravityVel = -0x400;
 
-				int32_t effectCount = 0;
 				switch (actor->creatureId)
 				{
 					case 3:
@@ -1019,12 +1019,6 @@ namespace Toy2
 					case 0xF:
 						actor->hitpoints = -1;
 						Particles::SpawnBurstRingAtPoint(actor, 0x20, 0x20, 0x20, 0x2000);
-						AudioManager::PlaySoundEffect(-2, &actor->pos);
-						break;
-					case 0x10:
-					case 0x19:
-						actor->hitpoints = -1;
-						effectCount = 6;
 						AudioManager::PlaySoundEffect(-2, &actor->pos);
 						break;
 					case 0x14:
@@ -1051,6 +1045,12 @@ namespace Toy2
 						actor->hitpoints = -0x5E;
 						actor->animationFramePosition = *actor->animationFrameSequence << 16;
 						actor->respawnDelay = 10000;
+						break;
+					case 0x10:
+					case 0x19:
+						actor->hitpoints = -1;
+						effectCount = 6;
+						AudioManager::PlaySoundEffect(-2, &actor->pos);
 						break;
 					case 0x1B:
 						actor->hitpoints = -1;
@@ -1112,25 +1112,30 @@ namespace Toy2
 					else
 					{
 						int32_t particleCount = -effectCount;
-						for (int32_t particleIndex = 0; particleIndex < particleCount; particleIndex++)
+						int32_t particleIndex = 0;
+						if (particleCount > 0)
 						{
-							Nu3D::Particles::ParticleInstance* particle =
-								Nu3D::Particles::SpawnFromPreset(effectX, effectY, effectZ, 0x63, (particleIndex & 1) * 10 + 4);
-							particle->velY -= 0x100;
-							particle->lifetime = (*g_randDatBufferPtr++ & 0x1F) + 0x78;
-							int32_t colour = (*g_randDatBufferPtr++ & 0x7F) + 0x40;
-							particle->colourR = colour;
-							particle->colourG = colour;
-							particle->colourB = colour;
-							if ((*g_randDatBufferPtr++ & 1) != 0)
+							do
 							{
-								particle->rotSpeed = (*g_randDatBufferPtr++ & 0x3F) + 0x40;
-							}
-							else
-							{
-								particle->rotSpeed = -0x40 - (*g_randDatBufferPtr++ & 0x3F);
-							}
-							Nu3D::Particles::SpawnFromPreset(effectX, effectY, effectZ, 0x11, 4);
+								Nu3D::Particles::ParticleInstance* particle =
+									Nu3D::Particles::SpawnFromPreset(effectX, effectY, effectZ, 0x63, (particleIndex & 1) * 10 + 4);
+								particle->velY -= 0x100;
+								particle->lifetime = (*g_randDatBufferPtr++ & 0x1F) + 0x78;
+								int32_t colour = (*g_randDatBufferPtr++ & 0x7F) + 0x40;
+								particle->colourR = colour;
+								particle->colourG = colour;
+								particle->colourB = colour;
+								if ((*g_randDatBufferPtr++ & 1) != 0)
+								{
+									particle->rotSpeed = (*g_randDatBufferPtr++ & 0x3F) + 0x40;
+								}
+								else
+								{
+									particle->rotSpeed = -0x40 - (*g_randDatBufferPtr++ & 0x3F);
+								}
+								Nu3D::Particles::SpawnFromPreset(effectX, effectY, effectZ, 0x11, 4);
+								particleIndex++;
+							} while (particleIndex < particleCount);
 						}
 						AudioManager::PlaySoundEffect(0xA, &actor->pos);
 					}
