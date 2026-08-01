@@ -29,10 +29,10 @@ int32_t g_masterTextureFlags[64];
 int32_t g_textureFlags[64];
 
 // GLOBAL: TOY2 0x0051A944
-int32_t g_masterTexturePaletteState[32];
+int16_t g_masterTexturePaletteState[64];
 
 // GLOBAL: TOY2 0x0050A690
-int32_t g_texturePaletteState[32];
+int16_t g_texturePaletteState[64];
 
 // GLOBAL: TOY2 0x0050AA64
 TextureDimensions g_textureDimensions[64];

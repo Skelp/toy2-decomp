@@ -128,10 +128,11 @@ extern LPVOID g_textureData[64];
 extern int32_t g_masterTextureFlags[64];
 extern int32_t g_textureFlags[64];
 extern TextureDimensions g_textureDimensions[64];
-extern int32_t g_masterTexturePaletteState[32];
-extern int32_t g_texturePaletteState[32];
+extern int16_t g_masterTexturePaletteState[64];
+extern int16_t g_texturePaletteState[64];
 
 BOOL D3DAppIReleaseAllTextures();
+void AllocateTexturePixelBuffer(int16_t textureIndex);
 BOOL D3DAppICreateFontSurfaces();
 BOOL D3DAppCreate(DWORD flags, HWND hwnd, D3DAppInfo** d3dApp);
 
