@@ -2155,21 +2155,22 @@ namespace Renderer
 			*capsOut = Renderer::g_deviceBlendShadeCaps;
 	}
 
-	// FUNCTION: TOY2 0x0048F410 [PROVISIONAL]
+	// FUNCTION: TOY2 0x0048F410 [MATCHED]
 	void RenderParallaxBackground(int32_t forceRender)
 	{
 		if (g_drawParallaxTexture)
 		{
-			if (Toy2::g_hasStaticBackdrop)
+			if (! Toy2::g_hasStaticBackdrop)
 			{
-				g_parallaxHorizOffset = 0.0;
-				g_parallaxCurHorizScroll = 0.0;
-				g_parallaxTexHeightRatio = 1.0;
-				g_parallaxTexWidthRatio = 1.0;
+				if (! Toy2::g_hasBackdrop)
+					return;
 			}
-			else if (! Toy2::g_hasBackdrop)
+			else
 			{
-				return;
+				g_parallaxHorizOffset = 0.0f;
+				g_parallaxCurHorizScroll = 0.0f;
+				g_parallaxTexHeightRatio = 1.0f;
+				g_parallaxTexWidthRatio = 1.0f;
 			}
 
 			if (forceRender || GetIsSoftwareRendering() || (Glue::SetBackdrop(Toy2::g_nextBackdropId), ! Glue::BackdropBltFast()))
@@ -2187,29 +2188,31 @@ namespace Renderer
 					uvMax.y = 1.0;
 					uvMax.x = 1.0;
 
-					if (g_parallaxHorizOffset > 0.0)
+					RGBA color;
+					color.a = 0xFF;
+					color.r = 0xFF;
+					color.g = 0xFF;
+					color.b = 0xFF;
+
+					if (g_parallaxHorizOffset > 0.0f)
 					{
-						float topFillHeight = 1.0 / g_virtualScreenHeight + g_parallaxHorizOffset;
-						Sprite::Queue2DSprite(0.0, 0.0, 1.0, topFillHeight, &uvMin, &uvMax, 0, g_parallaxTexLastPixel, RENDER_PARALLAX_BG);
+						float topFillHeight = 1.0f / g_virtualScreenHeight + g_parallaxHorizOffset;
+						Sprite::Queue2DSprite(0.0f, 0.0f, 1.0f, topFillHeight, &uvMin, &uvMax, 0, g_parallaxTexLastPixel, RENDER_PARALLAX_BG);
 					}
 
-					double verticalExtent = g_parallaxTexHeightRatio + g_parallaxHorizOffset;
+					float verticalExtent = g_parallaxTexHeightRatio + g_parallaxHorizOffset;
 
-					if (verticalExtent < 1.0)
+					if (verticalExtent < 1.0f)
 					{
-						float bottomFillHeight = 1.0 - g_parallaxHorizOffset - g_parallaxTexHeightRatio + 1.0 / g_virtualScreenHeight;
-						float verticalEnd = verticalExtent;
+						float bottomFillHeight = 1.0f - g_parallaxHorizOffset - g_parallaxTexHeightRatio + 1.0f / g_virtualScreenHeight;
 
-						Sprite::Queue2DSprite(0.0, verticalEnd, 1.0, bottomFillHeight, &uvMin, &uvMax, 0, g_parallaxTexFirstPixel, RENDER_PARALLAX_BG);
+						Sprite::Queue2DSprite(0.0f, verticalExtent, 1.0f, bottomFillHeight, &uvMin, &uvMax, 0, g_parallaxTexFirstPixel, RENDER_PARALLAX_BG);
 					}
 
-					double nextHorizontalPos;
+					float nextHorizontalPos;
 
 					do
 					{
-						RGBA color;
-						color.value = -1;
-
 						Sprite::Queue2DSprite(g_parallaxCurHorizScroll,
 							g_parallaxHorizOffset,
 							g_parallaxTexWidthRatio,
@@ -2224,7 +2227,7 @@ namespace Renderer
 
 						g_parallaxCurHorizScroll = nextHorizontalPos;
 
-					} while (nextHorizontalPos < 1.0);
+					} while (nextHorizontalPos < 1.0f);
 				}
 			}
 		}
