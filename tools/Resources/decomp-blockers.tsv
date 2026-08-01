@@ -25,7 +25,10 @@
 0x0043C750	-	The function cyclically reorders 0x30-byte animation track records, but metadata fields at +0x0A/+0x12/+0x1A/+0x22 and +0x24..+0x2F have no corroborated roles or typed readers; completing it would require guessed layout names
 0x0043D9E0	-	Needs source evidence for the component evaluation order. Five natural forms did not reproduce the retail register schedule.
 0x0043E6E0	-	The game-state field roles and source branch structure remain unresolved. Caller and callee evidence does not identify the remaining fields or branches.
+0x0043F3D0	0x0043D9E0,0x00451280	The function needs the proven projection and world-to-view local-lifetime models.
+0x004402B0	0x0043F3D0,0x004885C0	The function needs the portal visibility traversal and sector lookup.
 0x00445720	-	The complete typed shadow draw path scores 54.43%; six forms preserve the quad data and call but leave stack-slot and assignment scheduling differences.
+0x00445980	-	The typed body scores 45.14%. Packed particle color scores 45.23%. A volatile dead byte scores 63.18%, but its source model lacks evidence. The texture-index and render-state lifetimes remain unknown.
 0x00447D40	-	Natural cursor initialization and fallback-store ordering preserve the 87.32% result; the remaining differences are pointer-address folding and independent store scheduling, with behavior and data model already established.
 0x0044E710	-	Needs source evidence for the segment pointer anchors and scratch-vector lifetimes; one explicit position-pointer form caused only an unrelated register-allocation change.
 0x0044EB90	-	The complete typed kite-tail draw path remains below 50%; three structural forms leave the CAP-03 register homes and one packed-colour stack slot unresolved.
