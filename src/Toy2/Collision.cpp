@@ -1439,7 +1439,7 @@ namespace Nu3D
 			PointI edge2;
 			int32_t normalDirection;
 
-			if (absNormalX >= absNormalY && absNormalX >= absNormalZ)
+			if (absNormalX > absNormalY && absNormalX >= absNormalZ)
 			{
 				point.x = pointY;
 				point.y = pointZ;
