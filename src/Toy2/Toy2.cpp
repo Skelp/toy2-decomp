@@ -1835,6 +1835,12 @@ namespace Toy2
 	// GLOBAL: TOY2 0x00731CBC
 	uint32_t g_unusedD3DFrameStartTime;
 
+	// GLOBAL: TOY2 0x00731C00
+	int16_t g_unusedD3DRendererValue;
+
+	// GLOBAL: TOY2 0x00731F28
+	int32_t g_unusedD3DRendererBuffer[0x420];
+
 	// GLOBAL: TOY2 0x0072E34C
 	int32_t g_mpegPlaybackDisabled;
 
@@ -6212,10 +6218,36 @@ namespace Toy2
 		} while (--textureCount != 0);
 	}
 
-	// STUB: TOY2 0x00499950
+	// FUNCTION: TOY2 0x00499950 [PROVISIONAL]
 	void InitDirect3DRenderer()
 	{
-		// Weird method, a good portion of these variables are never even used in the game
+		Logger::Log("INIT : Starting Direct3D renderer.\n");
+
+		RECT* destRect = DrawingDevice::GetDestRect();
+		g_destRectWidth = destRect->right - destRect->left;
+		g_destRectHeight = destRect->bottom - destRect->top;
+
+		if (g_destRectHalfWidth != g_perspectiveTableHalfWidth)
+		{
+			g_perspectiveTableHalfWidth = g_destRectHalfWidth;
+			BuildPerspectiveDivideTable(g_destRectHalfWidth);
+		}
+
+		g_softWindowWidth = g_destRectWidth;
+		g_screenClipRight = g_destRectWidth - 1;
+		g_screenClipBottom = g_destRectHeight - 1;
+		g_destRectWidthScaled = (g_destRectWidth << 8) / 320;
+		g_screenClipLeft = 0;
+		g_destRectHalfWidth = g_destRectWidth / 2;
+		g_destRectHalfHeight = g_destRectHeight / 2;
+		g_screenClipRightFixed = (g_destRectWidth << 10) - 1;
+		g_softWindowHalfWidth = g_destRectHalfWidth;
+		g_softWindowHeight = g_destRectHeight;
+
+		memset(g_unusedD3DRendererBuffer, 0, sizeof(g_unusedD3DRendererBuffer));
+		g_screenClipTop = 0;
+		g_screenClipLeftFixed = 0;
+		g_unusedD3DRendererValue = 0;
 	}
 
 	// FUNCTION: TOY2 0x00499EB0 [MATCHED]
