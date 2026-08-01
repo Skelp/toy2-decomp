@@ -2,6 +2,7 @@
 0x00401FB0	-	needs source evidence for argument register homes after the scoped remaining count scored 67.31% versus the 33.33% baseline
 0x004025C0	-	Typed TokenDialogueEntry source and an explicit two-exit loop both compile at 55.38%; retail anchors the cursor on dialogueRecordIndex, while VC6 anchors it on subtitle. Only a raw negative-index cursor reproduces the retail anchor.
 0x00402A10	-	Complete typed command interpreter with scaled path coordinates scored 25.79%; an explicit input-lock lifetime was neutral. Retail uses a different command/path pointer lifetime model across the whole 2624-byte body, and raw RecordData indexing would conceal the established data model.
+0x004076F0	-	The 4096-byte movement interpreter depends on unnamed actor fields, unknown command opcodes, and an indirect behavior callback. No reconstructed sibling or reference identifies the complete state model.
 0x0040B9D0	-	The complete DirectDraw flow stays at 76.19%. Four natural forms only change the compiler's shared zero register.
 0x00410410	-	The complete particle and light flow stays at 61.40%. Four natural loop and random-cursor forms only change register allocation.
 0x004106C0	-	The complete burst-ring flow stays at 87.60%. Declaration order is neutral, and only a dead parameter slot and pointer-compare opcode differ.
@@ -23,6 +24,7 @@
 0x004398B0	-	2176-byte post-game screen loop depends on an undeclared 64-entry particle record, several unresolved globals, and intertwined animation/input/fade state; no reference analogue or reconstructed sibling
 0x0043C750	-	The function cyclically reorders 0x30-byte animation track records, but metadata fields at +0x0A/+0x12/+0x1A/+0x22 and +0x24..+0x2F have no corroborated roles or typed readers; completing it would require guessed layout names
 0x0043D9E0	-	Needs source evidence for the component evaluation order. Five natural forms did not reproduce the retail register schedule.
+0x0043E6E0	-	The game-state field roles and source branch structure remain unresolved. Caller and callee evidence does not identify the remaining fields or branches.
 0x00445720	-	The complete typed shadow draw path scores 54.43%; six forms preserve the quad data and call but leave stack-slot and assignment scheduling differences.
 0x00447D40	-	Natural cursor initialization and fallback-store ordering preserve the 87.32% result; the remaining differences are pointer-address folding and independent store scheduling, with behavior and data model already established.
 0x0044E710	-	Needs source evidence for the segment pointer anchors and scratch-vector lifetimes; one explicit position-pointer form caused only an unrelated register-allocation change.
@@ -45,12 +47,15 @@
 0x00487B20	0x0048B750	Two complete natural forms scored 19.41% and 19.31%. Together with SweepWallSegments at 15.65%/10.37%, the repeated sub-50 result rejects the shared edge-sweep source model despite a confirmed ABI and behavior; reconstruct SweepAgainstCandidates or the original intermediate-width model first.
 0x004885C0	-	Leaf body depends on unresolved collision-tree node and face layouts; callers are unfinished and the decompilation exposes many unnamed fields, so a plausible typed implementation is not yet supported.
 0x00488E10	-	Behavior, ABI, platform fields, and fixed-point rotation composition are recovered, but a natural structured implementation with inline rotation helpers scored 12.15%. Retail depends on monolithic expression and local-lifetime structure not proven by current evidence.
+0x00489C30	-	The complete typed reconstruction uses a 0x9070-byte frame but differs in array positions, loop cursors, and register lifetimes. Natural forms scored 14.71% to 17.30%.
+0x0048A4C0	-	The remaining mismatch needs source evidence for the axis-local lifetimes and frame layout. Parameter reuse scored 47.50%. Interleaved axis locals stayed at 53.31%.
 0x0048ACC0	-	Two complete typed command-switch forms scored 20.34% and 11.48%. Reproducing the retail inlined velocity stores made the result worse, so the shared motion/control-flow model is rejected; reconstruct an original command abstraction or smaller caller-side prerequisite first.
 0x0048C030	-	Behavior, two-argument ABI, moving-platform transform, and both packed-face tests are recovered, but the natural structured implementation scored 11.91%. Retail uses a shared 0xB4-byte local model not supported by current type evidence; needs that source model before promotion.
 0x0048F1B0	-	Incrementing the parameter and materializing indexed ID/pointer pairs improves 63.01% to 67.65%, but the compiler still saves EDI in the prologue instead of after range validation. The improved complete form remains below the 75% validation threshold.
 0x00490B90	-	All six natural temporary orders and right-first product spelling compile to the same 65.71% or 32.50% regalloc patterns; ABI, alias-safe temporaries, arithmetic, and stores are otherwise confirmed
 0x00490EE0	-	No callers or x-refs are known, and Ghidra cannot form a function body at the authoritative map start; the many-argument ABI is not recoverable from raw disassembly alone
 0x00491F20	-	No callers or x-refs are known, and Ghidra cannot form a function body at the authoritative map start; the many-argument ABI is not recoverable from raw disassembly alone
+0x00492F70	-	The function has no direct callers, and its ten-argument ABI, render-state globals, and helper at 0x00497FE0 have no source evidence. The current evidence cannot identify a complete source interface.
 0x004946A0	-	The typed tiled-sprite path scores 56.00%; four credible forms leave the verified CAP-24 x87 divisor spill and evaluation schedule.
 0x00494820	-	The typed virtual-width sprite path scores 57.14%; four credible forms leave the verified CAP-24 x87 divisor spill and evaluation schedule.
 0x0049EBA0	-	signed int16 global is confirmed by matched GetCurButtonsPressed; cached-reference baseline scores 51.85%, while direct-table forms with a local or split assignment score 14.81% and leave an unsupported load-width/address-mode mismatch
