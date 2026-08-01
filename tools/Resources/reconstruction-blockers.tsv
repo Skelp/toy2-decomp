@@ -2,10 +2,6 @@
 0x004076F0	-	Needs the actor command opcodes and behavior callback contract.	indirect-dispatch
 0x004398B0	-	Needs the particle record layout and screen-state globals.	layout
 0x0043C750	-	Needs names and roles for the animation-track metadata fields.	layout
-0x0043F3D0	0x0043D9E0,0x00451280	Needs projection and world-to-view behavior.	semantic
-0x004402B0	0x0043F3D0,0x004885C0	Needs portal traversal and sector lookup behavior.	semantic
-0x00483EF0	0x00482A00,0x00484380	Needs the substep and collision-resolution contracts.	abi
-0x004885C0	-	Needs the collision-tree node and face layouts.	layout
 0x0048D530	0x0048C030	Needs the per-mesh raycast contract.	semantic
 0x00490EE0	-	Needs a caller or data reference to establish the ABI.	abi
 0x00491F20	-	Needs a caller or data reference to establish the ABI.	abi
@@ -13,4 +9,3 @@
 0x004B9D70	-	Needs the type of the loop-carried stack value.	semantic
 0x004BE0B0	-	Needs the scratch-buffer layout and polygon-pass structure.	layout
 0x004C0320	0x004BD040	Needs the projection and split helper contract.	semantic
-0x004CABD0	-	Needs roles for serialized fields at offsets 0x04 and 0x10.	layout
