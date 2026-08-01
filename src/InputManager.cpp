@@ -191,6 +191,18 @@ namespace InputManager
 	// FUNCTION: TOY2 0x00414AE0 [MATCHED]
 	int32_t GetJoystickButtonState(int32_t buttonIndex) { return g_joystickState.rgbButtons[buttonIndex]; }
 
+	// FUNCTION: TOY2 0x00415100 [MATCHED]
+	int32_t HasSecondaryJoystickButtonPressed()
+	{
+		for (int32_t button = 1; button < 32; button++)
+		{
+			if (g_joystickState.rgbButtons[button])
+				return 1;
+		}
+
+		return 0;
+	}
+
 	// FUNCTION: TOY2 0x00415120 [MATCHED]
 	int32_t GetPressedInput()
 	{
@@ -219,6 +231,14 @@ namespace InputManager
 		}
 
 		return NULL;
+	}
+
+	// FUNCTION: TOY2 0x004154C0 [MATCHED]
+	void PollKeyboardState()
+	{
+		Nu3D::MemSet32Util(g_inputStates, 64, 0);
+		g_directInputDevice->Acquire();
+		g_directInputDevice->GetDeviceState(256, g_inputStates);
 	}
 
 	// FUNCTION: TOY2 0x00415500 [MATCHED]
@@ -315,6 +335,9 @@ namespace InputManager
 
 		return -1;
 	}
+
+	// FUNCTION: TOY2 0x004157D0 [MATCHED]
+	void ResetInputHistory(int32_t inputCode) { g_previousInputStates[inputCode] = 0xFF; }
 }
 
 namespace InputManager
