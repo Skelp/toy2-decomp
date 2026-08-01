@@ -393,7 +393,7 @@ namespace Toy2
 			}
 		}
 
-		// FUNCTION: TOY2 0x00428BA0 [MATCHED]
+		// FUNCTION: TOY2 0x00428BA0 [EFFECTIVE]
 		void UpdateObjectGroupFlash()
 		{
 			// Keep this read before the phase read. VC6 can reverse commutative global reads after unrelated source changes.
@@ -1135,14 +1135,16 @@ namespace Toy2
 			g_waterLevelPhase += Renderer::g_frameDelta * 32;
 			if (g_waterLevel < g_targetWaterLevel)
 			{
-				AudioManager::PlaySoundEffect(0x95, reinterpret_cast<Vector3I*>(1));
+				Vector3I* globalSoundPosition = reinterpret_cast<Vector3I*>(1);
+				AudioManager::PlaySoundEffect(0x95, globalSoundPosition);
 				g_waterLevel += Renderer::g_frameDelta * 0x200;
 				if (g_waterLevel > g_targetWaterLevel)
 					g_waterLevel = g_targetWaterLevel;
 			}
 			else if (g_waterLevel > g_targetWaterLevel)
 			{
-				AudioManager::PlaySoundEffect(0x95, reinterpret_cast<Vector3I*>(1));
+				Vector3I* globalSoundPosition = reinterpret_cast<Vector3I*>(1);
+				AudioManager::PlaySoundEffect(0x95, globalSoundPosition);
 				g_waterLevel -= Renderer::g_frameDelta * 0x40;
 				if (g_waterLevel < g_targetWaterLevel)
 					g_waterLevel = g_targetWaterLevel;
