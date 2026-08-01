@@ -59,9 +59,7 @@ score() {
 }
 
 ensure_build() {
-    if [[ ! -f build/reccmp-build.yml || ! -f build/toy2.exe || ! -f build/toy2.pdb ]]; then
-        build
-    fi
+    build_game
 }
 
 write_comparison_report() {

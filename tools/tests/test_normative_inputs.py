@@ -1,5 +1,6 @@
-import subprocess
 import csv
+import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -26,6 +27,14 @@ NORMATIVE_INPUTS = (
 
 
 class NormativeInputTests(unittest.TestCase):
+    def test_comparison_commands_refresh_the_game_build(self):
+        script = (ROOT / "tools" / "decomp").read_text(encoding="utf-8")
+        ensure_build = re.search(
+            r"^ensure_build\(\) \{\n(.*?)^\}", script, re.MULTILINE | re.DOTALL
+        )
+        self.assertIsNotNone(ensure_build)
+        self.assertEqual(ensure_build.group(1).strip(), "build_game")
+
     def test_normative_inputs_exist_and_are_not_ignored(self):
         for name in NORMATIVE_INPUTS:
             with self.subTest(name=name):
