@@ -1,10 +1,12 @@
 #include "InputManager.h"
 #include "Toy2/Win95.h"
 #include "SaveManager.h"
+#include "Nu3D/Camera.h"
 #include "Nu3D/Nu3D.h"
 #include "Renderer/TexturedQuad.h"
 #include "Toy2/Direct6.h"
 #include "Toy2/Ini.h"
+#include "Toy2/MainMenu.h"
 #include "Toy2/Toy2.h"
 
 #include <DINPUT.H>
@@ -812,6 +814,17 @@ namespace InputManager
 		g_previousInputStates[inputCode] = ~g_inputStates[inputCode];
 
 		return result;
+	}
+
+	// FUNCTION: TOY2 0x0047BAC0 [MATCHED]
+	void BeginControlMenuExitOnEscape()
+	{
+		if (IsKeyPressed(1) && ! Toy2::MainMenu::g_nextScreen)
+		{
+			Toy2::MainMenu::g_nextScreen = 1;
+			Toy2::MainMenu::g_fadeTimer = 44;
+			Nu3D::Camera::SetTint(0, 0, 0, 3);
+		}
 	}
 
 	// FUNCTION: TOY2 0x00415800 [MATCHED]
