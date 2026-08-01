@@ -14,14 +14,131 @@ namespace DevDraw
 	// GLOBAL: TOY2 0x00732FBC
 	int32_t g_vertexCount;
 
+	// GLOBAL: TOY2 0x00732FC0
+	int16_t g_texturedQuadCount;
+
 	// GLOBAL: TOY2 0x00732FC8
 	DrawBuffer g_drawBufferStorage;
 
 	// GLOBAL: TOY2 0x007D2DA8
 	TransparentDrawBuffer g_transparentDrawBufferStorage;
 
-	// STUB: TOY2 0x00494C30
-	int16_t SubmitTexturedQuad(TexturedQuad* quad) { return 1; }
+	// FUNCTION: TOY2 0x00494C30 [PROVISIONAL]
+	int16_t SubmitTexturedQuad(TexturedQuad* quad)
+	{
+		switch (g_renderMode)
+		{
+			case RENDERMODE_D3D: {
+				if (Toy2::drawb->VerticeCount[quad->drawSlot] >= 494)
+				{
+					FlushDrawBufferSlot((int16_t)quad->drawSlot);
+				}
+
+				int16_t firstVertex = Toy2::drawb->VerticeCount[quad->drawSlot];
+				Toy2::drawb->Index[quad->drawSlot][Toy2::drawb->IndexCount[quad->drawSlot]++] = firstVertex;
+				Toy2::drawb->Index[quad->drawSlot][Toy2::drawb->IndexCount[quad->drawSlot]++] = firstVertex + 1;
+				Toy2::drawb->Index[quad->drawSlot][Toy2::drawb->IndexCount[quad->drawSlot]++] = firstVertex + 2;
+				Toy2::drawb->Index[quad->drawSlot][Toy2::drawb->IndexCount[quad->drawSlot]++] = firstVertex + 1;
+				Toy2::drawb->Index[quad->drawSlot][Toy2::drawb->IndexCount[quad->drawSlot]++] = firstVertex + 3;
+				Toy2::drawb->Index[quad->drawSlot][Toy2::drawb->IndexCount[quad->drawSlot]++] = firstVertex + 2;
+
+				Nu3D::VertexTL* vertex = static_cast<Nu3D::VertexTL*>(Toy2::drawb->Vertice[quad->drawSlot]) + firstVertex;
+				Toy2::drawb->VerticeCount[quad->drawSlot] += 4;
+
+				int32_t intensity = Nu3D::Camera::g_cameraTintBlue * 224 / 128;
+				uint32_t diffuse = 0xFF000000 | intensity << 16 | intensity << 8 | intensity;
+
+				vertex->position.x = quad->points[0].x;
+				vertex->position.y = quad->points[0].y;
+				vertex->position.z = quad->depth * 0.000244140625f;
+				vertex->rhw = 1.0f;
+				vertex->diffuse.value = diffuse;
+				vertex->specular.value = 0;
+				vertex->uv.x = (float)quad->texCoords[0].u / quad->textureWidth;
+				vertex->uv.y = (float)quad->texCoords[0].v / quad->textureHeight;
+				vertex++;
+
+				vertex->position.x = quad->points[1].x;
+				vertex->position.y = quad->points[1].y;
+				vertex->position.z = quad->depth * 0.000244140625f;
+				vertex->rhw = 1.0f;
+				vertex->diffuse.value = diffuse;
+				vertex->specular.value = 0;
+				vertex->uv.x = (float)quad->texCoords[1].u / quad->textureWidth;
+				vertex->uv.y = (float)quad->texCoords[1].v / quad->textureHeight;
+				vertex++;
+
+				vertex->position.x = quad->points[2].x;
+				vertex->position.y = quad->points[2].y;
+				vertex->position.z = quad->depth * 0.000244140625f;
+				vertex->rhw = 1.0f;
+				vertex->diffuse.value = diffuse;
+				vertex->specular.value = 0;
+				vertex->uv.x = (float)quad->texCoords[2].u / quad->textureWidth;
+				vertex->uv.y = (float)quad->texCoords[2].v / quad->textureHeight;
+				vertex++;
+
+				vertex->position.x = quad->points[3].x;
+				vertex->position.y = quad->points[3].y;
+				vertex->position.z = quad->depth * 0.000244140625f;
+				vertex->rhw = 1.0f;
+				vertex->diffuse.value = diffuse;
+				vertex->specular.value = 0;
+				vertex->uv.x = (float)quad->texCoords[3].u / quad->textureWidth;
+				vertex->uv.y = (float)quad->texCoords[3].v / quad->textureHeight;
+
+				g_texturedQuadCount++;
+				break;
+			}
+			case RENDERMODE_SOFTWARE:
+				if (SoftwareRenderer::g_softwareRenderItemCount < SoftwareRenderer::g_softwareRendererBufferBlockCount)
+				{
+					SoftwareRenderer::SoftwareRenderItem* items =
+						static_cast<SoftwareRenderer::SoftwareRenderItem*>(SoftwareRenderer::g_softwareRendererBuffer);
+					SoftwareRenderer::SoftwareRenderItem* item = &items[SoftwareRenderer::g_softwareRenderItemCount++];
+
+					item->vertices[0].x = quad->points[0].x;
+					item->vertices[1].x = quad->points[1].x;
+					item->vertices[2].x = quad->points[3].x;
+					item->vertices[3].x = quad->points[2].x;
+					item->vertices[0].y = quad->points[0].y;
+					item->vertices[1].y = quad->points[1].y;
+					item->vertices[2].y = quad->points[3].y;
+					item->vertices[3].y = quad->points[2].y;
+					item->vertices[0].u = quad->texCoords[0].u;
+					item->vertices[1].u = quad->texCoords[1].u;
+					item->vertices[2].u = quad->texCoords[3].u;
+					item->vertices[3].u = quad->texCoords[2].u;
+					item->vertices[0].v = quad->texCoords[0].v;
+					item->vertices[1].v = quad->texCoords[1].v;
+					item->vertices[2].v = quad->texCoords[3].v;
+					item->vertices[3].v = quad->texCoords[2].v;
+
+					item->vertices[0].blue = 0x80000;
+					item->vertices[1].blue = 0x80000;
+					item->vertices[2].blue = 0x80000;
+					item->vertices[3].blue = 0x80000;
+					item->vertices[0].green = 0x80000;
+					item->vertices[1].green = 0x80000;
+					item->vertices[2].green = 0x80000;
+					item->vertices[3].green = 0x80000;
+					item->vertices[0].red = 0x80000;
+					item->vertices[1].red = 0x80000;
+					item->vertices[2].red = 0x80000;
+					item->vertices[3].red = 0x80000;
+
+					item->renderFlags = SoftwareRenderer::SOFTWARE_RENDER_HIGH_PRIORITY;
+					item->textureIndex = (uint8_t)quad->drawSlot;
+					item->next = SoftwareRenderer::g_softwareRenderBuckets[quad->depth];
+					SoftwareRenderer::g_softwareRenderBuckets[quad->depth] = item;
+				}
+				break;
+			default:
+				break;
+		}
+
+		return 1;
+	}
 
 	// FUNCTION: TOY2 0x00497FE0 [MATCHED]
 	void SetVertexBufferAllocation(int16_t slot, int32_t allocate)

@@ -310,6 +310,7 @@ namespace Renderer
 namespace DevDraw
 {
 	extern int32_t g_vertexCount;
+	extern int16_t g_texturedQuadCount;
 
 	// Opaque indexed draw buffer. Stores per-slot vertex-pointer, vertex-count,
 	// index, and index-count arrays for the main (opaque) geometry pass. The

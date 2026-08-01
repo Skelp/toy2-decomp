@@ -28,7 +28,42 @@ namespace SoftwareRenderer
 	extern int32_t g_backBufferClearComplete;
 	extern int32_t g_skipOddSoftwareFrames;
 	extern int32_t g_displayMaxX;
-	struct SoftwareRenderItem;
+	struct SoftwareRasterVertex
+	{
+		int32_t x;
+		int32_t y;
+		int32_t blue;
+		int32_t green;
+		int32_t red;
+		int32_t u;
+		int32_t v;
+	};
+
+	struct SoftwareRenderItem
+	{
+		SoftwareRasterVertex vertices[4];
+		SoftwareRenderItem* next;
+		uint16_t renderFlags;
+		uint8_t textureIndex;
+		uint8_t reserved[9];
+	};
+
+	enum SoftwareRenderFlags
+	{
+		SOFTWARE_RENDER_QUAD = 0x1,
+		SOFTWARE_RENDER_COLOUR_KEY = 0x8,
+		SOFTWARE_RENDER_BLEND_50 = 0x10,
+		SOFTWARE_RENDER_ADDITIVE = 0x20,
+		SOFTWARE_RENDER_COLOUR_OFFSET = 0x40,
+		SOFTWARE_RENDER_SUBTRACTIVE = 0x1000,
+		SOFTWARE_RENDER_HIGH_PRIORITY = 0x8000,
+	};
+
+	STATIC_ASSERT(sizeof(SoftwareRasterVertex) == 0x1C);
+	STATIC_ASSERT(sizeof(SoftwareRenderItem) == 0x80);
+	STATIC_ASSERT(offsetof(SoftwareRenderItem, next) == 0x70);
+	STATIC_ASSERT(offsetof(SoftwareRenderItem, renderFlags) == 0x74);
+	STATIC_ASSERT(offsetof(SoftwareRenderItem, textureIndex) == 0x76);
 	extern SoftwareRenderItem** g_softwareRenderBuckets;
 	extern SoftwareRenderItem* g_softwareRenderBucketStorage[4096];
 	extern int32_t g_softwareRenderItemCount;
