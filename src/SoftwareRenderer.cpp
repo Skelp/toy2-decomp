@@ -151,11 +151,10 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00A4CC80
 	int32_t g_sortedRenderFlushPhase;
 
-	// Reset by FlushSortedRenderCommands after the sorted bucket walk. g_unkB626C0 sits just
-	// below the bucket array; g_unkB7FBB8 sits just below g_clipLeft. Roles
-	// not yet fully understood.
+	// FlushSortedRenderCommands resets this state after the sorted bucket walk.
+	// This value is immediately before the bucket array.
 	// GLOBAL: TOY2 0x00B626C0
-	int32_t g_unkB626C0;
+	int32_t g_sortedRenderBucketState;
 
 	// GLOBAL: TOY2 0x00DE20A8
 	int32_t g_renderCommandCount;
@@ -226,7 +225,7 @@ namespace SoftwareRenderer
 	RenderCommand g_renderCommands[1024];
 
 	// GLOBAL: TOY2 0x00B7FBB8
-	int32_t g_unkB7FBB8;
+	int32_t g_sortedRenderState;
 
 	// GLOBAL: TOY2 0x00A4CC74
 	int32_t g_levelFileIndex;
@@ -8683,7 +8682,7 @@ namespace SoftwareRenderer
 		RasterizeQuadSpans(command, commandTexData);
 	}
 
-	// FUNCTION: TOY2 0x004BCB60 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004BCB60 [MATCHED]
 	void FlushSortedRenderCommands()
 	{
 		if (g_sortedRenderFlushPhase == 1)
@@ -8698,8 +8697,8 @@ namespace SoftwareRenderer
 				}
 			}
 		}
-		g_unkB7FBB8 = 0;
-		g_unkB626C0 = 0;
+		g_sortedRenderState = 0;
+		g_sortedRenderBucketState = 0;
 		g_sortedRenderFlushPhase++;
 	}
 
