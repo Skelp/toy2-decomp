@@ -3,7 +3,7 @@
 0x004025C0	-	Typed TokenDialogueEntry source and an explicit two-exit loop both compile at 55.38%; retail anchors the cursor on dialogueRecordIndex, while VC6 anchors it on subtitle. Only a raw negative-index cursor reproduces the retail anchor.
 0x00402A10	-	Complete typed command interpreter with scaled path coordinates scored 25.79%; an explicit input-lock lifetime was neutral. Retail uses a different command/path pointer lifetime model across the whole 2624-byte body, and raw RecordData indexing would conceal the established data model.
 0x004076F0	-	The 4096-byte movement interpreter depends on unnamed actor fields, unknown command opcodes, and an indirect behavior callback. No reconstructed sibling or reference identifies the complete state model.
-0x0040B9D0	-	The complete DirectDraw flow stays at 76.19%. Four natural forms only change the compiler's shared zero register.
+0x0040B9D0	-	The DirectDraw flow and two-argument ABI are complete at 76.19 percent. Four natural forms change only the compiler's shared zero register.	compiler-codegen	ready	-	58927700766e90d6
 0x00410410	-	The particle and light flow is complete at 61.40 percent. Four natural loop and random-cursor forms change only register allocation.	compiler-codegen	ready	-	4dc4afbdea54f034
 0x004106C0	-	The burst-ring flow is complete at 87.60 percent. Declaration order is neutral, and only a dead parameter slot and pointer-compare opcode differ.	compiler-codegen	ready	-	af8fd3dfc3ea6681
 0x00410F40	-	A complete natural reconstruction reached 61.09% similarity; unresolved stack-frame, register-lifetime, and switch-shape differences leave the source model unconfirmed.	semantic	uncertain	-	8e24288456fd918c
