@@ -46,6 +46,7 @@ namespace InputManager
 	int16_t KeyNameToScancode(uint8_t keyName);
 	uint8_t IsKeyPressed(int32_t inputCode);
 	int32_t FindKeyPressed();
+	uint8_t IsKeyReleased(int32_t inputCode);
 	int32_t FindKeyReleased();
 	int32_t GetCurButtonsPressed();
 	void UpdateDirectionInputState();

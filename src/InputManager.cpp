@@ -527,33 +527,36 @@ namespace InputManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x004157E0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004157E0 [MATCHED]
 	uint8_t IsKeyPressed(int32_t inputCode)
 	{
-		uint8_t currentState = g_inputStates[inputCode];
-		uint8_t previousState = g_previousInputStates[inputCode];
-		uint8_t result = currentState & previousState;
-
-		g_previousInputStates[inputCode] = ~currentState;
+		uint8_t result = g_inputStates[inputCode] & g_previousInputStates[inputCode];
+		g_previousInputStates[inputCode] = ~g_inputStates[inputCode];
 
 		return result;
 	}
 
-	// FUNCTION: TOY2 0x00415800 [PROVISIONAL]
+	// FUNCTION: TOY2 0x00415800 [MATCHED]
 	int32_t FindKeyPressed()
 	{
 		for (int32_t inputCode = 1; inputCode < 256; inputCode++)
 		{
-			uint8_t currentState = g_inputStates[inputCode];
-			uint8_t previousState = g_previousInputStates[inputCode];
-			uint8_t result = currentState;
-			result &= previousState;
-			g_previousInputStates[inputCode] = ~currentState;
+			uint8_t result = g_inputStates[inputCode] & g_previousInputStates[inputCode];
+			g_previousInputStates[inputCode] = ~g_inputStates[inputCode];
 			if (result)
 				return inputCode;
 		}
 
 		return 0;
+	}
+
+	// FUNCTION: TOY2 0x00415840 [MATCHED]
+	uint8_t IsKeyReleased(int32_t inputCode)
+	{
+		uint8_t result = g_inputStates[inputCode] & g_previousInputStates[inputCode];
+		g_previousInputStates[inputCode] = ~g_inputStates[inputCode];
+
+		return result;
 	}
 
 	// FUNCTION: TOY2 0x00415860 [MATCHED]
