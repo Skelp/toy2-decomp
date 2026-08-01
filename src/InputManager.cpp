@@ -12,6 +12,12 @@
 
 namespace InputManager
 {
+	enum ControlMenuState
+	{
+		CONTROL_MENU_STATE_BIND_KEYBOARD = 10,
+		CONTROL_MENU_STATE_BIND_JOYSTICK = 40,
+	};
+
 	struct KeyboardGlyph
 	{
 		DevDraw::TexturedQuad renderData;
@@ -141,6 +147,12 @@ namespace InputManager
 
 	// GLOBAL: TOY2 0x0052F460
 	int32_t g_unusedColouredTextState;
+
+	// GLOBAL: TOY2 0x0052F3DC
+	int32_t g_controlMenuState;
+
+	// GLOBAL: TOY2 0x0052F468
+	int32_t g_selectedControlEntryIndex;
 
 	// GLOBAL: TOY2 0x004EDC58
 	int32_t g_keyboardGlyphTextureSlot = 1;
@@ -602,6 +614,63 @@ namespace InputManager
 		}
 
 		DevDraw::SubmitTexturedQuad(&quad);
+	}
+
+	// FUNCTION: TOY2 0x004160F0 [PROVISIONAL]
+	void DrawKeyboardBindings(Toy2::Ini::ControlTextEntry** entries)
+	{
+		Toy2::Ini::ControlTextEntry** nextEntry = entries;
+		Toy2::Ini::ControlTextEntry* entry = *nextEntry;
+		int32_t entryIndex = 0;
+		nextEntry++;
+
+		if (entry != (Toy2::Ini::ControlTextEntry*)-1)
+		{
+			do
+			{
+				int32_t glyphOffset;
+				if (entry->glyphIndex != -1)
+				{
+					g_selectedKeyboardGlyph = &g_keyboardGlyphs[entry->glyphIndex];
+					glyphOffset = g_selectedKeyboardGlyph->width;
+					if (glyphOffset >= 40)
+						glyphOffset += 8;
+					else
+						glyphOffset = 40;
+				}
+				else
+				{
+					glyphOffset = 40;
+				}
+
+				DrawKeyboardGlyphText(entry->x, entry->y, entry->text);
+				if (entryIndex <= 10)
+					DrawKeyboardGlyph(entry->x - glyphOffset, entry->y, entry->glyphIndex);
+
+				if (g_selectedControlEntryIndex >= 0)
+				{
+					if (g_selectedControlEntryIndex <= 10)
+					{
+						if (entry == entries[g_selectedControlEntryIndex]
+							&& (Renderer::g_frameDelta % 20 < 10 || g_controlMenuState == CONTROL_MENU_STATE_BIND_KEYBOARD))
+						{
+							DrawKeyboardGlyphText(entry->x + g_selectedKeyboardGlyph->width - glyphOffset, entry->y, "]");
+							DrawKeyboardGlyphText(entry->x - glyphOffset - 6, entry->y, "[");
+						}
+					}
+					else if (entry == entries[g_selectedControlEntryIndex]
+						&& (Renderer::g_frameDelta % 20 < 10 || g_controlMenuState == CONTROL_MENU_STATE_BIND_KEYBOARD))
+					{
+						DrawKeyboardGlyphText(entry->x + g_renderedKeyboardGlyphTextWidth, entry->y, "]");
+						DrawKeyboardGlyphText(entry->x - 6, entry->y, "[");
+					}
+				}
+
+				entry = *nextEntry;
+				entryIndex++;
+				nextEntry++;
+			} while (entry != (Toy2::Ini::ControlTextEntry*)-1);
+		}
 	}
 
 	// FUNCTION: TOY2 0x004157D0 [MATCHED]

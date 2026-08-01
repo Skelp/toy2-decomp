@@ -987,15 +987,6 @@ namespace Toy2
 			int32_t keyword;
 		};
 
-		struct ControlTextEntry
-		{
-			int32_t x;
-			int32_t y;
-			int32_t reserved0;
-			const char* text;
-			int32_t reserved1;
-		};
-
 		struct PaddedControlTextEntry
 		{
 			ControlTextEntry entry;
