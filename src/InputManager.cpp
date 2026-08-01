@@ -221,6 +221,66 @@ namespace InputManager
 		return NULL;
 	}
 
+	// FUNCTION: TOY2 0x00415500 [MATCHED]
+	int16_t ScancodeToGlyphIndex(uint8_t scanCode)
+	{
+		for (int32_t i = 0; g_keyboardGlyphMappings[i].scanCode != -1; i++)
+		{
+			if (g_keyboardGlyphMappings[i].scanCode == scanCode)
+				return g_keyboardGlyphMappings[i].glyphIndex;
+		}
+
+		return -1;
+	}
+
+	// FUNCTION: TOY2 0x00415540 [MATCHED]
+	int16_t GlyphIndexToScancode(uint8_t glyphIndex)
+	{
+		for (int32_t i = 0; g_keyboardGlyphMappings[i].scanCode != -1; i++)
+		{
+			if (g_keyboardGlyphMappings[i].glyphIndex == glyphIndex)
+				return g_keyboardGlyphMappings[i].scanCode;
+		}
+
+		return -1;
+	}
+
+	// FUNCTION: TOY2 0x00415580 [MATCHED]
+	int16_t KeyNameToGlyphIndex(uint8_t keyName)
+	{
+		for (int32_t i = 0; g_keyboardGlyphMappings[i].scanCode != -1; i++)
+		{
+			if (g_keyboardGlyphMappings[i].character == keyName)
+				return g_keyboardGlyphMappings[i].glyphIndex;
+		}
+
+		return -1;
+	}
+
+	// FUNCTION: TOY2 0x004155C0 [MATCHED]
+	int16_t GlyphIndexToKeyName(uint8_t glyphIndex)
+	{
+		for (int32_t i = 0; g_keyboardGlyphMappings[i].scanCode != -1; i++)
+		{
+			if (g_keyboardGlyphMappings[i].glyphIndex == glyphIndex)
+				return g_keyboardGlyphMappings[i].character;
+		}
+
+		return -1;
+	}
+
+	// FUNCTION: TOY2 0x00415600 [MATCHED]
+	int16_t ScancodeToKeyName(uint8_t scanCode)
+	{
+		for (int32_t i = 0; g_keyboardGlyphMappings[i].scanCode != -1; i++)
+		{
+			if (g_keyboardGlyphMappings[i].scanCode == scanCode)
+				return g_keyboardGlyphMappings[i].character;
+		}
+
+		return -1;
+	}
+
 	// FUNCTION: TOY2 0x00415640 [MATCHED]
 	int16_t KeyNameToScancode(uint8_t keyName)
 	{

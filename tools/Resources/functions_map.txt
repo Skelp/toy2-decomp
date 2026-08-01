@@ -121,6 +121,11 @@
 0x004152A0 InputManager::GetGameControlName
 0x004152E0 InputManager::Init
 0x00415460 InputManager::Cleanup
+0x00415500 InputManager::ScancodeToGlyphIndex
+0x00415540 InputManager::GlyphIndexToScancode
+0x00415580 InputManager::KeyNameToGlyphIndex
+0x004155C0 InputManager::GlyphIndexToKeyName
+0x00415600 InputManager::ScancodeToKeyName
 0x00415640 InputManager::KeyNameToScancode
 0x004157E0 InputManager::IsKeyPressed
 0x00415800 InputManager::FindKeyPressed
