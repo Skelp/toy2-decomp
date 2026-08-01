@@ -55,6 +55,8 @@ set(TOY2_SOURCES
     src/LoggerNoZBufferHardwareError.inc
     src/LoggerSurfaceLostError.inc
 
+    src/EventManager.cpp
+
     src/FileUtils.h
 
     src/Nullsub.cpp

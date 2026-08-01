@@ -99,6 +99,7 @@
 0x004132A0 AudioManager::Stream::Stop
 0x00413300 AudioManager::IsStreamActive
 0x00413310 AudioManager::LoadFile
+0x00413E80 EventManager::DeleteAll
 0x00414110 Toy2::Buzz::Respawn
 0x00414270 Toy2::LoadLevelWithFadeIn
 0x00414320 Toy2::ShowLevelIntroScreen
