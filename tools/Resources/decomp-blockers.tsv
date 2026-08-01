@@ -28,6 +28,7 @@
 0x0043D9E0	-	Needs source evidence for the component evaluation order. Five natural forms did not reproduce the retail register schedule.
 0x0043E6E0	-	The game-state field roles and source branch structure remain unresolved. Caller and callee evidence does not identify the remaining fields or branches.
 0x0043F3D0	0x0043D9E0,0x00451280	The function needs the proven projection and world-to-view local-lifetime models.
+0x0043FEF0	-	ABI, portal layouts, plane-crossing behavior, sector update, and both InsidePolLines calls are confirmed. The natural structured implementation is complete at 50.92%; caching the record and actor coordinates increased the frame and reduced the score to 48.96%, so the remaining mismatch is local lifetime and expression-shape evidence rather than an unknown contract.	source-form	ready	-	be423a739a440dc2
 0x004402B0	0x0043F3D0,0x004885C0	The function needs the portal visibility traversal and sector lookup.
 0x00445720	-	The complete typed shadow draw path scores 54.43%; six forms preserve the quad data and call but leave stack-slot and assignment scheduling differences.
 0x00445980	-	The typed body scores 45.14%. Packed particle color scores 45.23%. A volatile dead byte scores 63.18%, but its source model lacks evidence. The texture-index and render-state lifetimes remain unknown.
