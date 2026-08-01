@@ -347,6 +347,7 @@
 0x00450C70 Nu3D::Math::SetRotationXYZ
 0x00450E50 Nu3D::Camera::ProjectTriangle
 0x00451280 Nu3D::Camera::ProjectQuad
+0x00451810 Nu3D::Camera::SetObjectViewTransform
 0x00451F80 Nu3D::Math::Cross2D
 0x00451FD0 Nu3D::Math::NormalizeToFixedPoint
 0x00452040 Nu3D::Math::NormalizeToFixedPoint16

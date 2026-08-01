@@ -446,6 +446,24 @@ namespace Nu3D
 			g_objectViewTransform.position.z = transform->position.z;
 		}
 
+		// FUNCTION: TOY2 0x00451810 [MATCHED]
+		void SetObjectViewTransform(const Matrix3x3I16* rotation, const Vector3I* position)
+		{
+			g_objectViewTransform.m00 = rotation->m00;
+			g_objectViewTransform.m01 = rotation->m01;
+			g_objectViewTransform.m02 = rotation->m02;
+			g_objectViewTransform.m10 = rotation->m10;
+			g_objectViewTransform.m11 = rotation->m11;
+			g_objectViewTransform.m12 = rotation->m12;
+			g_objectViewTransform.m20 = rotation->m20;
+			g_objectViewTransform.m21 = rotation->m21;
+			g_objectViewTransform.m22 = rotation->m22;
+			g_objectViewTransform.position.x = position->x;
+			g_objectViewTransform.position.y = position->y;
+			// Retail copies the Y position into Z.
+			g_objectViewTransform.position.z = position->y;
+		}
+
 		// FUNCTION: TOY2 0x0043D9E0 [PROVISIONAL]
 		void WorldToView(const Vector3I16* source, Vector3I* destination, int32_t* viewDistance)
 		{
