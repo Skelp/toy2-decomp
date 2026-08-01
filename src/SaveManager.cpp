@@ -25,6 +25,16 @@ namespace SaveManager
 	// FUNCTION: TOY2 0x00498470 [MATCHED]
 	void SetLightShadowEffects(int32_t enabled) { g_save0Data.lightShadowEffects = enabled; }
 
+	// FUNCTION: TOY2 0x00415160 [MATCHED]
+	void ClearInputMappings()
+	{
+		for (int32_t i = 0; i < 38; i++)
+		{
+			g_save99Data.saveStructs[i].dInputCode = TOY_INPUT_UNKNOWN;
+			g_save99Data.saveStructs[i].gameControlId = 0;
+		}
+	}
+
 	// FUNCTION: TOY2 0x00415180 [MATCHED]
 	void AddInputEntry(int32_t inputCode, int32_t controlId)
 	{
