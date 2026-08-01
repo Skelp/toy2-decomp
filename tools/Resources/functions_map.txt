@@ -548,7 +548,10 @@
 0x00498470 SaveManager::SetLightShadowEffects
 0x00498550 Toy2::ProcessMiscEvents
 0x00498620 InputManager::GetCurButtonsPressed
+0x00498B80 Toy2::CopyTextureSlot
+0x004998A0 Toy2::LogTextureStatuses
 0x00499950 Toy2::InitDirect3DRenderer
+0x00499EB0 Toy2::MarkTextureForDestroy
 0x0049A930 Toy2::PlayMovie
 0x0049AB90 Toy2::PlayMovieWithTransition
 0x0049AE20 AudioManager::SetSfxVolume

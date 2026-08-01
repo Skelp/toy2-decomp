@@ -6159,9 +6159,89 @@ namespace Toy2
 		Logger::Log("\n");
 	}
 
+	// FUNCTION: TOY2 0x00498B80 [PROVISIONAL]
+	void CopyTextureSlot(int32_t sourceIndex, int32_t destinationIndex)
+	{
+		sourceIndex += 12;
+		destinationIndex += 6;
+
+		void** sourceTexture = &g_textureData[sourceIndex];
+		if (*sourceTexture == NULL)
+			return;
+
+		int32_t* destinationType = &d3dappi.TextureType[destinationIndex];
+		if (g_textureDimensions[destinationIndex].width != 256)
+		{
+			*destinationType = D3DTEXTURE_STATUS_DESTROY;
+			D3DAppIReleaseAllTextures();
+		}
+
+		d3dappi.TextureStatus[destinationIndex] = d3dappi.TextureStatus[sourceIndex];
+		g_textureDimensions[destinationIndex].width = g_textureDimensions[sourceIndex].width;
+		g_textureData[destinationIndex] = *sourceTexture;
+		g_textureDimensions[destinationIndex].height = g_textureDimensions[sourceIndex].height;
+		SoftwareRenderer::g_softwareTextureData[destinationIndex] = *sourceTexture;
+		*destinationType = D3DTEXTURE_STATUS_LOADED;
+		D3DAppIReleaseAllTextures();
+	}
+
+	// FUNCTION: TOY2 0x004998A0 [MATCHED]
+	void LogTextureStatuses()
+	{
+		int32_t textureIndex = 0;
+		int32_t* textureType = d3dappi.TextureType;
+		int32_t textureCount = 64;
+		do
+		{
+			Logger::Log("INFO Texture page %d - ", textureIndex);
+			switch (*textureType)
+			{
+				case D3DTEXTURE_STATUS_NULL:
+					Logger::Log("Status is D3DTEXTURE_STATUS_NULL");
+					break;
+				case D3DTEXTURE_STATUS_LOADED:
+					Logger::Log("Status is D3DTEXTURE_STATUS_LOADED");
+					break;
+				case D3DTEXTURE_STATUS_GETHANDLE:
+					Logger::Log("Status is D3DTEXTURE_STATUS_GETHANDLE");
+					break;
+				case D3DTEXTURE_STATUS_READY:
+					Logger::Log("Status is D3DTEXTURE_STATUS_READY");
+					break;
+				case D3DTEXTURE_STATUS_RELOAD:
+					Logger::Log("Status is D3DTEXTURE_STATUS_RELOAD");
+					break;
+				case D3DTEXTURE_STATUS_DESTROY:
+					Logger::Log("Status is D3DTEXTURE_STATUS_DESTROY");
+					break;
+				case D3DTEXTURE_STATUS_DESTROYED:
+					Logger::Log("Status is D3DTEXTURE_STATUS_DESTROYED");
+					break;
+				case D3DTEXTURE_STATUS_FAILEDLOAD:
+					Logger::Log("Status is D3DTEXTURE_STATUS_FAILEDLOAD");
+					break;
+			}
+			Logger::Log("\n");
+			textureIndex++;
+			textureType++;
+		} while (--textureCount != 0);
+	}
+
 	// STUB: TOY2 0x00499950
 	void InitDirect3DRenderer()
 	{
 		// Weird method, a good portion of these variables are never even used in the game
+	}
+
+	// FUNCTION: TOY2 0x00499EB0 [MATCHED]
+	void MarkTextureForDestroy(uint32_t textureSlot)
+	{
+		textureSlot &= 0xffff;
+		int32_t* textureType = &d3dappi.TextureType[textureSlot];
+		if (*textureType != D3DTEXTURE_STATUS_NULL)
+		{
+			*textureType = D3DTEXTURE_STATUS_DESTROY;
+			D3DAppIReleaseAllTextures();
+		}
 	}
 }

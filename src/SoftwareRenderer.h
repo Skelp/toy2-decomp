@@ -169,6 +169,7 @@ namespace SoftwareRenderer
 	// skipped. No writer has been located yet (likely zero for the retail path).
 	extern int32_t g_disableSortedPrimitiveSubmission;
 	extern void* g_softwareRendererBuffer;
+	extern void* g_softwareTextureData[64];
 	extern LPVOID g_primarySurfacePtr;
 	extern int32_t g_primarySurfacePitch;
 	extern int32_t g_pixelFormatMode;
