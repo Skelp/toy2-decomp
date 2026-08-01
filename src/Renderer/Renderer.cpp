@@ -1479,9 +1479,17 @@ namespace Renderer
 	int32_t ConvertRGBATo16Bit(RGBA color)
 	{
 		if (SoftwareRenderer::g_pixelFormatMode == 0)
-			return ((uint16_t)(color.g & 0xF8) << 2) + ((uint16_t)(color.b & 0xF8) << 7) + (uint16_t)(color.r >> 3);
+		{
+			uint16_t red = color.r >> 3;
+			uint16_t green = (color.g & 0xF8) << 2;
+			uint16_t blue = (color.b & 0xF8) << 7;
+			return green + blue + red;
+		}
 
-		return ((uint16_t)(color.g & 0xF8) << 3) + ((uint16_t)(color.b & 0xF8) << 8) + (uint16_t)(color.r >> 3);
+		uint16_t red = color.r >> 3;
+		uint16_t green = (color.g & 0xF8) << 3;
+		uint16_t blue = (color.b & 0xF8) << 8;
+		return green + blue + red;
 	}
 
 	// FUNCTION: TOY2 0x004B37B0 [MATCHED]
