@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES = {
-    "codegen": (ROOT / ".notes/codegen-index.md", ROOT / ".notes/codegen-rules.md"),
+    "codegen": (ROOT / ".notes/codegen-patterns.md",),
     "debt": (ROOT / ".notes/refactor-debt.md",),
     "names": (ROOT / ".notes/original-names.md",),
 }

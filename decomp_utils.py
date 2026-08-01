@@ -2,6 +2,7 @@ import sys
 sys.dont_write_bytecode = True
 
 import argparse
+import json
 import re
 from pathlib import Path
 from colorama import Fore, Style, init
@@ -132,7 +133,7 @@ def progress_breakdown(source_functions, implemented_addresses, match_statuses):
     return counts
 
 
-def count_progress(namespace_filter=None, verbose=False):
+def count_progress(namespace_filter=None, verbose=False, json_output=False):
     functions_map_path = Path("tools/Resources/functions_map.txt")
     if not functions_map_path.exists():
         print("Error: tools/Resources/functions_map.txt not found!")
@@ -148,10 +149,12 @@ def count_progress(namespace_filter=None, verbose=False):
         print("No valid function addresses found in functions_map.txt")
         return
 
-    print("Parsing source files...")
+    if not json_output:
+        print("Parsing source files...")
     source_functions, duplicate_funcs, duplicate_globals = parse_source_files()
 
-    report_duplicates(duplicate_funcs, duplicate_globals)
+    if not json_output:
+        report_duplicates(duplicate_funcs, duplicate_globals)
 
     ida_addresses = set(ida_functions.keys())
 
@@ -171,6 +174,22 @@ def count_progress(namespace_filter=None, verbose=False):
             print(f"Found an unknown $FUNC type for {address}")
 
     if namespace_filter:
+        if json_output:
+            matching = {
+                address for address, name in ida_functions.items()
+                if name.startswith(namespace_filter + "::")
+            }
+            implemented = len(matching & implemented_addresses)
+            unfinished = len(matching & unfinished_addresses)
+            json.dump({
+                "namespace": namespace_filter,
+                "total": len(matching),
+                "implemented": implemented,
+                "unfinished": unfinished,
+                "not_started": len(matching) - implemented - unfinished,
+            }, sys.stdout, indent=2)
+            print()
+            return
         print_namespace_progress(
             namespace_filter,
             ida_functions,
@@ -185,6 +204,34 @@ def count_progress(namespace_filter=None, verbose=False):
     not_started_addresses = ida_addresses - implemented_addresses - unfinished_addresses
     not_started_count = len(not_started_addresses)
 
+    implemented_percentage = (implemented_count / total_ida_functions) * 100
+    started_percentage = ((implemented_count + unfinished_count) / total_ida_functions) * 100
+    match_statuses = read_match_statuses(Path("build/decomp-report-data.json"))
+    breakdown = progress_breakdown(source_functions, implemented_addresses, match_statuses)
+    verified_count = breakdown["matched"] + breakdown["effective"] + breakdown["tool"]
+    provisional_count = implemented_count - verified_count
+
+    if json_output:
+        json.dump({
+            "total": total_ida_functions,
+            "implemented": implemented_count,
+            "unfinished": unfinished_count,
+            "not_started": not_started_count,
+            "implementation_percent": round(implemented_percentage, 1),
+            "started_percent": round(started_percentage, 1),
+            "verified": verified_count,
+            "exact": breakdown["matched"],
+            "effective": breakdown["effective"],
+            "tool": breakdown["tool"],
+            "provisional": provisional_count,
+            "provisional_75_plus": breakdown["provisional_75_plus"],
+            "provisional_50_to_75": breakdown["provisional_50_to_75"],
+            "provisional_below_50": breakdown["provisional_below_50"],
+            "provisional_unscored": breakdown["provisional_unscored"],
+        }, sys.stdout, indent=2)
+        print()
+        return
+
     print("\n" + "=" * 60)
     print("DECOMPILATION PROGRESS REPORT")
     print("=" * 60)
@@ -194,16 +241,9 @@ def count_progress(namespace_filter=None, verbose=False):
     print(f"Not started functions:      {not_started_count}")
     print("-" * 60)
 
-    implemented_percentage = (implemented_count / total_ida_functions) * 100
-    started_percentage = ((implemented_count + unfinished_count) / total_ida_functions) * 100
-
     print(f"Implementation progress:    {implemented_percentage:.1f}%")
     print(f"Started progress:           {started_percentage:.1f}%")
     print(f"Implemented vs Overall:     {implemented_count}/{total_ida_functions}")
-    match_statuses = read_match_statuses(Path("build/decomp-report-data.json"))
-    breakdown = progress_breakdown(source_functions, implemented_addresses, match_statuses)
-    verified_count = breakdown["matched"] + breakdown["effective"] + breakdown["tool"]
-    provisional_count = implemented_count - verified_count
     print("-" * 60)
     print(f"Verified functions:         {verified_count}")
     print(f"  Exact matches:            {breakdown['matched']}")
@@ -320,6 +360,7 @@ def main():
         action="store_true",
         help="Shows extra info",
     )
+    parser.add_argument("--json", action="store_true", help="Print machine-readable progress.")
 
     args = parser.parse_args()
 
@@ -328,7 +369,7 @@ def main():
 
     if args.progress:
         namespace_filter = None if args.progress is True else args.progress
-        count_progress(namespace_filter, verbose=args.verbose)
+        count_progress(namespace_filter, verbose=args.verbose, json_output=args.json)
 
     if not args.progress and not args.count:
         print("Enter an option, --count or --progress.")

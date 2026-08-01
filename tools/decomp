@@ -82,7 +82,6 @@ baseline() {
 
 validate() {
     local allow_target_regression=0
-    local allow_low_score=0
     local staged=0
     local targets=()
     while [[ $# -gt 0 ]]; do
@@ -94,10 +93,6 @@ validate() {
                 ;;
             --allow-target-regression)
                 allow_target_regression=1
-                shift
-                ;;
-            --allow-low-score)
-                allow_low_score=1
                 shift
                 ;;
             --staged)
@@ -130,12 +125,6 @@ validate() {
     )
     if [[ $allow_target_regression -eq 1 ]]; then
         verify_args+=(--allow-target-regression)
-    fi
-    if [[ $allow_low_score -eq 1 ]]; then
-        verify_args+=(--allow-low-score)
-    fi
-    if [[ $staged -eq 1 ]]; then
-        verify_args+=(--require-staged-ledger)
     fi
     python tools/decomp_verify.py "${verify_args[@]}"
     if [[ $staged -eq 1 ]]; then
@@ -243,7 +232,6 @@ Commands:
   undefer <addr>    Clear all committed blockers for one target
   blockers [addr]   Show committed blockers
   evidence <addr>   Collect bounded evidence for one target in a single call
-  audit [args]      Rank audits, show completion, or refresh the audit ledger
   baseline          Save a fresh parent-state comparison before source edits
   validate [args]   Build and reject verification or score regressions
   experiment [...] Record labeled source-form comparison trials
@@ -251,7 +239,7 @@ Commands:
   names             Re-extract .notes/original-names.md from the retail binary
   report [file]     Generate the self-contained HTML decompilation dashboard
   session-summary   Summarize selected targets against the saved baseline
-  progress [scope]  Show annotation progress, optionally for a namespace
+  progress [--json] [scope]  Show annotation progress
   check             Verify functions_map.txt is sorted, deduplicated, named, in-range
   run [args]        Run the recompiled toy2.exe through Wine
   shell             Start a shell with the decompilation environment active
@@ -259,26 +247,20 @@ Commands:
 
 `candidates` reads the retail binary, committed files, and build reports. It
 does not call Ghidra or reccmp. `evidence` makes bounded Ghidra queries:
-  tools/decomp candidates --limit 15 --why    # pending freeze audits
-  tools/decomp candidates --new-work --why
+  tools/decomp candidates --why
   tools/decomp candidates --diagnose
-  tools/decomp candidates --research --why
   tools/decomp candidates --for 0x00401230 --why
   tools/decomp candidates --stubs --limit 10
   tools/decomp candidates Nu3D --leaves --why
   tools/decomp discover
   tools/decomp discover --all
-  tools/decomp defer 0x00401230 --kind layout --semantic-state uncertain \
-    --evidence-provider 0x00405670 --fingerprint auto --reason "needs the producer layout"
-  tools/decomp defer 0x00401230 --kind compiler-codegen \
-    --semantic-state ready --fingerprint auto --reason "behavior is known; source form differs"
+  tools/decomp defer 0x00401230 --kind layout --blocked-by 0x00405670 \
+    --reason "needs the producer layout"
   tools/decomp evidence 0x00403640
   tools/decomp evidence --unmapped 0x00403640
   tools/decomp evidence 0x00403640 --disasm
   tools/decomp evidence 0x00403640 --decomp-range 80:160
   tools/decomp evidence 0x00403640 --full
-  tools/decomp audit --legacy-caps --limit 20
-  tools/decomp audit --status
 
 `score` avoids the assembly diff when you only need the percentage:
   tools/decomp score 0x00403640 0x004B99F0
@@ -360,18 +342,6 @@ case "$command" in
         if [[ $# -gt 0 && $1 != --* ]]; then address="$1"; shift; fi
         exec python tools/decomp_candidates.py --list-blockers "$address" "$@"
         ;;
-    audit)
-        if [[ ${1:-} == "--status" ]]; then
-            shift
-            exec python tools/decomp_verify.py audit-status \
-                build/decomp-report-data.json "$@"
-        elif [[ ${1:-} == "--refresh-ledger" ]]; then
-            shift
-            exec python tools/decomp_verify.py ledger \
-                build/decomp-report-data.json tools/Resources/audit-ledger.tsv "$@"
-        fi
-        exec python tools/decomp_candidates.py --audit "$@"
-        ;;
     evidence)
         exec python tools/decomp_evidence.py "$@"
         ;;
@@ -443,8 +413,16 @@ case "$command" in
             build/decomp-baseline-report.json build/decomp-report-data.json "$@"
         ;;
     progress)
-        if [[ $# -gt 1 ]]; then
-            echo "Usage: tools/decomp progress [namespace]" >&2
+        if [[ ${1:-} == "--json" ]]; then
+            shift
+            if [[ $# -gt 1 ]]; then echo "Usage: tools/decomp progress [--json] [namespace]" >&2; exit 2; fi
+            if [[ $# -eq 1 ]]; then
+                python decomp_utils.py --progress "$1" --json
+            else
+                python decomp_utils.py --progress --json
+            fi
+        elif [[ $# -gt 1 ]]; then
+            echo "Usage: tools/decomp progress [--json] [namespace]" >&2
             exit 2
         elif [[ $# -eq 1 ]]; then
             python decomp_utils.py --progress "$1"

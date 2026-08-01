@@ -30,14 +30,11 @@ __pycache__/
 !.notes/
 .notes/*
 !.notes/README.md
-!.notes/codegen-index.md
-!.notes/codegen-rules.md
-!.notes/codegen-caps.md
+!.notes/codegen-patterns.md
 !.notes/reccmp-mechanics.md
 !.notes/original-names.md
 !.notes/refactor-debt.md
 !.notes/shared-globals.md
-!.notes/caps-registry.tsv
 !.notes/lint-baseline.tsv
 !.notes/lint-rules.md
 !.notes/implementation-plan.md
@@ -50,7 +47,7 @@ __pycache__/
 .agents/skills/*
 !.agents/skills/continue-decomp/
 !.agents/skills/continue-decomp/SKILL.md
-!.agents/skills/decomp-worker/
-!.agents/skills/decomp-worker/SKILL.md
-!.agents/skills/decomp-worker/agents/
-!.agents/skills/decomp-worker/agents/openai.yaml
+!.agents/skills/decomp-expert/
+!.agents/skills/decomp-expert/SKILL.md
+!.agents/skills/decomp-expert/agents/
+!.agents/skills/decomp-expert/agents/openai.yaml

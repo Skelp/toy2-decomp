@@ -1,6 +1,5 @@
 import subprocess
 import csv
-import re
 import unittest
 from pathlib import Path
 
@@ -11,21 +10,17 @@ ROOT = Path(__file__).resolve().parents[2]
 NORMATIVE_INPUTS = (
     "AGENTS.md",
     ".agents/skills/continue-decomp/SKILL.md",
-    ".agents/skills/decomp-worker/SKILL.md",
-    ".agents/skills/decomp-worker/agents/openai.yaml",
+    ".agents/skills/decomp-expert/SKILL.md",
+    ".agents/skills/decomp-expert/agents/openai.yaml",
     ".notes/README.md",
-    ".notes/codegen-index.md",
-    ".notes/codegen-rules.md",
-    ".notes/codegen-caps.md",
+    ".notes/codegen-patterns.md",
     ".notes/reccmp-mechanics.md",
     ".notes/original-names.md",
     ".notes/refactor-debt.md",
     ".notes/shared-globals.md",
-    ".notes/caps-registry.tsv",
     ".notes/lint-baseline.tsv",
     ".notes/lint-rules.md",
-    "tools/Resources/audit-ledger.tsv",
-    "tools/Resources/decomp-blockers.tsv",
+    "tools/Resources/reconstruction-blockers.tsv",
     "tools/Resources/tool_artifacts.tsv",
 )
 
@@ -77,7 +72,7 @@ class NormativeInputTests(unittest.TestCase):
             .splitlines()
             if line and not line.startswith("#")
         }
-        with (ROOT / "tools/Resources/decomp-blockers.tsv").open(
+        with (ROOT / "tools/Resources/reconstruction-blockers.tsv").open(
             encoding="utf-8", newline=""
         ) as handle:
             rows = [
@@ -107,49 +102,20 @@ class NormativeInputTests(unittest.TestCase):
             "compiler-codegen",
             "tooling",
         }
-        states = {"unknown", "uncertain", "ready"}
-        extended = [row for row in rows if len(row) >= 7]
-        providers = {
-            int(value, 16)
-            for row in extended
-            for value in row[5].split(",")
-            if value != "-"
-        }
-        self.assertTrue(providers <= mapped)
-        self.assertFalse([row for row in extended if row[3] not in kinds])
-        self.assertFalse([row for row in extended if row[4] not in states])
-        self.assertFalse(
-            [
-                row
-                for row in extended
-                if row[6] != "-" and not re.fullmatch(r"[0-9a-f]{16}", row[6])
-            ]
-        )
-
-    def test_every_provisional_function_is_in_the_audit_ledger(self):
-        provisional = {
+        self.assertFalse([row for row in rows if len(row) != 4])
+        self.assertFalse([row for row in rows if row[3] not in kinds])
+        unfinished = {
             int(item.address, 16)
             for item in read_source_annotations(ROOT / "src")
-            if item.kind == "function" and item.tag == "provisional"
+            if item.kind == "stub"
         }
-        with (ROOT / "tools" / "Resources" / "audit-ledger.tsv").open(
-            encoding="utf-8", newline=""
-        ) as handle:
-            audited = {
-                int(row[0], 16)
-                for row in csv.reader(handle, delimiter="\t")
-                if row and not row[0].startswith("#")
-            }
-        self.assertTrue(provisional <= audited)
-        with (ROOT / ".notes" / "caps-registry.tsv").open(
-            encoding="utf-8", newline=""
-        ) as handle:
-            legacy_caps = {
-                int(row[0], 16)
-                for row in csv.reader(handle, delimiter="\t")
-                if row and not row[0].startswith("#")
-            }
-        self.assertTrue(legacy_caps <= audited)
+        annotated = {
+            int(item.address, 16)
+            for item in read_source_annotations(ROOT / "src")
+            if item.kind in ("stub", "function")
+        }
+        unfinished |= set(targets) - annotated
+        self.assertTrue(set(targets) <= unfinished)
 
 
 if __name__ == "__main__":

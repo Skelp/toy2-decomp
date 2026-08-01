@@ -35,7 +35,6 @@ from tools.decomp_candidates import (  # noqa: E402
     add_dependency_evidence,
     build_candidates,
     parse_map,
-    read_caps,
     read_match_percentages,
     read_original_sizes,
 )
@@ -211,7 +210,6 @@ def main() -> int:
     global_names = global_symbol_names()
     matches = read_match_percentages()
     original_sizes = read_original_sizes()
-    caps = read_caps()
 
     unmapped = address not in names
     ghidra_target = ghidra_function_at(address) if unmapped and args.unmapped else None
@@ -253,9 +251,6 @@ def main() -> int:
         else:
             print(f"approximate size  {following - address} bytes (map-gap fallback)")
     print(f"current match    {'-' if match is None else f'{match * 100:.2f}%'}")
-    if caps.get(address):
-        print(f"known cap        {caps[address]}  (see .notes/codegen-caps.md)")
-
     section("dependency readiness")
     if unmapped:
         print("unavailable until the function start and map entry are confirmed")
@@ -271,9 +266,8 @@ def main() -> int:
                 print("implemented source. Dependency readiness applies to unfinished targets")
             else:
                 print("ready" if dependency_target.dependency_ready else "blocked")
-            print(f"  semantic   {dependency_target.semantic_state}")
             if dependency_target.blocker_kind:
-                print(f"  blocker    {dependency_target.blocker_kind}")
+                print(f"  advisory   {dependency_target.blocker_kind}")
             unresolved = list(dependency_target.unresolved_dependencies)
             for dependency in bounded(
                 unresolved, row_limit, f"tools/decomp evidence {args.address} --full"

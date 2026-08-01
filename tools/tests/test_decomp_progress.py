@@ -1,6 +1,12 @@
 import sys
 import types
 import unittest
+import contextlib
+import io
+import json
+import tempfile
+from pathlib import Path
+from unittest import mock
 
 sys.modules.setdefault(
     "colorama",
@@ -44,6 +50,34 @@ class ProgressBreakdownTests(unittest.TestCase):
         self.assertEqual(counts["provisional_50_to_75"], 1)
         self.assertEqual(counts["provisional_below_50"], 1)
         self.assertEqual(counts["provisional_unscored"], 1)
+
+    def test_json_progress_is_machine_readable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "tools" / "Resources").mkdir(parents=True)
+            (root / "tools" / "Resources" / "functions_map.txt").write_text(
+                "0x00401000 N::Done\n0x00402000 N::Stub\n0x00403000 N::New\n",
+                encoding="utf-8",
+            )
+            source = {
+                "00401000": {"status": "IMPLEMENTED", "file": "a.cpp", "verification": "matched"},
+                "00402000": {"status": "UNFINISHED", "file": "a.cpp", "verification": "provisional"},
+            }
+            output = io.StringIO()
+            old_cwd = Path.cwd()
+            try:
+                import os
+                os.chdir(root)
+                with mock.patch.object(decomp_utils, "parse_source_files", return_value=(source, {}, {})), \
+                     mock.patch.object(decomp_utils, "read_match_statuses", return_value={}):
+                    with contextlib.redirect_stdout(output):
+                        decomp_utils.count_progress(json_output=True)
+            finally:
+                os.chdir(old_cwd)
+            payload = json.loads(output.getvalue())
+            self.assertEqual(payload["implemented"], 1)
+            self.assertEqual(payload["unfinished"], 1)
+            self.assertEqual(payload["not_started"], 1)
 
 
 if __name__ == "__main__":

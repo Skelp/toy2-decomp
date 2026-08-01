@@ -3,7 +3,7 @@
 How reccmp, its annotations, and the Ghidra importer behave. These are tool
 rules, not code-generation rules.
 
-Read one section when the index in `codegen-index.md` points at it.
+Search this file with `tools/decomp notes QUERY` and read only the relevant section.
 
 ## [TOOL-01] `// GLOBAL:` address must include the `0x` prefix
 

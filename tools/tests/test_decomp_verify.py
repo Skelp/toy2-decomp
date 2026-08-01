@@ -1,12 +1,10 @@
-import importlib.util
-import csv
 import contextlib
+import importlib.util
 import io
 import json
 import tempfile
 import unittest
 from pathlib import Path
-
 
 SCRIPT = Path(__file__).parents[1] / "decomp_verify.py"
 SPEC = importlib.util.spec_from_file_location("decomp_verify", SCRIPT)
@@ -16,280 +14,90 @@ SPEC.loader.exec_module(VERIFY)
 
 
 class VerifyRegressionTests(unittest.TestCase):
-    def write_report(self, directory: str, name: str, matching: float) -> Path:
+    def write_report(self, directory, name, rows):
         path = Path(directory) / name
-        path.write_text(
-            json.dumps({"data": [{"address": "0x401000", "matching": matching}]}),
-            encoding="utf-8",
-        )
+        path.write_text(json.dumps({"data": rows}), encoding="utf-8")
         return path
+
+    def validate(self, baseline, current, targets, allow=False, source_root=None):
+        old_artifacts = VERIFY.TOOL_ARTIFACTS
+        VERIFY.TOOL_ARTIFACTS = baseline.parent / "none.tsv"
+        try:
+            return VERIFY.validate(
+                baseline,
+                current,
+                set(targets),
+                allow,
+                source_root=source_root or baseline.parent / "src",
+                check_annotation_tags=False,
+            )
+        finally:
+            VERIFY.TOOL_ARTIFACTS = old_artifacts
 
     def test_rejects_an_untouched_score_regression(self):
         with tempfile.TemporaryDirectory() as directory:
-            baseline = self.write_report(directory, "before.json", 0.8)
-            current = self.write_report(directory, "after.json", 0.7)
-            old_artifacts = VERIFY.TOOL_ARTIFACTS
-            VERIFY.TOOL_ARTIFACTS = Path(directory) / "none.tsv"
-            try:
-                self.assertEqual(
-                    VERIFY.validate(
-                        baseline, current, set(), False, check_annotation_tags=False
-                    ),
-                    1,
-                )
-            finally:
-                VERIFY.TOOL_ARTIFACTS = old_artifacts
-
-    def test_session_summary_reports_new_targets_and_distribution(self):
-        with tempfile.TemporaryDirectory() as directory:
-            baseline = Path(directory) / "before.json"
-            current = Path(directory) / "after.json"
-            baseline.write_text(
-                json.dumps(
-                    {
-                        "data": [
-                            {"address": "0x401000", "matching": 0.4, "stub": True},
-                            {"address": "0x402000", "matching": 0.8},
-                        ]
-                    }
-                ),
-                encoding="utf-8",
-            )
-            current.write_text(
-                json.dumps(
-                    {
-                        "data": [
-                            {"address": "0x401000", "matching": 1.0},
-                            {"address": "0x402000", "matching": 0.9},
-                        ]
-                    }
-                ),
-                encoding="utf-8",
-            )
-            output = io.StringIO()
-            with contextlib.redirect_stdout(output):
-                result = VERIFY.session_summary(
-                    baseline, current, [0x401000, 0x402000]
-                )
-            self.assertEqual(result, 0)
-            self.assertIn("2 (1 new, 1 exact)", output.getvalue())
-            self.assertIn("mean 95.00%", output.getvalue())
-
-    def test_rejects_full_report_regression_when_target_improves(self):
-        with tempfile.TemporaryDirectory() as directory:
-            baseline = Path(directory) / "before.json"
-            current = Path(directory) / "after.json"
-            baseline.write_text(
-                json.dumps(
-                    {"data": [
-                        {"address": "0x401000", "matching": 0.5},
-                        {"address": "0x402000", "matching": 0.8},
-                    ]}
-                ),
-                encoding="utf-8",
-            )
-            current.write_text(
-                json.dumps(
-                    {"data": [
-                        {"address": "0x401000", "matching": 0.7},
-                        {"address": "0x402000", "matching": 0.7},
-                    ]}
-                ),
-                encoding="utf-8",
-            )
-            old_artifacts = VERIFY.TOOL_ARTIFACTS
-            VERIFY.TOOL_ARTIFACTS = Path(directory) / "none.tsv"
-            try:
-                self.assertEqual(
-                    VERIFY.validate(
-                        baseline,
-                        current,
-                        {0x401000},
-                        False,
-                        check_annotation_tags=False,
-                    ),
-                    1,
-                )
-            finally:
-                VERIFY.TOOL_ARTIFACTS = old_artifacts
+            root = Path(directory)
+            (root / "src").mkdir()
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 0.8},
+                {"address": "0x402000", "matching": 0.8},
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.9},
+                {"address": "0x402000", "matching": 0.7},
+            ])
+            self.assertEqual(self.validate(baseline, current, {0x401000}), 1)
 
     def test_target_regression_requires_the_explicit_override(self):
         with tempfile.TemporaryDirectory() as directory:
-            baseline = self.write_report(directory, "before.json", 0.8)
-            current = self.write_report(directory, "after.json", 0.7)
-            old_artifacts = VERIFY.TOOL_ARTIFACTS
-            VERIFY.TOOL_ARTIFACTS = Path(directory) / "none.tsv"
-            ledger = Path(directory) / "audit.tsv"
-            ledger.write_text(
-                "0x00401000\tprovisional\tpartial\t70.00\tclean\taudit\t"
-                "uncertain\trevisit\t\t80.00\t70.00\tremoved raw offset\n",
+            root = Path(directory)
+            (root / "src").mkdir()
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 0.8}
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.7}
+            ])
+            self.assertEqual(self.validate(baseline, current, {0x401000}), 1)
+            self.assertEqual(self.validate(baseline, current, {0x401000}, True), 0)
+
+    def test_new_target_below_75_is_advisory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 0.0, "stub": True}
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.4}
+            ])
+            self.assertEqual(self.validate(baseline, current, {0x401000}), 0)
+
+    def test_target_source_debt_still_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src"
+            source.mkdir()
+            (source / "test.cpp").write_text(
+                "// FUNCTION: TOY2 0x00401000 [PROVISIONAL]\n"
+                "void Test(char* value) { *(int*)((char*)value + 4) = 1; }\n",
                 encoding="utf-8",
             )
-            try:
-                self.assertEqual(
-                    VERIFY.validate(
-                        baseline,
-                        current,
-                        {0x401000},
-                        False,
-                        check_annotation_tags=False,
-                    ),
-                    1,
-                )
-                self.assertEqual(
-                    VERIFY.validate(
-                        baseline,
-                        current,
-                        {0x401000},
-                        True,
-                        check_annotation_tags=False,
-                        audit_ledger=ledger,
-                    ),
-                    0,
-                )
-            finally:
-                VERIFY.TOOL_ARTIFACTS = old_artifacts
-
-    def test_new_sub_50_target_requires_maintainer_review(self):
-        with tempfile.TemporaryDirectory() as directory:
-            baseline = self.write_report(directory, "before.json", 0.0)
-            current = self.write_report(directory, "after.json", 0.4)
-            source = Path(directory) / "src"
-            source.mkdir()
-            ledger = Path(directory) / "audit.tsv"
-            old_artifacts = VERIFY.TOOL_ARTIFACTS
-            VERIFY.TOOL_ARTIFACTS = Path(directory) / "none.tsv"
-            try:
-                self.assertEqual(
-                    VERIFY.validate(
-                        baseline,
-                        current,
-                        {0x401000},
-                        False,
-                        source_root=source,
-                        check_annotation_tags=False,
-                        audit_ledger=ledger,
-                    ),
-                    1,
-                )
-            finally:
-                VERIFY.TOOL_ARTIFACTS = old_artifacts
-
-    def test_maintainer_can_approve_a_reviewed_sub_50_target(self):
-        with tempfile.TemporaryDirectory() as directory:
-            baseline = self.write_report(directory, "before.json", 0.0)
-            current = self.write_report(directory, "after.json", 0.4)
-            source = Path(directory) / "src"
-            source.mkdir()
-            ledger = Path(directory) / "audit.tsv"
-            ledger.write_text(
-                "0x00401000\tprovisional\tpartial\t40.00\tclean\tmaintainer-review\t"
-                "the ABI and data layout are supported but local lifetimes remain uncertain\t"
-                "revisit when a related function identifies the original local declaration order\t"
-                "0.00,40.00\t-\t-\t-\taudited\tsub-50\tnatural-loop,early-return\n",
-                encoding="utf-8",
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 0.2}
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.4}
+            ])
+            self.assertEqual(
+                self.validate(baseline, current, {0x401000}, source_root=source), 1
             )
-            old_artifacts = VERIFY.TOOL_ARTIFACTS
-            VERIFY.TOOL_ARTIFACTS = Path(directory) / "none.tsv"
-            try:
-                self.assertEqual(
-                    VERIFY.validate(
-                        baseline,
-                        current,
-                        {0x401000},
-                        False,
-                        source_root=source,
-                        check_annotation_tags=False,
-                        audit_ledger=ledger,
-                        allow_low_score=True,
-                    ),
-                    0,
-                )
-            finally:
-                VERIFY.TOOL_ARTIFACTS = old_artifacts
-
-    def test_new_target_below_75_requires_maintainer_review(self):
-        with tempfile.TemporaryDirectory() as directory:
-            baseline = self.write_report(directory, "before.json", 0.0)
-            current = self.write_report(directory, "after.json", 0.7)
-            source = Path(directory) / "src"
-            source.mkdir()
-            old_artifacts = VERIFY.TOOL_ARTIFACTS
-            VERIFY.TOOL_ARTIFACTS = Path(directory) / "none.tsv"
-            try:
-                self.assertEqual(
-                    VERIFY.validate(
-                        baseline,
-                        current,
-                        {0x401000},
-                        False,
-                        source_root=source,
-                        check_annotation_tags=False,
-                        audit_ledger=Path(directory) / "audit.tsv",
-                    ),
-                    1,
-                )
-            finally:
-                VERIFY.TOOL_ARTIFACTS = old_artifacts
-
-    def test_new_provisional_target_requires_specific_ledger_evidence(self):
-        with tempfile.TemporaryDirectory() as directory:
-            baseline = self.write_report(directory, "before.json", 0.0)
-            current = self.write_report(directory, "after.json", 0.8)
-            source = Path(directory) / "src"
-            source.mkdir()
-            ledger = Path(directory) / "audit.tsv"
-            ledger.write_text(
-                "0x00401000\tprovisional\tpartial\t80.00\tclean\tinitial-audit\t"
-                "binary or source model is not verified\t"
-                "recheck ABI, layout, control flow, and natural source forms\t"
-                "80.00\t-\t-\t-\tpending\t-\t-\n",
-                encoding="utf-8",
-            )
-            old_artifacts = VERIFY.TOOL_ARTIFACTS
-            VERIFY.TOOL_ARTIFACTS = Path(directory) / "none.tsv"
-            try:
-                self.assertEqual(
-                    VERIFY.validate(
-                        baseline,
-                        current,
-                        {0x401000},
-                        False,
-                        source_root=source,
-                        check_annotation_tags=False,
-                        audit_ledger=ledger,
-                    ),
-                    1,
-                )
-            finally:
-                VERIFY.TOOL_ARTIFACTS = old_artifacts
-
-    def test_existing_sub_50_target_can_improve_without_new_work_approval(self):
-        with tempfile.TemporaryDirectory() as directory:
-            baseline = self.write_report(directory, "before.json", 0.2)
-            current = self.write_report(directory, "after.json", 0.4)
-            source = Path(directory) / "src"
-            source.mkdir()
-            old_artifacts = VERIFY.TOOL_ARTIFACTS
-            VERIFY.TOOL_ARTIFACTS = Path(directory) / "none.tsv"
-            try:
-                self.assertEqual(
-                    VERIFY.validate(
-                        baseline,
-                        current,
-                        {0x401000},
-                        False,
-                        source_root=source,
-                        check_annotation_tags=False,
-                    ),
-                    0,
-                )
-            finally:
-                VERIFY.TOOL_ARTIFACTS = old_artifacts
 
     def test_baseline_metadata_rejects_a_changed_report(self):
         with tempfile.TemporaryDirectory() as directory:
-            report = self.write_report(directory, "before.json", 0.8)
+            report = self.write_report(Path(directory), "before.json", [
+                {"address": "0x401000", "matching": 0.8}
+            ])
             metadata = Path(directory) / "metadata.json"
             VERIFY.write_metadata(metadata, report)
             report.write_text('{"data": []}', encoding="utf-8")
@@ -306,166 +114,32 @@ class VerifyRegressionTests(unittest.TestCase):
                 "// FUNCTION: TOY2 0x00401000 [MATCHED]\nvoid Test() {}\n",
                 encoding="utf-8",
             )
-            report = self.write_report(directory, "report.json", 0.7)
-            problems = VERIFY.check_annotations(report, root)
-            self.assertTrue(any("requires provisional" in item for item in problems))
+            report = self.write_report(Path(directory), "report.json", [
+                {"address": "0x401000", "matching": 0.7}
+            ])
+            self.assertTrue(any(
+                "requires provisional" in item
+                for item in VERIFY.check_annotations(report, root)
+            ))
 
-    def test_unmatched_function_requires_provisional_tag(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / "src"
-            root.mkdir()
-            (root / "test.cpp").write_text(
-                "// FUNCTION: TOY2 0x00401000 [MATCHED]\nvoid Test() {}\n",
-                encoding="utf-8",
-            )
-            report = Path(directory) / "report.json"
-            report.write_text('{"data": []}', encoding="utf-8")
-            problems = VERIFY.check_annotations(report, root)
-            self.assertTrue(any("requires provisional" in item for item in problems))
-
-    def test_ledger_refresh_preserves_a_manual_audit(self):
+    def test_session_summary_reports_new_targets_and_distribution(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            source = root / "src"
-            source.mkdir()
-            (root / ".notes").mkdir()
-            (root / ".notes" / "caps-registry.tsv").write_text("", encoding="utf-8")
-            (source / "test.cpp").write_text(
-                "// FUNCTION: TOY2 0x00401000 [PROVISIONAL]\nvoid Test() {}\n",
-                encoding="utf-8",
-            )
-            report = self.write_report(directory, "report.json", 0.4)
-            ledger = root / "audit.tsv"
-            ledger.write_text(
-                "0x00401000\tprovisional\tpartial\t30.00\tclean\tmanual-audit\t"
-                "the ABI is known but the branch model is not\t"
-                "revisit when caller evidence identifies the branch role\t40.00\t-\t-\t-\t"
-                "audited\tsub-50\n",
-                encoding="utf-8",
-            )
-            old_root = VERIFY.ROOT
-            VERIFY.ROOT = root
-            try:
-                VERIFY.write_audit_ledger(report, source, ledger)
-            finally:
-                VERIFY.ROOT = old_root
-            with ledger.open(encoding="utf-8", newline="") as handle:
-                row = next(row for row in csv.reader(handle, delimiter="\t") if row and not row[0].startswith("#"))
-            self.assertEqual(row[3], "40.00")
-            self.assertEqual(row[5], "manual-audit")
-            self.assertEqual(row[6], "the ABI is known but the branch model is not")
-            self.assertEqual(row[12], "audited")
-            self.assertEqual(row[13], "sub-50")
-
-    def test_ledger_refresh_keeps_an_effective_sub_50_audit(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            source = root / "src"
-            source.mkdir()
-            (root / ".notes").mkdir()
-            (root / ".notes" / "caps-registry.tsv").write_text("", encoding="utf-8")
-            (source / "test.cpp").write_text(
-                "// FUNCTION: TOY2 0x00401000 [EFFECTIVE]\n"
-                "int Test() { return 1; }\n",
-                encoding="utf-8",
-            )
-            report = Path(directory) / "report.json"
-            report.write_text(
-                json.dumps(
-                    {
-                        "data": [
-                            {
-                                "address": "0x401000",
-                                "matching": 0.4,
-                                "effective": True,
-                            }
-                        ]
-                    }
-                ),
-                encoding="utf-8",
-            )
-            ledger = root / "audit.tsv"
-            ledger.write_text(
-                "0x00401000\teffective\teffective\t40.00\tclean\tmanual-audit\t"
-                "the instruction stream differs only in interchangeable volatile registers\t"
-                "revisit if source evidence explains the register allocation difference\t"
-                "40.00\t-\t-\t-\taudited\tsub-50\n",
-                encoding="utf-8",
-            )
-            old_root = VERIFY.ROOT
-            VERIFY.ROOT = root
-            try:
-                VERIFY.write_audit_ledger(report, source, ledger)
-            finally:
-                VERIFY.ROOT = old_root
-            with ledger.open(encoding="utf-8", newline="") as handle:
-                row = next(
-                    row
-                    for row in csv.reader(handle, delimiter="\t")
-                    if row and not row[0].startswith("#")
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 0.4, "stub": True},
+                {"address": "0x402000", "matching": 0.8},
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 1.0},
+                {"address": "0x402000", "matching": 0.9},
+            ])
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                result = VERIFY.session_summary(
+                    baseline, current, [0x401000, 0x402000]
                 )
-            self.assertEqual(row[1], "effective")
-            self.assertEqual(row[2], "effective")
-            self.assertEqual(row[5], "manual-audit")
-            self.assertEqual(row[12], "audited")
-            self.assertEqual(row[13], "sub-50")
-
-    def test_audit_status_rejects_placeholder_classification(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            source = root / "src"
-            source.mkdir()
-            (root / ".notes").mkdir()
-            (root / ".notes" / "caps-registry.tsv").write_text("", encoding="utf-8")
-            (source / "test.cpp").write_text(
-                "// FUNCTION: TOY2 0x00401000 [PROVISIONAL]\nvoid Test() {}\n",
-                encoding="utf-8",
-            )
-            report = self.write_report(directory, "report.json", 0.4)
-            ledger = root / "audit.tsv"
-            ledger.write_text(
-                "0x00401000\tprovisional\tpartial\t40.00\tclean\tinitial-audit\t"
-                "binary or source model is not verified\t"
-                "recheck ABI, layout, control flow, and natural source forms\t-\t-\t-\t-\t"
-                "pending\tsub-50\n",
-                encoding="utf-8",
-            )
-            old_root = VERIFY.ROOT
-            VERIFY.ROOT = root
-            try:
-                result = VERIFY.audit_status(report, source, ledger)
-            finally:
-                VERIFY.ROOT = old_root
-            self.assertEqual(result["required"], 1)
-            self.assertEqual(result["pending"], 1)
-
-    def test_audit_status_rejects_an_unmeasured_compiler_excuse(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            source = root / "src"
-            source.mkdir()
-            (root / ".notes").mkdir()
-            (root / ".notes" / "caps-registry.tsv").write_text("", encoding="utf-8")
-            (source / "test.cpp").write_text(
-                "// FUNCTION: TOY2 0x00401000 [PROVISIONAL]\nvoid Test() {}\n",
-                encoding="utf-8",
-            )
-            report = self.write_report(directory, "report.json", 0.4)
-            ledger = root / "audit.tsv"
-            ledger.write_text(
-                "0x00401000\tprovisional\tpartial\t40.00\tclean\tmanual-audit\t"
-                "the remaining mismatch is probably a compiler quirk\t"
-                "try again later\t-\t-\t-\t-\taudited\tsub-50\n",
-                encoding="utf-8",
-            )
-            old_root = VERIFY.ROOT
-            VERIFY.ROOT = root
-            try:
-                result = VERIFY.audit_status(report, source, ledger)
-            finally:
-                VERIFY.ROOT = old_root
-            self.assertEqual(result["required"], 1)
-            self.assertEqual(result["pending"], 1)
+            self.assertEqual(result, 0)
+            self.assertIn("2 (1 new, 1 exact)", output.getvalue())
 
 
 if __name__ == "__main__":

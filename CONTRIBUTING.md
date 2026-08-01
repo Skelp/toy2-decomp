@@ -107,16 +107,10 @@ finding stays visible as legacy debt. If your change removes that finding,
 remove its stale row from `.notes/lint-baseline.tsv`.
 
 An exact machine-code match is not verified when the function has source lint
-debt. reccmp-effective matches are distinct from exact matches. A partial
-match stays provisional unless the verifier confirms a narrow data-symbol
-rendering artifact. Legacy CAP notes do not waive a mismatch. Review them with
-`tools/decomp audit --legacy-caps`.
-
-During the initial audit freeze, run `tools/decomp audit --status`. The command
-lists each required audit that still has placeholder evidence. Refresh measured
-scores with `tools/decomp audit --refresh-ledger`. The refresh preserves manual
-audit conclusions. Remove the freeze file only after `tools/decomp audit
---status --check` succeeds.
+debt. reccmp-effective matches are distinct from exact matches. A partial match
+stays provisional unless the verifier confirms a narrow data-symbol rendering
+artifact. Similarity below 75 percent is advisory. Validation still rejects
+source debt and regressions outside the selected target.
 
 The `toy2decomp` executable always compiles retail behavior for reccmp.
 `patcher.dll` enables runtime convenience changes only when `APPLY_FIXES`

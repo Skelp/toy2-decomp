@@ -1,0 +1,4 @@
+interface:
+  display_name: "Decomp Expert"
+  short_description: "Reconstruct a coherent source campaign"
+  default_prompt: "Use $decomp-expert to reconstruct one coherent Toy Story 2 source campaign."

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "discover", "evidence", "notes", "defer", "undefer", "blockers", "audit", "baseline", "validate", "experiment", "lint", "report", "session-summary", "progress", "run", "shell", "help")]
+    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "discover", "evidence", "notes", "defer", "undefer", "blockers", "baseline", "validate", "experiment", "lint", "report", "session-summary", "progress", "run", "shell", "help")]
     [string] $Command = "help",
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -135,13 +135,12 @@ Commands:
   defer <addr> ...  Record a committed blocker or prerequisite
   undefer <addr>    Clear all committed blockers for one target
   blockers [addr]   Show committed blockers
-  audit [args]      Review audits, show completion, or refresh the ledger
   validate [args]   Build and reject comparison or source-quality regressions
   experiment [args] Store and compare one source-form experiment
   lint [args]       Check reconstructed source plausibility
   report [file]     Generate the self-contained HTML decompilation dashboard
   session-summary   Summarize selected targets against the saved baseline
-  progress [scope]  Show annotation progress, optionally for a namespace
+  progress [--json] [scope]  Show annotation progress
   run [args]        Run the recompiled toy2.exe
   shell             Start cmd.exe with the VC6 environment active
 
@@ -212,25 +211,8 @@ if ($Command -eq "session-summary") {
     Assert-LastExit "Summarizing the session"
     exit 0
 }
-if ($Command -in @("candidates", "audit")) {
-    if ($Command -eq "audit" -and $CommandArgs.Count -gt 0 -and $CommandArgs[0] -eq "--status") {
-        $StatusArgs = @("audit-status", (Join-Path $Root "build\decomp-report-data.json"))
-        if ($CommandArgs.Count -gt 1) { $StatusArgs += $CommandArgs[1..($CommandArgs.Count - 1)] }
-        & python (Join-Path $Root "tools\decomp_verify.py") @StatusArgs
-        Assert-LastExit "Checking audit completion"
-        exit 0
-    }
-    if ($Command -eq "audit" -and $CommandArgs.Count -gt 0 -and $CommandArgs[0] -eq "--refresh-ledger") {
-        & python (Join-Path $Root "tools\decomp_verify.py") ledger `
-            (Join-Path $Root "build\decomp-report-data.json") `
-            (Join-Path $Root "tools\Resources\audit-ledger.tsv")
-        Assert-LastExit "Refreshing the audit ledger"
-        exit 0
-    }
-    $CandidateArgs = @()
-    if ($Command -eq "audit") { $CandidateArgs += "--audit" }
-    $CandidateArgs += $CommandArgs
-    & $VenvPython (Join-Path $Root "tools\decomp_candidates.py") @CandidateArgs
+if ($Command -eq "candidates") {
+    & $VenvPython (Join-Path $Root "tools\decomp_candidates.py") @CommandArgs
     Assert-LastExit "Ranking decompilation candidates"
     exit 0
 }
@@ -298,7 +280,6 @@ switch ($Command) {
         Write-ComparisonReport $Current
         $Targets = @()
         $AllowTargetRegression = $false
-        $AllowLowScore = $false
         $Staged = $false
         for ($Index = 0; $Index -lt $CommandArgs.Count; $Index++) {
             if ($CommandArgs[$Index] -eq "--target" -and $Index + 1 -lt $CommandArgs.Count) {
@@ -306,8 +287,6 @@ switch ($Command) {
                 $Targets += $CommandArgs[$Index]
             } elseif ($CommandArgs[$Index] -eq "--allow-target-regression") {
                 $AllowTargetRegression = $true
-            } elseif ($CommandArgs[$Index] -eq "--allow-low-score") {
-                $AllowLowScore = $true
             } elseif ($CommandArgs[$Index] -eq "--staged") {
                 $Staged = $true
             } else {
@@ -318,8 +297,6 @@ switch ($Command) {
         $VerifyArgs = @("validate", $Baseline, $Current) + $Targets
         $VerifyArgs += @("--metadata", (Join-Path $Root "build\decomp-baseline-meta.json"))
         if ($AllowTargetRegression) { $VerifyArgs += "--allow-target-regression" }
-        if ($AllowLowScore) { $VerifyArgs += "--allow-low-score" }
-        if ($Staged) { $VerifyArgs += "--require-staged-ledger" }
         & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") @VerifyArgs
         Assert-LastExit "Validating comparison results"
         if ($Staged) {
@@ -390,11 +367,16 @@ switch ($Command) {
         New-DecompReport $Output
     }
     "progress" {
-        if ($CommandArgs.Count -gt 1) {
-            throw "Usage: tools/decomp.ps1 progress [namespace]"
+        if ($CommandArgs.Count -gt 2) {
+            throw "Usage: tools/decomp.ps1 progress [--json] [namespace]"
         }
         $ProgressArgs = @("decomp_utils.py", "--progress")
-        if ($CommandArgs.Count -eq 1) { $ProgressArgs += $CommandArgs[0] }
+        $Namespace = @($CommandArgs | Where-Object { $_ -ne "--json" })
+        if ($Namespace.Count -gt 1) {
+            throw "Usage: tools/decomp.ps1 progress [--json] [namespace]"
+        }
+        if ($Namespace.Count -eq 1) { $ProgressArgs += $Namespace[0] }
+        if ($CommandArgs -contains "--json") { $ProgressArgs += "--json" }
         & (Join-Path $VenvScripts "python.exe") @ProgressArgs
         Assert-LastExit "Calculating progress"
     }

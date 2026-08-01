@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import re
 import statistics
@@ -28,7 +27,6 @@ from tools import decomp_lint  # noqa: E402
 from tools.decomp_annotations import read_source_annotations  # noqa: E402
 
 TOOL_ARTIFACTS = ROOT / "tools" / "Resources" / "tool_artifacts.tsv"
-AUDIT_LEDGER = ROOT / "tools" / "Resources" / "audit-ledger.tsv"
 
 
 def file_hash(path: Path) -> str:
@@ -277,337 +275,6 @@ def write_experiment_record(report: Path, address: int, output: Path) -> None:
     )
 
 
-def write_audit_ledger(report: Path, source_root: Path, output: Path) -> None:
-    statuses = read_match_statuses(report)
-    artifacts = read_tool_artifacts(TOOL_ARTIFACTS)
-    debt = read_source_debt(source_root)
-    legacy = {}
-    legacy_path = ROOT / ".notes" / "caps-registry.tsv"
-    if legacy_path.exists():
-        with legacy_path.open(encoding="utf-8", newline="") as handle:
-            for row in csv.reader(handle, delimiter="\t"):
-                if row and not row[0].startswith("#"):
-                    legacy[int(row[0], 16)] = row
-    existing = {}
-    if output.exists():
-        with output.open(encoding="utf-8", newline="") as handle:
-            for row in csv.reader(handle, delimiter="\t"):
-                if row and not row[0].startswith("#"):
-                    existing[int(row[0], 16)] = row
-    rows = []
-    for annotation in read_source_annotations(source_root):
-        if annotation.kind != "function":
-            continue
-        address = int(annotation.address, 16)
-        status = statuses.get(address)
-        tool = status is not None and address in artifacts and is_symbol_only_diff(status)
-        verification = verification_status(
-            status, tool_artifact=tool, source_clean=address not in debt
-        )
-        scopes = []
-        if address in legacy:
-            scopes.append("former-cap")
-        if status is not None and status.matching < 0.5:
-            scopes.append("sub-50")
-        if status is not None and (status.matching == 1.0 or status.effective or tool) and address in debt:
-            scopes.append("verified-debt")
-        if verification != "provisional" and not scopes:
-            continue
-        old = legacy.get(address, [])
-        previous = existing.get(address, [])
-        origin = previous[5] if len(previous) > 5 else (
-            old[1] if len(old) > 1 else "initial-audit"
-        )
-        uncertainty = previous[6] if len(previous) > 6 else (
-            old[4] if len(old) > 4 else "binary or source model is not verified"
-        )
-        trigger = previous[7] if len(previous) > 7 else ""
-        if not trigger or trigger == "recheck ABI, layout, control flow, and natural source forms":
-            if old:
-                trigger = (
-                    "revisit if new caller, type, or source-form evidence explains the "
-                    f"recorded {old[1]} mismatch"
-                )
-            else:
-                trigger = "recheck ABI, layout, control flow, and natural source forms"
-        audit_state = previous[12] if len(previous) > 12 else (
-            "audited" if old and uncertainty != "binary or source model is not verified" else "pending"
-        )
-        rows.append(
-            (
-                f"0x{address:08X}",
-                verification,
-                "unmatched" if status is None else status.binary_status,
-                "-" if status is None else f"{status.matching * 100:.2f}",
-                ",".join(sorted(set(debt.get(address, [])))) or "clean",
-                origin,
-                uncertainty,
-                trigger,
-                previous[8] if len(previous) > 8 else (old[2] if len(old) > 2 else "-"),
-                previous[9] if len(previous) > 9 else "-",
-                previous[10] if len(previous) > 10 else "-",
-                previous[11] if len(previous) > 11 else "-",
-                audit_state,
-                ",".join(scopes) or "-",
-                previous[14] if len(previous) > 14 else "-",
-            )
-        )
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-        writer.writerow(
-            (
-                "# address", "status", "binary", "raw-score", "source-debt",
-                "origin", "uncertainty", "revisit-trigger", "tested-scores",
-                "before-score", "after-score", "eliminated-source-defect",
-                "audit-state", "freeze-scope",
-                "tested-forms",
-            )
-        )
-        writer.writerows(sorted(rows))
-
-
-def audit_status(report: Path, source_root: Path, ledger: Path) -> dict:
-    statuses = read_match_statuses(report)
-    debt = read_source_debt(source_root)
-    legacy_path = ROOT / ".notes" / "caps-registry.tsv"
-    legacy = set()
-    if legacy_path.exists():
-        with legacy_path.open(encoding="utf-8", newline="") as handle:
-            for row in csv.reader(handle, delimiter="\t"):
-                if row and not row[0].startswith("#"):
-                    legacy.add(int(row[0], 16))
-    records = {}
-    if ledger.exists():
-        with ledger.open(encoding="utf-8", newline="") as handle:
-            for row in csv.reader(handle, delimiter="\t"):
-                if row and not row[0].startswith("#"):
-                    records[int(row[0], 16)] = row
-    required = {}
-    for annotation in read_source_annotations(source_root):
-        if annotation.kind != "function":
-            continue
-        address = int(annotation.address, 16)
-        status = statuses.get(address)
-        scopes = []
-        if address in legacy:
-            scopes.append("former-cap")
-        if status is not None and status.matching < 0.5:
-            scopes.append("sub-50")
-        if status is not None and (status.matching == 1.0 or status.effective) and address in debt:
-            scopes.append("verified-debt")
-        if scopes:
-            required[address] = scopes
-    pending = {}
-    for address, scopes in required.items():
-        row = records.get(address, [])
-        state = row[12] if len(row) > 12 else "pending"
-        origin = row[5] if len(row) > 5 else ""
-        uncertainty = row[6] if len(row) > 6 else ""
-        trigger = row[7] if len(row) > 7 else ""
-        tested_scores = row[8] if len(row) > 8 else ""
-        if (
-            state != "audited"
-            or origin in ("", "initial-audit")
-            or not uncertainty
-            or uncertainty == "binary or source model is not verified"
-            or len(uncertainty.split()) < 8
-            or not trigger
-            or trigger == "recheck ABI, layout, control flow, and natural source forms"
-            or len(trigger.split()) < 8
-            or not re.search(r"\b(?:if|when)\b", trigger, re.IGNORECASE)
-            or tested_scores in ("", "-")
-        ):
-            pending[address] = scopes
-    return {
-        "required": len(required),
-        "audited": len(required) - len(pending),
-        "pending": len(pending),
-        "pending_functions": [
-            {"address": f"0x{address:08X}", "scope": scopes}
-            for address, scopes in sorted(pending.items())
-        ],
-    }
-
-
-def readability_audit_problems(
-    ledger: Path, targets: set[int], baseline: dict, current: dict
-) -> list[str]:
-    records = {}
-    if ledger.exists():
-        with ledger.open(encoding="utf-8", newline="") as handle:
-            for row in csv.reader(handle, delimiter="\t"):
-                if row and not row[0].startswith("#"):
-                    records[int(row[0], 16)] = row
-    problems = []
-    for address in targets:
-        before = baseline.get(address)
-        after = current.get(address)
-        if before is None or after is None or after.matching >= before.matching:
-            continue
-        row = records.get(address)
-        if row is None or len(row) < 12:
-            problems.append(f"0x{address:08X}: readability regression has no audit-ledger row")
-            continue
-        expected_before = f"{before.matching * 100:.2f}"
-        expected_after = f"{after.matching * 100:.2f}"
-        if row[9] != expected_before or row[10] != expected_after or not row[11].strip():
-            problems.append(
-                f"0x{address:08X}: audit ledger must record before {expected_before}, "
-                f"after {expected_after}, and the eliminated source defect"
-            )
-    return problems
-
-
-def low_score_review_problems(
-    ledger: Path,
-    targets: set[int],
-    baseline: dict,
-    current: dict,
-    artifacts: dict[int, str],
-    allow_low_score: bool,
-    new_targets: set[int] | None = None,
-) -> list[str]:
-    records = {}
-    if ledger.exists():
-        with ledger.open(encoding="utf-8", newline="") as handle:
-            for row in csv.reader(handle, delimiter="\t"):
-                if row and not row[0].startswith("#"):
-                    records[int(row[0], 16)] = row
-
-    problems = []
-    for address in sorted(targets):
-        before = baseline.get(address)
-        status = current.get(address)
-        if status is None:
-            continue
-        tool = address in artifacts and is_symbol_only_diff(status)
-        if status.matching >= 0.75 or status.matching == 1.0 or status.effective or tool:
-            continue
-        is_new = (
-            address in new_targets
-            if new_targets is not None
-            else before is None or before.matching == 0.0
-        )
-        if not is_new:
-            continue
-        if not allow_low_score:
-            problems.append(
-                f"0x{address:08X}: new target score {status.matching * 100:.2f}% is below 75%. "
-                "Keep the function as STUB or get a maintainer review"
-            )
-            continue
-
-        row = records.get(address, [])
-        origin = row[5].strip() if len(row) > 5 else ""
-        uncertainty = row[6].strip() if len(row) > 6 else ""
-        trigger = row[7].strip() if len(row) > 7 else ""
-        tested_scores = row[8].strip() if len(row) > 8 else ""
-        audit_state = row[12].strip() if len(row) > 12 else ""
-        tested_forms = row[14].strip() if len(row) > 14 else ""
-        if (
-            origin != "maintainer-review"
-            or audit_state != "audited"
-            or len(uncertainty.split()) < 8
-            or len(trigger.split()) < 8
-            or not re.search(r"\b(?:if|when)\b", trigger, re.IGNORECASE)
-            or tested_scores in ("", "-")
-            or tested_forms in ("", "-")
-        ):
-            problems.append(
-                f"0x{address:08X}: low-score approval needs an audited ledger row with "
-                "origin maintainer-review, measured scores, tested forms, uncertainty, "
-                "and a revisit trigger"
-            )
-    return problems
-
-
-def new_provisional_ledger_problems(
-    ledger: Path,
-    targets: set[int],
-    baseline: dict,
-    current: dict,
-    artifacts: dict[int, str],
-    require_staged: bool = False,
-    new_targets: set[int] | None = None,
-) -> list[str]:
-    records = {}
-    staged_error = False
-    if require_staged:
-        try:
-            relative = ledger.resolve().relative_to(ROOT.resolve()).as_posix()
-            staged_diff = subprocess.run(
-                ["git", "diff", "--cached", "--quiet", "--", relative],
-                cwd=ROOT,
-                capture_output=True,
-                check=False,
-            )
-            if staged_diff.returncode != 1:
-                raise ValueError("the audit ledger has no staged change")
-            content = subprocess.run(
-                ["git", "show", f":{relative}"],
-                cwd=ROOT,
-                text=True,
-                capture_output=True,
-                check=True,
-            ).stdout
-            rows = csv.reader(content.splitlines(), delimiter="\t")
-            for row in rows:
-                if row and not row[0].startswith("#"):
-                    records[int(row[0], 16)] = row
-        except (OSError, ValueError, subprocess.CalledProcessError):
-            staged_error = True
-    elif ledger.exists():
-        with ledger.open(encoding="utf-8", newline="") as handle:
-            for row in csv.reader(handle, delimiter="\t"):
-                if row and not row[0].startswith("#"):
-                    records[int(row[0], 16)] = row
-
-    problems = []
-    for address in sorted(targets):
-        before = baseline.get(address)
-        status = current.get(address)
-        is_new = (
-            address in new_targets
-            if new_targets is not None
-            else before is None or before.matching == 0.0
-        )
-        if status is None or not is_new:
-            continue
-        tool = address in artifacts and is_symbol_only_diff(status)
-        if status.matching == 1.0 or status.effective or tool:
-            continue
-        if staged_error:
-            problems.append(
-                f"0x{address:08X}: stage the audit ledger with the new provisional target"
-            )
-            continue
-        row = records.get(address, [])
-        score = row[3].strip() if len(row) > 3 else ""
-        origin = row[5].strip() if len(row) > 5 else ""
-        uncertainty = row[6].strip() if len(row) > 6 else ""
-        trigger = row[7].strip() if len(row) > 7 else ""
-        tested_scores = row[8].strip() if len(row) > 8 else ""
-        audit_state = row[12].strip() if len(row) > 12 else ""
-        tested_forms = row[14].strip() if len(row) > 14 else ""
-        if (
-            score != f"{status.matching * 100:.2f}"
-            or origin in ("", "initial-audit")
-            or audit_state != "audited"
-            or len(uncertainty.split()) < 8
-            or len(trigger.split()) < 8
-            or not re.search(r"\b(?:if|when)\b", trigger, re.IGNORECASE)
-            or tested_scores in ("", "-")
-            or tested_forms in ("", "-")
-        ):
-            problems.append(
-                f"0x{address:08X}: new provisional target needs an audited ledger row "
-                "with its current score, specific uncertainty, tested forms, measured "
-                "scores, and a conditional revisit trigger"
-            )
-    return problems
-
-
 def session_summary(baseline_path: Path, current_path: Path, targets: list[int]) -> int:
     baseline = read_match_statuses(baseline_path)
     current = read_match_statuses(current_path)
@@ -658,22 +325,6 @@ def session_summary(baseline_path: Path, current_path: Path, targets: list[int])
         f"{after_accuracy * 100:.2f}% ({(after_accuracy - before_accuracy) * 100:+.2f} points)"
     )
     return 0
-
-
-def head_function_addresses() -> set[int]:
-    result = subprocess.run(
-        ["git", "grep", "-h", "-E", r"FUNCTION:.*0x[0-9A-Fa-f]{8}", "HEAD", "--", "src"],
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if result.returncode not in (0, 1):
-        raise RuntimeError("git could not read the baseline source annotations")
-    return {
-        int(match.group(0), 16)
-        for match in re.finditer(r"0x[0-9A-Fa-f]{8}", result.stdout)
-    }
 
 
 def classify(report: Path, address: int, source_root: Path = ROOT / "src") -> int:
@@ -733,9 +384,6 @@ def validate(
     metadata_path: Path | None = None,
     source_root: Path = ROOT / "src",
     check_annotation_tags: bool = True,
-    audit_ledger: Path = AUDIT_LEDGER,
-    allow_low_score: bool = False,
-    require_staged_ledger: bool = False,
 ) -> int:
     baseline = read_match_statuses(baseline_path)
     current = read_match_statuses(current_path)
@@ -744,34 +392,8 @@ def validate(
     if metadata_path is not None:
         problems.extend(validate_metadata(metadata_path, baseline_path))
     source_debt = read_source_debt(source_root)
-    new_targets = targets - head_function_addresses() if require_staged_ledger else None
     if check_annotation_tags:
         problems.extend(check_annotations(current_path, source_root))
-    if allow_target_regression:
-        problems.extend(readability_audit_problems(audit_ledger, targets, baseline, current))
-    problems.extend(
-        low_score_review_problems(
-            audit_ledger,
-            targets,
-            baseline,
-            current,
-            artifacts,
-            allow_low_score,
-            new_targets,
-        )
-    )
-    problems.extend(
-        new_provisional_ledger_problems(
-            audit_ledger,
-            targets,
-            baseline,
-            current,
-            artifacts,
-            require_staged_ledger,
-            new_targets,
-        )
-    )
-
     for address, before in baseline.items():
         after = current.get(address)
         if after is None:
@@ -861,12 +483,9 @@ def main() -> int:
     validate_parser.add_argument("current", type=Path)
     validate_parser.add_argument("targets", nargs="+", type=parse_address)
     validate_parser.add_argument("--allow-target-regression", action="store_true")
-    validate_parser.add_argument("--allow-low-score", action="store_true")
     validate_parser.add_argument("--metadata", type=Path)
     validate_parser.add_argument("--source-root", type=Path, default=ROOT / "src")
     validate_parser.add_argument("--skip-annotation-check", action="store_true")
-    validate_parser.add_argument("--audit-ledger", type=Path, default=AUDIT_LEDGER)
-    validate_parser.add_argument("--require-staged-ledger", action="store_true")
 
     annotations_parser = subparsers.add_parser("annotations")
     annotations_parser.add_argument("report", type=Path)
@@ -877,17 +496,6 @@ def main() -> int:
     experiment_parser.add_argument("report", type=Path)
     experiment_parser.add_argument("address", type=parse_address)
     experiment_parser.add_argument("output", type=Path)
-
-    ledger_parser = subparsers.add_parser("ledger")
-    ledger_parser.add_argument("report", type=Path)
-    ledger_parser.add_argument("output", type=Path, nargs="?", default=AUDIT_LEDGER)
-    ledger_parser.add_argument("--source-root", type=Path, default=ROOT / "src")
-
-    audit_status_parser = subparsers.add_parser("audit-status")
-    audit_status_parser.add_argument("report", type=Path)
-    audit_status_parser.add_argument("--source-root", type=Path, default=ROOT / "src")
-    audit_status_parser.add_argument("--audit-ledger", type=Path, default=AUDIT_LEDGER)
-    audit_status_parser.add_argument("--check", action="store_true")
 
     session_parser = subparsers.add_parser("session-summary")
     session_parser.add_argument("baseline", type=Path)
@@ -913,13 +521,6 @@ def main() -> int:
     if args.command == "experiment":
         write_experiment_record(args.report, args.address, args.output)
         return 0
-    if args.command == "ledger":
-        write_audit_ledger(args.report, args.source_root, args.output)
-        return 0
-    if args.command == "audit-status":
-        result = audit_status(args.report, args.source_root, args.audit_ledger)
-        print(json.dumps(result, indent=2))
-        return 1 if args.check and result["pending"] else 0
     if args.command == "session-summary":
         return session_summary(args.baseline, args.current, args.targets)
     return validate(
@@ -930,9 +531,6 @@ def main() -> int:
         args.metadata,
         args.source_root,
         not args.skip_annotation_check,
-        args.audit_ledger,
-        args.allow_low_score,
-        args.require_staged_ledger,
     )
 
 

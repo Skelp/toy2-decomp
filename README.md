@@ -72,10 +72,9 @@ Both expose the same workflow:
 | `compare` | Run detailed reccmp machine-code comparison |
 | `score` | Classify functions as exact, effective, tool artifact, or provisional |
 | `candidates` | Rank functions by reconstruction evidence |
-| `audit` | Review provisional functions and legacy CAP claims |
 | `validate` | Reject comparison and source-quality regressions |
 | `report` | Generate `build/decomp-report.html` |
-| `progress [namespace]` | Count source annotations against the function map |
+| `progress [--json] [namespace]` | Count source annotations against the function map |
 | `run` | Launch `build/toy2.exe`. Requires an already configured runtime environment |
 | `shell` | Open a shell with the local compiler environment active |
 
