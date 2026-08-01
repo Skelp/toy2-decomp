@@ -20,6 +20,11 @@ namespace Toy2
 	extern int32_t g_poleClimbState;
 	extern int32_t g_levelFileIndex;
 
+	namespace Platform
+	{
+		void AdvancePartialMotion(int32_t frameScale, int32_t collisionScale, int32_t skipMotion);
+	}
+
 	namespace Levels
 	{
 		extern void* g_cachedAllBuffer;
@@ -237,7 +242,8 @@ namespace Toy2
 			Platform::CollisionFace* face;
 			Vector3I16 normal;
 			int16_t contactState;
-			uint8_t reserved[8];
+			Vector3I16 wallNormal;
+			int16_t reserved;
 			Vector3I16 movement;
 			Vector3I16 surfaceVelocity;
 			int32_t contactTimer;
@@ -331,10 +337,19 @@ namespace Toy2
 			int32_t movementLength;
 		};
 
+		struct CollisionStepMotion
+		{
+			Vector3I16 movement;
+			int16_t reserved;
+			Vector3I16 platformMovement;
+		};
+
 		const int16_t COLLISION_MESH_STATIC_A = 6;
 		const int16_t COLLISION_MESH_STATIC_B = 7;
 		const uint16_t COLLISION_MESH_EXCLUDE_FROM_GRID = 0x400;
 		const uint16_t COLLISION_MESH_EXCLUDE_FROM_QUERY = 0x100;
+		const uint32_t COLLISION_NO_CONTACT = 0xFFFFFFFF;
+		const int16_t PLATFORM_FLAG_COLLISION_SUPPORT = 0x1;
 
 		static __forceinline int32_t ShiftTowardZero(int32_t value, int32_t bits) { return (value + ((value >> 31) & ((1 << bits) - 1))) >> bits; }
 
@@ -343,6 +358,7 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(SurfaceCollisionResult) == sizeof(CollisionQueryResult));
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, normal) == 0x08);
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, contactState) == 0x0E);
+		STATIC_ASSERT(offsetof(SurfaceCollisionResult, wallNormal) == 0x10);
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, movement) == 0x18);
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, surfaceVelocity) == 0x1E);
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, contactTimer) == 0x24);
@@ -358,6 +374,7 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(CollisionGridCell) == 0x14);
 		STATIC_ASSERT(sizeof(CollisionMeshRecord) == sizeof(CollisionMeshInstance));
 		STATIC_ASSERT(sizeof(CollisionSweep) == 0x4C);
+		STATIC_ASSERT(sizeof(CollisionStepMotion) == 0x0E);
 		STATIC_ASSERT(offsetof(CollisionSweep, nearestFraction) == 0x20);
 		STATIC_ASSERT(offsetof(CollisionSweep, hitNormal) == 0x34);
 		STATIC_ASSERT(offsetof(CollisionSweep, movementDirection) == 0x3C);
@@ -1443,6 +1460,464 @@ namespace Toy2
 			}
 
 			return foundHit;
+		}
+
+		// GLOBAL: TOY2 0x00729170
+		int32_t g_lastCollisionEndDistance;
+
+		// GLOBAL: TOY2 0x0072959C
+		int32_t g_lastCollisionStartDistance;
+
+		// GLOBAL: TOY2 0x0072D298
+		int32_t g_hadGroundResponse;
+
+		static __forceinline int32_t RotateTransposeX(const Matrix3x3I16& matrix, int32_t x, int32_t y, int32_t z)
+		{
+			return ShiftTowardZero(matrix.m00 * x + matrix.m10 * y + matrix.m20 * z, 12);
+		}
+
+		static __forceinline int32_t RotateTransposeY(const Matrix3x3I16& matrix, int32_t x, int32_t y, int32_t z)
+		{
+			return ShiftTowardZero(matrix.m01 * x + matrix.m11 * y + matrix.m21 * z, 12);
+		}
+
+		static __forceinline int32_t RotateTransposeZ(const Matrix3x3I16& matrix, int32_t x, int32_t y, int32_t z)
+		{
+			return ShiftTowardZero(matrix.m02 * x + matrix.m12 * y + matrix.m22 * z, 12);
+		}
+
+		static __forceinline int32_t RotateX(const Matrix3x3I16& matrix, int32_t x, int32_t y, int32_t z)
+		{
+			return ShiftTowardZero(matrix.m00 * x + matrix.m01 * y + matrix.m02 * z, 12);
+		}
+
+		static __forceinline int32_t RotateY(const Matrix3x3I16& matrix, int32_t x, int32_t y, int32_t z)
+		{
+			return ShiftTowardZero(matrix.m10 * x + matrix.m11 * y + matrix.m12 * z, 12);
+		}
+
+		static __forceinline int32_t RotateZ(const Matrix3x3I16& matrix, int32_t x, int32_t y, int32_t z)
+		{
+			return ShiftTowardZero(matrix.m20 * x + matrix.m21 * y + matrix.m22 * z, 12);
+		}
+
+		static __forceinline void RemoveNormalComponent(Vector3I16* movement, const Vector3I16& normal, int32_t shift)
+		{
+			int32_t dot = movement->x * normal.x + movement->y * normal.y + movement->z * normal.z;
+			int32_t scale = -ShiftTowardZero(dot, shift);
+			movement->x += (int16_t)ShiftTowardZero(normal.x * scale, 17);
+			movement->y += (int16_t)ShiftTowardZero(normal.y * scale, 17);
+			movement->z += (int16_t)ShiftTowardZero(normal.z * scale, 17);
+		}
+
+		static __forceinline void RemoveNormalComponent(Vector3I* movement, const Vector3I16& normal, int32_t shift)
+		{
+			int32_t dot = movement->x * normal.x + movement->y * normal.y + movement->z * normal.z;
+			int32_t scale = -ShiftTowardZero(dot, shift);
+			movement->x += (int16_t)ShiftTowardZero(normal.x * scale, 17);
+			movement->y += (int16_t)ShiftTowardZero(normal.y * scale, 17);
+			movement->z += (int16_t)ShiftTowardZero(normal.z * scale, 17);
+		}
+
+		// FUNCTION: TOY2 0x00482A00 [PROVISIONAL]
+		int32_t ResolveSubstep(CollisionStepMotion* motion,
+			Vector3I* position,
+			Vector3I* velocity,
+			SurfaceCollisionResult* result,
+			const int16_t* meshIndices,
+			PackedCollisionFace** faces,
+			int32_t faceCount,
+			int32_t movePlatforms)
+		{
+			Vector3I totalMovement;
+			totalMovement.x = motion->movement.x + motion->platformMovement.x;
+			totalMovement.y = motion->movement.y + motion->platformMovement.y;
+			totalMovement.z = motion->movement.z + motion->platformMovement.z;
+
+			CollisionSweep sweep;
+			sweep.contactFlags = COLLISION_NO_CONTACT;
+			sweep.nearestFraction = 0x7FFFFFFF;
+			bool triangleHit = false;
+			int16_t preparedMeshIndex = -1;
+
+			for (int32_t faceIndex = 0; faceIndex < faceCount; faceIndex++)
+			{
+				PackedCollisionFace* face = faces[faceIndex];
+				int16_t meshIndex = meshIndices[faceIndex];
+				if (meshIndex != preparedMeshIndex)
+				{
+					CollisionMeshInstance& mesh = g_collisionMeshInstances[meshIndex];
+					sweep.start.x = position->x - mesh.origin.x;
+					sweep.start.y = position->y - mesh.origin.y;
+					sweep.start.z = position->z - mesh.origin.z;
+
+					if (mesh.typeFlags == COLLISION_MESH_MOVING)
+					{
+						Platform::PlatformState& platform = Platform::g_platformStates[mesh.platformIdx];
+						if ((platform.flags & Platform::PLATFORM_FLAG_ROTATED) != 0)
+						{
+							Vector3I16 angles;
+							angles.x = platform.rotationAnglesFixed.x >> 2;
+							angles.y = platform.rotationAnglesFixed.y >> 2;
+							angles.z = platform.rotationAnglesFixed.z >> 2;
+							Nu3D::Math::SetRotationXYZ(&angles, &Animation::g_keyframeRotation.matrix);
+							int32_t relativeX = sweep.start.x;
+							int32_t relativeY = sweep.start.y;
+							int32_t relativeZ = sweep.start.z;
+							sweep.start.x = RotateTransposeX(Animation::g_keyframeRotation.matrix, relativeX, relativeY, relativeZ);
+							sweep.start.y = RotateTransposeY(Animation::g_keyframeRotation.matrix, relativeX, relativeY, relativeZ);
+							sweep.start.z = RotateTransposeZ(Animation::g_keyframeRotation.matrix, relativeX, relativeY, relativeZ);
+
+							angles.x = (platform.rotationAnglesFixed.x + platform.remainingRotation.x) >> 2;
+							angles.y = (platform.rotationAnglesFixed.y + platform.remainingRotation.y) >> 2;
+							angles.z = (platform.rotationAnglesFixed.z + platform.remainingRotation.z) >> 2;
+							Nu3D::Math::SetRotationXYZ(&angles, &Animation::g_keyframeRotation.matrix);
+							relativeX = position->x - mesh.origin.x + totalMovement.x;
+							relativeY = position->y - mesh.origin.y + totalMovement.y;
+							relativeZ = position->z - mesh.origin.z + totalMovement.z;
+							if (movePlatforms != 0)
+							{
+								relativeX -= platform.remainingTranslation.x;
+								relativeY -= platform.remainingTranslation.y;
+								relativeZ -= platform.remainingTranslation.z;
+							}
+							sweep.end.x = RotateTransposeX(Animation::g_keyframeRotation.matrix, relativeX, relativeY, relativeZ);
+							sweep.end.y = RotateTransposeY(Animation::g_keyframeRotation.matrix, relativeX, relativeY, relativeZ);
+							sweep.end.z = RotateTransposeZ(Animation::g_keyframeRotation.matrix, relativeX, relativeY, relativeZ);
+						}
+						else
+						{
+							sweep.end.x = sweep.start.x + totalMovement.x;
+							sweep.end.y = sweep.start.y + totalMovement.y;
+							sweep.end.z = sweep.start.z + totalMovement.z;
+							if (movePlatforms != 0)
+							{
+								sweep.end.x -= platform.remainingTranslation.x;
+								sweep.end.y -= platform.remainingTranslation.y;
+								sweep.end.z -= platform.remainingTranslation.z;
+							}
+						}
+					}
+					else
+					{
+						sweep.end.x = sweep.start.x + totalMovement.x;
+						sweep.end.y = sweep.start.y + totalMovement.y;
+						sweep.end.z = sweep.start.z + totalMovement.z;
+					}
+
+					sweep.movementDirection.x = sweep.end.x - sweep.start.x;
+					sweep.movementDirection.y = sweep.end.y - sweep.start.y;
+					sweep.movementDirection.z = sweep.end.z - sweep.start.z;
+					while (abs(sweep.movementDirection.x) > 0x4000 || abs(sweep.movementDirection.y) > 0x4000
+						|| abs(sweep.movementDirection.z) > 0x4000)
+					{
+						sweep.movementDirection.x >>= 1;
+						sweep.movementDirection.y >>= 1;
+						sweep.movementDirection.z >>= 1;
+					}
+					Nu3D::Math::NormalizeToFixedPoint(&sweep.movementDirection, &sweep.movementDirection);
+					sweep.movementLength = (((sweep.end.x - sweep.start.x) * sweep.movementDirection.x
+						+ (sweep.end.y - sweep.start.y) * sweep.movementDirection.y
+						+ (sweep.end.z - sweep.start.z) * sweep.movementDirection.z)
+						>> 12)
+						+ 0x100;
+					preparedMeshIndex = meshIndex;
+				}
+
+				if (SweepTriangle(face, &sweep, result->collisionDistance, (uint16_t)meshIndex) != 0)
+					triangleHit = true;
+			}
+
+			int32_t wallResult = SweepWallSegments(&sweep, position, &totalMovement, result->collisionDistance);
+			if (wallResult == 1)
+				sweep.contactFlags = COLLISION_NO_CONTACT;
+			else if (! triangleHit)
+			{
+				if (movePlatforms != 0)
+					Platform::AdvancePartialMotion(100, 0, 0);
+				position->x += totalMovement.x;
+				position->y += totalMovement.y;
+				position->z += totalMovement.z;
+				motion->movement.x = motion->movement.y = motion->movement.z = 0;
+				motion->platformMovement.x = motion->platformMovement.y = motion->platformMovement.z = 0;
+				return 0;
+			}
+
+			bool movingContact = sweep.contactFlags != COLLISION_NO_CONTACT
+				&& g_collisionMeshInstances[sweep.contactFlags & COLLISION_CONTACT_MESH_INDEX_MASK].typeFlags == COLLISION_MESH_MOVING;
+			if (movingContact
+				&& (Platform::g_platformStates[g_collisionMeshInstances[sweep.contactFlags & COLLISION_CONTACT_MESH_INDEX_MASK].platformIdx].flags
+					& Platform::PLATFORM_FLAG_ROTATED)
+					!= 0)
+				sweep.endDistance -= 0x80;
+			else
+				sweep.endDistance -= 0x60;
+			sweep.startDistance = (sweep.startDistance - 0x20) >> 3;
+			sweep.endDistance >>= 3;
+			int32_t distanceRange = sweep.startDistance - sweep.endDistance;
+			g_lastCollisionEndDistance = sweep.endDistance;
+			g_lastCollisionStartDistance = sweep.startDistance;
+			position->x += sweep.startDistance * totalMovement.x / distanceRange;
+			position->y += sweep.startDistance * totalMovement.y / distanceRange;
+			position->z += sweep.startDistance * totalMovement.z / distanceRange;
+			if (movePlatforms != 0)
+				Platform::AdvancePartialMotion(sweep.startDistance, sweep.endDistance, 0);
+
+			Vector3I16 normal = sweep.hitNormal.direction;
+			int32_t platformIndex = -1;
+			if (movingContact)
+			{
+				platformIndex = g_collisionMeshInstances[sweep.contactFlags & COLLISION_CONTACT_MESH_INDEX_MASK].platformIdx;
+				result->platformIndex = (int16_t)platformIndex;
+				Platform::PlatformState& platform = Platform::g_platformStates[platformIndex];
+				if ((platform.flags & Platform::PLATFORM_FLAG_ROTATED) != 0)
+				{
+					Vector3I16 angles;
+					angles.x = platform.rotationAnglesFixed.x >> 2;
+					angles.y = platform.rotationAnglesFixed.y >> 2;
+					angles.z = platform.rotationAnglesFixed.z >> 2;
+					Nu3D::Math::SetRotationXYZ(&angles, &Animation::g_keyframeRotation.matrix);
+					normal.x = (int16_t)RotateX(Animation::g_keyframeRotation.matrix,
+						sweep.hitNormal.direction.x,
+						sweep.hitNormal.direction.y,
+						sweep.hitNormal.direction.z);
+					normal.y = (int16_t)RotateY(Animation::g_keyframeRotation.matrix,
+						sweep.hitNormal.direction.x,
+						sweep.hitNormal.direction.y,
+						sweep.hitNormal.direction.z);
+					normal.z = (int16_t)RotateZ(Animation::g_keyframeRotation.matrix,
+						sweep.hitNormal.direction.x,
+						sweep.hitNormal.direction.y,
+						sweep.hitNormal.direction.z);
+				}
+			}
+
+			motion->movement.x -= (int16_t)(motion->movement.x * sweep.startDistance / distanceRange);
+			motion->movement.y -= (int16_t)(motion->movement.y * sweep.startDistance / distanceRange);
+			motion->movement.z -= (int16_t)(motion->movement.z * sweep.startDistance / distanceRange);
+			if (! movingContact)
+			{
+				motion->platformMovement.x -= (int16_t)(motion->platformMovement.x * sweep.startDistance / distanceRange);
+				motion->platformMovement.y -= (int16_t)(motion->platformMovement.y * sweep.startDistance / distanceRange);
+				motion->platformMovement.z -= (int16_t)(motion->platformMovement.z * sweep.startDistance / distanceRange);
+			}
+
+			if (normal.y < -0x2000)
+			{
+				RemoveNormalComponent(&motion->movement, normal, 11);
+				if (! movingContact)
+					RemoveNormalComponent(&motion->platformMovement, normal, 11);
+				else
+				{
+					Platform::PlatformState& platform = Platform::g_platformStates[platformIndex];
+					motion->platformMovement.x = platform.remainingTranslation.x + (normal.x >> 8);
+					motion->platformMovement.y = platform.remainingTranslation.y + (normal.y >> 8);
+					motion->platformMovement.z = platform.remainingTranslation.z + (normal.z >> 8);
+					if ((platform.flags & Platform::PLATFORM_FLAG_ROTATED) != 0)
+					{
+						Vector3I16 angles;
+						angles.x = platform.rotationAnglesFixed.x >> 2;
+						angles.y = platform.rotationAnglesFixed.y >> 2;
+						angles.z = platform.rotationAnglesFixed.z >> 2;
+						Nu3D::Math::SetRotationXYZ(&angles, &Animation::g_keyframeRotation.matrix);
+						angles.x = (platform.rotationAnglesFixed.x + platform.remainingRotation.x) >> 2;
+						angles.y = (platform.rotationAnglesFixed.y + platform.remainingRotation.y) >> 2;
+						angles.z = (platform.rotationAnglesFixed.z + platform.remainingRotation.z) >> 2;
+						Nu3D::Math::SetRotationXYZ(&angles, &Animation::g_nextKeyframeRotation.matrix);
+						CollisionMeshInstance& mesh = g_collisionMeshInstances[platform.collisionMeshIndex];
+						int32_t relativeX = position->x - mesh.origin.x;
+						int32_t relativeY = position->y - mesh.origin.y;
+						int32_t relativeZ = position->z - mesh.origin.z;
+						int32_t localX = RotateTransposeX(Animation::g_keyframeRotation.matrix, relativeX, relativeY, relativeZ);
+						int32_t localY = RotateTransposeY(Animation::g_keyframeRotation.matrix, relativeX, relativeY, relativeZ);
+						int32_t localZ = RotateTransposeZ(Animation::g_keyframeRotation.matrix, relativeX, relativeY, relativeZ);
+						int32_t movedX = RotateX(Animation::g_nextKeyframeRotation.matrix, localX, localY, localZ) + mesh.origin.x;
+						int32_t movedY = RotateY(Animation::g_nextKeyframeRotation.matrix, localX, localY, localZ) + mesh.origin.y;
+						int32_t movedZ = RotateZ(Animation::g_nextKeyframeRotation.matrix, localX, localY, localZ) + mesh.origin.z;
+						motion->platformMovement.x += (int16_t)movedX - (int16_t)position->x;
+						int16_t oldMovementY = motion->platformMovement.y;
+						motion->platformMovement.y += (int16_t)movedY - (int16_t)position->y;
+						motion->platformMovement.z += (int16_t)movedZ - (int16_t)position->z;
+						if (motion->platformMovement.y < oldMovementY)
+							motion->platformMovement.y += (motion->platformMovement.y - oldMovementY) / 8 + 0x20;
+					}
+					platform.flags |= Platform::PLATFORM_FLAG_BUZZ_CONTACT;
+					platform.contactFace = reinterpret_cast<Platform::CollisionFace*>(sweep.face);
+				}
+				RemoveNormalComponent(velocity, normal, 11);
+			}
+			else
+			{
+				if (Renderer::g_frameDelta >= 3)
+				{
+					velocity->x >>= 1;
+					velocity->z >>= 1;
+				}
+				else
+				{
+					velocity->x = ShiftTowardZero(velocity->x * 15, 4);
+					velocity->z = ShiftTowardZero(velocity->z * 15, 4);
+				}
+
+				int32_t normalShift = g_hadGroundResponse == 0 ? 11 : 10;
+				if (normal.y < 1 || motion->movement.y < 1)
+					RemoveNormalComponent(&motion->movement, normal, normalShift);
+				if (! movingContact)
+				{
+					if (normal.y < 1 || motion->platformMovement.y < 1)
+						RemoveNormalComponent(&motion->platformMovement, normal, normalShift);
+				}
+				else
+				{
+					Platform::PlatformState& platform = Platform::g_platformStates[platformIndex];
+					velocity->y += normal.y >> 6;
+					motion->movement.y += normal.y >> 6;
+					motion->platformMovement.x = platform.remainingTranslation.x + (normal.x >> 8);
+					motion->platformMovement.z = platform.remainingTranslation.z + (normal.z >> 8);
+					if ((platform.flags & Platform::PLATFORM_FLAG_ROTATED) != 0)
+					{
+						motion->movement.x += normal.x >> 7;
+						motion->movement.z += normal.z >> 7;
+						motion->platformMovement.x += normal.x >> 7;
+						motion->platformMovement.z += normal.z >> 7;
+					}
+					platform.flags |= PLATFORM_FLAG_COLLISION_SUPPORT;
+					platform.contactFace = reinterpret_cast<Platform::CollisionFace*>(sweep.face);
+				}
+
+				result->normal = normal;
+				result->contactState = movingContact ? 2 : 1;
+				if (normal.y < 1 || velocity->y < 1)
+					RemoveNormalComponent(velocity, normal, normalShift);
+				motion->movement.x += normal.x / 0x60;
+				motion->movement.y += normal.y / 0x60;
+				motion->movement.z += normal.z / 0x60;
+				velocity->x += normal.x / 0x60;
+				velocity->z += normal.z / 0x60;
+				g_hadGroundResponse = 1;
+			}
+
+			if (sweep.contactFlags != COLLISION_NO_CONTACT)
+			{
+				uint8_t surfaceType = (uint8_t)g_collisionMeshInstances[sweep.contactFlags & COLLISION_CONTACT_MESH_INDEX_MASK].unk;
+				if (surfaceType != 0xFF)
+					result->surfaceType = (result->surfaceType & 0xFF00) | surfaceType;
+			}
+			if (normal.y >= -0x2000)
+				return 2;
+			result->contactFlags = sweep.contactFlags;
+			result->face = reinterpret_cast<Platform::CollisionFace*>(sweep.face);
+			result->wallNormal = normal;
+			return 1;
+		}
+
+		// FUNCTION: TOY2 0x00483EF0 [PROVISIONAL]
+		int32_t ResolvePlatformFooting(CollisionStepMotion* motion,
+			Vector3I* position,
+			Vector3I*,
+			SurfaceCollisionResult* result)
+		{
+			Platform::CollisionFace* contactFace = result->face;
+			int16_t meshIndex = (int16_t)(result->contactFlags & COLLISION_CONTACT_MESH_INDEX_MASK);
+			CollisionMeshInstance& mesh = g_collisionMeshInstances[meshIndex];
+			uint8_t surfaceType = (uint8_t)mesh.unk;
+			if (surfaceType != 0xFF)
+				result->surfaceType ^= (uint8_t)result->surfaceType ^ surfaceType;
+
+			Vector3I16 primaryNormal;
+			Vector3I16 secondaryNormal;
+			if (mesh.typeFlags == COLLISION_MESH_MOVING
+				&& (Platform::g_platformStates[mesh.platformIdx].flags & Platform::PLATFORM_FLAG_ROTATED) != 0)
+			{
+				Platform::PlatformState& platform = Platform::g_platformStates[mesh.platformIdx];
+				Vector3I16 angles;
+				angles.x = platform.rotationAnglesFixed.x >> 2;
+				angles.y = platform.rotationAnglesFixed.y >> 2;
+				angles.z = platform.rotationAnglesFixed.z >> 2;
+				Nu3D::Math::SetRotationXYZ(&angles, &Animation::g_keyframeRotation.matrix);
+
+				primaryNormal.x = (int16_t)RotateX(
+					Animation::g_keyframeRotation.matrix, contactFace->normal.x, contactFace->normal.y, contactFace->normal.z);
+				primaryNormal.y = (int16_t)RotateY(
+					Animation::g_keyframeRotation.matrix, contactFace->normal.x, contactFace->normal.y, contactFace->normal.z);
+				primaryNormal.z = (int16_t)RotateZ(
+					Animation::g_keyframeRotation.matrix, contactFace->normal.x, contactFace->normal.y, contactFace->normal.z);
+
+				if (contactFace->secondaryNormal.y != 0x7FFF)
+				{
+					secondaryNormal.x = (int16_t)RotateX(Animation::g_keyframeRotation.matrix,
+						contactFace->secondaryNormal.x,
+						contactFace->secondaryNormal.y,
+						contactFace->secondaryNormal.z);
+					secondaryNormal.y = (int16_t)RotateY(Animation::g_keyframeRotation.matrix,
+						contactFace->secondaryNormal.x,
+						contactFace->secondaryNormal.y,
+						contactFace->secondaryNormal.z);
+					secondaryNormal.z = (int16_t)RotateZ(Animation::g_keyframeRotation.matrix,
+						contactFace->secondaryNormal.x,
+						contactFace->secondaryNormal.y,
+						contactFace->secondaryNormal.z);
+				}
+				else
+					secondaryNormal = contactFace->secondaryNormal;
+			}
+			else
+			{
+				primaryNormal = contactFace->normal;
+				secondaryNormal = contactFace->secondaryNormal;
+			}
+
+			Vector3I combinedMovement;
+			combinedMovement.x = motion->movement.x + motion->platformMovement.x;
+			combinedMovement.y = motion->movement.y + motion->platformMovement.y;
+			combinedMovement.z = motion->movement.z + motion->platformMovement.z;
+
+			Vector3I stepPosition;
+			stepPosition.x = position->x + combinedMovement.x;
+			stepPosition.y = position->y + combinedMovement.y;
+			stepPosition.z = position->z + combinedMovement.z;
+
+			const Vector3I16& contactNormal =
+				(result->contactFlags & COLLISION_CONTACT_SECONDARY_FACE) != 0 ? secondaryNormal : primaryNormal;
+			stepPosition.y += contactNormal.y >> 8;
+
+			CollisionStepMotion stepMotion;
+			stepMotion.movement.x = 0;
+			stepMotion.movement.y = (int16_t)(-contactNormal.y >> 6);
+			stepMotion.movement.z = 0;
+			stepMotion.platformMovement.x = 0;
+			stepMotion.platformMovement.y = 0;
+			stepMotion.platformMovement.z = 0;
+
+			SurfaceCollisionResult stepResult = *result;
+			PackedCollisionFace* face = reinterpret_cast<PackedCollisionFace*>(contactFace);
+			if (ResolveSubstep(&stepMotion, &stepPosition, &combinedMovement, &stepResult, &meshIndex, &face, 1, 0) == 1)
+			{
+				const Vector3I16& resolvedNormal = (stepResult.contactFlags & COLLISION_CONTACT_SECONDARY_FACE) != 0
+					? secondaryNormal
+					: primaryNormal;
+				motion->movement.x =
+					(int16_t)((resolvedNormal.x >> 9) - (int16_t)position->x - motion->platformMovement.x + (int16_t)stepPosition.x);
+				motion->movement.y =
+					(int16_t)((resolvedNormal.y >> 8) - (int16_t)position->y - motion->platformMovement.y + (int16_t)stepPosition.y);
+				motion->movement.z =
+					(int16_t)((resolvedNormal.z >> 9) - (int16_t)position->z - motion->platformMovement.z + (int16_t)stepPosition.z);
+				return 1;
+			}
+
+			if (secondaryNormal.y != 0x7FFF)
+			{
+				motion->movement.x += (int16_t)((secondaryNormal.x + primaryNormal.x) >> 9);
+				motion->movement.y += (int16_t)((secondaryNormal.y + primaryNormal.y) >> 9);
+				motion->movement.z += (int16_t)((secondaryNormal.z + primaryNormal.z) >> 9);
+			}
+			else
+			{
+				motion->movement.x += primaryNormal.x >> 9;
+				motion->movement.y += primaryNormal.y >> 9;
+				motion->movement.z += primaryNormal.z >> 9;
+			}
+			return 0;
 		}
 
 		// FUNCTION: TOY2 0x00485940 [PROVISIONAL]
