@@ -443,6 +443,36 @@ class DependencySelectionTests(unittest.TestCase):
             {first.address, second.address},
         )
 
+    def test_manual_blocker_holds_its_recursive_group(self):
+        target = make(
+            0x401000,
+            "N::Target",
+            size=200,
+            state="NOT_STARTED",
+            declared_dependencies=(0x402000,),
+        )
+        blocked_caller = make(
+            0x402000,
+            "N::BlockedCaller",
+            size=200,
+            state="STUB",
+            manual_blocker=True,
+            deferred_reason="unknown intermediate model",
+        )
+        pool = [target, blocked_caller]
+        candidates.add_dependency_evidence(
+            pool,
+            self.graph(
+                {
+                    target.address: {blocked_caller.address},
+                    blocked_caller.address: {target.address},
+                }
+            ),
+        )
+        self.assertFalse(target.dependency_ready)
+        self.assertFalse(blocked_caller.dependency_ready)
+        self.assertEqual(candidates.dependency_frontier_for(target.address, pool), set())
+
     def test_declared_prerequisite_reactivates_after_acceptance(self):
         target = make(
             0x401000,

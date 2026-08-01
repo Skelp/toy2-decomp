@@ -730,7 +730,9 @@ def add_dependency_evidence(
                 if component_by_node[target] != component
             )
         )
-        candidate.dependency_ready = not unresolved_components and not candidate.manual_blocker
+        candidate.dependency_ready = (
+            not unresolved_components and component not in manual_components
+        )
 
         immediate_callers: set[int] = set()
         for caller_component in reverse_component_edges.get(component, set()):
