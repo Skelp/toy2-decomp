@@ -8,6 +8,8 @@
 #include "Toy2/Toy2.h"
 
 #include <DINPUT.H>
+#include <cstdio>
+#include <cstring>
 #include <stddef.h>
 
 namespace InputManager
@@ -660,6 +662,56 @@ namespace InputManager
 					}
 					else if (entry == entries[g_selectedControlEntryIndex]
 						&& (Renderer::g_frameDelta % 20 < 10 || g_controlMenuState == CONTROL_MENU_STATE_BIND_KEYBOARD))
+					{
+						DrawKeyboardGlyphText(entry->x + g_renderedKeyboardGlyphTextWidth, entry->y, "]");
+						DrawKeyboardGlyphText(entry->x - 6, entry->y, "[");
+					}
+				}
+
+				entry = *nextEntry;
+				entryIndex++;
+				nextEntry++;
+			} while (entry != (Toy2::Ini::ControlTextEntry*)-1);
+		}
+	}
+
+	// FUNCTION: TOY2 0x00416240 [MATCHED]
+	void DrawJoystickBindings(Toy2::Ini::ControlTextEntry** entries)
+	{
+		char buttonText[32];
+		Toy2::Ini::ControlTextEntry** nextEntry = entries;
+		Toy2::Ini::ControlTextEntry* entry = *nextEntry;
+		int32_t entryIndex = 0;
+		nextEntry++;
+
+		if (entry != (Toy2::Ini::ControlTextEntry*)-1)
+		{
+			do
+			{
+				int32_t bindingOffset;
+				DrawKeyboardGlyphText(entry->x, entry->y, entry->text);
+
+				if (entryIndex <= 6)
+				{
+					memset(buttonText, 0, sizeof(buttonText));
+					sprintf(buttonText, "#%d", entry->inputCode + 1);
+					bindingOffset = 30;
+					DrawKeyboardGlyphText(entry->x - bindingOffset, entry->y, buttonText);
+				}
+
+				if (g_selectedControlEntryIndex >= 0)
+				{
+					if (g_selectedControlEntryIndex <= 6)
+					{
+						if (entry == entries[g_selectedControlEntryIndex]
+							&& (Renderer::g_frameDelta % 20 < 10 || g_controlMenuState == CONTROL_MENU_STATE_BIND_JOYSTICK))
+						{
+							DrawKeyboardGlyphText(entry->x - bindingOffset + g_renderedKeyboardGlyphTextWidth, entry->y, "]");
+							DrawKeyboardGlyphText(entry->x - bindingOffset - 6, entry->y, "[");
+						}
+					}
+					else if (entry == entries[g_selectedControlEntryIndex]
+						&& (Renderer::g_frameDelta % 20 < 10 || g_controlMenuState == CONTROL_MENU_STATE_BIND_JOYSTICK))
 					{
 						DrawKeyboardGlyphText(entry->x + g_renderedKeyboardGlyphTextWidth, entry->y, "]");
 						DrawKeyboardGlyphText(entry->x - 6, entry->y, "[");
