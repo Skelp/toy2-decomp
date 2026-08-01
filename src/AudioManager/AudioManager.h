@@ -118,7 +118,7 @@ namespace AudioManager
 	extern int32_t g_musicVolumeLevel;
 	extern LPDIRECTSOUND g_directSound;
 	extern LPDIRECTSOUNDBUFFER g_dsPrimaryBuffer;
-	extern LPDIRECTSOUNDBUFFER g_dsSecondaryBuffer;
+	extern LPDIRECTSOUNDNOTIFY g_dsNotify;
 	extern int16_t g_dsVolTable[151];
 
 	extern HANDLE g_streamCommandEvent;
