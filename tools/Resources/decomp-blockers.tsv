@@ -33,6 +33,7 @@
 0x0044E710	-	Needs source evidence for the segment pointer anchors and scratch-vector lifetimes; one explicit position-pointer form caused only an unrelated register-allocation change.
 0x0044EB90	-	The complete typed kite-tail draw path remains below 50%; three structural forms leave the CAP-03 register homes and one packed-colour stack slot unresolved.
 0x0044F010	-	The complete precipitation draw path scores 37.84%; four forms preserve the layout and draw call but leave the FPO frame and conversion schedule unresolved.
+0x0044F880	-	The large conversion body needs a verified variable-lifetime and control-flow model; the natural row-destination form scores 21.41%.
 0x00450E50	0x00451280	Needs the ProjectQuad caller model to identify the padded point ABI and projection local lifetimes.
 0x00451280	-	Semantics and ABI are recovered, but VC6 eliminates the retail dead transformed-X fields. Direct locals scored 36.05%, address helper 34.76%, volatile outputs 29.98%, Vector4 results 32.41%, and in-place Vector4 results 32.62%. Needs evidence for the original transform idiom before promotion.
 0x00461D20	-	The complete RasterizeTexturedRect555 analogue has the same 626-instruction structure but measures only 24.90%; cloning its 565 constants would create a new sub-threshold target without a resolved shared rasterizer source model

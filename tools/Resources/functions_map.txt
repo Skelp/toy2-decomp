@@ -359,6 +359,7 @@
 0x0044F820 Nu3D::Camera::EnableCameraSkew
 0x0044F840 Toy2::ShowModelNode
 0x0044F860 Toy2::HideModelNode
+0x0044F880 Toy2::ConvertPSXTexturePixels
 0x0044FF50 NGNLoader::DetectBackdropTextures
 0x00450010 RawLoader::LoadRawAndNGN
 0x004500A0 Toy2::LoadLevelGraphics

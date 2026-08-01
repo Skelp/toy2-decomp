@@ -161,6 +161,7 @@ set(TOY2_SOURCES
     src/Toy2/Camera.cpp
     src/Toy2/Weather.cpp
     src/Toy2/Weather.h
+    src/Toy2/TextureConversion.cpp
 
     # Nu3D
     src/Nu3D/Creature.h
