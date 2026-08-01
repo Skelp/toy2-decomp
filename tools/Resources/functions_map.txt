@@ -467,6 +467,7 @@
 0x0047EC20 AudioManager::LoadSfxPackForLevel
 0x0047EDE0 AudioManager::Init
 0x0047EF80 Toy2::ProfileCPU
+0x0047F6B0 Toy2::LoadSwitchTPage
 0x00480660 Toy2::Collision::SweepWallSegments
 0x00480AE0 Nu3D::Math::InsidePolLines
 0x00481140 Nu3D::Collision::IsPointInTriangle

@@ -5412,6 +5412,43 @@ namespace Toy2
 #pragma optimize("", on)
 #pragma intrinsic(abs)
 
+	// FUNCTION: TOY2 0x0047F6B0 [PROVISIONAL]
+	void LoadSwitchTPage()
+	{
+		Logger::Log("LoadSwitchTPage\n");
+
+		void* buffer = malloc(0x30000);
+		FileUtils::LoadFile("soft.raw", buffer);
+
+		if (! SoftwareRenderer::g_softwareTextureData[6])
+			SoftwareRenderer::g_softwareTextureData[6] = malloc(0x20000);
+
+		uint16_t* destinationPixels = (uint16_t*)SoftwareRenderer::g_softwareTextureData[6];
+		int32_t pixelsRemaining = 0x10000;
+		uint8_t* sourcePixel = (uint8_t*)buffer + 2;
+
+		if (SoftwareRenderer::g_bitsPerPixel == 16)
+		{
+			do
+			{
+				*destinationPixels++ =
+					(((uint16_t)(sourcePixel[-2] & 0xF8) << 5 | ((uint16_t)sourcePixel[-1] & 0xFFFC)) << 3) | (uint16_t)(sourcePixel[0] >> 3);
+				sourcePixel += 3;
+			} while (--pixelsRemaining != 0);
+		}
+		else
+		{
+			do
+			{
+				*destinationPixels++ =
+					((((uint16_t)sourcePixel[-2] & 0xFFF8) << 5 | ((uint16_t)sourcePixel[-1] & 0xFFF8)) << 2) | (uint16_t)(sourcePixel[0] >> 3);
+				sourcePixel += 3;
+			} while (--pixelsRemaining != 0);
+		}
+
+		free(buffer);
+	}
+
 	// FUNCTION: TOY2 0x0048E730 [PROVISIONAL]
 	void OneInit()
 	{
