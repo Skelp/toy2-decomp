@@ -105,6 +105,9 @@
 0x00414550 Toy2::Level::FixupRecordCoordinates
 0x00414720 Toy2::EnterLevel
 0x00414A80 Toy2::Actor::GetCreatureList
+0x00414AC0 InputManager::GetJoystickX
+0x00414AD0 InputManager::GetJoystickY
+0x00414AE0 InputManager::GetJoystickButtonState
 0x00414AF0 InputManager::UpdateInputState
 0x00414EA0 InputManager::EnumDevices
 0x00414F20 SaveManager::Init

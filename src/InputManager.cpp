@@ -182,6 +182,15 @@ namespace InputManager
 		{ INPUT_SPIN, INPUT_JUMP, INPUT_FIRE },
 	};
 
+	// FUNCTION: TOY2 0x00414AC0 [MATCHED]
+	int32_t GetJoystickX() { return g_joystickRawX >> 8; }
+
+	// FUNCTION: TOY2 0x00414AD0 [MATCHED]
+	int32_t GetJoystickY() { return g_joystickRawY >> 8; }
+
+	// FUNCTION: TOY2 0x00414AE0 [MATCHED]
+	int32_t GetJoystickButtonState(int32_t buttonIndex) { return g_joystickState.rgbButtons[buttonIndex]; }
+
 	// FUNCTION: TOY2 0x00415120 [MATCHED]
 	int32_t GetPressedInput()
 	{
