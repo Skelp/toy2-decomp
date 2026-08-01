@@ -18,6 +18,7 @@ namespace Toy2
 	extern int32_t g_ziplineState;
 	extern int32_t g_ledgeClimbTimer;
 	extern int32_t g_poleClimbState;
+	extern int32_t g_levelFileIndex;
 
 	namespace Levels
 	{
@@ -245,6 +246,20 @@ namespace Toy2
 			uint16_t surfaceType;
 		};
 
+		struct PlatformMotionCollisionResult
+		{
+			uint32_t contactFlags;
+			Platform::CollisionFace* face;
+			uint8_t reserved[0x10];
+			Vector3I16 movement;
+			Vector3I16 platformMovement;
+			uint8_t reserved2[4];
+			int16_t platformIndex;
+			int16_t platformRotationState;
+			int16_t reserved3;
+			uint16_t surfaceType;
+		};
+
 		struct PackedCollisionFace
 		{
 			int16_t boundsMinX;
@@ -329,6 +344,10 @@ namespace Toy2
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, surfaceVelocity) == 0x1E);
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, contactTimer) == 0x24);
 		STATIC_ASSERT(offsetof(SurfaceCollisionResult, collisionDistance) == 0x2C);
+		STATIC_ASSERT(sizeof(PlatformMotionCollisionResult) == sizeof(CollisionQueryResult));
+		STATIC_ASSERT(offsetof(PlatformMotionCollisionResult, movement) == 0x18);
+		STATIC_ASSERT(offsetof(PlatformMotionCollisionResult, platformMovement) == 0x1E);
+		STATIC_ASSERT(offsetof(PlatformMotionCollisionResult, platformRotationState) == 0x2A);
 		STATIC_ASSERT(sizeof(PackedCollisionFace) == 0x2C);
 		STATIC_ASSERT(offsetof(PackedCollisionFace, firstPlaneNormal) == 0x20);
 		STATIC_ASSERT(offsetof(PackedCollisionFace, secondPlaneNormal) == 0x26);
@@ -1207,6 +1226,7 @@ namespace Toy2
 		}
 
 		const int32_t PLATFORM_FLAG_TRANSLATING = 0x80;
+		const int32_t PLATFORM_FLAG_CARRIES_BUZZ = 0x100;
 
 		// GLOBAL: TOY2 0x00728720
 		PlatformState g_platformStates[32];
@@ -1400,6 +1420,279 @@ namespace Toy2
 				platformIndex++;
 				platformCount--;
 			} while (platformCount != 0);
+		}
+
+		// FUNCTION: TOY2 0x00488E10 [PROVISIONAL]
+		void UpdateBuzzPlatformMotion(int32_t queryIndex, int32_t collisionPass)
+		{
+			if (collisionPass == 2)
+			{
+				return;
+			}
+
+			Collision::PlatformMotionCollisionResult* collisionResults =
+				reinterpret_cast<Collision::PlatformMotionCollisionResult*>(Collision::g_collisionQueryResults);
+			int32_t movedPlatformIndex = -1;
+			bool carryFromAllPlatforms = g_ledgeClimbPlatformIndex >= 0 && g_levelFileIndex == 10;
+			int32_t activePlatformIndex = -1;
+			if (Collision::g_activePlatformIndex >= 0 && g_buzzActor.airborneMode == 0
+				&& (g_platformStates[Collision::g_activePlatformIndex].flags & PLATFORM_FLAG_BUZZ_GROUNDED) != 0)
+			{
+				activePlatformIndex = Collision::g_activePlatformIndex;
+			}
+
+			for (int32_t workspaceIndex = 0; workspaceIndex < 8; workspaceIndex++)
+			{
+				if (Terrain::g_collisionWorkspace->slots[workspaceIndex].activeFrames > 0)
+				{
+					Terrain::g_collisionWorkspace->slots[workspaceIndex].activeFrames--;
+				}
+			}
+
+			int32_t buzzZ = g_buzzActor.posAngles.pos.z;
+			for (int32_t platformIndex = 0; platformIndex < 32; platformIndex++)
+			{
+				PlatformState& platform = g_platformStates[platformIndex];
+				uint16_t flags = platform.flags;
+				if ((flags & PLATFORM_FLAG_CARRIES_BUZZ) != 0
+					&& (flags & (PLATFORM_FLAG_BUZZ_CONTACT | PLATFORM_FLAG_BUZZ_GROUNDED)) != 0 && g_buzzActor.airborneMode == 0)
+				{
+					activePlatformIndex = platformIndex;
+				}
+
+				platform.flags = flags & ~(1 | PLATFORM_FLAG_BUZZ_CONTACT);
+				if ((flags & PLATFORM_FLAG_TRANSLATING) != 0)
+				{
+					platform.remainingTranslation = platform.velocity;
+				}
+				if ((platform.flags & PLATFORM_FLAG_ROTATED) != 0)
+				{
+					platform.remainingRotation = platform.angularVelocity;
+				}
+
+				if (platformIndex == g_ledgeClimbPlatformIndex || platformIndex == activePlatformIndex || carryFromAllPlatforms)
+				{
+					platform.remainingTranslation.x = 0;
+					platform.remainingTranslation.y = 0;
+					platform.remainingTranslation.z = 0;
+					platform.remainingRotation.x = 0;
+					platform.remainingRotation.y = 0;
+					platform.remainingRotation.z = 0;
+
+					if ((platform.flags & PLATFORM_FLAG_CARRIES_BUZZ) != 0)
+					{
+						Collision::CollisionMeshInstance& mesh = Collision::g_collisionMeshInstances[platform.collisionMeshIndex];
+						int32_t movementX = platform.velocity.x;
+						int32_t movementY = platform.velocity.y;
+						int32_t movementZ = platform.velocity.z;
+						mesh.origin.x += movementX;
+						mesh.origin.y += movementY;
+						mesh.origin.z += movementZ;
+						mesh.boundsMin.x += movementX;
+						mesh.boundsMin.z += movementZ;
+
+						if (platformIndex == g_ledgeClimbPlatformIndex || g_ledgeClimbPlatformIndex == -1)
+						{
+							buzzZ += movementZ;
+							movedPlatformIndex = platformIndex;
+							g_buzzActor.posAngles.pos.x += movementX;
+							g_buzzActor.posAngles.pos.y += movementY;
+							g_buzzActor.posAngles.pos.z = buzzZ;
+
+							if ((platform.flags & PLATFORM_FLAG_ROTATED) != 0)
+							{
+								Vector3I16 angles;
+								angles.x = platform.rotationAnglesFixed.x >> 2;
+								angles.y = platform.rotationAnglesFixed.y >> 2;
+								angles.z = platform.rotationAnglesFixed.z >> 2;
+								Nu3D::Math::SetRotationXYZ(&angles, &Animation::g_keyframeRotation.matrix);
+								angles.x = (platform.rotationAnglesFixed.x + platform.angularVelocity.x) >> 2;
+								angles.y = (platform.rotationAnglesFixed.y + platform.angularVelocity.y) >> 2;
+								angles.z = (platform.rotationAnglesFixed.z + platform.angularVelocity.z) >> 2;
+								Nu3D::Math::SetRotationXYZ(&angles, &Animation::g_nextKeyframeRotation.matrix);
+
+								int32_t relativeX = g_buzzActor.posAngles.pos.x - mesh.origin.x;
+								int32_t relativeY = g_buzzActor.posAngles.pos.y - mesh.origin.y;
+								int32_t relativeZ = g_buzzActor.posAngles.pos.z - mesh.origin.z;
+								int32_t localRawX = Animation::g_keyframeRotation.matrix.m00 * relativeX
+									+ Animation::g_keyframeRotation.matrix.m10 * relativeY
+									+ Animation::g_keyframeRotation.matrix.m20 * relativeZ;
+								int32_t localRawY = Animation::g_keyframeRotation.matrix.m01 * relativeX
+									+ Animation::g_keyframeRotation.matrix.m11 * relativeY
+									+ Animation::g_keyframeRotation.matrix.m21 * relativeZ;
+								int32_t localRawZ = Animation::g_keyframeRotation.matrix.m02 * relativeX
+									+ Animation::g_keyframeRotation.matrix.m12 * relativeY
+									+ Animation::g_keyframeRotation.matrix.m22 * relativeZ;
+								int32_t localX = localRawX / 4096;
+								int32_t localY = localRawY / 4096;
+								int32_t localZ = localRawZ / 4096;
+								int32_t fractionX = localRawX & 0xFFF;
+								int32_t fractionY = localRawY & 0xFFF;
+								int32_t fractionZ = localRawZ & 0xFFF;
+
+								int32_t rotatedX = Animation::g_nextKeyframeRotation.matrix.m00 * localX
+									+ Animation::g_nextKeyframeRotation.matrix.m01 * localY
+									+ Animation::g_nextKeyframeRotation.matrix.m02 * localZ
+									+ Animation::g_nextKeyframeRotation.matrix.m00 * fractionX / 4096
+									+ Animation::g_nextKeyframeRotation.matrix.m01 * fractionY / 4096
+									+ Animation::g_nextKeyframeRotation.matrix.m02 * fractionZ / 4096;
+								int32_t rotatedY = Animation::g_nextKeyframeRotation.matrix.m10 * localX
+									+ Animation::g_nextKeyframeRotation.matrix.m11 * localY
+									+ Animation::g_nextKeyframeRotation.matrix.m12 * localZ
+									+ Animation::g_nextKeyframeRotation.matrix.m10 * fractionX / 4096
+									+ Animation::g_nextKeyframeRotation.matrix.m11 * fractionY / 4096
+									+ Animation::g_nextKeyframeRotation.matrix.m12 * fractionZ / 4096;
+								int32_t rotatedZ = Animation::g_nextKeyframeRotation.matrix.m20 * localX
+									+ Animation::g_nextKeyframeRotation.matrix.m21 * localY
+									+ Animation::g_nextKeyframeRotation.matrix.m22 * localZ
+									+ Animation::g_nextKeyframeRotation.matrix.m20 * fractionX / 4096
+									+ Animation::g_nextKeyframeRotation.matrix.m21 * fractionY / 4096
+									+ Animation::g_nextKeyframeRotation.matrix.m22 * fractionZ / 4096;
+								g_buzzActor.posAngles.pos.x = rotatedX / 4096 + mesh.origin.x;
+								g_buzzActor.posAngles.pos.y = rotatedY / 4096 + mesh.origin.y;
+								buzzZ = rotatedZ / 4096 + mesh.origin.z;
+								platform.rotationAnglesFixed.x += platform.angularVelocity.x;
+								platform.rotationAnglesFixed.y += platform.angularVelocity.y;
+								platform.rotationAnglesFixed.z += platform.angularVelocity.z;
+								g_buzzActor.posAngles.pos.z = buzzZ;
+							}
+						}
+
+						if (g_buzzActor.velocity.lateral != 0 || g_buzzActor.velocity.forward != 0)
+						{
+							collisionResults[0].platformMovement.y += 800;
+						}
+					}
+				}
+				else if ((platform.flags & (PLATFORM_FLAG_BUZZ_CONTACT | PLATFORM_FLAG_BUZZ_GROUNDED)) != 0)
+				{
+					Collision::PlatformMotionCollisionResult& result = collisionResults[0];
+					result.platformMovement.x += platform.velocity.x;
+					result.platformMovement.y += platform.velocity.y;
+					result.platformMovement.z += platform.velocity.z;
+					if (platform.angularVelocity.x != 0 || platform.angularVelocity.y != 0 || platform.angularVelocity.z != 0)
+					{
+						result.platformRotationState = 0;
+					}
+
+					Vector3I16 angles;
+					angles.x = platform.rotationAnglesFixed.x >> 2;
+					angles.y = platform.rotationAnglesFixed.y >> 2;
+					angles.z = platform.rotationAnglesFixed.z >> 2;
+					Nu3D::Math::SetRotationXYZ(&angles, &Animation::g_keyframeRotation.matrix);
+					angles.x = (platform.rotationAnglesFixed.x + platform.remainingRotation.x) >> 2;
+					angles.y = (platform.rotationAnglesFixed.y + platform.remainingRotation.y) >> 2;
+					angles.z = (platform.rotationAnglesFixed.z + platform.remainingRotation.z) >> 2;
+					Nu3D::Math::SetRotationXYZ(&angles, &Animation::g_nextKeyframeRotation.matrix);
+
+					Collision::CollisionMeshInstance& mesh = Collision::g_collisionMeshInstances[platform.collisionMeshIndex];
+					int32_t relativeX = g_buzzActor.posAngles.pos.x - mesh.origin.x;
+					int32_t relativeY = g_buzzActor.posAngles.pos.y - mesh.origin.y;
+					int32_t relativeZ = g_buzzActor.posAngles.pos.z - mesh.origin.z;
+					int32_t localX = (Animation::g_keyframeRotation.matrix.m00 * relativeX
+						+ Animation::g_keyframeRotation.matrix.m10 * relativeY
+						+ Animation::g_keyframeRotation.matrix.m20 * relativeZ)
+						/ 4096;
+					int32_t localY = (Animation::g_keyframeRotation.matrix.m01 * relativeX
+						+ Animation::g_keyframeRotation.matrix.m11 * relativeY
+						+ Animation::g_keyframeRotation.matrix.m21 * relativeZ)
+						/ 4096;
+					int32_t localZ = (Animation::g_keyframeRotation.matrix.m02 * relativeX
+						+ Animation::g_keyframeRotation.matrix.m12 * relativeY
+						+ Animation::g_keyframeRotation.matrix.m22 * relativeZ)
+						/ 4096;
+					int32_t rotatedX = (Animation::g_nextKeyframeRotation.matrix.m00 * localX
+						+ Animation::g_nextKeyframeRotation.matrix.m01 * localY
+						+ Animation::g_nextKeyframeRotation.matrix.m02 * localZ)
+						/ 4096;
+					int32_t rotatedY = (Animation::g_nextKeyframeRotation.matrix.m10 * localX
+						+ Animation::g_nextKeyframeRotation.matrix.m11 * localY
+						+ Animation::g_nextKeyframeRotation.matrix.m12 * localZ)
+						/ 4096;
+					int32_t rotatedZ = (Animation::g_nextKeyframeRotation.matrix.m20 * localX
+						+ Animation::g_nextKeyframeRotation.matrix.m21 * localY
+						+ Animation::g_nextKeyframeRotation.matrix.m22 * localZ)
+						/ 4096;
+					result.platformMovement.x += (int16_t)rotatedX - (int16_t)g_buzzActor.posAngles.pos.x + (int16_t)mesh.origin.x;
+					result.platformMovement.y += (int16_t)rotatedY - (int16_t)g_buzzActor.posAngles.pos.y + (int16_t)mesh.origin.y;
+					result.platformMovement.z += (int16_t)rotatedZ - (int16_t)g_buzzActor.posAngles.pos.z + (int16_t)mesh.origin.z;
+					buzzZ = g_buzzActor.posAngles.pos.z;
+				}
+
+				platform.flags &= ~PLATFORM_FLAG_BUZZ_GROUNDED;
+			}
+
+			collisionResults[queryIndex].movement.x += collisionResults[queryIndex].platformMovement.x;
+			collisionResults[queryIndex].movement.y += collisionResults[queryIndex].platformMovement.y;
+			collisionResults[queryIndex].movement.z += collisionResults[queryIndex].platformMovement.z;
+			Collision::g_activePlatformIndex = activePlatformIndex;
+
+			if (Collision::g_previousPlatformIndex != -1 && movedPlatformIndex == -1 && g_buzzActor.airborneMode == 0)
+			{
+				PlatformState& platform = g_platformStates[Collision::g_previousPlatformIndex];
+				int32_t movementY = platform.velocity.y / 2;
+				g_buzzActor.posAngles.pos.y += movementY;
+				int32_t movementZ = platform.velocity.z / 2;
+				g_buzzActor.posAngles.pos.z = buzzZ + movementZ;
+				g_buzzActor.velocity.forward += movementZ;
+				int32_t movementX = platform.velocity.x / 2;
+				g_buzzActor.posAngles.pos.x += movementX;
+				g_buzzActor.velocity.lateral += movementX;
+				g_buzzActor.velocity.vertical += movementY;
+
+				if ((platform.flags & PLATFORM_FLAG_ROTATED) != 0)
+				{
+					Vector3I16 angles;
+					angles.x = platform.rotationAnglesFixed.x >> 2;
+					angles.y = platform.rotationAnglesFixed.y >> 2;
+					angles.z = platform.rotationAnglesFixed.z >> 2;
+					Nu3D::Math::SetRotationXYZ(&angles, &Animation::g_keyframeRotation.matrix);
+					angles.x = (platform.rotationAnglesFixed.x + platform.angularVelocity.x) >> 2;
+					angles.y = (platform.rotationAnglesFixed.y + platform.angularVelocity.y) >> 2;
+					angles.z = (platform.rotationAnglesFixed.z + platform.angularVelocity.z) >> 2;
+					Nu3D::Math::SetRotationXYZ(&angles, &Animation::g_nextKeyframeRotation.matrix);
+
+					Collision::CollisionMeshInstance& mesh = Collision::g_collisionMeshInstances[platform.collisionMeshIndex];
+					int32_t relativeX = g_buzzActor.posAngles.pos.x - mesh.origin.x;
+					int32_t relativeY = g_buzzActor.posAngles.pos.y - mesh.origin.y;
+					int32_t relativeZ = g_buzzActor.posAngles.pos.z - mesh.origin.z;
+					int32_t localX = (Animation::g_keyframeRotation.matrix.m00 * relativeX
+						+ Animation::g_keyframeRotation.matrix.m10 * relativeY
+						+ Animation::g_keyframeRotation.matrix.m20 * relativeZ)
+						/ 4096;
+					int32_t localY = (Animation::g_keyframeRotation.matrix.m01 * relativeX
+						+ Animation::g_keyframeRotation.matrix.m11 * relativeY
+						+ Animation::g_keyframeRotation.matrix.m21 * relativeZ)
+						/ 4096;
+					int32_t localZ = (Animation::g_keyframeRotation.matrix.m02 * relativeX
+						+ Animation::g_keyframeRotation.matrix.m12 * relativeY
+						+ Animation::g_keyframeRotation.matrix.m22 * relativeZ)
+						/ 4096;
+					int32_t targetX = (Animation::g_nextKeyframeRotation.matrix.m00 * localX
+						+ Animation::g_nextKeyframeRotation.matrix.m01 * localY
+						+ Animation::g_nextKeyframeRotation.matrix.m02 * localZ)
+						/ 4096
+						+ mesh.origin.x;
+					int32_t targetY = (Animation::g_nextKeyframeRotation.matrix.m10 * localX
+						+ Animation::g_nextKeyframeRotation.matrix.m11 * localY
+						+ Animation::g_nextKeyframeRotation.matrix.m12 * localZ)
+						/ 4096
+						+ mesh.origin.y;
+					int32_t targetZ = (Animation::g_nextKeyframeRotation.matrix.m20 * localX
+						+ Animation::g_nextKeyframeRotation.matrix.m21 * localY
+						+ Animation::g_nextKeyframeRotation.matrix.m22 * localZ)
+						/ 4096
+						+ mesh.origin.z;
+					g_buzzActor.posAngles.pos.x += (targetX - g_buzzActor.posAngles.pos.x) / 2;
+					g_buzzActor.posAngles.pos.y += (targetY - g_buzzActor.posAngles.pos.y) / 2;
+					g_buzzActor.posAngles.pos.z += (targetZ - g_buzzActor.posAngles.pos.z) / 2;
+					g_buzzActor.velocity.lateral += (targetX - g_buzzActor.posAngles.pos.x) / 2;
+					g_buzzActor.velocity.vertical += (targetY - g_buzzActor.posAngles.pos.y) / 2;
+					g_buzzActor.velocity.forward += (targetZ - g_buzzActor.posAngles.pos.z) / 2;
+				}
+			}
+
+			Collision::g_previousPlatformIndex = movedPlatformIndex;
 		}
 
 		// FUNCTION: TOY2 0x0048ACC0 [PROVISIONAL]
