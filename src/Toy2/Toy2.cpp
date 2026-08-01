@@ -56,6 +56,14 @@ namespace AudioManager
 	extern char g_sfxSubPath[4];
 }
 
+namespace InputManager
+{
+	extern int32_t g_renderedKeyboardGlyphTextWidth;
+
+	int32_t CalculateKeyboardGlyphTextWidth(const char* text);
+	void DrawKeyboardGlyphText(int32_t x, int32_t y, const char* text);
+}
+
 namespace Renderer
 {
 	extern float g_parallaxHorizOffset;
@@ -1851,13 +1859,28 @@ namespace Toy2
 	{
 		int32_t x;
 		int32_t y;
-		int32_t occupied;
+		int32_t empty;
 		char label[12];
 		SaveManager::Save0Data saveData;
 	};
 
+	enum GameSaveSlotMenuState
+	{
+		GAME_SAVE_SLOT_MENU_STATE_EDIT_NAME = 3,
+		GAME_SAVE_SLOT_MENU_STATE_SELECT_SLOT = 30,
+	};
+
 	STATIC_ASSERT(offsetof(GameSaveSlot, saveData) == 0x18);
 	STATIC_ASSERT(sizeof(GameSaveSlot) == 0x1A0);
+
+	// GLOBAL: TOY2 0x00704E50
+	int32_t g_selectedGameSaveSlotRed;
+
+	// GLOBAL: TOY2 0x00704E54
+	int32_t g_selectedGameSaveSlotGreen;
+
+	// GLOBAL: TOY2 0x00704E58
+	int32_t g_selectedGameSaveSlotBlue;
 
 	// GLOBAL: TOY2 0x00704E5C
 	int32_t g_selectedGameSaveSlotIndex;
@@ -1903,6 +1926,32 @@ namespace Toy2
 
 	// GLOBAL: TOY2 0x004F7280
 	int32_t g_showBlackFrames = 1;
+
+	// GLOBAL: TOY2 0x004FB200
+	GameSaveSlot g_gameSaveSlots[9] = {
+		{ 8, 20, 1, "" },
+		{ 8, 40, 1, "" },
+		{ 8, 60, 1, "" },
+		{ 8, 80, 1, "" },
+		{ 8, 100, 1, "" },
+		{ 8, 120, 1, "" },
+		{ 8, 140, 1, "" },
+		{ 8, 160, 1, "" },
+		{ 8, -1, 1, "" },
+	};
+
+	// GLOBAL: TOY2 0x004FC0A0
+	GameSaveSlot* g_gameSaveSlotPointers[9] = {
+		&g_gameSaveSlots[0],
+		&g_gameSaveSlots[1],
+		&g_gameSaveSlots[2],
+		&g_gameSaveSlots[3],
+		&g_gameSaveSlots[4],
+		&g_gameSaveSlots[5],
+		&g_gameSaveSlots[6],
+		&g_gameSaveSlots[7],
+		(GameSaveSlot*)-1,
+	};
 
 	// GLOBAL: TOY2 0x004FCDB4
 	int32_t g_cdBaseTrack = 2;
@@ -4297,6 +4346,48 @@ namespace Toy2
 		}
 
 		g_levelFileIndex = prevLevelFileIdx;
+	}
+
+	// FUNCTION: TOY2 0x0047B560 [MATCHED]
+	void DrawGameSaveSlots(int32_t menuState)
+	{
+		int32_t slotIndex = 0;
+		char emptyLabel[32];
+		memset(emptyLabel, 0, sizeof(emptyLabel));
+		strcat(emptyLabel, "Leer");
+
+		GameSaveSlot** slotPointer = &g_gameSaveSlotPointers[1];
+		GameSaveSlot* slot = g_gameSaveSlotPointers[0];
+		while (slot != (GameSaveSlot*)-1)
+		{
+			if (slotIndex == g_selectedGameSaveSlotIndex && menuState == GAME_SAVE_SLOT_MENU_STATE_EDIT_NAME && Renderer::g_frameDelta % 20 < 10)
+			{
+				int32_t labelWidth = InputManager::CalculateKeyboardGlyphTextWidth(slot->label);
+				InputManager::DrawKeyboardGlyphText(slot->x + labelWidth, slot->y + 10, "-");
+			}
+
+			const char* label = slot->empty ? emptyLabel : slot->label;
+
+			if (slotIndex == g_selectedGameSaveSlotIndex)
+			{
+				InputManager::DrawColouredKeyboardGlyphText(
+					slot->x, slot->y, label, g_selectedGameSaveSlotBlue, g_selectedGameSaveSlotGreen, g_selectedGameSaveSlotRed);
+			}
+			else
+			{
+				InputManager::DrawKeyboardGlyphText(slot->x, slot->y, label);
+			}
+
+			if (slotIndex == g_selectedGameSaveSlotIndex && menuState == GAME_SAVE_SLOT_MENU_STATE_SELECT_SLOT && Renderer::g_frameDelta % 20 < 10)
+			{
+				InputManager::DrawKeyboardGlyphText(slot->x + InputManager::g_renderedKeyboardGlyphTextWidth, slot->y, "]");
+				InputManager::DrawKeyboardGlyphText(slot->x - 4, slot->y, "[");
+			}
+
+			++slotIndex;
+			slot = *slotPointer;
+			++slotPointer;
+		}
 	}
 
 	// FUNCTION: TOY2 0x0047B6B0 [PROVISIONAL]
