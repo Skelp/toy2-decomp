@@ -1084,6 +1084,7 @@
 0x004C20E0 SoftwareRenderer::SetLevelFileIndex
 0x004C20F0 Nu3D::Material::ReleaseFromList
 0x004C2150 Nu3D::Material::Allocate
+0x004C2190 Nu3D::Material::Read
 0x004C22E0 Nu3D::Material::CreateFromColor
 0x004C23B0 Nu3D::Material::ConvertFileToMaterial
 0x004C2450 Nu3D::Material::TryCache

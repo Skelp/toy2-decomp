@@ -76,6 +76,60 @@ namespace Nu3D
 		return result;
 	}
 
+	// FUNCTION: TOY2 0x004C2190 [MATCHED]
+	Material* Material::Read(FILE* stream)
+	{
+		Material* material = Allocate();
+
+		if (material)
+		{
+			material->d3dMaterial.dwSize = sizeof(D3DMATERIAL);
+
+			fread(&material->d3dMaterial.diffuse.r, 1, sizeof(float), stream);
+			fread(&material->d3dMaterial.diffuse.g, 1, sizeof(float), stream);
+			fread(&material->d3dMaterial.diffuse.b, 1, sizeof(float), stream);
+			material->d3dMaterial.diffuse.a = 1.0f;
+
+			fread(&material->d3dMaterial.ambient.r, 1, sizeof(float), stream);
+			fread(&material->d3dMaterial.ambient.g, 1, sizeof(float), stream);
+			fread(&material->d3dMaterial.ambient.b, 1, sizeof(float), stream);
+			material->d3dMaterial.ambient.a = 1.0f;
+
+			fread(&material->d3dMaterial.specular.r, 1, sizeof(float), stream);
+			fread(&material->d3dMaterial.specular.g, 1, sizeof(float), stream);
+			fread(&material->d3dMaterial.specular.b, 1, sizeof(float), stream);
+			material->d3dMaterial.specular.a = 1.0f;
+
+			fread(&material->d3dMaterial.emissive.r, 1, sizeof(float), stream);
+			material->d3dMaterial.emissive.g = material->d3dMaterial.emissive.r * material->d3dMaterial.diffuse.g;
+			material->d3dMaterial.emissive.b = material->d3dMaterial.emissive.r * material->d3dMaterial.diffuse.b;
+			material->d3dMaterial.emissive.r = material->d3dMaterial.diffuse.r * material->d3dMaterial.emissive.r;
+			material->d3dMaterial.emissive.a = 1.0f;
+
+			fread(&material->d3dMaterial.power, 1, sizeof(float), stream);
+			material->d3dMaterial.hTexture = 0;
+			material->d3dMaterial.dwRampSize = 0;
+
+			LPDIRECT3DMATERIAL3* direct3DMat3 = &material->direct3DMat3;
+			if (DrawingDevice::CreateMaterial(direct3DMat3) < 0)
+			{
+				*direct3DMat3 = 0;
+				ReleaseFromList(material);
+				return 0;
+			}
+
+			SetMaterial(*direct3DMat3, &material->d3dMaterial);
+			GetHandle(*direct3DMat3, &material->d3dMaterialHandle);
+
+			material->texDataIndex = 0;
+			material->renderEntryHead = 0;
+			material->metadata = 0;
+			material->opacity = 1.0f;
+		}
+
+		return material;
+	}
+
 	// FUNCTION: TOY2 0x004C28F0 [MATCHED]
 	Material* Material::GetFreeByIndex(int32_t index) { return &g_materialFreeList[index]; }
 

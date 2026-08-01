@@ -3,6 +3,7 @@
 #include "Common.h"
 #include <directx6/ddraw.h>
 #include <directx6/d3d.h>
+#include <STDIO.H>
 
 namespace Renderer
 {
@@ -43,6 +44,7 @@ namespace Nu3D
 		static void Init();
 		static void Close();
 		static Material* Allocate();
+		static Material* Read(FILE* stream);
 		static Material* GetFreeByIndex(int32_t index);
 		static Material* GetHead();
 		static void InsertSorted(Material* material);
