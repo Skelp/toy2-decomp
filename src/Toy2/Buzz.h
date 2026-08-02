@@ -115,7 +115,8 @@ namespace Toy2
 		{
 			Vector3I position;
 			uint8_t linkId;
-			uint8_t reservedD[3];
+			uint8_t radiusAndFlags;
+			uint8_t reservedE[2];
 		};
 
 		struct Toy2BuzzActor
