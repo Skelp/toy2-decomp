@@ -16,13 +16,13 @@ namespace Nu3D
 	int32_t g_textClipY2 = 0;
 
 	// GLOBAL: TOY2 0x0050866C
-	float g_fontScaleY = 0.0;
+	float g_fontScaleY = 0.5f;
 
 	// GLOBAL: TOY2 0x00508664
 	int32_t g_textTabWidth = 0;
 
 	// GLOBAL: TOY2 0x00508668
-	float g_fontScaleX = 0.0;
+	float g_fontScaleX = 0.5f;
 
 	// GLOBAL: TOY2 0x005086DC
 	DrawTextStringFunc g_drawTextStringFunc = Font::DrawTextString;
@@ -31,7 +31,7 @@ namespace Nu3D
 	CalculateTextSizeFunc g_calculateTextSizeFunc = Font::CalculateUnscaledTextSize;
 
 	// GLOBAL: TOY2 0x00508670
-	float g_scaledFontHeight = 0.0;
+	float g_scaledFontHeight = 1.0f;
 
 	// GLOBAL: TOY2 0x00508674
 	float g_scaledFontAscent = 1.0;
