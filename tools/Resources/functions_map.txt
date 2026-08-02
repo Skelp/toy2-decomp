@@ -859,9 +859,12 @@
 0x004B1190 NGNLoader::FreeAllBmpDataNodes
 0x004B1880 Nu3D::SetIsSoftwareRendering
 0x004B1890 TextureContainer::~TextureContainer
+0x004B1950 D3DTextr_DestroyAllTextures
 0x004B1980 D3DTextr_GetSurface
 0x004B19A0 D3DTextr_FindTexture
 0x004B19E0 D3DTextr_GetSurface
+0x004B19F0 D3DTextr_GetTexture
+0x004B1A10 D3DTextr_GetTexture
 0x004B2B20 SoftwareRenderer::ReleaseVertexBuffer
 0x004B2B30 SoftwareRenderer::CreateVertexBuffer
 0x004B2B80 SoftwareRenderer::GetStrideFromFVF

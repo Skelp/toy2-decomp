@@ -177,3 +177,31 @@ LPDIRECTDRAWSURFACE4 D3DTextr_GetSurface(TextureContainer* texture)
 		return texture->surface;
 	return NULL;
 }
+
+// FUNCTION: TOY2 0x004B1950 [PROVISIONAL]
+void D3DTextr_DestroyAllTextures()
+{
+	TextureContainer* texture = g_textureList;
+	if (texture != NULL)
+	{
+		delete texture;
+		g_textureList = NULL;
+	}
+}
+
+// FUNCTION: TOY2 0x004B19F0 [MATCHED]
+LPDIRECT3DTEXTURE2 D3DTextr_GetTexture(const char* name)
+{
+	TextureContainer* texture = D3DTextr_FindTexture(name);
+	if (texture != NULL)
+		return texture->texture;
+	return NULL;
+}
+
+// FUNCTION: TOY2 0x004B1A10 [MATCHED]
+LPDIRECT3DTEXTURE2 D3DTextr_GetTexture(TextureContainer* texture)
+{
+	if (texture != NULL)
+		return texture->texture;
+	return NULL;
+}
