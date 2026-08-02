@@ -53,7 +53,7 @@ char g_texturePath[512] = "MEDIA\\";
 char* g_textureRegistryValueName = "DX6SDK Samples Path";
 
 // GLOBAL: TOY2 0x0050848C
-int32_t g_minTextureAlphaBits;
+int32_t g_minTextureAlphaBits = 4;
 
 struct TextureSearchInfo
 {
@@ -455,31 +455,37 @@ HRESULT D3DTextr_RestoreTextureContainer(TextureContainer* texture, LPDIRECT3DDE
 	if (FAILED(device->GetCaps(&hardwareDesc, &softwareDesc)))
 		return E_FAIL;
 
-	DWORD textureCaps = hardwareDesc.dwFlags != 0 ? hardwareDesc.dpcTriCaps.dwTextureCaps : softwareDesc.dpcTriCaps.dwTextureCaps;
+	DWORD textureCaps;
+	if (hardwareDesc.dwFlags != 0)
+		textureCaps = hardwareDesc.dpcTriCaps.dwTextureCaps;
+	else
+		textureCaps = softwareDesc.dpcTriCaps.dwTextureCaps;
 
+	TextureSearchInfo searchInfo;
 	HBITMAP bitmap = texture->bitmap;
+	HBITMAP alphaBitmap = texture->alphaBitmap;
 	BITMAP bitmapInfo;
 	GetObject(bitmap, sizeof(bitmapInfo), &bitmapInfo);
+	DWORD bitmapWidth = bitmapInfo.bmWidth;
+	DWORD bitmapHeight = bitmapInfo.bmHeight;
 
 	DDSURFACEDESC2 surfaceDesc;
 	DrawingDevice::CD3DFramework::InitSurfaceDesc(&surfaceDesc, 0, 0);
 	surfaceDesc.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT | DDSD_TEXTURESTAGE;
+	surfaceDesc.ddsCaps.dwCaps = DDSCAPS_TEXTURE;
 	if (Nu3D::g_isSoftwareRendering)
-		surfaceDesc.ddsCaps.dwCaps = DDSCAPS_TEXTURE | DDSCAPS_SYSTEMMEMORY;
+		surfaceDesc.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
 	else
-	{
-		surfaceDesc.ddsCaps.dwCaps = DDSCAPS_TEXTURE;
 		surfaceDesc.ddsCaps.dwCaps2 = DDSCAPS2_TEXTUREMANAGE;
-	}
 
 	surfaceDesc.dwTextureStage = texture->stage;
-	surfaceDesc.dwWidth = bitmapInfo.bmWidth;
-	surfaceDesc.dwHeight = bitmapInfo.bmHeight;
+	surfaceDesc.dwWidth = bitmapWidth;
+	surfaceDesc.dwHeight = bitmapHeight;
 
 	if ((textureCaps & D3DPTEXTURECAPS_POW2) != 0)
 	{
-		for (surfaceDesc.dwWidth = 1; surfaceDesc.dwWidth < (DWORD)bitmapInfo.bmWidth; surfaceDesc.dwWidth <<= 1) {}
-		for (surfaceDesc.dwHeight = 1; surfaceDesc.dwHeight < (DWORD)bitmapInfo.bmHeight; surfaceDesc.dwHeight <<= 1) {}
+		for (surfaceDesc.dwWidth = 1; bitmapWidth > surfaceDesc.dwWidth; surfaceDesc.dwWidth <<= 1) {}
+		for (surfaceDesc.dwHeight = 1; bitmapHeight > surfaceDesc.dwHeight; surfaceDesc.dwHeight <<= 1) {}
 	}
 
 	if ((textureCaps & D3DPTEXTURECAPS_SQUAREONLY) != 0)
@@ -491,19 +497,28 @@ HRESULT D3DTextr_RestoreTextureContainer(TextureContainer* texture, LPDIRECT3DDE
 	}
 
 	BOOL usePalette = bitmapInfo.bmBitsPixel <= 8;
+	BOOL useAlpha = FALSE;
 	if (texture->hasAlpha)
+	{
+		useAlpha = TRUE;
 		g_minTextureAlphaBits = texture->alphaBitmap != NULL ? 4 : 1;
+	}
 
 	if ((texture->flags & 0xB) != 0 && usePalette)
-		usePalette = (textureCaps & D3DPTEXTURECAPS_ALPHAPALETTE) != 0;
+	{
+		useAlpha = TRUE;
+		if ((textureCaps & D3DPTEXTURECAPS_ALPHAPALETTE) == 0)
+			usePalette = FALSE;
+	}
 
-	TextureSearchInfo searchInfo;
-	searchInfo.desiredBpp = (texture->flags & 4) != 0 ? 32 : 16;
-	searchInfo.useAlpha = texture->hasAlpha;
+	searchInfo.useAlpha = useAlpha;
 	searchInfo.usePalette = usePalette;
 	searchInfo.useFourCC = surfaceDesc.ddpfPixelFormat.dwFlags & DDPF_FOURCC;
-	searchInfo.found = FALSE;
 	searchInfo.output = &surfaceDesc.ddpfPixelFormat;
+	searchInfo.desiredBpp = 16;
+	searchInfo.found = FALSE;
+	if ((texture->flags & 4) != 0)
+		searchInfo.desiredBpp = 32;
 	device->EnumTextureFormats(D3DTextr_FindSuitablePixelFormat, &searchInfo);
 
 	if (! searchInfo.found && usePalette)
@@ -520,10 +535,10 @@ HRESULT D3DTextr_RestoreTextureContainer(TextureContainer* texture, LPDIRECT3DDE
 	if (Nu3D::g_isSoftwareRendering)
 	{
 		surfaceDesc.dwFlags |= DDSD_PITCH | DDSD_LPSURFACE;
-		surfaceDesc.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
 		surfaceDesc.lPitch = surfaceDesc.dwWidth * 2;
+		surfaceDesc.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
 		if ((texture->flags & 4) != 0)
-			surfaceDesc.lPitch *= 2;
+			surfaceDesc.lPitch <<= 1;
 
 		texture->rgbaData = (uint32_t*)malloc(surfaceDesc.lPitch * surfaceDesc.dwHeight);
 		if (texture->rgbaData == NULL)
@@ -538,7 +553,7 @@ HRESULT D3DTextr_RestoreTextureContainer(TextureContainer* texture, LPDIRECT3DDE
 		return E_FAIL;
 
 	memcpy(&texture->surfaceDesc, &surfaceDesc, sizeof(surfaceDesc));
-	return CopyBitmapToTextureSurface(texture->surface, bitmap, texture->flags, texture->alphaBitmap);
+	return CopyBitmapToTextureSurface(texture->surface, bitmap, texture->flags, alphaBitmap);
 }
 
 static HRESULT CALLBACK D3DTextr_FindSuitablePixelFormat(LPDDPIXELFORMAT pixelFormat, LPVOID context)
