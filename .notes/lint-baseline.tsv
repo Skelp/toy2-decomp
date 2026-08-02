@@ -8,10 +8,6 @@
 0x00438a50	unstructured-control-flow	goto-count	8564fcf859bd	src/Toy2/LevelSelect.cpp
 0x00452fc0	unstructured-control-flow	goto-count	9bbef2ba4b6b	src/Toy2/Levels.cpp
 0x0049d910	unstructured-control-flow	goto-count	77dd5e8ddf01	src/Toy2/Toy2.cpp
-src/Toy2/AirportInfiltration.cpp	repeated-private-type	Toy2::HiddenCollectibleState	944fc945562d	src/Toy2/AirportInfiltration.cpp
-src/Toy2/AlleysAndGullies.cpp	repeated-private-type	Toy2::HiddenCollectibleState	944fc945562d	src/Toy2/AlleysAndGullies.cpp
-src/Toy2/AlsPenthouse.cpp	repeated-private-type	Toy2::HiddenCollectibleState	944fc945562d	src/Toy2/AlsPenthouse.cpp
-src/Toy2/ConstructionYard.cpp	repeated-private-type	Toy2::HiddenCollectibleState	944fc945562d	src/Toy2/ConstructionYard.cpp
 src/Nu3D/Camera.cpp	repeated-private-type	Nu3D::SoftwareProjectionPoint	8cff9b180f19	src/Nu3D/Camera.cpp
 src/Toy2/Actor.cpp	repeated-private-type	Toy2::BuzzLightPreset	87de3d82851d	src/Toy2/Actor.cpp
 src/Toy2/BombsAway.cpp	repeated-private-type	Toy2::BuzzLightPreset	87de3d82851d	src/Toy2/BombsAway.cpp

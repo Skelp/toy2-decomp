@@ -4,6 +4,7 @@
 #include "Toy2/Buzz.h"
 #include "Toy2/Camera.h"
 #include "Toy2/Collectables.h"
+#include "Toy2/HiddenCollectible.h"
 #include "Toy2/TokenDialogue.h"
 #include "Toy2/Collision.h"
 #include "Toy2/Levels.h"
@@ -63,11 +64,6 @@ namespace Toy2
 			GUNSLINGER_ENCOUNTER_COMPLETE = 200,
 		};
 
-		struct HiddenCollectibleState
-		{
-			int32_t* verticalPosition;
-			int32_t savedVerticalPosition;
-		};
 		struct RaisedPlatformLink
 		{
 			uint8_t platformId;
@@ -361,9 +357,9 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0052FDC0
 		int32_t g_platformCollisionState;
 		// GLOBAL: TOY2 0x0052FDC8
-		HiddenCollectibleState g_hiddenCollectibles[5];
+		Collectables::HiddenCollectibleState g_hiddenCollectibles[5];
 
-		STATIC_ASSERT(sizeof(HiddenCollectibleState) == 0x8);
+		STATIC_ASSERT(sizeof(Collectables::HiddenCollectibleState) == 0x8);
 
 		// FUNCTION: TOY2 0x00429CE0 [TOOL]
 		void InitHiddenCollectibles()

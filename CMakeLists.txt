@@ -158,6 +158,7 @@ set(TOY2_SOURCES
     src/Toy2/Collision.cpp
     src/Toy2/Collectables.cpp
     src/Toy2/Collectables.h
+    src/Toy2/HiddenCollectible.h
     src/Toy2/KiteTail.cpp
     src/Toy2/KiteTail.h
     src/Toy2/MainMenu.cpp

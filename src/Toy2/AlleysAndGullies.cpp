@@ -5,6 +5,7 @@
 #include "Toy2/Camera.h"
 #include "Toy2/Collision.h"
 #include "Toy2/Collectables.h"
+#include "Toy2/HiddenCollectible.h"
 #include "Toy2/Levels.h"
 #include "Toy2/Lighting.h"
 #include "Toy2/Particles.h"
@@ -71,12 +72,6 @@ namespace Toy2
 		enum
 		{
 			FALLING_WOOD_ANGLE_MASK = 0xFFF,
-		};
-
-		struct HiddenCollectibleState
-		{
-			int32_t* verticalPosition;
-			int32_t savedVerticalPosition;
 		};
 
 		// GLOBAL: TOY2 0x004F215C
@@ -162,7 +157,7 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0052F950
 		int32_t g_gateRotationSpeed;
 		// GLOBAL: TOY2 0x0052F954
-		HiddenCollectibleState g_hiddenCollectibles[5];
+		Collectables::HiddenCollectibleState g_hiddenCollectibles[5];
 		// GLOBAL: TOY2 0x0052F97C
 		int32_t g_platform7PathPosition;
 		// GLOBAL: TOY2 0x0052F980
@@ -172,7 +167,7 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0052F988
 		int32_t g_platform2TiltVelocity;
 
-		STATIC_ASSERT(sizeof(HiddenCollectibleState) == 0x8);
+		STATIC_ASSERT(sizeof(Collectables::HiddenCollectibleState) == 0x8);
 		STATIC_ASSERT(sizeof(MoveableObjectInitTable) == 0x1A);
 
 		// FUNCTION: TOY2 0x0041E150 [PROVISIONAL]

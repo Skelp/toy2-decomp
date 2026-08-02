@@ -5,6 +5,7 @@
 #include "Toy2/Camera.h"
 #include "Toy2/Collision.h"
 #include "Toy2/Collectables.h"
+#include "Toy2/HiddenCollectible.h"
 #include "Toy2/Levels.h"
 #include "Toy2/Lighting.h"
 #include "Toy2/Particles.h"
@@ -46,12 +47,6 @@ namespace Toy2
 			SLAMMED_PLATFORM_SECOND = 2,
 			SLAMMED_PLATFORM_THIRD = 4,
 			SLAMMED_PLATFORM_LIFT_RETURNING = 8,
-		};
-
-		struct HiddenCollectibleState
-		{
-			int32_t* verticalPosition;
-			int32_t savedVerticalPosition;
 		};
 
 		struct MoveableObjectInitTable
@@ -214,7 +209,7 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0052F810
 		int32_t g_workLightTargetIntensity;
 		// GLOBAL: TOY2 0x0052F814
-		HiddenCollectibleState g_hiddenCollectibles[5];
+		Collectables::HiddenCollectibleState g_hiddenCollectibles[5];
 		// GLOBAL: TOY2 0x0052F83C
 		int32_t g_fallingParticleTimer;
 		// GLOBAL: TOY2 0x0052F840
@@ -264,7 +259,7 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0052F8A4
 		int32_t g_fallingParticlePathIndex;
 
-		STATIC_ASSERT(sizeof(HiddenCollectibleState) == 0x8);
+		STATIC_ASSERT(sizeof(Collectables::HiddenCollectibleState) == 0x8);
 		STATIC_ASSERT(sizeof(MoveableObjectInitTable) == 0xE);
 
 		// FUNCTION: TOY2 0x0041BC20 [PROVISIONAL]

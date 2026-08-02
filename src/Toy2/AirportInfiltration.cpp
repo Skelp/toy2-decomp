@@ -5,6 +5,7 @@
 #include "Toy2/Buzz.h"
 #include "Toy2/Camera.h"
 #include "Toy2/Collectables.h"
+#include "Toy2/HiddenCollectible.h"
 #include "Toy2/Levels.h"
 #include "Toy2/Lighting.h"
 #include "Toy2/Particles.h"
@@ -167,15 +168,9 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0052FEE8
 		int32_t g_prospectorEffectTimer;
 
-		struct HiddenCollectibleState
-		{
-			int32_t* verticalPosition;
-			int32_t savedVerticalPosition;
-		};
-
 		struct State
 		{
-			HiddenCollectibleState hiddenCollectibles[5];
+			Collectables::HiddenCollectibleState hiddenCollectibles[5];
 			int32_t prospectorTurnAngle;
 			int32_t fanBlend;
 			int32_t prospectorState;
@@ -194,7 +189,7 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0052FEEC
 		State g_state;
 
-		STATIC_ASSERT(sizeof(HiddenCollectibleState) == 0x8);
+		STATIC_ASSERT(sizeof(Collectables::HiddenCollectibleState) == 0x8);
 		STATIC_ASSERT(sizeof(State) == 0x5C);
 		STATIC_ASSERT(offsetof(State, prospectorTurnAngle) == 0x28);
 		STATIC_ASSERT(offsetof(State, prospectorState) == 0x30);
