@@ -21,10 +21,10 @@ namespace SoftwareRenderer
 	PointI g_backdropScrollOverride = { -32768, -32768 };
 
 	// GLOBAL: TOY2 0x004F73A8
-	BackdropDimensions g_backdropDimensions = { 0, 0, 0 };
+	BackdropDimensions g_backdropDimensions = { 256, 128, 32 };
 
 	// GLOBAL: TOY2 0x004F73D4
-	BackdropDimensions g_staticBackdropDimensions = { 0, 0, 0 };
+	BackdropDimensions g_staticBackdropDimensions = { 128, 160, 32 };
 
 	// GLOBAL: TOY2 0x00500A1C
 	int32_t g_backdropTextureColumn = 0xFFFFFFFF;
