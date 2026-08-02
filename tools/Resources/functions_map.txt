@@ -873,6 +873,7 @@
 0x004B1B60 LoadTextureImage
 0x004B1C50 FindTextureFile
 0x004B1E10 D3DTextr_CreateTextureFromBitmap
+0x004B1EC0 D3DTextr_RestoreTexture
 0x004B1F30 D3DTextr_RestoreTextureContainer
 0x004B2B20 SoftwareRenderer::ReleaseVertexBuffer
 0x004B2B30 SoftwareRenderer::CreateVertexBuffer

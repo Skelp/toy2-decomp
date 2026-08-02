@@ -416,6 +416,30 @@ HRESULT D3DTextr_CreateTextureFromBitmap(HBITMAP bitmap, HBITMAP alphaBitmap, ch
 	return S_OK;
 }
 
+// FUNCTION: TOY2 0x004B1EC0 [MATCHED]
+HRESULT D3DTextr_RestoreTexture(char* name, LPDIRECT3DDEVICE3 device)
+{
+	if (device == NULL)
+		return E_INVALIDARG;
+
+	TextureContainer* texture = D3DTextr_FindTexture(name);
+	if (texture == NULL)
+		return DDERR_NOTFOUND;
+
+	if (texture->texture != NULL)
+	{
+		texture->texture->Release();
+		texture->texture = NULL;
+	}
+	if (texture->surface != NULL)
+	{
+		texture->surface->Release();
+		texture->surface = NULL;
+	}
+
+	return D3DTextr_RestoreTextureContainer(texture, device);
+}
+
 // FUNCTION: TOY2 0x004B1F30 [PROVISIONAL]
 HRESULT D3DTextr_RestoreTextureContainer(TextureContainer* texture, LPDIRECT3DDEVICE3 device)
 {
