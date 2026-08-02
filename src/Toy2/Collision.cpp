@@ -3220,7 +3220,7 @@ namespace Nu3D
 		// STUB: TOY2 0x0048B750
 		int32_t SweepAgainstCandidates(const Vector4I* movement, Vector4I* position, int32_t radius);
 
-		// FUNCTION: TOY2 0x00481140 [PROVISIONAL]
+		// FUNCTION: TOY2 0x00481140 [MATCHED]
 		int16_t IsPointInTriangle(int32_t pointX,
 			int32_t pointY,
 			int32_t pointZ,
@@ -3232,52 +3232,71 @@ namespace Nu3D
 			int32_t edge2Z,
 			const Vector3I16* normal)
 		{
-			int32_t absNormalX = abs(normal->x);
-			int32_t absNormalY = abs(normal->y);
-			int32_t absNormalZ = abs(normal->z);
-			PointI point;
-			PointI edge1;
-			PointI edge2;
-			int32_t normalDirection;
-
-			if (absNormalX > absNormalY && absNormalX >= absNormalZ)
+			if (abs(normal->y) >= abs(normal->x) && abs(normal->y) >= abs(normal->z))
 			{
-				point.x = pointY;
-				point.y = pointZ;
-				edge1.x = edge1Y;
-				edge1.y = edge1Z;
-				edge2.x = edge2Y;
-				edge2.y = edge2Z;
-				normalDirection = normal->x;
+				if (normal->y < 0)
+				{
+					if (pointX * edge1Z - pointZ * edge1X >= 0
+						&& (pointZ - edge2Z) * edge2X - (pointX - edge2X) * edge2Z >= 0
+						&& (pointZ - edge1Z) * (edge1X - edge2X)
+							+ (pointX - edge1X) * (edge2Z - edge1Z)
+						>= 0)
+						return 1;
+				}
+				else
+				{
+					if ((pointZ - edge1Z) * edge1X - (pointX - edge1X) * edge1Z >= 0
+						&& pointX * edge2Z - pointZ * edge2X >= 0
+						&& (edge2X - edge1X) * (pointZ - edge2Z)
+							+ (pointX - edge2X) * (edge1Z - edge2Z)
+						>= 0)
+						return 1;
+				}
 			}
-			else if (absNormalY >= absNormalZ)
+			else if (abs(normal->x) >= abs(normal->y) && abs(normal->x) >= abs(normal->z))
 			{
-				point.x = pointX;
-				point.y = pointZ;
-				edge1.x = edge1X;
-				edge1.y = edge1Z;
-				edge2.x = edge2X;
-				edge2.y = edge2Z;
-				normalDirection = -normal->y;
+				if (normal->x < 0)
+				{
+					if ((pointZ - edge1Z) * edge1Y - (pointY - edge1Y) * edge1Z >= 0
+						&& pointY * edge2Z - pointZ * edge2Y >= 0
+						&& (edge2Y - edge1Y) * (pointZ - edge2Z)
+							+ (pointY - edge2Y) * (edge1Z - edge2Z)
+						>= 0)
+						return 1;
+				}
+				else
+				{
+					if (pointY * edge1Z - pointZ * edge1Y >= 0
+						&& (pointZ - edge2Z) * edge2Y - (pointY - edge2Y) * edge2Z >= 0
+						&& (pointY - edge1Y) * (edge2Z - edge1Z)
+							+ (pointZ - edge1Z) * (edge1Y - edge2Y)
+						>= 0)
+						return 1;
+				}
 			}
 			else
 			{
-				point.x = pointX;
-				point.y = pointY;
-				edge1.x = edge1X;
-				edge1.y = edge1Y;
-				edge2.x = edge2X;
-				edge2.y = edge2Y;
-				normalDirection = normal->z;
+				if (normal->z < 0)
+				{
+					if (pointY * edge1X - pointX * edge1Y >= 0
+						&& (pointX - edge2X) * edge2Y - (pointY - edge2Y) * edge2X >= 0
+						&& (pointY - edge1Y) * (edge2X - edge1X)
+							+ (pointX - edge1X) * (edge1Y - edge2Y)
+						>= 0)
+						return 1;
+				}
+				else
+				{
+					if ((pointX - edge1X) * edge1Y - (pointY - edge1Y) * edge1X >= 0
+						&& pointY * edge2X - pointX * edge2Y >= 0
+						&& (pointX - edge2X) * (edge2Y - edge1Y)
+							+ (pointY - edge2Y) * (edge1X - edge2X)
+						>= 0)
+						return 1;
+				}
 			}
 
-			int32_t side1 = edge1.x * point.y - edge1.y * point.x;
-			int32_t side2 = (edge1.y - edge2.y) * (point.x - edge2.x) - (point.y - edge2.y) * (edge1.x - edge2.x);
-			int32_t side3 = edge2.y * point.x - point.y * edge2.x;
-
-			if (normalDirection < 0)
-				return side1 >= 0 && side2 >= 0 && side3 >= 0;
-			return side1 <= 0 && side2 <= 0 && side3 <= 0;
+			return 0;
 		}
 
 		// FUNCTION: TOY2 0x00487B20 [PROVISIONAL]
