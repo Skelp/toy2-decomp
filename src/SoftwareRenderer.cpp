@@ -4623,21 +4623,27 @@ namespace SoftwareRenderer
 		return 1;
 	}
 
-	// FUNCTION: TOY2 0x004BCAD0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004BCAD0 [MATCHED]
 	void QueueRenderCommand(Nu3D::VertexTL* vertices[4], int32_t vertexCount, uint32_t* texData, int32_t renderState)
 	{
 		if (g_renderCommandCount < 0x400)
 		{
 			RenderCommand* command = &g_renderCommands[g_renderCommandCount];
 			g_renderCommandCount++;
-			Nu3D::VertexTL* dst = command->vertices;
-			for (int i = 0; i < 3; i++)
-			{
-				dst[i] = *vertices[i];
-			}
+			Nu3D::VertexTL** source = vertices;
+			Nu3D::VertexTL* dest = command->vertices;
+			*dest = **source;
+			source++;
+			dest++;
+			*dest = **source;
+			source++;
+			dest++;
+			*dest = **source;
 			if (vertexCount == 4)
 			{
-				dst[3] = *vertices[3];
+				source++;
+				dest++;
+				*dest = **source;
 			}
 			command->vertexCount = vertexCount;
 			command->texData = texData;
