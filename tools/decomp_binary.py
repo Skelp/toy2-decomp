@@ -48,6 +48,12 @@ class Section:
 
 
 @dataclass(frozen=True)
+class DataDirectory:
+    virtual_address: int
+    size: int
+
+
+@dataclass(frozen=True)
 class ImageMetadata:
     """PE fields that describe the image and its raw file layout."""
 
@@ -55,6 +61,16 @@ class ImageMetadata:
     image_base: int
     header_size: int
     sections: tuple[Section, ...]
+    pe_offset: int = 0
+    optional_offset: int = 0
+    directories: tuple[DataDirectory, ...] = ()
+
+
+@dataclass(frozen=True)
+class ResourceEntry:
+    path: tuple[str | int, ...]
+    data: bytes
+    code_page: int
 
 
 @dataclass(frozen=True)
@@ -90,12 +106,28 @@ def parse_image_metadata(data: bytes) -> ImageMetadata:
     section_count = struct.unpack_from("<H", data, pe + 6)[0]
     optional_size = struct.unpack_from("<H", data, pe + 20)[0]
     optional = pe + 24
-    if optional_size < 64 or optional + optional_size > len(data):
+    if optional_size < 96 or optional + optional_size > len(data):
         raise ValueError("The retail executable has an invalid optional header.")
     if struct.unpack_from("<H", data, optional)[0] != 0x10B:
         raise ValueError("The retail executable is not a PE32 image.")
     image_base = struct.unpack_from("<I", data, optional + 28)[0]
     header_size = struct.unpack_from("<I", data, optional + 60)[0]
+    directory_count = struct.unpack_from("<I", data, optional + 92)[0]
+    directory_count = min(directory_count, 16)
+    directory_offset = optional + 96
+    if directory_offset + directory_count * 8 > optional + optional_size:
+        raise ValueError("The retail executable has an invalid data directory.")
+    directories = tuple(
+        DataDirectory(
+            virtual_address=struct.unpack_from(
+                "<I", data, directory_offset + index * 8
+            )[0],
+            size=struct.unpack_from(
+                "<I", data, directory_offset + index * 8 + 4
+            )[0],
+        )
+        for index in range(directory_count)
+    )
     section_table = optional + optional_size
     if section_count > 96 or section_table + section_count * 40 > len(data):
         raise ValueError("The retail executable has an invalid section table.")
@@ -117,6 +149,9 @@ def parse_image_metadata(data: bytes) -> ImageMetadata:
         image_base=image_base,
         header_size=header_size,
         sections=tuple(sections),
+        pe_offset=pe,
+        optional_offset=optional,
+        directories=directories,
     )
 
 
@@ -124,6 +159,97 @@ def read_image_metadata(path: Path = EXE_PATH) -> ImageMetadata:
     """Read PE layout metadata from an executable."""
 
     return parse_image_metadata(path.read_bytes())
+
+
+def address_to_file_offset(metadata: ImageMetadata, address: int) -> int | None:
+    """Translate an absolute virtual address with explicit image metadata."""
+
+    for section in metadata.sections:
+        if (
+            section.virtual_address
+            <= address
+            < section.virtual_address + section.raw_size
+        ):
+            return section.raw_pointer + address - section.virtual_address
+    return None
+
+
+def parse_resources(data: bytes, metadata: ImageMetadata) -> tuple[ResourceEntry, ...]:
+    """Parse leaf payloads from a PE resource directory."""
+
+    resource_index = 2
+    if len(metadata.directories) <= resource_index:
+        return ()
+    directory = metadata.directories[resource_index]
+    if directory.virtual_address == 0 or directory.size == 0:
+        return ()
+    base = address_to_file_offset(
+        metadata, metadata.image_base + directory.virtual_address
+    )
+    if base is None or base + directory.size > len(data):
+        raise ValueError("The PE resource directory is outside the file.")
+
+    def checked(offset: int, size: int) -> int:
+        absolute = base + offset
+        if offset < 0 or absolute < base or absolute + size > base + directory.size:
+            raise ValueError("The PE resource directory contains an invalid offset.")
+        return absolute
+
+    def name(value: int) -> str | int:
+        if value & 0x80000000 == 0:
+            return value
+        absolute = checked(value & 0x7FFFFFFF, 2)
+        length = struct.unpack_from("<H", data, absolute)[0]
+        end = absolute + 2 + length * 2
+        if end > base + directory.size:
+            raise ValueError("The PE resource directory contains an invalid name.")
+        return data[absolute + 2 : end].decode("utf-16-le", "replace")
+
+    output: list[ResourceEntry] = []
+    active: set[int] = set()
+
+    def visit(offset: int, path: tuple[str | int, ...], depth: int) -> None:
+        if depth > 8 or offset in active:
+            raise ValueError("The PE resource directory contains a cycle.")
+        active.add(offset)
+        absolute = checked(offset, 16)
+        named_count, id_count = struct.unpack_from("<HH", data, absolute + 12)
+        count = named_count + id_count
+        entries = checked(offset + 16, count * 8)
+        for index in range(count):
+            name_value, child_value = struct.unpack_from(
+                "<II", data, entries + index * 8
+            )
+            child_path = path + (name(name_value),)
+            child_offset = child_value & 0x7FFFFFFF
+            if child_value & 0x80000000:
+                visit(child_offset, child_path, depth + 1)
+                continue
+            leaf = checked(child_offset, 16)
+            data_rva, size, code_page, _ = struct.unpack_from("<IIII", data, leaf)
+            payload_offset = address_to_file_offset(
+                metadata, metadata.image_base + data_rva
+            )
+            if payload_offset is None or payload_offset + size > len(data):
+                raise ValueError("A PE resource payload is outside the file.")
+            output.append(
+                ResourceEntry(
+                    path=child_path,
+                    data=data[payload_offset : payload_offset + size],
+                    code_page=code_page,
+                )
+            )
+        active.remove(offset)
+
+    visit(0, (), 0)
+    return tuple(output)
+
+
+def read_resources(path: Path = EXE_PATH) -> tuple[ResourceEntry, ...]:
+    """Read the resource leaf payloads from a PE executable."""
+
+    data = path.read_bytes()
+    return parse_resources(data, parse_image_metadata(data))
 
 
 def available() -> bool:

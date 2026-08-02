@@ -228,12 +228,11 @@
       <div class="panel-head">
         <div>
           <h2 class="panel-title" id="binary-layout-title">Retail file coverage</h2>
-          <p class="panel-copy">The bar shows PE regions in file-offset order and uses their raw sizes. The .text score bands are aggregate values. Muted regions have no reliable score.</p>
+          <p class="panel-copy">The bar shows each raw PE region in file-offset order. Each section uses its available code, data, or PE evidence. Bands show aggregate scores, not matching byte positions.</p>
         </div>
         <div class="legend" aria-label="Retail file coverage legend">
-          <span><i class="swatch" style="--swatch:var(--green)"></i> explained code</span>
-          <span><i class="swatch" style="--swatch:var(--red)"></i> unexplained scored code</span>
-          <span><i class="swatch" style="--swatch:var(--unknown)"></i> unscored bytes</span>
+          <span><i class="swatch" style="--swatch:var(--green)"></i> explained bytes</span>
+          <span><i class="swatch" style="--swatch:var(--red)"></i> unexplained bytes</span>
         </div>
       </div>
       <div id="binary-layout-content"></div>
@@ -394,6 +393,7 @@
 
     function renderMetrics() {
       const cards = [
+        ["Whole-file evidence", pct(binaryLayout.explained_file_percent || 0), `${bytes(binaryLayout.explained_file_bytes)} explained · ${bytes(binaryLayout.unexplained_file_bytes)} unexplained`, "var(--cyan)"],
         ["Terminal bytes", pct(metrics.terminal_byte_progress), `${bytes(metrics.terminal_bytes)} terminal · ${metrics.terminal_functions} functions`, "var(--green)"],
         ["Effective bytes", pct(metrics.project_effective_byte_progress), `${bytes(metrics.project_effective_bytes)} effective · ${bytes(metrics.refinement_gap_bytes)} refinement gap`, "var(--cyan)"],
         ["Implementation coverage", pct(metrics.project_total ? metrics.project_implemented / metrics.project_total * 100 : 0), `${metrics.project_implemented} implemented / ${metrics.project_total} mapped · ${bytes(metrics.coverage_gap_bytes)} coverage gap`, "var(--purple)"],
@@ -532,6 +532,7 @@
     function regionColor(item) {
       if (item.status === "explained") return "var(--green)";
       if (item.status === "unexplained") return "var(--red)";
+      if (item.score !== undefined) return numericColor(Number(item.score));
       const colors = {
         ".rdata": "#566779", ".data": "#6b566d", ".idata": "#526a73",
         ".rsrc": "#665e76", ".reloc": "#536570", headers: "#465864",
@@ -542,7 +543,21 @@
 
     function layoutDescription(segment) {
       const end = Number(segment.offset) + Number(segment.size);
-      return `${segment.name}\n${bytes(segment.size)} raw bytes · ${hexOffset(segment.offset)}–${hexOffset(end)}\n${segment.measurement === "code-score" ? "Only mapped project function bytes have a score." : "These bytes are not scored."}`;
+      return `${segment.name}\n${bytes(segment.size)} raw bytes · ${hexOffset(segment.offset)}–${hexOffset(end)}\n${bytes(segment.explained_bytes)} explained · ${bytes(segment.unexplained_scored_bytes)} unexplained · ${segment.measurement}`;
+    }
+
+    function sectionEvidenceDescription(segment) {
+      const descriptions = {
+        ".rdata": "Typed globals and virtual tables provide the evidence.",
+        ".data": "Typed globals, scalar fields, pointers, arrays, and initialization state provide the evidence.",
+        ".idata": "Imported modules, names, and ordinals provide the evidence.",
+        ".rsrc": "Identical resource payloads provide the evidence. Resource paths identify each result.",
+        ".reloc": "Relocation sites mapped through matched symbols provide the evidence.",
+        headers: "Raw PE header bytes at equivalent offsets provide the evidence.",
+        overlay: "NB10 fields and the PDB basename provide the evidence.",
+        gap: "Raw padding bytes at equivalent offsets provide the evidence."
+      };
+      return descriptions[segment.name] || descriptions[segment.kind] || `${segment.measurement} evidence provides the score.`;
     }
 
     function renderFileLayout() {
@@ -562,12 +577,12 @@
         node.style.setProperty("--segment-color", regionColor(segment));
         node.title = layoutDescription(segment);
         node.setAttribute("aria-label", layoutDescription(segment).replaceAll("\n", ". "));
-        if (segment.measurement === "code-score") {
+        if (Number(segment.scored_bytes) > 0) {
           node.classList.add("file-segment-code");
           const bands = [
-            ["explained", segment.explained_bytes, "file-score-explained", "Explained scored code"],
-            ["unexplained", segment.unexplained_scored_bytes, "file-score-unexplained", "Unexplained scored code"],
-            ["unscored", segment.unscored_bytes, "file-score-unscored", "Unscored .text bytes"]
+            ["explained", segment.explained_bytes, "file-score-explained", "Explained bytes"],
+            ["unexplained", segment.unexplained_scored_bytes, "file-score-unexplained", "Unexplained bytes"],
+            ["unscored", segment.unscored_bytes, "file-score-unscored", "Unscored bytes"]
           ];
           bands.forEach(([status, size, className, name]) => {
             if (Number(size) <= 0) return;
@@ -590,8 +605,8 @@
 
       const summary = element("div", "layout-summary");
       summary.append(
-        element("div", "", `${bytes(binaryLayout.explained_code_bytes)} of ${bytes(binaryLayout.file_size)} have measured code evidence (${pct(binaryLayout.explained_file_percent)}).`),
-        element("div", "", `${bytes(binaryLayout.unscored_file_bytes)} are outside the project function score. Unscored bytes do not count as explained.`)
+        element("div", "", `${bytes(binaryLayout.explained_file_bytes)} of ${bytes(binaryLayout.file_size)} have reconstruction evidence (${pct(binaryLayout.explained_file_percent)}).`),
+        element("div", "", `${bytes(binaryLayout.unexplained_file_bytes)} do not yet have matching evidence. All raw file bytes have a score.`)
       );
       content.replaceChildren(bar, labels, summary);
     }
@@ -607,7 +622,7 @@
         const node = element("div", "byte-tree-node");
         setTreemapBounds(node, rect);
         node.style.setProperty("--node-color", regionColor(rect));
-        node.title = `${rect.name}\n${bytes(rect.weight)}\n${rect.description}`;
+        node.title = `${rect.name}\n${bytes(rect.weight)}${rect.score === undefined ? "" : ` · ${pct(rect.score * 100)}`}\n${rect.description}`;
         const label = element("span", "byte-tree-label");
         label.append(element("span", "byte-tree-name", rect.name), element("span", "byte-tree-size", bytes(rect.weight)));
         if (rect.width < 72 || rect.height < 30) label.hidden = true;
@@ -620,27 +635,37 @@
       const codeSections = binaryLayout.sections.filter(section => section.group === "code");
       const dataSections = binaryLayout.sections.filter(section => section.group === "data");
       const codeItems = codeSections.flatMap(section => [
-        { name: "Explained scored code", weight: section.explained_bytes, status: "explained", description: "This is the effective matched fraction of scored project function bytes." },
-        { name: "Unexplained scored code", weight: section.unexplained_scored_bytes, status: "unexplained", description: "The current function score does not explain these bytes." },
-        { name: "Unscored code", weight: section.unscored_bytes, status: "unscored", description: "No project function score covers these .text bytes." }
+        { name: "Explained code", weight: section.explained_bytes, status: "explained", description: "Function comparison explains these bytes." },
+        { name: "Unexplained code", weight: section.unexplained_scored_bytes, status: "unexplained", description: "Function comparison does not yet explain these bytes." }
       ]);
-      const dataItems = dataSections.map(section => ({
-        name: section.name, weight: section.size, status: "unscored", kind: "data",
-        description: "Current tools do not score data reconstruction."
-      }));
+      const dataVariables = binaryLayout.data_evidence?.variables?.variables || [];
+      const dataItems = [];
+      dataSections.forEach(section => {
+        const start = Number(section.virtual_address), end = start + Number(section.size);
+        dataVariables.filter(variable => Number(variable.original_address) >= start && Number(variable.original_address) < end).forEach(variable => {
+          const mismatches = (variable.fields || []).filter(field => !field.match);
+          dataItems.push({
+            name: variable.name, weight: variable.size, score: variable.score,
+            status: variable.score >= .999 ? "explained" : variable.score > 0 ? "partial" : "unexplained",
+            description: `${bytes(variable.matched_bytes)} of ${bytes(variable.size)} match. ${mismatches.length} scalar field${mismatches.length === 1 ? " differs" : "s differ"}.`
+          });
+        });
+        const remainder = Math.max(0, Number(section.size) - Number(section.evidence_bytes || 0));
+        dataItems.push({ name: "Unmapped .data bytes", weight: remainder, status: "unexplained", description: "No matched global owns these initialized bytes." });
+      });
       const otherItems = binaryLayout.segments.filter(segment => {
         if (segment.kind !== "section") return true;
         return segment.group === "other";
-      }).map(segment => ({
-        name: segment.name, weight: segment.size, status: "unscored", kind: segment.kind,
-        description: "Current tools do not score this file region."
-      }));
+      }).flatMap(segment => [
+        { name: `${segment.name} explained`, weight: segment.explained_bytes, status: "explained", kind: segment.kind, description: sectionEvidenceDescription(segment) },
+        { name: `${segment.name} unexplained`, weight: segment.unexplained_scored_bytes, status: "unexplained", kind: segment.kind, description: `${sectionEvidenceDescription(segment)} Matching evidence is missing for these bytes.` }
+      ]);
       const codeRawBytes = codeSections.reduce((sum, section) => sum + section.size, 0);
       const dataRawBytes = dataSections.reduce((sum, section) => sum + section.size, 0);
       const otherRawBytes = otherItems.reduce((sum, item) => sum + Number(item.weight), 0);
-      $("code-tree-meta").textContent = `${bytes(codeRawBytes)} raw bytes. ${bytes(binaryLayout.scored_code_bytes)} have project scores. Score bands do not show byte positions.`;
-      $("data-tree-meta").textContent = `${bytes(dataRawBytes)} raw bytes. Data reconstruction has no reliable score.`;
-      $("other-tree-meta").textContent = `${bytes(otherRawBytes)} raw bytes. These file regions have no reliable score.`;
+      $("code-tree-meta").textContent = `${bytes(codeRawBytes)} raw bytes. Function evidence explains ${bytes(binaryLayout.explained_code_bytes)}.`;
+      $("data-tree-meta").textContent = `${bytes(dataRawBytes)} raw bytes. ${dataItems.length - 1} matched globals provide type-aware evidence.`;
+      $("other-tree-meta").textContent = `${bytes(otherRawBytes)} raw bytes. Headers, imports, resources, relocations, constants, and debug data use section-specific evidence.`;
       renderByteTreemap("code-treemap", codeItems);
       renderByteTreemap("data-treemap", dataItems);
       renderByteTreemap("other-treemap", otherItems);
@@ -845,7 +870,7 @@
     }
 
     $("generated").textContent = `Generated ${new Date(report.generated * 1000).toLocaleString()}`;
-    $("report-meta").textContent = `${metrics.project_total} mapped project functions · ${metrics.report_entities} reccmp entities · runtime separated`;
+    $("report-meta").textContent = `${pct(binaryLayout.explained_file_percent || 0)} whole-file evidence · ${metrics.project_total} mapped project functions · ${metrics.report_entities} reccmp entities`;
     renderMetrics(); renderFileLayout(); renderBinaryTreemaps(); renderTreemap(); renderHistogram(); renderGroupCards(); bindControls(); renderExplorer();
     let treemapResizeFrame = 0;
     new ResizeObserver(() => {

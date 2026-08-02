@@ -20,6 +20,7 @@ work, or a concise no-source result after bounded pivots.
 8. Run `tools/decomp baseline` once before source edits.
 9. Inspect the target file's namespaces, includes, globals, and private helpers.
 10. Check nearby function-map entries and source-path evidence for file boundaries.
+11. Run `tools/decomp data --limit 10` and inspect relevant global differences.
 
 A campaign contains one large function or at most three related functions.
 Rank work by unresolved bytes, evidence readiness, dependency impact, and
@@ -30,6 +31,10 @@ source debt. Do not select work only by address or easy percentage gain.
 Run `tools/decomp evidence ADDRESS`. Establish the ABI, data model, control
 flow, ownership, and supported names. Search bounded notes with `tools/decomp
 notes`. Use OpenCrashWOC only for relevant terms or analogues.
+
+Run `tools/decomp data GLOBAL_ADDRESS` when the target reads or writes a scored
+global. Use mismatched scalar fields as layout and initializer evidence. Do not
+change an unrelated global only to increase the whole-file score.
 
 Choose the likely original translation unit before you edit source. Do not add
 new code to a catch-all file only because the file already exists. Use retail
@@ -100,4 +105,5 @@ SOURCE_DEBT_DELTA: <count>
 PIVOTS: <integer>
 NEXT: <best next subsystem or blocking fact>
 FILE_STRUCTURE: <kept, moved, or deferred with brief evidence>
+DATA_EVIDENCE: <affected global scores or none>
 ```

@@ -3,6 +3,7 @@ import struct
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 SCRIPT = Path(__file__).parents[1] / "generate-decomp-report.py"
@@ -20,6 +21,7 @@ class ReportMetricTests(unittest.TestCase):
         cards = template[template.index("const cards = [") : template.index(
             "];", template.index("const cards = [")
         )]
+        self.assertLess(cards.index('"Whole-file evidence"'), cards.index('"Terminal bytes"'))
         self.assertLess(cards.index('"Terminal bytes"'), cards.index('"Effective bytes"'))
         self.assertLess(cards.index('"Effective bytes"'), cards.index('"Implementation coverage"'))
         self.assertIn('"Change gate"', cards)
@@ -109,15 +111,110 @@ class ReportMetricTests(unittest.TestCase):
                 ("overlay", 0x480, 0x20),
             ],
         )
-        self.assertEqual(layout["scored_code_bytes"], 0x30)
+        self.assertEqual(layout["scored_code_bytes"], 0x100)
         self.assertEqual(layout["explained_code_bytes"], 0x20)
-        self.assertEqual(layout["unexplained_scored_code_bytes"], 0x10)
-        self.assertEqual(layout["unscored_file_bytes"], 0x4A0 - 0x30)
+        self.assertEqual(layout["unexplained_scored_code_bytes"], 0xE0)
+        self.assertEqual(layout["scored_file_bytes"], 0x4A0)
+        self.assertEqual(layout["unscored_file_bytes"], 0)
         text = next(item for item in layout["sections"] if item["name"] == ".text")
-        self.assertEqual(text["unscored_bytes"], 0xD0)
+        self.assertEqual(text["evidence_bytes"], 0x30)
+        self.assertEqual(text["unscored_bytes"], 0)
         data = next(item for item in layout["sections"] if item["name"] == ".data")
-        self.assertEqual(data["measurement"], "unscored")
+        self.assertEqual(data["measurement"], "semantic-score")
         self.assertEqual(data["explained_bytes"], 0)
+
+    def test_data_evidence_scores_typed_global_bytes(self):
+        metadata = REPORT.decomp_binary.ImageMetadata(
+            file_size=0x280,
+            image_base=0x400000,
+            header_size=0x200,
+            sections=(
+                REPORT.decomp_binary.Section(
+                    ".data", 0x401000, 0x80, 0x200, 0x80, 0xC0000040
+                ),
+            ),
+        )
+        evidence = {
+            "variables": {
+                "variables": [
+                    {
+                        "original_address": 0x401010,
+                        "size": 16,
+                        "score": 0.75,
+                    }
+                ]
+            }
+        }
+
+        layout = REPORT.build_binary_layout(
+            metadata, [], data_evidence=evidence
+        )
+
+        data = layout["sections"][0]
+        self.assertEqual(data["evidence_bytes"], 16)
+        self.assertEqual(data["explained_bytes"], 12)
+        self.assertEqual(data["unexplained_scored_bytes"], 0x80 - 12)
+
+    def test_parses_resource_leaf_payload(self):
+        image = bytearray(0x300)
+        section = REPORT.decomp_binary.Section(
+            ".rsrc", 0x401000, 0x100, 0x200, 0x100, 0x40000040
+        )
+        directories = (
+            REPORT.decomp_binary.DataDirectory(0, 0),
+            REPORT.decomp_binary.DataDirectory(0, 0),
+            REPORT.decomp_binary.DataDirectory(0x1000, 0x100),
+        )
+        metadata = REPORT.decomp_binary.ImageMetadata(
+            file_size=len(image),
+            image_base=0x400000,
+            header_size=0x200,
+            sections=(section,),
+            directories=directories,
+        )
+        struct.pack_into("<HH", image, 0x200 + 12, 0, 1)
+        struct.pack_into("<II", image, 0x200 + 16, 10, 0x80000018)
+        struct.pack_into("<HH", image, 0x218 + 12, 0, 1)
+        struct.pack_into("<II", image, 0x218 + 16, 20, 0x80000030)
+        struct.pack_into("<HH", image, 0x230 + 12, 0, 1)
+        struct.pack_into("<II", image, 0x230 + 16, 1033, 0x48)
+        struct.pack_into("<IIII", image, 0x248, 0x1080, 3, 0, 0)
+        image[0x280:0x283] = b"abc"
+
+        resources = REPORT.decomp_binary.parse_resources(bytes(image), metadata)
+
+        self.assertEqual(len(resources), 1)
+        self.assertEqual(resources[0].path, (10, 20, 1033))
+        self.assertEqual(resources[0].data, b"abc")
+
+    def test_resource_score_matches_payload_across_different_ids(self):
+        resource = REPORT.decomp_binary.ResourceEntry
+        original = (resource((2, 127, 2057), b"payload", 0),)
+        recompiled = (resource((2, 127, 0), b"payload", 0),)
+        with patch.object(
+            REPORT.decomp_binary,
+            "parse_resources",
+            side_effect=(original, recompiled),
+        ):
+            explained, rows = REPORT.score_resources(
+                b"original",
+                REPORT.decomp_binary.ImageMetadata(1, 0, 1, ()),
+                b"recompiled",
+                REPORT.decomp_binary.ImageMetadata(1, 0, 1, ()),
+            )
+
+        self.assertEqual(explained, len(b"payload"))
+        self.assertTrue(rows[0]["match"])
+
+    def test_nb10_score_normalizes_only_the_pdb_basename(self):
+        original = b"NB10" + b"\0" * 4 + b"\x01" * 8 + b"C:\\old\\toy2.pdb\0"
+        recompiled = b"NB10" + b"\0" * 4 + b"\x02" * 8 + b"Z:\\new\\toy2.pdb\0"
+
+        explained, detail = REPORT.score_debug_overlay(original, recompiled)
+
+        self.assertEqual(explained, 17)
+        self.assertEqual(detail["format"], "NB10")
+        self.assertTrue(detail["basename_match"])
 
     def test_reads_pe_layout_fields(self):
         image = bytearray(0x500)
@@ -167,7 +264,7 @@ class ReportMetricTests(unittest.TestCase):
         self.assertIn('id="code-treemap"', template)
         self.assertIn('id="data-treemap"', template)
         self.assertIn('id="other-treemap"', template)
-        self.assertIn("Unscored bytes do not count as explained.", template)
+        self.assertIn("All raw file bytes have a score.", template)
 
     def test_project_and_runtime_metrics_are_separate(self):
         report = {

@@ -89,6 +89,7 @@ function New-DecompReport([string] $Output = "build\decomp-report.html") {
     $ReportJson = Join-Path $Root "build\decomp-report-data.json"
     $ReportSummary = Join-Path $Root "build\decomp-report-summary.txt"
     $FunctionSizes = Join-Path $Root "build\decomp-function-sizes.json"
+    $DataReport = Join-Path $Root "build\decomp-data-report.json"
     if (-not [IO.Path]::IsPathRooted($Output)) {
         $Output = Join-Path $Root $Output
     }
@@ -107,6 +108,14 @@ function New-DecompReport([string] $Output = "build\decomp-report.html") {
         Assert-LastExit "Reading original function sizes"
     }
 
+    & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\generate-decomp-data-report.py") `
+        --original (Join-Path $Root "original\toy2.exe") `
+        --recompiled (Join-Path $Root "build\toy2.exe") `
+        --pdb (Join-Path $Root "build\toy2.pdb") `
+        --source-root (Join-Path $Root "src") `
+        --output $DataReport
+    Assert-LastExit "Comparing global data"
+
     & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\generate-decomp-report.py") `
         --input $ReportJson `
         --summary $ReportSummary `
@@ -114,6 +123,8 @@ function New-DecompReport([string] $Output = "build\decomp-report.html") {
         --functions-map (Join-Path $Root "tools\Resources\functions_map.txt") `
         --function-sizes $FunctionSizes `
         --retail-exe (Join-Path $Root "original\toy2.exe") `
+        --recompiled-exe (Join-Path $Root "build\toy2.exe") `
+        --data-report $DataReport `
         --template (Join-Path $Root "tools\decomp-report-template.html") `
         --output $Output
     Assert-LastExit "Generating HTML report"
@@ -139,6 +150,7 @@ Commands:
   validate [args]   Build and reject comparison or source-quality regressions
   experiment [args] Store and compare one source-form experiment
   lint [args]       Check reconstructed source plausibility
+  data [addr]       Show type-aware initialized-global differences
   report [file]     Generate the self-contained HTML decompilation dashboard
   session-summary   Summarize selected targets against the saved baseline
   progress [--json] [scope]  Show annotation progress
@@ -366,6 +378,19 @@ switch ($Command) {
         }
         $Output = if ($CommandArgs.Count -eq 1) { $CommandArgs[0] } else { "build\decomp-report.html" }
         New-DecompReport $Output
+    }
+    "data" {
+        Ensure-Build
+        $DataReport = Join-Path $Root "build\decomp-data-report.json"
+        & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\generate-decomp-data-report.py") `
+            --original (Join-Path $Root "original\toy2.exe") `
+            --recompiled (Join-Path $Root "build\toy2.exe") `
+            --pdb (Join-Path $Root "build\toy2.pdb") `
+            --source-root (Join-Path $Root "src") `
+            --output $DataReport
+        Assert-LastExit "Comparing global data"
+        & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_data.py") @CommandArgs
+        Assert-LastExit "Showing global-data evidence"
     }
     "progress" {
         if ($CommandArgs.Count -gt 2) {

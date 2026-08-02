@@ -206,6 +206,7 @@ report() {
     local report_json="build/decomp-report-data.json"
     local report_summary="build/decomp-report-summary.txt"
     local function_sizes="build/decomp-function-sizes.json"
+    local data_report="build/decomp-data-report.json"
 
     if [[ $# -gt 1 ]]; then
         echo "Usage: tools/decomp report [output.html]" >&2
@@ -227,6 +228,13 @@ report() {
         ghidra function list --json --limit 0 --fields address,size > "$function_sizes" || rm -f "$function_sizes"
     fi
 
+    python tools/generate-decomp-data-report.py \
+        --original original/toy2.exe \
+        --recompiled build/toy2.exe \
+        --pdb build/toy2.pdb \
+        --source-root src \
+        --output "$data_report"
+
     python tools/generate-decomp-report.py \
         --input "$report_json" \
         --summary "$report_summary" \
@@ -234,6 +242,8 @@ report() {
         --functions-map tools/Resources/functions_map.txt \
         --function-sizes "$function_sizes" \
         --retail-exe original/toy2.exe \
+        --recompiled-exe build/toy2.exe \
+        --data-report "$data_report" \
         --template tools/decomp-report-template.html \
         --output "$output"
 }
@@ -260,6 +270,7 @@ Commands:
   experiment [...] Record labeled source-form comparison trials
   lint [files]      Check reconstructed source for decompiler residue
   names             Re-extract .notes/original-names.md from the retail binary
+  data [addr]       Show type-aware initialized-global differences
   report [file]     Generate the self-contained HTML decompilation dashboard
   session-summary   Summarize selected targets against the saved baseline
   progress [--json] [scope]  Show annotation progress
@@ -428,6 +439,16 @@ case "$command" in
         ;;
     report)
         report "$@"
+        ;;
+    data)
+        ensure_build
+        python tools/generate-decomp-data-report.py \
+            --original original/toy2.exe \
+            --recompiled build/toy2.exe \
+            --pdb build/toy2.pdb \
+            --source-root src \
+            --output build/decomp-data-report.json
+        exec python tools/decomp_data.py "$@"
         ;;
     session-summary)
         if [[ $# -eq 0 ]]; then

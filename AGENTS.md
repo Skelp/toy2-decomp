@@ -48,6 +48,7 @@ git status --short
 tools/decomp progress --json
 tools/decomp candidates --coverage --why
 tools/decomp candidates --refine --why
+tools/decomp data --limit 10
 tools/decomp baseline
 ```
 
@@ -69,6 +70,12 @@ Use `tools/decomp evidence ADDRESS` before editing. Confirm most of these facts:
 - callers, callees, important constants, and side effects.
 - global and structure accesses.
 - a plausible source-level control-flow shape.
+
+Use `tools/decomp data` for initialized globals. Use `tools/decomp data ADDRESS`
+to inspect mismatched fields in one global. The report compares typed scalars,
+arrays, pointers, and initialization state. A data difference can show an
+incorrect type, layout, initializer, pointer target, or ownership boundary.
+Confirm each conclusion with callers, retail data, or DWARF evidence.
 
 If the first target lacks evidence, pivot within the same subsystem. Make no
 more than two pivots per campaign. A blocker is useful only when it identifies
@@ -187,6 +194,9 @@ target score and the global metrics. Do not create a metadata-only success
 commit.
 
 Run the full comparison, sync, and report once after a successful campaign.
+Inspect the whole-file and data scores in the report. Explain a score decrease
+when a corrected range or symbol replaces an estimated gap. Do not hide a real
+data, resource, import, relocation, header, or debug-record regression.
 Run tool unit tests only when tool code changed. Integrate current
 `origin/agent/continuous`, then rebuild and validate the integrated tree.
 Reject a push when an integrated function violates the 50 percent or terminal

@@ -1,0 +1,248 @@
+#!/usr/bin/env python3
+"""Export byte-weighted comparisons for initialized project globals."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+from reccmp.compare import Compare
+from reccmp.compare.db import ReccmpMatch
+from reccmp.compare.variables import VariableComparator
+from reccmp.cvdump.cvinfo import CvdumpTypeKey
+from reccmp.cvdump.types import CvdumpIntegrityError, CvdumpKeyError
+from reccmp.project.detect import GhidraConfig, RecCmpTarget, ReportConfig
+from reccmp.types import ImageId
+
+
+def variable_size(engine: Compare, variable) -> int:
+    """Get the precise PDB type size, or use the matched symbol size."""
+
+    type_key = variable.get("data_type")
+    if type_key:
+        try:
+            size = engine.types.get(CvdumpTypeKey(type_key)).size
+            if size is not None:
+                return size
+        except (CvdumpIntegrityError, CvdumpKeyError, KeyError, ValueError):
+            pass
+    size = variable.any_size()
+    return int(size or 0)
+
+
+def is_physically_stored(engine: Compare, address: int, size: int) -> bool:
+    """Return true when the complete retail variable has bytes in the file."""
+
+    return any(
+        section.virtual_address <= address
+        and address + size <= section.virtual_address + section.size_of_raw_data
+        for section in engine.orig_bin.sections
+    )
+
+
+def scalar_sizes(engine: Compare, variable, item, size: int) -> list[int]:
+    """Return the byte width for each result from the variable comparator."""
+
+    type_key = variable.get("data_type")
+    if type_key and not item.raw_only:
+        try:
+            return [
+                scalar.size
+                for scalar in engine.types.get_scalars_gapless(CvdumpTypeKey(type_key))
+            ]
+        except (CvdumpIntegrityError, CvdumpKeyError, KeyError, ValueError):
+            pass
+    return [1] * size
+
+
+def export_variables(engine: Compare) -> dict:
+    """Compare all matched globals that occupy physical retail bytes."""
+
+    comparator = VariableComparator(
+        # reccmp exposes no public database accessor for its data comparator.
+        db=engine._db,  # pylint: disable=protected-access
+        types=engine.types,
+        orig_bin=engine.orig_bin,
+        recomp_bin=engine.recomp_bin,
+    )
+    variables = []
+    for variable in engine.get_variables():
+        size = variable_size(engine, variable)
+        if size <= 0 or not is_physically_stored(engine, variable.orig_addr, size):
+            continue
+
+        item = comparator.compare_variable(variable)
+        widths = scalar_sizes(engine, variable, item, size)
+        fields = []
+        matched_bytes = 0
+        for compared, width in zip(item.compared, widths):
+            width = min(width, max(0, size - compared.offset))
+            if width <= 0:
+                continue
+            if compared.match:
+                matched_bytes += width
+            fields.append(
+                {
+                    "offset": compared.offset,
+                    "size": width,
+                    "name": compared.name or "",
+                    "match": compared.match,
+                    "original": compared.values[0],
+                    "recompiled": compared.values[1],
+                }
+            )
+
+        variables.append(
+            {
+                "original_address": variable.orig_addr,
+                "recompiled_address": variable.recomp_addr,
+                "name": variable.name,
+                "size": size,
+                "matched_bytes": matched_bytes,
+                "score": matched_bytes / size,
+                "result": item.result.name.lower(),
+                "raw_only": item.raw_only,
+                "error": item.error,
+                "fields": fields,
+            }
+        )
+
+    return {
+        "format": 1,
+        "variables": variables,
+        "variable_count": len(variables),
+        "scored_bytes": sum(item["size"] for item in variables),
+        "explained_bytes": sum(item["matched_bytes"] for item in variables),
+    }
+
+
+def export_vtables(engine: Compare) -> dict:
+    """Export byte-weighted virtual-table comparison results."""
+
+    matches = {item.orig_addr: item for item in engine.get_vtables()}
+    tables = []
+    for result in engine.compare_vtables():
+        match = matches.get(result.orig_addr)
+        if match is None:
+            continue
+        size = match.any_size(ImageId.ORIG)
+        if size <= 0 or not is_physically_stored(engine, result.orig_addr, size):
+            continue
+        score = result.effective_ratio
+        tables.append(
+            {
+                "original_address": result.orig_addr,
+                "recompiled_address": result.recomp_addr,
+                "name": result.name,
+                "size": size,
+                "matched_bytes": size * score,
+                "score": score,
+            }
+        )
+    return {
+        "tables": tables,
+        "table_count": len(tables),
+        "scored_bytes": sum(item["size"] for item in tables),
+        "explained_bytes": sum(item["matched_bytes"] for item in tables),
+    }
+
+
+def export_imports(engine: Compare) -> dict:
+    """Compare imported modules and symbols without using table addresses."""
+
+    def key(item):
+        return (item.module.lower(), item.name, item.ordinal)
+
+    original = list(engine.orig_bin.imports)
+    recompiled_keys = {key(item) for item in engine.recomp_bin.imports}
+    entries = [
+        {
+            "module": item.module,
+            "name": item.name,
+            "ordinal": item.ordinal,
+            "match": key(item) in recompiled_keys,
+        }
+        for item in original
+    ]
+    return {
+        "entries": entries,
+        "entry_count": len(entries),
+        "matched_entries": sum(item["match"] for item in entries),
+        "score": sum(item["match"] for item in entries) / len(entries)
+        if entries
+        else 1.0,
+    }
+
+
+def export_relocations(engine: Compare) -> dict:
+    """Map retail relocation sites through matched functions and globals."""
+
+    original = sorted(engine.orig_bin.relocations)
+    recompiled = engine.recomp_bin.relocations
+    matched = 0
+    mapped = 0
+    for address in original:
+        entity = engine._db.get(  # pylint: disable=protected-access
+            ImageId.ORIG, address, exact=False
+        )
+        if not isinstance(entity, ReccmpMatch):
+            continue
+        mapped += 1
+        recompiled_address = entity.recomp_addr + address - entity.orig_addr
+        if recompiled_address in recompiled:
+            matched += 1
+    return {
+        "entry_count": len(original),
+        "mapped_entries": mapped,
+        "matched_entries": matched,
+        "score": matched / len(original) if original else 1.0,
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--original", type=Path, required=True)
+    parser.add_argument("--recompiled", type=Path, required=True)
+    parser.add_argument("--pdb", type=Path, required=True)
+    parser.add_argument("--source-root", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+
+    target = RecCmpTarget(
+        target_id="TOY2",
+        filename=args.original.name,
+        sha256="",
+        encoding=None,
+        source_paths=(args.source_root.resolve(),),
+        ghidra_config=GhidraConfig(),
+        report_config=ReportConfig(),
+        original_path=args.original.resolve(),
+        recompiled_path=args.recompiled.resolve(),
+        recompiled_pdb=args.pdb.resolve(),
+    )
+    engine = Compare.from_target(target)
+    payload = {
+        "format": 1,
+        "variables": export_variables(engine),
+        "vtables": export_vtables(engine),
+        "imports": export_imports(engine),
+        "relocations": export_relocations(engine),
+        "debug": {
+            "original_pdb": engine.orig_bin.pdb_filename,
+            "recompiled_pdb": engine.recomp_bin.pdb_filename,
+        },
+    }
+    args.output.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    print(
+        f"Data evidence: {payload['variables']['variable_count']:,} variables, "
+        f"{payload['variables']['explained_bytes']:,} / "
+        f"{payload['variables']['scored_bytes']:,} bytes explained."
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

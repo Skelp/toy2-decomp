@@ -18,8 +18,10 @@ external supervisor or use Goal mode inside a worker.
 6. Record `HEAD`, implemented count, terminal count, and byte metrics.
 7. Inspect `tools/decomp candidates --coverage --why`.
 8. Inspect `tools/decomp candidates --refine --why`.
-9. Inspect the largest source files and mixed-namespace files.
-10. Keep a file-structure watchlist with the evidence for each suspected split.
+9. Inspect `tools/decomp data --limit 10`.
+10. Record the whole-file, code, data, resource, import, and relocation scores.
+11. Inspect the largest source files and mixed-namespace files.
+12. Keep a file-structure watchlist with the evidence for each suspected split.
 
 ## Run campaigns
 
@@ -51,6 +53,7 @@ After the worker returns:
 8. Run `tools/decomp sync` after source progress.
 9. Inspect changed file placement, linkage, headers, and CMake entries.
 10. Update the file-structure watchlist after each accepted campaign.
+11. Verify the whole-file section scores and explain each regression.
 
 Watch for growth in catch-all files such as `Toy2.cpp`. Use function-map
 clusters, retail paths, DWARF units, private state, and call relationships as

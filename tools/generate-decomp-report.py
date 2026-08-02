@@ -73,10 +73,120 @@ def read_function_sizes(path: Path | None) -> dict[str, int]:
     return sizes
 
 
+def read_data_evidence(path: Path | None) -> dict:
+    """Read the optional type-aware global-data comparison report."""
+
+    if path is None or not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def image_end(metadata: decomp_binary.ImageMetadata) -> int:
+    """Return the first byte after the final raw PE region."""
+
+    return max(
+        [metadata.header_size]
+        + [section.raw_pointer + section.raw_size for section in metadata.sections]
+    )
+
+
+def exact_byte_count(original: bytes, recompiled: bytes) -> int:
+    """Count equal bytes at equivalent offsets in two structural regions."""
+
+    return sum(left == right for left, right in zip(original, recompiled))
+
+
+def score_debug_overlay(
+    original: bytes, recompiled: bytes
+) -> tuple[float, dict]:
+    """Score the NB10 fields and PDB basename in a file overlay."""
+
+    detail = {"format": "unknown", "explained_bytes": 0.0}
+    if not original:
+        return 0.0, detail
+    if not (original.startswith(b"NB10") and recompiled.startswith(b"NB10")):
+        explained = exact_byte_count(original, recompiled)
+        detail.update({"format": "raw", "explained_bytes": explained})
+        return float(explained), detail
+
+    header_size = min(16, len(original))
+    explained = exact_byte_count(original[:header_size], recompiled[:header_size])
+    original_path = original[16:].split(b"\0", 1)[0]
+    recompiled_path = recompiled[16:].split(b"\0", 1)[0]
+    original_name = original_path.replace(b"/", b"\\").rsplit(b"\\", 1)[-1]
+    recompiled_name = recompiled_path.replace(b"/", b"\\").rsplit(b"\\", 1)[-1]
+    if original_name.lower() == recompiled_name.lower():
+        explained += min(len(original_name) + 1, max(0, len(original) - 16))
+    detail.update(
+        {
+            "format": "NB10",
+            "original_pdb": original_path.decode("ascii", "replace"),
+            "recompiled_pdb": recompiled_path.decode("ascii", "replace"),
+            "basename_match": original_name.lower() == recompiled_name.lower(),
+            "explained_bytes": explained,
+        }
+    )
+    return float(min(explained, len(original))), detail
+
+
+def score_resources(
+    original_data: bytes,
+    original_metadata: decomp_binary.ImageMetadata,
+    recompiled_data: bytes,
+    recompiled_metadata: decomp_binary.ImageMetadata,
+) -> tuple[float, list[dict]]:
+    """Score resource payloads by identity, independent of resource IDs."""
+
+    original = decomp_binary.parse_resources(original_data, original_metadata)
+    recompiled = decomp_binary.parse_resources(recompiled_data, recompiled_metadata)
+    recompiled_payloads = {item.data for item in recompiled}
+    rows = []
+    explained = 0
+    for item in original:
+        match = item.data in recompiled_payloads
+        if match:
+            explained += len(item.data)
+        rows.append(
+            {
+                "path": [str(part) for part in item.path],
+                "size": len(item.data),
+                "code_page": item.code_page,
+                "match": match,
+            }
+        )
+    return float(explained), rows
+
+
+def score_intervals(
+    section_start: int, section_size: int, intervals: list[tuple[int, int, float]]
+) -> tuple[int, float]:
+    """Return the covered and explained bytes from non-overlapping intervals."""
+
+    section_end = section_start + section_size
+    cursor = section_start
+    covered = 0
+    explained = 0.0
+    for start, end, score in sorted(intervals):
+        start = max(section_start, start, cursor)
+        end = min(section_end, end)
+        if start >= end:
+            continue
+        size = end - start
+        covered += size
+        explained += size * max(0.0, min(1.0, score))
+        cursor = end
+    return covered, explained
+
+
 def build_binary_layout(
-    metadata: decomp_binary.ImageMetadata, entities: list[dict]
+    metadata: decomp_binary.ImageMetadata,
+    entities: list[dict],
+    original_data: bytes | None = None,
+    recompiled_metadata: decomp_binary.ImageMetadata | None = None,
+    recompiled_data: bytes | None = None,
+    data_evidence: dict | None = None,
 ) -> dict:
-    """Build a non-overlapping raw-file model with measured code progress."""
+    """Build a complete raw-file score with one status for every byte."""
 
     file_size = metadata.file_size
     if file_size <= 0 or not 0 < metadata.header_size <= file_size:
@@ -94,7 +204,11 @@ def build_binary_layout(
             "kind": "headers",
             "offset": 0,
             "size": metadata.header_size,
-            "measurement": "unscored",
+            "measurement": "raw-score",
+            "scored_bytes": metadata.header_size,
+            "explained_bytes": 0.0,
+            "unexplained_scored_bytes": metadata.header_size,
+            "unscored_bytes": 0,
         }
     ]
     section_rows: list[dict] = []
@@ -115,7 +229,11 @@ def build_binary_layout(
                     "kind": "gap",
                     "offset": cursor,
                     "size": start - cursor,
-                    "measurement": "unscored",
+                    "measurement": "raw-score",
+                    "scored_bytes": start - cursor,
+                    "explained_bytes": 0.0,
+                    "unexplained_scored_bytes": start - cursor,
+                    "unscored_bytes": 0,
                 }
             )
         group = (
@@ -135,11 +253,11 @@ def build_binary_layout(
             "virtual_address": section.virtual_address,
             "virtual_size": section.virtual_size,
             "characteristics": section.characteristics,
-            "measurement": "code-score" if group == "code" else "unscored",
-            "scored_bytes": 0,
+            "measurement": "code-score" if group == "code" else "semantic-score",
+            "scored_bytes": section.raw_size,
             "explained_bytes": 0.0,
-            "unexplained_scored_bytes": 0.0,
-            "unscored_bytes": section.raw_size,
+            "unexplained_scored_bytes": section.raw_size,
+            "unscored_bytes": 0,
         }
         section_rows.append(row)
         segments.append(row.copy())
@@ -153,68 +271,150 @@ def build_binary_layout(
                 "kind": "overlay",
                 "offset": cursor,
                 "size": file_size - cursor,
-                "measurement": "unscored",
+                "measurement": "semantic-score",
+                "scored_bytes": file_size - cursor,
+                "explained_bytes": 0.0,
+                "unexplained_scored_bytes": file_size - cursor,
+                "unscored_bytes": 0,
             }
         )
 
-    project_entities = [
+    code_entities = [
         entity
         for entity in entities
-        if entity.get("category") == "project"
-        and int(entity.get("original_size") or 0) > 0
+        if int(entity.get("original_size") or 0) > 0
     ]
+    evidence = data_evidence or {}
+    variables = evidence.get("variables", {}).get("variables", [])
+    vtables = evidence.get("vtables", {}).get("tables", [])
+    data_rows = variables + vtables
+    resource_rows: list[dict] = []
     for section in section_rows:
-        if section["group"] != "code":
-            continue
         section_start = section["virtual_address"]
-        section_end = section_start + section["size"]
-        intervals = []
-        for entity in project_entities:
-            try:
-                start = int(str(entity["address"]), 16)
-            except (KeyError, TypeError, ValueError):
-                continue
-            end = start + int(entity["original_size"])
-            clipped_start = max(section_start, start)
-            clipped_end = min(section_end, end)
-            if clipped_start >= clipped_end:
-                continue
-            score = (
-                1.0
-                if entity.get("effective")
-                else max(0.0, min(1.0, float(entity.get("matching", 0))))
+        intervals: list[tuple[int, int, float]] = []
+        if section["group"] == "code":
+            for entity in code_entities:
+                try:
+                    start = int(str(entity["address"]), 16)
+                except (KeyError, TypeError, ValueError):
+                    continue
+                size = int(entity["original_size"])
+                score = (
+                    1.0
+                    if entity.get("effective")
+                    else max(0.0, min(1.0, float(entity.get("matching", 0))))
+                )
+                if entity.get("stub") or entity.get("status") == "unmatched":
+                    score = 0.0
+                intervals.append((start, start + size, score))
+            covered, explained = score_intervals(
+                section_start, section["size"], intervals
             )
-            if entity.get("stub") or entity.get("status") == "unmatched":
-                score = 0.0
-            intervals.append((clipped_start, clipped_end, score))
+            section["evidence_bytes"] = covered
+            section["explained_bytes"] = explained
+        elif section["name"] in (".rdata", ".data"):
+            for item in data_rows:
+                start = int(item.get("original_address", 0))
+                size = int(item.get("size", 0))
+                if size > 0:
+                    intervals.append((start, start + size, float(item.get("score", 0))))
+            covered, explained = score_intervals(
+                section_start, section["size"], intervals
+            )
+            section["evidence_bytes"] = covered
+            section["explained_bytes"] = explained
+        elif section["name"] == ".idata":
+            section["evidence_bytes"] = section["size"]
+            section["explained_bytes"] = section["size"] * float(
+                evidence.get("imports", {}).get("score", 0)
+            )
+        elif section["name"] == ".reloc":
+            section["evidence_bytes"] = section["size"]
+            section["explained_bytes"] = section["size"] * float(
+                evidence.get("relocations", {}).get("score", 0)
+            )
+        elif (
+            section["name"] == ".rsrc"
+            and original_data is not None
+            and recompiled_data is not None
+            and recompiled_metadata is not None
+        ):
+            explained, resource_rows = score_resources(
+                original_data, metadata, recompiled_data, recompiled_metadata
+            )
+            section["evidence_bytes"] = sum(item["size"] for item in resource_rows)
+            section["explained_bytes"] = min(section["size"], explained)
+        elif original_data is not None and recompiled_data is not None:
+            original = original_data[
+                section["offset"] : section["offset"] + section["size"]
+            ]
+            peer = next(
+                (
+                    item
+                    for item in recompiled_metadata.sections
+                    if item.name == section["name"]
+                ),
+                None,
+            ) if recompiled_metadata is not None else None
+            recompiled = (
+                recompiled_data[peer.raw_pointer : peer.raw_pointer + peer.raw_size]
+                if peer is not None
+                else b""
+            )
+            section["evidence_bytes"] = section["size"]
+            section["explained_bytes"] = exact_byte_count(original, recompiled)
 
-        interval_cursor = section_start
-        scored_bytes = 0
-        explained_bytes = 0.0
-        for start, end, score in sorted(intervals):
-            start = max(start, interval_cursor)
-            if start >= end:
-                continue
-            size = end - start
-            scored_bytes += size
-            explained_bytes += size * score
-            interval_cursor = end
-        section["scored_bytes"] = scored_bytes
-        section["explained_bytes"] = explained_bytes
-        section["unexplained_scored_bytes"] = scored_bytes - explained_bytes
-        section["unscored_bytes"] = section["size"] - scored_bytes
+        section["unexplained_scored_bytes"] = (
+            section["size"] - section["explained_bytes"]
+        )
         for segment in segments:
             if segment["key"] == section["key"]:
                 segment.update(section)
                 break
 
-    scored_code_bytes = sum(row["scored_bytes"] for row in section_rows)
-    explained_code_bytes = sum(row["explained_bytes"] for row in section_rows)
+    debug_detail: dict = {}
+    if original_data is not None and recompiled_data is not None and recompiled_metadata:
+        headers = segments[0]
+        headers["explained_bytes"] = exact_byte_count(
+            original_data[: metadata.header_size],
+            recompiled_data[: recompiled_metadata.header_size],
+        )
+        headers["unexplained_scored_bytes"] = (
+            headers["size"] - headers["explained_bytes"]
+        )
+        original_overlay = original_data[image_end(metadata) :]
+        recompiled_overlay = recompiled_data[image_end(recompiled_metadata) :]
+        for segment in segments:
+            if segment["kind"] == "overlay":
+                explained, debug_detail = score_debug_overlay(
+                    original_overlay, recompiled_overlay
+                )
+                segment["explained_bytes"] = explained
+                segment["unexplained_scored_bytes"] = segment["size"] - explained
+            elif segment["kind"] == "gap":
+                peer = recompiled_data[
+                    segment["offset"] : segment["offset"] + segment["size"]
+                ]
+                original = original_data[
+                    segment["offset"] : segment["offset"] + segment["size"]
+                ]
+                segment["explained_bytes"] = exact_byte_count(original, peer)
+                segment["unexplained_scored_bytes"] = (
+                    segment["size"] - segment["explained_bytes"]
+                )
+
+    scored_code_bytes = sum(
+        row["scored_bytes"] for row in section_rows if row["group"] == "code"
+    )
+    explained_code_bytes = sum(
+        row["explained_bytes"] for row in section_rows if row["group"] == "code"
+    )
     unexplained_scored_code_bytes = scored_code_bytes - explained_code_bytes
     raw_total = sum(segment["size"] for segment in segments)
     if raw_total != file_size:
         raise ValueError("The PE raw regions do not cover the retail file once.")
 
+    explained_file_bytes = sum(segment["explained_bytes"] for segment in segments)
     return {
         "available": True,
         "error": None,
@@ -226,19 +426,30 @@ def build_binary_layout(
         "scored_code_bytes": scored_code_bytes,
         "explained_code_bytes": explained_code_bytes,
         "unexplained_scored_code_bytes": unexplained_scored_code_bytes,
-        "unscored_file_bytes": file_size - scored_code_bytes,
+        "scored_file_bytes": file_size,
+        "explained_file_bytes": explained_file_bytes,
+        "unexplained_file_bytes": file_size - explained_file_bytes,
+        "unscored_file_bytes": 0,
         "explained_file_percent": (
-            explained_code_bytes / file_size * 100 if file_size else 0.0
+            explained_file_bytes / file_size * 100 if file_size else 0.0
         ),
         "scored_code_effective_percent": (
             explained_code_bytes / scored_code_bytes * 100
             if scored_code_bytes
             else 0.0
         ),
+        "data_evidence": evidence,
+        "resources": resource_rows,
+        "debug_overlay": debug_detail,
     }
 
 
-def read_binary_layout(path: Path | None, entities: list[dict]) -> dict:
+def read_binary_layout(
+    path: Path | None,
+    entities: list[dict],
+    recompiled_path: Path | None = None,
+    data_evidence: dict | None = None,
+) -> dict:
     """Read the retail layout without stopping report generation on an error."""
 
     if path is None:
@@ -247,7 +458,22 @@ def read_binary_layout(path: Path | None, entities: list[dict]) -> dict:
             "error": "The report command did not specify a retail executable.",
         }
     try:
-        return build_binary_layout(decomp_binary.read_image_metadata(path), entities)
+        original_data = path.read_bytes()
+        metadata = decomp_binary.parse_image_metadata(original_data)
+        recompiled_data = recompiled_path.read_bytes() if recompiled_path else None
+        recompiled_metadata = (
+            decomp_binary.parse_image_metadata(recompiled_data)
+            if recompiled_data is not None
+            else None
+        )
+        return build_binary_layout(
+            metadata,
+            entities,
+            original_data,
+            recompiled_metadata,
+            recompiled_data,
+            data_evidence,
+        )
     except FileNotFoundError:
         return {
             "available": False,
@@ -652,6 +878,16 @@ def main() -> int:
         type=Path,
         help="Retail PE executable used for the raw-file layout",
     )
+    parser.add_argument(
+        "--recompiled-exe",
+        type=Path,
+        help="Recompiled PE executable used for non-code comparison",
+    )
+    parser.add_argument(
+        "--data-report",
+        type=Path,
+        help="Type-aware global-data comparison JSON",
+    )
     parser.add_argument("--template", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -671,7 +907,12 @@ def main() -> int:
     payload = enrich_report(
         report, annotations, names, summary, quality, function_sizes, tool_artifacts
     )
-    payload["binary_layout"] = read_binary_layout(args.retail_exe, payload["entities"])
+    payload["binary_layout"] = read_binary_layout(
+        args.retail_exe,
+        payload["entities"],
+        recompiled_path=args.recompiled_exe,
+        data_evidence=read_data_evidence(args.data_report),
+    )
     template = args.template.read_text(encoding="utf-8")
     marker = "__DECOMP_REPORT_DATA__"
     if template.count(marker) != 1:
@@ -679,6 +920,19 @@ def main() -> int:
     output = template.replace(marker, safe_json_for_script(payload))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(output, encoding="utf-8")
+    layout = payload["binary_layout"]
+    if layout.get("available"):
+        print(
+            "Whole-file evidence: "
+            f"{layout['explained_file_bytes']:.3f} / {layout['file_size']} bytes "
+            f"({layout['explained_file_percent']:.2f}%)."
+        )
+        section_text = ", ".join(
+            f"{section['name']}={section['explained_bytes'] / section['size'] * 100:.2f}%"
+            for section in layout["sections"]
+            if section["size"]
+        )
+        print(f"Section evidence: {section_text}.")
     print(f"Wrote {args.output} ({len(output.encode('utf-8')):,} bytes)")
     return 0
 
