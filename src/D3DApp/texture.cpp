@@ -231,7 +231,7 @@ TextureContainer* D3DTextr_GetTextureContainer(const char* name)
 	return D3DTextr_FindTexture(name);
 }
 
-// FUNCTION: TOY2 0x004B1A60
+// FUNCTION: TOY2 0x004B1A60 [MATCHED]
 void D3DTextr_SetTexturePath(const char* path)
 {
 	if (path == NULL)
