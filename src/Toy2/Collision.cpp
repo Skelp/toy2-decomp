@@ -1,4 +1,5 @@
 #include "Toy2/Collision.h"
+#include "Toy2/CollisionInternal.h"
 #include "FileUtils.h"
 #include "Nu3D/Link.h"
 #include "Nu3D/Math.h"
@@ -31,11 +32,6 @@ namespace Toy2
 		extern int32_t g_hasZoneData;
 
 		void BuildLevelPath(int32_t level, char* output, const char* suffix);
-	}
-
-	namespace Collision
-	{
-		struct PackedCollisionFace;
 	}
 
 	namespace Terrain
@@ -236,23 +232,6 @@ namespace Toy2
 
 	namespace Collision
 	{
-		struct SurfaceCollisionResult
-		{
-			uint32_t contactFlags;
-			Platform::CollisionFace* face;
-			Vector3I16 normal;
-			int16_t contactState;
-			Vector3I16 wallNormal;
-			int16_t reserved;
-			Vector3I16 movement;
-			Vector3I16 surfaceVelocity;
-			int32_t contactTimer;
-			int16_t platformIndex;
-			uint8_t reserved2[2];
-			int16_t collisionDistance;
-			uint16_t surfaceType;
-		};
-
 		struct PlatformMotionCollisionResult
 		{
 			uint32_t contactFlags;
@@ -265,42 +244,6 @@ namespace Toy2
 			int16_t platformRotationState;
 			int16_t reserved3;
 			uint16_t surfaceType;
-		};
-
-		struct PackedCollisionFace
-		{
-			int16_t boundsMinX;
-			int16_t boundsExtentX;
-			int8_t boundsMinYBlock;
-			int8_t boundsExtentYBlock;
-			int8_t boundsMinZBlock;
-			int8_t boundsExtentZBlock;
-			Vector3I16 vertex0;
-			Vector3I16 vertex1Offset;
-			Vector3I16 vertex2Offset;
-			Vector3I16 vertex3Offset;
-			Vector3I16 firstPlaneNormal;
-			Vector3I16 secondPlaneNormal;
-		};
-
-		struct CollisionTreeGroup
-		{
-			int16_t marker;
-			int16_t faceCount;
-			int16_t boundsMinX;
-			int16_t boundsExtentX;
-			int16_t boundsMinZ;
-			int16_t boundsExtentZ;
-		};
-
-		struct CollisionGridCell
-		{
-			int16_t meshListStart;
-			int16_t meshCount;
-			int32_t boundsMinX;
-			int32_t boundsMinZ;
-			int32_t boundsExtentX;
-			int32_t boundsExtentZ;
 		};
 
 		struct CollisionMeshRecord
@@ -337,13 +280,6 @@ namespace Toy2
 			int32_t movementLength;
 		};
 
-		struct CollisionStepMotion
-		{
-			Vector3I16 movement;
-			int16_t reserved;
-			Vector3I16 platformMovement;
-		};
-
 		const int16_t COLLISION_MESH_STATIC_A = 6;
 		const int16_t COLLISION_MESH_STATIC_B = 7;
 		const uint16_t COLLISION_MESH_EXCLUDE_FROM_GRID = 0x400;
@@ -355,26 +291,12 @@ namespace Toy2
 
 		STATIC_ASSERT(sizeof(CollisionNormal) == 0x08);
 		STATIC_ASSERT(offsetof(CollisionNormal, reserved) == 0x06);
-		STATIC_ASSERT(sizeof(SurfaceCollisionResult) == sizeof(CollisionQueryResult));
-		STATIC_ASSERT(offsetof(SurfaceCollisionResult, normal) == 0x08);
-		STATIC_ASSERT(offsetof(SurfaceCollisionResult, contactState) == 0x0E);
-		STATIC_ASSERT(offsetof(SurfaceCollisionResult, wallNormal) == 0x10);
-		STATIC_ASSERT(offsetof(SurfaceCollisionResult, movement) == 0x18);
-		STATIC_ASSERT(offsetof(SurfaceCollisionResult, surfaceVelocity) == 0x1E);
-		STATIC_ASSERT(offsetof(SurfaceCollisionResult, contactTimer) == 0x24);
-		STATIC_ASSERT(offsetof(SurfaceCollisionResult, collisionDistance) == 0x2C);
 		STATIC_ASSERT(sizeof(PlatformMotionCollisionResult) == sizeof(CollisionQueryResult));
 		STATIC_ASSERT(offsetof(PlatformMotionCollisionResult, movement) == 0x18);
 		STATIC_ASSERT(offsetof(PlatformMotionCollisionResult, platformMovement) == 0x1E);
 		STATIC_ASSERT(offsetof(PlatformMotionCollisionResult, platformRotationState) == 0x2A);
-		STATIC_ASSERT(sizeof(PackedCollisionFace) == 0x2C);
-		STATIC_ASSERT(offsetof(PackedCollisionFace, firstPlaneNormal) == 0x20);
-		STATIC_ASSERT(offsetof(PackedCollisionFace, secondPlaneNormal) == 0x26);
-		STATIC_ASSERT(sizeof(CollisionTreeGroup) == 0x0C);
-		STATIC_ASSERT(sizeof(CollisionGridCell) == 0x14);
 		STATIC_ASSERT(sizeof(CollisionMeshRecord) == sizeof(CollisionMeshInstance));
 		STATIC_ASSERT(sizeof(CollisionSweep) == 0x4C);
-		STATIC_ASSERT(sizeof(CollisionStepMotion) == 0x0E);
 		STATIC_ASSERT(offsetof(CollisionSweep, nearestFraction) == 0x20);
 		STATIC_ASSERT(offsetof(CollisionSweep, hitNormal) == 0x34);
 		STATIC_ASSERT(offsetof(CollisionSweep, movementDirection) == 0x3C);
