@@ -770,15 +770,16 @@ namespace Renderer
 		void DrawClipped(int16_t xPos, int16_t yPos, int16_t clipLeft, int16_t clipRight, int16_t sheetIndex, int16_t tileIndex)
 		{
 			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
+			int32_t textureDataIndex;
+			Vector2F uvTopLeft;
+			Vector2F uvBottomRight;
+			uint32_t bitmapWidth;
+			uint32_t bitmapHeight;
 			if (sheet)
 			{
-				int32_t textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
-				Vector2F uvTopLeft;
-				Vector2F uvBottomRight;
+				textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
 				if (textureDataIndex != 0)
 				{
-					uint32_t bitmapWidth;
-					uint32_t bitmapHeight;
 					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
 
 					uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;
@@ -790,9 +791,10 @@ namespace Renderer
 				RGBA color = { (uint8_t)Nu3D::Camera::g_cameraTintRed, (uint8_t)Nu3D::Camera::g_cameraTintGreen, (uint8_t)Nu3D::Camera::g_cameraTintBlue, 255 };
 				float normalizedClipLeft = (float)clipLeft / g_virtualScreenWidth;
 				float normalizedClipRight = (float)clipRight / g_virtualScreenWidth;
-				float normalizedX = (float)xPos / g_virtualScreenWidth;
-				float normalizedY = (float)yPos / g_virtualScreenHeight;
-				float normalizedWidth = (float)sheet->tileWidth / g_virtualScreenWidth;
+				float normalizedX = (float)xPos * (1.0f / g_virtualScreenWidth);
+				float normalizedY = (float)yPos * (1.0f / g_virtualScreenHeight);
+				float normalizedWidth = (float)sheet->tileWidth * (1.0f / g_virtualScreenWidth);
+				float normalizedHeight = (float)sheet->tileHeight * (1.0f / g_virtualScreenHeight);
 
 				if (normalizedClipLeft <= normalizedX + normalizedWidth && normalizedX <= normalizedClipRight)
 				{
@@ -814,7 +816,7 @@ namespace Renderer
 					Queue2DSprite(normalizedX,
 						normalizedY,
 						normalizedWidth,
-						(float)sheet->tileHeight / g_virtualScreenHeight,
+						normalizedHeight,
 						&uvTopLeft,
 						&uvBottomRight,
 						textureDataIndex,
