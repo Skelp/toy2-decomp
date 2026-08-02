@@ -29,12 +29,18 @@ namespace Toy2
 	};
 	STATIC_ASSERT(sizeof(ControlConfigEntry) == 8);
 
+	// GLOBAL: TOY2 0x0050084C
+	char g_controlConfigLeftLabel[] = "left";
+
+	// GLOBAL: TOY2 0x00500854
+	char g_controlConfigRightLabel[] = "right";
+
 	// GLOBAL: TOY2 0x00500E58
 	ControlConfigEntry g_controlConfigEntries[14] = {
 		{ INPUT_UP, "up" },
 		{ INPUT_DOWN, "down" },
-		{ INPUT_LEFT, "left" },
-		{ INPUT_RIGHT, "right" },
+		{ INPUT_LEFT, g_controlConfigLeftLabel },
+		{ INPUT_RIGHT, g_controlConfigRightLabel },
 		{ INPUT_JUMP, "jump" },
 		{ INPUT_FIRE, "fire" },
 		{ INPUT_SPIN, "spin" },
