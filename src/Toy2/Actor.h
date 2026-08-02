@@ -112,7 +112,7 @@ namespace Toy2
 		extern Toy2Actor* g_activeActors[65];
 
 		extern Toy2Actor g_creatureActors[64];
-		extern uint8_t* g_animationFrameSequences[26];
+		extern uint8_t* g_animationFrameSequences[];
 		extern uint16_t* g_movementDataByControl[2];
 		extern Toy2Actor* g_renderActors[64];
 

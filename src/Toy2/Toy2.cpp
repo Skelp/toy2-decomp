@@ -2889,7 +2889,7 @@ namespace Toy2
 			actor->animationFramePosition = 0;
 			actor->primaryAnimIdx = 0;
 			actor->secondaryAnimIdx = -1;
-			actor->animationFrameSequence = Actor::g_animationFrameSequences[1];
+			actor->animationFrameSequence = Actor::g_animationFrameSequences[1 - 1];
 			actor->previousActorPhase = 0;
 			actor->unkWord15 = 0;
 			actor->movementCommandTimer = 0;

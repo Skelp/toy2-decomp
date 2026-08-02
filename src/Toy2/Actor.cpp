@@ -1008,14 +1008,14 @@ namespace Toy2
 					case 3:
 					case 0xE:
 						actor->primaryAnimIdx = 2;
-						actor->animationFrameSequence = g_animationFrameSequences[1];
+						actor->animationFrameSequence = g_animationFrameSequences[1 - 1];
 						effectCount = 3;
 						actor->hitpoints = -0x5E;
 						actor->animationFramePosition = *actor->animationFrameSequence << 16;
 						break;
 					case 4:
 						actor->primaryAnimIdx = 2;
-						actor->animationFrameSequence = g_animationFrameSequences[7];
+						actor->animationFrameSequence = g_animationFrameSequences[7 - 1];
 						effectCount = 3;
 						actor->hitpoints = -0x3E;
 						actor->animationFramePosition = *actor->animationFrameSequence << 16;
@@ -1027,7 +1027,7 @@ namespace Toy2
 						break;
 					case 0x14:
 						actor->primaryAnimIdx = 1;
-						actor->animationFrameSequence = g_animationFrameSequences[0x14];
+						actor->animationFrameSequence = g_animationFrameSequences[0x14 - 1];
 						effectCount = 3;
 						actor->hitpoints = -0x46;
 						actor->animationFramePosition = *actor->animationFrameSequence << 16;
@@ -1044,7 +1044,7 @@ namespace Toy2
 					case 0x18:
 						actor->gravityVel = -0xB00;
 						actor->primaryAnimIdx = 2;
-						actor->animationFrameSequence = g_animationFrameSequences[1];
+						actor->animationFrameSequence = g_animationFrameSequences[1 - 1];
 						effectCount = 3;
 						actor->hitpoints = -0x5E;
 						actor->animationFramePosition = *actor->animationFrameSequence << 16;
@@ -1272,8 +1272,39 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0052c840
 		Toy2Actor g_creatureActors[64];
 
-		// GLOBAL: TOY2 0x004E0588
-		uint8_t* g_animationFrameSequences[26];
+		// GLOBAL: TOY2 0x004E0374
+		uint8_t g_animationFrameData[536] = {
+#include "Toy2/ActorAnimationFrameData.inc"
+		};
+
+		// GLOBAL: TOY2 0x004E058C
+		uint8_t* g_animationFrameSequences[25] = {
+			g_animationFrameData + 0x000,
+			g_animationFrameData + 0x01C,
+			g_animationFrameData + 0x02C,
+			g_animationFrameData + 0x030,
+			g_animationFrameData + 0x03C,
+			g_animationFrameData + 0x048,
+			g_animationFrameData + 0x050,
+			g_animationFrameData + 0x064,
+			g_animationFrameData + 0x088,
+			g_animationFrameData + 0x0A4,
+			g_animationFrameData + 0x0AC,
+			g_animationFrameData + 0x0C0,
+			g_animationFrameData + 0x0D0,
+			g_animationFrameData + 0x0D8,
+			g_animationFrameData + 0x0E0,
+			g_animationFrameData + 0x0EC,
+			g_animationFrameData + 0x100,
+			g_animationFrameData + 0x10C,
+			g_animationFrameData + 0x120,
+			g_animationFrameData + 0x12C,
+			g_animationFrameData + 0x140,
+			g_animationFrameData + 0x154,
+			g_animationFrameData + 0x17C,
+			g_animationFrameData + 0x1C8,
+			g_animationFrameData + 0x1FC,
+		};
 
 		// GLOBAL: TOY2 0x00830D40
 		int32_t g_periodicHintSoundTimer;
@@ -1380,7 +1411,7 @@ namespace Toy2
 		void SetAnimation(Toy2Actor* actor, int16_t animationIndex, int32_t frameSequenceIndex)
 		{
 			actor->primaryAnimIdx = animationIndex;
-			actor->animationFrameSequence = g_animationFrameSequences[frameSequenceIndex];
+			actor->animationFrameSequence = g_animationFrameSequences[frameSequenceIndex - 1];
 			actor->animationFramePosition = (uint32_t)*actor->animationFrameSequence << 16;
 		}
 
@@ -1644,7 +1675,7 @@ namespace Toy2
 				if (previousAttackTimer > 200 && actor->previousActorPhase <= 200)
 				{
 					actor->primaryAnimIdx = 1;
-					actor->animationFrameSequence = Actor::g_animationFrameSequences[8];
+					actor->animationFrameSequence = Actor::g_animationFrameSequences[8 - 1];
 					actor->animationFramePosition = *actor->animationFrameSequence << 16;
 				}
 
@@ -1681,7 +1712,7 @@ namespace Toy2
 				if (previousAttackTimer > 136 && actor->previousActorPhase <= 136)
 				{
 					actor->primaryAnimIdx = 0;
-					actor->animationFrameSequence = Actor::g_animationFrameSequences[7];
+					actor->animationFrameSequence = Actor::g_animationFrameSequences[7 - 1];
 					actor->animationFramePosition = *actor->animationFrameSequence << 16;
 				}
 			}
@@ -1690,7 +1721,7 @@ namespace Toy2
 				if (actor->primaryAnimIdx == 1)
 				{
 					actor->primaryAnimIdx = 0;
-					actor->animationFrameSequence = Actor::g_animationFrameSequences[7];
+					actor->animationFrameSequence = Actor::g_animationFrameSequences[7 - 1];
 					actor->animationFramePosition = *actor->animationFrameSequence << 16;
 				}
 				actor->previousActorPhase = 0x104;
