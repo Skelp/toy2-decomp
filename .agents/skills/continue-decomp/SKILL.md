@@ -81,14 +81,19 @@ After the worker returns:
 4. Run `tools/decomp progress --json` and verify each reported metric.
 5. Count a valid coverage, refinement, or data result as source progress.
 6. Close or interrupt the worker before the next campaign.
-7. Run `tools/decomp report` after source progress.
-8. Run `tools/decomp sync` after source progress.
+7. Confirm that the worker ran `tools/decomp report` after source progress.
+8. Confirm that the worker ran `tools/decomp sync` after source progress.
 9. Inspect changed file placement, linkage, headers, and CMake entries.
 10. Update the file-structure watchlist after each accepted campaign.
 11. Verify the whole-file section scores and explain each regression.
 12. Record the result with `tools/decomp campaigns record`.
 13. Record elapsed minutes, code bytes, data bytes, addresses, and the commit.
 14. Check the retained-byte rate for the last ten campaigns.
+
+Run the full report and sync exactly once for each successful campaign. Do not
+repeat a successful worker report or sync. Check the report summary, file time,
+section scores, and sync result. Repeat a command only when its evidence is
+missing, stale, or failed.
 
 Watch for growth in catch-all files such as `Toy2.cpp`. Use function-map
 clusters, retail paths, DWARF units, private state, and call relationships as
