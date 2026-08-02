@@ -90,6 +90,19 @@ class CampaignTests(unittest.TestCase):
         self.assertIn("Measured campaigns: 1 (1 source, 0 no-source)", text)
         self.assertIn("Retained rate: 10.00 bytes/minute", text)
 
+    def test_duplicate_uses_mode_result_addresses_and_commit(self):
+        existing = {
+            "mode": "data",
+            "result": "source",
+            "addresses": ["0x00401000"],
+            "commit": "abc123",
+            "minutes": 5,
+        }
+        duplicate = dict(existing, minutes=7, note="new note")
+        other = dict(existing, commit="def456")
+        self.assertTrue(campaigns.is_duplicate([existing], duplicate))
+        self.assertFalse(campaigns.is_duplicate([existing], other))
+
 
 if __name__ == "__main__":
     unittest.main()

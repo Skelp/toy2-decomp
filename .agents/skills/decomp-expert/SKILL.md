@@ -24,6 +24,9 @@ work, or a concise no-source result after bounded pivots.
 11. Run `tools/decomp data --limit 10` and inspect relevant global differences.
 12. Run `tools/decomp campaigns summary` and inspect the assigned addresses.
 
+Do not record the campaign result. The supervisor records it after independent
+validation. This rule prevents duplicate records.
+
 A function campaign contains one large function or at most three related
 functions. A data campaign contains at most three related initialized globals.
 Rank work by unresolved bytes, evidence readiness, dependency impact, and

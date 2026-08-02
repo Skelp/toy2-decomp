@@ -94,6 +94,11 @@ def append_record(path: Path, record: dict[str, object]) -> None:
         handle.write("\n")
 
 
+def is_duplicate(records: list[dict[str, object]], record: dict[str, object]) -> bool:
+    keys = ("mode", "result", "addresses", "commit")
+    return any(all(item.get(key) == record.get(key) for key in keys) for item in records)
+
+
 def print_summary(records: list[dict[str, object]], limit: int) -> None:
     selected = records[-limit:] if limit else records
     if not selected:
@@ -170,6 +175,8 @@ def main() -> int:
             "commit": args.commit,
             "note": args.note,
         }
+        if is_duplicate(records, item):
+            parser.error("this campaign result already exists")
         append_record(args.file, item)
         print(f"Recorded {args.mode} {args.result} campaign.")
         return 0
