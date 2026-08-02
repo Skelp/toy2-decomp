@@ -32,6 +32,16 @@ namespace Toy2
 			int16_t terminator;
 		};
 
+		struct TokenDialogueRecord
+		{
+			int32_t tokenId;
+			int32_t dialogueRecordIndex;
+			const char* subtitle;
+			int32_t facingAngle;
+		};
+
+		STATIC_ASSERT(sizeof(TokenDialogueRecord) == 0x10);
+
 		enum KiteEncounterState
 		{
 			KITE_ENCOUNTER_ACTIVE = 2,
@@ -49,12 +59,7 @@ namespace Toy2
 			-1,
 		};
 		// GLOBAL: TOY2 0x004F153C
-		Collectables::TokenDialogueValue g_tokenDialogueValues[] = {
-			{ 0x46 },
-			{ 0xC },
-			{ reinterpret_cast<int32_t>(g_molehillChallengeInstructions) },
-			{ 0x800 },
-		};
+		extern const TokenDialogueRecord g_tokenDialogueValues = { 0x46, 0xC, g_molehillChallengeInstructions, 0x800 };
 		// GLOBAL: TOY2 0x004F154C
 		int16_t g_tokenLinkIds[] = { 0x33, 0x31, 0x32, 0x30, 0x34, 0 };
 
@@ -153,7 +158,7 @@ namespace Toy2
 			Collectables::Init(g_tokenLinkIds, 0x41);
 			Collectables::Activate(3, 1);
 			MoveableObject::InitTable(g_moveableObjectInitTable.entries);
-			Collectables::LoadTokenTable(g_tokenDialogueValues);
+			Collectables::LoadTokenTable(reinterpret_cast<const Collectables::TokenDialogueValue*>(&g_tokenDialogueValues));
 
 			g_environmentSurfaceY = 0x4400;
 			g_previousBuzzEnvironmentY = 0x4400;
