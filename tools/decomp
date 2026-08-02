@@ -198,6 +198,9 @@ validate() {
     if [[ $meta_resolution -eq 1 ]]; then
         verify_args+=(--meta-resolution)
     fi
+    if [[ $staged -eq 1 ]]; then
+        verify_args+=(--staged)
+    fi
     if [[ -n $mode ]]; then
         verify_args+=(--mode "$mode")
     fi

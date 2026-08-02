@@ -1013,13 +1013,17 @@ def check_repeated_private_types(units: list[SourceUnit]) -> list[Finding]:
     return findings
 
 
-def target_units(staged: bool, explicit: list[str]) -> list[SourceUnit]:
+def target_units(
+    staged: bool, explicit: list[str], *, revision: str | None = None
+) -> list[SourceUnit]:
     if explicit:
         paths = [Path(item).resolve() for item in explicit]
         return [SourceUnit(path, path.read_text(encoding="utf-8", errors="ignore")) for path in paths]
-    if staged:
+    if staged or revision is not None:
         result = subprocess.run(
-            ["git", "ls-files", "src"],
+            ["git", "ls-tree", "-r", "--name-only", revision, "--", "src"]
+            if revision is not None
+            else ["git", "ls-files", "src"],
             capture_output=True, text=True, check=False, cwd=ROOT,
         )
         units: list[SourceUnit] = []
@@ -1028,7 +1032,8 @@ def target_units(staged: bool, explicit: list[str]) -> list[SourceUnit]:
             if path.suffix not in SOURCE_SUFFIXES:
                 continue
             shown = subprocess.run(
-                ["git", "show", f":{name}"], capture_output=True, check=False, cwd=ROOT,
+                ["git", "show", f"{revision}:{name}" if revision else f":{name}"],
+                capture_output=True, check=False, cwd=ROOT,
             )
             if shown.returncode == 0:
                 units.append(SourceUnit(path, shown.stdout.decode("utf-8", errors="ignore")))
@@ -1048,10 +1053,21 @@ def scan_units(units: list[SourceUnit], *, cross_file: bool = True) -> list[Find
     return sorted(findings, key=lambda item: (item.relative_path, item.line, item.column, item.rule))
 
 
-def read_baseline(path: Path = BASELINE_PATH, *, staged: bool = False) -> list[BaselineEntry]:
-    if staged and path.resolve() == BASELINE_PATH.resolve():
+def read_baseline(
+    path: Path = BASELINE_PATH,
+    *,
+    staged: bool = False,
+    revision: str | None = None,
+) -> list[BaselineEntry]:
+    if (staged or revision is not None) and path.resolve() == BASELINE_PATH.resolve():
         shown = subprocess.run(
-            ["git", "show", ":.notes/lint-baseline.tsv"],
+            [
+                "git",
+                "show",
+                f"{revision}:.notes/lint-baseline.tsv"
+                if revision
+                else ":.notes/lint-baseline.tsv",
+            ],
             capture_output=True, check=False, cwd=ROOT,
         )
         if shown.returncode != 0:

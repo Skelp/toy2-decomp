@@ -11,6 +11,7 @@ import subprocess
 import sys
 from hashlib import sha256
 from pathlib import Path
+from typing import NamedTuple
 
 sys.dont_write_bytecode = True
 
@@ -27,6 +28,12 @@ from tools import decomp_lint  # noqa: E402
 from tools.decomp_annotations import read_source_annotations  # noqa: E402
 
 TOOL_ARTIFACTS = ROOT / "tools" / "Resources" / "tool_artifacts.tsv"
+
+
+class LintDebtChange(NamedTuple):
+    removed_errors: int = 0
+    new_errors: int = 0
+    stale_rows: int = 0
 
 
 def file_hash(path: Path) -> str:
@@ -197,19 +204,69 @@ def write_metadata(
     )
 
 
-def read_source_debt(source_root: Path) -> dict[int, list[str]]:
-    units = decomp_lint.target_units(False, [str(source_root)]) if source_root.is_file() else [
-        decomp_lint.SourceUnit(path, path.read_text(encoding="utf-8", errors="ignore"))
-        for path in sorted(source_root.rglob("*"))
-        if path.suffix in decomp_lint.SOURCE_SUFFIXES
-    ]
+def read_source_debt(source_root: Path, *, staged: bool = False) -> dict[int, list[str]]:
+    if staged:
+        units = decomp_lint.target_units(True, [])
+    elif source_root.is_file():
+        units = decomp_lint.target_units(False, [str(source_root)])
+    else:
+        units = [
+            decomp_lint.SourceUnit(
+                path, path.read_text(encoding="utf-8", errors="ignore")
+            )
+            for path in sorted(source_root.rglob("*"))
+            if path.suffix in decomp_lint.SOURCE_SUFFIXES
+        ]
     findings = decomp_lint.scan_units(units, cross_file=source_root.is_dir())
-    findings, _ = decomp_lint.apply_baseline(findings, decomp_lint.read_baseline())
+    findings, _ = decomp_lint.apply_baseline(
+        findings, decomp_lint.read_baseline(staged=staged)
+    )
     debt: dict[int, list[str]] = {}
     for finding in findings:
         if finding.owner_address and not finding.suppressed:
             debt.setdefault(int(finding.owner_address, 16), []).append(finding.rule)
     return debt
+
+
+def classify_lint_debt_change(
+    head_findings: list[decomp_lint.Finding],
+    head_entries: list[decomp_lint.BaselineEntry],
+    staged_findings: list[decomp_lint.Finding],
+    staged_entries: list[decomp_lint.BaselineEntry],
+) -> LintDebtChange:
+    head_findings, _ = decomp_lint.apply_baseline(head_findings, head_entries)
+    classified, stale = decomp_lint.apply_baseline(staged_findings, staged_entries)
+
+    staged_finding_keys = {finding.baseline_key for finding in staged_findings}
+    staged_entry_keys = {entry.key for entry in staged_entries}
+    removed = {
+        finding.baseline_key
+        for finding in head_findings
+        if finding.severity == "error"
+        and finding.legacy
+        and not finding.suppressed
+        and finding.baseline_key not in staged_finding_keys
+        and finding.baseline_key not in staged_entry_keys
+    }
+    new_errors = {
+        finding.baseline_key
+        for finding in classified
+        if finding.severity == "error"
+        and not finding.legacy
+        and not finding.suppressed
+    }
+    return LintDebtChange(len(removed), len(new_errors), len(stale))
+
+
+def read_lint_debt_change() -> LintDebtChange:
+    return classify_lint_debt_change(
+        decomp_lint.scan_units(
+            decomp_lint.target_units(False, [], revision="HEAD")
+        ),
+        decomp_lint.read_baseline(revision="HEAD"),
+        decomp_lint.scan_units(decomp_lint.target_units(True, [])),
+        decomp_lint.read_baseline(staged=True),
+    )
 
 
 def validate_metadata(
@@ -757,6 +814,7 @@ def validate(
     baseline_data_path: Path | None = None,
     current_data_path: Path | None = None,
     accounting_correction: str | None = None,
+    staged: bool = False,
 ) -> int:
     baseline = read_match_statuses(baseline_path)
     current = read_match_statuses(current_path)
@@ -770,7 +828,12 @@ def validate(
                 baseline_data_path if mode == "data" else None,
             )
         )
-    source_debt = read_source_debt(source_root)
+    source_debt = read_source_debt(source_root, staged=staged)
+    lint_change = (
+        read_lint_debt_change()
+        if staged and mode == "refinement"
+        else LintDebtChange()
+    )
     current_state = source_state(source_root)
     baseline_state = read_baseline_state(metadata_path)
     baseline_implemented = {
@@ -792,6 +855,14 @@ def validate(
         problems.append("--accounting-correction requires --meta-resolution")
     if accounting_correction is not None and mode != "data":
         problems.append("--accounting-correction requires --mode data")
+    if lint_change.new_errors:
+        problems.append(
+            f"staged source has {lint_change.new_errors} new source-debt error(s)"
+        )
+    if lint_change.stale_rows:
+        problems.append(
+            f"staged lint baseline has {lint_change.stale_rows} stale row(s)"
+        )
     if check_annotation_tags:
         problems.extend(check_annotations(current_path, source_root))
     for address, before in baseline.items():
@@ -881,10 +952,15 @@ def validate(
                 problems.append(
                     f"0x{address:08X}: refinement target was not implemented at baseline"
                 )
-            if not (improved or promoted or debt_removed):
+            lint_debt_removed = bool(
+                lint_change.removed_errors
+                and not lint_change.new_errors
+                and not lint_change.stale_rows
+            )
+            if not (improved or promoted or debt_removed or lint_debt_removed):
                 problems.append(
                     f"0x{address:08X}: refinement did not improve similarity, "
-                    "reach terminal status, or remove terminal source debt"
+                    "reach terminal status, or remove tracked source debt"
                 )
 
     if mode == "coverage" and has_baseline_state:
@@ -994,6 +1070,7 @@ def main() -> int:
     validate_parser.add_argument("--metadata", type=Path)
     validate_parser.add_argument("--source-root", type=Path, default=ROOT / "src")
     validate_parser.add_argument("--skip-annotation-check", action="store_true")
+    validate_parser.add_argument("--staged", action="store_true")
 
     annotations_parser = subparsers.add_parser("annotations")
     annotations_parser.add_argument("report", type=Path)
@@ -1044,6 +1121,7 @@ def main() -> int:
         args.baseline_data,
         args.current_data,
         args.accounting_correction,
+        args.staged,
     )
 
 

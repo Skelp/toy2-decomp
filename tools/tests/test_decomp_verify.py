@@ -106,11 +106,17 @@ class VerifyRegressionTests(unittest.TestCase):
         baseline_data=None,
         current_data=None,
         accounting_correction=None,
+        staged=False,
+        lint_change=None,
     ):
         old_artifacts = VERIFY.TOOL_ARTIFACTS
         VERIFY.TOOL_ARTIFACTS = baseline.parent / "none.tsv"
         try:
-            with mock.patch.object(VERIFY, "validate_metadata", return_value=[]):
+            with mock.patch.object(VERIFY, "validate_metadata", return_value=[]), mock.patch.object(
+                VERIFY,
+                "read_lint_debt_change",
+                return_value=lint_change or VERIFY.LintDebtChange(),
+            ):
                 return VERIFY.validate(
                     baseline,
                     current,
@@ -124,6 +130,7 @@ class VerifyRegressionTests(unittest.TestCase):
                     baseline_data_path=baseline_data,
                     current_data_path=current_data,
                     accounting_correction=accounting_correction,
+                    staged=staged,
                 )
         finally:
             VERIFY.TOOL_ARTIFACTS = old_artifacts
@@ -350,6 +357,107 @@ class VerifyRegressionTests(unittest.TestCase):
             self.assertEqual(
                 self.validate(baseline, current, {0x401000}, mode="refinement"), 0
             )
+
+    def test_non_function_lint_debt_removal_counts_as_refinement_progress(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 0.8}
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.8}
+            ])
+            change = VERIFY.LintDebtChange(removed_errors=5)
+            self.assertEqual(
+                self.validate(
+                    baseline,
+                    current,
+                    {0x401000},
+                    mode="refinement",
+                    staged=True,
+                    lint_change=change,
+                ),
+                0,
+            )
+
+    def test_new_lint_debt_blocks_refinement_progress(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 0.8}
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.8}
+            ])
+            change = VERIFY.LintDebtChange(removed_errors=1, new_errors=1)
+            self.assertEqual(
+                self.validate(
+                    baseline,
+                    current,
+                    {0x401000},
+                    mode="refinement",
+                    staged=True,
+                    lint_change=change,
+                ),
+                1,
+            )
+
+    def test_lint_debt_removal_does_not_hide_untouched_function_regression(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 0.8},
+                {"address": "0x402000", "matching": 0.8},
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.8},
+                {"address": "0x402000", "matching": 0.7},
+            ])
+            self.assertEqual(
+                self.validate(
+                    baseline,
+                    current,
+                    {0x401000},
+                    mode="refinement",
+                    staged=True,
+                    lint_change=VERIFY.LintDebtChange(removed_errors=1),
+                ),
+                1,
+            )
+
+    def test_lint_debt_change_requires_source_and_baseline_repairs(self):
+        finding = VERIFY.decomp_lint.Finding(
+            Path("src/first.cpp"),
+            1,
+            "repeated-private-type",
+            "error",
+            "struct SharedType { int value; };",
+            "type repeats",
+            subject="SharedType",
+            fingerprint="abc123",
+        )
+        owner, rule, subject, fingerprint = finding.baseline_key
+        entry = VERIFY.decomp_lint.BaselineEntry(
+            owner, rule, subject, fingerprint, "src/first.cpp"
+        )
+
+        removed = VERIFY.classify_lint_debt_change([finding], [entry], [], [])
+        self.assertEqual(removed, VERIFY.LintDebtChange(removed_errors=1))
+
+        row_only = VERIFY.classify_lint_debt_change(
+            [finding], [entry], [finding], []
+        )
+        self.assertEqual(row_only.removed_errors, 0)
+        self.assertEqual(row_only.new_errors, 1)
+
+        source_only = VERIFY.classify_lint_debt_change(
+            [finding], [entry], [], [entry]
+        )
+        self.assertEqual(source_only.removed_errors, 0)
+        self.assertEqual(source_only.stale_rows, 1)
 
     def test_refinement_below_50_must_cross_the_gate(self):
         with tempfile.TemporaryDirectory() as directory:
