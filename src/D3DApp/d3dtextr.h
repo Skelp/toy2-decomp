@@ -15,9 +15,9 @@ struct TextureContainer
 	LPDIRECT3DTEXTURE2 texture;
 	uint32_t stage;
 	char name[80];
-	uint32_t colorKey;
+	BOOL hasAlpha;
 	uint32_t flags;
-	uint8_t textureMetadata[40];
+	uint8_t* surfaceBits[10];
 	uint32_t* rgbaData;
 	DDSURFACEDESC2 surfaceDesc;
 	uint32_t textureHandle;
@@ -37,6 +37,7 @@ uint32_t* D3DTextr_GetRGBAData(TextureContainer* texture);
 void D3DTextr_GetSurfaceDesc(TextureContainer* texture, DDSURFACEDESC2** surfaceDesc);
 TextureContainer* D3DTextr_GetTextureContainer(const char* name);
 void D3DTextr_SetTexturePath(const char* path);
+HRESULT D3DTextr_CreateTexture(char* name, DWORD stage, DWORD flags);
 
 STATIC_ASSERT(sizeof(TextureContainer) == 0x120);
 STATIC_ASSERT(offsetof(TextureContainer, rgbaData) == 0x94);

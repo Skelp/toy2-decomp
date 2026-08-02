@@ -869,6 +869,9 @@
 0x004B1A40 D3DTextr_GetSurfaceDesc
 0x004B1A50 D3DTextr_GetTextureContainer
 0x004B1A60 D3DTextr_SetTexturePath
+0x004B1AA0 D3DTextr_CreateTexture
+0x004B1B60 LoadTextureImage
+0x004B1C50 FindTextureFile
 0x004B2B20 SoftwareRenderer::ReleaseVertexBuffer
 0x004B2B30 SoftwareRenderer::CreateVertexBuffer
 0x004B2B80 SoftwareRenderer::GetStrideFromFVF

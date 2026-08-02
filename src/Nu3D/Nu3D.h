@@ -43,6 +43,7 @@ namespace Nu3D
 
 	extern int32_t g_useAsDiffuseModulation;
 	extern int32_t g_defaultPrimitiveFlags;
+	extern int32_t g_isSoftwareRendering;
 
 	void SetIsSoftwareRendering(int32_t value);
 	uint32_t GetHighResolutionTime();

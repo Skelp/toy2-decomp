@@ -1,11 +1,13 @@
 #include "D3DApp/d3dappi.h"
 #include "D3DApp/d3dtextr.h"
 #include "Logger.h"
+#include "Nu3D/Nu3D.h"
 #include "SaveManager.h"
 #include "SoftwareRenderer.h"
 #include "Toy2/Direct6.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 namespace SoftwareRenderer
@@ -45,6 +47,9 @@ TextureContainer* g_textureList;
 
 // GLOBAL: TOY2 0x00508288
 char g_texturePath[512] = "MEDIA\\";
+
+// GLOBAL: TOY2 0x00508488
+char* g_textureRegistryValueName = "DX6SDK Samples Path";
 
 // FUNCTION: TOY2 0x00497DB0 [MATCHED]
 void AllocateTexturePixelBuffer(int16_t textureIndex)
@@ -238,4 +243,112 @@ void D3DTextr_SetTexturePath(const char* path)
 		path = &SaveManager::g_emptyString;
 
 	strcpy(g_texturePath, path);
+}
+
+inline BOOL FileExists(char* name)
+{
+	FILE* file = fopen(name, "rb");
+	return file != NULL ? fclose(file) == 0 : FALSE;
+}
+
+// FUNCTION: TOY2 0x004B1C50 [MATCHED]
+static HRESULT FindTextureFile(char* filename, char* texturePath, char* fullPath)
+{
+	strcpy(fullPath, filename);
+	if (FileExists(fullPath))
+		return DD_OK;
+
+	char* path = getenv("D3DPATH");
+	if (path != NULL)
+	{
+		sprintf(fullPath, "%s\\%s", path, filename);
+		if (FileExists(fullPath))
+			return DD_OK;
+	}
+
+	HKEY key;
+	LONG result = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "Software\\Microsoft\\DirectX", 0, KEY_READ, &key);
+	if (result == ERROR_SUCCESS)
+	{
+		char path[512];
+		DWORD type;
+		DWORD size = sizeof(path);
+		result = RegQueryValueEx(key, g_textureRegistryValueName, NULL, &type, (BYTE*)path, &size);
+		RegCloseKey(key);
+
+		if (result == ERROR_SUCCESS)
+		{
+			sprintf(fullPath, "%s\\D3DIM\\Media\\%s", path, filename);
+			if (FileExists(fullPath))
+				return DD_OK;
+
+			sprintf(fullPath, "%s\\%s%s", path, texturePath, filename);
+			if (FileExists(fullPath))
+				return DD_OK;
+		}
+	}
+
+	return DDERR_NOTFOUND;
+}
+
+// FUNCTION: TOY2 0x004B1B60 [MATCHED]
+static HRESULT LoadTextureImage(TextureContainer* texture)
+{
+	char* filename = texture->name;
+	char* extension = strrchr(filename, '.');
+	char pathname[256];
+
+	if (extension == NULL)
+		return DDERR_UNSUPPORTED;
+
+	texture->bitmap = (HBITMAP)LoadImage(GetModuleHandle(NULL), filename, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
+	if (texture->bitmap != NULL)
+		return S_OK;
+
+	if (FAILED(FindTextureFile(filename, g_texturePath, pathname)))
+		return DDERR_NOTFOUND;
+
+	if (lstrcmpi(extension, ".bmp") == 0)
+	{
+		texture->bitmap = (HBITMAP)LoadImage(GetModuleHandle(NULL), pathname, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
+		if (texture->bitmap == NULL)
+		{
+			texture->bitmap = (HBITMAP)LoadImage(NULL, pathname, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION);
+		}
+
+		return texture->bitmap != NULL ? DD_OK : DDERR_NOTFOUND;
+	}
+
+	return DDERR_UNSUPPORTED;
+}
+
+// FUNCTION: TOY2 0x004B1AA0 [PROVISIONAL]
+HRESULT D3DTextr_CreateTexture(char* name, DWORD stage, DWORD flags)
+{
+	if (D3DTextr_FindTexture(name) != NULL)
+		return S_OK;
+
+	TextureContainer* texture = new TextureContainer;
+	if (texture == NULL)
+		return E_OUTOFMEMORY;
+
+	ZeroMemory(texture, sizeof(TextureContainer));
+	lstrcpy(texture->name, name);
+	texture->stage = stage;
+	texture->flags = flags;
+	if (Nu3D::g_isSoftwareRendering)
+		texture->flags |= 4;
+
+	if (FAILED(LoadTextureImage(texture)))
+	{
+		delete texture;
+		return E_FAIL;
+	}
+
+	if (g_textureList != NULL)
+		g_textureList->prev = texture;
+	texture->next = g_textureList;
+	g_textureList = texture;
+
+	return S_OK;
 }
