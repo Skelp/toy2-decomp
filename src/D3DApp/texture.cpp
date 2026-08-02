@@ -38,6 +38,9 @@ int16_t g_texturePaletteState[64];
 // GLOBAL: TOY2 0x0050AA64
 TextureDimensions g_textureDimensions[64];
 
+// GLOBAL: TOY2 0x00884474
+TextureContainer* g_textureList;
+
 // FUNCTION: TOY2 0x00497DB0 [MATCHED]
 void AllocateTexturePixelBuffer(int16_t textureIndex)
 {
@@ -143,4 +146,34 @@ TextureContainer::~TextureContainer()
 	}
 
 	DeleteObject(bitmap);
+}
+
+// FUNCTION: TOY2 0x004B1980 [MATCHED]
+LPDIRECTDRAWSURFACE4 D3DTextr_GetSurface(const char* name)
+{
+	TextureContainer* texture = D3DTextr_FindTexture(name);
+	if (texture != NULL)
+		return texture->surface;
+	return NULL;
+}
+
+// FUNCTION: TOY2 0x004B19A0 [MATCHED]
+TextureContainer* D3DTextr_FindTexture(const char* name)
+{
+	TextureContainer* texture = g_textureList;
+	while (texture != NULL)
+	{
+		if (lstrcmpi(name, texture->name) == 0)
+			return texture;
+		texture = texture->next;
+	}
+	return NULL;
+}
+
+// FUNCTION: TOY2 0x004B19E0 [MATCHED]
+LPDIRECTDRAWSURFACE4 D3DTextr_GetSurface(TextureContainer* texture)
+{
+	if (texture != NULL)
+		return texture->surface;
+	return NULL;
 }

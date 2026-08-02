@@ -27,6 +27,10 @@ struct TextureContainer
 	~TextureContainer();
 };
 
+LPDIRECTDRAWSURFACE4 D3DTextr_GetSurface(const char* name);
+TextureContainer* D3DTextr_FindTexture(const char* name);
+LPDIRECTDRAWSURFACE4 D3DTextr_GetSurface(TextureContainer* texture);
+
 STATIC_ASSERT(sizeof(TextureContainer) == 0x120);
 STATIC_ASSERT(offsetof(TextureContainer, rgbaData) == 0x94);
 STATIC_ASSERT(offsetof(TextureContainer, surfaceDesc) == 0x98);
