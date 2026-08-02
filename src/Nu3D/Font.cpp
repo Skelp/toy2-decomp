@@ -334,7 +334,7 @@ namespace Nu3D
 	int16_t g_nextFontId = 0;
 
 	// GLOBAL: TOY2 0x004DDABC
-	int16_t g_defaultFontType = 0;
+	extern const int16_t g_defaultFontType = 0;
 
 	// FUNCTION: TOY2 0x004B3A20 [PROVISIONAL]
 	Font* Font::BuildObject(int32_t numGlyphs)
