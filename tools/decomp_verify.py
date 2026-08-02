@@ -63,7 +63,9 @@ def source_state(source_root: Path) -> dict[str, object]:
     }
 
 
-def metadata(report: Path | None = None) -> dict[str, object]:
+def metadata(
+    report: Path | None = None, data_report: Path | None = None
+) -> dict[str, object]:
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, capture_output=True, check=True
     ).stdout.strip()
@@ -79,6 +81,8 @@ def metadata(report: Path | None = None) -> dict[str, object]:
             values[name] = file_hash(path)
     if report is not None and report.exists():
         values["baseline_report_sha256"] = file_hash(report)
+    if data_report is not None and data_report.exists():
+        values["baseline_data_report_sha256"] = file_hash(data_report)
     values["sdk_headers_sha256"] = tree_hash(ROOT / "external" / "include")
     values["vc6_headers_sha256"] = tree_hash(
         ROOT / ".tooling" / "msvc600-8168" / "VC98" / "Include"
@@ -97,8 +101,13 @@ def metadata(report: Path | None = None) -> dict[str, object]:
     return values
 
 
-def write_metadata(path: Path, report: Path | None = None) -> None:
-    path.write_text(json.dumps(metadata(report), indent=2) + "\n", encoding="utf-8")
+def write_metadata(
+    path: Path, report: Path | None = None, data_report: Path | None = None
+) -> None:
+    path.write_text(
+        json.dumps(metadata(report, data_report), indent=2) + "\n",
+        encoding="utf-8",
+    )
 
 
 def read_source_debt(source_root: Path) -> dict[int, list[str]]:
@@ -116,7 +125,11 @@ def read_source_debt(source_root: Path) -> dict[int, list[str]]:
     return debt
 
 
-def validate_metadata(metadata_path: Path, baseline_path: Path) -> list[str]:
+def validate_metadata(
+    metadata_path: Path,
+    baseline_path: Path,
+    baseline_data_path: Path | None = None,
+) -> list[str]:
     if not metadata_path.exists():
         return ["baseline metadata is missing; run tools/decomp baseline"]
     try:
@@ -128,6 +141,14 @@ def validate_metadata(metadata_path: Path, baseline_path: Path) -> list[str]:
     expected_report = saved.get("baseline_report_sha256")
     if not expected_report or expected_report != file_hash(baseline_path):
         problems.append("baseline report does not match its saved metadata")
+    if baseline_data_path is not None:
+        expected_data_report = saved.get("baseline_data_report_sha256")
+        if (
+            not baseline_data_path.exists()
+            or not expected_data_report
+            or expected_data_report != file_hash(baseline_data_path)
+        ):
+            problems.append("baseline data report does not match its saved metadata")
     baseline_head = saved.get("git_head")
     if not baseline_head:
         problems.append("baseline git_head does not match the current build context")
@@ -170,6 +191,177 @@ def effective_score(status) -> float:
 
 def is_terminal(status, debt: list[str] | None = None) -> bool:
     return bool(status and (status.exact or status.effective) and not debt)
+
+
+def read_data_report(path: Path | None) -> dict[str, object]:
+    """Read a typed-data report, or return an empty report."""
+
+    if path is None or not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def data_variables(payload: dict[str, object]) -> dict[int, dict]:
+    group = payload.get("variables", {})
+    rows = group.get("variables", []) if isinstance(group, dict) else []
+    return {
+        int(item["original_address"]): item
+        for item in rows
+        if isinstance(item, dict) and item.get("original_address") is not None
+    }
+
+
+def unscored_data_variables(payload: dict[str, object]) -> dict[int, dict]:
+    group = payload.get("variables", {})
+    rows = group.get("unscored_variables", []) if isinstance(group, dict) else []
+    return {
+        int(item["original_address"]): item
+        for item in rows
+        if isinstance(item, dict) and item.get("original_address") is not None
+    }
+
+
+def data_target_problem(address: int, payload: dict[str, object]) -> str:
+    unscored = unscored_data_variables(payload).get(address)
+    if unscored is None:
+        return (
+            f"0x{address:08X}: data target is unknown. "
+            "Use tools/decomp data --limit 10."
+        )
+    reason = unscored.get("reason")
+    if reason == "bss_only":
+        return (
+            f"0x{address:08X}: data target is BSS-only. "
+            "Select an initialized global."
+        )
+    if reason == "unknown_size":
+        return f"0x{address:08X}: data target has no scored type size"
+    return f"0x{address:08X}: data target has no scored retail bytes"
+
+
+def data_sections(payload: dict[str, object]) -> dict[str, dict]:
+    group = payload.get("sections", {})
+    rows = group.get("sections", []) if isinstance(group, dict) else []
+    return {
+        str(item["name"]): item
+        for item in rows
+        if isinstance(item, dict) and item.get("name")
+    }
+
+
+def validate_data_campaign(
+    baseline_payload: dict[str, object],
+    current_payload: dict[str, object],
+    targets: set[int],
+    accounting_correction: str | None,
+) -> list[str]:
+    """Validate selected initialized globals and aggregate data evidence."""
+
+    problems: list[str] = []
+    if not baseline_payload:
+        return ["baseline data report is missing. Run tools/decomp baseline."]
+    if not current_payload:
+        return ["current data report is missing"]
+    if len(targets) > 3:
+        problems.append("a data campaign can have at most three targets")
+
+    baseline = data_variables(baseline_payload)
+    current = data_variables(current_payload)
+    comparable_targets: set[int] = set()
+    for address in sorted(targets):
+        before = baseline.get(address)
+        after = current.get(address)
+        if before is None:
+            problems.append(data_target_problem(address, baseline_payload))
+            continue
+        if after is None:
+            problems.append(
+                f"0x{address:08X}: data target is not scored in the current report"
+            )
+            continue
+        comparable_targets.add(address)
+        before_matched = float(before.get("matched_bytes", 0))
+        after_matched = float(after.get("matched_bytes", 0))
+        before_size = int(before.get("size", 0))
+        after_size = int(after.get("size", 0))
+        before_score = float(before.get("score", 0))
+        after_score = float(after.get("score", 0))
+        print(
+            f"0x{address:08X}  data {before_matched:g}/{before_size} -> "
+            f"{after_matched:g}/{after_size} bytes "
+            f"({before_score * 100:.2f}% -> {after_score * 100:.2f}%)"
+        )
+        if accounting_correction is None:
+            if after_matched <= before_matched:
+                problems.append(
+                    f"0x{address:08X}: data target did not improve explained bytes"
+                )
+            if after_score + 1e-12 < before_score:
+                problems.append(f"0x{address:08X}: data target score regressed")
+
+    if accounting_correction is not None:
+        print(f"Accounting correction: {accounting_correction}")
+        return problems
+
+    for address, before in baseline.items():
+        if address in comparable_targets:
+            continue
+        after = current.get(address)
+        if after is None:
+            problems.append(f"0x{address:08X}: unrelated data target disappeared")
+            continue
+        if float(after.get("matched_bytes", 0)) + 1e-12 < float(
+            before.get("matched_bytes", 0)
+        ):
+            problems.append(f"0x{address:08X}: unrelated data bytes regressed")
+        elif float(after.get("score", 0)) + 1e-12 < float(
+            before.get("score", 0)
+        ):
+            problems.append(f"0x{address:08X}: unrelated data score regressed")
+
+    before_group = baseline_payload.get("variables", {})
+    after_group = current_payload.get("variables", {})
+    if not isinstance(before_group, dict) or not isinstance(after_group, dict):
+        return problems + ["typed-data totals are missing"]
+    before_explained = float(before_group.get("explained_bytes", 0))
+    after_explained = float(after_group.get("explained_bytes", 0))
+    if after_explained <= before_explained:
+        problems.append("initialized-data explained bytes did not improve")
+
+    before_sections = data_sections(baseline_payload)
+    after_sections = data_sections(current_payload)
+    for name, before in before_sections.items():
+        after = after_sections.get(name)
+        if after is None:
+            problems.append(f"{name}: scored data section disappeared")
+            continue
+        if float(after.get("explained_bytes", 0)) + 1e-12 < float(
+            before.get("explained_bytes", 0)
+        ):
+            problems.append(f"{name}: explained section bytes regressed")
+        elif float(after.get("score", 0)) + 1e-12 < float(
+            before.get("score", 0)
+        ):
+            problems.append(f"{name}: data section score regressed")
+
+    for group_name in ("vtables", "imports", "relocations"):
+        before = baseline_payload.get(group_name, {})
+        after = current_payload.get(group_name, {})
+        if not isinstance(before, dict) or not isinstance(after, dict):
+            continue
+        if group_name == "vtables":
+            before_value = float(before.get("explained_bytes", 0))
+            after_value = float(after.get("explained_bytes", 0))
+        else:
+            before_value = float(before.get("matched_entries", 0))
+            after_value = float(after.get("matched_entries", 0))
+        if after_value + 1e-12 < before_value:
+            problems.append(f"{group_name}: data evidence regressed")
+    return problems
 
 
 VERIFICATION_TAG = {
@@ -421,13 +613,22 @@ def validate(
     check_annotation_tags: bool = True,
     mode: str = "coverage",
     meta_resolution: bool = False,
+    baseline_data_path: Path | None = None,
+    current_data_path: Path | None = None,
+    accounting_correction: str | None = None,
 ) -> int:
     baseline = read_match_statuses(baseline_path)
     current = read_match_statuses(current_path)
     artifacts = read_tool_artifacts(TOOL_ARTIFACTS)
     problems: list[str] = []
     if metadata_path is not None:
-        problems.extend(validate_metadata(metadata_path, baseline_path))
+        problems.extend(
+            validate_metadata(
+                metadata_path,
+                baseline_path,
+                baseline_data_path if mode == "data" else None,
+            )
+        )
     source_debt = read_source_debt(source_root)
     current_state = source_state(source_root)
     baseline_state = read_baseline_state(metadata_path)
@@ -446,6 +647,10 @@ def validate(
         problems.append(
             "--allow-target-regression requires explicit meta-resolution work"
         )
+    if accounting_correction is not None and not meta_resolution:
+        problems.append("--accounting-correction requires --meta-resolution")
+    if accounting_correction is not None and mode != "data":
+        problems.append("--accounting-correction requires --mode data")
     if check_annotation_tags:
         problems.extend(check_annotations(current_path, source_root))
     for address, before in baseline.items():
@@ -477,7 +682,8 @@ def validate(
                 f"({before.matching * 100:.2f}% -> {after.matching * 100:.2f}%)"
             )
 
-    for address in sorted(targets):
+    function_targets = sorted(targets) if mode != "data" else []
+    for address in function_targets:
         status = current.get(address)
         if status is None:
             problems.append(f"0x{address:08X}: target is not in the current report")
@@ -544,6 +750,36 @@ def validate(
         if len(current_implemented) <= len(baseline_implemented):
             problems.append("coverage did not increase the implemented-function count")
 
+    if mode == "data":
+        if has_baseline_state:
+            for address in sorted(baseline_implemented - current_implemented):
+                problems.append(
+                    f"0x{address:08X}: implemented function disappeared"
+                )
+        for address, rules in source_debt.items():
+            added_rules = set(rules) - set(baseline_debt.get(address, []))
+            if added_rules:
+                problems.append(
+                    f"0x{address:08X}: source debt increased: "
+                    f"{', '.join(sorted(added_rules))}"
+                )
+        baseline_source_hash = baseline_state.get("source_dependency_sha256")
+        if accounting_correction is None:
+            if baseline_source_hash is None:
+                problems.append(
+                    "baseline metadata has no source state. Run tools/decomp baseline."
+                )
+            elif baseline_source_hash == tree_hash(source_root):
+                problems.append("data campaign did not change the source tree")
+        problems.extend(
+            validate_data_campaign(
+                read_data_report(baseline_data_path),
+                read_data_report(current_data_path),
+                targets,
+                accounting_correction,
+            )
+        )
+
     newly_implemented = (
         current_implemented - baseline_implemented if has_baseline_state else set()
     )
@@ -590,6 +826,7 @@ def main() -> int:
     metadata_parser = subparsers.add_parser("metadata")
     metadata_parser.add_argument("output", type=Path)
     metadata_parser.add_argument("--report", type=Path)
+    metadata_parser.add_argument("--data-report", type=Path)
 
     classify_parser = subparsers.add_parser("classify")
     classify_parser.add_argument("report", type=Path)
@@ -606,8 +843,13 @@ def main() -> int:
     validate_parser.add_argument("current", type=Path)
     validate_parser.add_argument("targets", nargs="+", type=parse_address)
     validate_parser.add_argument("--allow-target-regression", action="store_true")
-    validate_parser.add_argument("--mode", choices=("coverage", "refinement"), default="coverage")
+    validate_parser.add_argument(
+        "--mode", choices=("coverage", "refinement", "data"), default="coverage"
+    )
     validate_parser.add_argument("--meta-resolution", action="store_true")
+    validate_parser.add_argument("--baseline-data", type=Path)
+    validate_parser.add_argument("--current-data", type=Path)
+    validate_parser.add_argument("--accounting-correction")
     validate_parser.add_argument("--metadata", type=Path)
     validate_parser.add_argument("--source-root", type=Path, default=ROOT / "src")
     validate_parser.add_argument("--skip-annotation-check", action="store_true")
@@ -629,7 +871,7 @@ def main() -> int:
 
     args = parser.parse_args()
     if args.command == "metadata":
-        write_metadata(args.output, args.report)
+        write_metadata(args.output, args.report, args.data_report)
         return 0
     if args.command == "classify":
         return classify(args.report, args.address, args.source_root)
@@ -658,6 +900,9 @@ def main() -> int:
         not args.skip_annotation_check,
         args.mode,
         args.meta_resolution,
+        args.baseline_data,
+        args.current_data,
+        args.accounting_correction,
     )
 
 

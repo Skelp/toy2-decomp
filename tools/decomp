@@ -70,15 +70,28 @@ write_comparison_report() {
     ) >/dev/null
 }
 
+write_data_report() {
+    local output_name="$1"
+    python tools/generate-decomp-data-report.py \
+        --original original/toy2.exe \
+        --recompiled build/toy2.exe \
+        --pdb build/toy2.pdb \
+        --source-root src \
+        --output "build/$output_name"
+}
+
 baseline() {
     build
     write_comparison_report decomp-baseline-report.json
+    write_data_report decomp-baseline-data-report.json
     python tools/decomp_verify.py metadata build/decomp-baseline-meta.json \
-        --report build/decomp-baseline-report.json
+        --report build/decomp-baseline-report.json \
+        --data-report build/decomp-baseline-data-report.json
     echo "Wrote build/decomp-baseline-report.json for $(git rev-parse --short HEAD)."
 }
 
 validate() {
+    local accounting_correction=""
     local allow_target_regression=0
     local meta_resolution=0
     local mode=""
@@ -96,8 +109,19 @@ validate() {
                 shift
                 ;;
             --mode)
-                [[ $# -ge 2 ]] || { echo "error: --mode needs coverage or refinement" >&2; return 2; }
+                [[ $# -ge 2 ]] || {
+                    echo "error: --mode needs a campaign type" >&2
+                    return 2
+                }
                 mode="$2"
+                shift 2
+                ;;
+            --accounting-correction)
+                [[ $# -ge 2 ]] || {
+                    echo "error: --accounting-correction needs a reason" >&2
+                    return 2
+                }
+                accounting_correction="$2"
                 shift 2
                 ;;
             --meta-resolution)
@@ -118,21 +142,49 @@ validate() {
         echo "error: validate needs at least one --target address" >&2
         return 2
     fi
-    if [[ $meta_resolution -eq 0 && $mode != coverage && $mode != refinement ]]; then
-        echo "error: validate needs --mode coverage or --mode refinement" >&2
+    if [[ -n $mode && $mode != coverage && $mode != refinement && $mode != data ]]; then
+        echo "error: unknown validation mode: $mode" >&2
+        return 2
+    fi
+    if [[ $meta_resolution -eq 0 && -z $mode ]]; then
+        echo "error: validate needs --mode coverage, refinement, or data" >&2
+        return 2
+    fi
+    if [[ $mode == data && ${#targets[@]} -gt 3 ]]; then
+        echo "error: a data campaign can have at most three targets" >&2
         return 2
     fi
     if [[ $allow_target_regression -eq 1 && $meta_resolution -eq 0 ]]; then
         echo "error: --allow-target-regression requires --meta-resolution" >&2
         return 2
     fi
+    if [[ -n $accounting_correction && $meta_resolution -eq 0 ]]; then
+        echo "error: --accounting-correction requires --meta-resolution" >&2
+        return 2
+    fi
+    if [[ -n $accounting_correction && $mode != data ]]; then
+        echo "error: --accounting-correction requires --mode data" >&2
+        return 2
+    fi
     if [[ ! -f build/decomp-baseline-report.json ]]; then
         echo "error: run tools/decomp baseline before you edit source" >&2
+        return 2
+    fi
+    if [[ $mode == data && ! -f build/decomp-baseline-data-report.json ]]; then
+        echo "error: run tools/decomp baseline before a data campaign" >&2
+        return 2
+    fi
+    if [[ $mode == data && $staged -eq 1 && -z $accounting_correction ]] && \
+        git diff --cached --quiet -- src; then
+        echo "error: a staged data campaign must change the source tree" >&2
         return 2
     fi
 
     build
     write_comparison_report decomp-current-report.json
+    if [[ $mode == data ]]; then
+        write_data_report decomp-current-data-report.json
+    fi
     local verify_args=(
         validate
         build/decomp-baseline-report.json
@@ -145,8 +197,18 @@ validate() {
     fi
     if [[ $meta_resolution -eq 1 ]]; then
         verify_args+=(--meta-resolution)
-    else
+    fi
+    if [[ -n $mode ]]; then
         verify_args+=(--mode "$mode")
+    fi
+    if [[ $mode == data ]]; then
+        verify_args+=(
+            --baseline-data build/decomp-baseline-data-report.json
+            --current-data build/decomp-current-data-report.json
+        )
+    fi
+    if [[ -n $accounting_correction ]]; then
+        verify_args+=(--accounting-correction "$accounting_correction")
     fi
     python tools/decomp_verify.py "${verify_args[@]}"
     if [[ $staged -eq 1 ]]; then
@@ -266,7 +328,7 @@ Commands:
   blockers [addr]   Show committed blockers
   evidence <addr>   Collect bounded evidence for one target in a single call
   baseline          Save a fresh parent-state comparison before source edits
-  validate [args]   Enforce coverage or refinement success and regressions
+  validate [args]   Enforce coverage, refinement, or data success and regressions
   experiment [...] Record labeled source-form comparison trials
   lint [files]      Check reconstructed source for decompiler residue
   names             Re-extract .notes/original-names.md from the retail binary
@@ -442,12 +504,7 @@ case "$command" in
         ;;
     data)
         ensure_build
-        python tools/generate-decomp-data-report.py \
-            --original original/toy2.exe \
-            --recompiled build/toy2.exe \
-            --pdb build/toy2.pdb \
-            --source-root src \
-            --output build/decomp-data-report.json
+        write_data_report decomp-data-report.json
         exec python tools/decomp_data.py "$@"
         ;;
     session-summary)

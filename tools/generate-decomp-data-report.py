@@ -67,9 +67,33 @@ def export_variables(engine: Compare) -> dict:
         recomp_bin=engine.recomp_bin,
     )
     variables = []
+    unscored_variables = []
     for variable in engine.get_variables():
         size = variable_size(engine, variable)
-        if size <= 0 or not is_physically_stored(engine, variable.orig_addr, size):
+        if size <= 0:
+            unscored_variables.append(
+                {
+                    "original_address": variable.orig_addr,
+                    "name": variable.name,
+                    "size": size,
+                    "reason": "unknown_size",
+                }
+            )
+            continue
+        if not is_physically_stored(engine, variable.orig_addr, size):
+            reason = (
+                "bss_only"
+                if engine.orig_bin.addr_is_uninitialized(variable.orig_addr)
+                else "no_physical_storage"
+            )
+            unscored_variables.append(
+                {
+                    "original_address": variable.orig_addr,
+                    "name": variable.name,
+                    "size": size,
+                    "reason": reason,
+                }
+            )
             continue
 
         item = comparator.compare_variable(variable)
@@ -111,9 +135,54 @@ def export_variables(engine: Compare) -> dict:
     return {
         "format": 1,
         "variables": variables,
+        "unscored_variables": unscored_variables,
         "variable_count": len(variables),
         "scored_bytes": sum(item["size"] for item in variables),
         "explained_bytes": sum(item["matched_bytes"] for item in variables),
+    }
+
+
+def export_sections(engine: Compare, payload: dict) -> dict:
+    """Summarize semantic evidence for each scored data section."""
+
+    variables = payload["variables"]["variables"]
+    vtables = payload["vtables"]["tables"]
+    rows = []
+    for section in engine.orig_bin.sections:
+        if section.name not in (".data", ".rdata", ".idata", ".reloc"):
+            continue
+        size = section.size_of_raw_data
+        evidence_bytes = 0
+        explained_bytes = 0.0
+        if section.name in (".data", ".rdata"):
+            for item in variables + vtables:
+                address = int(item.get("original_address", 0))
+                item_size = int(item.get("size", 0))
+                if (
+                    section.virtual_address <= address
+                    and address + item_size <= section.virtual_address + size
+                ):
+                    evidence_bytes += item_size
+                    explained_bytes += float(item.get("matched_bytes", 0))
+        elif section.name == ".idata":
+            evidence_bytes = size
+            explained_bytes = size * float(payload["imports"].get("score", 0))
+        else:
+            evidence_bytes = size
+            explained_bytes = size * float(payload["relocations"].get("score", 0))
+        rows.append(
+            {
+                "name": section.name,
+                "size": size,
+                "evidence_bytes": evidence_bytes,
+                "explained_bytes": explained_bytes,
+                "score": explained_bytes / size if size else 1.0,
+            }
+        )
+    return {
+        "sections": rows,
+        "scored_bytes": sum(item["size"] for item in rows),
+        "explained_bytes": sum(item["explained_bytes"] for item in rows),
     }
 
 
@@ -233,6 +302,7 @@ def main() -> int:
             "recompiled_pdb": engine.recomp_bin.pdb_filename,
         },
     }
+    payload["sections"] = export_sections(engine, payload)
     args.output.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )

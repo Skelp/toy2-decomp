@@ -52,16 +52,17 @@ tools/decomp data --limit 10
 tools/decomp baseline
 ```
 
-Use two campaign queues. A `COVERAGE` campaign reconstructs a `STUB` or an
+Use three campaign queues. A `COVERAGE` campaign reconstructs a `STUB` or an
 unstarted function. A `REFINEMENT` campaign improves provisional source,
-resolves a tool-only result, or removes source debt. Alternate the queues when
-both have credible work. Continue the available queue when the other queue has
-no credible work.
+resolves a tool-only result, or removes source debt. A `DATA` campaign improves
+typed evidence for initialized globals. Alternate all credible queues. Do not
+force a queue when it has no credible target.
 
 Rank work by unresolved retail bytes, evidence readiness, dependency impact,
 and source debt. A provisional callee can support behavior reconstruction.
 Treat it as a high-priority refinement prerequisite. Select one large function
 or at most three related functions in one subsystem.
+A data campaign can select at most three related initialized globals.
 
 Use `tools/decomp evidence ADDRESS` before editing. Confirm most of these facts:
 
@@ -76,6 +77,9 @@ to inspect mismatched fields in one global. The report compares typed scalars,
 arrays, pointers, and initialization state. A data difference can show an
 incorrect type, layout, initializer, pointer target, or ownership boundary.
 Confirm each conclusion with callers, retail data, or DWARF evidence.
+
+Select data work with `tools/decomp data --limit 10`. Reject targets without
+caller, retail, or DWARF evidence. Do not select BSS or unscored globals.
 
 If the first target lacks evidence, pivot within the same subsystem. Make no
 more than two pivots per campaign. A blocker is useful only when it identifies
@@ -154,9 +158,10 @@ Use this loop:
 evidence -> plausible source -> format -> build and compare -> explain -> revise
 ```
 
-Run `tools/decomp bc ADDRESS` after each meaningful source-model change. It
-saves the full diff and prints a bounded summary. Search compiler guidance with
-`tools/decomp notes QUERY --source codegen`. Do not read large note files.
+Run `tools/decomp bc ADDRESS` after each meaningful function-model change. It
+saves the full diff and prints a bounded summary. For data work, rebuild and
+run `tools/decomp data ADDRESS`. Search compiler guidance with `tools/decomp
+notes QUERY --source codegen`. Do not read large note files.
 
 The final similarity must be at least 50 percent unless reccmp marks the
 function exact or effective. A low score often shows an incorrect source
@@ -175,22 +180,29 @@ Before a source commit, run:
 ```sh
 tools/decomp validate --mode coverage --target ADDRESS --staged
 tools/decomp validate --mode refinement --target ADDRESS --staged
+tools/decomp validate --mode data --target ADDRESS --staged
 tools/decomp check
 git diff --check
 ```
 
 Use the mode that matches the campaign. Validation rejects ABI, annotation,
 source-quality, terminal-state, and untouched-function regressions. It also
-rejects targets below 50 percent. Normal campaigns must not use
+rejects function targets below 50 percent. Normal campaigns must not use
 `--allow-target-regression`. Use it only with `--meta-resolution` for an
 explicit workflow repair.
+
+Data validation requires a source change and improved typed bytes. It rejects
+selected, unrelated, aggregate, and data-section regressions. Use
+`--meta-resolution` with `--accounting-correction "REASON"` for an accounting
+correction.
 
 A successful coverage campaign must change C++, convert a target to
 `FUNCTION`, and increase the implemented count. A successful refinement
 campaign must improve similarity, reach terminal status, or remove source
-debt while terminal status remains. Both campaign types are source progress.
-Use `tools/decomp progress --json` before and after each campaign. Record the
-target score and the global metrics. Do not create a metadata-only success
+debt while terminal status remains. A successful data campaign must improve
+explained typed bytes without regressions. All three campaign types are source
+progress. Use `tools/decomp progress --json` before and after each campaign.
+Record target scores and global metrics. Do not create a metadata-only success
 commit.
 
 Run the full comparison, sync, and report once after a successful campaign.

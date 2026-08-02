@@ -20,6 +20,45 @@ class VerifyRegressionTests(unittest.TestCase):
         path.write_text(json.dumps({"data": rows}), encoding="utf-8")
         return path
 
+    def write_data_report(
+        self,
+        directory,
+        name,
+        rows,
+        *,
+        unscored=None,
+        section_explained=None,
+    ):
+        explained = sum(item.get("matched_bytes", 0) for item in rows)
+        scored = sum(item.get("size", 0) for item in rows)
+        section_explained = (
+            explained if section_explained is None else section_explained
+        )
+        payload = {
+            "variables": {
+                "variables": rows,
+                "unscored_variables": unscored or [],
+                "explained_bytes": explained,
+                "scored_bytes": scored,
+            },
+            "sections": {
+                "sections": [
+                    {
+                        "name": ".data",
+                        "size": 100,
+                        "explained_bytes": section_explained,
+                        "score": section_explained / 100,
+                    }
+                ]
+            },
+            "vtables": {"explained_bytes": 0},
+            "imports": {"matched_entries": 5},
+            "relocations": {"matched_entries": 0},
+        }
+        path = Path(directory) / name
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        return path
+
     def validate(
         self,
         baseline,
@@ -29,6 +68,9 @@ class VerifyRegressionTests(unittest.TestCase):
         source_root=None,
         mode="coverage",
         metadata=None,
+        baseline_data=None,
+        current_data=None,
+        accounting_correction=None,
     ):
         old_artifacts = VERIFY.TOOL_ARTIFACTS
         VERIFY.TOOL_ARTIFACTS = baseline.parent / "none.tsv"
@@ -43,7 +85,10 @@ class VerifyRegressionTests(unittest.TestCase):
                     source_root=source_root or baseline.parent / "src",
                     check_annotation_tags=False,
                     mode=mode,
-                    meta_resolution=allow,
+                    meta_resolution=allow or accounting_correction is not None,
+                    baseline_data_path=baseline_data,
+                    current_data_path=current_data,
+                    accounting_correction=accounting_correction,
                 )
         finally:
             VERIFY.TOOL_ARTIFACTS = old_artifacts
@@ -122,6 +167,19 @@ class VerifyRegressionTests(unittest.TestCase):
             self.assertIn(
                 "baseline report does not match its saved metadata",
                 VERIFY.validate_metadata(metadata, report),
+            )
+
+    def test_baseline_metadata_rejects_a_changed_data_report(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = self.write_report(root, "before.json", [])
+            data_report = self.write_data_report(root, "before-data.json", [])
+            metadata = root / "metadata.json"
+            VERIFY.write_metadata(metadata, report, data_report)
+            data_report.write_text("{}", encoding="utf-8")
+            self.assertIn(
+                "baseline data report does not match its saved metadata",
+                VERIFY.validate_metadata(metadata, report, data_report),
             )
 
     def test_annotation_tag_becomes_stale_after_regression(self):
@@ -283,6 +341,244 @@ class VerifyRegressionTests(unittest.TestCase):
                     source_root=source,
                     mode="refinement",
                     metadata=metadata,
+                ),
+                1,
+            )
+
+    def test_data_campaign_accepts_improved_typed_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src"
+            source.mkdir()
+            (source / "data.cpp").write_text("int value = 2;\n", encoding="utf-8")
+            metadata = root / "meta.json"
+            metadata.write_text(
+                json.dumps(
+                    {
+                        "implemented_addresses": [],
+                        "source_debt": {},
+                        "source_dependency_sha256": "baseline-source",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            baseline = self.write_report(root, "before.json", [])
+            current = self.write_report(root, "after.json", [])
+            baseline_data = self.write_data_report(
+                root,
+                "before-data.json",
+                [
+                    {
+                        "original_address": 0x501000,
+                        "size": 4,
+                        "matched_bytes": 0,
+                        "score": 0.0,
+                    }
+                ],
+            )
+            current_data = self.write_data_report(
+                root,
+                "after-data.json",
+                [
+                    {
+                        "original_address": 0x501000,
+                        "size": 4,
+                        "matched_bytes": 4,
+                        "score": 1.0,
+                    }
+                ],
+            )
+            self.assertEqual(
+                self.validate(
+                    baseline,
+                    current,
+                    {0x501000},
+                    source_root=source,
+                    mode="data",
+                    metadata=metadata,
+                    baseline_data=baseline_data,
+                    current_data=current_data,
+                ),
+                0,
+            )
+
+    def test_data_campaign_rejects_unchanged_and_bss_targets(self):
+        before = {
+            "variables": {
+                "variables": [
+                    {
+                        "original_address": 0x501000,
+                        "size": 4,
+                        "matched_bytes": 2,
+                        "score": 0.5,
+                    }
+                ],
+                "unscored_variables": [
+                    {
+                        "original_address": 0x502000,
+                        "reason": "bss_only",
+                    }
+                ],
+                "explained_bytes": 2,
+            }
+        }
+        problems = VERIFY.validate_data_campaign(
+            before, before, {0x501000, 0x502000}, None
+        )
+        self.assertTrue(any("did not improve" in item for item in problems))
+        self.assertTrue(any("BSS-only" in item for item in problems))
+
+    def test_data_campaign_rejects_unknown_and_unscored_targets(self):
+        payload = {
+            "variables": {
+                "variables": [],
+                "unscored_variables": [
+                    {
+                        "original_address": 0x502000,
+                        "reason": "unknown_size",
+                    }
+                ],
+                "explained_bytes": 0,
+            }
+        }
+        problems = VERIFY.validate_data_campaign(
+            payload, payload, {0x501000, 0x502000}, None
+        )
+        self.assertTrue(any("is unknown" in item for item in problems))
+        self.assertTrue(any("no scored type size" in item for item in problems))
+
+    def test_accounting_correction_uses_a_separate_meta_path(self):
+        payload = {
+            "variables": {
+                "variables": [
+                    {
+                        "original_address": 0x501000,
+                        "size": 4,
+                        "matched_bytes": 2,
+                        "score": 0.5,
+                    }
+                ],
+                "explained_bytes": 2,
+            }
+        }
+        self.assertTrue(
+            VERIFY.validate_data_campaign(payload, payload, {0x501000}, None)
+        )
+        self.assertEqual(
+            VERIFY.validate_data_campaign(
+                payload,
+                payload,
+                {0x501000},
+                "Correct the typed range.",
+            ),
+            [],
+        )
+
+    def test_data_campaign_rejects_unrelated_and_section_regressions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            baseline = self.write_data_report(
+                root,
+                "before-data.json",
+                [
+                    {
+                        "original_address": 0x501000,
+                        "size": 4,
+                        "matched_bytes": 0,
+                        "score": 0.0,
+                    },
+                    {
+                        "original_address": 0x502000,
+                        "size": 4,
+                        "matched_bytes": 4,
+                        "score": 1.0,
+                    },
+                ],
+                section_explained=10,
+            )
+            current = self.write_data_report(
+                root,
+                "after-data.json",
+                [
+                    {
+                        "original_address": 0x501000,
+                        "size": 4,
+                        "matched_bytes": 4,
+                        "score": 1.0,
+                    },
+                    {
+                        "original_address": 0x502000,
+                        "size": 4,
+                        "matched_bytes": 0,
+                        "score": 0.0,
+                    },
+                ],
+                section_explained=8,
+            )
+            problems = VERIFY.validate_data_campaign(
+                VERIFY.read_data_report(baseline),
+                VERIFY.read_data_report(current),
+                {0x501000},
+                None,
+            )
+            self.assertTrue(
+                any("unrelated data bytes regressed" in item for item in problems)
+            )
+            self.assertTrue(
+                any("section bytes regressed" in item for item in problems)
+            )
+
+    def test_data_campaign_rejects_unchanged_source_tree(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src"
+            source.mkdir()
+            metadata = root / "meta.json"
+            metadata.write_text(
+                json.dumps(
+                    {
+                        "implemented_addresses": [],
+                        "source_debt": {},
+                        "source_dependency_sha256": VERIFY.tree_hash(source),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            report = self.write_report(root, "functions.json", [])
+            baseline_data = self.write_data_report(
+                root,
+                "before-data.json",
+                [
+                    {
+                        "original_address": 0x501000,
+                        "size": 4,
+                        "matched_bytes": 0,
+                        "score": 0.0,
+                    }
+                ],
+            )
+            current_data = self.write_data_report(
+                root,
+                "after-data.json",
+                [
+                    {
+                        "original_address": 0x501000,
+                        "size": 4,
+                        "matched_bytes": 4,
+                        "score": 1.0,
+                    }
+                ],
+            )
+            self.assertEqual(
+                self.validate(
+                    report,
+                    report,
+                    {0x501000},
+                    source_root=source,
+                    mode="data",
+                    metadata=metadata,
+                    baseline_data=baseline_data,
+                    current_data=current_data,
                 ),
                 1,
             )

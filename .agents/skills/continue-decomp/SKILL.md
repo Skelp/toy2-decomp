@@ -25,9 +25,8 @@ external supervisor or use Goal mode inside a worker.
 
 ## Run campaigns
 
-Assign each campaign as `COVERAGE` or `REFINEMENT`. Alternate modes when both
-queues have credible work. Continue the available mode when one queue has no
-credible work.
+Assign each campaign as `COVERAGE`, `REFINEMENT`, or `DATA`. Alternate all
+credible queues. Do not force a queue when it has no credible target.
 
 Spawn one fresh worker with `fork_turns: "none"` for each campaign. Tell it to
 use `decomp-expert`. Give it the repository path, branch, current `HEAD`, mode,
@@ -38,6 +37,9 @@ Give the worker relevant file-structure evidence for its subsystem. Ask it to
 check the likely original translation unit before it adds code. Do not direct a
 split from file size or namespace count alone.
 
+For data work, give the worker target byte scores and aggregate initialized
+bytes. Include known caller, retail, and DWARF evidence.
+
 Wait with the longest practical interval. Check status after a long wait or
 when the user asks.
 
@@ -47,7 +49,7 @@ After the worker returns:
 2. Confirm its commits are on `agent/continuous` and pushed.
 3. Rebuild and run the mode-specific validation independently.
 4. Run `tools/decomp progress --json` and verify each reported metric.
-5. Count a valid coverage or refinement result as source progress.
+5. Count a valid coverage, refinement, or data result as source progress.
 6. Close or interrupt the worker before the next campaign.
 7. Run `tools/decomp report` after source progress.
 8. Run `tools/decomp sync` after source progress.
@@ -64,10 +66,10 @@ Do not count a structure-only commit as source progress unless it removes
 tracked source debt. Prefer a supported file move as part of a valid coverage
 or refinement campaign. Require comparisons for all moved functions.
 
-Keep separate no-source counts for coverage and refinement. Switch modes after
-a failure. Reset both counts after source progress. Stop only when both counts
-reach three without intervening progress. Do not count metadata, notes, or
-blocker-only commits as source progress.
+Keep separate no-source counts for coverage, refinement, and data. Switch modes
+after a failure. Reset all counts after source progress. Stop only when all
+three counts reach three. Do not count metadata, notes, or blocker-only commits
+as source progress.
 
 Resolve workflow failures. Assign a fresh expert a bounded meta-resolution
 campaign when a tool problem prevents all source work. Resume source campaigns
