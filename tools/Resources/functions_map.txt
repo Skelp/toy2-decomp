@@ -1168,6 +1168,7 @@
 0x004CA0C0 Nu3D::CopyNormalsFromNearestVertex
 0x004CA1D0 NGNLoader::ExtractShapePatch
 0x004CA420 NGNLoader::ExtractCreatureData
+0x004CA880 Nu3D::FindCreatureNodeIndexByName
 0x004CAA60 Nu3D::Scene::RenderActor
 0x004CAB80 Nu3D::Creature::SetNodeVisible
 0x004CABD0 Nu3D::LoadNamedTrackSet

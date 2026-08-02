@@ -256,6 +256,23 @@ namespace NGNLoader
 
 namespace Nu3D
 {
+	// FUNCTION: TOY2 0x004CA880 [MATCHED]
+	int32_t FindCreatureNodeIndexByName(Creature* creature, const char* nodeName)
+	{
+		int32_t nodeIndex = creature->nodeCount;
+		if (creature->nodeNames)
+		{
+			while (nodeIndex)
+			{
+				--nodeIndex;
+				if (strcmpi(nodeName, creature->nodeNames[nodeIndex]) == 0)
+					return nodeIndex;
+			}
+		}
+
+		return -1;
+	}
+
 	struct Quaternion
 	{
 		float x;
