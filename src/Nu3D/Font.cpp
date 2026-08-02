@@ -236,10 +236,9 @@ namespace Nu3D
 			charSet = g_defaultCharSet;
 		int32_t numGlyphs = strlen(charSet);
 		HFONT hfont = CreateFontA(fontSize, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, fontName);
-		HDC hdc;
 		if (hfont)
 		{
-			hdc = CreateDC();
+			HDC hdc = CreateDC();
 			if (hdc)
 			{
 				font = BuildObject(numGlyphs);
@@ -326,8 +325,8 @@ namespace Nu3D
 				ResetContext();
 				BuildTexResource(font);
 			}
+			DeleteObject(hfont);
 		}
-		DeleteObject(hfont);
 		return font;
 	}
 
