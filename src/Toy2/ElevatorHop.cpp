@@ -222,7 +222,7 @@ int32_t Toy2::ElevatorHop::g_link20PathPointIndex;
 Vector3I Toy2::ElevatorHop::g_fanParticleVelocityFactors[5] = {
 	{ 0, 0, 0x100 },
 	{ 0x100, 0, 0 },
-	{ 0, -0x100, -0x100 },
+	{ 0, 0, -0x100 },
 	{ -0x100, 0, 0 },
 	{ 0, -0x100, 0 },
 };

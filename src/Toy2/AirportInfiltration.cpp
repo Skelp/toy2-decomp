@@ -132,7 +132,7 @@ namespace Toy2
 			{ 0x500, 0, 0 },
 			{ 0, 0, -0x500 },
 			{ -0x500, 0, 0 },
-			{ 0, 0, -0x500 },
+			{ 0, -0x500, 0 },
 		};
 
 		struct MoveableObjectInitTable
