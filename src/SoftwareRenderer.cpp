@@ -4120,14 +4120,21 @@ namespace SoftwareRenderer
 		} while (--height != 0);
 	}
 
-	// FUNCTION: TOY2 0x0047D650 [PROVISIONAL]
+	// FUNCTION: TOY2 0x0047D650 [MATCHED]
 	void ClearScanlineFlags(ScanlineScratch* scanline, int32_t count)
 	{
-		do
+		__asm
 		{
-			scanline->populatedByte = 0;
-			scanline++;
-		} while (--count != 0);
+			push edi
+			mov edi, scanline
+			mov ecx, count
+		clearNext:
+			mov byte ptr [edi], 0
+			add edi, 04ch
+			dec ecx
+			jne clearNext
+			pop edi
+		}
 	}
 
 	// FUNCTION: TOY2 0x004C1E70 [MATCHED]
