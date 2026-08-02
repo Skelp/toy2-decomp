@@ -5,6 +5,8 @@ import json
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 
 
@@ -58,6 +60,35 @@ class CampaignTests(unittest.TestCase):
             path.write_text("{}\nnot-json\n", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "line 2"):
                 campaigns.read_records(path)
+
+    def test_summary_excludes_meta_and_imported_records_from_rate(self):
+        records = [
+            {
+                "mode": "refinement",
+                "result": "source",
+                "addresses": ["0x00401000"],
+                "minutes": 10,
+                "effective_bytes": 100,
+            },
+            {
+                "mode": "coverage",
+                "result": "no-source",
+                "addresses": ["0x00402000"],
+                "minutes": 0,
+            },
+            {
+                "mode": "meta",
+                "result": "meta-fix",
+                "addresses": [],
+                "minutes": 20,
+            },
+        ]
+        output = StringIO()
+        with redirect_stdout(output):
+            campaigns.print_summary(records, 0)
+        text = output.getvalue()
+        self.assertIn("Measured campaigns: 1 (1 source, 0 no-source)", text)
+        self.assertIn("Retained rate: 10.00 bytes/minute", text)
 
 
 if __name__ == "__main__":

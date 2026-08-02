@@ -99,12 +99,18 @@ def print_summary(records: list[dict[str, object]], limit: int) -> None:
     if not selected:
         print("No campaign records exist.")
         return
-    effective = sum(float(item.get("effective_bytes", 0.0) or 0.0) for item in selected)
-    initialized = sum(int(item.get("initialized_bytes", 0) or 0) for item in selected)
-    minutes = sum(float(item.get("minutes", 0.0) or 0.0) for item in selected)
-    sources = sum(item.get("result") == "source" for item in selected)
-    no_sources = sum(item.get("result") == "no-source" for item in selected)
-    print(f"Campaigns: {len(selected)} ({sources} source, {no_sources} no-source)")
+    measured = [
+        item
+        for item in selected
+        if item.get("mode") != "meta" and float(item.get("minutes", 0.0) or 0.0) > 0
+    ]
+    effective = sum(float(item.get("effective_bytes", 0.0) or 0.0) for item in measured)
+    initialized = sum(int(item.get("initialized_bytes", 0) or 0) for item in measured)
+    minutes = sum(float(item.get("minutes", 0.0) or 0.0) for item in measured)
+    sources = sum(item.get("result") == "source" for item in measured)
+    no_sources = sum(item.get("result") == "no-source" for item in measured)
+    print(f"Records: {len(selected)}")
+    print(f"Measured campaigns: {len(measured)} ({sources} source, {no_sources} no-source)")
     print(f"Elapsed: {minutes:.1f} minutes")
     print(f"Effective code: {effective:+.2f} bytes")
     print(f"Initialized data: {initialized:+d} bytes")
@@ -116,10 +122,11 @@ def print_summary(records: list[dict[str, object]], limit: int) -> None:
         retained = float(item.get("effective_bytes", 0.0) or 0.0) + int(
             item.get("initialized_bytes", 0) or 0
         )
+        record_kind = "imported" if float(item.get("minutes", 0.0) or 0.0) == 0 else "measured"
         print(
             f"  {item.get('mode', '-'):<10} {item.get('result', '-'):<9} "
             f"{float(item.get('minutes', 0.0) or 0.0):>5.1f} min  "
-            f"{retained:>8.2f} bytes  {addresses}"
+            f"{retained:>8.2f} bytes  {record_kind:<8} {addresses}"
         )
 
 
