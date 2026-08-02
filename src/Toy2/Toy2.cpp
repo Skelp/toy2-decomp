@@ -2082,7 +2082,7 @@ namespace Toy2
 	int32_t g_saveLoaded;
 
 	// GLOBAL: TOY2 0x00503840
-	int16_t g_levelTokenTarget[16];
+	int16_t g_levelTokenTarget[16] = { 0, 0, 3, 0, 0, 10, 0, 0, 18, 0, 0, 28, 0, 0, 40, 0 };
 
 	// GLOBAL: TOY2 0x00503AD4
 	char g_pathBinName[16] = "PAD\\PATH00.BIN";
