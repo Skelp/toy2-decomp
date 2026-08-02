@@ -743,3 +743,56 @@ static HRESULT CopyBitmapToTextureSurface(LPDIRECTDRAWSURFACE4 surface, HBITMAP 
 
 	return S_OK;
 }
+
+// FUNCTION: TOY2 0x004B2880 [MATCHED]
+HRESULT D3DTextr_RestoreTexture(TextureContainer* texture, LPDIRECT3DDEVICE3 device)
+{
+	if (device == NULL)
+		return E_INVALIDARG;
+	if (texture == NULL)
+		return DDERR_NOTFOUND;
+
+	if (texture->texture != NULL)
+	{
+		texture->texture->Release();
+		texture->texture = NULL;
+	}
+	if (texture->surface != NULL)
+	{
+		texture->surface->Release();
+		texture->surface = NULL;
+	}
+
+	return D3DTextr_RestoreTextureContainer(texture, device);
+}
+
+// FUNCTION: TOY2 0x004B28E0 [MATCHED]
+HRESULT D3DTextr_RestoreAllTextures(LPDIRECT3DDEVICE3 device)
+{
+	for (TextureContainer* texture = g_textureList; texture != NULL; texture = texture->next)
+	{
+		D3DTextr_RestoreTexture(texture->name, device);
+	}
+	return S_OK;
+}
+
+// FUNCTION: TOY2 0x004B2910 [MATCHED]
+HRESULT D3DTextr_InvalidateTexture(char* name)
+{
+	TextureContainer* texture = D3DTextr_FindTexture(name);
+	if (texture == NULL)
+		return DDERR_NOTFOUND;
+
+	if (texture->texture != NULL)
+	{
+		texture->texture->Release();
+		texture->texture = NULL;
+	}
+	if (texture->surface != NULL)
+	{
+		texture->surface->Release();
+		texture->surface = NULL;
+	}
+
+	return S_OK;
+}

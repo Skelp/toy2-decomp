@@ -40,7 +40,10 @@ void D3DTextr_SetTexturePath(const char* path);
 HRESULT D3DTextr_CreateTexture(char* name, DWORD stage, DWORD flags);
 HRESULT D3DTextr_CreateTextureFromBitmap(HBITMAP bitmap, HBITMAP alphaBitmap, char* name, DWORD stage, DWORD flags);
 HRESULT D3DTextr_RestoreTexture(char* name, LPDIRECT3DDEVICE3 device);
+HRESULT D3DTextr_RestoreTexture(TextureContainer* texture, LPDIRECT3DDEVICE3 device);
 HRESULT D3DTextr_RestoreTextureContainer(TextureContainer* texture, LPDIRECT3DDEVICE3 device);
+HRESULT D3DTextr_RestoreAllTextures(LPDIRECT3DDEVICE3 device);
+HRESULT D3DTextr_InvalidateTexture(char* name);
 
 STATIC_ASSERT(sizeof(TextureContainer) == 0x120);
 STATIC_ASSERT(offsetof(TextureContainer, rgbaData) == 0x94);
