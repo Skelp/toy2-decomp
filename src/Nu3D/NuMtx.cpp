@@ -11,7 +11,7 @@ namespace Nu3D
 		D3DMATRIX g_identityMatrix = { 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 };
 
 		// GLOBAL: TOY2 0x00505548
-		D3DMATRIX g_matrixMultiplyResult;
+		D3DMATRIX g_matrixMultiplyResult = { 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 };
 
 		// GLOBAL: TOY2 0x00508898
 		Vector3F g_matrixScale = { 1.0f, 1.0f, 1.0f };
@@ -290,39 +290,24 @@ namespace Nu3D
 		// FUNCTION: TOY2 0x004AA100 [PROVISIONAL]
 		void FullMatrixMultiply(D3DMATRIX* output, const D3DMATRIX* left, const D3DMATRIX* right)
 		{
-			g_matrixMultiplyResult._11 = left->_14 * right->_41 + left->_13 * right->_31 + left->_11 * right->_11 + left->_12 * right->_21;
-			g_matrixMultiplyResult._12 = left->_14 * right->_42 + left->_13 * right->_32 + left->_11 * right->_12 + left->_12 * right->_22;
-			g_matrixMultiplyResult._13 = left->_14 * right->_43 + left->_13 * right->_33 + left->_11 * right->_13 + left->_12 * right->_23;
-			g_matrixMultiplyResult._14 = left->_14 * right->_44 + left->_13 * right->_34 + left->_11 * right->_14 + left->_12 * right->_24;
-			g_matrixMultiplyResult._21 = left->_24 * right->_41 + left->_23 * right->_31 + left->_21 * right->_11 + left->_22 * right->_21;
-			g_matrixMultiplyResult._22 = left->_24 * right->_42 + left->_23 * right->_32 + left->_21 * right->_12 + left->_22 * right->_22;
-			g_matrixMultiplyResult._23 = left->_24 * right->_43 + left->_23 * right->_33 + left->_21 * right->_13 + left->_22 * right->_23;
-			g_matrixMultiplyResult._24 = left->_24 * right->_44 + left->_23 * right->_34 + left->_21 * right->_14 + left->_22 * right->_24;
-			g_matrixMultiplyResult._31 = left->_34 * right->_41 + left->_33 * right->_31 + left->_31 * right->_11 + left->_32 * right->_21;
-			g_matrixMultiplyResult._32 = left->_34 * right->_42 + left->_33 * right->_32 + left->_31 * right->_12 + left->_32 * right->_22;
-			g_matrixMultiplyResult._33 = left->_34 * right->_43 + left->_33 * right->_33 + left->_31 * right->_13 + left->_32 * right->_23;
-			g_matrixMultiplyResult._34 = left->_34 * right->_44 + left->_33 * right->_34 + left->_31 * right->_14 + left->_32 * right->_24;
-			g_matrixMultiplyResult._41 = left->_44 * right->_41 + left->_43 * right->_31 + left->_41 * right->_11 + left->_42 * right->_21;
-			g_matrixMultiplyResult._42 = left->_44 * right->_42 + left->_43 * right->_32 + left->_41 * right->_12 + left->_42 * right->_22;
-			g_matrixMultiplyResult._43 = left->_44 * right->_43 + left->_43 * right->_33 + left->_41 * right->_13 + left->_42 * right->_23;
-			g_matrixMultiplyResult._44 = left->_44 * right->_44 + left->_43 * right->_34 + left->_41 * right->_14 + left->_42 * right->_24;
+			g_matrixMultiplyResult._11 = right->_21 * left->_12 + left->_13 * right->_31 + left->_14 * right->_41 + left->_11 * right->_11;
+			g_matrixMultiplyResult._12 = right->_12 * left->_11 + right->_32 * left->_13 + left->_12 * right->_22 + right->_42 * left->_14;
+			g_matrixMultiplyResult._13 = right->_23 * left->_12 + left->_14 * right->_43 + right->_13 * left->_11 + right->_33 * left->_13;
+			g_matrixMultiplyResult._14 = right->_24 * left->_12 + left->_11 * right->_14 + left->_13 * right->_34 + right->_44 * left->_14;
+			g_matrixMultiplyResult._21 = left->_21 * right->_11 + right->_21 * left->_22 + left->_24 * right->_41 + left->_23 * right->_31;
+			g_matrixMultiplyResult._22 = left->_24 * right->_42 + left->_22 * right->_22 + left->_21 * right->_12 + left->_23 * right->_32;
+			g_matrixMultiplyResult._23 = left->_21 * right->_13 + right->_23 * left->_22 + left->_23 * right->_33 + left->_24 * right->_43;
+			g_matrixMultiplyResult._24 = right->_24 * left->_22 + left->_21 * right->_14 + left->_23 * right->_34 + right->_44 * left->_24;
+			g_matrixMultiplyResult._31 = left->_31 * right->_11 + right->_21 * left->_32 + left->_34 * right->_41 + left->_33 * right->_31;
+			g_matrixMultiplyResult._32 = left->_34 * right->_42 + left->_32 * right->_22 + left->_31 * right->_12 + left->_33 * right->_32;
+			g_matrixMultiplyResult._33 = left->_31 * right->_13 + right->_23 * left->_32 + left->_33 * right->_33 + left->_34 * right->_43;
+			g_matrixMultiplyResult._34 = right->_24 * left->_32 + left->_31 * right->_14 + left->_33 * right->_34 + right->_44 * left->_34;
+			g_matrixMultiplyResult._41 = left->_41 * right->_11 + right->_21 * left->_42 + left->_44 * right->_41 + left->_43 * right->_31;
+			g_matrixMultiplyResult._42 = left->_44 * right->_42 + left->_42 * right->_22 + left->_41 * right->_12 + left->_43 * right->_32;
+			g_matrixMultiplyResult._43 = left->_41 * right->_13 + right->_23 * left->_42 + left->_43 * right->_33 + left->_44 * right->_43;
+			g_matrixMultiplyResult._44 = right->_24 * left->_42 + left->_41 * right->_14 + left->_43 * right->_34 + right->_44 * left->_44;
 
-			output->_11 = g_matrixMultiplyResult._11;
-			output->_12 = g_matrixMultiplyResult._12;
-			output->_13 = g_matrixMultiplyResult._13;
-			output->_14 = g_matrixMultiplyResult._14;
-			output->_21 = g_matrixMultiplyResult._21;
-			output->_22 = g_matrixMultiplyResult._22;
-			output->_23 = g_matrixMultiplyResult._23;
-			output->_24 = g_matrixMultiplyResult._24;
-			output->_31 = g_matrixMultiplyResult._31;
-			output->_32 = g_matrixMultiplyResult._32;
-			output->_33 = g_matrixMultiplyResult._33;
-			output->_34 = g_matrixMultiplyResult._34;
-			output->_41 = g_matrixMultiplyResult._41;
-			output->_42 = g_matrixMultiplyResult._42;
-			output->_43 = g_matrixMultiplyResult._43;
-			output->_44 = g_matrixMultiplyResult._44;
+			memcpy(output, &g_matrixMultiplyResult, sizeof(D3DMATRIX));
 		}
 
 		// FUNCTION: TOY2 0x004AA520 [EFFECTIVE]
@@ -392,24 +377,21 @@ namespace Nu3D
 			output->_12 *= scale;
 			output->_13 *= scale;
 
-			float factor1 = row1[0];
-			float factor2 = row2[0];
-			float factor3 = source._41;
-			row1[1] -= factor1 * row0[1];
-			row2[1] -= factor2 * row0[1];
-			source._42 -= factor3 * row0[1];
-			row1[2] -= factor1 * row0[2];
-			row2[2] -= factor2 * row0[2];
-			source._43 -= factor3 * row0[2];
-			output->_21 -= factor1 * output->_11;
-			output->_22 -= factor1 * output->_12;
-			output->_23 -= factor1 * output->_13;
-			output->_31 -= factor2 * output->_11;
-			output->_32 -= factor2 * output->_12;
-			output->_33 -= factor2 * output->_13;
-			output->_41 -= factor3 * output->_11;
-			output->_42 -= factor3 * output->_12;
-			output->_43 -= factor3 * output->_13;
+			row1[1] -= row1[0] * row0[1];
+			row2[1] -= row2[0] * row0[1];
+			source._42 -= source._41 * row0[1];
+			row1[2] -= row1[0] * row0[2];
+			row2[2] -= row2[0] * row0[2];
+			source._43 -= source._41 * row0[2];
+			output->_21 -= row1[0] * output->_11;
+			output->_22 -= row1[0] * output->_12;
+			output->_23 -= row1[0] * output->_13;
+			output->_31 -= row2[0] * output->_11;
+			output->_32 -= row2[0] * output->_12;
+			output->_33 -= row2[0] * output->_13;
+			output->_41 -= source._41 * output->_11;
+			output->_42 -= source._41 * output->_12;
+			output->_43 -= source._41 * output->_13;
 
 			if (Abs(row1[1]) < Abs(row2[1]))
 			{
@@ -434,39 +416,33 @@ namespace Nu3D
 			output->_22 *= scale;
 			output->_23 *= scale;
 
-			factor1 = row0[1];
-			factor2 = row2[1];
-			factor3 = source._42;
-			row0[2] -= factor1 * row1[2];
-			row2[2] -= factor2 * row1[2];
-			source._43 -= factor3 * row1[2];
-			output->_11 -= factor1 * output->_21;
-			output->_12 -= factor1 * output->_22;
-			output->_13 -= factor1 * output->_23;
-			output->_31 -= factor2 * output->_21;
-			output->_32 -= factor2 * output->_22;
-			output->_33 -= factor2 * output->_23;
-			output->_41 -= factor3 * output->_21;
-			output->_42 -= factor3 * output->_22;
-			output->_43 -= factor3 * output->_23;
+			row0[2] -= row0[1] * row1[2];
+			row2[2] -= row2[1] * row1[2];
+			source._43 -= source._42 * row1[2];
+			output->_11 -= row0[1] * output->_21;
+			output->_12 -= row0[1] * output->_22;
+			output->_13 -= row0[1] * output->_23;
+			output->_31 -= row2[1] * output->_21;
+			output->_32 -= row2[1] * output->_22;
+			output->_33 -= row2[1] * output->_23;
+			output->_41 -= source._42 * output->_21;
+			output->_42 -= source._42 * output->_22;
+			output->_43 -= source._42 * output->_23;
 
 			scale = 1.0f / row2[2];
 			output->_31 *= scale;
 			output->_32 *= scale;
 			output->_33 *= scale;
 
-			factor1 = row0[2];
-			factor2 = row1[2];
-			factor3 = source._43;
-			output->_11 -= factor1 * output->_31;
-			output->_12 -= factor1 * output->_32;
-			output->_13 -= factor1 * output->_33;
-			output->_21 -= factor2 * output->_31;
-			output->_22 -= factor2 * output->_32;
-			output->_23 -= factor2 * output->_33;
-			output->_41 -= factor3 * output->_31;
-			output->_42 -= factor3 * output->_32;
-			output->_43 -= factor3 * output->_33;
+			output->_11 -= row0[2] * output->_31;
+			output->_12 -= row0[2] * output->_32;
+			output->_13 -= row0[2] * output->_33;
+			output->_21 -= row1[2] * output->_31;
+			output->_22 -= row1[2] * output->_32;
+			output->_23 -= row1[2] * output->_33;
+			output->_41 -= source._43 * output->_31;
+			output->_42 -= source._43 * output->_32;
+			output->_43 -= source._43 * output->_33;
 		}
 
 		// FUNCTION: TOY2 0x004AAC40 [PROVISIONAL]
@@ -480,34 +456,27 @@ namespace Nu3D
 			float upLengthSquared = up->x * up->x + up->y * up->y + up->z * up->z;
 			float forwardLengthSquared = forward->x * forward->x + forward->y * forward->y + forward->z * forward->z;
 			float directionLengthSquared = direction->x * direction->x + direction->y * direction->y + direction->z * direction->z;
-			float scale = 0.0f;
-
-			if (directionLengthSquared != 0.0f)
-				scale = (float)sqrt(forwardLengthSquared / directionLengthSquared);
+			float scale = (float)sqrt(forwardLengthSquared / directionLengthSquared);
 
 			forward->x = direction->x * scale;
 			forward->y = direction->y * scale;
 			forward->z = direction->z * scale;
 
-			float alignment = (float)fabs(up->x * forward->x + up->y * forward->y + up->z * forward->z);
+			float alignment = Abs(Vector3F::DotProduct(up, forward));
 
 			if (alignment <= 0.8660253882408142f)
 			{
 				VertexCrossProduct(right, up, forward);
 
 				float newLengthSquared = right->x * right->x + right->y * right->y + right->z * right->z;
-				scale = 0.0f;
-				if (newLengthSquared != 0.0f)
-					scale = (float)sqrt(rightLengthSquared / newLengthSquared);
+				scale = (float)sqrt(rightLengthSquared / newLengthSquared);
 				right->x *= scale;
 				right->y *= scale;
 				right->z *= scale;
 
 				VertexCrossProduct(up, forward, right);
 				newLengthSquared = up->x * up->x + up->y * up->y + up->z * up->z;
-				scale = 0.0f;
-				if (newLengthSquared != 0.0f)
-					scale = (float)sqrt(upLengthSquared / newLengthSquared);
+				scale = (float)sqrt(upLengthSquared / newLengthSquared);
 				up->x *= scale;
 				up->y *= scale;
 				up->z *= scale;
@@ -517,18 +486,14 @@ namespace Nu3D
 				VertexCrossProduct(up, forward, right);
 
 				float newLengthSquared = up->x * up->x + up->y * up->y + up->z * up->z;
-				scale = 0.0f;
-				if (newLengthSquared != 0.0f)
-					scale = (float)sqrt(upLengthSquared / newLengthSquared);
+				scale = (float)sqrt(upLengthSquared / newLengthSquared);
 				up->x *= scale;
 				up->y *= scale;
 				up->z *= scale;
 
 				VertexCrossProduct(right, up, forward);
 				newLengthSquared = right->x * right->x + right->y * right->y + right->z * right->z;
-				scale = 0.0f;
-				if (newLengthSquared != 0.0f)
-					scale = (float)sqrt(rightLengthSquared / newLengthSquared);
+				scale = (float)sqrt(rightLengthSquared / newLengthSquared);
 				right->x *= scale;
 				right->y *= scale;
 				right->z *= scale;
