@@ -249,10 +249,14 @@ namespace SoftwareRenderer
 	int32_t g_bottomOffset = -1;
 
 	// GLOBAL: TOY2 0x005088E4
-	int32_t g_primaryBucketOffsets[16];
+	int32_t g_primaryBucketOffsets[16] = {
+		0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240
+	};
 
 	// GLOBAL: TOY2 0x00508924
-	int32_t g_secondaryBucketOffsets[16];
+	int32_t g_secondaryBucketOffsets[16] = {
+		0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60
+	};
 
 	// GLOBAL: TOY2 0x00B7FBBC
 	int32_t g_clipLeft;
@@ -4701,15 +4705,18 @@ namespace SoftwareRenderer
 		int32_t bucket;
 		if (g_reverseDepthSortEnabled == 1)
 		{
-			sortDepth *= k_reverseDepthSortScale;
-			int32_t depth = 2 - (int32_t)sortDepth;
+			int32_t depth = 2 - (int32_t)(sortDepth * k_reverseDepthSortScale);
 			if ((g_sortedRenderFlags & 1) == 0)
 			{
-				bucket = depth + g_primaryBucketOffsets[bucketGroup] * 3;
+				int32_t offset = g_primaryBucketOffsets[bucketGroup];
+				depth += offset;
+				bucket = depth + offset * 2;
 			}
 			else
 			{
-				bucket = depth + g_secondaryBucketOffsets[bucketGroup] * 3 + 1100;
+				int32_t offset = g_secondaryBucketOffsets[bucketGroup];
+				depth += offset;
+				bucket = depth + offset * 2 + 1100;
 			}
 		}
 		else
@@ -4717,11 +4724,15 @@ namespace SoftwareRenderer
 			int32_t depth = (int32_t)sortDepth;
 			if ((g_sortedRenderFlags & 1) == 0)
 			{
-				bucket = depth + g_primaryBucketOffsets[bucketGroup] * 3;
+				int32_t offset = g_primaryBucketOffsets[bucketGroup];
+				depth += offset;
+				bucket = depth + offset * 2;
 			}
 			else
 			{
-				bucket = depth + g_secondaryBucketOffsets[bucketGroup] * 3 + 1100;
+				int32_t offset = g_secondaryBucketOffsets[bucketGroup];
+				depth += offset;
+				bucket = depth + offset * 2 + 1100;
 			}
 		}
 
@@ -4730,15 +4741,22 @@ namespace SoftwareRenderer
 			return;
 		}
 
-		RenderCommand* command = &g_sortedRenderCommands[g_sortedRenderCommandCount++];
+		RenderCommand* command = &g_sortedRenderCommands[g_sortedRenderCommandCount];
+		g_sortedRenderCommandCount++;
 		Nu3D::VertexTL** source = vertices;
-		Nu3D::VertexTL* destination = command->vertices;
-		*destination++ = **source++;
-		*destination++ = **source++;
-		*destination = **source;
+		Nu3D::VertexTL* dest = command->vertices;
+		*dest = **source;
+		source++;
+		dest++;
+		*dest = **source;
+		source++;
+		dest++;
+		*dest = **source;
 		if (vertexCount == 4)
 		{
-			destination[1] = *source[1];
+			source++;
+			dest++;
+			*dest = **source;
 		}
 		command->vertexCount = vertexCount;
 		command->texData = texData;
