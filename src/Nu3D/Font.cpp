@@ -879,18 +879,17 @@ namespace Nu3D
 			int32_t startX = g_textCursorX;
 			maxWidth = 0;
 			width = 0;
-			char c = *text;
-			if (c)
+			if (*text)
 			{
 				do
 				{
-					switch (c)
+					switch (*text)
 					{
 						case '\t': {
-							int32_t next = g_textCursorX + g_textTabWidth;
-							next -= next % g_textTabWidth;
-							width += next - g_textCursorX;
-							g_textCursorX = next;
+							int32_t oldX = g_textCursorX;
+							g_textCursorX += g_textTabWidth;
+							g_textCursorX -= g_textCursorX % g_textTabWidth;
+							width += g_textCursorX - oldX;
 						}
 						break;
 						case '\n':
@@ -906,17 +905,16 @@ namespace Nu3D
 							break;
 						default: {
 							int32_t w;
-							if (ComputeScaledCharClip(c))
-								w = DrawScaledGlyph(c);
+							if (ComputeScaledCharClip(*text))
+								w = DrawScaledGlyph(*text);
 							else
-								w = DrawClippedScaledGlyph(c);
+								w = DrawClippedScaledGlyph(*text);
 							width += w;
 							g_textCursorX += w;
 						}
 						break;
 					}
-					c = *++text;
-				} while (c);
+				} while (*++text);
 			}
 		}
 		else
