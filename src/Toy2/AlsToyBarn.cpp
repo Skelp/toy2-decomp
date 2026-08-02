@@ -4,6 +4,7 @@
 #include "Toy2/Camera.h"
 #include "Toy2/Collision.h"
 #include "Toy2/Collectables.h"
+#include "Toy2/TokenDialogue.h"
 #include "Toy2/Direct6.h"
 #include "Toy2/Gadget.h"
 #include "Toy2/Levels.h"
@@ -73,23 +74,8 @@ namespace Toy2
 			int16_t terminator;
 		};
 
-		struct TokenDialogueRecord
-		{
-			int32_t tokenId;
-			int32_t dialogueRecordIndex;
-			const char* subtitle;
-			int32_t facingAngle;
-		};
-
-		struct TokenDialogueTable
-		{
-			TokenDialogueRecord records[1];
-			int32_t terminator;
-		};
-
-		STATIC_ASSERT(sizeof(TokenDialogueRecord) == 0x10);
-		STATIC_ASSERT(sizeof(TokenDialogueTable) == 0x14);
-		STATIC_ASSERT(offsetof(TokenDialogueTable, terminator) == 0x10);
+		STATIC_ASSERT(sizeof(Collectables::TokenDialogueTable<1>) == 0x14);
+		STATIC_ASSERT(offsetof(Collectables::TokenDialogueTable<1>, terminator) == 0x10);
 
 		// GLOBAL: TOY2 0x004F2844
 		char g_hayBaleRideInstructions[] = {
@@ -127,7 +113,7 @@ namespace Toy2
 		int16_t g_tokenLinkIds[] = { 0x31, 0x33, 0x34, 0x32, 0x30, 0 };
 
 		// GLOBAL: TOY2 0x004F2A54
-		extern const TokenDialogueTable g_tokenDialogueValues = {
+		extern const Collectables::TokenDialogueTable<1> g_tokenDialogueValues = {
 			{
 				{ 0x46, 0x14, g_hayBaleRideInstructions, 0x400 },
 			},

@@ -11,12 +11,7 @@
 src/Toy2/AirportInfiltration.cpp	repeated-private-type	Toy2::HiddenCollectibleState	944fc945562d	src/Toy2/AirportInfiltration.cpp
 src/Toy2/AlleysAndGullies.cpp	repeated-private-type	Toy2::HiddenCollectibleState	944fc945562d	src/Toy2/AlleysAndGullies.cpp
 src/Toy2/AlsPenthouse.cpp	repeated-private-type	Toy2::HiddenCollectibleState	944fc945562d	src/Toy2/AlsPenthouse.cpp
-src/Toy2/AlsPenthouse.cpp	repeated-private-type	Toy2::TokenDialogueRecord	82b182fa6cbc	src/Toy2/AlsPenthouse.cpp
-src/Toy2/AlsToyBarn.cpp	repeated-private-type	Toy2::TokenDialogueRecord	82b182fa6cbc	src/Toy2/AlsToyBarn.cpp
-src/Toy2/AndysHouse.cpp	repeated-private-type	Toy2::TokenDialogueRecord	82b182fa6cbc	src/Toy2/AndysHouse.cpp
-src/Toy2/AndysNeighborhood.cpp	repeated-private-type	Toy2::TokenDialogueRecord	82b182fa6cbc	src/Toy2/AndysNeighborhood.cpp
 src/Toy2/ConstructionYard.cpp	repeated-private-type	Toy2::HiddenCollectibleState	944fc945562d	src/Toy2/ConstructionYard.cpp
-src/Toy2/ElevatorHop.cpp	repeated-private-type	Toy2::TokenDialogueRecord	82b182fa6cbc	src/Toy2/ElevatorHop.cpp
 src/Nu3D/Camera.cpp	repeated-private-type	Nu3D::SoftwareProjectionPoint	8cff9b180f19	src/Nu3D/Camera.cpp
 src/Toy2/Actor.cpp	repeated-private-type	Toy2::BuzzLightPreset	87de3d82851d	src/Toy2/Actor.cpp
 src/Toy2/BombsAway.cpp	repeated-private-type	Toy2::BuzzLightPreset	87de3d82851d	src/Toy2/BombsAway.cpp

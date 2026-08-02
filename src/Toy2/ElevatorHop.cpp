@@ -4,6 +4,7 @@
 #include "Toy2/Actor.h"
 #include "Toy2/Buzz.h"
 #include "Toy2/Collectables.h"
+#include "Toy2/TokenDialogue.h"
 #include "Toy2/Levels.h"
 #include "Toy2/Particles.h"
 #include "AudioManager/AudioManager.h"
@@ -46,23 +47,8 @@ namespace Toy2
 			GUNS_P_ACTOR_FLAG_VERTICAL_TARGET = 0x10,
 		};
 
-		struct TokenDialogueRecord
-		{
-			int32_t tokenId;
-			int32_t dialogueRecordIndex;
-			const char* subtitle;
-			int32_t facingAngle;
-		};
-
-		struct TokenDialogueTable
-		{
-			TokenDialogueRecord records[3];
-			int32_t terminator;
-		};
-
-		STATIC_ASSERT(sizeof(TokenDialogueRecord) == 0x10);
-		STATIC_ASSERT(sizeof(TokenDialogueTable) == 0x34);
-		STATIC_ASSERT(offsetof(TokenDialogueTable, terminator) == 0x30);
+		STATIC_ASSERT(sizeof(Collectables::TokenDialogueTable<3>) == 0x34);
+		STATIC_ASSERT(offsetof(Collectables::TokenDialogueTable<3>, terminator) == 0x30);
 
 		// GLOBAL: TOY2 0x0052FC20
 		int32_t g_gunsPVisualToggle;
@@ -142,7 +128,7 @@ namespace Toy2
 		// GLOBAL: TOY2 0x004F3798
 		int16_t g_tokenLinkIds[] = { 0x6B, 0x6C, 0x6E, 0x6A, 0x6D, 0 };
 		// GLOBAL: TOY2 0x004F37A4
-		extern const TokenDialogueTable g_tokenDialogueValues = {
+		extern const Collectables::TokenDialogueTable<3> g_tokenDialogueValues = {
 			{
 				{ 0x70, 0x22, g_elevatorInstructions, 0 },
 				{ 0x71, 0x23, g_controlRoomFanInstructions, 0 },

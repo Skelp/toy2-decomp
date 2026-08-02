@@ -5,6 +5,7 @@
 #include "Toy2/Buzz.h"
 #include "Toy2/Camera.h"
 #include "Toy2/Collectables.h"
+#include "Toy2/TokenDialogue.h"
 #include "Toy2/Levels.h"
 #include "Toy2/Particles.h"
 #include "Toy2/Weather.h"
@@ -51,20 +52,6 @@ namespace Toy2
 		{
 			Vector3I position;
 			int32_t padding;
-		};
-
-		struct TokenDialogueRecord
-		{
-			int32_t tokenId;
-			int32_t dialogueRecordIndex;
-			const char* subtitle;
-			int32_t facingAngle;
-		};
-
-		struct TokenDialogueTable
-		{
-			TokenDialogueRecord records[9];
-			int32_t terminator;
 		};
 
 		// GLOBAL: TOY2 0x004F04D0
@@ -139,7 +126,7 @@ namespace Toy2
 		};
 
 		// GLOBAL: TOY2 0x004F0EE8
-		extern const TokenDialogueTable g_tokenDialogueValues = {
+		extern const Collectables::TokenDialogueTable<9> g_tokenDialogueValues = {
 			{
 				{ 0x43, 0x1F, g_cameraInstructions, 0x800 },
 				{ 0x3E, 0x20, g_swingBarInstructions, 0x800 },

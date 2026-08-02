@@ -4,6 +4,7 @@
 #include "Toy2/Camera.h"
 #include "Toy2/Collision.h"
 #include "Toy2/Collectables.h"
+#include "Toy2/TokenDialogue.h"
 #include "Toy2/KiteTail.h"
 #include "Toy2/Levels.h"
 #include "Toy2/Particles.h"
@@ -32,16 +33,6 @@ namespace Toy2
 			int16_t terminator;
 		};
 
-		struct TokenDialogueRecord
-		{
-			int32_t tokenId;
-			int32_t dialogueRecordIndex;
-			const char* subtitle;
-			int32_t facingAngle;
-		};
-
-		STATIC_ASSERT(sizeof(TokenDialogueRecord) == 0x10);
-
 		enum KiteEncounterState
 		{
 			KITE_ENCOUNTER_ACTIVE = 2,
@@ -59,7 +50,7 @@ namespace Toy2
 			-1,
 		};
 		// GLOBAL: TOY2 0x004F153C
-		extern const TokenDialogueRecord g_tokenDialogueValues = { 0x46, 0xC, g_molehillChallengeInstructions, 0x800 };
+		extern const Collectables::TokenDialogueRecord g_tokenDialogueValues = { 0x46, 0xC, g_molehillChallengeInstructions, 0x800 };
 		// GLOBAL: TOY2 0x004F154C
 		int16_t g_tokenLinkIds[] = { 0x33, 0x31, 0x32, 0x30, 0x34, 0 };
 

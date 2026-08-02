@@ -99,6 +99,7 @@ set(TOY2_SOURCES
     src/Toy2/LevelSelect.h
     src/Toy2/LevelLogic.h
     src/Toy2/Particles.h
+    src/Toy2/TokenDialogue.h
     src/Toy2/CreditsText.inc
     src/Toy2/LaserAttackInstructions.inc
     src/Toy2/CameraInstructions.inc
