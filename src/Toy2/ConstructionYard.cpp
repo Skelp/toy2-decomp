@@ -1,4 +1,5 @@
 #include "Toy2/Toy2.h"
+#include "Toy2/MoveableObjectInternal.h"
 #include "Toy2/LevelLogic.h"
 #include "Toy2/Actor.h"
 #include "Toy2/Buzz.h"
@@ -47,12 +48,6 @@ namespace Toy2
 			SLAMMED_PLATFORM_SECOND = 2,
 			SLAMMED_PLATFORM_THIRD = 4,
 			SLAMMED_PLATFORM_LIFT_RETURNING = 8,
-		};
-
-		struct MoveableObjectInitTable
-		{
-			MoveableObject::InitEntry entries[2];
-			int16_t terminator;
 		};
 
 		struct PaintIndicatorEntry
@@ -260,8 +255,6 @@ namespace Toy2
 		int32_t g_fallingParticlePathIndex;
 
 		STATIC_ASSERT(sizeof(Collectables::HiddenCollectibleState) == 0x8);
-		STATIC_ASSERT(sizeof(MoveableObjectInitTable) == 0xE);
-
 		// FUNCTION: TOY2 0x0041BC20 [PROVISIONAL]
 		void MoveDrills(int32_t* cycleTimer, int32_t* verticalVelocity, int32_t* verticalOffset, int32_t drillLinkId, int32_t cycleDuration, int32_t platformId)
 		{

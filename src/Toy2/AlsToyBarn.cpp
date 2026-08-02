@@ -1,4 +1,5 @@
 #include "Toy2/Toy2.h"
+#include "Toy2/MoveableObjectInternal.h"
 #include "Toy2/LevelLogic.h"
 #include "Toy2/Actor.h"
 #include "Toy2/Camera.h"
@@ -66,12 +67,6 @@ namespace Toy2
 			DINO_ENCOUNTER_ACTIVE = 2,
 			DINO_ENCOUNTER_DEFEATED = 3,
 			DINO_ENCOUNTER_REWARD_GIVEN = 200,
-		};
-
-		struct MoveableObjectInitTable
-		{
-			MoveableObject::InitEntry entries[2];
-			int16_t terminator;
 		};
 
 		STATIC_ASSERT(sizeof(Collectables::TokenDialogueTable<1>) == 0x14);

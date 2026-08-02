@@ -130,6 +130,7 @@ set(TOY2_SOURCES
     src/Toy2/FinalShowdown.cpp
     src/Toy2/Toy2.cpp
     src/Toy2/Toy2.h
+    src/Toy2/MoveableObjectInternal.h
     src/Toy2/IniKeywords.inc
     src/D3DApp/d3dapp.cpp
     src/D3DApp/d3dapp.h

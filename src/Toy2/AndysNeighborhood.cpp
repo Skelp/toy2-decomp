@@ -1,4 +1,5 @@
 #include "Toy2/Toy2.h"
+#include "Toy2/MoveableObjectInternal.h"
 #include "Toy2/LevelLogic.h"
 #include "Toy2/Actor.h"
 #include "Toy2/Camera.h"
@@ -27,12 +28,6 @@ namespace Toy2
 
 	namespace AndysNeighborhood
 	{
-		struct MoveableObjectInitTable
-		{
-			MoveableObject::InitEntry entries[2];
-			int16_t terminator;
-		};
-
 		enum KiteEncounterState
 		{
 			KITE_ENCOUNTER_ACTIVE = 2,
