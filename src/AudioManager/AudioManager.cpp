@@ -371,15 +371,18 @@ namespace AudioManager
 
 	STATIC_ASSERT(sizeof(SoundPackDescriptor) == 0x8);
 
-	static char* g_primarySoundNames[] = {
+	// GLOBAL: TOY2 0x004FCDC4
+	char* g_primarySoundNames[] = {
 #include "PrimarySoundNames.inc"
 	};
 
-	static char* g_secondarySoundNames[] = {
+	// GLOBAL: TOY2 0x004FD1C8
+	char* g_secondarySoundNames[] = {
 #include "SecondarySoundNames.inc"
 	};
 
-	static char* g_emptySoundNames[1];
+	// GLOBAL: TOY2 0x00726F40
+	char* g_emptySoundNames[1];
 
 	void LoadSoundEffect(char* name, int32_t index, int32_t flag);
 
