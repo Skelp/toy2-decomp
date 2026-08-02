@@ -4782,26 +4782,29 @@ namespace SoftwareRenderer
 
 		if (vertexCount == 4)
 		{
-			if ((vertex0->position.x >= (float)g_clipTop || vertex1->position.x >= (float)g_clipTop || vertex2->position.x >= (float)g_clipTop
-					|| vertex3->position.x >= (float)g_clipTop)
-				&& (vertex0->position.x <= (float)g_clipBottom || vertex1->position.x <= (float)g_clipBottom || vertex2->position.x <= (float)g_clipBottom
-					|| vertex3->position.x <= (float)g_clipBottom)
-				&& (vertex0->position.y >= (float)g_clipLeft || vertex1->position.y >= (float)g_clipLeft || vertex2->position.y >= (float)g_clipLeft
-					|| vertex3->position.y >= (float)g_clipLeft)
-				&& (vertex0->position.y <= (float)g_clipRight || vertex1->position.y <= (float)g_clipRight || vertex2->position.y <= (float)g_clipRight
-					|| vertex3->position.y <= (float)g_clipRight))
-				return 0;
+			if ((vertex0->position.x < (float)g_clipTop && vertex1->position.x < (float)g_clipTop && vertex2->position.x < (float)g_clipTop
+					&& vertex3->position.x < (float)g_clipTop)
+				|| (vertex0->position.x > (float)g_clipBottom && vertex1->position.x > (float)g_clipBottom && vertex2->position.x > (float)g_clipBottom
+					&& vertex3->position.x > (float)g_clipBottom)
+				|| (vertex0->position.y < (float)g_clipLeft && vertex1->position.y < (float)g_clipLeft && vertex2->position.y < (float)g_clipLeft
+					&& vertex3->position.y < (float)g_clipLeft)
+				|| (vertex0->position.y > (float)g_clipRight && vertex1->position.y > (float)g_clipRight && vertex2->position.y > (float)g_clipRight
+					&& vertex3->position.y > (float)g_clipRight))
+				return 1;
 		}
-		else if (vertexCount == 3)
+		else
 		{
-			if ((vertex0->position.x >= (float)g_clipTop || vertex1->position.x >= (float)g_clipTop || vertex2->position.x >= (float)g_clipTop)
-				&& (vertex0->position.x <= (float)g_clipBottom || vertex1->position.x <= (float)g_clipBottom || vertex2->position.x <= (float)g_clipBottom)
-				&& (vertex0->position.y >= (float)g_clipLeft || vertex1->position.y >= (float)g_clipLeft || vertex2->position.y >= (float)g_clipLeft)
-				&& (vertex0->position.y <= (float)g_clipRight || vertex1->position.y <= (float)g_clipRight || vertex2->position.y <= (float)g_clipRight))
-				return 0;
+			if (vertexCount != 3)
+				return 1;
+
+			if ((vertex0->position.x < (float)g_clipTop && vertex1->position.x < (float)g_clipTop && vertex2->position.x < (float)g_clipTop)
+				|| (vertex0->position.x > (float)g_clipBottom && vertex1->position.x > (float)g_clipBottom && vertex2->position.x > (float)g_clipBottom)
+				|| (vertex0->position.y < (float)g_clipLeft && vertex1->position.y < (float)g_clipLeft && vertex2->position.y < (float)g_clipLeft)
+				|| (vertex0->position.y > (float)g_clipRight && vertex1->position.y > (float)g_clipRight && vertex2->position.y > (float)g_clipRight))
+				return 1;
 		}
 
-		return 1;
+		return 0;
 	}
 
 	// FUNCTION: TOY2 0x0047C800 [PROVISIONAL]
