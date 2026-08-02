@@ -273,10 +273,14 @@ namespace Nu3D
 		// FUNCTION: TOY2 0x0049F400 [PROVISIONAL]
 		int32_t IsWithinDistance(const Vector3I* left, const Vector3I* right, int32_t radius)
 		{
-			int32_t deltaX = (left->x - right->x) >> 8;
-			int32_t deltaY = (left->y - right->y) >> 8;
-			int32_t deltaZ = (left->z - right->z) >> 8;
-			int32_t distSq = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
+			Vector3I delta = *left;
+			delta.x -= right->x;
+			delta.y -= right->y;
+			delta.z -= right->z;
+			int32_t deltaX = delta.x >> 8;
+			int32_t deltaY = delta.y >> 8;
+			int32_t deltaZ = delta.z >> 8;
+			int32_t distSq = deltaZ * deltaZ + deltaY * deltaY + deltaX * deltaX;
 			if (distSq < radius * radius)
 				return distSq + 1;
 			return 0;
