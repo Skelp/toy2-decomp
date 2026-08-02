@@ -43,6 +43,13 @@ namespace Toy2
 			TOKEN_COLLECTION_STATE_LAUNCH = 4,
 		};
 
+		struct InteractionPickup : Buzz::GadgetPickup
+		{
+			uint8_t GetRadiusAndFlags() const { return reservedD[0]; }
+		};
+
+		STATIC_ASSERT(sizeof(InteractionPickup) == 0x10);
+
 		void Token(int32_t tokenId);
 
 		// GLOBAL: TOY2 0x005039C4
@@ -69,7 +76,7 @@ namespace Toy2
 		int32_t g_tokenLaunchVerticalVelocity;
 
 		// GLOBAL: TOY2 0x00830D5C
-		Buzz::GadgetPickup* g_respawningGadgetPickup;
+		InteractionPickup* g_respawningGadgetPickup;
 
 		// GLOBAL: TOY2 0x00830E34
 		int32_t g_respawningGadgetPickupY;
@@ -113,7 +120,7 @@ namespace Toy2
 				g_gadgetRespawnTimer -= Renderer::g_frameDelta;
 				if (g_gadgetRespawnTimer <= 0)
 				{
-					Buzz::GadgetPickup* respawningPickup = g_respawningGadgetPickup;
+					InteractionPickup* respawningPickup = g_respawningGadgetPickup;
 					respawningPickup->position.y = g_respawningGadgetPickupY;
 					g_gadgetRespawnTimer = 0;
 					Nu3D::Link::SetScaleFromFixedOffsets(respawningPickup->linkId, 0x1000, 0x1000, 0x1000);
@@ -133,21 +140,21 @@ namespace Toy2
 
 			int32_t pickupSound = 0;
 			Levels::RecordData* pickupRecords = Levels::g_recordData[63];
-			Buzz::GadgetPickup* pickup = reinterpret_cast<Buzz::GadgetPickup*>(pickupRecords + 1);
+			InteractionPickup* pickup = reinterpret_cast<InteractionPickup*>(pickupRecords + 1);
 			int32_t buzzX = g_buzzActor.posAngles.pos.x >> 5;
 			int32_t buzzY = g_buzzActor.posAngles.pos.y >> 5;
 			int32_t buzzZ = g_buzzActor.posAngles.pos.z >> 5;
 
 			for (uint32_t pickupCount = pickupRecords->recordCount; pickupCount != 0; pickupCount--, pickup++)
 			{
-				if (pickup->position.y == INT_MIN || (pickup->radiusAndFlags & PICKUP_FLAG_PERSISTENT) == 0
-					|| (pickup->radiusAndFlags & PICKUP_RADIUS_MASK) == 0)
+				if (pickup->position.y == INT_MIN || (pickup->GetRadiusAndFlags() & PICKUP_FLAG_PERSISTENT) == 0
+					|| (pickup->GetRadiusAndFlags() & PICKUP_RADIUS_MASK) == 0)
 					continue;
 
 				int32_t distanceX = (buzzX - pickup->position.x) >> 3;
 				int32_t distanceY = (buzzY - 0xE6 - pickup->position.y) >> 3;
 				int32_t distanceZ = (buzzZ - pickup->position.z) >> 3;
-				int32_t pickupRadius = (pickup->radiusAndFlags & PICKUP_RADIUS_MASK) + 0xE;
+				int32_t pickupRadius = (pickup->GetRadiusAndFlags() & PICKUP_RADIUS_MASK) + 0xE;
 				if (distanceX * distanceX + distanceY * distanceY + distanceZ * distanceZ >= pickupRadius * pickupRadius)
 					continue;
 
