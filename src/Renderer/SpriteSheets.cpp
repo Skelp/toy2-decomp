@@ -699,6 +699,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6B48
 	SpriteSheet* g_level0Sheets[35] = {
 		&g_level0Sheet1,
 		&g_level0Sheet2,
@@ -739,46 +740,56 @@ namespace Renderer
 
 	SpriteSheet g_level1Sheet1 = { 8, 32, 32, 0, { { 128, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level1Sheet2 = { 8, 40, 32, 0, { { 64, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F0EA4
 	SpriteSheet* g_level1Sheets[5] = { &g_level1Sheet1, &g_level1Sheet1, &g_level1Sheet1, &g_level1Sheet2, SPRITE_SHEET_END };
 
 	SpriteSheet g_level2Sheet1 = { 8, 32, 32, 0, { { 96, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level2Sheet2 = { 8, 31, 23, 0, { { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level2Sheet3 = { 8, 31, 31, 0, { { 64, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level2Sheet4 = { 8, 31, 31, 0, { { 128, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F14F4
 	SpriteSheet* g_level2Sheets[5] = { &g_level2Sheet1, &g_level2Sheet2, &g_level2Sheet3, &g_level2Sheet4, SPRITE_SHEET_END };
 
 	SpriteSheet g_level3Sheet1 = { 8, 8, 32, 0, { { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F1564
 	SpriteSheet* g_level3Sheets[2] = { &g_level3Sheet1, SPRITE_SHEET_END };
 
 	SpriteSheet g_level4Sheet1 = { 8, 32, 32, 0, { { 64, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level4Sheet2 = { 8, 32, 32, 0, { { 128, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level4Sheet3 = { 8, 31, 31, 0, { { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F1B54
 	SpriteSheet* g_level4Sheets[4] = { &g_level4Sheet1, &g_level4Sheet2, &g_level4Sheet3, SPRITE_SHEET_END };
 
 	SpriteSheet g_level5Sheet2 = { 8, 32, 32, 0, { { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level5Sheet1 = { 8, 32, 32, 0, { { 64, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level5Sheet3 = { 8, 8, 32, 0, { { 128, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F214C
 	SpriteSheet* g_level5Sheets[4] = { &g_level5Sheet1, &g_level5Sheet2, &g_level5Sheet3, SPRITE_SHEET_END };
 
 	SpriteSheet g_level6Sheet1 = { 31, 31, 31, 0, { { 96, 96 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F21A4
 	SpriteSheet* g_level6Sheets[5] = { &g_level6Sheet1, &g_level6Sheet1, &g_level6Sheet1, &g_level6Sheet1, SPRITE_SHEET_END };
 
 	SpriteSheet g_level7Sheet2 = { 1, 63, 63, 0, { { 192, 192 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level7Sheet1 = { 7, 32, 32, 0, { { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level7Sheet3 = { 7, 31, 31, 0, { { 64, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F293C
 	SpriteSheet* g_level7Sheets[4] = { &g_level7Sheet1, &g_level7Sheet2, &g_level7Sheet3, SPRITE_SHEET_END };
 
 	SpriteSheet g_level8Sheet3 = { 8, 31, 31, 0, { { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level8Sheet2 = { 8, 31, 31, 0, { { 64, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level8Sheet1 = { 8, 32, 32, 0, { { 192, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F2EF4
 	SpriteSheet* g_level8Sheets[4] = { &g_level8Sheet1, &g_level8Sheet2, &g_level8Sheet3, SPRITE_SHEET_END };
 
+	// GLOBAL: TOY2 0x004F2F58
 	SpriteSheet* g_level9Sheets[1] = { SPRITE_SHEET_END };
 
 	SpriteSheet g_level10Sheet1 = { 8, 32, 32, 0, { { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level10Sheet2 = { 8, 63, 63, 0, { { 64, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level10Sheet3 = { 8, 31, 31, 0, { { 128, 0 }, { 0, 0 } } };
 
+	// GLOBAL: TOY2 0x004F366C
 	SpriteSheet* g_level10Sheets[7] = {
 		&g_level10Sheet1,
 		&g_level10Sheet1,
@@ -791,9 +802,11 @@ namespace Renderer
 
 	SpriteSheet g_level11Sheet1 = { 7, 32, 32, 0, { { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level11Sheet2 = { 7, 32, 32, 0, { { 192, 196 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F3DF4
 	SpriteSheet* g_level11Sheets[3] = { &g_level11Sheet1, &g_level11Sheet2, SPRITE_SHEET_END };
 
 	SpriteSheet g_level12Sheet1 = { 8, 31, 31, 0, { { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F4054
 	SpriteSheet* g_level12Sheets[4] = { &g_level12Sheet1, &g_level12Sheet1, &g_level12Sheet1, SPRITE_SHEET_END };
 
 	SpriteSheet g_level13Sheet1 = { 23, 32, 32, 0, { { 0, 128 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
@@ -802,6 +815,7 @@ namespace Renderer
 	SpriteSheet g_level13Sheet5 = { 31, 31, 31, 0, { { 128, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level13Sheet6 = { 23, 31, 31, 0, { { 160, 64 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level13Sheet3 = { 23, 31, 47, 0, { { 128, 64 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F464C
 	SpriteSheet* g_level13Sheets[7] = {
 		&g_level13Sheet1,
 		&g_level13Sheet2,
@@ -815,6 +829,7 @@ namespace Renderer
 	SpriteSheet g_level14Sheet1 = { 23, 32, 32, 0, { { 64, 64 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level14Sheet3 = { 31, 31, 16, 0, { { 160, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level14Sheet2 = { 23, 8, 31, 0, { { 128, 64 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F4C2C
 	SpriteSheet* g_level14Sheets[5] = {
 		&g_level14Sheet1,
 		&g_level14Sheet2,
@@ -827,6 +842,7 @@ namespace Renderer
 	SpriteSheet g_level15Sheet3 = { 31, 31, 31, 0, { { 128, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level15Sheet4 = { 23, 31, 31, 0, { { 160, 64 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level15Sheet2 = { 23, 31, 47, 0, { { 128, 64 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F4CB4
 	SpriteSheet* g_level15Sheets[7] = {
 		&g_level15Sheet1,
 		&g_level15Sheet1,
@@ -1093,6 +1109,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F4EF8
 	SpriteSheet* g_level16Sheets[22] = {
 		&g_level16Sheet1,
 		&g_level16Sheet2,
@@ -1118,8 +1135,11 @@ namespace Renderer
 		SPRITE_SHEET_END,
 	};
 
+	// GLOBAL: TOY2 0x004F4F50
 	SpriteSheet* g_level17Sheets[1] = { SPRITE_SHEET_END };
+	// GLOBAL: TOY2 0x004F4F54
 	SpriteSheet* g_level18Sheets[1] = { SPRITE_SHEET_END };
+	// GLOBAL: TOY2 0x004F4F58
 	SpriteSheet* g_level19Sheets[1] = { SPRITE_SHEET_END };
 
 	// GLOBAL: TOY2 0x004F7284
@@ -1146,6 +1166,7 @@ namespace Renderer
 		g_level19Sheets,
 	};
 
+	// GLOBAL: TOY2 0x004EBE68
 	SpriteSheet g_commonSheet1 = {
 		31,
 		15,
@@ -1159,6 +1180,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004EBE78
 	SpriteSheet g_commonSheet2 = {
 		31,
 		15,
@@ -1176,6 +1198,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004EBE90
 	SpriteSheet g_commonSheet25 = {
 		31,
 		15,
@@ -1193,6 +1216,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004EBEA8
 	SpriteSheet g_commonSheet3 = {
 		31,
 		15,
@@ -1206,6 +1230,7 @@ namespace Renderer
 		},
 
 	};
+	// GLOBAL: TOY2 0x004EBEB8
 	SpriteSheet g_commonSheet4 = {
 		31,
 		16,
@@ -1227,15 +1252,25 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004EBED8
 	SpriteSheet g_commonSheet5 = { 31, 31, 31, 0, { { 96, 96 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EBEE8
 	SpriteSheet g_commonSheet6 = { 31, 31, 31, 0, { { 128, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EBEF8
 	SpriteSheet g_commonSheet7 = { 31, 1, 1, 0, { { 112, 112 }, { 240, 80 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EBF08
 	SpriteSheet g_commonSheet8 = { 31, 32, 32, 0, { { 160, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EBF18
 	SpriteSheet g_commonSheet9 = { 31, 31, 31, 0, { { 160, 32 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EBF28
 	SpriteSheet g_commonSheet10 = { 31, 31, 8, 0, { { 128, 32 }, { 128, 41 }, { 128, 50 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EBF38
 	SpriteSheet g_commonSheet35 = { 31, 31, 15, 0, { { 96, 48 }, { 96, 48 }, { 96, 48 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EBF48
 	SpriteSheet g_commonSheet13 = { 31, 7, 32, 0, { { 216, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EBF58
 	SpriteSheet g_commonSheet14 = { 31, 31, 7, 0, { { 224, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EBF68
 	SpriteSheet g_commonSheet17 = {
 		31,
 		31,
@@ -1257,25 +1292,44 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004EBF88
 	SpriteSheet g_commonSheet18 = { 31, 31, 31, 0, { { 64, 64 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EBF98
 	SpriteSheet g_commonSheet19 = { 31, 16, 8, 0, { { 32, 88 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EBFA8
 	SpriteSheet g_commonSheet20 = { 31, 31, 31, 0, { { 192, 96 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EBFB8
 	SpriteSheet g_commonSheet22 = { 31, 31, 31, 0, { { 192, 64 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EBFC8
 	SpriteSheet g_commonSheet23 = { 31, 31, 31, 0, { { 224, 64 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EBFD8
 	SpriteSheet g_commonSheet24 = { 31, 31, 31, 0, { { 64, 96 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EBFE8
 	SpriteSheet g_commonSheet26 = { 31, 11, 11, 0, { { 96, 64 }, { 108, 64 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EBFF8
 	SpriteSheet g_commonSheet27 = { 31, 40, 32, 0, { { 0, 128 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EC008
 	SpriteSheet g_commonSheet28 = { 31, 32, 32, 0, { { 64, 128 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EC018
 	SpriteSheet g_commonSheet29 = { 31, 31, 19, 0, { { 224, 96 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EC028
 	SpriteSheet g_commonSheet30 = { 31, 8, 8, 0, { { 64, 128 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EC038
 	SpriteSheet g_commonSheet31 = { 31, 31, 39, 0, { { 128, 128 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EC048
 	SpriteSheet g_commonSheet32 = { 31, 15, 15, 0, { { 80, 48 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EC058
 	SpriteSheet g_commonSheet33 = { 31, 32, 32, 0, { { 192, 128 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EC068
 	SpriteSheet g_commonSheet34 = { 31, 15, 16, 0, { { 112, 32 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EC078
 	SpriteSheet g_commonSheet36 = { 31, 31, 16, 0, { { 160, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EC088
 	SpriteSheet g_commonSheet39 = { 31, 16, 16, 0, { { 64, 224 }, { 80, 224 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004EC098
 	SpriteSheet g_commonSheet40 = { 31, 31, 31, 0, { { 0, 160 }, { 0, 0 } } };
 
+	// GLOBAL: TOY2 0x00500D30
 	SpriteSheet g_commonSheet21 = {
 		32,
 		16,
@@ -1341,11 +1395,17 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x00500DA8
 	SpriteSheet g_commonSheet11 = { 32, 64, 64, 0, { { 128, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x00500DB8
 	SpriteSheet g_commonSheet12 = { 32, 48, 64, 0, { { 192, 32 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x00500DC8
 	SpriteSheet g_commonSheet15 = { 32, 64, 32, 0, { { 192, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x00500DD8
 	SpriteSheet g_commonSheet16 = { 32, 64, 32, 0, { { 128, 64 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x00500C10
 	SpriteSheet g_commonSheet37 = { 32, 64, 62, 0, { { 128, 96 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x00500C20
 	SpriteSheet g_commonSheet38 = { 32, 64, 62, 0, { { 192, 100 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 
 	// GLOBAL: TOY2 0x004EC0A4
