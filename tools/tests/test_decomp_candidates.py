@@ -83,6 +83,20 @@ class CandidateTests(unittest.TestCase):
         self.assertGreater(small.expected_bytes_per_minute, oversized.expected_bytes_per_minute)
         self.assertGreater(small.expected_bytes_per_minute, blocked.expected_bytes_per_minute)
 
+    def test_refinement_yield_penalizes_a_large_gate_deficit(self):
+        above_gate = make(
+            0x401000, "N::Above", size=1000, state="FUNCTION", match=0.55
+        )
+        below_gate = make(
+            0x402000, "N::Below", size=1000, state="FUNCTION", match=0.10
+        )
+        candidates.estimate_yield(above_gate, "refinement")
+        candidates.estimate_yield(below_gate, "refinement")
+        self.assertGreater(
+            above_gate.expected_bytes_per_minute,
+            below_gate.expected_bytes_per_minute,
+        )
+
     def test_parse_map_sorts_and_skips_comments(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "map.txt"

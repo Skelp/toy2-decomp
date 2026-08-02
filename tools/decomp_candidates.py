@@ -817,7 +817,8 @@ def estimate_yield(candidate: Candidate, queue: str | None) -> None:
         if candidate.match is not None and candidate.match >= 0.5:
             confidence = 0.35
         else:
-            confidence = 0.15
+            current_match = candidate.match or 0.0
+            confidence = 0.15 * max(0.1, current_match / 0.5)
     else:
         expected_minutes = min(60.0, max(6.0, 5.0 + candidate.size / 180.0))
         if candidate.size <= 600:
@@ -837,6 +838,8 @@ def estimate_yield(candidate: Candidate, queue: str | None) -> None:
 
     if not candidate.source:
         confidence *= 0.8
+    if candidate.dependency_component >= 0 and not candidate.dependency_ready:
+        confidence *= 0.65
     if candidate.manual_blocker:
         confidence *= 0.1
     if candidate.indirect_calls or candidate.indirect_jumps:
