@@ -1068,7 +1068,8 @@ namespace AudioManager
 		OneShotSoundPreset& preset = g_oneShotPresets[soundIndex];
 		int32_t audibility = 150;
 		uint16_t encodedSoundIndex = preset.encodedSoundIndex;
-		if ((encodedSoundIndex & 0x4000) != 0)
+		int16_t usesLevelSoundMapping = encodedSoundIndex & 0x4000;
+		if (usesLevelSoundMapping != 0)
 		{
 			int16_t* mapping = &g_levelSoundMappings[0].levelFileIndex + (encodedSoundIndex & 0x3fff);
 			while (*mapping != Toy2::g_levelFileIndex)
