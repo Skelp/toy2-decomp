@@ -44,6 +44,17 @@ class Section:
     virtual_size: int
     raw_pointer: int
     raw_size: int
+    characteristics: int = 0
+
+
+@dataclass(frozen=True)
+class ImageMetadata:
+    """PE fields that describe the image and its raw file layout."""
+
+    file_size: int
+    image_base: int
+    header_size: int
+    sections: tuple[Section, ...]
 
 
 @dataclass(frozen=True)
@@ -64,13 +75,33 @@ class StringLiteral:
 @lru_cache(maxsize=1)
 def _image() -> tuple[bytes, int, tuple[Section, ...]]:
     data = EXE_PATH.read_bytes()
+    metadata = parse_image_metadata(data)
+    return data, metadata.image_base, metadata.sections
+
+
+def parse_image_metadata(data: bytes) -> ImageMetadata:
+    """Parse the raw layout fields from a PE32 image."""
+
+    if len(data) < 0x40 or data[:2] != b"MZ":
+        raise ValueError("The retail executable does not have a valid DOS header.")
     pe = struct.unpack_from("<I", data, 0x3C)[0]
+    if pe + 24 > len(data) or data[pe : pe + 4] != b"PE\0\0":
+        raise ValueError("The retail executable does not have a valid PE header.")
     section_count = struct.unpack_from("<H", data, pe + 6)[0]
     optional_size = struct.unpack_from("<H", data, pe + 20)[0]
-    image_base = struct.unpack_from("<I", data, pe + 24 + 28)[0]
+    optional = pe + 24
+    if optional_size < 64 or optional + optional_size > len(data):
+        raise ValueError("The retail executable has an invalid optional header.")
+    if struct.unpack_from("<H", data, optional)[0] != 0x10B:
+        raise ValueError("The retail executable is not a PE32 image.")
+    image_base = struct.unpack_from("<I", data, optional + 28)[0]
+    header_size = struct.unpack_from("<I", data, optional + 60)[0]
+    section_table = optional + optional_size
+    if section_count > 96 or section_table + section_count * 40 > len(data):
+        raise ValueError("The retail executable has an invalid section table.")
     sections = []
     for index in range(section_count):
-        offset = pe + 24 + optional_size + index * 40
+        offset = section_table + index * 40
         sections.append(
             Section(
                 name=data[offset : offset + 8].rstrip(b"\0").decode("ascii", "replace"),
@@ -78,9 +109,21 @@ def _image() -> tuple[bytes, int, tuple[Section, ...]]:
                 virtual_size=struct.unpack_from("<I", data, offset + 8)[0],
                 raw_pointer=struct.unpack_from("<I", data, offset + 20)[0],
                 raw_size=struct.unpack_from("<I", data, offset + 16)[0],
+                characteristics=struct.unpack_from("<I", data, offset + 36)[0],
             )
         )
-    return data, image_base, tuple(sections)
+    return ImageMetadata(
+        file_size=len(data),
+        image_base=image_base,
+        header_size=header_size,
+        sections=tuple(sections),
+    )
+
+
+def read_image_metadata(path: Path = EXE_PATH) -> ImageMetadata:
+    """Read PE layout metadata from an executable."""
+
+    return parse_image_metadata(path.read_bytes())
 
 
 def available() -> bool:

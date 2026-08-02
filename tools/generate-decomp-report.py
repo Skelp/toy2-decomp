@@ -12,6 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from decomp_annotations import canonical_address, read_source_annotations
+import decomp_binary
 import decomp_lint
 from decomp_status import MatchStatus, is_symbol_only_diff, read_tool_artifacts, verification_status
 
@@ -65,9 +66,198 @@ def read_function_sizes(path: Path | None) -> dict[str, int]:
     for item in json.loads(path.read_text(encoding="utf-8-sig")):
         address = item.get("address") or item.get("entry_point")
         size = item.get("size")
-        if address and isinstance(size, int) and size > 0:
+        # Ghidra uses a one-byte extent when it knows only a function start.
+        # Keep the function-map span in that case.
+        if address and isinstance(size, int) and size > 1:
             sizes[canonical_address(f"0x{address}")] = size
     return sizes
+
+
+def build_binary_layout(
+    metadata: decomp_binary.ImageMetadata, entities: list[dict]
+) -> dict:
+    """Build a non-overlapping raw-file model with measured code progress."""
+
+    file_size = metadata.file_size
+    if file_size <= 0 or not 0 < metadata.header_size <= file_size:
+        raise ValueError("The retail executable has an invalid raw header size.")
+
+    raw_sections = sorted(
+        (section for section in metadata.sections if section.raw_size),
+        key=lambda section: (section.raw_pointer, section.name),
+    )
+    cursor = metadata.header_size
+    segments = [
+        {
+            "key": "headers",
+            "name": "PE headers",
+            "kind": "headers",
+            "offset": 0,
+            "size": metadata.header_size,
+            "measurement": "unscored",
+        }
+    ]
+    section_rows: list[dict] = []
+    gap_index = 0
+    for index, section in enumerate(raw_sections):
+        start = section.raw_pointer
+        end = start + section.raw_size
+        if start < cursor:
+            raise ValueError("The retail executable has overlapping raw regions.")
+        if start > file_size or end > file_size:
+            raise ValueError("A PE section extends past the retail file.")
+        if start > cursor:
+            gap_index += 1
+            segments.append(
+                {
+                    "key": f"gap-{gap_index}",
+                    "name": "File padding",
+                    "kind": "gap",
+                    "offset": cursor,
+                    "size": start - cursor,
+                    "measurement": "unscored",
+                }
+            )
+        group = (
+            "code"
+            if section.name == ".text" or section.characteristics & 0x20000000
+            else "data"
+            if section.name == ".data"
+            else "other"
+        )
+        row = {
+            "key": f"section-{index}",
+            "name": section.name or f"Section {index + 1}",
+            "kind": "section",
+            "group": group,
+            "offset": start,
+            "size": section.raw_size,
+            "virtual_address": section.virtual_address,
+            "virtual_size": section.virtual_size,
+            "characteristics": section.characteristics,
+            "measurement": "code-score" if group == "code" else "unscored",
+            "scored_bytes": 0,
+            "explained_bytes": 0.0,
+            "unexplained_scored_bytes": 0.0,
+            "unscored_bytes": section.raw_size,
+        }
+        section_rows.append(row)
+        segments.append(row.copy())
+        cursor = end
+
+    if cursor < file_size:
+        segments.append(
+            {
+                "key": "overlay",
+                "name": "File overlay",
+                "kind": "overlay",
+                "offset": cursor,
+                "size": file_size - cursor,
+                "measurement": "unscored",
+            }
+        )
+
+    project_entities = [
+        entity
+        for entity in entities
+        if entity.get("category") == "project"
+        and int(entity.get("original_size") or 0) > 0
+    ]
+    for section in section_rows:
+        if section["group"] != "code":
+            continue
+        section_start = section["virtual_address"]
+        section_end = section_start + section["size"]
+        intervals = []
+        for entity in project_entities:
+            try:
+                start = int(str(entity["address"]), 16)
+            except (KeyError, TypeError, ValueError):
+                continue
+            end = start + int(entity["original_size"])
+            clipped_start = max(section_start, start)
+            clipped_end = min(section_end, end)
+            if clipped_start >= clipped_end:
+                continue
+            score = (
+                1.0
+                if entity.get("effective")
+                else max(0.0, min(1.0, float(entity.get("matching", 0))))
+            )
+            if entity.get("stub") or entity.get("status") == "unmatched":
+                score = 0.0
+            intervals.append((clipped_start, clipped_end, score))
+
+        interval_cursor = section_start
+        scored_bytes = 0
+        explained_bytes = 0.0
+        for start, end, score in sorted(intervals):
+            start = max(start, interval_cursor)
+            if start >= end:
+                continue
+            size = end - start
+            scored_bytes += size
+            explained_bytes += size * score
+            interval_cursor = end
+        section["scored_bytes"] = scored_bytes
+        section["explained_bytes"] = explained_bytes
+        section["unexplained_scored_bytes"] = scored_bytes - explained_bytes
+        section["unscored_bytes"] = section["size"] - scored_bytes
+        for segment in segments:
+            if segment["key"] == section["key"]:
+                segment.update(section)
+                break
+
+    scored_code_bytes = sum(row["scored_bytes"] for row in section_rows)
+    explained_code_bytes = sum(row["explained_bytes"] for row in section_rows)
+    unexplained_scored_code_bytes = scored_code_bytes - explained_code_bytes
+    raw_total = sum(segment["size"] for segment in segments)
+    if raw_total != file_size:
+        raise ValueError("The PE raw regions do not cover the retail file once.")
+
+    return {
+        "available": True,
+        "error": None,
+        "file_size": file_size,
+        "header_size": metadata.header_size,
+        "section_count": len(metadata.sections),
+        "segments": segments,
+        "sections": section_rows,
+        "scored_code_bytes": scored_code_bytes,
+        "explained_code_bytes": explained_code_bytes,
+        "unexplained_scored_code_bytes": unexplained_scored_code_bytes,
+        "unscored_file_bytes": file_size - scored_code_bytes,
+        "explained_file_percent": (
+            explained_code_bytes / file_size * 100 if file_size else 0.0
+        ),
+        "scored_code_effective_percent": (
+            explained_code_bytes / scored_code_bytes * 100
+            if scored_code_bytes
+            else 0.0
+        ),
+    }
+
+
+def read_binary_layout(path: Path | None, entities: list[dict]) -> dict:
+    """Read the retail layout without stopping report generation on an error."""
+
+    if path is None:
+        return {
+            "available": False,
+            "error": "The report command did not specify a retail executable.",
+        }
+    try:
+        return build_binary_layout(decomp_binary.read_image_metadata(path), entities)
+    except FileNotFoundError:
+        return {
+            "available": False,
+            "error": "The retail executable is not available.",
+        }
+    except (OSError, ValueError) as error:
+        return {
+            "available": False,
+            "error": f"Cannot read the retail executable layout: {error}",
+        }
 
 
 def read_lint_quality(source_root: Path) -> tuple[dict[str, list[dict]], dict[str, int]]:
@@ -457,6 +647,11 @@ def main() -> int:
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--functions-map", type=Path)
     parser.add_argument("--function-sizes", type=Path, help="Ghidra function-list JSON for the original executable")
+    parser.add_argument(
+        "--retail-exe",
+        type=Path,
+        help="Retail PE executable used for the raw-file layout",
+    )
     parser.add_argument("--template", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -476,6 +671,7 @@ def main() -> int:
     payload = enrich_report(
         report, annotations, names, summary, quality, function_sizes, tool_artifacts
     )
+    payload["binary_layout"] = read_binary_layout(args.retail_exe, payload["entities"])
     template = args.template.read_text(encoding="utf-8")
     marker = "__DECOMP_REPORT_DATA__"
     if template.count(marker) != 1:

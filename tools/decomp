@@ -233,6 +233,7 @@ report() {
         --source-root src \
         --functions-map tools/Resources/functions_map.txt \
         --function-sizes "$function_sizes" \
+        --retail-exe original/toy2.exe \
         --template tools/decomp-report-template.html \
         --output "$output"
 }

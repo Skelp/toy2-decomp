@@ -113,6 +113,7 @@ function New-DecompReport([string] $Output = "build\decomp-report.html") {
         --source-root (Join-Path $Root "src") `
         --functions-map (Join-Path $Root "tools\Resources\functions_map.txt") `
         --function-sizes $FunctionSizes `
+        --retail-exe (Join-Path $Root "original\toy2.exe") `
         --template (Join-Path $Root "tools\decomp-report-template.html") `
         --output $Output
     Assert-LastExit "Generating HTML report"

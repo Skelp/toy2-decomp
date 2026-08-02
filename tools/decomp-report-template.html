@@ -107,6 +107,30 @@
     .bar-fill { height: 100%; width: var(--width); background: var(--color); border-radius: inherit; }
     .break-count { text-align: right; font: 10px ui-monospace, monospace; }
 
+    .binary-layout { margin-top: 14px; }
+    .file-layout-bar { display: flex; width: 100%; height: 58px; overflow: hidden; border: 1px solid #2b4556; border-radius: 10px; background: #07131c; }
+    .file-segment { position: relative; min-width: 0; height: 100%; overflow: hidden; border-right: 1px solid rgb(7 16 24 / 75%); background: var(--segment-color); }
+    .file-segment:last-child { border-right: 0; }
+    .file-segment-code { display: flex; }
+    .file-score-band { min-width: 0; height: 100%; }
+    .file-score-explained { background: var(--green); }
+    .file-score-unexplained { background: var(--red); }
+    .file-score-unscored { background: repeating-linear-gradient(135deg, #364a57, #364a57 6px, #293b47 6px, #293b47 12px); }
+    .file-segment-unscored { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--segment-color) 82%, #253641), color-mix(in srgb, var(--segment-color) 82%, #253641) 6px, color-mix(in srgb, var(--segment-color) 62%, #172934) 6px, color-mix(in srgb, var(--segment-color) 62%, #172934) 12px); }
+    .file-layout-labels { display: flex; width: 100%; min-height: 28px; color: var(--muted); font: 9px/1.2 ui-monospace, monospace; }
+    .file-layout-label { min-width: 0; padding: 6px 3px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+    .layout-summary { margin: 13px 0 0; color: var(--muted); font: 11px/1.55 ui-monospace, monospace; }
+    .binary-treemaps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+    .binary-tree-card { min-width: 0; }
+    .binary-tree-title { margin: 0 0 7px; font-size: 13px; }
+    .binary-tree-meta { min-height: 32px; margin: 0 0 9px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .byte-treemap { position: relative; height: 230px; overflow: hidden; border: 1px solid #1a3344; border-radius: 10px; background: #07131c; }
+    .byte-tree-node { position: absolute; overflow: hidden; border: 1px solid rgb(7 16 24 / 78%); border-radius: 4px; background: var(--node-color); }
+    .byte-tree-label { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 4px; padding: 8px; overflow: hidden; color: white; background: linear-gradient(180deg, rgb(0 0 0 / 5%), rgb(0 0 0 / 34%)); text-shadow: 0 1px 3px rgb(0 0 0 / 75%); }
+    .byte-tree-name { overflow: hidden; font-size: 11px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+    .byte-tree-size { color: rgb(255 255 255 / 78%); font: 9px ui-monospace, monospace; }
+    .binary-layout-error { padding: 28px; border: 1px dashed #526574; border-radius: 10px; color: var(--muted); text-align: center; }
+
     .files-panel { margin-top: 14px; }
     .file-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
     .file-card { border: 1px solid var(--line); border-radius: 12px; padding: 13px; background: rgb(7 17 25 / 58%); cursor: pointer; }
@@ -166,6 +190,8 @@
       #treemap { height: 520px; }
       .controls { grid-template-columns: 1fr 1fr; }
       .controls input { grid-column: 1 / -1; }
+      .binary-treemaps { grid-template-columns: 1fr; }
+      .byte-treemap { height: 200px; }
     }
     @media (max-width: 620px) {
       .shell { width: min(100% - 20px, 1500px); padding-top: 22px; }
@@ -197,6 +223,38 @@
     </header>
 
     <section class="metrics" id="metrics" aria-label="Project metrics"></section>
+
+    <section class="panel binary-layout" aria-labelledby="binary-layout-title">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title" id="binary-layout-title">Retail file coverage</h2>
+          <p class="panel-copy">The bar shows PE regions in file-offset order and uses their raw sizes. The .text score bands are aggregate values. Muted regions have no reliable score.</p>
+        </div>
+        <div class="legend" aria-label="Retail file coverage legend">
+          <span><i class="swatch" style="--swatch:var(--green)"></i> explained code</span>
+          <span><i class="swatch" style="--swatch:var(--red)"></i> unexplained scored code</span>
+          <span><i class="swatch" style="--swatch:var(--unknown)"></i> unscored bytes</span>
+        </div>
+      </div>
+      <div id="binary-layout-content"></div>
+      <div class="binary-treemaps" id="binary-treemaps" aria-label="PE region treemaps">
+        <article class="binary-tree-card">
+          <h3 class="binary-tree-title">Code (.text)</h3>
+          <p class="binary-tree-meta" id="code-tree-meta"></p>
+          <div class="byte-treemap" id="code-treemap"></div>
+        </article>
+        <article class="binary-tree-card">
+          <h3 class="binary-tree-title">Data (.data)</h3>
+          <p class="binary-tree-meta" id="data-tree-meta"></p>
+          <div class="byte-treemap" id="data-treemap"></div>
+        </article>
+        <article class="binary-tree-card">
+          <h3 class="binary-tree-title">Other file regions</h3>
+          <p class="binary-tree-meta" id="other-tree-meta"></p>
+          <div class="byte-treemap" id="other-treemap"></div>
+        </article>
+      </div>
+    </section>
 
     <section class="grid-main">
       <article class="panel">
@@ -304,10 +362,12 @@
     const report = JSON.parse(document.getElementById("report-data").textContent);
     const entities = report.entities;
     const metrics = report.metrics;
+    const binaryLayout = report.binary_layout || { available: false, error: "The report has no retail file layout." };
     const state = { group: null, file: null, search: "", status: "all", scope: "all", sort: "accuracy-asc", showStubs: false };
     const $ = id => document.getElementById(id);
     const pct = value => `${Number(value).toFixed(2)}%`;
     const bytes = value => `${Number(value || 0).toLocaleString()} B`;
+    const hexOffset = value => `0x${Number(value || 0).toString(16).toUpperCase().padStart(8, "0")}`;
     const originalSize = entity => Math.max(1, Number(entity.original_size || 0));
     const effectiveAccuracy = entity => entity.effective ? 1 : Number(entity.matching || 0);
     const topGroup = source => source.startsWith("[") ? source.split("/")[0] : (source.includes("/") ? source.split("/")[0] : "Core");
@@ -467,6 +527,123 @@
         box = result.box;
       }
       return rects;
+    }
+
+    function regionColor(item) {
+      if (item.status === "explained") return "var(--green)";
+      if (item.status === "unexplained") return "var(--red)";
+      const colors = {
+        ".rdata": "#566779", ".data": "#6b566d", ".idata": "#526a73",
+        ".rsrc": "#665e76", ".reloc": "#536570", headers: "#465864",
+        gap: "#334651", overlay: "#765c51"
+      };
+      return colors[item.name] || colors[item.kind] || "var(--unknown)";
+    }
+
+    function layoutDescription(segment) {
+      const end = Number(segment.offset) + Number(segment.size);
+      return `${segment.name}\n${bytes(segment.size)} raw bytes · ${hexOffset(segment.offset)}–${hexOffset(end)}\n${segment.measurement === "code-score" ? "Only mapped project function bytes have a score." : "These bytes are not scored."}`;
+    }
+
+    function renderFileLayout() {
+      const content = $("binary-layout-content");
+      if (!binaryLayout.available) {
+        content.replaceChildren(element("div", "binary-layout-error", binaryLayout.error || "The retail file layout is not available."));
+        $("binary-treemaps").hidden = true;
+        return;
+      }
+
+      const bar = element("div", "file-layout-bar");
+      const labels = element("div", "file-layout-labels");
+      binaryLayout.segments.forEach(segment => {
+        const width = Number(segment.size) / binaryLayout.file_size * 100;
+        const node = element("div", "file-segment");
+        node.style.width = `${width}%`;
+        node.style.setProperty("--segment-color", regionColor(segment));
+        node.title = layoutDescription(segment);
+        node.setAttribute("aria-label", layoutDescription(segment).replaceAll("\n", ". "));
+        if (segment.measurement === "code-score") {
+          node.classList.add("file-segment-code");
+          const bands = [
+            ["explained", segment.explained_bytes, "file-score-explained", "Explained scored code"],
+            ["unexplained", segment.unexplained_scored_bytes, "file-score-unexplained", "Unexplained scored code"],
+            ["unscored", segment.unscored_bytes, "file-score-unscored", "Unscored .text bytes"]
+          ];
+          bands.forEach(([status, size, className, name]) => {
+            if (Number(size) <= 0) return;
+            const band = element("span", `file-score-band ${className}`);
+            band.style.width = `${Number(size) / segment.size * 100}%`;
+            band.title = `${name}: ${bytes(size)}`;
+            band.dataset.status = status;
+            node.append(band);
+          });
+        } else {
+          node.classList.add("file-segment-unscored");
+        }
+        bar.append(node);
+
+        const label = element("div", "file-layout-label", width >= 1.6 ? segment.name : "");
+        label.style.width = `${width}%`;
+        label.title = layoutDescription(segment);
+        labels.append(label);
+      });
+
+      const summary = element("div", "layout-summary");
+      summary.append(
+        element("div", "", `${bytes(binaryLayout.explained_code_bytes)} of ${bytes(binaryLayout.file_size)} have measured code evidence (${pct(binaryLayout.explained_file_percent)}).`),
+        element("div", "", `${bytes(binaryLayout.unscored_file_bytes)} are outside the project function score. Unscored bytes do not count as explained.`)
+      );
+      content.replaceChildren(bar, labels, summary);
+    }
+
+    function renderByteTreemap(hostId, items) {
+      const host = $(hostId); host.replaceChildren();
+      const visible = items.filter(item => Number(item.weight) > 0);
+      if (!visible.length) {
+        host.append(element("div", "empty", "This region is not present in the retail file."));
+        return;
+      }
+      layout(visible, 0, 0, host.clientWidth, host.clientHeight).forEach(rect => {
+        const node = element("div", "byte-tree-node");
+        setTreemapBounds(node, rect);
+        node.style.setProperty("--node-color", regionColor(rect));
+        node.title = `${rect.name}\n${bytes(rect.weight)}\n${rect.description}`;
+        const label = element("span", "byte-tree-label");
+        label.append(element("span", "byte-tree-name", rect.name), element("span", "byte-tree-size", bytes(rect.weight)));
+        if (rect.width < 72 || rect.height < 30) label.hidden = true;
+        node.append(label); host.append(node);
+      });
+    }
+
+    function renderBinaryTreemaps() {
+      if (!binaryLayout.available) return;
+      const codeSections = binaryLayout.sections.filter(section => section.group === "code");
+      const dataSections = binaryLayout.sections.filter(section => section.group === "data");
+      const codeItems = codeSections.flatMap(section => [
+        { name: "Explained scored code", weight: section.explained_bytes, status: "explained", description: "This is the effective matched fraction of scored project function bytes." },
+        { name: "Unexplained scored code", weight: section.unexplained_scored_bytes, status: "unexplained", description: "The current function score does not explain these bytes." },
+        { name: "Unscored code", weight: section.unscored_bytes, status: "unscored", description: "No project function score covers these .text bytes." }
+      ]);
+      const dataItems = dataSections.map(section => ({
+        name: section.name, weight: section.size, status: "unscored", kind: "data",
+        description: "Current tools do not score data reconstruction."
+      }));
+      const otherItems = binaryLayout.segments.filter(segment => {
+        if (segment.kind !== "section") return true;
+        return segment.group === "other";
+      }).map(segment => ({
+        name: segment.name, weight: segment.size, status: "unscored", kind: segment.kind,
+        description: "Current tools do not score this file region."
+      }));
+      const codeRawBytes = codeSections.reduce((sum, section) => sum + section.size, 0);
+      const dataRawBytes = dataSections.reduce((sum, section) => sum + section.size, 0);
+      const otherRawBytes = otherItems.reduce((sum, item) => sum + Number(item.weight), 0);
+      $("code-tree-meta").textContent = `${bytes(codeRawBytes)} raw bytes. ${bytes(binaryLayout.scored_code_bytes)} have project scores. Score bands do not show byte positions.`;
+      $("data-tree-meta").textContent = `${bytes(dataRawBytes)} raw bytes. Data reconstruction has no reliable score.`;
+      $("other-tree-meta").textContent = `${bytes(otherRawBytes)} raw bytes. These file regions have no reliable score.`;
+      renderByteTreemap("code-treemap", codeItems);
+      renderByteTreemap("data-treemap", dataItems);
+      renderByteTreemap("other-treemap", otherItems);
     }
 
     function setTreemapFocus(group = null, file = null) {
@@ -669,12 +846,16 @@
 
     $("generated").textContent = `Generated ${new Date(report.generated * 1000).toLocaleString()}`;
     $("report-meta").textContent = `${metrics.project_total} mapped project functions · ${metrics.report_entities} reccmp entities · runtime separated`;
-    renderMetrics(); renderTreemap(); renderHistogram(); renderGroupCards(); bindControls(); renderExplorer();
+    renderMetrics(); renderFileLayout(); renderBinaryTreemaps(); renderTreemap(); renderHistogram(); renderGroupCards(); bindControls(); renderExplorer();
     let treemapResizeFrame = 0;
     new ResizeObserver(() => {
       cancelAnimationFrame(treemapResizeFrame);
-      treemapResizeFrame = requestAnimationFrame(renderTreemap);
+      treemapResizeFrame = requestAnimationFrame(() => { renderTreemap(); renderBinaryTreemaps(); });
     }).observe($("treemap"));
+    ["code-treemap", "data-treemap", "other-treemap"].forEach(id => new ResizeObserver(() => {
+      cancelAnimationFrame(treemapResizeFrame);
+      treemapResizeFrame = requestAnimationFrame(renderBinaryTreemaps);
+    }).observe($(id)));
   })();
   </script>
 </body>

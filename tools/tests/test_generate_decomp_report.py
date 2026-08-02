@@ -1,4 +1,6 @@
 import importlib.util
+import struct
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -53,12 +55,119 @@ class ReportMetricTests(unittest.TestCase):
             self.assertEqual(sizes["0x401000"], 0x25)
 
     def test_reads_original_function_sizes(self):
-        import tempfile
-
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "sizes.json"
-            path.write_text('[{"address":"00401000","size":37}]', encoding="utf-8")
+            path.write_text(
+                '[{"address":"00401000","size":37},'
+                '{"address":"00402000","size":1}]',
+                encoding="utf-8",
+            )
             self.assertEqual(REPORT.read_function_sizes(path), {"0x401000": 37})
+
+    def test_binary_layout_counts_each_raw_file_byte_once(self):
+        metadata = REPORT.decomp_binary.ImageMetadata(
+            file_size=0x4A0,
+            image_base=0x400000,
+            header_size=0x200,
+            sections=(
+                REPORT.decomp_binary.Section(
+                    ".text", 0x401000, 0x100, 0x200, 0x100, 0x60000020
+                ),
+                REPORT.decomp_binary.Section(
+                    ".data", 0x402000, 0x180, 0x400, 0x80, 0xC0000040
+                ),
+            ),
+        )
+        entities = [
+            {
+                "address": "0x401010",
+                "category": "project",
+                "original_size": 0x20,
+                "matching": 0.5,
+                "status": "partial",
+            },
+            {
+                "address": "0x401030",
+                "category": "project",
+                "original_size": 0x10,
+                "matching": 0.2,
+                "effective": True,
+                "status": "effective",
+            },
+        ]
+
+        layout = REPORT.build_binary_layout(metadata, entities)
+
+        self.assertEqual(sum(item["size"] for item in layout["segments"]), 0x4A0)
+        self.assertEqual(
+            [(item["kind"], item["offset"], item["size"]) for item in layout["segments"]],
+            [
+                ("headers", 0, 0x200),
+                ("section", 0x200, 0x100),
+                ("gap", 0x300, 0x100),
+                ("section", 0x400, 0x80),
+                ("overlay", 0x480, 0x20),
+            ],
+        )
+        self.assertEqual(layout["scored_code_bytes"], 0x30)
+        self.assertEqual(layout["explained_code_bytes"], 0x20)
+        self.assertEqual(layout["unexplained_scored_code_bytes"], 0x10)
+        self.assertEqual(layout["unscored_file_bytes"], 0x4A0 - 0x30)
+        text = next(item for item in layout["sections"] if item["name"] == ".text")
+        self.assertEqual(text["unscored_bytes"], 0xD0)
+        data = next(item for item in layout["sections"] if item["name"] == ".data")
+        self.assertEqual(data["measurement"], "unscored")
+        self.assertEqual(data["explained_bytes"], 0)
+
+    def test_reads_pe_layout_fields(self):
+        image = bytearray(0x500)
+        image[:2] = b"MZ"
+        struct.pack_into("<I", image, 0x3C, 0x80)
+        image[0x80:0x84] = b"PE\0\0"
+        struct.pack_into("<H", image, 0x86, 1)
+        struct.pack_into("<H", image, 0x94, 0xE0)
+        optional = 0x98
+        struct.pack_into("<H", image, optional, 0x10B)
+        struct.pack_into("<I", image, optional + 28, 0x400000)
+        struct.pack_into("<I", image, optional + 60, 0x200)
+        section = optional + 0xE0
+        image[section : section + 8] = b".text\0\0\0"
+        struct.pack_into("<I", image, section + 8, 0x280)
+        struct.pack_into("<I", image, section + 12, 0x1000)
+        struct.pack_into("<I", image, section + 16, 0x200)
+        struct.pack_into("<I", image, section + 20, 0x200)
+        struct.pack_into("<I", image, section + 36, 0x60000020)
+
+        metadata = REPORT.decomp_binary.parse_image_metadata(bytes(image))
+
+        self.assertEqual(metadata.file_size, 0x500)
+        self.assertEqual(metadata.header_size, 0x200)
+        self.assertEqual(metadata.sections[0].virtual_address, 0x401000)
+        self.assertEqual(metadata.sections[0].raw_pointer, 0x200)
+        self.assertEqual(metadata.sections[0].characteristics, 0x60000020)
+
+    def test_missing_and_malformed_retail_files_do_not_stop_the_report(self):
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            missing = REPORT.read_binary_layout(directory / "missing.exe", [])
+            malformed_path = directory / "bad.exe"
+            malformed_path.write_bytes(b"not a PE image")
+            malformed = REPORT.read_binary_layout(malformed_path, [])
+
+        self.assertFalse(missing["available"])
+        self.assertEqual(missing["error"], "The retail executable is not available.")
+        self.assertFalse(malformed["available"])
+        self.assertIn("Cannot read the retail executable layout", malformed["error"])
+
+    def test_template_has_separate_raw_region_views(self):
+        template = (SCRIPT.parent / "decomp-report-template.html").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('id="binary-layout-content"', template)
+        self.assertIn('id="code-treemap"', template)
+        self.assertIn('id="data-treemap"', template)
+        self.assertIn('id="other-treemap"', template)
+        self.assertIn("Unscored bytes do not count as explained.", template)
 
     def test_project_and_runtime_metrics_are_separate(self):
         report = {
