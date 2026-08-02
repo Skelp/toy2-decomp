@@ -78,7 +78,7 @@ namespace Toy2
 		// GLOBAL: TOY2 0x004F1BA4
 		int16_t g_platform1MotionScript[] = { 4, 4, 0, 20, 3, 0x7F, 0x60, 1, 0, 0, 0, 20, 3, 0x7F, 0x20, 0, 0xF, 0 };
 		// GLOBAL: TOY2 0x004F1BC8
-		int16_t g_platform2MotionScript[] = { 4, 4, 1, 20, 8, 0x100, 3, 0x7F, 0x60, 9, 0x100, 1, 0, 0, 20, 3, 0x7F, 0x20, 0, 0x13, 0, 0 };
+		int16_t g_platform2MotionScript[] = { 4, 4, 1, 20, 8, 0x100, 3, 0x7F, 0x60, 9, 0x100, 1, 0, 0, 0, 20, 3, 0x7F, 0x20, 0, 0x13, 0 };
 		// GLOBAL: TOY2 0x004F1BF4
 		int16_t g_platform3MotionScript[] = { 4, 4, 2, 20, 3, 0x3F, 0x60, 1, 0, 0, 0, 20, 6, 0x100, 3, 0x7F, 0x60, 0, 0x11, 0 };
 		// GLOBAL: TOY2 0x004F1C1C
