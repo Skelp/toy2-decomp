@@ -243,6 +243,7 @@ set(TOY2_SOURCES
     src/AudioManager/OneShotSoundPresets.inc
     src/AudioManager/PrimarySoundNames.inc
     src/AudioManager/SecondarySoundNames.inc
+    src/AudioManager/SoundSequences.inc
 )
 
 # Build the game

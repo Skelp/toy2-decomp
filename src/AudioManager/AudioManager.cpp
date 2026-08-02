@@ -1079,9 +1079,32 @@ namespace AudioManager
 	// FUNCTION: TOY2 0x0049E9C0 [MATCHED]
 	void ClearSequence7Cursor() { g_soundSequenceSlots[7].cursor = 0; }
 
-	// Callers use identifiers from -1 through -6 to select the six sequence-data blobs.
+	struct SoundSequenceData
+	{
+		int16_t sequence1[28];
+		int16_t sequence2[24];
+		int16_t sequence3[22];
+		int16_t sequence4[24];
+		int16_t sequence5[44];
+		int16_t sequence6[14];
+	};
+
+	STATIC_ASSERT(sizeof(SoundSequenceData) == 0x138);
+
+	// GLOBAL: TOY2 0x005036F0
+	SoundSequenceData g_soundSequenceData = {
+#include "SoundSequences.inc"
+	};
+
 	// GLOBAL: TOY2 0x00503828
-	int16_t* g_sequenceDataPtrs[6];
+	int16_t* g_sequenceDataPtrs[6] = {
+		g_soundSequenceData.sequence1,
+		g_soundSequenceData.sequence2,
+		g_soundSequenceData.sequence3,
+		g_soundSequenceData.sequence4,
+		g_soundSequenceData.sequence5,
+		g_soundSequenceData.sequence6,
+	};
 
 	// Header at the start of each sequence-data blob: three peak-volume
 	// fields that the engine doubles into the 8-bit DirectSound range.
