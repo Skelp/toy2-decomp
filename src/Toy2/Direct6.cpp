@@ -204,6 +204,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x004F73C8
 	int32_t g_groundColorBlue = 40;
 
+	// GLOBAL: TOY2 0x004F73CC
+	int32_t g_backdropPacketOffsets[2] = { 64, 0 };
+
 	// FUNCTION: TOY2 0x00498140 [MATCHED]
 	int16_t InitDirect3DMaterials()
 	{

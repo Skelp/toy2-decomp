@@ -5,13 +5,31 @@
 #include "Logger.h"
 #include "NGNLoader/NGNLoader.h"
 #include "Toy2/Actor.h"
+#include "Toy2/Direct6.h"
+#include "SoftwareRenderer.h"
 
 #include <WINDOWS.H>
 #include <STDIO.H>
 #include <STRING.H>
 
+namespace Toy2
+{
+	extern int32_t g_backdropPacketOffsets[2];
+}
+
 namespace RawLoader
 {
+	struct BackdropPacket
+	{
+		int32_t type;
+		int32_t verticalOffset;
+		int16_t width;
+		int16_t height;
+		int16_t paletteByteCount;
+		int16_t pixelFormat;
+		uint8_t imageData[1];
+	};
+
 	// GLOBAL: TOY2 0x005D2BE0
 	uint8_t* g_resumePacketPtr;
 
@@ -37,7 +55,7 @@ namespace RawLoader
 	int16_t g_unused2;
 
 	// GLOBAL: TOY2 0x0055A13C
-	int16_t g_unused3;
+	int32_t g_unused3;
 
 	// GLOBAL: TOY2 0x00557700
 	uint8_t* g_unused5;
@@ -47,6 +65,15 @@ namespace RawLoader
 
 	// GLOBAL: TOY2 0x00703BE8
 	uint16_t g_type36Data1[4];
+
+	// GLOBAL: TOY2 0x005D2ADC
+	int16_t g_type36Width;
+
+	// GLOBAL: TOY2 0x00559E7C
+	int16_t g_type36Height;
+
+	// GLOBAL: TOY2 0x00559EDA
+	int16_t g_type36PixelFormat;
 
 	// GLOBAL: TOY2 0x004F7408
 	uint8_t g_unusedBuffer5[12] = { 32, 0, 255, 32, 0, 0, 0, 0, 0, 164, 0, 201 };
@@ -438,20 +465,17 @@ namespace RawLoader
 	// FUNCTION: TOY2 0x00452310 [PROVISIONAL]
 	void LoadPacketData(char* fileName)
 	{
-		uint8_t* buffer;
+		int16_t backdropOffsetX;
+		int16_t backdropOffsetY;
+		uint8_t* buffer = reinterpret_cast<uint8_t*>(fileName);
 		uint8_t* resumePtr;
 		uint8_t* decompBuffer;
-		uint8_t* packetCursor;
 
 		Logger::Log("ROUTINE : Loading packet data %s, level %d.\n", fileName, Toy2::g_levelFileIndex);
 
-		if ((Toy2::Levels::g_levelLoadConfig & 0x800) != 0 && (resumePtr = g_resumePacketPtr) != 0)
+		if ((Toy2::Levels::g_levelLoadConfig & 0x800) == 0 || (resumePtr = g_resumePacketPtr) == 0)
 		{
-			buffer = reinterpret_cast<uint8_t*>(fileName); // ?
-		}
-		else
-		{
-			buffer = Toy2::Levels::g_levelDataHeapBase + sizeof(Toy2::Levels::g_levelDataHeapBase) - FileUtils::GetFileSize(fileName);
+			buffer = reinterpret_cast<uint8_t*>(g_type36Data1) - FileUtils::GetFileSize(fileName);
 
 			FileUtils::LoadFile(fileName, buffer);
 
@@ -459,13 +483,13 @@ namespace RawLoader
 			memset(g_unusedBuffer2, 0, sizeof(g_unusedBuffer2));
 
 			resumePtr = g_resumePacketPtr;
-			packetCursor = buffer;
-
 			memset(g_unusedBuffer3, 0, sizeof(g_unusedBuffer3));
 
 			g_unused1 = 0x80000000;
 			g_unused2 = 0;
 			g_unused3 = 0;
+			backdropOffsetX = 0;
+			backdropOffsetY = 0;
 
 			Toy2::g_hasBackdrop = 0;
 
@@ -477,10 +501,7 @@ namespace RawLoader
 		memset(g_creatureListRam, 0, sizeof(g_creatureListRam));
 
 		if ((Toy2::Levels::g_levelLoadConfig & 0x800) != 0 && resumePtr)
-		{
 			buffer = resumePtr;
-			packetCursor = resumePtr;
-		}
 
 		decompBuffer = Toy2::Levels::g_levelLoadArena;
 		int32_t resumeCounter = 0;
@@ -492,20 +513,42 @@ namespace RawLoader
 
 			if (*packetType == 35)
 			{
+				memset(g_creatureListRam, 0, sizeof(g_creatureListRam));
 				memcpy(g_creatureListRam, decompBuffer + 4, sizeof(g_creatureListRam));
 				Logger::Log("LOAD: Type 35, CreatListRam.\n");
 			}
 			else if (*packetType == 36)
 			{
-				// omitted
-				// $TODO: implement this portion, don't know if it actually does anything
+				BackdropPacket* packet = reinterpret_cast<BackdropPacket*>(decompBuffer);
+				int16_t width = packet->width;
+				g_type36Width = width;
+				int16_t height = packet->height;
+				g_type36Height = height;
+				int16_t paletteByteCount = packet->paletteByteCount;
+				g_type36Data1[0] = paletteByteCount;
+				g_type36PixelFormat = packet->pixelFormat;
+
+				SoftwareRenderer::g_backdropDimensions.width = width;
+				SoftwareRenderer::g_backdropDimensions.height = height;
+				SoftwareRenderer::g_backdropDimensions.verticalOffset = packet->verticalOffset;
+
+				int32_t paletteOffset = paletteByteCount / 2;
+				Toy2::g_skyColorRed = packet->imageData[packet->imageData[paletteOffset * 2] * 3];
+				Toy2::g_skyColorGreen = packet->imageData[packet->imageData[paletteOffset * 2] * 3 + 1];
+				Toy2::g_skyColorBlue = packet->imageData[packet->imageData[paletteOffset * 2] * 3 + 2];
+
+				int32_t groundPixelOffset = paletteOffset * 2 + width * height - 1;
+				Toy2::g_groundColorRed = packet->imageData[packet->imageData[groundPixelOffset] * 3];
+				Toy2::g_groundColorGreen = packet->imageData[packet->imageData[groundPixelOffset] * 3 + 1];
+				Toy2::g_groundColorBlue = packet->imageData[packet->imageData[groundPixelOffset] * 3 + 2];
+				Toy2::g_backdropPacketOffsets[0] = backdropOffsetX;
+				Toy2::g_backdropPacketOffsets[1] = backdropOffsetY;
 			}
 
 			int32_t packetPayloadSize = (buffer[6] + ((buffer[5] + (buffer[4] << 8)) << 8)) << 8;
 			uint8_t* packetBodyBase = &buffer[buffer[7]];
 
 			buffer = &packetBodyBase[packetPayloadSize + 14];
-			packetCursor = buffer;
 
 			if ((Toy2::Levels::g_levelLoadConfig & 0x800) != 0)
 			{
