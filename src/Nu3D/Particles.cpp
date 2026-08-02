@@ -943,15 +943,15 @@ namespace Nu3D
 				return &g_rejectedParticleInstance;
 			}
 
+			int32_t oldestParticleIndex = -1;
+			int32_t shortestLifetime = 9999;
+			int32_t checkedCount = 0;
 			g_particleAllocationCursor++;
 			if (g_particleAllocationCursor >= 64)
 			{
 				g_particleAllocationCursor = 0;
 			}
 
-			int32_t oldestParticleIndex = -1;
-			int32_t shortestLifetime = 9999;
-			int32_t checkedCount = 0;
 			while ((g_particleInstances[g_particleAllocationCursor].renderFlags & Renderer::RENDER_TEXTURE_WRAP_UV) != 0
 				&& g_particleInstances[g_particleAllocationCursor].lifetime != 0)
 			{
