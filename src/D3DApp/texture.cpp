@@ -205,3 +205,23 @@ LPDIRECT3DTEXTURE2 D3DTextr_GetTexture(TextureContainer* texture)
 		return texture->texture;
 	return NULL;
 }
+
+// FUNCTION: TOY2 0x004B1A20 [MATCHED]
+uint32_t* D3DTextr_GetRGBAData(TextureContainer* texture)
+{
+	if (texture != NULL)
+		return texture->rgbaData;
+	return NULL;
+}
+
+// FUNCTION: TOY2 0x004B1A40 [MATCHED]
+void D3DTextr_GetSurfaceDesc(TextureContainer* texture, DDSURFACEDESC2** surfaceDesc)
+{
+	*surfaceDesc = &texture->surfaceDesc;
+}
+
+// FUNCTION: TOY2 0x004B1A50 [MATCHED]
+TextureContainer* D3DTextr_GetTextureContainer(const char* name)
+{
+	return D3DTextr_FindTexture(name);
+}
