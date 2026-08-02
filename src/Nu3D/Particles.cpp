@@ -1034,7 +1034,7 @@ namespace Nu3D
 					velocityX = -(*g_randDatBufferPtr++ & velocityX) << 3;
 					break;
 				case 4:
-					velocityX = ((*g_randDatBufferPtr++ & velocityX) + ((velocityX >> 4) & 0xFF0)) << 3;
+					velocityX = ((*g_randDatBufferPtr++ & velocityX) + ((velocityX >> 4) & 0xFF0)) * 8;
 					break;
 				case 5:
 					velocityX = ((*g_randDatBufferPtr++ & velocityX) - ((velocityX >> 4) & 0xFF0)) << 3;
@@ -1057,7 +1057,7 @@ namespace Nu3D
 					velocityY = -(*g_randDatBufferPtr++ & velocityY) << 3;
 					break;
 				case 4:
-					velocityY = ((*g_randDatBufferPtr++ & velocityY) + ((velocityY >> 4) & 0xFF0)) << 3;
+					velocityY = ((*g_randDatBufferPtr++ & velocityY) + ((velocityY >> 4) & 0xFF0)) * 8;
 					break;
 				case 5:
 					velocityY = ((*g_randDatBufferPtr++ & velocityY) - ((velocityY >> 4) & 0xFF0)) << 3;
@@ -1080,7 +1080,7 @@ namespace Nu3D
 					velocityZ = -(*g_randDatBufferPtr++ & velocityZ) << 3;
 					break;
 				case 4:
-					velocityZ = ((*g_randDatBufferPtr++ & velocityZ) + ((velocityZ >> 4) & 0xFF0)) << 3;
+					velocityZ = ((*g_randDatBufferPtr++ & velocityZ) + ((velocityZ >> 4) & 0xFF0)) * 8;
 					break;
 				case 5:
 					velocityZ = ((*g_randDatBufferPtr++ & velocityZ) - ((velocityZ >> 4) & 0xFF0)) << 3;
@@ -1103,7 +1103,7 @@ namespace Nu3D
 					yawAngle = -(*g_randDatBufferPtr++ & yawAngle) << 3;
 					break;
 				case 4:
-					yawAngle = ((*g_randDatBufferPtr++ & yawAngle) + ((yawAngle >> 4) & 0xFF0)) << 3;
+					yawAngle = ((*g_randDatBufferPtr++ & yawAngle) + ((yawAngle >> 4) & 0xFF0)) * 8;
 					break;
 				case 5:
 					yawAngle = ((*g_randDatBufferPtr++ & yawAngle) - ((yawAngle >> 4) & 0xFF0)) << 3;
