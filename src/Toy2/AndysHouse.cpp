@@ -53,6 +53,20 @@ namespace Toy2
 			int32_t padding;
 		};
 
+		struct TokenDialogueRecord
+		{
+			int32_t tokenId;
+			int32_t dialogueRecordIndex;
+			const char* subtitle;
+			int32_t facingAngle;
+		};
+
+		struct TokenDialogueTable
+		{
+			TokenDialogueRecord records[9];
+			int32_t terminator;
+		};
+
 		// GLOBAL: TOY2 0x004F04D0
 		extern const char g_laserAttackInstructions[] = {
 #include "LaserAttackInstructions.inc"
@@ -125,44 +139,19 @@ namespace Toy2
 		};
 
 		// GLOBAL: TOY2 0x004F0EE8
-		extern const Collectables::TokenDialogueValue g_tokenDialogueValues[] = {
-			{ 0x43 },
-			{ 0x1F },
-			{ reinterpret_cast<int32_t>(g_cameraInstructions) },
-			{ 0x800 },
-			{ 0x3E },
-			{ 0x20 },
-			{ reinterpret_cast<int32_t>(g_swingBarInstructions) },
-			{ 0x800 },
-			{ 0x3F },
-			{ 0x21 },
-			{ reinterpret_cast<int32_t>(g_stompInstructions) },
-			{ 0x983 },
-			{ 0x40 },
-			{ 0x22 },
-			{ reinterpret_cast<int32_t>(g_pushInstructions) },
-			{ 0x800 },
-			{ 0x44 },
-			{ 0x23 },
-			{ reinterpret_cast<int32_t>(g_extendedJumpInstructions) },
-			{ 0x2D7 },
-			{ 0x41 },
-			{ 0x24 },
-			{ reinterpret_cast<int32_t>(g_poleInstructions) },
-			{ 0xE2 },
-			{ 0x45 },
-			{ 0x25 },
-			{ reinterpret_cast<int32_t>(g_zipLineInstructions) },
-			{ 0x30 },
-			{ 0x42 },
-			{ 0x26 },
-			{ reinterpret_cast<int32_t>(g_visorInstructions) },
-			{ 0xC00 },
-			{ 0x47 },
-			{ 0x28 },
-			{ reinterpret_cast<int32_t>(g_laserAttackInstructions) },
-			{ 0 },
-			{ -1 },
+		extern const TokenDialogueTable g_tokenDialogueValues = {
+			{
+				{ 0x43, 0x1F, g_cameraInstructions, 0x800 },
+				{ 0x3E, 0x20, g_swingBarInstructions, 0x800 },
+				{ 0x3F, 0x21, g_stompInstructions, 0x983 },
+				{ 0x40, 0x22, g_pushInstructions, 0x800 },
+				{ 0x44, 0x23, g_extendedJumpInstructions, 0x2D7 },
+				{ 0x41, 0x24, g_poleInstructions, 0xE2 },
+				{ 0x45, 0x25, g_zipLineInstructions, 0x30 },
+				{ 0x42, 0x26, g_visorInstructions, 0xC00 },
+				{ 0x47, 0x28, g_laserAttackInstructions, 0 },
+			},
+			-1,
 		};
 
 		// GLOBAL: TOY2 0x004F0F7C
@@ -261,7 +250,7 @@ namespace Toy2
 		void Init()
 		{
 			Collectables::Init(g_tokenLinkIds, 0x48);
-			Collectables::LoadTokenTable(g_tokenDialogueValues);
+			Collectables::LoadTokenTable(reinterpret_cast<const Collectables::TokenDialogueValue*>(g_tokenDialogueValues.records));
 			Collectables::Activate(3, 1);
 			MoveableObject::InitTable(g_moveableObjectInitTable);
 
