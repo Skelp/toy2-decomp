@@ -382,6 +382,7 @@
 0x004521A0 Toy2::Levels::BuildLevelPath
 0x00452310 RawLoader::LoadPacketData
 0x00452A20 Toy2::ConvertPSXTexturePage16
+0x00452EF0 Toy2::Levels::BuildLevelBinPath
 0x00452FC0 Toy2::InitLevelPlay
 0x00453CA0 Toy2::ResetBackdropState
 0x00453CD0 Renderer::SetVirtualRatioTo54

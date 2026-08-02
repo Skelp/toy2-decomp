@@ -1173,6 +1173,31 @@ namespace Toy2
 			strcat(output, suffix);
 		}
 
+		// FUNCTION: TOY2 0x00452EF0 [MATCHED]
+		void BuildLevelBinPath(int32_t level, char* output, int32_t useAlternateRange)
+		{
+			strcpy(output, "..\\level");
+
+			if (useAlternateRange > 0)
+				level += 10;
+
+			char digits[4];
+			if (level < 10)
+			{
+				digits[0] = '0';
+				digits[1] = level + '0';
+			}
+			else
+			{
+				digits[0] = level / 10 + '0';
+				digits[1] = level % 10 + '0';
+			}
+
+			digits[2] = '\0';
+			strcat(output, digits);
+			strcat(output, ".bin");
+		}
+
 		// FUNCTION: TOY2 0x00452FC0 [PROVISIONAL]
 		void InitLevelPlay(int32_t levelId)
 		{
