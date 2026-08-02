@@ -18,6 +18,8 @@ work, or a concise no-source result after bounded pivots.
 6. Select one subsystem campaign.
 7. Record each target score and status.
 8. Run `tools/decomp baseline` once before source edits.
+9. Inspect the target file's namespaces, includes, globals, and private helpers.
+10. Check nearby function-map entries and source-path evidence for file boundaries.
 
 A campaign contains one large function or at most three related functions.
 Rank work by unresolved bytes, evidence readiness, dependency impact, and
@@ -28,6 +30,20 @@ source debt. Do not select work only by address or easy percentage gain.
 Run `tools/decomp evidence ADDRESS`. Establish the ABI, data model, control
 flow, ownership, and supported names. Search bounded notes with `tools/decomp
 notes`. Use OpenCrashWOC only for relevant terms or analogues.
+
+Choose the likely original translation unit before you edit source. Do not add
+new code to a catch-all file only because the file already exists. Use retail
+paths, address clusters, DWARF units, private state, helpers, and dependencies
+as boundary evidence.
+
+If evidence supports a split, move the complete coherent slice. Preserve
+namespaces, linkage, annotations, data order, and initialization order. Add a
+header only for cross-file use. Add each new `.cpp` file to CMake. Compare all
+moved functions and check all visible users.
+
+Do not split a file from size or namespace count alone. If evidence is weak,
+keep the current placement and report the missing boundary evidence. A file
+move must accompany valid campaign progress unless it removes tracked debt.
 
 Write the simplest plausible C++. Build early. Run `tools/decomp bc ADDRESS`
 after each meaningful source-model change. Let the compiler test hypotheses.
@@ -83,4 +99,5 @@ EFFECTIVE_BYTES_DELTA: <bytes>
 SOURCE_DEBT_DELTA: <count>
 PIVOTS: <integer>
 NEXT: <best next subsystem or blocking fact>
+FILE_STRUCTURE: <kept, moved, or deferred with brief evidence>
 ```

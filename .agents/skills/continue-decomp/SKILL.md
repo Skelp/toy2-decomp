@@ -18,6 +18,8 @@ external supervisor or use Goal mode inside a worker.
 6. Record `HEAD`, implemented count, terminal count, and byte metrics.
 7. Inspect `tools/decomp candidates --coverage --why`.
 8. Inspect `tools/decomp candidates --refine --why`.
+9. Inspect the largest source files and mixed-namespace files.
+10. Keep a file-structure watchlist with the evidence for each suspected split.
 
 ## Run campaigns
 
@@ -29,6 +31,10 @@ Spawn one fresh worker with `fork_turns: "none"` for each campaign. Tell it to
 use `decomp-expert`. Give it the repository path, branch, current `HEAD`, mode,
 global baseline, and useful prior output. Never reuse a worker. Use a new task
 name such as `campaign_001`.
+
+Give the worker relevant file-structure evidence for its subsystem. Ask it to
+check the likely original translation unit before it adds code. Do not direct a
+split from file size or namespace count alone.
 
 Wait with the longest practical interval. Check status after a long wait or
 when the user asks.
@@ -43,6 +49,17 @@ After the worker returns:
 6. Close or interrupt the worker before the next campaign.
 7. Run `tools/decomp report` after source progress.
 8. Run `tools/decomp sync` after source progress.
+9. Inspect changed file placement, linkage, headers, and CMake entries.
+10. Update the file-structure watchlist after each accepted campaign.
+
+Watch for growth in catch-all files such as `Toy2.cpp`. Use function-map
+clusters, retail paths, DWARF units, private state, and call relationships as
+boundary evidence. Ask a later worker to move a coherent slice when evidence
+supports the split.
+
+Do not count a structure-only commit as source progress unless it removes
+tracked source debt. Prefer a supported file move as part of a valid coverage
+or refinement campaign. Require comparisons for all moved functions.
 
 Keep separate no-source counts for coverage and refinement. Switch modes after
 a failure. Reset both counts after source progress. Stop only when both counts

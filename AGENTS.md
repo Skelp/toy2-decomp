@@ -107,6 +107,33 @@ only to improve a score.
 Headers are part of the reconstruction. Check all visible users after a type or
 layout change. Add size and offset assertions when the project supports them.
 
+## Reconstruct translation units
+
+Treat file placement as source evidence. Do not assume that a current catch-all
+file matches the original translation unit. `Toy2.cpp` is a watchlist item, not
+a special case.
+
+Before you add code to a large or mixed file, inspect these facts:
+
+- nearby addresses and names in the function map.
+- retail source paths, asserts, and log strings.
+- OpenCrashWOC translation units and related terms.
+- shared globals, private helpers, callers, and callees.
+- the file's namespaces, includes, static data, and initialization order.
+
+Keep a coherent subsystem in one `.cpp` file when evidence supports that
+boundary. A separate state group, private helper set, or narrow dependency set
+can support a split. File size or namespace count alone cannot support a split.
+
+When evidence supports a split, move the complete coherent slice. Preserve
+namespaces, linkage, address annotations, data order, and initialization order.
+Add a header only for real cross-file use. Add each new source file to CMake.
+Check all visible users and compare each moved function after the move.
+
+A file move can accompany valid source progress. A structure-only campaign
+must remove tracked source debt to count as refinement progress. Do not create
+a cleanup-only success commit.
+
 Keep a large initializer in a named `.inc` file beside its owning `.cpp` file.
 A string is large at 160 decoded bytes. A non-string array is large at 32
 elements and 256 initialized bytes. The `.inc` file contains initializer tokens
