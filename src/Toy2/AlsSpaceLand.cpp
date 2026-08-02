@@ -346,7 +346,7 @@ namespace Toy2
 			AndysHouse::g_raceCheckpointPassCount = 3;
 		}
 
-		// FUNCTION: TOY2 0x00423200
+		// FUNCTION: TOY2 0x00423200 [PROVISIONAL]
 		void Interactions()
 		{
 			RotatingLinkState* rotatingLink = g_rotatingLinkStates;
