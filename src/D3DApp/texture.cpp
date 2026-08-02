@@ -1,5 +1,6 @@
 #include "D3DApp/d3dappi.h"
 #include "D3DApp/d3dtextr.h"
+#include "DrawingDevice.h"
 #include "Logger.h"
 #include "Nu3D/Nu3D.h"
 #include "SaveManager.h"
@@ -50,6 +51,38 @@ char g_texturePath[512] = "MEDIA\\";
 
 // GLOBAL: TOY2 0x00508488
 char* g_textureRegistryValueName = "DX6SDK Samples Path";
+
+// GLOBAL: TOY2 0x0050848C
+int32_t g_minTextureAlphaBits;
+
+struct TextureSearchInfo
+{
+	DWORD desiredBpp;
+	BOOL useAlpha;
+	BOOL usePalette;
+	BOOL useFourCC;
+	BOOL found;
+	LPDDPIXELFORMAT output;
+};
+
+static HRESULT CALLBACK D3DTextr_FindSuitablePixelFormat(LPDDPIXELFORMAT pixelFormat, LPVOID context);
+static int32_t D3DTextr_CountAlphaBits(LPDDPIXELFORMAT pixelFormat);
+static HRESULT CopyBitmapToTextureSurface(LPDIRECTDRAWSURFACE4 surface, HBITMAP bitmap, DWORD flags, HBITMAP alphaBitmap);
+
+static LPDIRECTDRAW4 GetDirectDrawFromDevice(LPDIRECT3DDEVICE3 device)
+{
+	if (device == NULL)
+		return NULL;
+
+	LPDIRECTDRAWSURFACE4 renderTarget;
+	if (FAILED(device->GetRenderTarget(&renderTarget)))
+		return NULL;
+
+	LPDIRECTDRAW4 directDraw = NULL;
+	renderTarget->GetDDInterface((LPVOID*)&directDraw);
+	renderTarget->Release();
+	return directDraw;
+}
 
 // FUNCTION: TOY2 0x00497DB0 [MATCHED]
 void AllocateTexturePixelBuffer(int16_t textureIndex)
@@ -379,6 +412,295 @@ HRESULT D3DTextr_CreateTextureFromBitmap(HBITMAP bitmap, HBITMAP alphaBitmap, ch
 		g_textureList->prev = texture;
 	texture->next = g_textureList;
 	g_textureList = texture;
+
+	return S_OK;
+}
+
+// FUNCTION: TOY2 0x004B1F30 [PROVISIONAL]
+HRESULT D3DTextr_RestoreTextureContainer(TextureContainer* texture, LPDIRECT3DDEVICE3 device)
+{
+	LPDIRECTDRAW4 directDraw = GetDirectDrawFromDevice(device);
+	if (directDraw == NULL)
+		return E_FAIL;
+	directDraw->Release();
+
+	D3DDEVICEDESC hardwareDesc;
+	D3DDEVICEDESC softwareDesc;
+	hardwareDesc.dwSize = sizeof(hardwareDesc);
+	softwareDesc.dwSize = sizeof(softwareDesc);
+	if (FAILED(device->GetCaps(&hardwareDesc, &softwareDesc)))
+		return E_FAIL;
+
+	DWORD textureCaps = hardwareDesc.dwFlags != 0 ? hardwareDesc.dpcTriCaps.dwTextureCaps : softwareDesc.dpcTriCaps.dwTextureCaps;
+
+	HBITMAP bitmap = texture->bitmap;
+	BITMAP bitmapInfo;
+	GetObject(bitmap, sizeof(bitmapInfo), &bitmapInfo);
+
+	DDSURFACEDESC2 surfaceDesc;
+	DrawingDevice::CD3DFramework::InitSurfaceDesc(&surfaceDesc, 0, 0);
+	surfaceDesc.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT | DDSD_TEXTURESTAGE;
+	if (Nu3D::g_isSoftwareRendering)
+		surfaceDesc.ddsCaps.dwCaps = DDSCAPS_TEXTURE | DDSCAPS_SYSTEMMEMORY;
+	else
+	{
+		surfaceDesc.ddsCaps.dwCaps = DDSCAPS_TEXTURE;
+		surfaceDesc.ddsCaps.dwCaps2 = DDSCAPS2_TEXTUREMANAGE;
+	}
+
+	surfaceDesc.dwTextureStage = texture->stage;
+	surfaceDesc.dwWidth = bitmapInfo.bmWidth;
+	surfaceDesc.dwHeight = bitmapInfo.bmHeight;
+
+	if ((textureCaps & D3DPTEXTURECAPS_POW2) != 0)
+	{
+		for (surfaceDesc.dwWidth = 1; surfaceDesc.dwWidth < (DWORD)bitmapInfo.bmWidth; surfaceDesc.dwWidth <<= 1) {}
+		for (surfaceDesc.dwHeight = 1; surfaceDesc.dwHeight < (DWORD)bitmapInfo.bmHeight; surfaceDesc.dwHeight <<= 1) {}
+	}
+
+	if ((textureCaps & D3DPTEXTURECAPS_SQUAREONLY) != 0)
+	{
+		if (surfaceDesc.dwWidth > surfaceDesc.dwHeight)
+			surfaceDesc.dwHeight = surfaceDesc.dwWidth;
+		else
+			surfaceDesc.dwWidth = surfaceDesc.dwHeight;
+	}
+
+	BOOL usePalette = bitmapInfo.bmBitsPixel <= 8;
+	if (texture->hasAlpha)
+		g_minTextureAlphaBits = texture->alphaBitmap != NULL ? 4 : 1;
+
+	if ((texture->flags & 0xB) != 0 && usePalette)
+		usePalette = (textureCaps & D3DPTEXTURECAPS_ALPHAPALETTE) != 0;
+
+	TextureSearchInfo searchInfo;
+	searchInfo.desiredBpp = (texture->flags & 4) != 0 ? 32 : 16;
+	searchInfo.useAlpha = texture->hasAlpha;
+	searchInfo.usePalette = usePalette;
+	searchInfo.useFourCC = surfaceDesc.ddpfPixelFormat.dwFlags & DDPF_FOURCC;
+	searchInfo.found = FALSE;
+	searchInfo.output = &surfaceDesc.ddpfPixelFormat;
+	device->EnumTextureFormats(D3DTextr_FindSuitablePixelFormat, &searchInfo);
+
+	if (! searchInfo.found && usePalette)
+	{
+		searchInfo.desiredBpp = 16;
+		searchInfo.usePalette = FALSE;
+		searchInfo.found = FALSE;
+		device->EnumTextureFormats(D3DTextr_FindSuitablePixelFormat, &searchInfo);
+	}
+
+	if (! searchInfo.found)
+		return E_FAIL;
+
+	if (Nu3D::g_isSoftwareRendering)
+	{
+		surfaceDesc.dwFlags |= DDSD_PITCH | DDSD_LPSURFACE;
+		surfaceDesc.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
+		surfaceDesc.lPitch = surfaceDesc.dwWidth * 2;
+		if ((texture->flags & 4) != 0)
+			surfaceDesc.lPitch *= 2;
+
+		texture->rgbaData = (uint32_t*)malloc(surfaceDesc.lPitch * surfaceDesc.dwHeight);
+		if (texture->rgbaData == NULL)
+			return E_FAIL;
+		surfaceDesc.lpSurface = texture->rgbaData;
+	}
+
+	if (FAILED(directDraw->CreateSurface(&surfaceDesc, &texture->surface, NULL)))
+		return E_FAIL;
+
+	if (FAILED(texture->surface->QueryInterface(IID_IDirect3DTexture2, (LPVOID*)&texture->texture)))
+		return E_FAIL;
+
+	memcpy(&texture->surfaceDesc, &surfaceDesc, sizeof(surfaceDesc));
+	return CopyBitmapToTextureSurface(texture->surface, bitmap, texture->flags, texture->alphaBitmap);
+}
+
+static HRESULT CALLBACK D3DTextr_FindSuitablePixelFormat(LPDDPIXELFORMAT pixelFormat, LPVOID context)
+{
+	if (pixelFormat == NULL || context == NULL)
+		return D3DENUMRET_OK;
+
+	TextureSearchInfo* searchInfo = (TextureSearchInfo*)context;
+	DWORD formatFlags = pixelFormat->dwFlags;
+	if ((formatFlags & (DDPF_LUMINANCE | DDPF_BUMPLUMINANCE | DDPF_BUMPDUDV)) != 0)
+		return D3DENUMRET_OK;
+
+	if (searchInfo->usePalette)
+	{
+		if ((formatFlags & DDPF_PALETTEINDEXED8) == 0)
+			return D3DENUMRET_OK;
+	}
+	else
+	{
+		if (pixelFormat->dwRGBBitCount < 16)
+			return D3DENUMRET_OK;
+
+		if (searchInfo->useFourCC)
+			return pixelFormat->dwFourCC == 0 ? D3DENUMRET_OK : D3DENUMRET_CANCEL;
+
+		if (pixelFormat->dwFourCC != 0)
+			return D3DENUMRET_OK;
+		if (searchInfo->useAlpha == 1 && (formatFlags & DDPF_ALPHAPIXELS) == 0)
+			return D3DENUMRET_OK;
+		if (searchInfo->useAlpha == 0 && (formatFlags & DDPF_ALPHAPIXELS) != 0)
+			return D3DENUMRET_OK;
+		if (pixelFormat->dwRGBBitCount != searchInfo->desiredBpp)
+			return D3DENUMRET_OK;
+		if (searchInfo->useAlpha && D3DTextr_CountAlphaBits(pixelFormat) < g_minTextureAlphaBits)
+			return D3DENUMRET_OK;
+	}
+
+	memcpy(searchInfo->output, pixelFormat, sizeof(DDPIXELFORMAT));
+	searchInfo->found = TRUE;
+	return D3DENUMRET_CANCEL;
+}
+
+static int32_t D3DTextr_CountAlphaBits(LPDDPIXELFORMAT pixelFormat)
+{
+	DWORD alphaMask = pixelFormat->dwRGBAlphaBitMask;
+	int32_t count = 0;
+	while (alphaMask != 0)
+	{
+		if ((alphaMask & 1) != 0)
+			++count;
+		alphaMask >>= 1;
+	}
+	return count;
+}
+
+static HRESULT CopyBitmapToTextureSurface(LPDIRECTDRAWSURFACE4 surface, HBITMAP bitmap, DWORD flags, HBITMAP alphaBitmap)
+{
+	LPDIRECTDRAW4 directDraw = NULL;
+	surface->GetDDInterface((LPVOID*)&directDraw);
+	if (directDraw == NULL)
+		return S_OK;
+
+	BITMAP bitmapInfo;
+	GetObject(bitmap, sizeof(bitmapInfo), &bitmapInfo);
+
+	DDSURFACEDESC2 textureDesc;
+	DrawingDevice::CD3DFramework::InitSurfaceDesc(&textureDesc, 0, 0);
+	surface->GetSurfaceDesc(&textureDesc);
+
+	DDSURFACEDESC2 sourceDesc;
+	DrawingDevice::CD3DFramework::InitSurfaceDesc(&sourceDesc, 0, 0);
+	sourceDesc.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT | DDSD_TEXTURESTAGE;
+	sourceDesc.ddsCaps.dwCaps = DDSCAPS_TEXTURE | DDSCAPS_SYSTEMMEMORY;
+	sourceDesc.dwWidth = bitmapInfo.bmWidth;
+	sourceDesc.dwHeight = bitmapInfo.bmHeight;
+	sourceDesc.ddpfPixelFormat = textureDesc.ddpfPixelFormat;
+
+	LPDIRECTDRAWSURFACE4 sourceSurface;
+	if (FAILED(directDraw->CreateSurface(&sourceDesc, &sourceSurface, NULL)))
+	{
+		directDraw->Release();
+		return S_OK;
+	}
+	directDraw->Release();
+
+	HDC bitmapDC = CreateCompatibleDC(NULL);
+	if (bitmapDC == NULL)
+	{
+		sourceSurface->Release();
+		return S_OK;
+	}
+
+	SelectObject(bitmapDC, bitmap);
+	if (bitmapInfo.bmBitsPixel == 8)
+	{
+		RGBQUAD colors[256];
+		UINT colorCount = GetDIBColorTable(bitmapDC, 0, 256, colors);
+		PALETTEENTRY entries[256];
+		for (UINT index = 0; index < colorCount; ++index)
+		{
+			entries[index].peRed = colors[index].rgbRed;
+			entries[index].peGreen = colors[index].rgbGreen;
+			entries[index].peBlue = colors[index].rgbBlue;
+			entries[index].peFlags = 0xFF;
+			DWORD color = RGB(colors[index].rgbRed, colors[index].rgbGreen, colors[index].rgbBlue);
+			if (((flags & 2) != 0 && color == RGB(0, 0, 0)) || ((flags & 1) != 0 && color == RGB(255, 255, 255))
+				|| ((flags & 8) != 0 && color == RGB(0, 255, 0)))
+			{
+				entries[index].peFlags = 0;
+			}
+		}
+
+		LPDIRECTDRAWPALETTE palette = NULL;
+		DWORD paletteFlags = DDPCAPS_8BIT;
+		if ((flags & 3) != 0)
+			paletteFlags |= DDPCAPS_ALPHA;
+		if (SUCCEEDED(directDraw->CreatePalette(paletteFlags, entries, &palette, NULL)))
+		{
+			sourceSurface->SetPalette(palette);
+			surface->SetPalette(palette);
+			palette->Release();
+		}
+	}
+
+	HDC surfaceDC;
+	if (SUCCEEDED(sourceSurface->GetDC(&surfaceDC)))
+	{
+		BitBlt(surfaceDC, 0, 0, bitmapInfo.bmWidth, bitmapInfo.bmHeight, bitmapDC, 0, 0, SRCCOPY);
+		sourceSurface->ReleaseDC(surfaceDC);
+	}
+	DeleteDC(bitmapDC);
+	surface->Blt(NULL, sourceSurface, NULL, DDBLT_WAIT, NULL);
+	sourceSurface->Release();
+
+	if (textureDesc.ddpfPixelFormat.dwRGBAlphaBitMask != 0 && ((flags & 0xB) != 0 || alphaBitmap != NULL))
+	{
+		DDSURFACEDESC2 lockDesc;
+		DrawingDevice::CD3DFramework::InitSurfaceDesc(&lockDesc, 0, 0);
+		HRESULT lockResult;
+		do
+		{
+			lockResult = surface->Lock(NULL, &lockDesc, 0, NULL);
+		} while (lockResult == DDERR_WASSTILLDRAWING);
+
+		if (SUCCEEDED(lockResult))
+		{
+			DWORD colorMask = lockDesc.ddpfPixelFormat.dwRBitMask | lockDesc.ddpfPixelFormat.dwGBitMask | lockDesc.ddpfPixelFormat.dwBBitMask;
+			DWORD transparentColor = 0;
+			if ((flags & 1) != 0)
+				transparentColor = colorMask;
+			if ((flags & 8) != 0)
+				transparentColor = lockDesc.ddpfPixelFormat.dwGBitMask;
+
+			DIBSECTION alphaInfo;
+			ZeroMemory(&alphaInfo, sizeof(alphaInfo));
+			if (alphaBitmap != NULL)
+				GetObject(alphaBitmap, sizeof(alphaInfo), &alphaInfo);
+
+			for (DWORD y = 0; y < lockDesc.dwHeight; ++y)
+			{
+				uint8_t* row = (uint8_t*)lockDesc.lpSurface + y * lockDesc.lPitch;
+				uint8_t* alphaRow =
+					alphaInfo.dsBm.bmBits != NULL ? (uint8_t*)alphaInfo.dsBm.bmBits + (lockDesc.dwHeight - y - 1) * alphaInfo.dsBm.bmWidthBytes : NULL;
+				for (DWORD x = 0; x < lockDesc.dwWidth; ++x)
+				{
+					if (lockDesc.ddpfPixelFormat.dwRGBBitCount == 16)
+					{
+						uint16_t* pixel = (uint16_t*)row + x;
+						if (alphaRow != NULL)
+							*pixel = (*pixel & (uint16_t)colorMask) | ((uint16_t)alphaRow[x] << 8 & (uint16_t)lockDesc.ddpfPixelFormat.dwRGBAlphaBitMask);
+						else if ((*pixel & (uint16_t)colorMask) != (uint16_t)transparentColor)
+							*pixel |= (uint16_t)lockDesc.ddpfPixelFormat.dwRGBAlphaBitMask;
+					}
+					else if (lockDesc.ddpfPixelFormat.dwRGBBitCount == 32)
+					{
+						uint32_t* pixel = (uint32_t*)row + x;
+						if (alphaRow != NULL)
+							*pixel = (*pixel & colorMask) | ((uint32_t)alphaRow[x] << 24 & lockDesc.ddpfPixelFormat.dwRGBAlphaBitMask);
+						else if ((*pixel & colorMask) != transparentColor)
+							*pixel |= lockDesc.ddpfPixelFormat.dwRGBAlphaBitMask;
+					}
+				}
+			}
+			surface->Unlock(NULL);
+		}
+	}
 
 	return S_OK;
 }
