@@ -104,6 +104,22 @@ namespace Toy2
 			int16_t reverseRecordType;
 			int16_t reverseDirection;
 		};
+		struct TokenDialogueRecord
+		{
+			int32_t tokenId;
+			int32_t dialogueRecordIndex;
+			const char* subtitle;
+			int32_t facingAngle;
+		};
+		struct TokenDialogueTable
+		{
+			TokenDialogueRecord records[2];
+			int32_t terminator;
+		};
+
+		STATIC_ASSERT(sizeof(TokenDialogueRecord) == 0x10);
+		STATIC_ASSERT(sizeof(TokenDialogueTable) == 0x24);
+		STATIC_ASSERT(offsetof(TokenDialogueTable, terminator) == 0x20);
 		enum GroundSlamTargetLinkOffset
 		{
 			GROUND_SLAM_SOURCE_LINK = 0,
@@ -204,16 +220,12 @@ namespace Toy2
 		// GLOBAL: TOY2 0x004F3F18
 		int16_t g_tokenLinkIds[6] = { 96, 98, 99, 100, 97, 0 };
 		// GLOBAL: TOY2 0x004F3F24
-		extern const Collectables::TokenDialogueValue g_tokenDialogueValues[] = {
-			{ 120 },
-			{ 22 },
-			{ reinterpret_cast<int32_t>(g_waterButtonInstructions) },
-			{ 0xC00 },
-			{ 119 },
-			{ 21 },
-			{ reinterpret_cast<int32_t>(g_trainSwitchInstructions) },
-			{ 0xC00 },
-			{ -1 },
+		extern const TokenDialogueTable g_tokenDialogueValues = {
+			{
+				{ 0x78, 0x16, g_waterButtonInstructions, 0xC00 },
+				{ 0x77, 0x15, g_trainSwitchInstructions, 0xC00 },
+			},
+			-1,
 		};
 		// GLOBAL: TOY2 0x004F3F48
 		ObjectGroup g_objectGroups[7] = {
@@ -974,7 +986,7 @@ namespace Toy2
 		void Init()
 		{
 			Collectables::Init(g_tokenLinkIds, 0x71);
-			Collectables::LoadTokenTable(g_tokenDialogueValues);
+			Collectables::LoadTokenTable(reinterpret_cast<const Collectables::TokenDialogueValue*>(g_tokenDialogueValues.records));
 			Collectables::Activate(3, 1);
 			MoveableObject::InitTable(g_moveableObjectInitTable.entries);
 			InitHiddenCollectibles();
