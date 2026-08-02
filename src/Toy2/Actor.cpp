@@ -547,14 +547,18 @@ namespace Toy2
 		{
 			int32_t shortestLifetime = INT_MAX;
 			int32_t lightIndex = x;
-			for (int32_t candidateIndex = 2; candidateIndex < 6; candidateIndex++)
+			int32_t candidateIndex = 2;
+			DynamicLight* candidate = &g_lightingState.dynamicLights[candidateIndex];
+			do
 			{
-				if (g_lightingState.dynamicLights[candidateIndex].lifetime < shortestLifetime)
+				if (candidate->lifetime < shortestLifetime)
 				{
-					shortestLifetime = g_lightingState.dynamicLights[candidateIndex].lifetime;
+					shortestLifetime = candidate->lifetime;
 					lightIndex = candidateIndex;
 				}
-			}
+				candidate++;
+				candidateIndex++;
+			} while (candidate < g_lightingState.dynamicLights + 6);
 
 			g_lightingState.dynamicLights[lightIndex].position.x = x;
 			g_lightingState.dynamicLights[lightIndex].position.y = y;
