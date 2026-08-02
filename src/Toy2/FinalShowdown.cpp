@@ -709,9 +709,9 @@ namespace Toy2
 				}
 			}
 
-			int32_t soundWave = Numerics::g_sinCosLUT[(cameraPitchAngle + 0x400) & 0xFFF] >> 6;
-			int32_t cameraPitch = soundWave & 0xFFF;
-			AudioManager::g_dynamicSoundFrequencies[0] = (0x180 - soundWave) * 8;
+			int32_t cameraPitch = Numerics::g_sinCosLUT[(cameraPitchAngle + 0x400) & 0xFFF] >> 6;
+			AudioManager::g_dynamicSoundFrequencies[0] = (0x180 - cameraPitch) * 8;
+			cameraPitch &= 0xFFF;
 			AudioManager::PlaySoundEffect(0xA8, 0);
 			if (Camera::g_scriptedCameraState != 0)
 				cameraPitch = 0;
