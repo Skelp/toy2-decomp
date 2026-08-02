@@ -5,6 +5,7 @@
 #include "Numerics.h"
 #include "Random.h"
 #include "Renderer/Renderer.h"
+#include "SaveManager.h"
 #include "Toy2/Win95.h"
 #include "Toy2/Toy2.h"
 #include <math.h>
@@ -370,6 +371,16 @@ namespace AudioManager
 
 	STATIC_ASSERT(sizeof(SoundPackDescriptor) == 0x8);
 
+	static char* g_primarySoundNames[] = {
+#include "PrimarySoundNames.inc"
+	};
+
+	static char* g_secondarySoundNames[] = {
+#include "SecondarySoundNames.inc"
+	};
+
+	static char* g_emptySoundNames[1];
+
 	void LoadSoundEffect(char* name, int32_t index, int32_t flag);
 
 	// FUNCTION: TOY2 0x0047D670 [MATCHED]
@@ -541,10 +552,46 @@ namespace AudioManager
 	}
 
 	// GLOBAL: TOY2 0x004FD140
-	SoundPackDescriptor g_primarySoundPacks[17];
+	SoundPackDescriptor g_primarySoundPacks[17] = {
+		{ g_primarySoundNames + 0, 1 },
+		{ g_primarySoundNames + 71, 87 },
+		{ g_primarySoundNames + 82, 87 },
+		{ g_primarySoundNames + 121, 87 },
+		{ g_primarySoundNames + 100, 87 },
+		{ g_primarySoundNames + 111, 87 },
+		{ g_primarySoundNames + 93, 87 },
+		{ g_primarySoundNames + 127, 87 },
+		{ g_primarySoundNames + 138, 87 },
+		{ g_primarySoundNames + 150, 87 },
+		{ g_primarySoundNames + 157, 87 },
+		{ g_primarySoundNames + 168, 87 },
+		{ g_primarySoundNames + 178, 87 },
+		{ g_primarySoundNames + 183, 87 },
+		{ g_primarySoundNames + 188, 87 },
+		{ g_primarySoundNames + 194, 87 },
+		{ g_primarySoundNames + 199, 1 },
+	};
 
 	// GLOBAL: TOY2 0x004FD5E0
-	SoundPackDescriptor g_secondarySoundPacks[17];
+	SoundPackDescriptor g_secondarySoundPacks[17] = {
+		{ g_secondarySoundNames + 0, 70 },
+		{ g_secondarySoundNames + 8, 67 },
+		{ g_secondarySoundNames + 29, 67 },
+		{ g_secondarySoundNames + 84, 67 },
+		{ g_secondarySoundNames + 48, 67 },
+		{ g_secondarySoundNames + 66, 67 },
+		{ g_secondarySoundNames + 44, 67 },
+		{ g_secondarySoundNames + 88, 67 },
+		{ g_secondarySoundNames + 99, 67 },
+		{ g_secondarySoundNames + 108, 67 },
+		{ g_secondarySoundNames + 112, 67 },
+		{ g_secondarySoundNames + 123, 67 },
+		{ g_secondarySoundNames + 138, 67 },
+		{ g_secondarySoundNames + 171, 67 },
+		{ g_secondarySoundNames + 202, 67 },
+		{ g_secondarySoundNames + 223, 67 },
+		{ g_emptySoundNames, 67 },
+	};
 
 	// GLOBAL: TOY2 0x004FCDC0
 	int32_t g_currentSfxLevelId;
@@ -977,7 +1024,34 @@ namespace AudioManager
 	STATIC_ASSERT(sizeof(LevelSoundMapping) == 0x4);
 
 	// GLOBAL: TOY2 0x005028E8
-	LevelSoundMapping g_levelSoundMappings[26];
+	LevelSoundMapping g_levelSoundMappings[26] = {
+		{ 1, 88 },
+		{ 2, 95 },
+		{ 8, 92 },
+		{ 1, LOOPING_SOUND_INDEX_FLAG | 92 },
+		{ 2, LOOPING_SOUND_INDEX_FLAG | 88 },
+		{ 2, LOOPING_SOUND_INDEX_FLAG | 87 },
+		{ 5, LOOPING_SOUND_INDEX_FLAG | 89 },
+		{ 11, LOOPING_SOUND_INDEX_FLAG | 95 },
+		{ 2, 92 },
+		{ 5, 87 },
+		{ 5, LOOPING_SOUND_INDEX_FLAG | 88 },
+		{ 3, LOOPING_SOUND_INDEX_FLAG | 89 },
+		{ 14, LOOPING_SOUND_INDEX_FLAG | 89 },
+		{ 6, LOOPING_SOUND_INDEX_FLAG | 92 },
+		{ 3, LOOPING_SOUND_INDEX_FLAG | 87 },
+		{ 9, LOOPING_SOUND_INDEX_FLAG | 92 },
+		{ 12, LOOPING_SOUND_INDEX_FLAG | 87 },
+		{ 15, LOOPING_SOUND_INDEX_FLAG | 87 },
+		{ 4, 91 },
+		{ 13, 88 },
+		{ 4, 90 },
+		{ 13, 89 },
+		{ 3, 88 },
+		{ 14, 90 },
+		{ 13, 90 },
+		{ 15, 90 },
+	};
 
 	namespace Preset
 	{
