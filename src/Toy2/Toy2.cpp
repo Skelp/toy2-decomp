@@ -6117,23 +6117,23 @@ namespace Toy2
 	// FUNCTION: TOY2 0x0048F1B0 [PROVISIONAL]
 	void SetBackdropByIndex(int32_t index)
 	{
-		int32_t sectorIdx = index + 1;
+		index++;
 		Renderer::g_parallaxCurHorizScroll = 0.0;
 
-		if (index + 1 >= 0 && sectorIdx < 9)
+		if (index >= 0 && index < 9)
 		{
-			if (NGNLoader::GetTextureDataIndex(g_sectorBackdropTexTable.primary[sectorIdx]))
+			if (NGNLoader::GetTextureDataIndex(g_sectorBackdropTexTable.primary[index]))
 			{
-				g_nextBackdropId = g_sectorBackdropTexTable.primary[sectorIdx];
+				g_nextBackdropId = g_sectorBackdropTexTable.primary[index];
 				g_hasBackdrop = 1;
 			}
 			else
 			{
-				uint32_t l_textureId = g_sectorBackdropTexTable.secondary[sectorIdx - 1];
-				int32_t* l_id = &g_sectorBackdropTexTable.secondary[sectorIdx - 1];
+				uint32_t textureId = g_sectorBackdropTexTable.secondary[index - 1];
+				int32_t* id = &g_sectorBackdropTexTable.secondary[index - 1];
 
-				if (NGNLoader::GetTextureDataIndex(l_textureId))
-					g_nextBackdropId = *l_id;
+				if (NGNLoader::GetTextureDataIndex(textureId))
+					g_nextBackdropId = *id;
 
 				g_hasBackdrop = 1;
 			}
