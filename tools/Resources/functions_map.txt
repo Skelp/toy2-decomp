@@ -808,6 +808,7 @@
 0x004AD1C0 Nu3D::InitBmpNodeSurface
 0x004AD610 DrawingDevice::CD3DFramework::InitSurfaceDesc
 0x004AD640 DrawingDevice::CD3DFramework::BuildViewport
+0x004AD7B0 GetDirectDrawFromDevice
 0x004ADFD0 Logger::LogD3DError
 0x004ADFF0 Logger::D3DErrorToString
 0x004AEC80 DrawingDevice::CD3DFramework::CD3DFramework

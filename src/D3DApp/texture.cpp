@@ -69,6 +69,7 @@ static HRESULT CALLBACK D3DTextr_FindSuitablePixelFormat(LPDDPIXELFORMAT pixelFo
 static int32_t D3DTextr_CountAlphaBits(LPDDPIXELFORMAT pixelFormat);
 static HRESULT CopyBitmapToTextureSurface(LPDIRECTDRAWSURFACE4 surface, HBITMAP bitmap, DWORD flags, HBITMAP alphaBitmap);
 
+// FUNCTION: TOY2 0x004AD7B0 [PROVISIONAL]
 static LPDIRECTDRAW4 GetDirectDrawFromDevice(LPDIRECT3DDEVICE3 device)
 {
 	if (device == NULL)
