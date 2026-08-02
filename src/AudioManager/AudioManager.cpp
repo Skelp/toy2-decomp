@@ -957,8 +957,16 @@ namespace AudioManager
 		return (leftVolume + rightVolume) / 2;
 	}
 
+	enum EncodedSoundIndexFlag
+	{
+		LEVEL_SOUND_MAPPING_OFFSET_FLAG = 0x4000,
+		LOOPING_SOUND_INDEX_FLAG = -0x8000,
+	};
+
 	// GLOBAL: TOY2 0x00502950
-	OneShotSoundPreset g_oneShotPresets[218];
+	OneShotSoundPreset g_oneShotPresets[218] = {
+#include "OneShotSoundPresets.inc"
+	};
 
 	struct LevelSoundMapping
 	{

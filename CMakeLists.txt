@@ -240,6 +240,7 @@ set(TOY2_SOURCES
     src/AudioManager/AudioManager.cpp
     src/AudioManager/AudioManager.h
     src/AudioManager/DsVolTable.inc
+    src/AudioManager/OneShotSoundPresets.inc
 )
 
 # Build the game
