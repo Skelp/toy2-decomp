@@ -607,7 +607,7 @@
 0x0049EEE0 Toy2::Lighting::UpdateBuzzLight
 0x0049F350 Toy2::Lighting::InitBuzzLight
 0x0049F3C0 Nu3D::Math::IsWithinDistanceXZ
-0x0049F400 Nu3D::Vector3I::IsWithinDistance
+0x0049F400 Nu3D::Math::IsWithinDistance
 0x0049F460 Toy2::Actor::IsInsideBounds
 0x0049F490 Toy2::AdvanceFramePhase
 0x0049F4B0 Toy2::Game::MenuLoop

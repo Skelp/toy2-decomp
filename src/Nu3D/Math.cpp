@@ -280,9 +280,9 @@ namespace Nu3D
 			delta.x -= right->x;
 			delta.y -= right->y;
 			delta.z -= right->z;
-			int32_t deltaX = delta.x >> 8;
 			int32_t deltaY = delta.y >> 8;
 			int32_t deltaZ = delta.z >> 8;
+			int32_t deltaX = delta.x >> 8;
 			int32_t distSq = deltaZ * deltaZ + deltaY * deltaY + deltaX * deltaX;
 			if (distSq < radius * radius)
 				return distSq + 1;
