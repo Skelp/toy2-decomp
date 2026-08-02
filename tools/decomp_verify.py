@@ -366,19 +366,48 @@ def validate_data_campaign(
 
     baseline = data_variables(baseline_payload)
     current = data_variables(current_payload)
-    comparable_targets: set[int] = set()
+    selected_before_matched = 0.0
+    selected_after_matched = 0.0
+    selected_before_size = 0
+    selected_after_size = 0
     for address in sorted(targets):
         before = baseline.get(address)
         after = current.get(address)
+        if before is None and after is None:
+            if accounting_correction is not None:
+                problems.append(
+                    f"0x{address:08X}: data target is absent from both reports"
+                )
+            else:
+                problems.append(data_target_problem(address, baseline_payload))
+            continue
         if before is None:
+            if accounting_correction is not None:
+                after_matched = float(after.get("matched_bytes", 0))
+                after_size = int(after.get("size", 0))
+                selected_after_matched += after_matched
+                selected_after_size += after_size
+                print(
+                    f"0x{address:08X}  data added {after_matched:g}/{after_size} bytes"
+                )
+                continue
             problems.append(data_target_problem(address, baseline_payload))
             continue
         if after is None:
+            if accounting_correction is not None:
+                before_matched = float(before.get("matched_bytes", 0))
+                before_size = int(before.get("size", 0))
+                selected_before_matched += before_matched
+                selected_before_size += before_size
+                print(
+                    f"0x{address:08X}  data removed "
+                    f"{before_matched:g}/{before_size} bytes"
+                )
+                continue
             problems.append(
                 f"0x{address:08X}: data target is not scored in the current report"
             )
             continue
-        comparable_targets.add(address)
         before_matched = float(before.get("matched_bytes", 0))
         after_matched = float(after.get("matched_bytes", 0))
         before_size = int(before.get("size", 0))
@@ -390,6 +419,10 @@ def validate_data_campaign(
             f"{after_matched:g}/{after_size} bytes "
             f"({before_score * 100:.2f}% -> {after_score * 100:.2f}%)"
         )
+        selected_before_matched += before_matched
+        selected_after_matched += after_matched
+        selected_before_size += before_size
+        selected_after_size += after_size
         if accounting_correction is None:
             if after_matched <= before_matched:
                 problems.append(
@@ -398,12 +431,25 @@ def validate_data_campaign(
             if after_score + 1e-12 < before_score:
                 problems.append(f"0x{address:08X}: data target score regressed")
 
-    if accounting_correction is not None:
+    if accounting_correction is not None and not problems:
         print(f"Accounting correction: {accounting_correction}")
-        return problems
+        if selected_after_matched <= selected_before_matched:
+            problems.append("selected data targets did not improve explained bytes")
+        before_score = (
+            selected_before_matched / selected_before_size
+            if selected_before_size
+            else 0.0
+        )
+        after_score = (
+            selected_after_matched / selected_after_size
+            if selected_after_size
+            else 0.0
+        )
+        if after_score + 1e-12 < before_score:
+            problems.append("selected data target score regressed")
 
     for address, before in baseline.items():
-        if address in comparable_targets:
+        if address in targets:
             continue
         after = current.get(address)
         if after is None:

@@ -561,8 +561,73 @@ class VerifyRegressionTests(unittest.TestCase):
         self.assertTrue(any("is unknown" in item for item in problems))
         self.assertTrue(any("no scored type size" in item for item in problems))
 
-    def test_accounting_correction_uses_a_separate_meta_path(self):
+    def test_accounting_correction_accepts_one_removed_and_two_added_targets(self):
+        before = {
+            "variables": {
+                "variables": [
+                    {
+                        "original_address": 0x4E0588,
+                        "size": 4,
+                        "matched_bytes": 2,
+                        "score": 0.5,
+                    }
+                ],
+                "explained_bytes": 2,
+            },
+            "sections": {
+                "sections": [
+                    {"name": ".data", "explained_bytes": 2, "score": 0.02}
+                ]
+            },
+        }
+        after = {
+            "variables": {
+                "variables": [
+                    {
+                        "original_address": 0x4E0374,
+                        "size": 4,
+                        "matched_bytes": 4,
+                        "score": 1.0,
+                    },
+                    {
+                        "original_address": 0x4E058C,
+                        "size": 4,
+                        "matched_bytes": 4,
+                        "score": 1.0,
+                    },
+                ],
+                "explained_bytes": 8,
+            },
+            "sections": {
+                "sections": [
+                    {"name": ".data", "explained_bytes": 8, "score": 0.08}
+                ]
+            },
+        }
+        self.assertEqual(
+            VERIFY.validate_data_campaign(
+                before,
+                after,
+                {0x4E0374, 0x4E0588, 0x4E058C},
+                "Correct the typed range.",
+            ),
+            [],
+        )
+
+    def test_accounting_correction_rejects_a_target_absent_from_both_reports(self):
         payload = {
+            "variables": {"variables": [], "explained_bytes": 0},
+        }
+        problems = VERIFY.validate_data_campaign(
+            payload,
+            payload,
+            {0x501000},
+            "Correct the typed range.",
+        )
+        self.assertTrue(any("absent from both reports" in item for item in problems))
+
+    def test_normal_data_campaign_rejects_range_replacement(self):
+        before = {
             "variables": {
                 "variables": [
                     {
@@ -575,17 +640,132 @@ class VerifyRegressionTests(unittest.TestCase):
                 "explained_bytes": 2,
             }
         }
-        self.assertTrue(
-            VERIFY.validate_data_campaign(payload, payload, {0x501000}, None)
+        after = {
+            "variables": {
+                "variables": [
+                    {
+                        "original_address": 0x502000,
+                        "size": 4,
+                        "matched_bytes": 4,
+                        "score": 1.0,
+                    },
+                    {
+                        "original_address": 0x503000,
+                        "size": 4,
+                        "matched_bytes": 4,
+                        "score": 1.0,
+                    },
+                ],
+                "explained_bytes": 8,
+            }
+        }
+        problems = VERIFY.validate_data_campaign(
+            before,
+            after,
+            {0x501000, 0x502000, 0x503000},
+            None,
         )
-        self.assertEqual(
-            VERIFY.validate_data_campaign(
-                payload,
-                payload,
-                {0x501000},
-                "Correct the typed range.",
-            ),
-            [],
+        self.assertTrue(any("is unknown" in item for item in problems))
+        self.assertTrue(
+            any("not scored in the current report" in item for item in problems)
+        )
+
+    def test_accounting_correction_does_not_hide_unrelated_regressions(self):
+        before = {
+            "variables": {
+                "variables": [
+                    {
+                        "original_address": 0x501000,
+                        "size": 4,
+                        "matched_bytes": 2,
+                        "score": 0.5,
+                    },
+                    {
+                        "original_address": 0x504000,
+                        "size": 4,
+                        "matched_bytes": 4,
+                        "score": 1.0,
+                    },
+                ],
+                "explained_bytes": 6,
+            }
+        }
+        after = {
+            "variables": {
+                "variables": [
+                    {
+                        "original_address": 0x502000,
+                        "size": 4,
+                        "matched_bytes": 4,
+                        "score": 1.0,
+                    },
+                    {
+                        "original_address": 0x503000,
+                        "size": 4,
+                        "matched_bytes": 4,
+                        "score": 1.0,
+                    },
+                    {
+                        "original_address": 0x504000,
+                        "size": 4,
+                        "matched_bytes": 3,
+                        "score": 0.75,
+                    },
+                ],
+                "explained_bytes": 11,
+            }
+        }
+        problems = VERIFY.validate_data_campaign(
+            before,
+            after,
+            {0x501000, 0x502000, 0x503000},
+            "Correct the typed range.",
+        )
+        self.assertTrue(
+            any("unrelated data bytes regressed" in item for item in problems)
+        )
+
+    def test_accounting_correction_requires_selected_target_improvement(self):
+        before = {
+            "variables": {
+                "variables": [
+                    {
+                        "original_address": 0x501000,
+                        "size": 8,
+                        "matched_bytes": 8,
+                        "score": 1.0,
+                    }
+                ],
+                "explained_bytes": 8,
+            }
+        }
+        after = {
+            "variables": {
+                "variables": [
+                    {
+                        "original_address": 0x502000,
+                        "size": 4,
+                        "matched_bytes": 4,
+                        "score": 1.0,
+                    },
+                    {
+                        "original_address": 0x503000,
+                        "size": 4,
+                        "matched_bytes": 4,
+                        "score": 1.0,
+                    },
+                ],
+                "explained_bytes": 8,
+            }
+        }
+        problems = VERIFY.validate_data_campaign(
+            before,
+            after,
+            {0x501000, 0x502000, 0x503000},
+            "Correct the typed range.",
+        )
+        self.assertTrue(
+            any("did not improve explained bytes" in item for item in problems)
         )
 
     def test_data_campaign_rejects_unrelated_and_section_regressions(self):
