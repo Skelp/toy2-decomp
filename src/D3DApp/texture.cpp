@@ -1,4 +1,5 @@
 #include "D3DApp/d3dappi.h"
+#include "D3DApp/d3dtextr.h"
 #include "Logger.h"
 #include "SoftwareRenderer.h"
 #include "Toy2/Direct6.h"
@@ -114,3 +115,32 @@ void AllocateTexturePixelBuffer(int16_t textureIndex)
 
 // FUNCTION: TOY2 0x00409C80 [MATCHED]
 BOOL D3DAppIReleaseAllTextures() { return TRUE; }
+
+// FUNCTION: TOY2 0x004B1890 [PROVISIONAL]
+TextureContainer::~TextureContainer()
+{
+	if (rgbaData != NULL)
+	{
+		free(rgbaData);
+	}
+
+	if (next != NULL)
+	{
+		delete next;
+		next = NULL;
+	}
+
+	if (texture != NULL)
+	{
+		texture->Release();
+		texture = NULL;
+	}
+
+	if (surface != NULL)
+	{
+		surface->Release();
+		surface = NULL;
+	}
+
+	DeleteObject(bitmap);
+}
