@@ -594,21 +594,21 @@ namespace Toy2
 			position.x = 0x51B97;
 			position.y = -0x104FD;
 			position.z = 0x5E58E;
-			Levels::g_portalZones[2].entries[0].recordIdx = static_cast<uint8_t>(g_secondPortalRecordIndex);
-			Levels::g_portalZones[2].entries[1].recordIdx = static_cast<uint8_t>(g_firstPortalRecordIndex);
-			if (Nu3D::Math::IsWithinDistance(&position, &g_buzzActor.posAngles.pos, 250) == 0)
-			{
-				reinterpret_cast<uint8_t*>(&Levels::g_portalZones[1].entries[0])[g_gatePortalEntryByteOffset] = 0xFF;
-				if (g_portalGateScale < 0x1000)
-					g_portalGateScale += 0x200;
-			}
-			else
+			if (Nu3D::Math::IsWithinDistance(&position, &g_buzzActor.posAngles.pos, 250) != 0)
 			{
 				reinterpret_cast<uint8_t*>(&Levels::g_portalZones[1].entries[0])[g_gatePortalEntryByteOffset] = static_cast<uint8_t>(g_gatePortalRecordIndex);
-				Levels::g_portalZones[2].entries[0].recordIdx = Levels::g_portalZones[2].entries[1].recordIdx;
+				Levels::g_portalZones[2].entries[0].recordIdx = static_cast<uint8_t>(g_firstPortalRecordIndex);
 				Levels::g_portalZones[2].entries[1].recordIdx = static_cast<uint8_t>(g_secondPortalRecordIndex);
 				if (g_portalGateScale > 0)
 					g_portalGateScale -= 0x200;
+			}
+			else
+			{
+				reinterpret_cast<uint8_t*>(&Levels::g_portalZones[1].entries[0])[g_gatePortalEntryByteOffset] = 0xFF;
+				Levels::g_portalZones[2].entries[1].recordIdx = static_cast<uint8_t>(g_firstPortalRecordIndex);
+				Levels::g_portalZones[2].entries[0].recordIdx = static_cast<uint8_t>(g_secondPortalRecordIndex);
+				if (g_portalGateScale < 0x1000)
+					g_portalGateScale += 0x200;
 			}
 			Nu3D::Link::SetScaleFromFixedOffsets(0x3F, 0x1000, g_portalGateScale, 0x1000);
 			Nu3D::Link::SetScaleFromFixedOffsets(0x40, 0x1000, g_portalGateScale, 0x1000);
@@ -662,16 +662,7 @@ namespace Toy2
 			soundPosition.x = (Camera::g_renderCameraTransform.pos.x - g_rotatingPlatformSoundPosition.x) * 3 / 4 + g_rotatingPlatformSoundPosition.x;
 			soundPosition.y = (Camera::g_renderCameraTransform.pos.y - g_rotatingPlatformSoundPosition.y) * 3 / 4 + g_rotatingPlatformSoundPosition.y;
 			soundPosition.z = (Camera::g_renderCameraTransform.pos.z - g_rotatingPlatformSoundPosition.z) * 3 / 4 + g_rotatingPlatformSoundPosition.z;
-			if (g_rotatingPlatformState == 0)
-			{
-				if (g_buzzActor.airborneMode != 0 && g_groundSlamTimer != 0 && g_footingType == 0x24)
-				{
-					g_rotatingPlatformState = 1;
-					Levels::DeactivateAmbientEmitter(3, 1);
-					AudioManager::PlaySoundEffect(0x6D, &soundPosition);
-				}
-			}
-			else
+			if (g_rotatingPlatformState != 0)
 			{
 				Vector3I rotation;
 				Platform::GetRotation(0x1A, &rotation);
@@ -710,6 +701,12 @@ namespace Toy2
 				int32_t linkedRotation = rotation.z / 4 + 0x266;
 				Nu3D::Link::SetRotationRelative8bit(0x1C, 0, 0, linkedRotation);
 				Nu3D::Link::SetRotationRelative8bit(0x1D, 0, 0, linkedRotation);
+			}
+			else if (g_buzzActor.airborneMode != 0 && g_groundSlamTimer != 0 && g_footingType == 0x24)
+			{
+				g_rotatingPlatformState = 1;
+				Levels::DeactivateAmbientEmitter(3, 1);
+				AudioManager::PlaySoundEffect(0x6D, &soundPosition);
 			}
 
 			MoveDrills(&g_firstDrillCycleTimer, &g_firstDrillVerticalVelocity, &g_firstDrillVerticalOffset, 0x24, 300, 10);
