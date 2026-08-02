@@ -35,6 +35,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x00500CC8
 	SpriteSheet g_level0Sheet1 = {
 		31,
 		32,
@@ -92,6 +93,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F68F0
 	SpriteSheet g_level0Sheet2 = {
 		5,
 		255,
@@ -105,6 +107,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6900
 	SpriteSheet g_level0Sheet3 = {
 		4,
 		32,
@@ -138,6 +141,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6938
 	SpriteSheet g_level0Sheet4 = {
 		6,
 		84,
@@ -159,6 +163,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6958
 	SpriteSheet g_level0Sheet5 = {
 		7,
 		84,
@@ -180,6 +185,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F69B8
 	SpriteSheet g_level0Sheet6 = {
 		4,
 		80,
@@ -201,6 +207,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F69D8
 	SpriteSheet g_level0Sheet7 = {
 		4,
 		32,
@@ -214,6 +221,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6978
 	SpriteSheet g_level0Sheet8 = {
 		8,
 		84,
@@ -235,6 +243,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6998
 	SpriteSheet g_level0Sheet9 = {
 		9,
 		84,
@@ -256,6 +265,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F69E8
 	SpriteSheet g_level0Sheet10 = {
 		0,
 		74,
@@ -273,6 +283,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6A00
 	SpriteSheet g_level0Sheet11 = {
 		1,
 		74,
@@ -290,6 +301,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6A18
 	SpriteSheet g_level0Sheet12 = {
 		2,
 		78,
@@ -307,6 +319,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x00500CB8
 	SpriteSheet g_level0Sheet13 = {
 		31,
 		32,
@@ -320,6 +333,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F68A0
 	SpriteSheet g_level0Sheet14 = {
 		0,
 		16,
@@ -365,6 +379,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6A40
 	SpriteSheet g_level0Sheet15 = {
 		0,
 		15,
@@ -378,6 +393,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6A50
 	SpriteSheet g_level0Sheet16 = {
 		0,
 		31,
@@ -391,6 +407,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6A60
 	SpriteSheet g_level0Sheet17 = {
 		0,
 		44,
@@ -404,6 +421,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x00500C30
 	SpriteSheet g_level0Sheet18 = {
 		10,
 		16,
@@ -477,6 +495,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6A30
 	SpriteSheet g_level0Sheet19 = {
 		5,
 		16,
@@ -490,6 +509,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6B38
 	SpriteSheet g_level0Sheet20 = {
 		17,
 		16,
@@ -503,6 +523,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6A70
 	SpriteSheet g_level0Sheet21 = {
 		0,
 		48,
@@ -544,6 +565,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6AB8
 	SpriteSheet g_level0Sheet22 = {
 		0,
 		48,
@@ -569,6 +591,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6AE0
 	SpriteSheet g_level0Sheet23 = {
 		1,
 		32,
@@ -594,6 +617,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6B08
 	SpriteSheet g_level0Sheet24 = {
 		2,
 		24,
@@ -615,6 +639,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x004F6B28
 	SpriteSheet g_level0Sheet25 = {
 		17,
 		16,
@@ -628,6 +653,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x00500E40
 	SpriteSheet g_level0Sheet26 = {
 		3,
 		64,
@@ -645,6 +671,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x00500DE8
 	SpriteSheet g_level0Sheet27 = {
 		18,
 		64,
@@ -674,6 +701,7 @@ namespace Renderer
 		},
 	};
 
+	// GLOBAL: TOY2 0x00500E18
 	SpriteSheet g_level0Sheet28 = {
 		19,
 		64,
