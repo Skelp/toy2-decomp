@@ -67,7 +67,7 @@ namespace Toy2
 		};
 
 		// GLOBAL: TOY2 0x004F1570
-		char g_paintMixingTokenInstructions[] = "if you can mix the paint to match the colors on the wall you will get a pizza planet ^token^.";
+		char g_paintMixingTokenInstructions[] = "if you can mix the the paint to match the colors on the wall you will get a pizza planet ^token^.";
 
 		// GLOBAL: TOY2 0x004F1B64
 		PaintIndicatorEntry g_paintIndicatorEntries[] = {
