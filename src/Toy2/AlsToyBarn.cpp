@@ -73,6 +73,24 @@ namespace Toy2
 			int16_t terminator;
 		};
 
+		struct TokenDialogueRecord
+		{
+			int32_t tokenId;
+			int32_t dialogueRecordIndex;
+			const char* subtitle;
+			int32_t facingAngle;
+		};
+
+		struct TokenDialogueTable
+		{
+			TokenDialogueRecord records[1];
+			int32_t terminator;
+		};
+
+		STATIC_ASSERT(sizeof(TokenDialogueRecord) == 0x10);
+		STATIC_ASSERT(sizeof(TokenDialogueTable) == 0x14);
+		STATIC_ASSERT(offsetof(TokenDialogueTable, terminator) == 0x10);
+
 		// GLOBAL: TOY2 0x004F2844
 		char g_hayBaleRideInstructions[] = {
 #include "HayBaleRideInstructions.inc"
@@ -109,12 +127,11 @@ namespace Toy2
 		int16_t g_tokenLinkIds[] = { 0x31, 0x33, 0x34, 0x32, 0x30, 0 };
 
 		// GLOBAL: TOY2 0x004F2A54
-		extern const Collectables::TokenDialogueValue g_tokenDialogueValues[] = {
-			{ 0x46 },
-			{ 0x14 },
-			{ reinterpret_cast<int32_t>(g_hayBaleRideInstructions) },
-			{ 0x400 },
-			{ -1 },
+		extern const TokenDialogueTable g_tokenDialogueValues = {
+			{
+				{ 0x46, 0x14, g_hayBaleRideInstructions, 0x400 },
+			},
+			-1,
 		};
 
 		// GLOBAL: TOY2 0x0052F9BC
@@ -228,7 +245,7 @@ namespace Toy2
 		void Init()
 		{
 			Collectables::Init(g_tokenLinkIds, 0x41);
-			Collectables::LoadTokenTable(g_tokenDialogueValues);
+			Collectables::LoadTokenTable(reinterpret_cast<const Collectables::TokenDialogueValue*>(g_tokenDialogueValues.records));
 			MoveableObject::InitTable(g_moveableObjectInitTable.entries);
 			Collectables::Activate(3, 1);
 			Nullsub7(0x13, 0x12);
