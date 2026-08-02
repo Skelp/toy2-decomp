@@ -315,6 +315,21 @@ class CrossFileTests(unittest.TestCase):
         self.assertEqual({item.subject for item in repeated}, {"Toy2::Record"})
         self.assertEqual({item.severity for item in repeated}, {"error"})
 
+    def test_qualified_field_types_are_compared(self):
+        definition = (
+            "namespace Toy2 { struct SurfaceCollisionResult { "
+            "Platform::CollisionFace* face; int32_t distance; }; }\n"
+        )
+        findings = self.repeated_type_findings({f"Collision{index}.cpp": definition for index in range(2)})
+        repeated = [item for item in findings if item.rule == "repeated-private-type"]
+        self.assertEqual(len(repeated), 2)
+        self.assertEqual({item.subject for item in repeated}, {"Toy2::SurfaceCollisionResult"})
+
+    def test_bit_field_layouts_are_skipped(self):
+        definition = "struct StatusBits { unsigned int active : 1; unsigned int mode : 3; };\n"
+        findings = self.repeated_type_findings({f"Status{index}.cpp": definition for index in range(2)})
+        self.assertNotIn("repeated-private-type", {item.rule for item in findings})
+
     def test_one_private_struct_is_accepted(self):
         definition = "struct Record { int id; const char* text; };\n"
         findings = self.repeated_type_findings({"One.cpp": definition})

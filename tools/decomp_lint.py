@@ -972,7 +972,7 @@ def _private_type_records(unit: SourceUnit) -> list[tuple[str, str, int, str, st
         if not body.strip() or "{" in body or "(" in body:
             continue
         fields = [_normalized(field) for field in body.split(";") if field.strip()]
-        if not fields or any(":" in field for field in fields):
+        if not fields or any(re.search(r"(?<!:):(?!:)", field) for field in fields):
             continue
         signature = ";".join(re.sub(r"\s*([,*&\[\]])\s*", r"\1", field) for field in fields)
         containing = [item for item in namespaces if item[0] <= match.start() < item[1]]
