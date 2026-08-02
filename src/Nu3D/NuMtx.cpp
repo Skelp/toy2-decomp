@@ -1,4 +1,5 @@
 #include "Nu3D/Math.h"
+#include "Nu3D/NuQuat.h"
 #include <MATH.H>
 
 namespace Nu3D
@@ -531,6 +532,45 @@ namespace Nu3D
 				right->x *= scale;
 				right->y *= scale;
 				right->z *= scale;
+			}
+		}
+
+		// FUNCTION: TOY2 0x004AB090 [PROVISIONAL]
+		void MatrixToQuaternion(D3DMATRIX* matrix, Quaternion* quaternion)
+		{
+			float trace = matrix->_22 + matrix->_33 + matrix->_11;
+			int32_t nextIndex[3] = { 1, 2, 0 };
+
+			if (trace > 0.0)
+			{
+				float root = (float)sqrt(trace + 1.0f);
+				quaternion->w = root * 0.5f;
+				root = 0.5f / root;
+				quaternion->x = (matrix->_23 - matrix->_32) * root;
+				quaternion->y = (matrix->_31 - matrix->_13) * root;
+				quaternion->z = (matrix->_12 - matrix->_21) * root;
+				return;
+			}
+			else
+			{
+				int32_t index = matrix->_22 > matrix->_11;
+				float* diagonal = &matrix->_11;
+				if (matrix->_33 > diagonal[index * 5])
+					index = 2;
+
+				int32_t next = nextIndex[index];
+				int32_t last = nextIndex[next];
+				Quaternion result;
+				float scale = (float)sqrt((diagonal[index * 5] - (diagonal[next * 5] + diagonal[last * 5])) + 1.0f);
+				float* values = &result.x;
+				values[index] = scale * 0.5f;
+				if (scale != 0.0f)
+					scale = 0.5f / scale;
+
+				result.w = (diagonal[next * 4 + last] - diagonal[last * 4 + next]) * scale;
+				values[next] = (diagonal[index * 4 + next] + diagonal[next * 4 + index]) * scale;
+				values[last] = (diagonal[index * 4 + last] + diagonal[last * 4 + index]) * scale;
+				*quaternion = result;
 			}
 		}
 

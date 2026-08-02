@@ -7,6 +7,7 @@
 #include "Renderer/Glue.h"
 #include "Renderer/Renderer.h"
 #include "Nu3D/Math.h"
+#include "Nu3D/NuQuat.h"
 #include "Nu3D/ObjLoad.h"
 
 #include <windows.h>
@@ -273,14 +274,6 @@ namespace Nu3D
 		return -1;
 	}
 
-	struct Quaternion
-	{
-		float x;
-		float y;
-		float z;
-		float w;
-	};
-
 	union NamedTrackTransform
 	{
 		D3DMATRIX matrix;
@@ -324,43 +317,6 @@ namespace Nu3D
 		int32_t length = ftell(stream);
 		fclose(stream);
 		return length;
-	}
-
-	static void MatrixToQuaternion(D3DMATRIX* matrix, Quaternion* quaternion)
-	{
-		float trace = matrix->_11 + matrix->_22 + matrix->_33;
-		int32_t nextIndex[3] = { 1, 2, 0 };
-
-		if (trace <= 0.0)
-		{
-			int32_t index = matrix->_11 < matrix->_22;
-			float* diagonal = &matrix->_11;
-			if (diagonal[index * 5] < matrix->_33)
-				index = 2;
-
-			int32_t next = nextIndex[index];
-			int32_t last = nextIndex[next];
-			Quaternion result;
-			float scale = (float)sqrt((diagonal[index * 5] - (diagonal[next * 5] + diagonal[last * 5])) + 1.0f);
-			float* values = &result.x;
-			values[index] = scale * 0.5f;
-			if (scale != 0.0f)
-				scale = 0.5f / scale;
-
-			result.w = (diagonal[next * 4 + last] - diagonal[last * 4 + next]) * scale;
-			values[next] = (diagonal[index * 4 + next] + diagonal[next * 4 + index]) * scale;
-			values[last] = (diagonal[index * 4 + last] + diagonal[last * 4 + index]) * scale;
-			*quaternion = result;
-		}
-		else
-		{
-			float root = (float)sqrt(trace + 1.0f);
-			trace = 0.5f / root;
-			quaternion->w = root * 0.5f;
-			quaternion->x = (matrix->_23 - matrix->_32) * trace;
-			quaternion->y = (matrix->_31 - matrix->_13) * trace;
-			quaternion->z = (matrix->_12 - matrix->_21) * trace;
-		}
 	}
 
 	// FUNCTION: TOY2 0x004CABD0 [PROVISIONAL]
@@ -412,7 +368,7 @@ namespace Nu3D
 						{
 							fread(&key->sampleIndex, sizeof(key->sampleIndex), 1, stream);
 							fread(&key->transform.matrix, sizeof(key->transform.matrix), 1, stream);
-							MatrixToQuaternion(&key->transform.matrix, &key->transform.rotation);
+							Math::MatrixToQuaternion(&key->transform.matrix, &key->transform.rotation);
 
 							key->next = 0;
 							key->trackIndex = trackIndex;

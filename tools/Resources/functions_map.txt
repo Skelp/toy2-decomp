@@ -722,6 +722,7 @@
 0x004AA520 Nu3D::Math::CreateInverseMatrix
 0x004AA620 Nu3D::Math::InvertAffineMatrix
 0x004AAC40 Nu3D::Math::BuildMatrixFromDirection
+0x004AB090 Nu3D::Math::MatrixToQuaternion
 0x004AB7D0 Nu3D::GetCPUFeatures
 0x004AB850 Nu3D::GetHighResolutionTime
 0x004AB8C0 Nu3D::GetCPUTimestamp
