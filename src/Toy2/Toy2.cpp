@@ -2839,7 +2839,7 @@ namespace Toy2
 	{
 		const uint16_t ACTOR_FLAG_IGNORE_RESPAWN_VISIBILITY = 0x40;
 
-		// FUNCTION: TOY2 0x00406CD0 [PROVISIONAL]
+		// FUNCTION: TOY2 0x00406CD0 [MATCHED]
 		void InitActor(Actor::Toy2Actor* actor, int32_t fullInit)
 		{
 			RawLoader::CreatureListRam* creature = actor->creatureRam;
@@ -2904,23 +2904,56 @@ namespace Toy2
 			switch (creature->creatureId)
 			{
 				case 1:
+					actor->visibilityDistance = 0x708;
+					return;
 				case 9:
+					actor->visibilityDistance = 0x708;
+					return;
 				case 16:
+					actor->visibilityDistance = 0x708;
+					return;
 				case 21:
+					actor->visibilityDistance = 0x708;
+					return;
 				case 29:
+					actor->visibilityDistance = 0x708;
+					return;
 				case 30:
+					actor->visibilityDistance = 0x708;
+					return;
 				case 34:
+					actor->visibilityDistance = 0x708;
+					return;
 				case 35:
+					actor->visibilityDistance = 0x708;
+					return;
 				case 36:
+					actor->visibilityDistance = 0x708;
+					return;
 				case 37:
+					actor->visibilityDistance = 0x708;
+					return;
 				case 39:
+					actor->visibilityDistance = 0x708;
+					return;
 				case 42:
+					actor->visibilityDistance = 0x708;
+					return;
 				case 49:
+					actor->visibilityDistance = 0x708;
+					return;
 				case 54:
+					actor->visibilityDistance = 0x708;
+					return;
 				case 55:
+					actor->visibilityDistance = 0x708;
+					return;
 				case 57:
+					actor->visibilityDistance = 0x708;
+					return;
 				case 62:
-					break;
+					actor->visibilityDistance = 0x708;
+					return;
 				case 4:
 					actor->actorBehaviour = CreatureBehaviour::Zurg3;
 					return;
