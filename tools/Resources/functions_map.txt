@@ -868,6 +868,7 @@
 0x004B1A20 D3DTextr_GetRGBAData
 0x004B1A40 D3DTextr_GetSurfaceDesc
 0x004B1A50 D3DTextr_GetTextureContainer
+0x004B1A60 D3DTextr_SetTexturePath
 0x004B2B20 SoftwareRenderer::ReleaseVertexBuffer
 0x004B2B30 SoftwareRenderer::CreateVertexBuffer
 0x004B2B80 SoftwareRenderer::GetStrideFromFVF

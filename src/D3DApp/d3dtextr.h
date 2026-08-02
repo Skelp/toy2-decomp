@@ -36,6 +36,7 @@ LPDIRECT3DTEXTURE2 D3DTextr_GetTexture(TextureContainer* texture);
 uint32_t* D3DTextr_GetRGBAData(TextureContainer* texture);
 void D3DTextr_GetSurfaceDesc(TextureContainer* texture, DDSURFACEDESC2** surfaceDesc);
 TextureContainer* D3DTextr_GetTextureContainer(const char* name);
+void D3DTextr_SetTexturePath(const char* path);
 
 STATIC_ASSERT(sizeof(TextureContainer) == 0x120);
 STATIC_ASSERT(offsetof(TextureContainer, rgbaData) == 0x94);

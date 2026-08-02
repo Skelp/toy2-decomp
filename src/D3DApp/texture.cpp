@@ -1,10 +1,12 @@
 #include "D3DApp/d3dappi.h"
 #include "D3DApp/d3dtextr.h"
 #include "Logger.h"
+#include "SaveManager.h"
 #include "SoftwareRenderer.h"
 #include "Toy2/Direct6.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 namespace SoftwareRenderer
 {
@@ -40,6 +42,9 @@ TextureDimensions g_textureDimensions[64];
 
 // GLOBAL: TOY2 0x00884474
 TextureContainer* g_textureList;
+
+// GLOBAL: TOY2 0x00508288
+char g_texturePath[512] = "MEDIA\\";
 
 // FUNCTION: TOY2 0x00497DB0 [MATCHED]
 void AllocateTexturePixelBuffer(int16_t textureIndex)
@@ -224,4 +229,13 @@ void D3DTextr_GetSurfaceDesc(TextureContainer* texture, DDSURFACEDESC2** surface
 TextureContainer* D3DTextr_GetTextureContainer(const char* name)
 {
 	return D3DTextr_FindTexture(name);
+}
+
+// FUNCTION: TOY2 0x004B1A60
+void D3DTextr_SetTexturePath(const char* path)
+{
+	if (path == NULL)
+		path = &SaveManager::g_emptyString;
+
+	strcpy(g_texturePath, path);
 }
