@@ -32,7 +32,7 @@ baseline row in the same commit.
 - `magic-pointer`: Code converts a nonzero integer literal to a pointer.
 - `signature-concealment`: A cast at a project-function call hides an incorrect
   caller type.
-- `repeated-private-type`: Three or more source files define the same named,
+- `repeated-private-type`: Two or more source files define the same named,
   nonempty type and field layout. Move the type to a shared owning header.
 
 Runtime byte movement is valid for file cursors, compressed data, locked

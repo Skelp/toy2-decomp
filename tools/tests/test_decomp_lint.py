@@ -307,17 +307,17 @@ class CrossFileTests(unittest.TestCase):
             units = [lint.SourceUnit(root / name, source) for name, source in sources.items()]
             return lint.scan_units(units)
 
-    def test_three_equivalent_private_structs_are_errors(self):
+    def test_two_equivalent_private_structs_are_errors(self):
         definition = "namespace Toy2 { namespace Level { struct Record { int id; const char* text; }; } }\n"
-        findings = self.repeated_type_findings({f"Level{index}.cpp": definition for index in range(3)})
+        findings = self.repeated_type_findings({f"Level{index}.cpp": definition for index in range(2)})
         repeated = [item for item in findings if item.rule == "repeated-private-type"]
-        self.assertEqual(len(repeated), 3)
+        self.assertEqual(len(repeated), 2)
         self.assertEqual({item.subject for item in repeated}, {"Toy2::Record"})
         self.assertEqual({item.severity for item in repeated}, {"error"})
 
-    def test_two_equivalent_private_structs_are_accepted(self):
+    def test_one_private_struct_is_accepted(self):
         definition = "struct Record { int id; const char* text; };\n"
-        findings = self.repeated_type_findings({"One.cpp": definition, "Two.cpp": definition})
+        findings = self.repeated_type_findings({"One.cpp": definition})
         self.assertNotIn("repeated-private-type", {item.rule for item in findings})
 
     def test_different_root_namespaces_are_accepted(self):
@@ -395,6 +395,43 @@ class StagedSourceTests(unittest.TestCase):
         self.assertEqual(len(units), 1)
         self.assertIn("iVar2", units[0].text)
         self.assertIn("decompiler-identifier", {item.rule for item in lint.scan_units(units)})
+
+    def test_staged_duplicate_is_compared_with_an_existing_index_file(self):
+        listed = subprocess_result(stdout="src/Existing.cpp\nsrc/New.cpp\n")
+        existing = subprocess_result(stdout=b"struct Record { int id; };\n")
+        staged = subprocess_result(stdout=b"struct Record { int id; };\n")
+        with patch.object(lint.subprocess, "run", side_effect=[listed, existing, staged]):
+            units = lint.target_units(True, [])
+        repeated = [item for item in lint.scan_units(units) if item.rule == "repeated-private-type"]
+        self.assertEqual(len(repeated), 2)
+
+    def test_unstaged_duplicate_does_not_change_the_index_view(self):
+        listed = subprocess_result(stdout="src/One.cpp\nsrc/Two.cpp\n")
+        first_index = subprocess_result(stdout=b"struct Record { int id; };\n")
+        second_index = subprocess_result(stdout=b"struct Record { int count; };\n")
+        with patch.object(lint.subprocess, "run", side_effect=[listed, first_index, second_index]):
+            units = lint.target_units(True, [])
+        self.assertNotIn("repeated-private-type", {item.rule for item in lint.scan_units(units)})
+
+    def test_staged_baseline_uses_the_index_and_keeps_stale_rows(self):
+        row = b"src/Old.cpp\trepeated-private-type\tRecord\t123456789abc\tsrc/Old.cpp\n"
+        with patch.object(lint.subprocess, "run", return_value=subprocess_result(stdout=row)):
+            entries = lint.read_baseline(staged=True)
+        self.assertEqual(len(entries), 1)
+        _, stale = lint.apply_baseline([], entries)
+        self.assertEqual(stale, entries)
+
+    def test_staged_lint_rejects_a_stale_baseline_row(self):
+        entry = lint.BaselineEntry(
+            "src/Old.cpp", "repeated-private-type", "Record", "123456789abc", "src/Old.cpp"
+        )
+        with (
+            patch.object(sys, "argv", ["decomp_lint.py", "--staged"]),
+            patch.object(lint, "target_units", return_value=[]),
+            patch.object(lint, "read_baseline", return_value=[entry]),
+            patch("builtins.print"),
+        ):
+            self.assertEqual(lint.main(), 1)
 
 
 def subprocess_result(*, stdout):

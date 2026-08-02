@@ -139,7 +139,7 @@ RULE_HELP = {
         "layout and use its owning type."
     ),
     "repeated-private-type": (
-        "Three or more source files define the same named type and field layout. "
+        "Two or more source files define the same named type and field layout. "
         "Move the type to a shared owning header."
     ),
 }
@@ -993,7 +993,7 @@ def check_repeated_private_types(units: list[SourceUnit]) -> list[Finding]:
     findings: list[Finding] = []
     for (root_namespace, kind, name, signature), records in groups.items():
         paths = {unit.path.resolve() for unit, _ in records}
-        if len(paths) < 3:
+        if len(paths) < 2:
             continue
         subject = f"{root_namespace}::{name}" if root_namespace else name
         fingerprint = _fingerprint(f"{kind} {subject} {{{signature}}}")
@@ -1048,15 +1048,24 @@ def scan_units(units: list[SourceUnit], *, cross_file: bool = True) -> list[Find
     return sorted(findings, key=lambda item: (item.relative_path, item.line, item.column, item.rule))
 
 
-def read_baseline(path: Path = BASELINE_PATH) -> list[BaselineEntry]:
-    if not path.exists():
-        return []
+def read_baseline(path: Path = BASELINE_PATH, *, staged: bool = False) -> list[BaselineEntry]:
+    if staged and path.resolve() == BASELINE_PATH.resolve():
+        shown = subprocess.run(
+            ["git", "show", ":.notes/lint-baseline.tsv"],
+            capture_output=True, check=False, cwd=ROOT,
+        )
+        if shown.returncode != 0:
+            return []
+        rows = shown.stdout.decode("utf-8", errors="ignore").splitlines()
+    else:
+        if not path.exists():
+            return []
+        rows = path.read_text(encoding="utf-8").splitlines()
     entries: list[BaselineEntry] = []
-    with path.open(encoding="utf-8", newline="") as handle:
-        for row in csv.reader(handle, delimiter="\t"):
-            if not row or row[0].startswith("#") or len(row) < 5:
-                continue
-            entries.append(BaselineEntry(*row[:5]))
+    for row in csv.reader(rows, delimiter="\t"):
+        if not row or row[0].startswith("#") or len(row) < 5:
+            continue
+        entries.append(BaselineEntry(*row[:5]))
     return entries
 
 
@@ -1118,7 +1127,7 @@ def main() -> int:
 
     units = target_units(args.staged, args.files)
     findings = scan_units(units, cross_file=not args.files)
-    entries = read_baseline(args.baseline)
+    entries = read_baseline(args.baseline, staged=args.staged)
     findings, stale = apply_baseline(findings, entries)
 
     if args.print_baseline:
@@ -1136,8 +1145,8 @@ def main() -> int:
     visible_warnings = [item for item in visible if item.severity == "warning" and not item.suppressed]
     visible_suppressed = [item for item in visible if item.suppressed]
 
-    # A subset scan cannot prove that baseline rows elsewhere are stale.
-    stale_is_gate = not args.staged and not args.files
+    # A file subset cannot prove that baseline rows elsewhere are stale.
+    stale_is_gate = not args.files
 
     if args.format == "json":
         json.dump(
