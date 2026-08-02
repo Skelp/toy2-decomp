@@ -45,6 +45,25 @@ namespace Toy2
 		{
 			GUNS_P_ACTOR_FLAG_VERTICAL_TARGET = 0x10,
 		};
+
+		struct TokenDialogueRecord
+		{
+			int32_t tokenId;
+			int32_t dialogueRecordIndex;
+			const char* subtitle;
+			int32_t facingAngle;
+		};
+
+		struct TokenDialogueTable
+		{
+			TokenDialogueRecord records[3];
+			int32_t terminator;
+		};
+
+		STATIC_ASSERT(sizeof(TokenDialogueRecord) == 0x10);
+		STATIC_ASSERT(sizeof(TokenDialogueTable) == 0x34);
+		STATIC_ASSERT(offsetof(TokenDialogueTable, terminator) == 0x30);
+
 		// GLOBAL: TOY2 0x0052FC20
 		int32_t g_gunsPVisualToggle;
 		// GLOBAL: TOY2 0x0052FC34
@@ -123,19 +142,14 @@ namespace Toy2
 		// GLOBAL: TOY2 0x004F3798
 		int16_t g_tokenLinkIds[] = { 0x6B, 0x6C, 0x6E, 0x6A, 0x6D, 0 };
 		// GLOBAL: TOY2 0x004F37A4
-		extern const Collectables::TokenDialogueValue g_tokenDialogueValues[] = { { 0x70 },
-			{ 0x22 },
-			{ reinterpret_cast<int32_t>(g_elevatorInstructions) },
-			{ 0 },
-			{ 0x71 },
-			{ 0x23 },
-			{ reinterpret_cast<int32_t>(g_controlRoomFanInstructions) },
-			{ 0 },
-			{ 0x72 },
-			{ 0x24 },
-			{ reinterpret_cast<int32_t>(g_elevatorShaftFanInstructions) },
-			{ 0 },
-			{ -1 } };
+		extern const TokenDialogueTable g_tokenDialogueValues = {
+			{
+				{ 0x70, 0x22, g_elevatorInstructions, 0 },
+				{ 0x71, 0x23, g_controlRoomFanInstructions, 0 },
+				{ 0x72, 0x24, g_elevatorShaftFanInstructions, 0 },
+			},
+			-1,
+		};
 
 		// GLOBAL: TOY2 0x0052FC10
 		Collectables::PickupRecord* g_challengeTokenPickup;
@@ -303,7 +317,7 @@ void Toy2::ElevatorHop::Init()
 	MoveableObject::InitTable(0);
 	Collectables::Init(g_tokenLinkIds, 0x73);
 	Collectables::Activate(3, 1);
-	Collectables::LoadTokenTable(g_tokenDialogueValues);
+	Collectables::LoadTokenTable(reinterpret_cast<const Collectables::TokenDialogueValue*>(g_tokenDialogueValues.records));
 
 	g_challengeTokenPickup = reinterpret_cast<Collectables::PickupRecord*>(Collectables::g_tokenStates[2].verticalPosition - 1);
 	g_challengeTokenPathProgress = 0;
