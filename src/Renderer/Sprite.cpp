@@ -1341,9 +1341,9 @@ namespace Renderer
 		void RenderType9(Nu3D::Material* material, Renderer::RenderEntry* entry)
 		{
 			Nu3D::InstanceData* instanceData = entry->instanceData;
-			Nu3D::Primitive* primitive = entry->primitive;
 			SoftwareRenderer::g_softwarePrimitiveType = instanceData->unkInt6;
 
+			Nu3D::Primitive* primitive = entry->primitive;
 			int32_t renderFlags = instanceData->renderFlags | primitive->renderFlags;
 			if (primitive->header[0].drawType == 4 || primitive->header[0].drawType == 5)
 				renderFlags |= RENDER_CULL_NONE;
@@ -1410,46 +1410,62 @@ namespace Renderer
 
 			for (int32_t headerIndex = 0; headerIndex < primitive->headerCount; ++headerIndex)
 			{
-				Nu3D::Primitive::Header& header = primitive->header[headerIndex];
 				if (g_drawTriangleWireframes != 0)
 				{
-					for (int32_t indexOffset = 0; indexOffset < header.indexCount; indexOffset += 3)
+					for (int32_t indexOffset = 0; indexOffset < primitive->header[headerIndex].indexCount; indexOffset += 3)
 					{
-						DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_LINESTRIP, destBuffer, header.indices + indexOffset, 3, drawFlags);
+						DrawingAPI::DrawIndexedPrimitiveVB(
+							D3DPT_LINESTRIP, destBuffer, primitive->header[headerIndex].indices + indexOffset, 3, drawFlags);
 					}
 					continue;
 				}
 
-				switch (header.drawType)
+				switch (primitive->header[headerIndex].drawType)
 				{
 					case 0:
-						g_submittedTriangleCount += header.indexCount / 3;
+						g_submittedTriangleCount += primitive->header[headerIndex].indexCount / 3;
 						if (g_drawingTransparentBuckets == 0)
 						{
-							DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLELIST, destBuffer, header.indices, header.indexCount, drawFlags);
+							DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLELIST,
+								destBuffer,
+								primitive->header[headerIndex].indices,
+								primitive->header[headerIndex].indexCount,
+								drawFlags);
 						}
 						else
 						{
-							SoftwareRenderer::SubmitTriangleList(renderFlags, destBuffer, entry, header.indices, header.indexCount);
+							SoftwareRenderer::SubmitTriangleList(renderFlags,
+								destBuffer,
+								entry,
+								primitive->header[headerIndex].indices,
+								primitive->header[headerIndex].indexCount);
 						}
 						break;
 
 					case 2:
-						g_submittedTriangleCount += header.indexCount >> 1;
+						g_submittedTriangleCount += primitive->header[headerIndex].indexCount >> 1;
 						if (g_drawingTransparentBuckets == 0)
 						{
-							DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLESTRIP, destBuffer, header.indices, header.indexCount, drawFlags);
+							DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLESTRIP,
+								destBuffer,
+								primitive->header[headerIndex].indices,
+								primitive->header[headerIndex].indexCount,
+								drawFlags);
 						}
 						else
 						{
-							SoftwareRenderer::SubmitTriangleStrip(renderFlags, destBuffer, entry, header.indices, header.indexCount);
+							SoftwareRenderer::SubmitTriangleStrip(renderFlags,
+								destBuffer,
+								entry,
+								primitive->header[headerIndex].indices,
+								primitive->header[headerIndex].indexCount);
 						}
 						break;
 
 					case 3: {
-						g_submittedTriangleCount += header.indexCount >> 1;
-						WORD* indices = header.indices;
-						for (int32_t indexCount = header.indexCount; indexCount != 0; indexCount -= 4)
+						g_submittedTriangleCount += primitive->header[headerIndex].indexCount >> 1;
+						WORD* indices = primitive->header[headerIndex].indices;
+						for (int32_t indexCount = primitive->header[headerIndex].indexCount; indexCount != 0; indexCount -= 4)
 						{
 							DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLESTRIP, destBuffer, indices, 4, drawFlags);
 							indices += 4;
@@ -1459,13 +1475,13 @@ namespace Renderer
 
 					case 4:
 					case 5: {
-						WORD* indices = header.indices;
+						WORD* indices = primitive->header[headerIndex].indices;
 						Vector3F billboardPosition;
 						Nu3D::Math::TransformPointByMatrix(
 							&billboardPosition, &primitive->patchVerts.data.vertices[*indices].position, &instanceData->matrices[0]);
 
 						D3DMATRIX billboardMatrix;
-						if (header.drawType == 4)
+						if (primitive->header[headerIndex].drawType == 4)
 						{
 							Nu3D::Math::BuildIdentityMatrix(&billboardMatrix);
 							Nu3D::Math::RotateYFromLut(&billboardMatrix, Nu3D::Camera::g_billboardYaw);

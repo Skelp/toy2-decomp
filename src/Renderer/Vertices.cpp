@@ -124,15 +124,22 @@ namespace Renderer
 				{
 					D3DMATRIX combined;
 					Nu3D::Math::MultiplyMatrix3x4(&combined, transform, Nu3D::Camera::GetViewMatrix());
+					float m21 = combined._21;
+					float m11 = combined._11;
+					float m22 = combined._22;
+					float m12 = combined._12;
+					float m32 = combined._32;
 
 					Nu3D::Vertex* sourceVertex = vertices->data.vertices;
 					for (int32_t vertexIndex = 0; vertexIndex < vertices->vertexCount; ++vertexIndex)
 					{
-						Vector3F& normal = sourceVertex->normals;
-						destVertex->uv.x = (normal.x * combined._11 + normal.y * combined._21 + normal.z * combined._31 + 1.0f) * 0.5f;
-						destVertex->uv.y = (1.0f - (normal.x * combined._12 + normal.y * combined._22 + normal.z * combined._32)) * 0.5f;
-						destVertex->diffuse.a = 0x60;
+						float normalX = sourceVertex->normals.x;
+						float normalY = sourceVertex->normals.y;
+						float normalZ = sourceVertex->normals.z;
 						++sourceVertex;
+						destVertex->uv.x = (normalX * m11 + normalY * m21 + normalZ * combined._31 + 1.0f) * 0.5f;
+						destVertex->uv.y = (1.0f - (normalX * m12 + normalY * m22 + normalZ * m32)) * 0.5f;
+						destVertex->diffuse.a = 0x60;
 						++destVertex;
 					}
 
