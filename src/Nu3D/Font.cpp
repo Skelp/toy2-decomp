@@ -935,12 +935,11 @@ namespace Nu3D
 			maxWidth = 0;
 			width = 0;
 			g_textHeight = (int32_t)g_scaledFontHeight;
-			char c = *text;
-			if (c)
+			if (*text)
 			{
 				do
 				{
-					switch (c)
+					switch (*text)
 					{
 						case '\t':
 							break;
@@ -951,11 +950,10 @@ namespace Nu3D
 							width = 0;
 							break;
 						default:
-							width += font->glyphs[font->charToGlyphIndex[(uint8_t)c]].width;
+							width += font->glyphs[font->charToGlyphIndex[(uint8_t)*text]].width;
 							break;
 					}
-					c = *++text;
-				} while (c);
+				} while (*++text);
 			}
 		}
 		else
