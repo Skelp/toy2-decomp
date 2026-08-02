@@ -500,17 +500,16 @@ namespace Toy2
 		// FUNCTION: TOY2 0x0042FC50 [PROVISIONAL]
 		void Interactions()
 		{
-			int32_t currentIntroTimer = g_introSequenceTimer;
 			if (g_introSequenceTimer != 0)
 			{
-				g_previousIntroSequenceTimer = currentIntroTimer;
-				if (currentIntroTimer < 1000)
-					g_introSequenceTimer = currentIntroTimer + Renderer::g_frameDelta;
+				g_previousIntroSequenceTimer = g_introSequenceTimer;
+				if (g_introSequenceTimer < 1000)
+					g_introSequenceTimer += Renderer::g_frameDelta;
 
-				if (g_introSequenceTimer > 150 && currentIntroTimer < 151)
+				if (g_introSequenceTimer > 150 && g_previousIntroSequenceTimer <= 150)
 					AudioManager::Preset::PlayOneShotSound(0xCD, &Actor::g_creatureActors[3]);
 
-				if (g_introSequenceTimer > 280 && g_previousIntroSequenceTimer < 281)
+				if (g_introSequenceTimer > 280 && g_previousIntroSequenceTimer <= 280)
 				{
 					g_floorVerticalVelocity = -0xC00;
 					g_floorRockAngle = 0x800;
@@ -519,7 +518,7 @@ namespace Toy2
 					Actor::g_creatureActors[4].gravityVel = -0x400;
 					AudioManager::PlaySoundEffect(0x2F, 0);
 				}
-				if (g_introSequenceTimer > 335 && g_previousIntroSequenceTimer < 336)
+				if (g_introSequenceTimer > 335 && g_previousIntroSequenceTimer <= 335)
 				{
 					g_floorVerticalVelocity = -0xC00;
 					g_floorRockAngle = 0x800;
@@ -528,7 +527,7 @@ namespace Toy2
 					Actor::g_creatureActors[4].gravityVel = -0x300;
 					AudioManager::PlaySoundEffect(0x2F, 0);
 				}
-				if (g_introSequenceTimer > 360 && g_previousIntroSequenceTimer < 361)
+				if (g_introSequenceTimer > 360 && g_previousIntroSequenceTimer <= 360)
 				{
 					g_floorVerticalVelocity = -0xC00;
 					g_floorRockAngle = 0x800;
@@ -541,7 +540,7 @@ namespace Toy2
 					Actor::g_creatureActors[4].motionTargetPos.y = 0;
 					AudioManager::PlaySoundEffect(0x2F, 0);
 				}
-				if (g_introSequenceTimer > 430 && g_previousIntroSequenceTimer < 431)
+				if (g_introSequenceTimer > 430 && g_previousIntroSequenceTimer <= 430)
 				{
 					g_floorVerticalVelocity = -0xC00;
 					g_floorRockAngle = 0x800;
@@ -576,31 +575,31 @@ namespace Toy2
 					g_floorRockAngle -= 0x100;
 					if (g_floorRockAngle < 0)
 						g_floorRockAngle = 0;
-					int32_t rockAmount = Numerics::g_sinCosLUT[g_floorRockAngle & 0xFFF];
 					switch (g_floorCollapseStep)
 					{
 					case 0:
-						Nu3D::Link::SetRotationAbsolute8bit(0, rockAmount >> 7, 0, 0);
-						Nu3D::Link::SetRotationAbsolute8bit(1, rockAmount >> 7, 0, 0);
-						Nu3D::Link::SetRotationAbsolute8bit(2, rockAmount >> 7, 0, 0);
-						Nu3D::Link::SetRotationAbsolute8bit(3, rockAmount >> 7, 0, 0);
+						Nu3D::Link::SetRotationAbsolute8bit(0, Numerics::g_sinCosLUT[g_floorRockAngle & 0xFFF] >> 7, 0, 0);
+						Nu3D::Link::SetRotationAbsolute8bit(1, Numerics::g_sinCosLUT[g_floorRockAngle & 0xFFF] >> 7, 0, 0);
+						Nu3D::Link::SetRotationAbsolute8bit(2, Numerics::g_sinCosLUT[g_floorRockAngle & 0xFFF] >> 7, 0, 0);
+						Nu3D::Link::SetRotationAbsolute8bit(3, Numerics::g_sinCosLUT[g_floorRockAngle & 0xFFF] >> 7, 0, 0);
 						break;
 					case 1:
-						Nu3D::Link::SetRotationAbsolute8bit(0, 0, 0, -rockAmount >> 8);
-						Nu3D::Link::SetRotationAbsolute8bit(1, 0, 0, -rockAmount >> 8);
-						Nu3D::Link::SetRotationAbsolute8bit(2, 0, 0, -rockAmount >> 8);
-						Nu3D::Link::SetRotationAbsolute8bit(3, 0, 0, -rockAmount >> 8);
+						Nu3D::Link::SetRotationAbsolute8bit(0, 0, 0, -Numerics::g_sinCosLUT[g_floorRockAngle & 0xFFF] >> 8);
+						Nu3D::Link::SetRotationAbsolute8bit(1, 0, 0, -Numerics::g_sinCosLUT[g_floorRockAngle & 0xFFF] >> 8);
+						Nu3D::Link::SetRotationAbsolute8bit(2, 0, 0, -Numerics::g_sinCosLUT[g_floorRockAngle & 0xFFF] >> 8);
+						Nu3D::Link::SetRotationAbsolute8bit(3, 0, 0, -Numerics::g_sinCosLUT[g_floorRockAngle & 0xFFF] >> 8);
 						break;
 					case 2:
-						Nu3D::Link::SetRotationAbsolute8bit(0, -rockAmount >> 7, 0, 0);
-						Nu3D::Link::SetRotationAbsolute8bit(1, -rockAmount >> 7, 0, 0);
-						Nu3D::Link::SetRotationAbsolute8bit(2, -rockAmount >> 7, 0, 0);
-						Nu3D::Link::SetRotationAbsolute8bit(3, -rockAmount >> 7, 0, 0);
+						Nu3D::Link::SetRotationAbsolute8bit(0, -Numerics::g_sinCosLUT[g_floorRockAngle & 0xFFF] >> 7, 0, 0);
+						Nu3D::Link::SetRotationAbsolute8bit(1, -Numerics::g_sinCosLUT[g_floorRockAngle & 0xFFF] >> 7, 0, 0);
+						Nu3D::Link::SetRotationAbsolute8bit(2, -Numerics::g_sinCosLUT[g_floorRockAngle & 0xFFF] >> 7, 0, 0);
+						Nu3D::Link::SetRotationAbsolute8bit(3, -Numerics::g_sinCosLUT[g_floorRockAngle & 0xFFF] >> 7, 0, 0);
 						break;
 					case 3:
-						rockAmount = Numerics::g_sinCosLUT[((g_floorRockAngle >> 1) + 0x400) & 0xFFF];
-						Nu3D::Link::SetRotationAbsolute8bit(0, 0, 0, -rockAmount >> 4);
-						Nu3D::Link::SetRotationAbsolute8bit(1, 0, 0, -rockAmount >> 4);
+						Nu3D::Link::SetRotationAbsolute8bit(
+							0, 0, 0, -Numerics::g_sinCosLUT[((g_floorRockAngle >> 1) + 0x400) & 0xFFF] >> 4);
+						Nu3D::Link::SetRotationAbsolute8bit(
+							1, 0, 0, -Numerics::g_sinCosLUT[((g_floorRockAngle >> 1) + 0x400) & 0xFFF] >> 4);
 						break;
 					}
 				}
@@ -685,14 +684,14 @@ namespace Toy2
 			if (g_smithState > 0)
 			{
 				g_soundSweepDelay -= Renderer::g_frameDelta;
-				if (g_soundSweepDelay < 1)
+				if (g_soundSweepDelay <= 0)
 				{
 					g_soundSweepDelay = 0;
 					g_soundSweepAngle += Renderer::g_frameDelta * 8;
 					if (g_soundSweepAngle < 0x3000)
 					{
 						cameraPitchAngle = g_soundSweepAngle;
-						if (g_soundSweepAngle > 0x7FF)
+						if (g_soundSweepAngle >= 0x800)
 						{
 							if (g_soundSweepAngle < 0x1800)
 								cameraPitchAngle = 0x800;
@@ -710,20 +709,19 @@ namespace Toy2
 				}
 			}
 
-			int16_t soundWave = Numerics::g_sinCosLUT[(cameraPitchAngle + 0x400) & 0xFFF] >> 6;
-			uint16_t cameraPitch = soundWave & 0xFFF;
+			int32_t soundWave = Numerics::g_sinCosLUT[(cameraPitchAngle + 0x400) & 0xFFF] >> 6;
+			int32_t cameraPitch = soundWave & 0xFFF;
 			AudioManager::g_dynamicSoundFrequencies[0] = (0x180 - soundWave) * 8;
 			AudioManager::PlaySoundEffect(0xA8, 0);
 			if (Camera::g_scriptedCameraState != 0)
 				cameraPitch = 0;
+			Camera::g_gameplayCamera.angles.pitch = cameraPitch;
 			if (g_smithState != 0)
 			{
 				HUD::g_slideTimers[HUD::SLIDE_BOSS_STATUS] = 90;
 				g_hudActorAnimationFrame =
 					(Actor::g_creatureActors[2].actorPhase + Actor::g_creatureActors[1].actorPhase - 27 + Actor::g_creatureActors[0].actorPhase) * 54 / 60;
 			}
-			Camera::g_gameplayCamera.angles.pitch = cameraPitch;
-
 			if (g_defeatedBossCount == 3)
 			{
 				g_defeatedBossCount = 4;
@@ -733,24 +731,23 @@ namespace Toy2
 			}
 			if (g_defeatedBossCount == 4 && Camera::g_cutsceneDuration == 0)
 			{
-				Actor::Toy2Actor* rescuers = Actor::g_creatureActors + 3;
-				rescuers[0].yawAngle = 0x400;
-				rescuers[0].targetYaw = 0x400;
-				rescuers[1].yawAngle = 0x400;
-				rescuers[1].targetYaw = 0x400;
+				Actor::g_creatureActors[3].yawAngle = 0x400;
+				Actor::g_creatureActors[3].targetYaw = 0x400;
+				Actor::g_creatureActors[4].yawAngle = 0x400;
 				SaveManager::g_save0Data.tokens[g_levelFileIndex] = 0x80;
+				Actor::g_creatureActors[4].targetYaw = 0x400;
 				g_defeatedBossCount = 5;
-				rescuers[0].pos.x = -0x4E4E0;
-				rescuers[0].pos.y = -0xBC80;
-				rescuers[0].pos.z = 0x14E0;
-				rescuers[1].pos.x = -0x46944;
-				rescuers[1].pos.y = -0xB680;
-				rescuers[1].pos.z = -0x1BEA;
-				rescuers[0].actorPhase = 1;
-				rescuers[1].actorPhase = 1;
-				rescuers[0].motionTargetPos.y = -0xBC80;
-				rescuers[1].motionTargetPos.y = -0xB680;
-				Camera::BeginScriptedCutsceneAtPoint(&rescuers[1].pos, 300, 0x40);
+				Actor::g_creatureActors[3].pos.x = -0x4E4E0;
+				Actor::g_creatureActors[3].pos.y = -0xBC80;
+				Actor::g_creatureActors[3].pos.z = 0x14E0;
+				Actor::g_creatureActors[4].pos.x = -0x46944;
+				Actor::g_creatureActors[4].pos.y = -0xB680;
+				Actor::g_creatureActors[4].pos.z = -0x1BEA;
+				Actor::g_creatureActors[3].actorPhase = 1;
+				Actor::g_creatureActors[4].actorPhase = 1;
+				Actor::g_creatureActors[3].motionTargetPos.y = -0xBC80;
+				Actor::g_creatureActors[4].motionTargetPos.y = -0xB680;
+				Camera::BeginScriptedCutsceneAtPoint(&Actor::g_creatureActors[4].pos, 300, 0x40);
 				Camera::g_cutsceneCameraPosition.x = Camera::g_cutsceneFocusPosition.x + 0x3000;
 				Camera::g_cutsceneCameraPosition.y = Camera::g_cutsceneFocusPosition.y - 0x3000;
 				Camera::g_cutsceneCameraPosition.z = Camera::g_cutsceneFocusPosition.z - 0x1000;
@@ -762,12 +759,11 @@ namespace Toy2
 			if (g_defeatedBossCount == 5)
 				Camera::g_cutsceneCameraPosition.z += Renderer::g_frameDelta * 0x20;
 
-			Levels::RecordData* flareRecords = Levels::g_recordData[0];
 			int32_t nearestDistanceSquared = INT_MAX;
 			int32_t nearestFlareIndex = 0;
-			for (int32_t flareIndex = 0; flareIndex < flareRecords->recordCount; flareIndex++)
+			for (int32_t flareIndex = 0; flareIndex < Levels::g_recordData[0]->recordCount; flareIndex++)
 			{
-				Vector3I* flare = &flareRecords->data[flareIndex];
+				Vector3I* flare = &Levels::g_recordData[0]->data[flareIndex];
 				int32_t cameraOffsetZ = (Camera::g_renderCameraTransform.pos.z - flare->z * 0x20) >> 8;
 				int32_t cameraOffsetY = (Camera::g_renderCameraTransform.pos.y - flare->y * 0x20) >> 8;
 				int32_t cameraOffsetX = (Camera::g_renderCameraTransform.pos.x - flare->x * 0x20) >> 8;
@@ -801,7 +797,7 @@ namespace Toy2
 				light->lifetime = 0;
 				return;
 			}
-			Vector3I* nearestFlare = &flareRecords->data[nearestFlareIndex];
+			Vector3I* nearestFlare = &Levels::g_recordData[0]->data[nearestFlareIndex];
 			light->position.x = nearestFlare->x << 5;
 			light->position.y = nearestFlare->y << 5;
 			light->position.z = nearestFlare->z << 5;
