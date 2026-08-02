@@ -696,15 +696,16 @@ namespace Renderer
 		int16_t DrawTiledFixed(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex)
 		{
 			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
+			int32_t textureDataIndex;
+			Vector2F uvTopLeft;
+			Vector2F uvBottomRight;
+			uint32_t bitmapWidth;
+			uint32_t bitmapHeight;
 			if (sheet)
 			{
-				int32_t textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
-				Vector2F uvTopLeft;
-				Vector2F uvBottomRight;
+				textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
 				if (textureDataIndex != 0)
 				{
-					uint32_t bitmapWidth;
-					uint32_t bitmapHeight;
 					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
 
 					uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;
@@ -732,15 +733,16 @@ namespace Renderer
 		int16_t DrawTile(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex)
 		{
 			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
+			int32_t textureDataIndex;
+			Vector2F uvTopLeft;
+			Vector2F uvBottomRight;
+			uint32_t bitmapWidth;
+			uint32_t bitmapHeight;
 			if (sheet)
 			{
-				int32_t textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
-				Vector2F uvTopLeft;
-				Vector2F uvBottomRight;
+				textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
 				if (textureDataIndex != 0)
 				{
-					uint32_t bitmapWidth;
-					uint32_t bitmapHeight;
 					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
 
 					uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;
