@@ -766,14 +766,20 @@ namespace Renderer
 		SPRITE_SHEET_END,
 	};
 
+	// GLOBAL: TOY2 0x004F0E88
 	SpriteSheet g_level1Sheet1 = { 8, 32, 32, 0, { { 128, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F0E98
 	SpriteSheet g_level1Sheet2 = { 8, 40, 32, 0, { { 64, 0 }, { 0, 0 } } };
 	// GLOBAL: TOY2 0x004F0EA4
 	SpriteSheet* g_level1Sheets[5] = { &g_level1Sheet1, &g_level1Sheet1, &g_level1Sheet1, &g_level1Sheet2, SPRITE_SHEET_END };
 
+	// GLOBAL: TOY2 0x004F14B8
 	SpriteSheet g_level2Sheet1 = { 8, 32, 32, 0, { { 96, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F14C8
 	SpriteSheet g_level2Sheet2 = { 8, 31, 23, 0, { { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F14D8
 	SpriteSheet g_level2Sheet3 = { 8, 31, 31, 0, { { 64, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F14E8
 	SpriteSheet g_level2Sheet4 = { 8, 31, 31, 0, { { 128, 0 }, { 0, 0 } } };
 	// GLOBAL: TOY2 0x004F14F4
 	SpriteSheet* g_level2Sheets[5] = { &g_level2Sheet1, &g_level2Sheet2, &g_level2Sheet3, &g_level2Sheet4, SPRITE_SHEET_END };
@@ -863,8 +869,11 @@ namespace Renderer
 		SPRITE_SHEET_END,
 	};
 
+	// GLOBAL: TOY2 0x004F4C00
 	SpriteSheet g_level14Sheet1 = { 23, 32, 32, 0, { { 64, 64 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F4C10
 	SpriteSheet g_level14Sheet3 = { 31, 31, 16, 0, { { 160, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F4C20
 	SpriteSheet g_level14Sheet2 = { 23, 8, 31, 0, { { 128, 64 }, { 0, 0 } } };
 	// GLOBAL: TOY2 0x004F4C2C
 	SpriteSheet* g_level14Sheets[5] = {
