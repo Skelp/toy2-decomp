@@ -15,6 +15,41 @@ SPEC.loader.exec_module(VERIFY)
 
 
 class VerifyRegressionTests(unittest.TestCase):
+    def write_build_context(
+        self,
+        root,
+        *,
+        source="main.cpp",
+        definitions="/DWIN32",
+        includes="-Isrc",
+        flags="/O2",
+        compiler="cl",
+        link_flags="/debug",
+    ):
+        build = Path(root) / "build"
+        rules = build / "CMakeFiles"
+        rules.mkdir(parents=True, exist_ok=True)
+        (rules / "rules.ninja").write_text(
+            "rule CXX_COMPILER__app\n"
+            f"  command = {compiler} $DEFINES $INCLUDES $FLAGS /Fo$out -c $in\n"
+            "  description = Compile $out\n"
+            "rule CXX_EXECUTABLE_LINKER__app\n"
+            "  command = link $in /out:$TARGET_FILE $LINK_FLAGS $LINK_LIBRARIES\n",
+            encoding="utf-8",
+        )
+        (build / "build.ninja").write_text(
+            f"build main.obj: CXX_COMPILER__app {source}\n"
+            f"  DEFINES = {definitions}\n"
+            f"  INCLUDES = {includes}\n"
+            f"  FLAGS = {flags}\n"
+            "build app.exe: CXX_EXECUTABLE_LINKER__app main.obj\n"
+            f"  LINK_FLAGS = {link_flags}\n"
+            "  LINK_LIBRARIES = user32.lib\n"
+            "  TARGET_FILE = app.exe\n",
+            encoding="utf-8",
+        )
+        return build
+
     def write_report(self, directory, name, rows):
         path = Path(directory) / name
         path.write_text(json.dumps({"data": rows}), encoding="utf-8")
@@ -181,6 +216,85 @@ class VerifyRegressionTests(unittest.TestCase):
                 "baseline data report does not match its saved metadata",
                 VERIFY.validate_metadata(metadata, report, data_report),
             )
+
+    def test_build_context_allows_a_source_list_only_change(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            build = self.write_build_context(root)
+            cmake = root / "CMakeLists.txt"
+            cmake.write_text("add_executable(app main.cpp)\n", encoding="utf-8")
+            before = VERIFY.normalized_build_context(build)
+            cmake.write_text(
+                "add_executable(app main.cpp Initializer.inc)\n", encoding="utf-8"
+            )
+            self.assertEqual(before, VERIFY.normalized_build_context(build))
+
+    def test_metadata_uses_generated_context_instead_of_cmake_text(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = self.write_report(root, "before.json", [])
+            common = {
+                "build_context_sha256": "same-generated-context",
+                "compiler_driver_sha256": "compiler",
+                "compiler_backend_sha256": "backend",
+                "sdk_headers_sha256": "sdk",
+                "vc6_headers_sha256": "vc6",
+                "reccmp_git_head": "reccmp",
+            }
+            metadata = root / "metadata.json"
+            metadata.write_text(
+                json.dumps(
+                    {
+                        **common,
+                        "git_head": "baseline",
+                        "baseline_report_sha256": VERIFY.file_hash(report),
+                        "cmake_flags_sha256": "old-cmake-text",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            current = {
+                **common,
+                "git_head": "current",
+                "cmake_flags_sha256": "new-cmake-text",
+            }
+            ancestor = mock.Mock(returncode=0)
+            with mock.patch.object(VERIFY, "metadata", return_value=current), mock.patch.object(
+                VERIFY.subprocess, "run", return_value=ancestor
+            ):
+                self.assertEqual(VERIFY.validate_metadata(metadata, report), [])
+
+            current["build_context_sha256"] = "changed-generated-context"
+            with mock.patch.object(VERIFY, "metadata", return_value=current), mock.patch.object(
+                VERIFY.subprocess, "run", return_value=ancestor
+            ):
+                self.assertIn(
+                    "baseline build_context_sha256 does not match the current build context",
+                    VERIFY.validate_metadata(metadata, report),
+                )
+
+    def test_build_context_rejects_compile_context_changes(self):
+        changes = {
+            "source compile unit": {"source": "other.cpp"},
+            "compiler definitions": {"definitions": "/DDEBUG"},
+            "compiler include paths": {"includes": "-Iother"},
+            "compiler flags": {"flags": "/Od"},
+            "compiler toolchain": {"compiler": "clang-cl"},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before = VERIFY.normalized_build_context(self.write_build_context(root))
+            for name, arguments in changes.items():
+                with self.subTest(name=name):
+                    build = self.write_build_context(root, **arguments)
+                    self.assertNotEqual(before, VERIFY.normalized_build_context(build))
+
+    def test_build_context_rejects_link_context_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before = VERIFY.normalized_build_context(self.write_build_context(root))
+            build = self.write_build_context(root, link_flags="/incremental:no")
+            self.assertNotEqual(before, VERIFY.normalized_build_context(build))
 
     def test_annotation_tag_becomes_stale_after_regression(self):
         with tempfile.TemporaryDirectory() as directory:

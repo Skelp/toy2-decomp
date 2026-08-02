@@ -47,6 +47,93 @@ def tree_hash(root: Path) -> str:
     return digest.hexdigest()
 
 
+def ninja_logical_lines(path: Path) -> list[str]:
+    """Read Ninja statements and join continued lines."""
+
+    statements = []
+    pending = ""
+    for raw_line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = raw_line.rstrip()
+        if line.endswith("$"):
+            pending += line[:-1] + " "
+            continue
+        statements.append(pending + line)
+        pending = ""
+    if pending:
+        statements.append(pending.rstrip())
+    return statements
+
+
+def ninja_blocks(path: Path) -> list[list[str]]:
+    """Read rule and build blocks from a generated Ninja file."""
+
+    blocks = []
+    block = []
+    for line in ninja_logical_lines(path):
+        if line.startswith(("rule ", "build ")):
+            if block:
+                blocks.append(block)
+            block = [line]
+        elif block and line[:1].isspace():
+            if line.strip():
+                block.append(line)
+        elif block and line.strip():
+            blocks.append(block)
+            block = []
+    if block:
+        blocks.append(block)
+    return blocks
+
+
+def normalized_build_context(build_root: Path) -> str:
+    """Hash the generated compile and link graph."""
+
+    build_file = build_root / "build.ninja"
+    rules_file = build_root / "CMakeFiles" / "rules.ninja"
+    if not build_file.exists() or not rules_file.exists():
+        return "missing"
+
+    rule_blocks = {
+        block[0].split(None, 1)[1]: block
+        for block in ninja_blocks(rules_file)
+        if block[0].startswith("rule ")
+        and re.search(r"(?:COMPILER|LINKER)", block[0])
+    }
+    referenced_variables = {}
+    normalized = []
+    for name, block in sorted(rule_blocks.items()):
+        rule_lines = [block[0]]
+        variables = set()
+        for line in block[1:]:
+            statement = line.strip()
+            if statement.startswith("description ="):
+                continue
+            rule_lines.append(statement)
+            variables.update(
+                first or second
+                for first, second in re.findall(
+                    r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))",
+                    statement,
+                )
+            )
+        referenced_variables[name] = variables
+        normalized.extend(line.strip() for line in rule_lines)
+
+    for block in ninja_blocks(build_file):
+        match = re.match(r"build\s+.+?:\s+(\S+)", block[0])
+        if match is None or match.group(1) not in rule_blocks:
+            continue
+        normalized.append(block[0].strip())
+        variables = referenced_variables[match.group(1)]
+        for line in block[1:]:
+            statement = line.strip()
+            key = statement.partition("=")[0].strip()
+            if key in variables:
+                normalized.append(statement)
+
+    return sha256(("\n".join(normalized) + "\n").encode("utf-8")).hexdigest()
+
+
 def source_state(source_root: Path) -> dict[str, object]:
     annotations = read_source_annotations(source_root)
     return {
@@ -75,10 +162,10 @@ def metadata(
         ("recompiled_sha256", ROOT / "build" / "toy2.exe"),
         ("compiler_driver_sha256", ROOT / ".tooling" / "msvc600-8168" / "VC98" / "Bin" / "CL.EXE"),
         ("compiler_backend_sha256", ROOT / ".tooling" / "msvc600-8168" / "VC98" / "Bin" / "C1XX.DLL"),
-        ("cmake_flags_sha256", ROOT / "CMakeLists.txt"),
     ):
         if path.exists():
             values[name] = file_hash(path)
+    values["build_context_sha256"] = normalized_build_context(ROOT / "build")
     if report is not None and report.exists():
         values["baseline_report_sha256"] = file_hash(report)
     if data_report is not None and data_report.exists():
@@ -161,11 +248,19 @@ def validate_metadata(
         )
         if ancestor.returncode != 0:
             problems.append("baseline git_head is not an ancestor of the current build context")
+    saved_build_context = saved.get("build_context_sha256")
+    if saved_build_context is not None:
+        if saved_build_context != current.get("build_context_sha256"):
+            problems.append(
+                "baseline build_context_sha256 does not match the current build context"
+            )
+    elif saved.get("build_rules_sha256") != current.get("build_rules_sha256"):
+        problems.append(
+            "baseline build_rules_sha256 does not match the current build context"
+        )
     for key in (
-        "build_rules_sha256",
         "compiler_driver_sha256",
         "compiler_backend_sha256",
-        "cmake_flags_sha256",
         "sdk_headers_sha256",
         "vc6_headers_sha256",
         "reccmp_git_head",
