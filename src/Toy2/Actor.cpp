@@ -34,7 +34,7 @@ namespace Toy2
 		char g_continuePrompt[] = "press jump to continue";
 
 		// GLOBAL: TOY2 0x004DF6CC
-		CutsceneScript g_dialogueCutsceneScript = { 0, 0, 1, -1, 0, 1, 0, 1, 2, -1, 0, 2, 0, 0 };
+		CutsceneScript g_dialogueCutsceneScript = { 0, 0, 1, -1, 0, 1, 1, 1, 2, -1, 0, 2, 1, 0 };
 
 		// GLOBAL: TOY2 0x0050A1FC
 		SubtitleCells g_subtitleCells;
