@@ -55,8 +55,20 @@ namespace Toy2
 			int16_t terminator;
 		};
 
+		struct PaintIndicatorEntry
+		{
+			int32_t completedMask;
+			int32_t linkId;
+		};
+
 		// GLOBAL: TOY2 0x004F1570
 		char g_paintMixingTokenInstructions[] = "if you can mix the paint to match the colors on the wall you will get a pizza planet ^token^.";
+
+		// GLOBAL: TOY2 0x004F1B64
+		PaintIndicatorEntry g_paintIndicatorEntries[] = {
+			{ 1, 0x30 }, { 2, 0x31 }, { 4, 0x32 }, { 0, 0 },
+			{ 1, -0x30 }, { 2, -0x31 }, { 4, -0x32 }, { 0, 0 }
+		};
 
 		// GLOBAL: TOY2 0x004F1BA4
 		int16_t g_platform1MotionScript[] = { 4, 4, 0, 20, 3, 0x7F, 0x60, 1, 0, 0, 0, 20, 3, 0x7F, 0x20, 0, 0xF, 0 };
@@ -86,6 +98,15 @@ namespace Toy2
 		// GLOBAL: TOY2 0x004F1CA4
 		extern const Collectables::TokenDialogueValue g_tokenDialogueValues[] = {
 			{ 0x21 }, { reinterpret_cast<int32_t>(g_paintMixingTokenInstructions) }, { 0 }, { -1 }
+		};
+
+		// GLOBAL: TOY2 0x004F1CB8
+		char* g_rotatingHintSubtitles[] = {
+			"i think i saw hamm over by the ^wheelbarrow^.",
+			"the ^foreman^ has lost his little tike workers. he is over by the ^trailer^.",
+			"^slinky^ is right under the girders. he has a ^challenge^ for you!",
+			"there is a paint mixing puzzle to solve in the ^trailer^!",
+			"the ^jackhammer^ boss is at the top of the girders. i better warn you though, you need to help ^mr. potato head^ find his eye to get the ^disk launcher^ to defeat the ^jackhammer^ boss.",
 		};
 
 		// GLOBAL: TOY2 0x004F1CCC
@@ -714,6 +735,36 @@ namespace Toy2
 					g_fallingParticlePathIndex = 0;
 			}
 			g_fallingParticleTimer -= Renderer::g_frameDelta;
+			if (g_ambientProjectileTimer < 0)
+			{
+				position.x = 0x783B;
+				position.y = -0x7D05B;
+				position.z = -0x742C4;
+				if (Nu3D::Math::IsWithinDistanceXZ(&position, &g_buzzActor.posAngles.pos, 900) != 0
+					&& position.y < g_buzzActor.posAngles.pos.y + 0x25800 && position.y > g_buzzActor.posAngles.pos.y - 0x19000)
+				{
+					g_ambientProjectilePathIndex = *g_randDatBufferPtr++ & 0xE;
+					Levels::RecordData* path = Levels::g_recordData[1];
+					Vector3I* start = &path->data[g_ambientProjectilePathIndex];
+					Vector3I* end = start + 1;
+					position.x = start->x * 0x20;
+					position.y = start->y * 0x20;
+					position.z = start->z * 0x20;
+					int32_t deltaX = (position.x - end->x * 0x20) >> 8;
+					int32_t deltaZ = (position.z - end->z * 0x20) >> 8;
+					int32_t travelAngle = (Nu3D::Math::CartesianToFixedAngle(deltaX, deltaZ) - 0x800) & 0xFFF;
+					int32_t distance = static_cast<int32_t>(sqrt(static_cast<double>(deltaX * deltaX + deltaZ * deltaZ)));
+					int32_t horizontalSpeed = distance * 3;
+					int32_t travelTime = (distance << 12) / horizontalSpeed;
+					int32_t gravityDrop = travelTime * 0x90 / 64;
+					int32_t velocityX = Numerics::g_sinCosLUT[travelAngle] * horizontalSpeed / 0x2000;
+					int32_t velocityY = ((end->y * 0x20 - position.y) * 0x20) / travelTime - gravityDrop;
+					int32_t velocityZ = Numerics::g_sinCosLUT[(travelAngle + 0x400) & 0xFFF] * horizontalSpeed / 0x2000;
+					Nu3D::Particles::SpawnInstance(position.x, position.y, position.z, velocityX, velocityY, velocityZ, 0x90, 0,
+						(*g_randDatBufferPtr++ & 1) * 0x80 - 0x40, 0x54);
+				}
+				g_ambientProjectileTimer = (*g_randDatBufferPtr++ & 0x1F) + 0x40;
+			}
 			g_ambientProjectileTimer -= Renderer::g_frameDelta;
 
 			Platform::GetOrigin(0, &position);
@@ -806,6 +857,26 @@ namespace Toy2
 			}
 			if (paintMixer->scaleY < 0x180)
 				paintMixer->actorFlags &= ~Actor::ACTOR_FLAG_TARGETABLE;
+			if (g_framePulseOutputs.eightTick != 0)
+			{
+				int32_t indicatorIndex = g_framePulsePhases.sixtyFourTick >> 3;
+				PaintIndicatorEntry* indicator = &g_paintIndicatorEntries[indicatorIndex];
+				if ((indicator->completedMask & g_completedPaintMask) != 0)
+				{
+					int32_t linkId = indicator->linkId;
+					if (linkId < 0)
+					{
+						linkId = -linkId;
+						Nu3D::Link::SetScaleFromFixedOffsets(linkId, 0, 0, 0);
+						Nu3D::Link::SetScaleFromFixedOffsets(linkId + 3, 0x1000, 0x1000, 0x1000);
+					}
+					else
+					{
+						Nu3D::Link::SetScaleFromFixedOffsets(linkId, 0x1000, 0x1000, 0x1000);
+						Nu3D::Link::SetScaleFromFixedOffsets(linkId + 3, 0, 0, 0);
+					}
+				}
+			}
 			if (g_completedPaintMask == 7 && Collectables::g_tokenStates[3].active == 0)
 				Collectables::Activate(3, 0);
 
@@ -861,6 +932,7 @@ namespace Toy2
 				"wow! thanks buzz! in return for finding my ^eye^ i will let you use the ^disk launcher^. it should help you defeat the toughest enemies!",
 				"the ^disk launcher^ will help you defeat the toughest enemies!", 0x440, 0xC40);
 			Actor::CollectQuestReward(0x14, 0x1D, 0xE10, 0x6E0, 0);
+			Actor::RotatingHint(0x11, 0x23, g_rotatingHintSubtitles);
 
 			Actor::Toy2Actor* littleTikesOwner = &Actor::g_creatureActors[0x12];
 			if ((littleTikesOwner->actorFlags & Actor::ACTOR_FLAG_INTERACTION_REQUESTED) != 0)
