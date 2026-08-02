@@ -34,7 +34,7 @@ namespace Renderer
 		int32_t g_spriteBuffer2DCount = 2000;
 
 		// GLOBAL: TOY2 0x00971F9C
-		Nu3D::Sprite g_spriteBuffer2D[2000];
+		Nu3D::Sprite g_spriteBuffer2D[2001];
 
 		// GLOBAL: TOY2 0x005087EC
 		WORD g_2DSpriteIndices[4] = { 0, 1, 2, 3 };
@@ -466,7 +466,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B8CC0 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004B8CC0 [MATCHED]
 		void Queue2DSprite(float xPosition,
 			float yPosition,
 			float width,
@@ -486,7 +486,7 @@ namespace Renderer
 				if (flags == RENDER_PARALLAX_BG)
 					sprite = &g_spriteBuffer2D[g_spriteBuffer2DCount];
 				else
-					sprite = &g_spriteBuffer2D[g_spriteBuffer2DCount--];
+					sprite = &g_spriteBuffer2D[--g_spriteBuffer2DCount + 1];
 
 				sprite->position.x = xPosition;
 				sprite->position.y = yPosition;
