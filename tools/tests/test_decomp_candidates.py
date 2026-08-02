@@ -36,6 +36,53 @@ def graph(callees=None, callers=None):
 
 
 class CandidateTests(unittest.TestCase):
+    def test_zero_yield_history_reduces_expected_rate_and_rank(self):
+        fresh = make(
+            0x401000, "N::Fresh", size=1000, state="FUNCTION", match=0.5
+        )
+        retried = make(
+            0x402000,
+            "N::Retried",
+            size=1000,
+            state="FUNCTION",
+            match=0.5,
+            prior_attempts=1,
+            prior_zero_yield_attempts=1,
+            prior_minutes=12,
+        )
+        chosen = candidates.select(
+            [retried, fresh],
+            namespace=None,
+            stubs_only=False,
+            leaves_only=False,
+            near_only=False,
+            max_size=None,
+            exclude_capped=True,
+            queue="refinement",
+            yield_order=True,
+        )
+        self.assertEqual(chosen[0].address, fresh.address)
+        self.assertLess(retried.expected_bytes_per_minute, fresh.expected_bytes_per_minute)
+        self.assertLess(retried.rank, fresh.rank)
+
+    def test_yield_estimate_penalizes_oversized_and_blocked_coverage(self):
+        small = make(0x401000, "N::Small", size=1000, state="STUB", source="N.cpp")
+        oversized = make(
+            0x402000, "N::Oversized", size=13000, state="STUB", source="N.cpp"
+        )
+        blocked = make(
+            0x403000,
+            "N::Blocked",
+            size=1000,
+            state="STUB",
+            source="N.cpp",
+            manual_blocker=True,
+        )
+        for item in (small, oversized, blocked):
+            candidates.estimate_yield(item, "coverage")
+        self.assertGreater(small.expected_bytes_per_minute, oversized.expected_bytes_per_minute)
+        self.assertGreater(small.expected_bytes_per_minute, blocked.expected_bytes_per_minute)
+
     def test_parse_map_sorts_and_skips_comments(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "map.txt"

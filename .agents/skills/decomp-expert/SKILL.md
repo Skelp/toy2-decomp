@@ -22,11 +22,16 @@ work, or a concise no-source result after bounded pivots.
 9. Inspect the target file's namespaces, includes, globals, and private helpers.
 10. Check nearby function-map entries and source-path evidence for file boundaries.
 11. Run `tools/decomp data --limit 10` and inspect relevant global differences.
+12. Run `tools/decomp campaigns summary` and inspect the assigned addresses.
 
 A function campaign contains one large function or at most three related
 functions. A data campaign contains at most three related initialized globals.
 Rank work by unresolved bytes, evidence readiness, dependency impact, and
-source debt. Do not select work only by address or easy percentage gain.
+source debt. Also use the estimated retained-byte rate. Do not select work only
+by address or easy percentage gain.
+
+Do not retry a zero-yield address unless the supervisor gives new evidence.
+Confirm that evidence before you edit source.
 
 ## Reconstruct
 
@@ -60,9 +65,30 @@ Write the simplest plausible C++. Build early. For function work, run
 `tools/decomp bc ADDRESS` after each meaningful model change. For data work,
 rebuild and run `tools/decomp data ADDRESS` after each meaningful change.
 
+Send the supervisor a preflight result within five minutes. Include the ABI,
+source model, affected byte range, file boundary, and expected retained bytes.
+
+Get the first score within eight minutes. Stop source trials after twelve
+minutes unless a score shows at least 100 likely retained bytes.
+
+For coverage, build a complete scored pilot before you refine the body. The
+pilot must include the ABI and one main control-flow path. Stop when the pilot
+is below 35 percent. Permit one more source model when the pilot is from 35
+through 49 percent.
+
+For refinement, name the saved-diff mismatch before the first edit. The first
+model must test that mismatch. Do not call register allocation or instruction
+scheduling a source model.
+
+Do not add targets to a bundle until the anchor retains 100 bytes. You can use
+a bundle without an anchor when all targets already pass validation.
+
 If evidence rejects the target, pivot to a related target in the subsystem.
 Make at most two pivots. Record only blockers with a specific prerequisite. Do
 not create a metadata-only commit.
+
+Stop after two failed source models. Restore each failed model before the next
+test. Do not run the full report or sync for a no-source result.
 
 The final score must be at least 50 percent unless reccmp marks the target
 exact or effective. Keep a readable model when evidence supports its ABI,
@@ -120,4 +146,9 @@ DATA_BYTES_BEFORE: <address=explained/scored or none>
 DATA_BYTES_AFTER: <address=explained/scored or none>
 INITIALIZED_DATA_DELTA: <explained bytes>
 WHOLE_FILE_SECTIONS: <whole-file and section scores or none>
+ELAPSED_MINUTES: <total worker minutes>
+PREFLIGHT_MINUTES: <minutes to the evidence decision>
+FIRST_SCORE_MINUTES: <minutes to the first compiled score>
+MODEL_TRIALS: <tested models, retained models, reverted models>
+RETAINED_BYTES_PER_MINUTE: <code plus data bytes divided by source-work minutes>
 ```

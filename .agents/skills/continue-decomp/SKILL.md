@@ -22,6 +22,8 @@ external supervisor or use Goal mode inside a worker.
 10. Record the whole-file, code, data, resource, import, and relocation scores.
 11. Inspect the largest source files and mixed-namespace files.
 12. Keep a file-structure watchlist with the evidence for each suspected split.
+13. Run `tools/decomp campaigns summary`.
+14. Use `tools/decomp candidates --yield --why` for coverage and refinement.
 
 ## Run campaigns
 
@@ -36,6 +38,34 @@ name such as `campaign_001`.
 Give the worker relevant file-structure evidence for its subsystem. Ask it to
 check the likely original translation unit before it adds code. Do not direct a
 split from file size or namespace count alone.
+
+Use campaign history when you select work. Do not retry a zero-yield target
+unless a new commit or new evidence changes its source model. State that new
+evidence in the assignment.
+
+Estimate retained bytes and elapsed minutes before you start a campaign.
+Prefer the highest credible retained-byte rate. Do not use unresolved bytes as
+the only measure.
+
+Apply these selection gates:
+
+1. A coverage target needs a scored pilot or a compiled analogue.
+2. The pilot must cover the ABI and one main control-flow path.
+3. Stop a coverage target when its first complete pilot is below 35 percent.
+4. Permit one more model when the pilot is from 35 through 49 percent.
+5. A refinement target needs a specific mismatch from the saved comparison.
+6. The mismatch must affect a repeated region or at least 100 retail bytes.
+7. A data target needs retail bytes and one caller or DWARF fact.
+
+Use these time gates unless a scored result justifies more time:
+
+1. Require the evidence preflight in five minutes.
+2. Require the first score in eight minutes.
+3. Stop source trials after twelve minutes.
+4. Permit fifteen minutes only when the retained estimate is at least 100 bytes.
+
+Do not start a three-target bundle without a tested anchor. The anchor must
+retain at least 100 bytes, or all bundle targets must already pass validation.
 
 For data work, give the worker target byte scores and aggregate initialized
 bytes. Include known caller, retail, and DWARF evidence.
@@ -56,6 +86,9 @@ After the worker returns:
 9. Inspect changed file placement, linkage, headers, and CMake entries.
 10. Update the file-structure watchlist after each accepted campaign.
 11. Verify the whole-file section scores and explain each regression.
+12. Record the result with `tools/decomp campaigns record`.
+13. Record elapsed minutes, code bytes, data bytes, addresses, and the commit.
+14. Check the retained-byte rate for the last ten campaigns.
 
 Watch for growth in catch-all files such as `Toy2.cpp`. Use function-map
 clusters, retail paths, DWARF units, private state, and call relationships as
@@ -70,6 +103,23 @@ Keep separate no-source counts for coverage, refinement, and data. Switch modes
 after a failure. Reset all counts after source progress. Stop only when all
 three counts reach three. Do not count metadata, notes, or blocker-only commits
 as source progress.
+
+Audit efficiency after every campaign. Review the last ten records after every
+third campaign. Also review them after two zero-yield results. Change the
+selection gate or worker contract when the same waste repeats.
+
+Use these audit signals:
+
+- retained code bytes per source-work minute.
+- retained data bytes per source-work minute.
+- time to the first score.
+- zero-yield campaign rate.
+- reverted model count.
+- integration time after the source model is complete.
+
+Treat two zero-yield campaigns in five records as a selection failure. Switch
+the queue or require stronger evidence. Treat a median retained result below
+100 bytes as a bundling or target-selection failure.
 
 Resolve workflow failures. Assign a fresh expert a bounded meta-resolution
 campaign when a tool problem prevents all source work. Resume source campaigns

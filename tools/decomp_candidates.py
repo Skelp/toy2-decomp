@@ -54,6 +54,7 @@ from tools.decomp_dependencies import (  # noqa: E402
     build_call_graph,
     strongly_connected_components,
 )
+from tools.decomp_campaigns import address_stats, read_records  # noqa: E402
 
 # A leaf-sized function is small enough that one decompilation shows the whole
 # body. The threshold is a heuristic on the gap to the next map address.
@@ -117,6 +118,14 @@ class Candidate:
     dependency_component: int = -1
     reasons: list[str] = field(default_factory=list)
     rank: float = 0.0
+    prior_attempts: int = 0
+    prior_zero_yield_attempts: int = 0
+    prior_minutes: float = 0.0
+    prior_effective_bytes: float = 0.0
+    prior_initialized_bytes: int = 0
+    expected_retained_bytes: float = 0.0
+    expected_minutes: float = 0.0
+    expected_bytes_per_minute: float = 0.0
 
     @property
     def source_debt(self) -> bool:
@@ -404,6 +413,7 @@ def build_candidates() -> list[Candidate]:
     lint_findings = read_lint_findings()
     deferrals = read_deferrals()
     original_sizes = read_original_sizes()
+    attempts = address_stats(read_records())
 
     reconstructed_per_namespace: dict[str, int] = {}
     for address, name in entries:
@@ -437,6 +447,7 @@ def build_candidates() -> list[Candidate]:
         deferral = deferrals.get(address, Deferral())
         match_status = matches.get(address)
         size = original_sizes.get(address, map_size)
+        history = attempts.get(address)
         candidates.append(
             Candidate(
                 address=address,
@@ -464,6 +475,11 @@ def build_candidates() -> list[Candidate]:
                 declared_dependencies=deferral.blocked_by,
                 manual_blocker=bool(deferral.reason and deferral.manual),
                 blocker_kind=deferral.kind if deferral.reason else "",
+                prior_attempts=history.attempts if history else 0,
+                prior_zero_yield_attempts=(history.zero_yield_attempts if history else 0),
+                prior_minutes=history.minutes if history else 0.0,
+                prior_effective_bytes=history.effective_bytes if history else 0.0,
+                prior_initialized_bytes=history.initialized_bytes if history else 0,
             )
         )
     return candidates
@@ -750,6 +766,19 @@ def score(candidate: Candidate) -> None:
         reasons.append(f"{blocker_state}: {candidate.deferred_reason}")
         reasons.append(f"advisory blocker kind {candidate.blocker_kind or 'semantic'}")
 
+    if candidate.prior_zero_yield_attempts:
+        penalty = min(candidate.prior_zero_yield_attempts * 220.0, 500.0)
+        rank -= penalty
+        reasons.append(
+            f"{candidate.prior_zero_yield_attempts} prior zero-yield campaign(s) "
+            f"used {candidate.prior_minutes:.1f} minute(s)"
+        )
+    elif candidate.prior_attempts:
+        retained = candidate.prior_effective_bytes + candidate.prior_initialized_bytes
+        reasons.append(
+            f"{candidate.prior_attempts} prior campaign(s) retained {retained:.1f} byte(s)"
+        )
+
     if candidate.dependency_component >= 0:
         if candidate.quality_prerequisite:
             rank += 180.0
@@ -780,6 +809,49 @@ def score(candidate: Candidate) -> None:
     candidate.reasons = reasons
 
 
+def estimate_yield(candidate: Candidate, queue: str | None) -> None:
+    """Estimate retained bytes per minute from current and local evidence."""
+
+    if queue == "refinement":
+        expected_minutes = min(20.0, max(5.0, 4.0 + candidate.size / 250.0))
+        if candidate.match is not None and candidate.match >= 0.5:
+            confidence = 0.35
+        else:
+            confidence = 0.15
+    else:
+        expected_minutes = min(60.0, max(6.0, 5.0 + candidate.size / 180.0))
+        if candidate.size <= 600:
+            confidence = 0.42
+        elif candidate.size <= 1500:
+            confidence = 0.28
+        elif candidate.size <= 3000:
+            confidence = 0.16
+        else:
+            confidence = 0.025
+        nearby = candidate.nearby_provisional_scores
+        if nearby:
+            average = sum(nearby) / len(nearby)
+            confidence *= max(0.4, min(1.5, average / 0.5))
+        elif candidate.siblings == 0:
+            confidence *= 0.7
+
+    if not candidate.source:
+        confidence *= 0.8
+    if candidate.manual_blocker:
+        confidence *= 0.1
+    if candidate.indirect_calls or candidate.indirect_jumps:
+        confidence *= 0.75
+    if candidate.quality_prerequisite:
+        confidence *= 1.2
+    confidence *= 0.15 ** candidate.prior_zero_yield_attempts
+
+    candidate.expected_retained_bytes = candidate.unresolved_bytes * confidence
+    candidate.expected_minutes = expected_minutes
+    candidate.expected_bytes_per_minute = (
+        candidate.expected_retained_bytes / expected_minutes if expected_minutes else 0.0
+    )
+
+
 def select(
     candidates: list[Candidate],
     *,
@@ -794,6 +866,7 @@ def select(
     include_deferred: bool = False,
     allow_large: bool = False,
     queue: str | None = None,
+    yield_order: bool = False,
 ) -> list[Candidate]:
     chosen: list[Candidate] = []
     for candidate in candidates:
@@ -848,7 +921,17 @@ def select(
 
     for candidate in chosen:
         score(candidate)
-    if queue == "refinement":
+        estimate_yield(candidate, queue)
+    if yield_order:
+        chosen.sort(
+            key=lambda item: (
+                -item.expected_bytes_per_minute,
+                item.prior_zero_yield_attempts,
+                -item.rank,
+                item.address,
+            )
+        )
+    elif queue == "refinement":
         chosen.sort(
             key=lambda item: (
                 not item.quality_prerequisite,
@@ -879,7 +962,9 @@ def select(
     return chosen
 
 
-def print_table(chosen: list[Candidate], limit: int, show_reasons: bool) -> None:
+def print_table(
+    chosen: list[Candidate], limit: int, show_reasons: bool, show_yield: bool = False
+) -> None:
     if not chosen:
         print("No candidate matches the given filters.")
         return
@@ -889,20 +974,22 @@ def print_table(chosen: list[Candidate], limit: int, show_reasons: bool) -> None
 
     show_dependencies = any(item.dependency_component >= 0 for item in shown)
     dependency_header = f"  {'DEPS':>7}  {'UNLOCK':>6}" if show_dependencies else ""
+    yield_header = f"  {'EST B/M':>8}" if show_yield else ""
     print(
         f"{'ADDRESS':<11}{'NAME':<{name_width + 2}}{'STATE':<13}{'SIZE':>6}  "
-        f"{'MATCH':>7}{dependency_header}  TU"
+        f"{'MATCH':>7}{dependency_header}{yield_header}  TU"
     )
-    print("-" * (11 + name_width + 2 + 13 + 6 + 9 + len(dependency_header) + 4))
+    print("-" * (11 + name_width + 2 + 13 + 6 + 9 + len(dependency_header) + len(yield_header) + 4))
     for item in shown:
         name = item.name if len(item.name) <= name_width else item.name[: name_width - 1] + "~"
         dependency_text = ""
         if show_dependencies:
             status = "ready" if item.dependency_ready else str(len(item.unresolved_dependencies))
             dependency_text = f"  {status:>7}  {item.immediate_unlocks:>6}"
+        yield_text = f"  {item.expected_bytes_per_minute:>8.1f}" if show_yield else ""
         print(
             f"{item.address_text:<11}{name:<{name_width + 2}}{item.state:<13}"
-            f"{item.size:>6}  {item.match_text:>7}{dependency_text}  {item.source or '-'}"
+            f"{item.size:>6}  {item.match_text:>7}{dependency_text}{yield_text}  {item.source or '-'}"
         )
         if show_reasons:
             print(f"{'':<11}rank {item.rank:.0f}: {'; '.join(item.reasons)}")
@@ -1039,6 +1126,12 @@ def main() -> int:
     parser.add_argument("--limit", type=int, help="rows to print (0 = all; default: 10)")
     parser.add_argument("--all", action="store_true", help="show all rows")
     parser.add_argument("--why", action="store_true", help="print the rank and its evidence")
+    parser.add_argument(
+        "--yield",
+        dest="yield_order",
+        action="store_true",
+        help="rank by estimated retained bytes per minute",
+    )
     parser.add_argument("--json", action="store_true", help="emit JSON instead of a table")
     args = parser.parse_args()
     if args.coverage and args.refine:
@@ -1145,6 +1238,7 @@ def main() -> int:
         include_deferred=include_blocked,
         allow_large=True,
         queue=queue if not (args.near or args.debt or args.quality) else None,
+        yield_order=args.yield_order,
     )
     if args.target_address is not None:
         frontier = dependency_frontier_for(args.target_address, candidates)
@@ -1196,6 +1290,12 @@ def main() -> int:
                     "indirect_jumps": item.indirect_jumps,
                     "rank": item.rank,
                     "unresolved_bytes": item.unresolved_bytes,
+                    "prior_attempts": item.prior_attempts,
+                    "prior_zero_yield_attempts": item.prior_zero_yield_attempts,
+                    "prior_minutes": item.prior_minutes,
+                    "expected_retained_bytes": item.expected_retained_bytes,
+                    "expected_minutes": item.expected_minutes,
+                    "expected_bytes_per_minute": item.expected_bytes_per_minute,
                     "terminal": item.terminal,
                     "reasons": item.reasons,
                 }
@@ -1215,7 +1315,7 @@ def main() -> int:
         target = next(item for item in candidates if item.address == args.target_address)
         dependency_limit = (args.limit or sys.maxsize) if limit_explicit else 12
         print_dependency_summary(target, names, dependency_limit)
-    print_table(chosen, args.limit, args.why)
+    print_table(chosen, args.limit, args.why, args.yield_order)
     return 0
 
 
