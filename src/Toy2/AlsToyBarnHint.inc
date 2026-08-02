@@ -1,0 +1,5 @@
+			"i saw ^hamm^ on the table in the ^office^.",
+			"the ^chicken^ has lost her ^chicks^. she is just past the ^bike^ section. buzz, one of the ^chicks^ is on the top of the boxes in this room! you'll need the ^hover boots^ to reach it and ^mr. potato head^ won't give you ^hover boots^ until later.",
+			"the ^rooster^ is at the end of the ^hall^ by the office. he has some ^challenges^ for you!",
+			"there is a ^token^ on top of the cabinets in the ^office^. you need to open up the ^locked^ drawers to get to it. try using the ^disk launcher^! if you haven't unlocked it yet, go see ^mr. potato head^ in the ^construction yard^ level.",
+			"the ^dinosaur^ boss is through a tunnel to the ^left^ of here.",
