@@ -140,7 +140,6 @@ namespace Toy2
 			int32_t maximumAngle,
 			int32_t angularDivisor);
 		int32_t HadBuzzContactThisFrame(int32_t platformIndex);
-		void StepMotionScript(int32_t platformIndex, int32_t linkId, int16_t** scriptPosition, int32_t* waitTimer, int32_t* speedScale);
 
 		extern PlatformState g_platformStates[32];
 

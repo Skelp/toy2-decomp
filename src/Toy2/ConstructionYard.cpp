@@ -25,6 +25,11 @@ namespace Toy2
 	extern int32_t g_hudActorAnimationFrame;
 	extern int32_t g_surfaceEffectState;
 
+	namespace Platform
+	{
+		void StepMotionScript(int32_t platformIndex, int32_t linkId, int16_t** scriptPosition, int32_t* waitTimer, int32_t* speedScale);
+	}
+
 	namespace ConstructionYard
 	{
 		enum DrillEncounterState
