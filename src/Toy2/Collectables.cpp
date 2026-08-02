@@ -720,7 +720,7 @@ namespace Toy2
 			Camera::g_gameplayCamera.roll = g_buzzActor.posAngles.angles.yaw;
 		}
 
-		// FUNCTION: TOY2 0x004A0DB0 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004A0DB0 [MATCHED]
 		void Activate(int32_t tokenIndex, int32_t skipCutscene)
 		{
 			if (g_tokenStates[tokenIndex].active != 0)
@@ -728,14 +728,14 @@ namespace Toy2
 
 			g_tokenStates[tokenIndex].active = 1;
 			int32_t* verticalPosition = g_tokenStates[tokenIndex].verticalPosition;
-			Vector3I position;
-			Nu3D::Link::GetCurrentPosFixed(g_tokenStates[tokenIndex].linkId, &position);
-			*verticalPosition = position.y >> 5;
+			PosAndAngles transform;
+			Nu3D::Link::GetCurrentPosFixed(g_tokenStates[tokenIndex].linkId, &transform.pos);
+			*verticalPosition = transform.pos.y >> 5;
 
 			if (skipCutscene == 0)
 			{
 				g_tokenStates[tokenIndex].timer = 0x84;
-				Camera::BeginScriptedCutsceneAtPoint(&position, 0xB4, 0x10);
+				Camera::BeginScriptedCutsceneAtPoint(&transform.pos, 0xB4, 0x10);
 				if (Camera::g_scriptedCameraState != 0)
 					Camera::g_scriptedCameraState = 5;
 			}
