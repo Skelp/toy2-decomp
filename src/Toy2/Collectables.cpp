@@ -96,12 +96,11 @@ namespace Toy2
 						&& ShowTokenSparkle(token->linkId) != 0)
 					{
 						Nu3D::Link::GetCurrentPosFixed(token->linkId, &position);
-						int32_t distanceZ = (Camera::g_renderCameraTransform.pos.z - position.z) >> 8;
-						int32_t distanceY = (Camera::g_renderCameraTransform.pos.y - position.y) >> 8;
 						int32_t distanceX = (Camera::g_renderCameraTransform.pos.x - position.x) >> 8;
-						int32_t distanceSquared = distanceZ * distanceZ;
-						distanceSquared += distanceY * distanceY;
-						distanceSquared += distanceX * distanceX;
+						int32_t distanceY = (Camera::g_renderCameraTransform.pos.y - position.y) >> 8;
+						int32_t distanceZ = (Camera::g_renderCameraTransform.pos.z - position.z) >> 8;
+						int32_t distanceSquared =
+							distanceZ * distanceZ + distanceY * distanceY + distanceX * distanceX;
 						if (distanceSquared < 0x90000 && distanceSquared + 1 != 0)
 						{
 							Nu3D::Particles::ParticleInstance* particle =
