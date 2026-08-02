@@ -102,7 +102,7 @@ namespace Toy2
 
 		// GLOBAL: TOY2 0x004F1CA4
 		extern const Collectables::TokenDialogueValue g_tokenDialogueValues[] = {
-			{ 0x21 }, { reinterpret_cast<int32_t>(g_paintMixingTokenInstructions) }, { 0 }, { -1 }
+			{ 0x74 }, { 0x21 }, { reinterpret_cast<int32_t>(g_paintMixingTokenInstructions) }, { 0 }, { -1 }
 		};
 
 		// GLOBAL: TOY2 0x004F1CB8
