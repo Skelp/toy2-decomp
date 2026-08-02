@@ -95,7 +95,7 @@ namespace Toy2
 			int32_t actorIndex, Nu3D::Creature* creature, const D3DMATRIX* actorMatrix, int16_t* clipData, int32_t framePosition, int32_t isSecondaryTrack);
 		void AnimateActors(Actor::Toy2Actor** actors);
 
-		void EvaluateClip(ClipHeader* clip, int32_t framePosition, uint16_t baseBoneIndex, int32_t track);
+		void EvaluateClip(ClipHeader* clip, int32_t framePosition, int16_t baseBoneIndex, int32_t track);
 		void TransformByBone(Vector3I* position, void* actor, int32_t boneIndex);
 
 		STATIC_ASSERT(sizeof(ClipHeader) == 0x10);

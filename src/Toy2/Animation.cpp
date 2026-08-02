@@ -117,7 +117,7 @@ namespace Toy2
 		}
 
 		// FUNCTION: TOY2 0x0043BA80 [PROVISIONAL]
-		void EvaluateClip(ClipHeader* clip, int32_t framePosition, uint16_t baseBoneIndex, int32_t track)
+		void EvaluateClip(ClipHeader* clip, int32_t framePosition, int16_t baseBoneIndex, int32_t track)
 		{
 			if (clip->headerSize < 0)
 			{
@@ -132,10 +132,11 @@ namespace Toy2
 
 			g_clipNodeOffsets = (int16_t*)((uint8_t*)clip + g_clipHeaderSize);
 			g_clipScaleFlags = (uint8_t*)clip + g_clipHeaderSize + clip->nodeOffsetCount * 2;
-			uint8_t* keyframeData = g_clipScaleFlags + clip->scaleFlagByteCount;
+			int16_t* keyframeData = reinterpret_cast<int16_t*>(g_clipScaleFlags + clip->scaleFlagByteCount);
 			int32_t frameIndex = (int16_t)(framePosition >> 16);
 			if (frameIndex > (clip->frameCountAndFlags & ClipHeader::FRAME_COUNT_MASK))
 				return;
+			int16_t* frameData = keyframeData + clip->sampleStride * frameIndex;
 
 			uint16_t fraction = (uint16_t)framePosition;
 			int32_t firstNode;
@@ -149,7 +150,7 @@ namespace Toy2
 			{
 				firstNode = g_singleNodeIndex;
 				nodeEnd = g_singleNodeIndex + 1;
-				baseBoneIndex += (uint16_t)g_singleNodeIndex;
+				baseBoneIndex += (int16_t)g_singleNodeIndex;
 			}
 
 			for (int32_t node = firstNode; node < nodeEnd; node++)
@@ -165,13 +166,12 @@ namespace Toy2
 
 				CharacterLoader::BoneTransform* transform = &CharacterLoader::g_boneTransforms[baseBoneIndex];
 				transform->track = (uint8_t)track;
-				KeyframeSample* sample =
-					reinterpret_cast<KeyframeSample*>(reinterpret_cast<int16_t*>(keyframeData) + sampleIndex + clip->sampleStride * frameIndex);
+				KeyframeSample* sample = reinterpret_cast<KeyframeSample*>(frameData + sampleIndex);
 				KeyframeSample* nextSample;
 				if (frameIndex < (clip->frameCountAndFlags & ClipHeader::FRAME_COUNT_MASK) - 1)
 					nextSample = reinterpret_cast<KeyframeSample*>(reinterpret_cast<int16_t*>(sample) + clip->sampleStride);
 				else
-					nextSample = reinterpret_cast<KeyframeSample*>(reinterpret_cast<int16_t*>(keyframeData) + sampleIndex);
+					nextSample = reinterpret_cast<KeyframeSample*>(keyframeData + sampleIndex);
 
 				if (fraction != 0)
 				{

@@ -1212,17 +1212,18 @@ namespace Toy2
 				Animation::g_keyframeRotation.matrix.m22 = (int16_t)(actor->scaleZ * Animation::g_keyframeRotation.matrix.m22 / 0x1000);
 			}
 
-			int32_t boneWorldX = actor->pos.x
+			Vector3I boneWorld;
+			boneWorld.x = actor->pos.x
 				+ (Animation::g_keyframeRotation.matrix.m00 * boneTransform->translation.x
 					  + Animation::g_keyframeRotation.matrix.m01 * boneTransform->translation.y
 					  + Animation::g_keyframeRotation.matrix.m02 * boneTransform->translation.z)
 					/ 0x80;
-			int32_t boneWorldY = actor->pos.y
+			boneWorld.y = actor->pos.y
 				+ (Animation::g_keyframeRotation.matrix.m10 * boneTransform->translation.x
 					  + Animation::g_keyframeRotation.matrix.m11 * boneTransform->translation.y
 					  + Animation::g_keyframeRotation.matrix.m12 * boneTransform->translation.z)
 					/ 0x80;
-			int32_t boneWorldZ = actor->pos.z
+			boneWorld.z = actor->pos.z
 				+ (Animation::g_keyframeRotation.matrix.m20 * boneTransform->translation.x
 					  + Animation::g_keyframeRotation.matrix.m21 * boneTransform->translation.y
 					  + Animation::g_keyframeRotation.matrix.m22 * boneTransform->translation.z)
@@ -1246,15 +1247,15 @@ namespace Toy2
 			int32_t localX = position->x;
 			int32_t localY = position->y;
 			int32_t localZ = position->z;
-			position->x = boneWorldX
+			position->x = boneWorld.x
 				+ (Animation::g_keyframeRotation.matrix.m00 * localX + Animation::g_keyframeRotation.matrix.m01 * localY
 					  + Animation::g_keyframeRotation.matrix.m02 * localZ)
 					/ 0x80;
-			position->y = boneWorldY
+			position->y = boneWorld.y
 				+ (Animation::g_keyframeRotation.matrix.m10 * localX + Animation::g_keyframeRotation.matrix.m11 * localY
 					  + Animation::g_keyframeRotation.matrix.m12 * localZ)
 					/ 0x80;
-			position->z = boneWorldZ
+			position->z = boneWorld.z
 				+ (Animation::g_keyframeRotation.matrix.m20 * localX + Animation::g_keyframeRotation.matrix.m21 * localY
 					  + Animation::g_keyframeRotation.matrix.m22 * localZ)
 					/ 0x80;
