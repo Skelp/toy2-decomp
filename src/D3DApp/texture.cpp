@@ -352,3 +352,33 @@ HRESULT D3DTextr_CreateTexture(char* name, DWORD stage, DWORD flags)
 
 	return S_OK;
 }
+
+// FUNCTION: TOY2 0x004B1E10 [PROVISIONAL]
+HRESULT D3DTextr_CreateTextureFromBitmap(HBITMAP bitmap, HBITMAP alphaBitmap, char* name, DWORD stage, DWORD flags)
+{
+	if (D3DTextr_FindTexture(name) != NULL)
+		return S_OK;
+
+	TextureContainer* texture = new TextureContainer;
+	if (texture == NULL)
+		return E_OUTOFMEMORY;
+
+	ZeroMemory(texture, sizeof(TextureContainer));
+	lstrcpy(texture->name, name);
+	texture->stage = stage;
+	texture->flags = flags;
+	if (Nu3D::g_isSoftwareRendering)
+		texture->flags |= 4;
+
+	texture->bitmap = bitmap;
+	texture->alphaBitmap = alphaBitmap;
+	if ((flags & 0xB) != 0 || alphaBitmap != NULL)
+		texture->hasAlpha = TRUE;
+
+	if (g_textureList != NULL)
+		g_textureList->prev = texture;
+	texture->next = g_textureList;
+	g_textureList = texture;
+
+	return S_OK;
+}

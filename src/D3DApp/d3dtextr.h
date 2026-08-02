@@ -10,7 +10,7 @@
 struct TextureContainer
 {
 	HBITMAP bitmap;
-	uint32_t width;
+	HBITMAP alphaBitmap;
 	LPDIRECTDRAWSURFACE4 surface;
 	LPDIRECT3DTEXTURE2 texture;
 	uint32_t stage;
@@ -38,6 +38,7 @@ void D3DTextr_GetSurfaceDesc(TextureContainer* texture, DDSURFACEDESC2** surface
 TextureContainer* D3DTextr_GetTextureContainer(const char* name);
 void D3DTextr_SetTexturePath(const char* path);
 HRESULT D3DTextr_CreateTexture(char* name, DWORD stage, DWORD flags);
+HRESULT D3DTextr_CreateTextureFromBitmap(HBITMAP bitmap, HBITMAP alphaBitmap, char* name, DWORD stage, DWORD flags);
 
 STATIC_ASSERT(sizeof(TextureContainer) == 0x120);
 STATIC_ASSERT(offsetof(TextureContainer, rgbaData) == 0x94);
