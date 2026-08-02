@@ -138,6 +138,10 @@ RULE_HELP = {
         "A completed function casts project data to a local View type. Confirm the shared "
         "layout and use its owning type."
     ),
+    "repeated-private-type": (
+        "Three or more source files define the same named type and field layout. "
+        "Move the type to a shared owning header."
+    ),
 }
 
 
@@ -940,13 +944,82 @@ def check_signature_drift(units: list[SourceUnit]) -> list[Finding]:
     return findings
 
 
+def _namespace_ranges(masked: str) -> list[tuple[int, int, str]]:
+    ranges: list[tuple[int, int, str]] = []
+    declaration = re.compile(r"\bnamespace\s+([A-Za-z_]\w*(?:::\w+)*)\s*\{")
+    for match in declaration.finditer(masked):
+        body = _balanced_body(masked, match.end() - 1)
+        if body is not None:
+            ranges.append((body[0], body[1], match.group(1)))
+    return ranges
+
+
+def _private_type_records(unit: SourceUnit) -> list[tuple[str, str, int, str, str]]:
+    if unit.path.suffix not in (".c", ".cpp"):
+        return []
+    if any(part.lower() in {"external", "generated", "build"} for part in unit.path.parts):
+        return []
+
+    masked = _mask_source(unit.text)
+    namespaces = _namespace_ranges(masked)
+    records: list[tuple[str, str, int, str, str]] = []
+    declaration = re.compile(r"\b(struct|union)\s+([A-Za-z_]\w*)\s*\{")
+    for match in declaration.finditer(masked):
+        body_range = _balanced_body(masked, match.end() - 1)
+        if body_range is None:
+            continue
+        body = masked[body_range[0] : body_range[1]]
+        if not body.strip() or "{" in body or "(" in body:
+            continue
+        fields = [_normalized(field) for field in body.split(";") if field.strip()]
+        if not fields or any(":" in field for field in fields):
+            continue
+        signature = ";".join(re.sub(r"\s*([,*&\[\]])\s*", r"\1", field) for field in fields)
+        containing = [item for item in namespaces if item[0] <= match.start() < item[1]]
+        containing.sort(key=lambda item: (item[0], -item[1]))
+        namespace = "::".join(item[2] for item in containing)
+        root_namespace = namespace.split("::", 1)[0]
+        line, _ = _line_column(unit.text, match.start())
+        records.append((match.group(1), match.group(2), line, root_namespace, signature))
+    return records
+
+
+def check_repeated_private_types(units: list[SourceUnit]) -> list[Finding]:
+    groups: dict[tuple[str, str, str, str], list[tuple[SourceUnit, int]]] = {}
+    for unit in units:
+        for kind, name, line, root_namespace, signature in _private_type_records(unit):
+            groups.setdefault((root_namespace, kind, name, signature), []).append((unit, line))
+
+    findings: list[Finding] = []
+    for (root_namespace, kind, name, signature), records in groups.items():
+        paths = {unit.path.resolve() for unit, _ in records}
+        if len(paths) < 3:
+            continue
+        subject = f"{root_namespace}::{name}" if root_namespace else name
+        fingerprint = _fingerprint(f"{kind} {subject} {{{signature}}}")
+        for unit, line in records:
+            findings.append(
+                Finding(
+                    unit.path,
+                    line,
+                    "repeated-private-type",
+                    "error",
+                    _line_text(unit.text, line),
+                    f"type {subject!r} repeats the same field layout in {len(paths)} source files. Move it to a shared owning header",
+                    subject=subject,
+                    fingerprint=fingerprint,
+                )
+            )
+    return findings
+
+
 def target_units(staged: bool, explicit: list[str]) -> list[SourceUnit]:
     if explicit:
         paths = [Path(item).resolve() for item in explicit]
         return [SourceUnit(path, path.read_text(encoding="utf-8", errors="ignore")) for path in paths]
     if staged:
         result = subprocess.run(
-            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
+            ["git", "ls-files", "src"],
             capture_output=True, text=True, check=False, cwd=ROOT,
         )
         units: list[SourceUnit] = []
@@ -971,6 +1044,7 @@ def scan_units(units: list[SourceUnit], *, cross_file: bool = True) -> list[Find
     if cross_file:
         findings.extend(check_signature_drift(units))
         findings.extend(check_signature_concealment(units))
+        findings.extend(check_repeated_private_types(units))
     return sorted(findings, key=lambda item: (item.relative_path, item.line, item.column, item.rule))
 
 
@@ -1043,7 +1117,7 @@ def main() -> int:
         return 0
 
     units = target_units(args.staged, args.files)
-    findings = scan_units(units, cross_file=not args.staged and not args.files)
+    findings = scan_units(units, cross_file=not args.files)
     entries = read_baseline(args.baseline)
     findings, stale = apply_baseline(findings, entries)
 

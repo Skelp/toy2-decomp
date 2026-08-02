@@ -301,6 +301,64 @@ class BaselineTests(unittest.TestCase):
 
 
 class CrossFileTests(unittest.TestCase):
+    def repeated_type_findings(self, sources: dict[str, str]) -> list[lint.Finding]:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            units = [lint.SourceUnit(root / name, source) for name, source in sources.items()]
+            return lint.scan_units(units)
+
+    def test_three_equivalent_private_structs_are_errors(self):
+        definition = "namespace Toy2 { namespace Level { struct Record { int id; const char* text; }; } }\n"
+        findings = self.repeated_type_findings({f"Level{index}.cpp": definition for index in range(3)})
+        repeated = [item for item in findings if item.rule == "repeated-private-type"]
+        self.assertEqual(len(repeated), 3)
+        self.assertEqual({item.subject for item in repeated}, {"Toy2::Record"})
+        self.assertEqual({item.severity for item in repeated}, {"error"})
+
+    def test_two_equivalent_private_structs_are_accepted(self):
+        definition = "struct Record { int id; const char* text; };\n"
+        findings = self.repeated_type_findings({"One.cpp": definition, "Two.cpp": definition})
+        self.assertNotIn("repeated-private-type", {item.rule for item in findings})
+
+    def test_different_root_namespaces_are_accepted(self):
+        sources = {
+            f"{name}.cpp": f"namespace {name} {{ struct Record {{ int id; }}; }}\n"
+            for name in ("Audio", "Game", "Render")
+        }
+        findings = self.repeated_type_findings(sources)
+        self.assertNotIn("repeated-private-type", {item.rule for item in findings})
+
+    def test_forward_empty_header_and_different_layout_are_accepted(self):
+        sources = {
+            "Forward.cpp": "struct Record;\n",
+            "Empty.cpp": "struct Record {};\n",
+            "Owner.h": "struct Record { int id; };\n",
+            "One.cpp": "struct Record { int id; };\n",
+            "Two.cpp": "struct Record { int count; };\n",
+        }
+        findings = self.repeated_type_findings(sources)
+        self.assertNotIn("repeated-private-type", {item.rule for item in findings})
+
+    def test_array_extents_remain_distinct(self):
+        sources = {
+            f"{index}.cpp": f"struct Table {{ Record records[{index}]; int end; }};\n"
+            for index in range(1, 5)
+        }
+        findings = self.repeated_type_findings(sources)
+        self.assertNotIn("repeated-private-type", {item.rule for item in findings})
+
+    def test_a_new_duplicate_stays_new_after_existing_rows_are_baselined(self):
+        definition = "struct Record { int id; const char* text; };\n"
+        findings = self.repeated_type_findings({f"{index}.cpp": definition for index in range(4)})
+        repeated = [item for item in findings if item.rule == "repeated-private-type"]
+        baseline = [
+            lint.BaselineEntry(*finding.baseline_key, finding.relative_path)
+            for finding in repeated[:3]
+        ]
+        classified, _ = lint.apply_baseline(repeated, baseline)
+        self.assertEqual(sum(item.legacy for item in classified), 3)
+        self.assertEqual(sum(not item.legacy for item in classified), 1)
+
     def test_project_call_cast_is_signature_concealment(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
