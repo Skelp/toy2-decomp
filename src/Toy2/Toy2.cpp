@@ -42,6 +42,7 @@
 #include "Nu3D/Particles.h"
 #include "Nu3D/Light.h"
 #include "Nu3D/Scene.h"
+#include "Nu3D/SoftwareProjectionPoint.h"
 #include "Renderer/Renderer.h"
 #include "AudioManager/AudioManager.h"
 #include "NGNLoader/NGNLoader.h"
@@ -107,15 +108,6 @@ namespace Nu3D
 		extern int32_t g_zoneViewportTopOffset;
 		extern int32_t g_zoneViewportRightOffset;
 		extern int32_t g_zoneViewportBottomOffset;
-
-		struct SoftwareProjectionPoint
-		{
-			int16_t x;
-			int16_t y;
-			int16_t z;
-			int16_t reserved;
-		};
-		STATIC_ASSERT(sizeof(SoftwareProjectionPoint) == 0x8);
 
 		int32_t ProjectQuad(const SoftwareProjectionPoint* point0,
 			const SoftwareProjectionPoint* point1,

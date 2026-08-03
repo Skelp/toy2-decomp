@@ -2,6 +2,7 @@
 #include "Nu3D/Math.h"
 #include "Nu3D/Portal.h"
 #include "Nu3D/Scene.h"
+#include "Nu3D/SoftwareProjectionPoint.h"
 #include "Nu3D/Viewport.h"
 #include "CharacterLoader.h"
 #include "DrawingDevice.h"
@@ -31,16 +32,6 @@ namespace Nu3D
 	namespace Camera
 	{
 		static __forceinline int32_t ShiftFixedTowardZero(int32_t value, int32_t bits) { return (value + ((value >> 31) & ((1 << bits) - 1))) >> bits; }
-
-		struct SoftwareProjectionPoint
-		{
-			int16_t x;
-			int16_t y;
-			int16_t z;
-			int16_t reserved;
-		};
-
-		STATIC_ASSERT(sizeof(SoftwareProjectionPoint) == 8);
 
 		// GLOBAL: TOY2 0x0055A0F0
 		int32_t g_softwareProjectionDepth;

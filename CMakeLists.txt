@@ -207,6 +207,7 @@ set(TOY2_SOURCES
     src/Nu3D/Light.h
     src/Nu3D/Camera.cpp
     src/Nu3D/Camera.h
+    src/Nu3D/SoftwareProjectionPoint.h
     src/Nu3D/Particles.h
     src/Nu3D/Particles.cpp
     src/Nu3D/ParticlePresets.inc
