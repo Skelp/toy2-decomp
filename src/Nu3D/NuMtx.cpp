@@ -196,10 +196,11 @@ namespace Nu3D
 			float cosine = Numerics::g_trigLUT[(trigOffset + 0x4000) & 0xFFFF];
 			float sine = Numerics::g_trigLUT[trigOffset & 0xFFFF];
 			float m11 = matrix->_11;
+			float rotated11 = m11 * cosine - sine * matrix->_31;
 			float m12 = matrix->_12;
 			float m13 = matrix->_13;
 
-			matrix->_11 = m11 * cosine - sine * matrix->_31;
+			matrix->_11 = rotated11;
 			matrix->_12 = m12 * cosine - sine * matrix->_32;
 			matrix->_13 = m13 * cosine - sine * matrix->_33;
 			matrix->_31 = cosine * matrix->_31 + m11 * sine;
