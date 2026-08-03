@@ -1232,7 +1232,6 @@ namespace ModeSelect
 	// FUNCTION: TOY2 0x00432020 [PROVISIONAL]
 	void Run()
 	{
-		// $TODO: I'd like to clean/unwrap the labels in this method when I have some spare time
 		using namespace DrawingDevice;
 
 		WNDCLASSA wndClass;
@@ -1383,22 +1382,14 @@ namespace ModeSelect
 				break;
 
 			int32_t shouldRedraw = 0;
-			int32_t nextDeviceCount;
-			DDAppDevice* nextDevice;
-			DDAppDevice::App* nextApp;
-			DDAppDevice::DisplayMode* nextDisplayMode;
-			DDAppDevice::DisplayMode* modeIterator;
-			int32_t nextModeCount;
-
 			switch (g_selectionState)
 			{
 				case SELECTION_STATE_DRIVER: {
 					if (! g_ddAppIterator->chainDDApp)
 					{
-					LBL_ENTER_DEVICE_SELECT:
 						g_selectionState = SELECTION_STATE_RENDER_METHOD;
 						shouldRedraw = 1;
-						goto LBL_NEXT_ITERATION;
+						break;
 					}
 
 					switch (g_keyDown)
@@ -1408,7 +1399,11 @@ namespace ModeSelect
 							DDAppDevice* deviceListHead = g_selectedDDApp->deviceListHead;
 
 							if (deviceListHead->nextDevice)
-								goto LBL_ENTER_DEVICE_SELECT;
+							{
+								g_selectionState = SELECTION_STATE_RENDER_METHOD;
+								shouldRedraw = 1;
+								break;
+							}
 
 							int32_t restoredDeviceIndex = 0;
 							DDAppDevice* restoredDevice;
@@ -1462,8 +1457,7 @@ namespace ModeSelect
 							g_savedModeIndex = restoredModeIndex;
 							g_selectionState = SELECTION_STATE_DISPLAY_MODE;
 							shouldRedraw = 1;
-
-							goto LBL_NEXT_ITERATION;
+							break;
 						}
 
 						case VK_UP: {
@@ -1496,35 +1490,25 @@ namespace ModeSelect
 							g_ddAppSelectedDevice = currentApp->deviceListHead;
 							DDAppDevice* currentDevice = g_ddAppSelectedDevice;
 
-							if (! g_ddAppSelectedDevice)
-								goto LBL_UP_DEVICE_FALLBACK;
-
-							int32_t minResolutionHeight;
-
-							while (! currentDevice->isHardwareAccelerated)
+							while (currentDevice && ! currentDevice->isHardwareAccelerated)
 							{
 								currentDevice = currentDevice->nextDevice;
 								++deviceCount;
 								g_ddAppSelectedDevice = currentDevice;
-
-								if (! currentDevice)
-								{
-								LBL_UP_DEVICE_FALLBACK:
-
-									g_ddAppSelectedDevice = currentApp->deviceListHead;
-									currentApp->primaryDevice = g_ddAppSelectedDevice;
-									minResolutionHeight = 0;
-
-									goto LBL_UP_DEVICE_DONE;
-								}
 							}
 
-							currentApp->primaryDevice = currentDevice;
-							minResolutionHeight = deviceCount;
+							if (! currentDevice)
+							{
+								g_ddAppSelectedDevice = currentApp->deviceListHead;
+								currentApp->primaryDevice = g_ddAppSelectedDevice;
+								g_savedDeviceIndex = 0;
+							}
+							else
+							{
+								currentApp->primaryDevice = currentDevice;
+								g_savedDeviceIndex = deviceCount;
+							}
 
-						LBL_UP_DEVICE_DONE:
-
-							g_savedDeviceIndex = minResolutionHeight;
 							int32_t modeCount = 0;
 							DDAppDevice::DisplayMode* currentMode = g_ddAppSelectedDevice->displayModeListHead;
 							g_ddAppSelectedDisplayMode = currentMode;
@@ -1542,13 +1526,13 @@ namespace ModeSelect
 							g_ddAppSelectedDevice->primaryDisplayMode = currentMode;
 							g_savedModeIndex = modeCount;
 							shouldRedraw = 1;
-
-							goto LBL_NEXT_ITERATION;
+							break;
 						}
 
 						case VK_DOWN: {
 							int32_t nextAppIndex = 0;
 							int32_t nextDeviceIndex = g_savedDriverIndex + 1;
+							DDAppDevice::App* nextApp;
 
 							for (nextApp = g_ddAppIterator;; nextApp = nextApp->chainDDApp)
 							{
@@ -1571,18 +1555,53 @@ namespace ModeSelect
 							}
 
 							g_savedDriverIndex = nextAppIndex;
-							nextDeviceCount = 0;
+							int32_t nextDeviceCount = 0;
 							g_ddAppSelectedDevice = nextApp->deviceListHead;
-							nextDevice = g_ddAppSelectedDevice;
+							DDAppDevice* nextDevice = g_ddAppSelectedDevice;
 
-							if (! g_ddAppSelectedDevice)
-								goto LBL_SCAN_DEVICE_FALLBACK;
+							while (nextDevice && ! nextDevice->isHardwareAccelerated)
+							{
+								nextDevice = nextDevice->nextDevice;
+								++nextDeviceCount;
+								g_ddAppSelectedDevice = nextDevice;
+							}
+
+							if (! nextDevice)
+							{
+								g_ddAppSelectedDevice = nextApp->deviceListHead;
+								nextApp->primaryDevice = g_ddAppSelectedDevice;
+								g_savedDeviceIndex = 0;
+							}
+							else
+							{
+								nextApp->primaryDevice = nextDevice;
+								g_savedDeviceIndex = nextDeviceCount;
+							}
+
+							int32_t nextModeCount = 0;
+							DDAppDevice::DisplayMode* nextDisplayMode = g_ddAppSelectedDevice->displayModeListHead;
+							g_ddAppSelectedDisplayMode = nextDisplayMode;
+
+							for (DDAppDevice::DisplayMode* modeIterator = nextDisplayMode->nextDisplayMode; modeIterator;
+								modeIterator = modeIterator->nextDisplayMode)
+							{
+								if (nextDisplayMode->surfaceDesc.dwHeight >= 480)
+									break;
+
+								nextDisplayMode = modeIterator;
+								++nextModeCount;
+								g_ddAppSelectedDisplayMode = modeIterator;
+							}
+
+							g_ddAppSelectedDevice->primaryDisplayMode = nextDisplayMode;
+							g_savedModeIndex = nextModeCount;
+							shouldRedraw = 1;
 
 							break;
 						}
 
 						default:
-							goto LBL_NEXT_ITERATION;
+							break;
 					}
 
 					break;
@@ -1595,13 +1614,18 @@ namespace ModeSelect
 						switch (g_keyDown)
 						{
 							case VK_BACK:
-								goto LBL_BACK_TO_DRIVER_SELECT;
+								if (g_ddAppIterator->chainDDApp)
+								{
+									g_selectionState = SELECTION_STATE_DRIVER;
+									shouldRedraw = 1;
+								}
+								break;
 
 							case VK_RETURN:
 							case VK_SPACE:
 								g_selectionState = SELECTION_STATE_DISPLAY_MODE;
 								shouldRedraw = 1;
-								goto LBL_NEXT_ITERATION;
+								break;
 
 							case VK_UP: {
 								int32_t fallbackModeIndex = 0;
@@ -1654,8 +1678,7 @@ namespace ModeSelect
 								g_ddAppSelectedDevice->primaryDisplayMode = upArrowMode;
 								g_savedModeIndex = upArrowModeCount;
 								shouldRedraw = 1;
-
-								goto LBL_NEXT_ITERATION;
+								break;
 							}
 
 							case VK_DOWN: {
@@ -1689,15 +1712,14 @@ namespace ModeSelect
 								g_savedDeviceIndex = downArrowIndex;
 								g_savedModeIndex = SelectSuitableDisplayMode();
 								shouldRedraw = 1;
-
-								goto LBL_NEXT_ITERATION;
+								break;
 							}
 
 							default:
-								goto LBL_NEXT_ITERATION;
+								break;
 						}
 
-						goto LBL_NEXT_ITERATION;
+						break;
 					}
 
 					DDAppDevice* selectedDevice = g_selectedDDApp->deviceListHead;
@@ -1756,8 +1778,7 @@ namespace ModeSelect
 					g_savedModeIndex = restoredModeIndex;
 					g_selectionState = SELECTION_STATE_DISPLAY_MODE;
 					shouldRedraw = 1;
-
-					goto LBL_NEXT_ITERATION;
+					break;
 				}
 
 				case SELECTION_STATE_DISPLAY_MODE: {
@@ -1765,38 +1786,35 @@ namespace ModeSelect
 					{
 						case VK_BACK:
 							if (g_selectedDDApp->deviceListHead->nextDevice)
-								goto LBL_ENTER_DEVICE_SELECT;
+								g_selectionState = SELECTION_STATE_RENDER_METHOD;
+							else if (g_ddAppIterator->chainDDApp)
+								g_selectionState = SELECTION_STATE_DRIVER;
+							else
+								break;
 
-						LBL_BACK_TO_DRIVER_SELECT:
-
-							if (! g_ddAppIterator->chainDDApp)
-								goto LBL_NEXT_ITERATION;
-
-							g_selectionState = SELECTION_STATE_DRIVER;
+							shouldRedraw = 1;
 							break;
 
 						case VK_RETURN:
 						case VK_SPACE:
-							goto LBL_COMMIT_EXIT;
+							g_selectionState = SELECTION_STATE_EXIT;
+							shouldRedraw = 1;
+							break;
 
 						case VK_UP:
 							g_savedModeIndex = SelectDisplayModeByIndex(g_savedModeIndex - 1);
 							shouldRedraw = 1;
-
-							goto LBL_NEXT_ITERATION;
+							break;
 
 						case VK_DOWN:
 							g_savedModeIndex = SelectDisplayModeByIndex(g_savedModeIndex + 1);
 							shouldRedraw = 1;
-
-							goto LBL_NEXT_ITERATION;
+							break;
 
 						default:
-							goto LBL_NEXT_ITERATION;
+							break;
 					}
-
-					shouldRedraw = 1;
-					goto LBL_NEXT_ITERATION;
+					break;
 				}
 
 				case SELECTION_STATE_WINDOW_MODE: {
@@ -1805,75 +1823,29 @@ namespace ModeSelect
 						case VK_BACK:
 							g_selectionState = SELECTION_STATE_DISPLAY_MODE;
 							shouldRedraw = 1;
-							goto LBL_NEXT_ITERATION;
+							break;
 
 						case VK_RETURN:
 						case VK_SPACE:
-						LBL_COMMIT_EXIT:
 							g_selectionState = SELECTION_STATE_EXIT;
 							shouldRedraw = 1;
-							goto LBL_NEXT_ITERATION;
+							break;
 
 						case VK_UP:
 						case VK_DOWN:
 							g_ddAppSelectedDevice->canRenderWindowedOnPrimary = 1 - g_ddAppSelectedDevice->canRenderWindowedOnPrimary;
 							shouldRedraw = 1;
-							goto LBL_NEXT_ITERATION;
+							break;
 
 						default:
-							goto LBL_NEXT_ITERATION;
+							break;
 					}
-
-					goto LBL_NEXT_ITERATION;
+					break;
 				}
 
 				default:
-					goto LBL_NEXT_ITERATION;
-			}
-
-			int32_t nextMinResHeight;
-
-			while (! nextDevice->isHardwareAccelerated)
-			{
-				nextDevice = nextDevice->nextDevice;
-				++nextDeviceCount;
-				g_ddAppSelectedDevice = nextDevice;
-
-				if (! nextDevice)
-				{
-				LBL_SCAN_DEVICE_FALLBACK:
-					g_ddAppSelectedDevice = nextApp->deviceListHead;
-					nextApp->primaryDevice = g_ddAppSelectedDevice;
-
-					nextMinResHeight = 0;
-					goto LBL_SCAN_DEVICE_DONE;
-				}
-			}
-
-			nextApp->primaryDevice = nextDevice;
-			nextMinResHeight = nextDeviceCount;
-		LBL_SCAN_DEVICE_DONE:
-			g_savedDeviceIndex = nextMinResHeight;
-
-			nextModeCount = 0;
-
-			nextDisplayMode = g_ddAppSelectedDevice->displayModeListHead;
-			g_ddAppSelectedDisplayMode = nextDisplayMode;
-
-			for (modeIterator = nextDisplayMode->nextDisplayMode; modeIterator; modeIterator = modeIterator->nextDisplayMode)
-			{
-				if (nextDisplayMode->surfaceDesc.dwHeight >= 480)
 					break;
-
-				nextDisplayMode = modeIterator;
-				++nextModeCount;
-				g_ddAppSelectedDisplayMode = modeIterator;
 			}
-
-			g_ddAppSelectedDevice->primaryDisplayMode = nextDisplayMode;
-			g_savedModeIndex = nextModeCount;
-			shouldRedraw = 1;
-		LBL_NEXT_ITERATION:
 
 			g_keyDown = 0;
 			if (shouldRedraw)

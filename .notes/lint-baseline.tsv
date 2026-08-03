@@ -1,5 +1,4 @@
 # owner	rule	subject	fingerprint	path
-0x00432020	unstructured-control-flow	goto-count	5ec26f3099de	src/ModeSelect.cpp
 0x004cbc90	unstructured-control-flow	goto-count	4c11133ca3eb	src/NGNLoader/ObjectLoad.cpp
 0x0047b170	unstructured-control-flow	goto-count	af283beb99ab	src/RawLoader.cpp
 0x00438a50	opaque-state-slot	startRecord->data[1]	29bb2dac2fd9	src/Toy2/LevelSelect.cpp
