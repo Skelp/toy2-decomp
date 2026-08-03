@@ -6957,6 +6957,31 @@ namespace Toy2
 		++screenText->status;
 	}
 
+	// FUNCTION: TOY2 0x0048E680 [MATCHED]
+	void __fastcall DrawQueuedScreenText(ScreenTextQueue* queue)
+	{
+		queue->current = 0;
+		while (queue->current < queue->count)
+		{
+			ScreenTextSurfaceState* screenText = queue->entries[queue->current];
+			if (screenText->status == 2)
+			{
+				screenText->status = 1;
+				g_screenTextLineY = 8;
+				d3dappi.lpBackBuffer->BltFast(screenText->screenX,
+					screenText->screenY,
+					screenText->surface,
+					&screenText->sourceRect,
+					DDBLTFAST_SRCCOLORKEY | DDBLTFAST_WAIT);
+			}
+
+			queue->entries[queue->current] = NULL;
+			++queue->current;
+		}
+
+		queue->count = 0;
+	}
+
 	// FUNCTION: TOY2 0x0048E730 [PROVISIONAL]
 	void OneInit()
 	{
