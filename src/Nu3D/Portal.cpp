@@ -49,9 +49,10 @@ namespace Nu3D
 	// FUNCTION: TOY2 0x004B33B0 [PROVISIONAL]
 	void Portal::AreaPortal::CalculateBoundingSphere(AreaPortal* portal)
 	{
-		float minimumZ = FLT_MAX;
-		float minimumY = FLT_MAX;
-		float minimumX = FLT_MAX;
+		Vector3F minimum;
+		minimum.z = FLT_MAX;
+		minimum.y = FLT_MAX;
+		minimum.x = FLT_MAX;
 
 		Vector3F maximum;
 		maximum.z = -FLT_MAX;
@@ -65,16 +66,16 @@ namespace Nu3D
 
 			do
 			{
-				if (vertex->x <= minimumX)
-					minimumX = vertex->x;
+				if (vertex->x <= minimum.x)
+					minimum.x = vertex->x;
 				if (vertex->x >= maximum.x)
 					maximum.x = vertex->x;
-				if (vertex->y <= minimumY)
-					minimumY = vertex->y;
+				if (vertex->y <= minimum.y)
+					minimum.y = vertex->y;
 				if (vertex->y >= maximum.y)
 					maximum.y = vertex->y;
-				if (minimumZ >= vertex->z)
-					minimumZ = vertex->z;
+				if (minimum.z >= vertex->z)
+					minimum.z = vertex->z;
 				if (vertex->z >= maximum.z)
 					maximum.z = vertex->z;
 
@@ -82,9 +83,9 @@ namespace Nu3D
 			} while (--verticesLeft);
 		}
 
-		portal->center.x = (maximum.x + minimumX) * 0.5f;
-		portal->center.y = (maximum.y + minimumY) * 0.5f;
-		portal->center.z = (maximum.z + minimumZ) * 0.5f;
+		portal->center.x = (maximum.x + minimum.x) * 0.5f;
+		portal->center.y = (maximum.y + minimum.y) * 0.5f;
+		portal->center.z = (maximum.z + minimum.z) * 0.5f;
 
 		Math::VertexSubtract(&maximum, &maximum, &portal->center);
 
