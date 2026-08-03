@@ -94,16 +94,16 @@ namespace Nu3D
 		extern int32_t g_cameraSkewPhase;
 		extern int32_t g_viewHistoryInitialized;
 
-		extern int16_t g_cameraTintBlue;
-		extern int16_t g_cameraTintGreen;
 		extern int16_t g_cameraTintRed;
-		extern uint8_t g_targetTintBlue;
-		extern uint8_t g_targetTintGreen;
+		extern int16_t g_cameraTintGreen;
+		extern int16_t g_cameraTintBlue;
 		extern uint8_t g_targetTintRed;
+		extern uint8_t g_targetTintGreen;
+		extern uint8_t g_targetTintBlue;
 		extern uint8_t g_targetTintFadeSpeed;
 		extern int16_t g_tintBlend;
 
-		void SetTint(uint8_t blue, uint8_t green, uint8_t red, uint8_t fadeSpeed);
+		void SetTint(uint8_t red, uint8_t green, uint8_t blue, uint8_t fadeSpeed);
 		void InitViewMatrixGlobals();
 		int32_t FadeToTargetTint();
 		void SetupViewMatrix(ActiveCameraTransform* camera);

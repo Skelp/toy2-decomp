@@ -28,9 +28,9 @@ extern "C" int __cdecl abs(int);
 namespace Toy2
 {
 	extern int32_t g_hudActorAnimationFrame;
-	extern uint8_t g_environmentTintRed;
-	extern uint8_t g_environmentTintGreen;
 	extern uint8_t g_environmentTintBlue;
+	extern uint8_t g_environmentTintGreen;
+	extern uint8_t g_environmentTintRed;
 
 	namespace AlsPenthouse
 	{
@@ -985,9 +985,9 @@ namespace Toy2
 			g_environmentSurfaceY = 0;
 			g_environmentEffectType = 1;
 			g_previousBuzzEnvironmentY = 0;
-			g_environmentTintBlue = 0x68;
+			g_environmentTintRed = 0x68;
 			g_environmentTintGreen = 0x68;
-			g_environmentTintRed = 0x80;
+			g_environmentTintBlue = 0x80;
 			HUD::g_challengeState = 0;
 			AndysHouse::g_raceCheckpointPassCount = 0;
 			g_waterLevel = 0;

@@ -66,7 +66,7 @@ namespace Toy2
 			switch (g_cameraTransitionState)
 			{
 				case 1:
-					if (Nu3D::Camera::g_cameraTintBlue == 0)
+					if (Nu3D::Camera::g_cameraTintRed == 0)
 					{
 						Nu3D::Camera::SetTint(0x80, 0x80, 0x80, 0x10);
 						g_gameplayStateFlags |= GAMEPLAY_STATE_CUTSCENE_ACTIVE;
@@ -82,7 +82,7 @@ namespace Toy2
 					break;
 
 				case 3:
-					if (Nu3D::Camera::g_cameraTintBlue == 0)
+					if (Nu3D::Camera::g_cameraTintRed == 0)
 					{
 						Nu3D::Camera::SetTint(0x80, 0x80, 0x80, 0x10);
 						g_gameplayStateFlags &= ~GAMEPLAY_STATE_CUTSCENE_ACTIVE;

@@ -71,9 +71,9 @@ namespace Toy2
 	// GLOBAL: TOY2 0x0053C83C
 	int32_t g_spinHoverTimer;
 
-	extern uint8_t g_environmentTintRed;
-	extern uint8_t g_environmentTintGreen;
 	extern uint8_t g_environmentTintBlue;
+	extern uint8_t g_environmentTintGreen;
+	extern uint8_t g_environmentTintRed;
 	extern Nu3D::Particles::ParticleInstance* g_laserAimParticle;
 	extern Vector4I g_aimTargetPosition;
 	extern int32_t g_aimTargetIndex;
@@ -886,25 +886,25 @@ namespace Toy2
 				{
 					if (tintBlend == 0)
 						Nu3D::Camera::EnableCameraSkew();
-					Nu3D::Camera::g_cameraTintBlue = g_environmentTintBlue;
-					Nu3D::Camera::g_cameraTintGreen = g_environmentTintGreen;
 					Nu3D::Camera::g_cameraTintRed = g_environmentTintRed;
+					Nu3D::Camera::g_cameraTintGreen = g_environmentTintGreen;
+					Nu3D::Camera::g_cameraTintBlue = g_environmentTintBlue;
 					Nu3D::Camera::g_tintBlend = (int16_t)tintBlend;
 				}
 				else
 				{
 					Nu3D::Camera::g_tintBlend = -1;
-					Nu3D::Camera::g_cameraTintBlue = 0x80;
-					Nu3D::Camera::g_cameraTintGreen = 0x80;
 					Nu3D::Camera::g_cameraTintRed = 0x80;
+					Nu3D::Camera::g_cameraTintGreen = 0x80;
+					Nu3D::Camera::g_cameraTintBlue = 0x80;
 				}
 			}
 			else if (Nu3D::Camera::g_tintBlend != -1)
 			{
 				Nu3D::Camera::g_tintBlend = -1;
-				Nu3D::Camera::g_cameraTintBlue = 0x80;
-				Nu3D::Camera::g_cameraTintGreen = 0x80;
 				Nu3D::Camera::g_cameraTintRed = 0x80;
+				Nu3D::Camera::g_cameraTintGreen = 0x80;
+				Nu3D::Camera::g_cameraTintBlue = 0x80;
 			}
 
 			if (g_environmentEffectType > 0 && g_environmentEffectType < 3)

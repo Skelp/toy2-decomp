@@ -22,9 +22,9 @@
 
 namespace Toy2
 {
-	extern uint8_t g_environmentTintRed;
-	extern uint8_t g_environmentTintGreen;
 	extern uint8_t g_environmentTintBlue;
+	extern uint8_t g_environmentTintGreen;
+	extern uint8_t g_environmentTintRed;
 
 	namespace AndysNeighborhood
 	{
@@ -148,9 +148,9 @@ namespace Toy2
 
 			g_environmentSurfaceY = 0x4400;
 			g_previousBuzzEnvironmentY = 0x4400;
-			g_environmentTintBlue = 0x50;
+			g_environmentTintRed = 0x50;
 			g_environmentTintGreen = 0x60;
-			g_environmentTintRed = 0x80;
+			g_environmentTintBlue = 0x80;
 			Platform::SetRotationAngles(0, 0, 0x961, 0);
 			Platform::SetRotationAngles(1, 0, 0xB4A, 0);
 

@@ -840,18 +840,18 @@ namespace Toy2
 				{
 					if (flashTimer < 0)
 						flashTimer = *g_randDatBufferPtr++ * 2 + 0x20;
-					else if (Nu3D::Camera::g_cameraTintRed > 0x40)
+					else if (Nu3D::Camera::g_cameraTintBlue > 0x40)
 					{
-						Nu3D::Camera::g_cameraTintRed = (int16_t)flashTimer * 3 + 0x80;
-						Nu3D::Camera::g_cameraTintBlue = Nu3D::Camera::g_cameraTintRed;
-						Nu3D::Camera::g_cameraTintGreen = Nu3D::Camera::g_cameraTintRed;
+						Nu3D::Camera::g_cameraTintBlue = (int16_t)flashTimer * 3 + 0x80;
+						Nu3D::Camera::g_cameraTintRed = Nu3D::Camera::g_cameraTintBlue;
+						Nu3D::Camera::g_cameraTintGreen = Nu3D::Camera::g_cameraTintBlue;
 					}
 				}
 				else
 				{
-					Nu3D::Camera::g_cameraTintBlue = 0x80;
-					Nu3D::Camera::g_cameraTintGreen = 0x80;
 					Nu3D::Camera::g_cameraTintRed = 0x80;
+					Nu3D::Camera::g_cameraTintGreen = 0x80;
+					Nu3D::Camera::g_cameraTintBlue = 0x80;
 					g_lightningFlashTimer = 10000;
 					flashTimer = g_lightningFlashTimer;
 				}

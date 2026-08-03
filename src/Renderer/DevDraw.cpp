@@ -53,7 +53,7 @@ namespace DevDraw
 				Nu3D::VertexTL* vertex = static_cast<Nu3D::VertexTL*>(Toy2::drawb->Vertice[quad->drawSlot]) + firstVertex;
 				Toy2::drawb->VerticeCount[quad->drawSlot] += 4;
 
-				int32_t intensity = Nu3D::Camera::g_cameraTintBlue * 224 / 128;
+				int32_t intensity = Nu3D::Camera::g_cameraTintRed * 224 / 128;
 				uint32_t diffuse = 0xFF000000 | intensity << 16 | intensity << 8 | intensity;
 
 				vertex->position.x = quad->points[0].x;
@@ -151,9 +151,9 @@ namespace DevDraw
 	// FUNCTION: TOY2 0x00495060 [PROVISIONAL]
 	int16_t SubmitColouredTexturedQuad(TexturedQuad* quad)
 	{
-		int32_t blue = quad->blue * Nu3D::Camera::g_cameraTintBlue / 128;
+		int32_t blue = quad->blue * Nu3D::Camera::g_cameraTintRed / 128;
 		int32_t green = quad->green * Nu3D::Camera::g_cameraTintGreen / 128;
-		int32_t red = quad->red * Nu3D::Camera::g_cameraTintRed / 128;
+		int32_t red = quad->red * Nu3D::Camera::g_cameraTintBlue / 128;
 
 		switch (g_renderMode)
 		{

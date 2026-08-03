@@ -146,9 +146,9 @@ namespace Toy2
 			g_fadeTimer = 0;
 			g_nextScreen = 0;
 
-			Nu3D::Camera::g_cameraTintBlue = 0;
-			Nu3D::Camera::g_cameraTintGreen = 0;
 			Nu3D::Camera::g_cameraTintRed = 0;
+			Nu3D::Camera::g_cameraTintGreen = 0;
+			Nu3D::Camera::g_cameraTintBlue = 0;
 
 			Nu3D::Camera::SetTint(128, 128, 128, 12);
 			SoftwareRenderer::SetBackdropScrollOverride(0, 0);
@@ -305,9 +305,9 @@ namespace Toy2
 				g_fadeTimer = 0;
 				g_nextScreen = 0;
 
-				Nu3D::Camera::g_cameraTintBlue = 0;
-				Nu3D::Camera::g_cameraTintGreen = 0;
 				Nu3D::Camera::g_cameraTintRed = 0;
+				Nu3D::Camera::g_cameraTintGreen = 0;
+				Nu3D::Camera::g_cameraTintBlue = 0;
 
 				Nu3D::Camera::SetTint(128, 128, 128, 12);
 				SoftwareRenderer::SetBackdropScrollOverride(0, 0);
@@ -436,9 +436,9 @@ namespace Toy2
 			InputManager::g_prevButtonsPressed = 0;
 			g_fadeTimer = 0;
 			g_nextScreen = 0;
-			Nu3D::Camera::g_cameraTintBlue = 0;
-			Nu3D::Camera::g_cameraTintGreen = 0;
 			Nu3D::Camera::g_cameraTintRed = 0;
+			Nu3D::Camera::g_cameraTintGreen = 0;
+			Nu3D::Camera::g_cameraTintBlue = 0;
 			Nu3D::Camera::SetTint(128, 128, 128, 12);
 			SoftwareRenderer::SetBackdropScrollOverride(0, 0);
 			Renderer::g_frameDelta = 1;

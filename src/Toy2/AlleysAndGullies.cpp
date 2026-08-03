@@ -25,9 +25,9 @@
 namespace Toy2
 {
 	extern int32_t g_hudActorAnimationFrame;
-	extern uint8_t g_environmentTintRed;
-	extern uint8_t g_environmentTintGreen;
 	extern uint8_t g_environmentTintBlue;
+	extern uint8_t g_environmentTintGreen;
+	extern uint8_t g_environmentTintRed;
 
 	// FUNCTION: TOY2 0x0041E020 [PROVISIONAL]
 	void InterpolatePathPoint(int32_t pathRecordType, int32_t pathPosition, Vector3I* position)
@@ -351,9 +351,9 @@ namespace Toy2
 			HUD::g_challengeState = 0;
 			AndysHouse::g_raceCheckpointPassCount = 0;
 			g_environmentEffectType = 1;
-			g_environmentTintBlue = 0x60;
+			g_environmentTintRed = 0x60;
 			g_environmentTintGreen = 0x78;
-			g_environmentTintRed = 0x80;
+			g_environmentTintBlue = 0x80;
 			g_previousClownPhase = Actor::g_creatureActors[3].actorPhase;
 			g_unusedState0 = 200;
 		}

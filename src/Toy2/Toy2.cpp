@@ -2145,10 +2145,10 @@ namespace Toy2
 	uint8_t g_environmentTintGreen;
 
 	// GLOBAL: TOY2 0x00830D2C
-	uint8_t g_environmentTintRed;
+	uint8_t g_environmentTintBlue;
 
 	// GLOBAL: TOY2 0x00830D2D
-	uint8_t g_environmentTintBlue;
+	uint8_t g_environmentTintRed;
 
 	// GLOBAL: TOY2 0x00830D38
 	int32_t g_cameraIdleTimer;
@@ -2825,9 +2825,9 @@ namespace Toy2
 
 		if (g_levelTransitionTimer < 46 && g_levelTransitionTimer + Renderer::g_frameDelta >= 46 && g_levelTransition > 0)
 		{
-			Nu3D::Camera::g_targetTintBlue = 0;
-			Nu3D::Camera::g_targetTintGreen = 0;
 			Nu3D::Camera::g_targetTintRed = 0;
+			Nu3D::Camera::g_targetTintGreen = 0;
+			Nu3D::Camera::g_targetTintBlue = 0;
 			Nu3D::Camera::g_targetTintFadeSpeed = 6;
 			Nu3D::Camera::g_tintBlend = -1;
 		}
@@ -3389,9 +3389,9 @@ namespace Toy2
 								g_levelTransition = 5;
 							g_buzzActor.actorFlags |= Buzz::ACTOR_FLAG_LOCK_FACING;
 							g_levelTransitionTimer = 0x2E;
-							Nu3D::Camera::g_targetTintBlue = 0;
-							Nu3D::Camera::g_targetTintGreen = 0;
 							Nu3D::Camera::g_targetTintRed = 0;
+							Nu3D::Camera::g_targetTintGreen = 0;
+							Nu3D::Camera::g_targetTintBlue = 0;
 							Nu3D::Camera::g_targetTintFadeSpeed = 6;
 							Nu3D::Camera::g_tintBlend = -1;
 						}
@@ -3673,7 +3673,7 @@ namespace Toy2
 				goto finish_frame;
 
 		open_pause_menu:
-			if (Nu3D::Camera::g_targetTintFadeSpeed == 0 && Nu3D::Camera::g_cameraTintRed != 0)
+			if (Nu3D::Camera::g_targetTintFadeSpeed == 0 && Nu3D::Camera::g_cameraTintBlue != 0)
 			{
 				AudioManager::StopAndWait();
 				AudioManager::FlushSoundVoices();
@@ -3711,9 +3711,9 @@ namespace Toy2
 			InputManager::g_prevButtonsPressed = 0;
 			MainMenu::g_fadeTimer = 0;
 			MainMenu::g_nextScreen = 0;
-			Nu3D::Camera::g_cameraTintBlue = 0;
-			Nu3D::Camera::g_cameraTintGreen = 0;
 			Nu3D::Camera::g_cameraTintRed = 0;
+			Nu3D::Camera::g_cameraTintGreen = 0;
+			Nu3D::Camera::g_cameraTintBlue = 0;
 			Nu3D::Camera::SetTint(128, 128, 128, 12);
 			SoftwareRenderer::SetBackdropScrollOverride(0, 0);
 			Renderer::g_frameDelta = 1;
@@ -3771,7 +3771,7 @@ namespace Toy2
 					fadeTimer -= Renderer::g_frameDelta;
 
 				if ((InputManager::g_curButtonsPressed & INPUT_JUMP) != 0 && (InputManager::g_prevButtonsPressed & INPUT_JUMP) == 0 && fadeTimer > 0x17
-					&& Nu3D::Camera::g_cameraTintBlue == 128)
+					&& Nu3D::Camera::g_cameraTintRed == 128)
 				{
 					Nu3D::Camera::SetTint(0, 0, 0, 6);
 					fadeTimer = 0x35;
@@ -3795,9 +3795,9 @@ namespace Toy2
 			InputManager::g_prevButtonsPressed = 0;
 			MainMenu::g_fadeTimer = 0;
 			MainMenu::g_nextScreen = 0;
-			Nu3D::Camera::g_cameraTintBlue = 0;
-			Nu3D::Camera::g_cameraTintGreen = 0;
 			Nu3D::Camera::g_cameraTintRed = 0;
+			Nu3D::Camera::g_cameraTintGreen = 0;
+			Nu3D::Camera::g_cameraTintBlue = 0;
 			Nu3D::Camera::SetTint(128, 128, 128, 12);
 			SoftwareRenderer::SetBackdropScrollOverride(0, 0);
 			Renderer::g_frameDelta = 1;
@@ -4945,9 +4945,9 @@ namespace Toy2
 		if (displayMode != 0 && displayMode != 123)
 		{
 			Nu3D::Camera::SetTint(0, 0, 0, 12);
-			Nu3D::Camera::g_cameraTintBlue = Nu3D::Camera::g_targetTintBlue;
-			Nu3D::Camera::g_cameraTintGreen = Nu3D::Camera::g_targetTintGreen;
 			Nu3D::Camera::g_cameraTintRed = Nu3D::Camera::g_targetTintRed;
+			Nu3D::Camera::g_cameraTintGreen = Nu3D::Camera::g_targetTintGreen;
+			Nu3D::Camera::g_cameraTintBlue = Nu3D::Camera::g_targetTintBlue;
 			Nu3D::Camera::g_targetTintFadeSpeed = 0;
 			goto cleanup;
 		}
@@ -5123,9 +5123,9 @@ namespace Toy2
 	// FUNCTION: TOY2 0x00414720 [PROVISIONAL]
 	int32_t EnterLevel(int32_t levelIndex)
 	{
-		Nu3D::Camera::g_cameraTintBlue = 0;
-		Nu3D::Camera::g_cameraTintGreen = 0;
 		Nu3D::Camera::g_cameraTintRed = 0;
+		Nu3D::Camera::g_cameraTintGreen = 0;
+		Nu3D::Camera::g_cameraTintBlue = 0;
 		Renderer::SetVirtualRatioTo54();
 
 		int32_t demoMode = g_demoMode;
@@ -5174,9 +5174,9 @@ namespace Toy2
 		AudioManager::g_maxLeftVolume = 0;
 		AudioManager::g_maxRightVolume = 0;
 		AudioManager::g_maxVolume = 0;
-		Nu3D::Camera::g_targetTintBlue = 0;
-		Nu3D::Camera::g_targetTintGreen = 0;
 		Nu3D::Camera::g_targetTintRed = 0;
+		Nu3D::Camera::g_targetTintGreen = 0;
+		Nu3D::Camera::g_targetTintBlue = 0;
 		Nu3D::Camera::g_targetTintFadeSpeed = 0;
 		g_randDatBufferPtr = g_randDatBuffer;
 		g_hudActorAnimationFrame = 54;
@@ -5215,9 +5215,9 @@ namespace Toy2
 		g_specialPickupCount = -1;
 		g_idleVoiceCooldown = 900;
 		g_idleVoicePreset = 206;
-		g_environmentTintBlue = 0x80;
-		g_environmentTintGreen = 0x80;
 		g_environmentTintRed = 0x80;
+		g_environmentTintGreen = 0x80;
+		g_environmentTintBlue = 0x80;
 		HUD::g_challengeState = 0;
 		AndysHouse::g_raceCheckpointPassCount = 0;
 
@@ -5297,9 +5297,9 @@ namespace Toy2
 			InputManager::g_prevButtonsPressed = 0;
 			MainMenu::g_fadeTimer = 0;
 			MainMenu::g_nextScreen = 0;
-			Nu3D::Camera::g_cameraTintBlue = 0;
-			Nu3D::Camera::g_cameraTintGreen = 0;
 			Nu3D::Camera::g_cameraTintRed = 0;
+			Nu3D::Camera::g_cameraTintGreen = 0;
+			Nu3D::Camera::g_cameraTintBlue = 0;
 			Nu3D::Camera::SetTint(128, 128, 128, 12);
 			SoftwareRenderer::SetBackdropScrollOverride(0, 0);
 			Renderer::g_frameDelta = 1;
@@ -5448,7 +5448,7 @@ namespace Toy2
 					fadeTimer -= Renderer::g_frameDelta;
 
 				if ((InputManager::g_curButtonsPressed & INPUT_CANCEL) != 0 && (InputManager::g_prevButtonsPressed & INPUT_CANCEL) == 0 && fadeTimer > 0x17
-					&& Nu3D::Camera::g_cameraTintBlue == 128)
+					&& Nu3D::Camera::g_cameraTintRed == 128)
 				{
 					fadeTimer = 0x35;
 					AudioManager::PlayOneShotSoundGlobal(2, 0x1200, 0x60, 0x60);
@@ -5457,7 +5457,7 @@ namespace Toy2
 				}
 
 				if ((InputManager::g_curButtonsPressed & INPUT_JUMP) != 0 && (InputManager::g_prevButtonsPressed & INPUT_JUMP) == 0 && fadeTimer > 0x17
-					&& Nu3D::Camera::g_cameraTintBlue == 128)
+					&& Nu3D::Camera::g_cameraTintRed == 128)
 				{
 					fadeTimer = 0x35;
 					AudioManager::PlayOneShotSoundGlobal(0, 0x1200, 0x60, 0x60);
@@ -5666,9 +5666,9 @@ namespace Toy2
 		RGBA clearColor;
 		clearColor.value = 0;
 
-		Nu3D::Camera::g_cameraTintBlue = 0;
-		Nu3D::Camera::g_cameraTintGreen = 0;
 		Nu3D::Camera::g_cameraTintRed = 0;
+		Nu3D::Camera::g_cameraTintGreen = 0;
+		Nu3D::Camera::g_cameraTintBlue = 0;
 		Nu3D::Camera::SetTint(128, 128, 128, 12);
 
 		if (postGameSave)
@@ -5972,7 +5972,7 @@ namespace Toy2
 					}
 
 					case SAVE_MENU_EXIT: {
-						if (Nu3D::Camera::g_cameraTintBlue == 0)
+						if (Nu3D::Camera::g_cameraTintRed == 0)
 							finished = 1;
 						break;
 					}
@@ -6177,9 +6177,9 @@ namespace Toy2
 		InputManager::g_prevButtonsPressed = 0;
 		MainMenu::g_fadeTimer = 0;
 		MainMenu::g_nextScreen = 0;
-		Nu3D::Camera::g_cameraTintBlue = 0;
-		Nu3D::Camera::g_cameraTintGreen = 0;
 		Nu3D::Camera::g_cameraTintRed = 0;
+		Nu3D::Camera::g_cameraTintGreen = 0;
+		Nu3D::Camera::g_cameraTintBlue = 0;
 		Nu3D::Camera::SetTint(128, 128, 128, 12);
 		SoftwareRenderer::SetBackdropScrollOverride(0, 0);
 		Renderer::g_frameDelta = 1;
@@ -6213,9 +6213,9 @@ namespace Toy2
 		InputManager::g_prevButtonsPressed = 0;
 		MainMenu::g_fadeTimer = 0;
 		MainMenu::g_nextScreen = 0;
-		Nu3D::Camera::g_cameraTintBlue = 0;
-		Nu3D::Camera::g_cameraTintGreen = 0;
 		Nu3D::Camera::g_cameraTintRed = 0;
+		Nu3D::Camera::g_cameraTintGreen = 0;
+		Nu3D::Camera::g_cameraTintBlue = 0;
 		Nu3D::Camera::SetTint(128, 128, 128, 12);
 		SoftwareRenderer::SetBackdropScrollOverride(0, 0);
 		Renderer::g_frameDelta = 1;
@@ -6280,9 +6280,9 @@ namespace Toy2
 		InputManager::g_prevButtonsPressed = 0;
 		MainMenu::g_fadeTimer = 0;
 		MainMenu::g_nextScreen = 0;
-		Nu3D::Camera::g_cameraTintBlue = 0;
-		Nu3D::Camera::g_cameraTintGreen = 0;
 		Nu3D::Camera::g_cameraTintRed = 0;
+		Nu3D::Camera::g_cameraTintGreen = 0;
+		Nu3D::Camera::g_cameraTintBlue = 0;
 		Nu3D::Camera::SetTint(128, 128, 128, 12);
 		SoftwareRenderer::SetBackdropScrollOverride(0, 0);
 		Renderer::g_frameDelta = 1;
@@ -6348,7 +6348,7 @@ namespace Toy2
 				creditsTimer -= Renderer::g_frameDelta;
 
 			if (((InputManager::g_curButtonsPressed & 0xf000) != 0 && (InputManager::g_prevButtonsPressed & 0xf000) == 0 || *creditsCursor == '\0')
-				&& creditsTimer > 53 && Nu3D::Camera::g_cameraTintBlue == 128)
+				&& creditsTimer > 53 && Nu3D::Camera::g_cameraTintRed == 128)
 			{
 				creditsTimer = 53;
 				Nu3D::Camera::SetTint(0, 0, 0, 6);
@@ -6379,9 +6379,9 @@ namespace Toy2
 				MainMenu::g_fadeTimer = 0;
 				MainMenu::g_nextScreen = 0;
 
-				Nu3D::Camera::g_cameraTintBlue = 0;
-				Nu3D::Camera::g_cameraTintGreen = 0;
 				Nu3D::Camera::g_cameraTintRed = 0;
+				Nu3D::Camera::g_cameraTintGreen = 0;
+				Nu3D::Camera::g_cameraTintBlue = 0;
 
 				Nu3D::Camera::SetTint(128, 128, 128, 12);
 				SoftwareRenderer::SetBackdropScrollOverride(0, 0);
@@ -6439,9 +6439,9 @@ namespace Toy2
 					MainMenu::g_fadeTimer = 0;
 					MainMenu::g_nextScreen = 0;
 
-					Nu3D::Camera::g_cameraTintBlue = 0;
-					Nu3D::Camera::g_cameraTintGreen = 0;
 					Nu3D::Camera::g_cameraTintRed = 0;
+					Nu3D::Camera::g_cameraTintGreen = 0;
+					Nu3D::Camera::g_cameraTintBlue = 0;
 
 					Nu3D::Camera::SetTint(128, 128, 128, 12);
 					SoftwareRenderer::SetBackdropScrollOverride(0, 0);
@@ -6500,9 +6500,9 @@ namespace Toy2
 				MainMenu::g_fadeTimer = 0;
 				MainMenu::g_nextScreen = 0;
 
-				Nu3D::Camera::g_cameraTintBlue = 0;
-				Nu3D::Camera::g_cameraTintGreen = 0;
 				Nu3D::Camera::g_cameraTintRed = 0;
+				Nu3D::Camera::g_cameraTintGreen = 0;
+				Nu3D::Camera::g_cameraTintBlue = 0;
 
 				Nu3D::Camera::SetTint(128, 128, 128, 12);
 				SoftwareRenderer::SetBackdropScrollOverride(0, 0);

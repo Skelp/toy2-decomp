@@ -134,22 +134,22 @@ namespace Nu3D
 		STATIC_ASSERT(sizeof(ViewRotationHistoryEntry) == 8);
 
 		// GLOBAL: TOY2 0x0054DE9C
-		int16_t g_cameraTintBlue;
+		int16_t g_cameraTintRed;
 
 		// GLOBAL: TOY2 0x00554038
 		int16_t g_cameraTintGreen;
 
 		// GLOBAL: TOY2 0x0054DD6C
-		int16_t g_cameraTintRed;
+		int16_t g_cameraTintBlue;
 
 		// GLOBAL: TOY2 0x0052ADB8
-		uint8_t g_targetTintBlue;
+		uint8_t g_targetTintRed;
 
 		// GLOBAL: TOY2 0x0052AD8C
 		uint8_t g_targetTintGreen;
 
 		// GLOBAL: TOY2 0x0052C820
-		uint8_t g_targetTintRed;
+		uint8_t g_targetTintBlue;
 
 		// GLOBAL: TOY2 0x00529E50
 		uint8_t g_targetTintFadeSpeed;
@@ -311,11 +311,11 @@ namespace Nu3D
 		int32_t g_effectMode;
 
 		// FUNCTION: TOY2 0x004A1BB0 [MATCHED]
-		void SetTint(uint8_t blue, uint8_t green, uint8_t red, uint8_t fadeSpeed)
+		void SetTint(uint8_t red, uint8_t green, uint8_t blue, uint8_t fadeSpeed)
 		{
-			g_targetTintBlue = blue;
-			g_targetTintGreen = green;
 			g_targetTintRed = red;
+			g_targetTintGreen = green;
+			g_targetTintBlue = blue;
 			g_targetTintFadeSpeed = fadeSpeed;
 			g_tintBlend = -1;
 		}
@@ -343,20 +343,20 @@ namespace Nu3D
 
 			if (fadeStep)
 			{
-				if (g_cameraTintBlue != g_targetTintBlue)
+				if (g_cameraTintRed != g_targetTintRed)
 				{
 					anyChannelChanged = 1;
-					if (g_cameraTintBlue < g_targetTintBlue)
+					if (g_cameraTintRed < g_targetTintRed)
 					{
-						g_cameraTintBlue += fadeStep;
-						if (g_cameraTintBlue > g_targetTintBlue)
-							g_cameraTintBlue = g_targetTintBlue;
+						g_cameraTintRed += fadeStep;
+						if (g_cameraTintRed > g_targetTintRed)
+							g_cameraTintRed = g_targetTintRed;
 					}
 					else
 					{
-						g_cameraTintBlue -= fadeStep;
-						if (g_cameraTintBlue < g_targetTintBlue)
-							g_cameraTintBlue = g_targetTintBlue;
+						g_cameraTintRed -= fadeStep;
+						if (g_cameraTintRed < g_targetTintRed)
+							g_cameraTintRed = g_targetTintRed;
 					}
 				}
 
@@ -377,20 +377,20 @@ namespace Nu3D
 					}
 				}
 
-				if (g_cameraTintRed != g_targetTintRed)
+				if (g_cameraTintBlue != g_targetTintBlue)
 				{
 					anyChannelChanged = 1;
-					if (g_cameraTintRed < g_targetTintRed)
+					if (g_cameraTintBlue < g_targetTintBlue)
 					{
-						g_cameraTintRed += fadeStep;
-						if (g_cameraTintRed > g_targetTintRed)
-							g_cameraTintRed = g_targetTintRed;
+						g_cameraTintBlue += fadeStep;
+						if (g_cameraTintBlue > g_targetTintBlue)
+							g_cameraTintBlue = g_targetTintBlue;
 					}
 					else
 					{
-						g_cameraTintRed -= fadeStep;
-						if (g_cameraTintRed < g_targetTintRed)
-							g_cameraTintRed = g_targetTintRed;
+						g_cameraTintBlue -= fadeStep;
+						if (g_cameraTintBlue < g_targetTintBlue)
+							g_cameraTintBlue = g_targetTintBlue;
 					}
 					return anyChannelChanged;
 				}

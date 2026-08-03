@@ -4537,11 +4537,11 @@ namespace SoftwareRenderer
 						if (result < 0)
 							Logger::LogDDError("d3dappi.lpSkyMat->GetMaterial(&mat)", result);
 
-						int32_t component = colour->red * Nu3D::Camera::g_cameraTintBlue;
+						int32_t component = colour->red * Nu3D::Camera::g_cameraTintRed;
 						mat.diffuse.r = ((component + ((component >> 31) & 0x7F)) >> 7) * (1.0 / 255.0);
 						component = colour->green * Nu3D::Camera::g_cameraTintGreen;
 						mat.diffuse.g = ((component + ((component >> 31) & 0x7F)) >> 7) * (1.0 / 255.0);
-						component = colour->blue * Nu3D::Camera::g_cameraTintRed;
+						component = colour->blue * Nu3D::Camera::g_cameraTintBlue;
 						mat.diffuse.b = ((component + ((component >> 31) & 0x7F)) >> 7) * (1.0 / 255.0);
 						result = d3dappi.lpSkyMat->SetMaterial(&mat);
 						if (result < 0)
@@ -8761,9 +8761,9 @@ namespace SoftwareRenderer
 	{
 		for (int32_t i = 0; i < 0x3fc; i += 4)
 		{
-			g_paletteEntries[i + 4] = (uint8_t)(g_paletteSource[i + 4] * Nu3D::Camera::g_cameraTintBlue / 128);
+			g_paletteEntries[i + 4] = (uint8_t)(g_paletteSource[i + 4] * Nu3D::Camera::g_cameraTintRed / 128);
 			g_paletteEntries[i + 5] = (uint8_t)(g_paletteSource[i + 5] * Nu3D::Camera::g_cameraTintGreen / 128);
-			g_paletteEntries[i + 6] = (uint8_t)(g_paletteSource[i + 6] * Nu3D::Camera::g_cameraTintRed / 128);
+			g_paletteEntries[i + 6] = (uint8_t)(g_paletteSource[i + 6] * Nu3D::Camera::g_cameraTintBlue / 128);
 		}
 		g_lpPalette->SetEntries(0, 1, 255, (LPPALETTEENTRY)&g_paletteEntries[4]);
 	}
@@ -9243,7 +9243,7 @@ namespace SoftwareRenderer
 			Logger::Log("SOFT : ERROR - Failed to lock back buffer - %s.\n", D3DAppErrorToString(result));
 		}
 
-		if (Nu3D::Camera::g_cameraTintBlue != 0x80 && g_renderMode == RENDERMODE_SOFTWARE && g_bitsPerPixel != 8)
+		if (Nu3D::Camera::g_cameraTintRed != 0x80 && g_renderMode == RENDERMODE_SOFTWARE && g_bitsPerPixel != 8)
 		{
 			int32_t rowSkip = (g_backBufferPitchPixels - Toy2::g_destRectWidth) / 2;
 			int32_t rowWidth = Toy2::g_destRectWidth / 2;

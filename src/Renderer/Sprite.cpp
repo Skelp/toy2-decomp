@@ -714,7 +714,7 @@ namespace Renderer
 					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
 				}
 
-				RGBA color = { (uint8_t)Nu3D::Camera::g_cameraTintRed, (uint8_t)Nu3D::Camera::g_cameraTintGreen, (uint8_t)Nu3D::Camera::g_cameraTintBlue, 255 };
+				RGBA color = { (uint8_t)Nu3D::Camera::g_cameraTintBlue, (uint8_t)Nu3D::Camera::g_cameraTintGreen, (uint8_t)Nu3D::Camera::g_cameraTintRed, 255 };
 
 				Queue2DSprite(xPos * (1.0f / 320.0f),
 					yPos * (1.0f / g_virtualScreenHeight),
@@ -752,9 +752,9 @@ namespace Renderer
 				}
 
 				RGBA color;
-				color.r = (uint8_t)Nu3D::Camera::g_cameraTintBlue;
+				color.r = (uint8_t)Nu3D::Camera::g_cameraTintRed;
 				color.g = (uint8_t)Nu3D::Camera::g_cameraTintGreen;
-				color.b = (uint8_t)Nu3D::Camera::g_cameraTintRed;
+				color.b = (uint8_t)Nu3D::Camera::g_cameraTintBlue;
 				color.a = 255;
 
 				Queue2DSprite(xPos * (1.0f / g_virtualScreenWidth),
@@ -792,7 +792,7 @@ namespace Renderer
 					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
 				}
 
-				RGBA color = { (uint8_t)Nu3D::Camera::g_cameraTintRed, (uint8_t)Nu3D::Camera::g_cameraTintGreen, (uint8_t)Nu3D::Camera::g_cameraTintBlue, 255 };
+				RGBA color = { (uint8_t)Nu3D::Camera::g_cameraTintBlue, (uint8_t)Nu3D::Camera::g_cameraTintGreen, (uint8_t)Nu3D::Camera::g_cameraTintRed, 255 };
 				float normalizedClipLeft = (float)clipLeft / g_virtualScreenWidth;
 				float normalizedClipRight = (float)clipRight / g_virtualScreenWidth;
 				float normalizedX = (float)xPos * (1.0f / g_virtualScreenWidth);
@@ -860,9 +860,9 @@ namespace Renderer
 					uvMax.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
 				}
 
-				color.r = (uint8_t)Nu3D::Camera::g_cameraTintBlue;
+				color.r = (uint8_t)Nu3D::Camera::g_cameraTintRed;
 				color.g = (uint8_t)Nu3D::Camera::g_cameraTintGreen;
-				color.b = (uint8_t)Nu3D::Camera::g_cameraTintRed;
+				color.b = (uint8_t)Nu3D::Camera::g_cameraTintBlue;
 
 				alpha = &color.a;
 				if (! alpha)

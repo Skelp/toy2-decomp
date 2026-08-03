@@ -2050,14 +2050,14 @@ namespace Renderer
 		Vector2F uvBottomRight;
 		RGBA overlayColor;
 
-		if (Nu3D::Camera::g_cameraTintBlue == 128 && Nu3D::Camera::g_cameraTintGreen == 128 && Nu3D::Camera::g_cameraTintRed == 128)
+		if (Nu3D::Camera::g_cameraTintRed == 128 && Nu3D::Camera::g_cameraTintGreen == 128 && Nu3D::Camera::g_cameraTintBlue == 128)
 			return;
 
-		if (Nu3D::Camera::g_cameraTintBlue > 128 || Nu3D::Camera::g_cameraTintGreen > 128 || Nu3D::Camera::g_cameraTintRed > 128)
+		if (Nu3D::Camera::g_cameraTintRed > 128 || Nu3D::Camera::g_cameraTintGreen > 128 || Nu3D::Camera::g_cameraTintBlue > 128)
 		{
 			int32_t brightenGreen = 2 * Nu3D::Camera::g_cameraTintGreen - 256;
-			int32_t brightenRed = 2 * Nu3D::Camera::g_cameraTintBlue - 256;
-			int32_t brightenBlue = 2 * Nu3D::Camera::g_cameraTintRed - 256;
+			int32_t brightenRed = 2 * Nu3D::Camera::g_cameraTintRed - 256;
+			int32_t brightenBlue = 2 * Nu3D::Camera::g_cameraTintBlue - 256;
 
 			if (brightenRed > 255)
 			{
@@ -2101,9 +2101,9 @@ namespace Renderer
 		}
 		else
 		{
-			int32_t darkenRed = 2 * (128 - Nu3D::Camera::g_cameraTintBlue);
+			int32_t darkenRed = 2 * (128 - Nu3D::Camera::g_cameraTintRed);
 			int32_t darkenGreen = 2 * (128 - Nu3D::Camera::g_cameraTintGreen);
-			int32_t darkenBlue = 2 * (128 - Nu3D::Camera::g_cameraTintRed);
+			int32_t darkenBlue = 2 * (128 - Nu3D::Camera::g_cameraTintBlue);
 
 			if (darkenRed > 255)
 			{
