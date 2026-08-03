@@ -2074,105 +2074,81 @@ namespace AudioManager
 	{
 		char waveName[256];
 		DWORD status;
-		if (g_audioInitialized == 0)
+		if (g_audioInitialized != 0)
 		{
-			return -1;
-		}
-
-		int32_t firstBuffer = soundIndex * 6;
-		if (g_loopingSoundOwners[firstBuffer] == NULL)
-		{
-			return -1;
-		}
-
-		g_dsResult = g_dsBuffers[firstBuffer]->GetStatus(&status);
-		if ((status & DSBSTATUS_BUFFERLOST) != 0)
-		{
-			int32_t bufferIndex = firstBuffer & SOUND_BUFFER_GROUP_MASK;
-			int32_t bufferEnd = bufferIndex + 8;
-			for (; bufferIndex < bufferEnd; bufferIndex++)
+			int32_t firstBuffer = soundIndex * 6;
+			if (g_loopingSoundOwners[firstBuffer] != NULL)
 			{
-				g_loopingSoundOwners[bufferIndex] = NULL;
-				if (g_audioInitialized != 0)
+				g_dsResult = g_dsBuffers[firstBuffer]->GetStatus(&status);
+				if ((status & DSBSTATUS_BUFFERLOST) != 0)
 				{
-					g_dsBuffers[bufferIndex]->Release();
-				}
-			}
-
-			int32_t levelId = g_currentSfxLevelId;
-			g_loadedSfxPackIndex = firstBuffer / 8;
-			if (g_audioInitialized != 0)
-			{
-				if (IsStreamActive())
-				{
-					StopAndWait();
-					while (IsStreamActive()) {}
-				}
-
-				g_streamPending = 0;
-				if (g_audioInitialized != 0)
-				{
-					int32_t i;
-					for (i = 767; i >= 0; i--)
+					int32_t bufferIndex = firstBuffer & SOUND_BUFFER_GROUP_MASK;
+					int32_t bufferEnd = bufferIndex + 8;
+					for (; bufferIndex < bufferEnd; bufferIndex++)
 					{
-						if (g_dsBuffers[i] != NULL)
+						g_loopingSoundOwners[bufferIndex] = NULL;
+						if (g_audioInitialized != 0)
 						{
-							DWORD playing;
-							if (g_audioInitialized == 0)
-							{
-								playing = 0;
-							}
-							else
-							{
-								g_dsResult = g_dsBuffers[i]->GetStatus(&status);
-								playing = status;
-							}
-							if ((playing & DSBSTATUS_PLAYING) == DSBSTATUS_PLAYING)
-							{
-								g_dsBuffers[i]->Stop();
-							}
-							g_dsBuffers[i]->Release();
-							g_dsBuffers[i] = NULL;
-							g_loopingSoundOwners[i] = NULL;
+							g_dsBuffers[bufferIndex]->Release();
 						}
 					}
-					for (i = 0; i < 768; i++)
-					{
-						g_dsBuffers[i] = NULL;
-					}
-					for (i = 0; i < 768; i++)
-					{
-						g_loopingSoundOwners[i] = NULL;
-					}
-					for (i = 0; i < 32; i++)
-					{
-						g_loopingSoundChannels[i][0] = -1;
-						g_loopingSoundChannels[i][1] = -1;
-					}
-				}
-			}
 
-			SoundPackDescriptor* pack = &g_primarySoundPacks[0];
-			char** soundName = pack->soundNames;
-			int32_t packSoundIndex = pack->firstSoundIndex;
-			while (*soundName != NULL)
-			{
-				if (**soundName != '\0')
-				{
-					sprintf(waveName, "%s.wav", *soundName);
-					LoadSoundEffect(waveName, packSoundIndex, 0);
-				}
-				soundName++;
-				packSoundIndex++;
-			}
+					int32_t levelId = g_currentSfxLevelId;
+					g_loadedSfxPackIndex = firstBuffer / 8;
+					if (g_audioInitialized != 0)
+					{
+						if (IsStreamActive())
+						{
+							StopAndWait();
+							while (IsStreamActive()) {}
+						}
 
-			if (levelId > 0)
-			{
-				if (levelId <= 16)
-				{
-					pack = &g_primarySoundPacks[levelId];
-					soundName = pack->soundNames;
-					packSoundIndex = pack->firstSoundIndex;
+						g_streamPending = 0;
+						if (g_audioInitialized != 0)
+						{
+							int32_t i;
+							for (i = 767; i >= 0; i--)
+							{
+								if (g_dsBuffers[i] != NULL)
+								{
+									DWORD playing;
+									if (g_audioInitialized == 0)
+									{
+										playing = 0;
+									}
+									else
+									{
+										g_dsResult = g_dsBuffers[i]->GetStatus(&status);
+										playing = status;
+									}
+									if ((playing & DSBSTATUS_PLAYING) == DSBSTATUS_PLAYING)
+									{
+										g_dsBuffers[i]->Stop();
+									}
+									g_dsBuffers[i]->Release();
+									g_dsBuffers[i] = NULL;
+									g_loopingSoundOwners[i] = NULL;
+								}
+							}
+							for (i = 0; i < 768; i++)
+							{
+								g_dsBuffers[i] = NULL;
+							}
+							for (i = 0; i < 768; i++)
+							{
+								g_loopingSoundOwners[i] = NULL;
+							}
+							for (i = 0; i < 32; i++)
+							{
+								g_loopingSoundChannels[i][0] = -1;
+								g_loopingSoundChannels[i][1] = -1;
+							}
+						}
+					}
+
+					SoundPackDescriptor* pack = &g_primarySoundPacks[0];
+					char** soundName = pack->soundNames;
+					int32_t packSoundIndex = pack->firstSoundIndex;
 					while (*soundName != NULL)
 					{
 						if (**soundName != '\0')
@@ -2183,137 +2159,156 @@ namespace AudioManager
 						soundName++;
 						packSoundIndex++;
 					}
-				}
 
-				if (levelId <= 16)
-				{
-					pack = &g_secondarySoundPacks[levelId];
-					soundName = pack->soundNames;
-					packSoundIndex = pack->firstSoundIndex;
-					while (*soundName != NULL)
+					if (levelId > 0)
 					{
-						if (**soundName != '\0')
+						if (levelId <= 16)
 						{
-							sprintf(waveName, "%s.wav", *soundName);
-							LoadSoundEffect(waveName, packSoundIndex, 0);
-						}
-						soundName++;
-						packSoundIndex++;
-					}
-				}
-			}
-
-			g_currentSfxLevelId = levelId;
-			g_loadedSfxPackIndex = -1;
-		}
-
-		uint16_t frequency = g_soundFreqTable[soundIndex];
-		int32_t pan = (rightVolume - leftVolume) * 10000 / 128;
-		if (pan > DSBPAN_RIGHT)
-		{
-			pan = DSBPAN_RIGHT;
-		}
-		else if (pan < DSBPAN_LEFT)
-		{
-			pan = DSBPAN_LEFT;
-		}
-
-		int32_t volume = rightVolume;
-		if (volume < leftVolume)
-		{
-			volume = leftVolume;
-		}
-		volume = g_dsVolTable[g_sfxVolume * volume / 256];
-
-		if (owner != NULL)
-		{
-			for (int32_t i = 0; i < 6; i++)
-			{
-				int32_t bufferIndex = firstBuffer + i;
-				if (g_loopingSoundOwners[bufferIndex] == owner)
-				{
-					g_dsResult = g_dsBuffers[bufferIndex]->GetCurrentPosition(&g_soundPlayCursor, &g_soundWriteCursor);
-					if (g_dsResult == DS_OK)
-					{
-						g_dsBuffers[bufferIndex]->SetFrequency(frequency);
-						g_dsBuffers[bufferIndex]->SetPan(pan);
-						g_dsBuffers[bufferIndex]->SetVolume(volume);
-						if (g_soundPlayCursor == 0)
-						{
-							if (looping != 0)
+							pack = &g_primarySoundPacks[levelId];
+							soundName = pack->soundNames;
+							packSoundIndex = pack->firstSoundIndex;
+							while (*soundName != NULL)
 							{
-								g_dsResult = g_dsBuffers[bufferIndex]->Play(0, 0, DSBPLAY_LOOPING);
+								if (**soundName != '\0')
+								{
+									sprintf(waveName, "%s.wav", *soundName);
+									LoadSoundEffect(waveName, packSoundIndex, 0);
+								}
+								soundName++;
+								packSoundIndex++;
 							}
-							else
+						}
+
+						if (levelId <= 16)
+						{
+							pack = &g_secondarySoundPacks[levelId];
+							soundName = pack->soundNames;
+							packSoundIndex = pack->firstSoundIndex;
+							while (*soundName != NULL)
 							{
-								g_dsResult = g_dsBuffers[bufferIndex]->Play(0, 0, 0);
+								if (**soundName != '\0')
+								{
+									sprintf(waveName, "%s.wav", *soundName);
+									LoadSoundEffect(waveName, packSoundIndex, 0);
+								}
+								soundName++;
+								packSoundIndex++;
 							}
 						}
 					}
-					return bufferIndex;
-				}
-			}
-		}
-		else
-		{
-			owner = (void*)1;
-		}
 
-		DWORD oldestPlayCursor = 0;
-		int32_t oldestBuffer = -1;
-		for (int32_t i = 0; i < 6; i++)
-		{
-			int32_t bufferIndex = firstBuffer + i;
-			if (g_loopingSoundOwners[bufferIndex] != NULL)
-			{
-				g_dsResult = g_dsBuffers[bufferIndex]->GetCurrentPosition(&g_soundPlayCursor, &g_soundWriteCursor);
-				if (g_dsResult == DS_OK)
+					g_currentSfxLevelId = levelId;
+					g_loadedSfxPackIndex = -1;
+				}
+
+				uint16_t frequency = g_soundFreqTable[soundIndex];
+				int32_t pan = (rightVolume - leftVolume) * 10000 / 128;
+				if (pan > DSBPAN_RIGHT)
 				{
-					if (g_soundPlayCursor == 0)
+					pan = DSBPAN_RIGHT;
+				}
+				else if (pan < DSBPAN_LEFT)
+				{
+					pan = DSBPAN_LEFT;
+				}
+
+				int32_t volume = rightVolume;
+				if (volume < leftVolume)
+				{
+					volume = leftVolume;
+				}
+				volume = g_dsVolTable[g_sfxVolume * volume / 256];
+
+				if (owner != NULL)
+				{
+					for (int32_t i = 0; i < 6; i++)
 					{
-						g_dsBuffers[bufferIndex]->SetFrequency(frequency);
-						g_dsBuffers[bufferIndex]->SetPan(pan);
-						g_dsBuffers[bufferIndex]->SetVolume(volume);
-						g_dsBuffers[bufferIndex]->SetCurrentPosition(0);
-						if (looping != 0)
+						int32_t bufferIndex = firstBuffer + i;
+						if (g_loopingSoundOwners[bufferIndex] == owner)
 						{
-							g_dsResult = g_dsBuffers[bufferIndex]->Play(0, 0, DSBPLAY_LOOPING);
+							g_dsResult = g_dsBuffers[bufferIndex]->GetCurrentPosition(&g_soundPlayCursor, &g_soundWriteCursor);
+							if (g_dsResult == DS_OK)
+							{
+								g_dsBuffers[bufferIndex]->SetFrequency(frequency);
+								g_dsBuffers[bufferIndex]->SetPan(pan);
+								g_dsBuffers[bufferIndex]->SetVolume(volume);
+								if (g_soundPlayCursor == 0)
+								{
+									if (looping != 0)
+									{
+										g_dsResult = g_dsBuffers[bufferIndex]->Play(0, 0, DSBPLAY_LOOPING);
+									}
+									else
+									{
+										g_dsResult = g_dsBuffers[bufferIndex]->Play(0, 0, 0);
+									}
+								}
+							}
+							return bufferIndex;
 						}
-						else
-						{
-							g_dsResult = g_dsBuffers[bufferIndex]->Play(0, 0, 0);
-						}
-						g_loopingSoundOwners[bufferIndex] = owner;
-						return bufferIndex;
 					}
-					if (g_soundPlayCursor > oldestPlayCursor)
+				}
+				else
+				{
+					owner = (void*)1;
+				}
+
+				DWORD oldestPlayCursor = 0;
+				int32_t oldestBuffer = -1;
+				for (int32_t i = 0; i < 6; i++)
+				{
+					int32_t bufferIndex = firstBuffer + i;
+					if (g_loopingSoundOwners[bufferIndex] != NULL)
 					{
-						oldestPlayCursor = g_soundPlayCursor;
-						oldestBuffer = bufferIndex;
+						g_dsResult = g_dsBuffers[bufferIndex]->GetCurrentPosition(&g_soundPlayCursor, &g_soundWriteCursor);
+						if (g_dsResult == DS_OK)
+						{
+							if (g_soundPlayCursor == 0)
+							{
+								g_dsBuffers[bufferIndex]->SetFrequency(frequency);
+								g_dsBuffers[bufferIndex]->SetPan(pan);
+								g_dsBuffers[bufferIndex]->SetVolume(volume);
+								g_dsBuffers[bufferIndex]->SetCurrentPosition(0);
+								if (looping != 0)
+								{
+									g_dsResult = g_dsBuffers[bufferIndex]->Play(0, 0, DSBPLAY_LOOPING);
+								}
+								else
+								{
+									g_dsResult = g_dsBuffers[bufferIndex]->Play(0, 0, 0);
+								}
+								g_loopingSoundOwners[bufferIndex] = owner;
+								return bufferIndex;
+							}
+							if (g_soundPlayCursor > oldestPlayCursor)
+							{
+								oldestPlayCursor = g_soundPlayCursor;
+								oldestBuffer = bufferIndex;
+							}
+						}
 					}
+				}
+
+				if (oldestBuffer != -1)
+				{
+					g_dsBuffers[oldestBuffer]->SetFrequency(frequency);
+					g_dsBuffers[oldestBuffer]->SetPan(pan);
+					g_dsBuffers[oldestBuffer]->SetVolume(volume);
+					g_dsBuffers[oldestBuffer]->SetCurrentPosition(0);
+					if (looping != 0)
+					{
+						g_dsResult = g_dsBuffers[oldestBuffer]->Play(0, 0, DSBPLAY_LOOPING);
+					}
+					else
+					{
+						g_dsResult = g_dsBuffers[oldestBuffer]->Play(0, 0, 0);
+					}
+					g_loopingSoundOwners[oldestBuffer] = owner;
+					return oldestBuffer;
 				}
 			}
 		}
-
-		if (oldestBuffer == -1)
-		{
-			return -1;
-		}
-
-		g_dsBuffers[oldestBuffer]->SetFrequency(frequency);
-		g_dsBuffers[oldestBuffer]->SetPan(pan);
-		g_dsBuffers[oldestBuffer]->SetVolume(volume);
-		g_dsBuffers[oldestBuffer]->SetCurrentPosition(0);
-		if (looping != 0)
-		{
-			g_dsResult = g_dsBuffers[oldestBuffer]->Play(0, 0, DSBPLAY_LOOPING);
-		}
-		else
-		{
-			g_dsResult = g_dsBuffers[oldestBuffer]->Play(0, 0, 0);
-		}
-		g_loopingSoundOwners[oldestBuffer] = owner;
-		return oldestBuffer;
+		return -1;
 	}
 
 	namespace Wave
