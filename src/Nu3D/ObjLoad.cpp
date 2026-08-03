@@ -331,7 +331,7 @@ namespace NGNLoader
 				Logger::GetErrorHandler("C:\\projects\\nu3d\\objload.c", 428)("Given vertex count of %d exceeds maximum allowed (%d)", vertexCount, 2000);
 
 			g_curVertexCount = vertexCount;
-			g_curVertexFlags = (uint8_t)vertexFlags;
+			g_curVertexFlags = vertexFlags;
 
 			int32_t vertexSize = vertexDataLength;
 
