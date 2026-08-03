@@ -35,6 +35,12 @@ use `decomp-expert`. Give it the repository path, branch, current `HEAD`, mode,
 global baseline, and useful prior output. Never reuse a worker. Use a new task
 name such as `campaign_001`.
 
+If `spawn_agent` fails at the thread limit, recover one slot immediately. Call
+`followup_task` for one completed worker with a cleanup-only task. Tell it not
+to change the repository or do source work. Immediately call `interrupt_agent`
+while the turn runs. Confirm the free slot with `list_agents`. Retry the spawn
+one time.
+
 Give the worker relevant file-structure evidence for its subsystem. Ask it to
 check the likely original translation unit before it adds code. Do not direct a
 split from file size or namespace count alone.
@@ -43,9 +49,14 @@ Use campaign history when you select work. Do not retry a zero-yield target
 unless a new commit or new evidence changes its source model. State that new
 evidence in the assignment.
 
-Estimate retained bytes and elapsed minutes before you start a campaign.
-Prefer the highest credible retained-byte rate. Do not use unresolved bytes as
-the only measure.
+Record the retained-byte estimate range and elapsed-minute estimate before
+delegation. Prefer the highest credible retained-byte rate. Do not use
+unresolved bytes as the only measure.
+
+Compare the first retained gain with the estimate lower bound. If the gain is
+less than 25 percent of that bound, close source exploration for the campaign.
+Accept a valid source gain, and deliver it without more model trials or polish.
+Penalize that estimate model and target class during the next selection.
 
 Apply these selection gates:
 
@@ -80,7 +91,7 @@ After the worker returns:
 3. Rebuild and run the mode-specific validation independently.
 4. Run `tools/decomp progress --json` and verify each reported metric.
 5. Count a valid coverage, refinement, or data result as source progress.
-6. Close or interrupt the worker before the next campaign.
+6. Complete the mandatory worker cleanup before the next campaign.
 7. Confirm that the worker ran `tools/decomp report` after source progress.
 8. Confirm that the worker ran `tools/decomp sync` after source progress.
 9. Inspect changed file placement, linkage, headers, and CMake entries.
@@ -89,6 +100,14 @@ After the worker returns:
 12. Record the result with `tools/decomp campaigns record`.
 13. Record elapsed minutes, code bytes, data bytes, addresses, and the commit.
 14. Check the retained-byte rate for the last ten campaigns.
+
+Use this cleanup protocol after every campaign:
+
+1. Do not give new source work to the old worker.
+2. Call `followup_task` with a cleanup-only task for the completed worker.
+3. Tell the worker not to change the repository or do source work.
+4. Immediately call `interrupt_agent` while the cleanup turn runs.
+5. Use `list_agents` to confirm that the worker no longer uses a slot.
 
 Run the full report and sync exactly once for each successful campaign. Do not
 repeat a successful worker report or sync. Check the report summary, file time,
