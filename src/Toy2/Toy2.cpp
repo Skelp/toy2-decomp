@@ -6373,29 +6373,26 @@ namespace Toy2
 				while (true)
 				{
 					Nu3D::Camera::FadeToTargetTint();
-					caseOneFadeFrames -= Renderer::g_frameDelta;
 
-					if (caseOneFadeFrames <= 0)
-						break;
-
-					if (caseOneFadeFrames <= 23)
+					if (caseOneFadeFrames > 0)
 					{
-						if ((caseOneFadeFrames + Renderer::g_frameDelta) > 23)
-							Nu3D::Camera::SetTint(0, 0, 0, 12);
+						caseOneFadeFrames -= Renderer::g_frameDelta;
+
+						if (caseOneFadeFrames <= 0)
+							caseOneFadeFrames = 0;
 					}
 
-				LBL_CHECK_FADE_COMPLETE:
+					if (caseOneFadeFrames <= 23 && caseOneFadeFrames + Renderer::g_frameDelta > 23)
+						Nu3D::Camera::SetTint(0, 0, 0, 12);
 
-					if (! caseOneFadeFrames)
+					if ((InputManager::g_curButtonsPressed & (INPUT_CANCEL | INPUT_SPIN | INPUT_JUMP | INPUT_FIRE)) != 0
+						&& caseOneFadeFrames < 0 && caseOneFadeFrames > 23)
+					{
+						caseOneFadeFrames = 24;
+					}
+					else if (! caseOneFadeFrames)
 						return 1;
 				}
-
-				caseOneFadeFrames = 0;
-
-				if ((caseOneFadeFrames + Renderer::g_frameDelta) > 23)
-					Nu3D::Camera::SetTint(0, 0, 0, 12);
-
-				goto LBL_CHECK_FADE_COMPLETE;
 			}
 
 			case 2:
