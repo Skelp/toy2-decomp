@@ -1279,7 +1279,6 @@ namespace Renderer
 		// FUNCTION: TOY2 0x004B6C10 [PROVISIONAL]
 		void RenderType8(Nu3D::Material* material, Renderer::RenderEntry* entry)
 		{
-			D3DMATRIX* transforms = entry->instanceData->matrices;
 			Nu3D::InstanceData* instanceData = entry->instanceData;
 
 			SoftwareRenderer::g_softwarePrimitiveType = instanceData->unkInt6;
@@ -1323,22 +1322,22 @@ namespace Renderer
 
 				if (patch->controlPointCount != 4)
 				{
-					int32_t halfVertexCount = patch->patchVertices.vertexCount / 2;
-					DrawingDevice::SetWorldTransform(&transforms[0]);
+					int32_t halfVertexCount = patch->patchVertices.vertexCount >> 1;
+					DrawingDevice::SetWorldTransform(&entry->instanceData->matrices[0]);
 					DrawingAPI::ProcessVerticesOnBuffer(destBuffer, vertexOp, 0, halfVertexCount, sourceBuffer, 0, 0);
-					DrawingDevice::SetWorldTransform(&transforms[1]);
+					DrawingDevice::SetWorldTransform(&entry->instanceData->matrices[1]);
 					result = DrawingAPI::ProcessVerticesOnBuffer(destBuffer, vertexOp, 32, halfVertexCount, sourceBuffer, halfVertexCount, 0);
 					indices = g_patchStripIndices;
 				}
 				else
 				{
-					DrawingDevice::SetWorldTransform(&transforms[0]);
+					DrawingDevice::SetWorldTransform(&entry->instanceData->matrices[0]);
 					result = DrawingAPI::ProcessVerticesOnBuffer(destBuffer, vertexOp, 0, 1, sourceBuffer, 0, 0);
-					DrawingDevice::SetWorldTransform(&transforms[1]);
+					DrawingDevice::SetWorldTransform(&entry->instanceData->matrices[1]);
 					result |= DrawingAPI::ProcessVerticesOnBuffer(destBuffer, vertexOp, 1, 1, sourceBuffer, 1, 0);
-					DrawingDevice::SetWorldTransform(&transforms[2]);
+					DrawingDevice::SetWorldTransform(&entry->instanceData->matrices[2]);
 					result |= DrawingAPI::ProcessVerticesOnBuffer(destBuffer, vertexOp, 2, 1, sourceBuffer, 2, 0);
-					DrawingDevice::SetWorldTransform(&transforms[3]);
+					DrawingDevice::SetWorldTransform(&entry->instanceData->matrices[3]);
 					result |= DrawingAPI::ProcessVerticesOnBuffer(destBuffer, vertexOp, 3, 1, sourceBuffer, 3, 0);
 					indices = g_patchQuadIndices;
 				}
@@ -1346,7 +1345,7 @@ namespace Renderer
 				if (result == 0)
 				{
 					if (projectTexture)
-						Renderer::Vertices::ProjectToScreen(&patch->patchVertices, transforms, patch->controlPointCount);
+						Renderer::Vertices::ProjectToScreen(&patch->patchVertices, entry->instanceData->matrices, patch->controlPointCount);
 
 					if (g_materialHorzOffset != 0.0f || g_materialVertOffset != 0.0f)
 						Renderer::Vertices::ApplyOffset(&patch->patchVertices, g_materialHorzOffset, g_materialVertOffset);
