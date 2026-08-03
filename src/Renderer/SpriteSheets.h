@@ -21,6 +21,7 @@ namespace Renderer
 
     extern SpriteSheet *g_spriteSheets[128];
 	extern SpriteSheet* g_fallbackSpriteSheet;
+	extern SpriteSheet* g_level7Sheets[4];
 
     void InitSpriteSheets();
 

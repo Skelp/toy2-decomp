@@ -811,12 +811,6 @@ namespace Renderer
 	// GLOBAL: TOY2 0x004F21A4
 	SpriteSheet* g_level6Sheets[5] = { &g_level6Sheet1, &g_level6Sheet1, &g_level6Sheet1, &g_level6Sheet1, SPRITE_SHEET_END };
 
-	SpriteSheet g_level7Sheet2 = { 1, 63, 63, 0, { { 192, 192 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
-	SpriteSheet g_level7Sheet1 = { 7, 32, 32, 0, { { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
-	SpriteSheet g_level7Sheet3 = { 7, 31, 31, 0, { { 64, 0 }, { 0, 0 } } };
-	// GLOBAL: TOY2 0x004F293C
-	SpriteSheet* g_level7Sheets[4] = { &g_level7Sheet1, &g_level7Sheet2, &g_level7Sheet3, SPRITE_SHEET_END };
-
 	SpriteSheet g_level8Sheet3 = { 8, 31, 31, 0, { { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level8Sheet2 = { 8, 31, 31, 0, { { 64, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
 	SpriteSheet g_level8Sheet1 = { 8, 32, 32, 0, { { 192, 0 }, { 0, 0 } } };

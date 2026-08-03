@@ -18,9 +18,22 @@
 #include "Nu3D/Math.h"
 #include "Nu3D/Particles.h"
 #include "Renderer/Renderer.h"
+#include "Renderer/SpriteSheets.h"
 #include "Random.h"
 #include "Numerics.h"
 #include "Nullsub.h"
+
+namespace Renderer
+{
+	// GLOBAL: TOY2 0x004F2910
+	SpriteSheet g_level7Sheet2 = { 1, 63, 63, 0, { { 192, 192 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F2920
+	SpriteSheet g_level7Sheet1 = { 7, 32, 32, 0, { { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F2930
+	SpriteSheet g_level7Sheet3 = { 7, 31, 31, 0, { { 64, 0 }, { 0, 0 } } };
+	// GLOBAL: TOY2 0x004F293C
+	SpriteSheet* g_level7Sheets[4] = { &g_level7Sheet1, &g_level7Sheet2, &g_level7Sheet3, (SpriteSheet*)-1 };
+}
 
 namespace Toy2
 {
