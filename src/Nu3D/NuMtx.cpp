@@ -465,24 +465,7 @@ namespace Nu3D
 
 			float alignment = Abs(Vector3F::DotProduct(up, forward));
 
-			if (alignment <= 0.8660253882408142f)
-			{
-				VertexCrossProduct(right, up, forward);
-
-				float newLengthSquared = right->x * right->x + right->y * right->y + right->z * right->z;
-				scale = (float)sqrt(rightLengthSquared / newLengthSquared);
-				right->x *= scale;
-				right->y *= scale;
-				right->z *= scale;
-
-				VertexCrossProduct(up, forward, right);
-				newLengthSquared = up->x * up->x + up->y * up->y + up->z * up->z;
-				scale = (float)sqrt(upLengthSquared / newLengthSquared);
-				up->x *= scale;
-				up->y *= scale;
-				up->z *= scale;
-			}
-			else
+			if (alignment > 0.8660253882408142f)
 			{
 				VertexCrossProduct(up, forward, right);
 
@@ -498,6 +481,23 @@ namespace Nu3D
 				right->x *= scale;
 				right->y *= scale;
 				right->z *= scale;
+			}
+			else
+			{
+				VertexCrossProduct(right, up, forward);
+
+				float newLengthSquared = right->x * right->x + right->y * right->y + right->z * right->z;
+				scale = (float)sqrt(rightLengthSquared / newLengthSquared);
+				right->x *= scale;
+				right->y *= scale;
+				right->z *= scale;
+
+				VertexCrossProduct(up, forward, right);
+				newLengthSquared = up->x * up->x + up->y * up->y + up->z * up->z;
+				scale = (float)sqrt(upLengthSquared / newLengthSquared);
+				up->x *= scale;
+				up->y *= scale;
+				up->z *= scale;
 			}
 		}
 
