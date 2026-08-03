@@ -224,6 +224,54 @@ def scalar_sizes(engine: Compare, variable, item, size: int) -> list[int]:
     return [1] * size
 
 
+def pointer_literal_comparison(
+    comparator: VariableComparator,
+    variable,
+    original: DataBlock,
+    recompiled: DataBlock,
+    scalar,
+    compared: ComparedOffset,
+) -> ComparedOffset:
+    """Compare a non-relocated pointer scalar as an exact stored literal."""
+
+    if not scalar.is_pointer:
+        return compared
+
+    original_address = variable.orig_addr + scalar.offset
+    recompiled_address = variable.recomp_addr + scalar.offset
+    if (
+        original_address in comparator.orig_bin.relocations
+        or recompiled_address in comparator.recomp_bin.relocations
+    ):
+        return compared
+
+    start = scalar.offset
+    end = start + scalar.size
+    original_bytes = original.data[start:end]
+    recompiled_bytes = recompiled.data[start:end]
+    bss_conflict = (
+        original.bss == BssState.NO and recompiled.bss == BssState.YES
+    ) or (recompiled.bss == BssState.NO and original.bss == BssState.YES)
+    literal_match = original_bytes == recompiled_bytes and not bss_conflict
+    if compared.match == literal_match:
+        return compared
+
+    def display(block: DataBlock, value: bytes) -> str:
+        if block.bss == BssState.YES:
+            return "(uninitialized)"
+        return f"Pointer literal 0x{int.from_bytes(value, 'little'):0{len(value) * 2}x}"
+
+    return ComparedOffset(
+        offset=compared.offset,
+        name=compared.name,
+        match=literal_match,
+        values=(
+            display(original, original_bytes),
+            display(recompiled, recompiled_bytes),
+        ),
+    )
+
+
 def comparison_fields(engine, comparator, variable, item, size):
     """Return comparison fields with one result for each union range."""
 
@@ -234,14 +282,30 @@ def comparison_fields(engine, comparator, variable, item, size):
         return ordinary
 
     try:
+        scalars = engine.types.get_scalars_gapless(CvdumpTypeKey(type_key))
         ranges = union_storage_ranges(engine.types, CvdumpTypeKey(type_key))
     except (CvdumpIntegrityError, CvdumpKeyError, KeyError, ValueError):
-        return ordinary
-    if not ranges:
         return ordinary
 
     original = DataBlock.read(variable.orig_addr, size, engine.orig_bin)
     recompiled = DataBlock.read(variable.recomp_addr, size, engine.recomp_bin)
+    ordinary = [
+        (
+            pointer_literal_comparison(
+                comparator,
+                variable,
+                original,
+                recompiled,
+                scalar,
+                compared,
+            ),
+            width,
+        )
+        for (compared, width), scalar in zip(ordinary, scalars)
+    ]
+    if not ranges:
+        return ordinary
+
     output = [
         (compared, width)
         for compared, width in ordinary
