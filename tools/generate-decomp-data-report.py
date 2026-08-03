@@ -6,14 +6,182 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import NamedTuple
 
 from reccmp.compare import Compare
 from reccmp.compare.db import ReccmpMatch
-from reccmp.compare.variables import VariableComparator
+from reccmp.compare.variables import (
+    BssState,
+    ComparedOffset,
+    DataBlock,
+    VariableComparator,
+    pointer_display,
+)
 from reccmp.cvdump.cvinfo import CvdumpTypeKey
 from reccmp.cvdump.types import CvdumpIntegrityError, CvdumpKeyError
 from reccmp.project.detect import GhidraConfig, RecCmpTarget, ReportConfig
 from reccmp.types import ImageId
+
+
+class UnionStorage(NamedTuple):
+    """Describe one union storage range in a variable."""
+
+    offset: int
+    size: int
+    name: str
+
+
+def union_storage_ranges(types, type_key, base: int = 0, name: str = ""):
+    """Find outer union storage ranges without selecting a union member."""
+
+    item = types.get(type_key)
+    if item.is_array():
+        assert item.array_type is not None
+        assert item.array_length is not None
+        assert item.array_element_size is not None
+        return [
+            storage
+            for index in range(item.array_length)
+            for storage in union_storage_ranges(
+                types,
+                item.array_type,
+                base + index * item.array_element_size,
+                f"{name}[{index}]",
+            )
+        ]
+
+    if not item.is_struct():
+        return []
+
+    raw_type = types.from_key(item.key)
+    if raw_type.get("type") == "LF_UNION":
+        assert item.size is not None
+        return [UnionStorage(base, item.size, f"{name} (union)".strip())]
+
+    assert item.members is not None
+    ranges = []
+    for member in item.members:
+        member_name = f"{name}.{member.name}" if name else member.name
+        ranges.extend(
+            union_storage_ranges(
+                types, member.type, base + member.offset, member_name
+            )
+        )
+    return ranges
+
+
+def union_storage_comparison(
+    comparator: VariableComparator,
+    variable,
+    original: DataBlock,
+    recompiled: DataBlock,
+    storage: UnionStorage,
+) -> ComparedOffset:
+    """Compare one union range with relocation evidence for active pointers."""
+
+    start = storage.offset
+    end = start + storage.size
+    original_relocations = {
+        offset
+        for offset in range(storage.size)
+        if variable.orig_addr + start + offset in comparator.orig_bin.relocations
+    }
+    recompiled_relocations = {
+        offset
+        for offset in range(storage.size)
+        if variable.recomp_addr + start + offset in comparator.recomp_bin.relocations
+    }
+
+    original_bytes = original.data[start:end]
+    recompiled_bytes = recompiled.data[start:end]
+    match = True
+
+    pointer_values = []
+    ignored = set()
+    pointer_offsets = original_relocations | recompiled_relocations
+    if pointer_offsets:
+        for offset in sorted(pointer_offsets):
+            if offset + 4 > storage.size:
+                match = False
+                break
+            ignored.update(range(offset, offset + 4))
+            original_pointer = int.from_bytes(
+                original_bytes[offset : offset + 4], "little"
+            )
+            recompiled_pointer = int.from_bytes(
+                recompiled_bytes[offset : offset + 4], "little"
+            )
+            pointer_match = comparator.is_pointer_match(
+                original_pointer, recompiled_pointer
+            ) or comparator.is_pointer_match_to_offset(
+                original_pointer, recompiled_pointer
+            )
+            match = match and pointer_match
+            pointer_values.append(
+                (
+                    offset,
+                    pointer_display(
+                        comparator.db,
+                        comparator.types,
+                        ImageId.ORIG,
+                        original_pointer,
+                    ),
+                    pointer_display(
+                        comparator.db,
+                        comparator.types,
+                        ImageId.RECOMP,
+                        recompiled_pointer,
+                    ),
+                )
+            )
+
+    match = match and all(
+        original_bytes[index] == recompiled_bytes[index]
+        for index in range(storage.size)
+        if index not in ignored
+    )
+
+    bss_conflict = (
+        original.bss == BssState.NO and recompiled.bss == BssState.YES
+    ) or (recompiled.bss == BssState.NO and original.bss == BssState.YES)
+    match = match and not bss_conflict
+
+    def display(block, raw_bytes, relocations, pointers, image_index):
+        if block.bss == BssState.YES:
+            return "(uninitialized)"
+        relocation_text = ", ".join(f"+0x{offset:X}" for offset in sorted(relocations))
+        pointer_text = ", ".join(
+            f"+0x{offset:X}: {values[image_index]}"
+            for offset, *values in pointers
+        )
+        parts = [f"Raw union bytes {raw_bytes.hex()}"]
+        if relocation_text:
+            parts.append(f"relocations {relocation_text}")
+        if pointer_text:
+            parts.append(pointer_text)
+        return ". ".join(parts)
+
+    return ComparedOffset(
+        offset=storage.offset,
+        name=storage.name,
+        match=match,
+        values=(
+            display(
+                original,
+                original_bytes,
+                original_relocations,
+                pointer_values,
+                0,
+            ),
+            display(
+                recompiled,
+                recompiled_bytes,
+                recompiled_relocations,
+                pointer_values,
+                1,
+            ),
+        ),
+    )
 
 
 def variable_size(engine: Compare, variable) -> int:
@@ -54,6 +222,44 @@ def scalar_sizes(engine: Compare, variable, item, size: int) -> list[int]:
         except (CvdumpIntegrityError, CvdumpKeyError, KeyError, ValueError):
             pass
     return [1] * size
+
+
+def comparison_fields(engine, comparator, variable, item, size):
+    """Return comparison fields with one result for each union range."""
+
+    widths = scalar_sizes(engine, variable, item, size)
+    ordinary = list(zip(item.compared, widths))
+    type_key = variable.get("data_type")
+    if not type_key or item.raw_only:
+        return ordinary
+
+    try:
+        ranges = union_storage_ranges(engine.types, CvdumpTypeKey(type_key))
+    except (CvdumpIntegrityError, CvdumpKeyError, KeyError, ValueError):
+        return ordinary
+    if not ranges:
+        return ordinary
+
+    original = DataBlock.read(variable.orig_addr, size, engine.orig_bin)
+    recompiled = DataBlock.read(variable.recomp_addr, size, engine.recomp_bin)
+    output = [
+        (compared, width)
+        for compared, width in ordinary
+        if not any(
+            storage.offset <= compared.offset < storage.offset + storage.size
+            for storage in ranges
+        )
+    ]
+    output.extend(
+        (
+            union_storage_comparison(
+                comparator, variable, original, recompiled, storage
+            ),
+            storage.size,
+        )
+        for storage in ranges
+    )
+    return sorted(output, key=lambda field: field[0].offset)
 
 
 def export_variables(engine: Compare) -> dict:
@@ -97,10 +303,11 @@ def export_variables(engine: Compare) -> dict:
             continue
 
         item = comparator.compare_variable(variable)
-        widths = scalar_sizes(engine, variable, item, size)
         fields = []
         matched_bytes = 0
-        for compared, width in zip(item.compared, widths):
+        for compared, width in comparison_fields(
+            engine, comparator, variable, item, size
+        ):
             width = min(width, max(0, size - compared.offset))
             if width <= 0:
                 continue
@@ -125,7 +332,15 @@ def export_variables(engine: Compare) -> dict:
                 "size": size,
                 "matched_bytes": matched_bytes,
                 "score": matched_bytes / size,
-                "result": item.result.name.lower(),
+                "result": (
+                    "error"
+                    if item.error
+                    else "match"
+                    if matched_bytes == size
+                    else "warn"
+                    if item.raw_only
+                    else "diff"
+                ),
                 "raw_only": item.raw_only,
                 "error": item.error,
                 "fields": fields,
