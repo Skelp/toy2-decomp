@@ -784,6 +784,7 @@ namespace Renderer
 	// GLOBAL: TOY2 0x004F14F4
 	SpriteSheet* g_level2Sheets[5] = { &g_level2Sheet1, &g_level2Sheet2, &g_level2Sheet3, &g_level2Sheet4, SPRITE_SHEET_END };
 
+	// GLOBAL: TOY2 0x004F1558
 	SpriteSheet g_level3Sheet1 = { 8, 8, 32, 0, { { 0, 0 }, { 0, 0 } } };
 	// GLOBAL: TOY2 0x004F1564
 	SpriteSheet* g_level3Sheets[2] = { &g_level3Sheet1, SPRITE_SHEET_END };
