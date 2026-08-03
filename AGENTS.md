@@ -19,6 +19,8 @@ A function is terminal only when all these conditions are true:
 
 Tool-only, provisional, `STUB`, and unstarted functions remain active work.
 
+There is a document in this repository (`toy2_gameplay_context.md`) for more context.
+
 ## Evidence and names
 
 Use evidence in this order:
