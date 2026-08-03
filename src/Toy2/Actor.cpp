@@ -793,7 +793,7 @@ namespace Toy2
 			Dialogue::Begin(actorIndex, dialogueRecordIndex, itemReturnedSubtitle, actorFacingAngle, cameraFacingAngle, -1);
 
 			Gadget::g_unlockNodeState = 0;
-			int32_t unlockFlag = Gadget::g_levelUnlockInfo[g_levelFileIndex - 1].unlockFlag;
+			uint16_t unlockFlag = Gadget::g_levelUnlockInfo[g_levelFileIndex - 1].unlockFlag;
 			g_unlocks |= unlockFlag;
 			switch (unlockFlag)
 			{
