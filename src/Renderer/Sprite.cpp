@@ -951,19 +951,21 @@ namespace Renderer
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x00493C30 [PROVISIONAL]
+		// FUNCTION: TOY2 0x00493C30 [MATCHED]
 		int16_t DrawColoured(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue)
 		{
 			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
+			int32_t textureDataIndex;
+			Vector2F uvTopLeft;
+			Vector2F uvBottomRight;
+			uint32_t bitmapWidth;
+			uint32_t bitmapHeight;
+			RGBA color;
 			if (sheet)
 			{
-				int32_t textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
-				Vector2F uvTopLeft;
-				Vector2F uvBottomRight;
+				textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
 				if (textureDataIndex != 0)
 				{
-					uint32_t bitmapWidth;
-					uint32_t bitmapHeight;
 					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
 
 					uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;
@@ -972,13 +974,14 @@ namespace Renderer
 					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
 				}
 
-				RGBA color = { blue, green, red, 255 };
-				float inverseHeight = 1.0f / g_virtualScreenHeight;
-				float inverseWidth = 1.0f / g_virtualScreenWidth;
-				Queue2DSprite((float)xPos * inverseWidth,
-					(float)yPos * inverseHeight,
-					(float)sheet->tileWidth * inverseWidth,
-					(float)sheet->tileHeight * inverseHeight,
+				color.a = 255;
+				color.r = red;
+				color.g = green;
+				color.b = blue;
+				Queue2DSprite((float)xPos * (1.0f / g_virtualScreenWidth),
+					(float)yPos * (1.0f / g_virtualScreenHeight),
+					(float)sheet->tileWidth * (1.0f / g_virtualScreenWidth),
+					(float)sheet->tileHeight * (1.0f / g_virtualScreenHeight),
 					&uvTopLeft,
 					&uvBottomRight,
 					textureDataIndex,
@@ -1015,6 +1018,10 @@ namespace Renderer
 		// FUNCTION: TOY2 0x0049D7A0 [PROVISIONAL]
 		void DrawBackdropTransition(int32_t* framesRemaining, int32_t* backdropIndex, int32_t duration)
 		{
+			int32_t* remaining = framesRemaining;
+			Vector2F uvTopLeft;
+			Vector2F uvBottomRight;
+			RGBA fadeColor;
 			if (*framesRemaining > 0)
 			{
 				*framesRemaining -= Renderer::g_frameDelta;
@@ -1030,24 +1037,46 @@ namespace Renderer
 				Renderer::Glue::SetBackdrop(Toy2::g_nextBackdropId);
 			}
 
-			const int32_t overlayFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT;
-
 			if (*framesRemaining < 25)
 			{
-				Vector2F uvTopLeft = { 0.0f, 0.0f };
-				Vector2F uvBottomRight = { 1.0f, 1.0f };
-				RGBA fadeColor = { 0 };
+				fadeColor.r = 0;
+				fadeColor.g = 0;
+				fadeColor.b = 0;
 				fadeColor.a = (uint8_t)(-10 * *framesRemaining - 1);
-				Queue2DSprite(0.0f, 0.0f, 1.0f, 1.0f, &uvTopLeft, &uvBottomRight, 0, fadeColor, overlayFlags);
+				uvTopLeft.x = 0.0f;
+				uvTopLeft.y = 0.0f;
+				uvBottomRight.x = 1.0f;
+				uvBottomRight.y = 1.0f;
+				Queue2DSprite(0.0f,
+					0.0f,
+					1.0f,
+					1.0f,
+					&uvTopLeft,
+					&uvBottomRight,
+					0,
+					fadeColor,
+					RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT);
 			}
 
-			if (*framesRemaining > duration - 25)
+			if (*remaining > duration - 25)
 			{
-				Vector2F uvTopLeft = { 0.0f, 0.0f };
-				Vector2F uvBottomRight = { 1.0f, 1.0f };
-				RGBA fadeColor = { 0 };
-				fadeColor.a = (uint8_t)(10 * *framesRemaining - 10 * duration - 1);
-				Queue2DSprite(0.0f, 0.0f, 1.0f, 1.0f, &uvTopLeft, &uvBottomRight, 0, fadeColor, overlayFlags);
+				fadeColor.r = 0;
+				fadeColor.g = 0;
+				fadeColor.b = 0;
+				fadeColor.a = (uint8_t)(10 * *remaining - 10 * duration - 1);
+				uvTopLeft.x = 0.0f;
+				uvTopLeft.y = 0.0f;
+				uvBottomRight.x = 1.0f;
+				uvBottomRight.y = 1.0f;
+				Queue2DSprite(0.0f,
+					0.0f,
+					1.0f,
+					1.0f,
+					&uvTopLeft,
+					&uvBottomRight,
+					0,
+					fadeColor,
+					RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT);
 			}
 		}
 
