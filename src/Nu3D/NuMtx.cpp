@@ -504,8 +504,8 @@ namespace Nu3D
 		// FUNCTION: TOY2 0x004AB090 [PROVISIONAL]
 		void MatrixToQuaternion(D3DMATRIX* matrix, Quaternion* quaternion)
 		{
-			float trace = matrix->_22 + matrix->_33 + matrix->_11;
-			int32_t nextIndex[3] = { 1, 2, 0 };
+			float trace = matrix->_33 + matrix->_22 + matrix->_11;
+			const int32_t nextIndex[3] = { 1, 2, 0 };
 
 			if (trace > 0.0)
 			{
@@ -526,17 +526,19 @@ namespace Nu3D
 
 				int32_t next = nextIndex[index];
 				int32_t last = nextIndex[next];
-				Quaternion result;
+				float result[4];
 				float scale = (float)sqrt((diagonal[index * 5] - (diagonal[next * 5] + diagonal[last * 5])) + 1.0f);
-				float* values = &result.x;
-				values[index] = scale * 0.5f;
+				result[index] = scale * 0.5f;
 				if (scale != 0.0f)
 					scale = 0.5f / scale;
 
-				result.w = (diagonal[next * 4 + last] - diagonal[last * 4 + next]) * scale;
-				values[next] = (diagonal[index * 4 + next] + diagonal[next * 4 + index]) * scale;
-				values[last] = (diagonal[index * 4 + last] + diagonal[last * 4 + index]) * scale;
-				*quaternion = result;
+				result[3] = (diagonal[next * 4 + last] - diagonal[last * 4 + next]) * scale;
+				result[next] = (diagonal[index * 4 + next] + diagonal[next * 4 + index]) * scale;
+				result[last] = (diagonal[index * 4 + last] + diagonal[last * 4 + index]) * scale;
+				quaternion->x = result[0];
+				quaternion->y = result[1];
+				quaternion->z = result[2];
+				quaternion->w = result[3];
 			}
 		}
 
