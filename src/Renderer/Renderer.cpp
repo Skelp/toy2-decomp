@@ -138,12 +138,52 @@ namespace Renderer
 
 			switch (character)
 			{
+				case 0xba:
+					glyphX = 64;
+					glyphY = 64;
+					break;
+				case 0xb9:
+					glyphX = 80;
+					glyphY = 64;
+					break;
+				case 0xb2:
+					glyphX = 96;
+					glyphY = 64;
+					break;
+				case 0xb3:
+					glyphX = 112;
+					glyphY = 64;
+					break;
+				case '.':
+					glyphX = 128;
+					glyphY = 128;
+					break;
+				case ',':
+					glyphX = 160;
+					glyphY = 128;
+					break;
+				case ';':
+					glyphX = 192;
+					glyphY = 128;
+					break;
+				case ':':
+					glyphX = 224;
+					glyphY = 128;
+					break;
+				case '\\':
+					glyphX = 0;
+					glyphY = 160;
+					break;
+				case '/':
+					glyphX = 32;
+					glyphY = 160;
+					break;
 				case '!':
 					glyphX = 96;
 					glyphY = 160;
 					break;
-				case '\'':
-					glyphX = 224;
+				case '?':
+					glyphX = 128;
 					glyphY = 160;
 					break;
 				case '(':
@@ -154,49 +194,9 @@ namespace Renderer
 					glyphX = 192;
 					glyphY = 160;
 					break;
-				case ',':
-					glyphX = 160;
-					glyphY = 128;
-					break;
-				case '.':
-					glyphX = 128;
-					glyphY = 128;
-					break;
-				case '/':
-					glyphX = 32;
-					glyphY = 160;
-					break;
-				case ':':
+				case '\'':
 					glyphX = 224;
-					glyphY = 128;
-					break;
-				case ';':
-					glyphX = 192;
-					glyphY = 128;
-					break;
-				case '?':
-					glyphX = 128;
 					glyphY = 160;
-					break;
-				case '\\':
-					glyphX = 0;
-					glyphY = 160;
-					break;
-				case 0xb2:
-					glyphX = 96;
-					glyphY = 64;
-					break;
-				case 0xb3:
-					glyphX = 112;
-					glyphY = 64;
-					break;
-				case 0xb9:
-					glyphX = 80;
-					glyphY = 64;
-					break;
-				case 0xba:
-					glyphX = 64;
-					glyphY = 64;
 					break;
 				default: {
 					int32_t glyphIndex;
