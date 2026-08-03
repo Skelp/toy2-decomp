@@ -8,6 +8,4 @@
 0x00438a50	unstructured-control-flow	goto-count	8564fcf859bd	src/Toy2/LevelSelect.cpp
 0x0049d910	unstructured-control-flow	goto-count	77dd5e8ddf01	src/Toy2/Toy2.cpp
 src/Nu3D/Camera.cpp	repeated-private-type	Nu3D::SoftwareProjectionPoint	8cff9b180f19	src/Nu3D/Camera.cpp
-src/Toy2/Buzz.cpp	repeated-private-type	Toy2::PoleRecord	459db3f4fef8	src/Toy2/Buzz.cpp
 src/Toy2/Toy2.cpp	repeated-private-type	Nu3D::SoftwareProjectionPoint	8cff9b180f19	src/Toy2/Toy2.cpp
-src/Toy2/Toy2.cpp	repeated-private-type	Toy2::PoleRecord	459db3f4fef8	src/Toy2/Toy2.cpp

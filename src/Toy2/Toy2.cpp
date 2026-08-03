@@ -27,6 +27,7 @@
 #include "Toy2/MainMenu.h"
 #include "Toy2/Actor.h"
 #include "Toy2/Animation.h"
+#include "Toy2/PoleRecord.h"
 #include "Toy2/Camera.h"
 #include "Toy2/Collision.h"
 #include "Toy2/Collectables.h"
@@ -592,16 +593,6 @@ namespace Toy2
 			RECORD_POLE = 61,
 			RECORD_ZIPLINE = 62
 		};
-
-		struct PoleRecord
-		{
-			Vector3I position;
-			int32_t type;
-			int32_t height;
-			int32_t reserved;
-		};
-
-		STATIC_ASSERT(sizeof(PoleRecord) == 0x18);
 
 		// FUNCTION: TOY2 0x00414550 [PROVISIONAL]
 		void FixupRecordCoordinates()

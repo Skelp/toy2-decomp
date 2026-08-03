@@ -7,6 +7,7 @@
 #include "Toy2/Collectables.h"
 #include "Toy2/Levels.h"
 #include "Toy2/LevelLogic.h"
+#include "Toy2/PoleRecord.h"
 #include "Toy2/Toy2.h"
 #include "AudioManager/AudioManager.h"
 #include "CharacterLoader.h"
@@ -3368,15 +3369,6 @@ namespace Toy2
 			POLE_BOUNDARY_BOTTOM = 1,
 			POLE_BOUNDARY_TOP = 2,
 		};
-
-		struct PoleRecord
-		{
-			Vector3I position;
-			int32_t type;
-			int32_t height;
-			int32_t reserved;
-		};
-		STATIC_ASSERT(sizeof(PoleRecord) == 0x18);
 
 		// FUNCTION: TOY2 0x004354E0 [PROVISIONAL]
 		int32_t HandlePoleClimb(Toy2BuzzActor* buzz)
