@@ -1577,74 +1577,65 @@ namespace Toy2
 							BuildLevelPath(levelIdCpy, fileNameBuffer, "level");
 
 						loadConfigCpy2 = g_levelLoadConfig;
-
-					LBL_BUILD_TEXTURE_SUFFIX:
-
-						if ((loadConfigCpy2 & 4) == 0 && levelIdCpy && levelId != 16)
-							goto LBL_LOAD_NGN;
-
-						variant = ((loadConfigCpy2 >> 6) & 3) - 1;
-
-						const char* tSuffix;
-
-						if (variant)
-						{
-							variantStep = variant - 1;
-
-							if (variantStep)
-							{
-								if (variantStep != 1)
-								{
-								LBL_LOAD_NGN:
-
-									strcat(fileNameBuffer, ".ngn");
-									strcat(FileUtils::g_fileNameBuffer, fileNameBuffer);
-
-									NGNLoader::SetNewImage(FileUtils::g_fileNameBuffer);
-									NGNLoader::DetectBackdropTextures();
-
-									loadConfigCpy2 = g_levelLoadConfig;
-									goto LBL_POST_NGN_LOAD;
-								}
-
-								tSuffix = "t3";
-							}
-							else
-							{
-								tSuffix = "t2";
-							}
-						}
-						else
-						{
-							tSuffix = "t1";
-						}
-
-						strcat(fileNameBuffer, tSuffix);
-						goto LBL_LOAD_NGN;
-					}
-
-					if (levelIdCpy >= 10)
-					{
-						strcpy(fileNameBuffer, "level");
-						fileNameBuffer[5] = levelIdCpy / 10 + 48;
-						fileNameBuffer[6] = levelIdCpy % 10 + 48;
-						loadConfigCpy2 = g_levelLoadConfig;
+						ngnBaseName = 0;
 					}
 					else
 					{
-						strcpy(fileNameBuffer, "level0");
-						fileNameBuffer[6] = levelIdCpy + 48;
-					}
+						if (levelIdCpy >= 10)
+						{
+							strcpy(fileNameBuffer, "level");
+							fileNameBuffer[5] = levelIdCpy / 10 + 48;
+							fileNameBuffer[6] = levelIdCpy % 10 + 48;
+							loadConfigCpy2 = g_levelLoadConfig;
+						}
+						else
+						{
+							strcpy(fileNameBuffer, "level0");
+							fileNameBuffer[6] = levelIdCpy + 48;
+						}
 
-					strcpy(&fileNameBuffer[7], "\\");
-					ngnBaseName = "level2";
+						strcpy(&fileNameBuffer[7], "\\");
+						ngnBaseName = "level2";
+					}
 				}
 
-				strcat(fileNameBuffer, ngnBaseName);
-				goto LBL_BUILD_TEXTURE_SUFFIX;
-			}
+				if (ngnBaseName)
+					strcat(fileNameBuffer, ngnBaseName);
 
-		LBL_POST_NGN_LOAD:
+				if ((loadConfigCpy2 & 4) != 0 || levelIdCpy == 0 || levelId == 16)
+				{
+					const char* textureSuffix = 0;
+					variant = ((loadConfigCpy2 >> 6) & 3) - 1;
+
+					if (variant)
+					{
+						variantStep = variant - 1;
+						if (variantStep)
+						{
+							if (variantStep == 1)
+								textureSuffix = "t3";
+						}
+						else
+						{
+							textureSuffix = "t2";
+						}
+					}
+					else
+					{
+						textureSuffix = "t1";
+					}
+
+					if (textureSuffix)
+						strcat(fileNameBuffer, textureSuffix);
+				}
+
+				strcat(fileNameBuffer, ".ngn");
+				strcat(FileUtils::g_fileNameBuffer, fileNameBuffer);
+				NGNLoader::SetNewImage(FileUtils::g_fileNameBuffer);
+				NGNLoader::DetectBackdropTextures();
+
+				loadConfigCpy2 = g_levelLoadConfig;
+			}
 
 			if ((loadConfigCpy2 & 8) == 0)
 			{
