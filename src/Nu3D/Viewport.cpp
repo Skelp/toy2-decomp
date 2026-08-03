@@ -218,7 +218,6 @@ namespace Nu3D
 		void SetCentre(float centreX, float centreY)
 		{
 			float left = g_currentViewportX;
-			float top = g_currentViewportY;
 
 			g_clipOffsetX = centreX;
 			g_clipOffsetY = centreY;
@@ -226,7 +225,8 @@ namespace Nu3D
 			// Force SetClipRect past its unchanged-rectangle fast path so the new
 			// centre offsets are submitted to the drawing device.
 			g_currentViewportX += 1.0f;
-			SetClipRect(left, top, left + g_currentViewportWidth - 1.0f, top + g_currentViewportHeight - 1.0f);
+			SetClipRect(left, g_currentViewportY, left + g_currentViewportWidth - 1.0f,
+				g_currentViewportY + g_currentViewportHeight - 1.0f);
 		}
 
 		// FUNCTION: TOY2 0x004B5AA0 [MATCHED]
