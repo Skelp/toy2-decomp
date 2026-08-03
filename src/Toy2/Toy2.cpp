@@ -6153,23 +6153,20 @@ namespace Toy2
 		index++;
 		Renderer::g_parallaxCurHorizScroll = 0.0;
 
-		if (index >= 0 && index < 9)
+		if (index < 0 || index >= 9)
+			return;
+
+		if (NGNLoader::GetTextureDataIndex(g_sectorBackdropTexTable.primary[index]))
 		{
-			if (NGNLoader::GetTextureDataIndex(g_sectorBackdropTexTable.primary[index]))
-			{
-				g_nextBackdropId = g_sectorBackdropTexTable.primary[index];
-				g_hasBackdrop = 1;
-			}
-			else
-			{
-				uint32_t textureId = g_sectorBackdropTexTable.secondary[index - 1];
-				int32_t* id = &g_sectorBackdropTexTable.secondary[index - 1];
+			g_nextBackdropId = g_sectorBackdropTexTable.primary[index];
+			g_hasBackdrop = 1;
+		}
+		else
+		{
+			if (NGNLoader::GetTextureDataIndex(g_sectorBackdropTexTable.secondary[index - 1]))
+				g_nextBackdropId = g_sectorBackdropTexTable.secondary[index - 1];
 
-				if (NGNLoader::GetTextureDataIndex(textureId))
-					g_nextBackdropId = *id;
-
-				g_hasBackdrop = 1;
-			}
+			g_hasBackdrop = 1;
 		}
 	}
 
