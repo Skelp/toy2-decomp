@@ -729,7 +729,7 @@ namespace Renderer
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x00494820 [PROVISIONAL]
+		// FUNCTION: TOY2 0x00494820 [EFFECTIVE]
 		int16_t DrawTile(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex)
 		{
 			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
@@ -751,7 +751,11 @@ namespace Renderer
 					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
 				}
 
-				RGBA color = { (uint8_t)Nu3D::Camera::g_cameraTintRed, (uint8_t)Nu3D::Camera::g_cameraTintGreen, (uint8_t)Nu3D::Camera::g_cameraTintBlue, 255 };
+				RGBA color;
+				color.r = (uint8_t)Nu3D::Camera::g_cameraTintBlue;
+				color.g = (uint8_t)Nu3D::Camera::g_cameraTintGreen;
+				color.b = (uint8_t)Nu3D::Camera::g_cameraTintRed;
+				color.a = 255;
 
 				Queue2DSprite(xPos * (1.0f / g_virtualScreenWidth),
 					yPos * (1.0f / g_virtualScreenHeight),
