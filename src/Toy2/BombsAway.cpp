@@ -1,6 +1,7 @@
 #include "Toy2/Toy2.h"
 #include "Toy2/LevelLogic.h"
 #include "Toy2/Actor.h"
+#include "Toy2/BuzzLightPreset.h"
 #include "Toy2/Camera.h"
 #include "Toy2/Collectables.h"
 #include "Toy2/Levels.h"
@@ -22,19 +23,6 @@
 namespace Toy2
 {
 	extern int32_t g_hudActorAnimationFrame;
-	namespace Lighting
-	{
-		struct BuzzLightPreset
-		{
-			Vector3I positionOffset;
-			int32_t reserved;
-			int32_t colour;
-		};
-		STATIC_ASSERT(sizeof(BuzzLightPreset) == 0x14);
-
-		extern BuzzLightPreset g_buzzLightPresets[15];
-	}
-
 	namespace BombsAway
 	{
 		enum EncounterState

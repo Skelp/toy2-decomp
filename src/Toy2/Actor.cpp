@@ -1,4 +1,5 @@
 #include "Toy2/Actor.h"
+#include "Toy2/BuzzLightPreset.h"
 #include "Toy2/Lighting.h"
 #include "Toy2/Animation.h"
 #include "Toy2/Buzz.h"
@@ -408,18 +409,6 @@ namespace Toy2
 	namespace Game
 	{
 		void InitActor(Actor::Toy2Actor* actor, int32_t param);
-	}
-
-	namespace Lighting
-	{
-		struct BuzzLightPreset
-		{
-			Vector3I positionOffset;
-			int32_t reserved;
-			int32_t colour;
-		};
-
-		STATIC_ASSERT(sizeof(BuzzLightPreset) == 0x14);
 	}
 
 	namespace Particles
