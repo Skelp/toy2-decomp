@@ -320,22 +320,6 @@ namespace Toy2
 			{
 				g_hayBaleRideTimer = 1;
 			}
-			else if (g_hayBaleRideTimer <= 0)
-			{
-				if (g_hayBaleRideSpeed > 0)
-				{
-					g_hayBaleRideSpeed -= Renderer::g_frameDelta;
-					if (g_hayBaleRideSpeed < 0)
-						g_hayBaleRideSpeed = 0;
-				}
-				if (g_groundSlamTimer != 0 && Platform::HadBuzzContactThisFrame(15) != 0 && HUD::g_challengeState == 0)
-				{
-					Platform::SetRotationAngles(15, 0, 0, -0x180);
-					Nu3D::Link::SetRotationRelative8bit(33, 0, 0, -0x180);
-					g_hayBaleRideTimer = 0xA8C;
-					Levels::DeactivateAmbientEmitter(0, 1);
-				}
-			}
 
 			if (g_hayBaleRideTimer > 0)
 			{
@@ -352,6 +336,22 @@ namespace Toy2
 					Nu3D::Link::SetRotationRelative8bit(33, 0, 0, 0);
 					HUD::g_challengeState = 0;
 					AndysHouse::g_raceCheckpointPassCount = 100;
+				}
+			}
+			else
+			{
+				if (g_hayBaleRideSpeed > 0)
+				{
+					g_hayBaleRideSpeed -= Renderer::g_frameDelta;
+					if (g_hayBaleRideSpeed < 0)
+						g_hayBaleRideSpeed = 0;
+				}
+				if (g_groundSlamTimer != 0 && Platform::HadBuzzContactThisFrame(15) != 0 && HUD::g_challengeState == 0)
+				{
+					Platform::SetRotationAngles(15, 0, 0, -0x180);
+					Nu3D::Link::SetRotationRelative8bit(33, 0, 0, -0x180);
+					g_hayBaleRideTimer = 0xA8C;
+					Levels::DeactivateAmbientEmitter(0, 1);
 				}
 			}
 
