@@ -6385,6 +6385,7 @@ namespace Toy2
 					if (caseOneFadeFrames <= 23 && caseOneFadeFrames + Renderer::g_frameDelta > 23)
 						Nu3D::Camera::SetTint(0, 0, 0, 12);
 
+					// This retail condition is unreachable because the frame count cannot satisfy both limits.
 					if ((InputManager::g_curButtonsPressed & (INPUT_CANCEL | INPUT_SPIN | INPUT_JUMP | INPUT_FIRE)) != 0
 						&& caseOneFadeFrames < 0 && caseOneFadeFrames > 23)
 					{
@@ -6440,16 +6441,11 @@ namespace Toy2
 							caseSixFadeFrames -= Renderer::g_frameDelta;
 
 							if (caseSixFadeFrames <= 0)
-								break;
+								caseSixFadeFrames = 0;
 						}
 
-						if (caseSixFadeFrames)
-						{
-							if ((caseSixFadeFrames + Renderer::g_frameDelta) > 23)
-								Nu3D::Camera::SetTint(0, 0, 0, 12);
-						}
-
-					LBL_CHECK_OR_COMPLETE:
+						if (caseSixFadeFrames <= 23 && caseSixFadeFrames + Renderer::g_frameDelta > 23)
+							Nu3D::Camera::SetTint(0, 0, 0, 12);
 
 						if ((InputManager::g_curButtonsPressed & (INPUT_CANCEL | INPUT_SPIN | INPUT_JUMP | INPUT_FIRE)) != 0
 							&& caseSixFadeFrames < skipInputThreshold && caseSixFadeFrames > 23)
@@ -6461,13 +6457,6 @@ namespace Toy2
 							return 1;
 						}
 					}
-
-					caseSixFadeFrames = 0;
-
-					if ((caseSixFadeFrames + Renderer::g_frameDelta) > 23)
-						Nu3D::Camera::SetTint(0, 0, 0, 12);
-
-					goto LBL_CHECK_OR_COMPLETE;
 				}
 
 				defaultFadeFramesRemaining = 600;
