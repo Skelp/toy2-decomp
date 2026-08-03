@@ -333,6 +333,74 @@ class CandidateTests(unittest.TestCase):
         )
         self.assertEqual(chosen[0].address, 0x402000)
 
+    def test_independent_refinement_requires_ready_saved_comparison(self):
+        independent = make(
+            0x401000, "N::Independent", size=500, state="FUNCTION", match=0.6
+        )
+        small = make(
+            0x402000, "N::Small", size=100, state="FUNCTION", match=0.6
+        )
+        unscored = make(
+            0x403000, "N::Unscored", size=500, state="FUNCTION"
+        )
+        tool = make(
+            0x404000,
+            "N::Tool",
+            size=500,
+            state="FUNCTION",
+            match=0.6,
+            tool_artifact="symbol display",
+        )
+        prerequisite = make(
+            0x405000, "N::Prerequisite", size=500, state="FUNCTION", match=0.6
+        )
+        prerequisite.quality_prerequisite = True
+        chosen = candidates.select(
+            [small, unscored, tool, prerequisite, independent],
+            namespace=None,
+            stubs_only=False,
+            leaves_only=False,
+            near_only=False,
+            max_size=None,
+            exclude_capped=True,
+            queue="refinement",
+            yield_order=True,
+            independent_refinement=True,
+        )
+        self.assertEqual([item.address for item in chosen], [independent.address])
+        self.assertIn("saved comparison available", independent.reasons)
+
+    def test_independent_refinement_uses_yield_and_history_ranking(self):
+        fresh = make(
+            0x401000, "N::Fresh", size=500, state="FUNCTION", match=0.6
+        )
+        attempted = make(
+            0x402000,
+            "N::Attempted",
+            size=500,
+            state="FUNCTION",
+            match=0.6,
+            prior_attempts=1,
+            prior_zero_yield_attempts=1,
+            prior_minutes=5.0,
+        )
+        chosen = candidates.select(
+            [attempted, fresh],
+            namespace=None,
+            stubs_only=False,
+            leaves_only=False,
+            near_only=False,
+            max_size=None,
+            exclude_capped=True,
+            queue="refinement",
+            yield_order=True,
+            independent_refinement=True,
+        )
+        self.assertEqual(
+            [item.address for item in chosen], [fresh.address, attempted.address]
+        )
+        self.assertIn("prior zero-yield campaign", "; ".join(attempted.reasons))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -142,8 +142,12 @@ Use these audit signals:
 - integration time after the source model is complete.
 
 Treat two zero-yield campaigns in five records as a selection failure. Switch
-the queue or require stronger evidence. Treat a median retained result below
-100 bytes as a bundling or target-selection failure.
+the queue or require stronger evidence. After two consecutive zero-yield
+refinement campaigns, inspect the coverage and data queues. If neither queue
+has a credible target, run
+`tools/decomp candidates --refine-independent --yield --why`. Do not retry an
+address with zero yield without new evidence. Treat a median retained result
+below 100 bytes as a bundling or target-selection failure.
 
 Resolve workflow failures. Assign a fresh expert a bounded meta-resolution
 campaign when a tool problem prevents all source work. Resume source campaigns

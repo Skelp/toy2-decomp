@@ -61,6 +61,7 @@ from tools.decomp_campaigns import address_stats, read_records  # noqa: E402
 LEAF_MAX_SIZE = 200
 CLUSTER_MAX_SIZE = 600
 LARGE_GOAL_MIN_SIZE = 1000
+INDEPENDENT_REFINEMENT_MIN_BYTES = 100
 BLOCKER_KINDS = (
     "semantic",
     "layout",
@@ -870,6 +871,7 @@ def select(
     allow_large: bool = False,
     queue: str | None = None,
     yield_order: bool = False,
+    independent_refinement: bool = False,
 ) -> list[Candidate]:
     chosen: list[Candidate] = []
     for candidate in candidates:
@@ -877,6 +879,15 @@ def select(
             continue
         if queue == "refinement" and (
             candidate.state != "FUNCTION" or candidate.terminal
+        ):
+            continue
+        if independent_refinement and not (
+            candidate.state == "FUNCTION"
+            and not candidate.binary_terminal
+            and candidate.match is not None
+            and not candidate.tool_artifact
+            and not candidate.quality_prerequisite
+            and candidate.unresolved_bytes >= INDEPENDENT_REFINEMENT_MIN_BYTES
         ):
             continue
         if new_work_only:
@@ -925,6 +936,9 @@ def select(
     for candidate in chosen:
         score(candidate)
         estimate_yield(candidate, queue)
+        if independent_refinement:
+            candidate.reasons.append("saved comparison available")
+            candidate.reasons.append("outside the dependency frontier")
     if yield_order:
         chosen.sort(
             key=lambda item: (
@@ -1045,6 +1059,14 @@ def main() -> int:
         help="only provisional, tool-only, or source-debt functions",
     )
     parser.add_argument(
+        "--refine-independent",
+        action="store_true",
+        help=(
+            "rank provisional functions outside the dependency frontier with a "
+            "saved comparison and at least 100 unresolved bytes"
+        ),
+    )
+    parser.add_argument(
         "--near",
         action="store_true",
         help="only provisional implemented functions; effective matches are excluded",
@@ -1137,8 +1159,15 @@ def main() -> int:
     )
     parser.add_argument("--json", action="store_true", help="emit JSON instead of a table")
     args = parser.parse_args()
-    if args.coverage and args.refine:
-        parser.error("--coverage and --refine cannot be combined")
+    queue_modes = sum((args.coverage, args.refine, args.refine_independent))
+    if queue_modes > 1:
+        parser.error(
+            "--coverage, --refine, and --refine-independent cannot be combined"
+        )
+    if args.refine_independent and (args.near or args.debt or args.quality):
+        parser.error(
+            "--refine-independent cannot be combined with --near, --debt, or --quality"
+        )
     limit_explicit = args.limit is not None or args.all
     if args.all:
         args.limit = 0
@@ -1212,7 +1241,7 @@ def main() -> int:
     if args.target_address is not None and args.target_address not in names:
         parser.error(f"0x{args.target_address:08X} is not in functions_map.txt")
 
-    queue = "refinement" if args.refine else "coverage"
+    queue = "refinement" if args.refine or args.refine_independent else "coverage"
     dependency_mode = not (args.near or args.debt or args.quality) or args.refine
     candidates = build_candidates()
     if dependency_mode:
@@ -1237,11 +1266,12 @@ def main() -> int:
         max_size=args.max_size,
         exclude_capped=not args.include_capped,
         debt_only=args.debt or args.quality,
-        new_work_only=dependency_mode,
+        new_work_only=dependency_mode and not args.refine_independent,
         include_deferred=include_blocked,
         allow_large=True,
         queue=queue if not (args.near or args.debt or args.quality) else None,
         yield_order=args.yield_order,
+        independent_refinement=args.refine_independent,
     )
     if args.target_address is not None:
         frontier = dependency_frontier_for(args.target_address, candidates)
