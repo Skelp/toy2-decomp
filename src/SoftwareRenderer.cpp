@@ -1571,7 +1571,69 @@ namespace SoftwareRenderer
 		RASTERIZE_SOLID_EDGE(point0, point1, edge01Done8);
 		RASTERIZE_SOLID_EDGE(point1, point2, edge12Done8);
 		RASTERIZE_SOLID_EDGE(point2, point3, edge23Done8);
-		RASTERIZE_SOLID_EDGE(point3, point0, edge30Done8);
+		{
+			int32_t edgeY;
+			int32_t edgeEndY;
+			int32_t edgeStartX;
+			int32_t edgeEndX;
+			bool rasterizeFinalEdge = false;
+			if (point3->y < point0->y)
+			{
+				if (point3->y <= Toy2::g_screenClipBottom && point0->y >= Toy2::g_screenClipTop)
+				{
+					edgeY = point3->y;
+					edgeEndY = point0->y;
+					edgeStartX = point3->x;
+					edgeEndX = point0->x;
+					rasterizeFinalEdge = true;
+				}
+			}
+			else if (point0->y < point3->y && point0->y <= Toy2::g_screenClipBottom && point3->y >= Toy2::g_screenClipTop)
+			{
+				edgeY = point0->y;
+				edgeEndY = point3->y;
+				edgeStartX = point0->x;
+				edgeEndX = point3->x;
+				rasterizeFinalEdge = true;
+			}
+
+			if (rasterizeFinalEdge)
+			{
+				int32_t edgeXStep = (edgeEndX - edgeStartX) * 0x400 / (edgeEndY - edgeY);
+				int32_t edgeXFixed = edgeStartX * 0x400 + 0x200;
+				if (edgeY < Toy2::g_screenClipTop)
+				{
+					edgeXFixed += (Toy2::g_screenClipTop - edgeY) * edgeXStep;
+					edgeY = Toy2::g_screenClipTop;
+				}
+
+				ScanlineScratch* edgeScanline = &g_scanlineScratch[edgeY];
+				do
+				{
+					if (g_skipOddScanlines == 0 || (edgeY & 1) == 0)
+					{
+						if (edgeScanline->populated == 0)
+						{
+							edgeScanline->rightXFixed = edgeXFixed;
+							edgeScanline->leftXFixed = edgeXFixed;
+							edgeScanline->populated = 1;
+						}
+						else if (edgeXFixed < edgeScanline->leftXFixed)
+						{
+							edgeScanline->leftXFixed = edgeXFixed;
+						}
+						else if (edgeXFixed > edgeScanline->rightXFixed)
+						{
+							edgeScanline->rightXFixed = edgeXFixed;
+						}
+					}
+					edgeScanline++;
+					edgeXFixed += edgeXStep;
+					edgeY++;
+				} while (edgeY <= edgeEndY && edgeY <= Toy2::g_screenClipBottom);
+				return;
+			}
+		}
 
 		uint8_t* rowStart = (uint8_t*)g_lockedBackBuffer + g_backBufferPitchPixels * topY + Toy2::g_screenClipLeft;
 		do
