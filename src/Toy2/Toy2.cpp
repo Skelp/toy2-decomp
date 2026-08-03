@@ -6844,32 +6844,56 @@ namespace Toy2
 
 	struct ScreenTextSurfaceState
 	{
-		void* textLines[64];
-		int32_t reservedCount;
-		int32_t lineCount;
-		int32_t currentLine;
-		uint32_t reserved[3];
+		char text[256];
+		int16_t screenX;
+		int16_t screenY;
+		int32_t status;
+		int32_t drawResult;
+		int32_t textLength;
+		HRESULT releaseResult;
+		va_list arguments;
 		LPDIRECTDRAWSURFACE3 surface;
 		DDSURFACEDESC surfaceDesc;
 		DDCOLORKEY colorKey;
 		int32_t width;
 		int32_t height;
+		HDC deviceContext;
+		RECT sourceRect;
 	};
 
-	STATIC_ASSERT(sizeof(ScreenTextSurfaceState) == 0x198);
+	STATIC_ASSERT(sizeof(ScreenTextSurfaceState) == 0x1AC);
 	STATIC_ASSERT(offsetof(ScreenTextSurfaceState, surface) == 0x118);
 	STATIC_ASSERT(offsetof(ScreenTextSurfaceState, surfaceDesc) == 0x11C);
 	STATIC_ASSERT(offsetof(ScreenTextSurfaceState, colorKey) == 0x188);
+	STATIC_ASSERT(offsetof(ScreenTextSurfaceState, deviceContext) == 0x198);
+	STATIC_ASSERT(offsetof(ScreenTextSurfaceState, sourceRect) == 0x19C);
+
+	struct ScreenTextQueue
+	{
+		ScreenTextSurfaceState* entries[32];
+		int32_t count;
+		int32_t current;
+	};
+
+	STATIC_ASSERT(sizeof(ScreenTextQueue) == 0x88);
+	STATIC_ASSERT(offsetof(ScreenTextQueue, count) == 0x80);
+	STATIC_ASSERT(offsetof(ScreenTextQueue, current) == 0x84);
+
+	// GLOBAL: TOY2 0x004FE75C
+	int16_t g_screenTextLineY = 8;
+
+	// GLOBAL: TOY2 0x0072E2B0
+	ScreenTextQueue g_screenTextQueue;
 
 	// FUNCTION: TOY2 0x0048E2B0 [EFFECTIVE]
 	ScreenTextSurfaceState* __fastcall InitScreenTextSurface(ScreenTextSurfaceState* screenText)
 	{
-		screenText->lineCount = 0;
-		screenText->currentLine = 0;
+		screenText->status = 0;
+		screenText->drawResult = 0;
 		screenText->width = g_screenClipRight;
 		screenText->height = 4 - g_d3dAppLogFont.lfHeight;
 
-		memset(screenText->textLines, 0, sizeof(screenText->textLines));
+		memset(screenText->text, 0, sizeof(screenText->text));
 
 		screenText->surfaceDesc.dwSize = sizeof(screenText->surfaceDesc);
 		screenText->surfaceDesc.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH;
@@ -6885,9 +6909,52 @@ namespace Toy2
 		memset(colorKey, 0, sizeof(*colorKey));
 		LPDIRECTDRAWSURFACE3 surface = screenText->surface;
 		surface->SetColorKey(DDCKEY_SRCBLT, colorKey);
-		++screenText->lineCount;
+		++screenText->status;
 
 		return screenText;
+	}
+
+	// FUNCTION: TOY2 0x0048E470 [MATCHED]
+	void QueueScreenText(ScreenTextSurfaceState* screenText, int16_t screenX, int32_t unused, const char* format, ...)
+	{
+		if (screenText->status != 1)
+			return;
+
+		va_start(screenText->arguments, format);
+		screenText->textLength = vsprintf(screenText->text, format, screenText->arguments);
+		va_end(screenText->arguments);
+
+		screenText->screenX = screenX;
+		screenText->screenY = g_screenTextLineY;
+		g_screenTextLineY += 16;
+
+		SetRect(&screenText->sourceRect, 0, 0, screenText->width, screenText->height);
+		screenText->drawResult = screenText->surface->GetDC(&screenText->deviceContext);
+		if (screenText->drawResult != DD_OK)
+			return;
+
+		SelectObject(screenText->deviceContext, g_d3dAppFont);
+		SetTextColor(screenText->deviceContext, 0xFFFF);
+		SetBkColor(screenText->deviceContext, 0);
+		SetBkMode(screenText->deviceContext, OPAQUE);
+		SetRect(&screenText->sourceRect, 0, 0, screenText->width, screenText->height);
+		screenText->drawResult = ExtTextOutA(screenText->deviceContext,
+			0,
+			0,
+			ETO_OPAQUE,
+			&screenText->sourceRect,
+			screenText->text,
+			screenText->textLength,
+			NULL);
+		screenText->releaseResult = screenText->surface->ReleaseDC(screenText->deviceContext);
+
+		if (g_screenTextQueue.count < 32)
+		{
+			g_screenTextQueue.entries[g_screenTextQueue.count] = screenText;
+			g_screenTextQueue.count = g_screenTextQueue.count + 1;
+		}
+
+		++screenText->status;
 	}
 
 	// FUNCTION: TOY2 0x0048E730 [PROVISIONAL]
