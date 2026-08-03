@@ -49,7 +49,7 @@ namespace Renderer
 		WORD g_billboardSpriteIndices[4] = { 0, 1, 2, 3 };
 
 		// GLOBAL: TOY2 0x005087D4
-		WORD g_triangleSpriteIndices[4] = { 0, 1, 2, 3 };
+		WORD g_triangleSpriteIndices[4] = { 0, 1, 2, 0 };
 
 		// GLOBAL: TOY2 0x005087DC
 		WORD g_quadSpriteFromVertsIndices[4] = { 0, 1, 2, 3 };
