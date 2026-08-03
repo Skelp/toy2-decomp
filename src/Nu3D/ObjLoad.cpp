@@ -91,33 +91,33 @@ namespace NGNLoader
 		// FUNCTION: TOY2 0x004CB320 [PROVISIONAL]
 		int32_t ExtractShapeTextures(FILE* stream)
 		{
-			int16_t nameTableCount;
-			int16_t texCount;
-			uint8_t nameTableCountOffset;
-			uint8_t nameTableLength;
+			uint32_t nameTableCount;
+			uint32_t texCount;
+			uint32_t nameTableCountOffset;
+			uint32_t nameTableLength;
 
 			fread(&nameTableCount, sizeof(int16_t), 1, stream);
 			fread(&texCount, sizeof(int16_t), 1, stream);
 			fread(&nameTableCountOffset, sizeof(uint8_t), 1, stream);
 			fread(&nameTableLength, sizeof(uint8_t), 1, stream);
 
-			if ((nameTableCountOffset + 1) * nameTableCount > 5120)
+			if (((nameTableCountOffset & 0xFF) + 1) * (nameTableCount & 0xFFFF) > 5120)
 				Logger::GetErrorHandler("C:\\projects\\nu3d\\objload.c", 228)("texture nametable size exceeds maximum allowed");
 
-			if (texCount >= 20)
-				Logger::GetErrorHandler("C:\\projects\\nu3d\\objload.c", 231)("number of textures %hd exceeds maximum allowed per shape %d", texCount, 20);
+			if ((texCount & 0xFFFF) >= 20)
+				Logger::GetErrorHandler("C:\\projects\\nu3d\\objload.c", 231)("number of textures %hd exceeds maximum allowed per shape %d", texCount & 0xFFFF, 20);
 
 			int32_t i = 0;
 			int32_t offset = 0;
 
-			if (nameTableCount)
+			if (nameTableCount & 0xFFFF)
 			{
 				char** buffer = g_nameTableEntries;
 				do
 				{
 					*buffer = &g_nameTableBuffer[offset];
 
-					uint8_t texDataLength;
+					uint32_t texDataLength;
 					fread(&texDataLength, sizeof(uint8_t), 1, stream);
 
 					if (texDataLength)
@@ -128,12 +128,12 @@ namespace NGNLoader
 
 					++i;
 					offset += nameTableCountOffset + 1;
-				} while (i < nameTableCount);
+				} while (i < (nameTableCount & 0xFFFF));
 			}
 
 			i = 0;
 
-			if (texCount)
+			if (texCount & 0xFFFF)
 			{
 				uint32_t* nextIndex = g_textureTable;
 
@@ -153,7 +153,7 @@ namespace NGNLoader
 
 					++i;
 					++nextIndex;
-				} while (i < texCount);
+				} while (i < (texCount & 0xFFFF));
 			}
 
 			return 1;
