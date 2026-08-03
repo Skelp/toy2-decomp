@@ -692,7 +692,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004946A0 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004946A0 [EFFECTIVE]
 		int16_t DrawTiledFixed(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex)
 		{
 			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
@@ -714,7 +714,11 @@ namespace Renderer
 					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
 				}
 
-				RGBA color = { (uint8_t)Nu3D::Camera::g_cameraTintBlue, (uint8_t)Nu3D::Camera::g_cameraTintGreen, (uint8_t)Nu3D::Camera::g_cameraTintRed, 255 };
+				RGBA color;
+				color.r = (uint8_t)Nu3D::Camera::g_cameraTintRed;
+				color.g = (uint8_t)Nu3D::Camera::g_cameraTintGreen;
+				color.b = (uint8_t)Nu3D::Camera::g_cameraTintBlue;
+				color.a = 255;
 
 				Queue2DSprite(xPos * (1.0f / 320.0f),
 					yPos * (1.0f / g_virtualScreenHeight),
@@ -792,7 +796,11 @@ namespace Renderer
 					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
 				}
 
-				RGBA color = { (uint8_t)Nu3D::Camera::g_cameraTintBlue, (uint8_t)Nu3D::Camera::g_cameraTintGreen, (uint8_t)Nu3D::Camera::g_cameraTintRed, 255 };
+				RGBA color;
+				color.r = (uint8_t)Nu3D::Camera::g_cameraTintRed;
+				color.g = (uint8_t)Nu3D::Camera::g_cameraTintGreen;
+				color.b = (uint8_t)Nu3D::Camera::g_cameraTintBlue;
+				color.a = 255;
 				float normalizedClipLeft = (float)clipLeft / g_virtualScreenWidth;
 				float normalizedClipRight = (float)clipRight / g_virtualScreenWidth;
 				float normalizedX = (float)xPos * (1.0f / g_virtualScreenWidth);
