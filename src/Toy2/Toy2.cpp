@@ -2356,18 +2356,16 @@ namespace Toy2
 					AudioManager::PlaySoundEffect(0x3F, NULL);
 				}
 
-				uint32_t exitBrightness;
 				if (g_tokenPromptSelection == 0)
 				{
 					Renderer::DrawString(106, "keep on playing", selectionBrightness, selectionBrightness, selectionBrightness, 0);
-					exitBrightness = 0x80;
+					Renderer::DrawString(114, "exit level?", 0x80, 0x80, 0x80, 0);
 				}
 				else
 				{
 					Renderer::DrawString(106, "keep on playing", 0x80, 0x80, 0x80, 0);
-					exitBrightness = selectionBrightness;
+					Renderer::DrawString(114, "exit level?", selectionBrightness, selectionBrightness, selectionBrightness, 0);
 				}
-				Renderer::DrawString(114, "exit level?", exitBrightness, exitBrightness, exitBrightness, 0);
 				Renderer::DrawString(124, "jump to select", 0x80, 0x80, 0x80, 0);
 				Renderer::DrawBlackBorderBox(77, 91, 0x166000, 0x2D000, 0, 0, 0x80);
 
