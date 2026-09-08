@@ -11,6 +11,8 @@ cmake_policy(SET CMP0091 NEW)
 
 project(${PROJECT_NAME} C CXX RC)
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
 if(CMAKE_HOST_UNIX AND MSVC)
     set(CMAKE_CXX_COMPILER_LAUNCHER "${CMAKE_CURRENT_SOURCE_DIR}/tools/vc6-compile")
 endif()
@@ -254,12 +256,36 @@ set(TOY2_SOURCES
     src/AudioManager/SoundSequences.inc
 )
 
+set(TOY2_RETAIL_EXECUTABLE "${CMAKE_CURRENT_SOURCE_DIR}/original/toy2.exe"
+    CACHE FILEPATH "Retail executable that supplies the game resources"
+)
+set(TOY2_GENERATED_RESOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/resources")
+set(TOY2_GENERATED_RESOURCE "${TOY2_GENERATED_RESOURCE_DIR}/toy2.res")
+add_custom_target(toy2_resources
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${TOY2_GENERATED_RESOURCE_DIR}"
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/extract_resources.py"
+        --input "${TOY2_RETAIL_EXECUTABLE}"
+        --output "${TOY2_GENERATED_RESOURCE}"
+    BYPRODUCTS "${TOY2_GENERATED_RESOURCE}"
+    DEPENDS
+        tools/extract_resources.py
+        tools/decomp_binary.py
+    COMMENT "Extract the retail resources"
+    VERBATIM
+)
+set_source_files_properties("${TOY2_GENERATED_RESOURCE}" PROPERTIES
+    EXTERNAL_OBJECT TRUE
+    GENERATED TRUE
+)
+
 # Build the game
 add_executable(toy2decomp WIN32 
     ${TOY2_SOURCES}
 
-    resources/toy2.rc
+    "${TOY2_GENERATED_RESOURCE}"
 )
+add_dependencies(toy2decomp toy2_resources)
 
 # Build the dynamically loaded testing dll(s). MODULE avoids declaring an
 # import library output: patcher exports no symbols, so VC6 does not create one.
