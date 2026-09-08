@@ -67,3 +67,9 @@ include the compiled score or the evidence that rejected the model.
 - Ruled out: The target-local branch-directional edge model with narrow first-use edge locals, branch-local edgeHeight, two-phase clear/draw locals, quad-first ordering, and topY-first declaration scored 42.34 percent.
 - Ruled out: Adding explicit destination loads and retail blend-term evaluation order in both pixel loops left the score at 42.34 percent.
 - Result note: The remaining source form must reproduce the retail edge-region stack and register allocation despite the confirmed seed copies and 0x20 frame.
+
+<!-- campaign-id: cee5105c-aa4c-4550-b3b8-8854a0f86e47 -->
+## 2026-09-08 | SoftwareRenderer | 0x00461890
+
+- Mode: coverage.
+- Ruled out: Complete RGB565 clipped textured-rectangle rasterizer using vertices 0 and 2, inclusive dimensions, fixed-point UV interpolation, transparent texel 0x07C0, odd-scanline skipping, and additive/subtractive/50-percent/opaque flag branches.
