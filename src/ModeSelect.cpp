@@ -166,7 +166,7 @@ namespace ModeSelect
 
 namespace ModeSelect
 {
-	// FUNCTION: TOY2 0x004ACD90 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004ACD90 [MATCHED]
 	void MarkCompatibleBitDepthDevices()
 	{
 		using namespace DrawingDevice;
@@ -645,7 +645,7 @@ namespace ModeSelect
 	BOOL WINAPI DDrawEnumCallback(GUID* lpGUID, LPSTR lpDriverDescription, LPSTR lpDriverName, LPVOID lpContext)
 	{ return DDrawEnumCallbackExA(lpGUID, lpDriverDescription, lpDriverName, 0, 0); }
 
-	// FUNCTION: TOY2 0x004AC4D0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004AC4D0 [MATCHED]
 	int32_t EnumerateDrivers(DeviceFilterCallback_t callback)
 	{
 		typedef HRESULT(WINAPI * DirectDrawEnumerateExA_t)(LPDDENUMCALLBACKEXA lpCallback, LPVOID lpContext, DWORD dwFlags);
