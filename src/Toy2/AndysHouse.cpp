@@ -383,37 +383,36 @@ namespace Toy2
 		{
 			if (Sector::g_activeSectorIndex == 1)
 			{
-				Actor::Toy2Actor* firstToy = &Actor::g_creatureActors[0];
-				Actor::Toy2Actor* secondToy = &Actor::g_creatureActors[2];
-				if (firstToy->actorPhase != 0x50)
+				if (Actor::g_creatureActors[0].actorPhase != 0x50)
 				{
-					firstToy->creatureRam->defenseMode = 0;
+					Actor::g_creatureActors[0].creatureRam->defenseMode = 0;
 					g_firstToyRollVelocity += Renderer::g_frameDelta * 4;
-					firstToy->rollAngle += g_firstToyRollVelocity;
-					if (firstToy->rollAngle > 0x700)
+					Actor::g_creatureActors[0].rollAngle += g_firstToyRollVelocity;
+					if (Actor::g_creatureActors[0].rollAngle > 0x700)
 					{
+						Actor::g_creatureActors[0].rollAngle = 0x700;
 						g_firstToyRollVelocity = -(g_firstToyRollVelocity / 2);
-						firstToy->rollAngle = 0x700;
-						AudioManager::PlaySoundEffect(0x32, &firstToy->pos);
+						AudioManager::PlaySoundEffect(0x32, &Actor::g_creatureActors[0].pos);
 						if (g_firstToyRollVelocity > -8)
-							firstToy->actorPhase = 0x50;
+							Actor::g_creatureActors[0].actorPhase = 0x50;
 					}
 				}
-				if (secondToy->actorPhase != 0x50)
+				if (Actor::g_creatureActors[2].actorPhase != 0x50)
 				{
-					secondToy->creatureRam->defenseMode = 0;
+					Actor::g_creatureActors[2].creatureRam->defenseMode = 0;
 					g_secondToyRollVelocity += Renderer::g_frameDelta * 4;
-					secondToy->rollAngle = (secondToy->rollAngle - g_secondToyRollVelocity) & 0xFFF;
-					if (secondToy->rollAngle < 0x900)
+					Actor::g_creatureActors[2].rollAngle = (Actor::g_creatureActors[2].rollAngle - g_secondToyRollVelocity) & 0xFFF;
+					if (Actor::g_creatureActors[2].rollAngle < 0x900)
 					{
+						Actor::g_creatureActors[2].rollAngle = 0x900;
 						g_secondToyRollVelocity = -(g_secondToyRollVelocity / 2);
-						secondToy->rollAngle = 0x900;
-						AudioManager::PlaySoundEffect(0x32, &secondToy->pos);
+						AudioManager::PlaySoundEffect(0x32, &Actor::g_creatureActors[2].pos);
 						if (g_secondToyRollVelocity > -8)
-							secondToy->actorPhase = 0x50;
+							Actor::g_creatureActors[2].actorPhase = 0x50;
 					}
 				}
-				if (firstToy->creatureRam->defenseMode == 0 && secondToy->creatureRam->defenseMode == 0)
+				if (Actor::g_creatureActors[0].creatureRam->defenseMode == 0
+					&& Actor::g_creatureActors[2].creatureRam->defenseMode == 0)
 				{
 					if (g_toyBoxLiftTimer == 0)
 					{
@@ -424,12 +423,21 @@ namespace Toy2
 				}
 				else
 				{
-					int8_t defenseMode = g_buzzActor.posAngles.pos.x < 0x4C274 ? 4 : 5;
-					if (firstToy->creatureRam->defenseMode != 0)
-						firstToy->creatureRam->defenseMode = defenseMode;
-					if (secondToy->creatureRam->defenseMode != 0)
-						secondToy->creatureRam->defenseMode = defenseMode;
-					if (g_buzzActor.specialAirState != 0 && g_footingType == 14)
+					if (g_buzzActor.posAngles.pos.x < 0x4C274)
+					{
+						if (Actor::g_creatureActors[0].creatureRam->defenseMode != 0)
+							Actor::g_creatureActors[0].creatureRam->defenseMode = 4;
+						if (Actor::g_creatureActors[2].creatureRam->defenseMode != 0)
+							Actor::g_creatureActors[2].creatureRam->defenseMode = 4;
+					}
+					else
+					{
+						if (Actor::g_creatureActors[0].creatureRam->defenseMode != 0)
+							Actor::g_creatureActors[0].creatureRam->defenseMode = 5;
+						if (Actor::g_creatureActors[2].creatureRam->defenseMode != 0)
+							Actor::g_creatureActors[2].creatureRam->defenseMode = 5;
+					}
+					if (g_buzzActor.collisionFlags != 0 && g_footingType == 14)
 						Platform::DisableCollision(9);
 					else
 						Collision::MarkPlatformAsMoving(9);
@@ -551,7 +559,7 @@ namespace Toy2
 				}
 				if (MoveableObject::g_objects[4].swingState == -1)
 					Levels::g_recordData[58]->data[Levels::g_alternateAmbientEmitterStart + 1].y = g_savedAmbientEmitterHeight;
-				if (g_buzzActor.specialAirState != 0 && (Platform::GetFlags(3) & 3) == 2 && Platform::GetContactFaceNormal(3)->y < -0x3000)
+				if (g_buzzActor.collisionFlags != 0 && (Platform::GetFlags(3) & 3) == 2 && Platform::GetContactFaceNormal(3)->y < -0x3000)
 				{
 					Levels::DeactivateAmbientEmitter(1, 1);
 					int32_t launchVelocity = -0x980;
@@ -700,7 +708,7 @@ namespace Toy2
 				Nu3D::Link::SetScaleFromFixedOffsets(0x17, 0x1000, bounceMagnitude * 0x80, 0x1000);
 				Nu3D::Link::SetRotationRelative8bit(0x17, 0, 0, bounceMagnitude * 0x20);
 				bool updateBounce = true;
-				if (g_buzzActor.specialAirState != 0 && g_footingType == 8)
+				if (g_buzzActor.collisionFlags != 0 && g_footingType == 8)
 				{
 					if (g_launchPadBounceState == 0)
 					{
