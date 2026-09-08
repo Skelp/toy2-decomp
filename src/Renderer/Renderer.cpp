@@ -970,13 +970,13 @@ namespace DrawingAPI
 	Device_DrawIndexedPrimitiveVB* DrawIndexedPrimitiveVB;
 
 	// GLOBAL: TOY2 0x005084FC
-	Device_ReleaseVertexBuffer* ReleaseVertexBuffer;
+	Device_ReleaseVertexBuffer* ReleaseVertexBuffer = HardwareDevice::ReleaseVertexBuffer;
 
 	// GLOBAL: TOY2 0x00508500
-	Device_CreateVertexBuffer* CreateVertexBuffer;
+	Device_CreateVertexBuffer* CreateVertexBuffer = HardwareDevice::CreateVertexBuffer;
 
 	// GLOBAL: TOY2 0x00508504
-	Device_LockVertexBuffer* LockVertexBuffer;
+	Device_LockVertexBuffer* LockVertexBuffer = HardwareDevice::LockVertexBuffer;
 
 	// GLOBAL: TOY2 0x00508508
 	Device_UnlockVertexBuffer* UnlockVertexBuffer;
