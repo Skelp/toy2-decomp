@@ -59,3 +59,11 @@ include the compiled score or the evidence that rejected the model.
 - Ruled out: Target-local branch-directional two-interpolant edge macro with direct scalar arms and quad-first topology scored 41.24 percent.
 - Ruled out: The same branch-directional model with topY declared before bottomY scored 43.49 percent.
 - Result note: The edge topology is supported, but the original declaration lifetimes and 0x20 stack-frame layout remain unresolved.
+
+<!-- campaign-id: 43affac8-3427-41b1-a453-197c301263a2 -->
+## 2026-09-08 | SoftwareRenderer | 0x0045B0B0
+
+- Mode: refinement.
+- Ruled out: The target-local branch-directional edge model with narrow first-use edge locals, branch-local edgeHeight, two-phase clear/draw locals, quad-first ordering, and topY-first declaration scored 42.34 percent.
+- Ruled out: Adding explicit destination loads and retail blend-term evaluation order in both pixel loops left the score at 42.34 percent.
+- Result note: The remaining source form must reproduce the retail edge-region stack and register allocation despite the confirmed seed copies and 0x20 frame.
