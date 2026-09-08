@@ -79,3 +79,9 @@ include the compiled score or the evidence that rejected the model.
 
 - Mode: coverage.
 - Ruled out: Complete 16-bit nearest-neighbor scaled texture blitter with nine cdecl integer arguments, inclusive destination bounds, signed fixed-point U/V steps, 256-pixel texture rows, and nested do-while loops.
+
+<!-- campaign-id: 140509a6-f216-4165-97d8-cf996eec87cf -->
+## 2026-09-08 | Software renderer colour-offset rasterizers | 0x00469900
+
+- Mode: coverage.
+- Ruled out: Natural inline five-interpolant RGB565 colour-offset blend-25 rasterizer: clone RasterizeBlend25TexturedPolygon565’s min/max clipping, polygon edge topology, and keyed/unkeyed span loops; expand each edge and span across u, v, blue, green, and red; shade sampled texels through g_redRampLow/g_greenRampLow/g_blueRampLow using the interpolated offsets; add the 75-percent destination contribution with masks 0x7BEF and 0x39E7; preserve transparent texel 0x07C0.
