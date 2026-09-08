@@ -35,3 +35,12 @@ include the compiled score or the evidence that rejected the model.
   experiment command overwrote the immutable baseline. The abort records retain
   the measured time. Campaign `ae64c1df-a577-48a0-9390-f745434f4d85` retains
   the first-score time.
+
+## 2026-09-08 | BarnEncounter camera selection | `0x00424490`
+
+- Retained: Six attachment slots, stable boss-position snapshots, and
+  `actorIndex - 1` indexing increased the score from 50.61 to 55.02 percent.
+- Ruled out: A full shared `dx`, `dz`, and `d0` camera-local model reduced the
+  retained score to 54.22 percent.
+- Retained: Explicit encounter-state bounds, `timer <= 0`, and `x`, `y`, `z`
+  target-store order increased the final score to 55.27 percent.

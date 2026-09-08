@@ -188,16 +188,16 @@ namespace Toy2
 			Actor::Toy2Actor* firstMinion = &Actor::g_creatureActors[g_firstMinionActorIndex];
 			Actor::Toy2Actor* secondMinion = &Actor::g_creatureActors[g_secondMinionActorIndex];
 			{
-				AttachmentPosition orbitPositions[7];
-				orbitPositions[0].position.x = boss->pos.x;
-				orbitPositions[0].position.z = boss->pos.z;
+				AttachmentPosition orbitPositions[6];
+				int32_t bossWorldX = boss->pos.x;
+				int32_t bossWorldZ = boss->pos.z;
 				int32_t orbitPosition = g_orbitPosition;
 				uint32_t orbitAngle = g_orbitAngle;
 				for (int32_t actorIndex = 1; actorIndex < 7; actorIndex++)
 				{
 					Actor::Toy2Actor* actor = &Actor::g_creatureActors[actorIndex];
-					actor->pos.x = boss->pos.x;
-					actor->pos.z = boss->pos.z;
+					actor->pos.x = bossWorldX;
+					actor->pos.z = bossWorldZ;
 					actor->yawAngle = static_cast<int16_t>(orbitAngle);
 					actor->targetYaw = orbitAngle;
 					if (actor->primaryAnimIdx == 0)
@@ -207,18 +207,19 @@ namespace Toy2
 					if (orbitPosition > 0x17FFFF)
 						orbitPosition -= 0x180000;
 
-					orbitPositions[actorIndex].vector.x = 0;
-					orbitPositions[actorIndex].vector.y = 0x96;
-					orbitPositions[actorIndex].vector.z = 0x5AA;
+					AttachmentPosition& attachmentPosition = orbitPositions[actorIndex - 1];
+					attachmentPosition.vector.x = 0;
+					attachmentPosition.vector.y = 0x96;
+					attachmentPosition.vector.z = 0x5AA;
 					orbitAngle = (orbitAngle + 0x2AB) & 0xFFF;
-					Actor::ResolveBoneAttachmentPos(&orbitPositions[actorIndex].vector, actor, 1);
+					Actor::ResolveBoneAttachmentPos(&attachmentPosition.vector, actor, 1);
 					if (actor->actorPhase == 1)
 					{
-						Nu3D::Collision::GetGroundHeight(&orbitPositions[actorIndex].groundProbe, 0x96);
-						if (Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &orbitPositions[actorIndex].position, 0x4B) != 0)
+						Nu3D::Collision::GetGroundHeight(&attachmentPosition.groundProbe, 0x96);
+						if (Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &attachmentPosition.position, 0x4B) != 0)
 						{
-							uint32_t direction = Nu3D::Math::CartesianToFixedAngle(g_buzzActor.posAngles.pos.x - orbitPositions[actorIndex].position.x,
-								g_buzzActor.posAngles.pos.z - orbitPositions[actorIndex].position.z);
+							uint32_t direction = Nu3D::Math::CartesianToFixedAngle(
+								g_buzzActor.posAngles.pos.x - attachmentPosition.position.x, g_buzzActor.posAngles.pos.z - attachmentPosition.position.z);
 							Buzz::HandleDamage(direction, 1);
 						}
 					}
@@ -383,9 +384,9 @@ namespace Toy2
 					{
 						g_laserCooldown = 200;
 						Actor::Toy2Actor* waveActor = &Actor::g_creatureActors[g_waveActorIndex];
-						Camera::g_cutsceneFocusPosition.x = orbitPositions[g_waveActorIndex].position.x;
-						Camera::g_cutsceneFocusPosition.y = orbitPositions[g_waveActorIndex].position.y;
-						Camera::g_cutsceneFocusPosition.z = orbitPositions[g_waveActorIndex].position.z;
+						Camera::g_cutsceneFocusPosition.x = orbitPositions[g_waveActorIndex - 1].position.x;
+						Camera::g_cutsceneFocusPosition.y = orbitPositions[g_waveActorIndex - 1].position.y;
+						Camera::g_cutsceneFocusPosition.z = orbitPositions[g_waveActorIndex - 1].position.z;
 						Camera::g_cutsceneCameraPosition.x =
 							Camera::g_cutsceneFocusPosition.x + Numerics::g_sinCosLUT[(waveActor->yawAngle + 0x400) & 0xFFF] * 3;
 						Camera::g_cutsceneCameraPosition.z =
@@ -422,7 +423,7 @@ namespace Toy2
 
 						if (waveActor->actorPhase == 1)
 						{
-							Vector3I& wavePosition = orbitPositions[g_waveActorIndex].position;
+							Vector3I& wavePosition = orbitPositions[g_waveActorIndex - 1].position;
 							Actor::Toy2Actor* waveFirstMinion = &Actor::g_creatureActors[g_firstMinionActorIndex];
 							Actor::Toy2Actor* waveSecondMinion = &Actor::g_creatureActors[g_secondMinionActorIndex];
 							waveFirstMinion->pos.x = wavePosition.x;
@@ -578,10 +579,10 @@ namespace Toy2
 				secondMinion->scaleZ = secondMinion->scaleX;
 			}
 
-			if (g_encounterState >= ENCOUNTER_WAVES && g_encounterState <= ENCOUNTER_FINAL_PHASE)
+			if (g_encounterState > ENCOUNTER_INTRO && g_encounterState < ENCOUNTER_DEFEATED)
 			{
 				g_cameraTargetUpdateTimer -= Renderer::g_frameDelta;
-				if (g_cameraTargetUpdateTimer < 1)
+				if (g_cameraTargetUpdateTimer <= 0)
 				{
 					g_cameraTargetUpdateTimer = 0x1E;
 					if (firstMinion->actorPhase > 0 || secondMinion->actorPhase > 0)
@@ -612,8 +613,8 @@ namespace Toy2
 				{
 					Actor::Toy2Actor* cameraTarget = &Actor::g_creatureActors[g_cameraTargetActorIndex];
 					Camera::g_actorCameraTarget.x = cameraTarget->pos.x;
-					Camera::g_actorCameraTarget.z = cameraTarget->pos.z;
 					Camera::g_actorCameraTarget.y = cameraTarget->pos.y - 0x2000;
+					Camera::g_actorCameraTarget.z = cameraTarget->pos.z;
 				}
 				else
 				{
