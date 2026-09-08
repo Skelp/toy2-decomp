@@ -44,3 +44,10 @@ include the compiled score or the evidence that rejected the model.
   retained score to 54.22 percent.
 - Retained: Explicit encounter-state bounds, `timer <= 0`, and `x`, `y`, `z`
   target-store order increased the final score to 55.27 percent.
+
+<!-- campaign-id: 7d41f21f-c66d-4fc6-93b3-ce84d0e7d70a -->
+## 2026-09-08 | SoftwareRenderer | 0x00465180
+
+- Mode: coverage.
+- Ruled out: Complete 555 Blend75 control skeleton with exclusive edge walks, separate keyed and unkeyed loops, 565 key 0x07C0, and 565 blend masks scored 19.98 percent.
+- Result note: The corrected map confirms a near-100-percent ceiling. Refine 0x0045B0B0's shared edge and declaration source form before retrying the rasterizer family.
