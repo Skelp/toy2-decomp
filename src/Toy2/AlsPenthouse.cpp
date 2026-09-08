@@ -1111,20 +1111,20 @@ namespace Toy2
 		// FUNCTION: TOY2 0x0042A130 [PROVISIONAL]
 		void Interactions()
 		{
-			if (g_buzzActor.cosmicShieldTimer == 0)
+			if (g_buzzActor.cosmicShieldTimer != 0)
 			{
-				if (g_platformCollisionState != 0)
+				if (g_platformCollisionState == 0)
 				{
-					Platform::DisableCollision(26);
-					Collision::MarkPlatformAsMoving(25);
-					g_platformCollisionState = 0;
+					Platform::DisableCollision(25);
+					Collision::MarkPlatformAsMoving(26);
+					g_platformCollisionState = 1;
 				}
 			}
-			else if (g_platformCollisionState == 0)
+			else if (g_platformCollisionState != 0)
 			{
-				Platform::DisableCollision(25);
-				Collision::MarkPlatformAsMoving(26);
-				g_platformCollisionState = 1;
+				Platform::DisableCollision(26);
+				Collision::MarkPlatformAsMoving(25);
+				g_platformCollisionState = 0;
 			}
 
 			g_waterLevelPhase += Renderer::g_frameDelta * 32;
