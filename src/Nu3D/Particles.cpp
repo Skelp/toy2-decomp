@@ -52,17 +52,16 @@ namespace Nu3D
 					if ((particle->renderFlags & PARTICLE_TRACKS_TARGET) != 0)
 					{
 						int32_t velocityDivisor;
-						int32_t turnDivisor;
+						int32_t turnDivisor = 8;
 						if (particle->updateParam == 0xC4)
 						{
-							velocityDivisor = 8;
+							velocityDivisor = turnDivisor;
 							int32_t remainingTime = particle->lifetime / 16;
 							turnDivisor = remainingTime * remainingTime + 4;
 						}
 						else
 						{
 							velocityDivisor = 16;
-							turnDivisor = 8;
 						}
 
 						if (particle->lifetime > 0)
@@ -72,9 +71,12 @@ namespace Nu3D
 							int32_t targetZ;
 							if (particle->targetActor == (Toy2::Actor::Toy2Actor*)-1)
 							{
-								targetX = Toy2::g_buzzActor.posAngles.pos.x - particle->pos.x;
 								targetY = Toy2::g_buzzActor.posAngles.pos.y - particle->pos.y - 0x2000;
+								targetX = Toy2::g_buzzActor.posAngles.pos.x - particle->pos.x;
 								targetZ = Toy2::g_buzzActor.posAngles.pos.z - particle->pos.z;
+								targetX >>= 5;
+								targetY >>= 5;
+								targetZ >>= 5;
 							}
 							else
 							{
@@ -84,10 +86,12 @@ namespace Nu3D
 								{
 									particle->lifetime = 1;
 								}
-								targetX = target->pos.x + volume->offset.x - particle->pos.x;
-								targetY = target->pos.y + volume->offset.y - particle->pos.y;
-								targetZ = target->pos.z + volume->offset.z - particle->pos.z;
-								velocityDivisor = 6;
+								targetX = volume->offset.x - particle->pos.x + target->pos.x;
+								targetY = volume->offset.y - particle->pos.y + target->pos.y;
+								targetZ = volume->offset.z - particle->pos.z + target->pos.z;
+								targetX >>= 5;
+								targetY >>= 5;
+								targetZ >>= 5;
 								if (particle->lifetime < 0x20)
 								{
 									turnDivisor = (particle->lifetime & 0xF) + 2;
@@ -96,14 +100,12 @@ namespace Nu3D
 								{
 									turnDivisor = (particle->lifetime & 0xF) * 3 + 2;
 								}
+								velocityDivisor = 6;
 							}
 
-							targetX >>= 5;
-							targetY >>= 5;
-							targetZ >>= 5;
 							int32_t targetYaw = Math::CartesianToFixedAngle(targetX, targetZ);
 							int32_t yawDelta = (targetYaw - particle->yawAngle) & 0xFFF;
-							if (yawDelta > 0x7FF)
+							if (yawDelta >= 0x800)
 							{
 								yawDelta -= 0x1000;
 							}
@@ -113,8 +115,8 @@ namespace Nu3D
 							{
 								int32_t horizontalDistance = (int32_t)sqrt((double)(targetX * targetX + targetZ * targetZ));
 								int32_t targetPitch = Math::CartesianToFixedAngle(horizontalDistance, targetY);
-								int32_t pitchDelta = (targetPitch - 0x400 - particle->discPitchAngle) & 0xFFF;
-								if (pitchDelta > 0x7FF)
+								int32_t pitchDelta = (targetPitch + (-0x400 - particle->discPitchAngle)) & 0xFFF;
+								if (pitchDelta >= 0x800)
 								{
 									pitchDelta -= 0x1000;
 								}
@@ -124,19 +126,19 @@ namespace Nu3D
 
 						int32_t pitchSine;
 						int32_t pitchCosine;
-						if (particle->discPitchAngle == -1)
-						{
-							pitchSine = 0;
-							pitchCosine = 0x4000;
-						}
-						else
+						if (particle->discPitchAngle != -1)
 						{
 							pitchSine = Numerics::g_sinCosLUT[particle->discPitchAngle & 0xFFF];
 							pitchCosine = Numerics::g_sinCosLUT[(particle->discPitchAngle + 0x400) & 0xFFF];
 						}
+						else
+						{
+							pitchSine = 0;
+							pitchCosine = 0x4000;
+						}
 						verticalVelocity = -pitchSine / velocityDivisor;
 						int32_t yaw = particle->yawAngle + 0x400;
-						particle->velX = (Numerics::g_sinCosLUT[particle->yawAngle & 0xFFF] * pitchCosine >> 14) / velocityDivisor;
+						particle->velX = (Numerics::g_sinCosLUT[particle->yawAngle] * pitchCosine >> 14) / velocityDivisor;
 						particle->velZ = (Numerics::g_sinCosLUT[yaw & 0xFFF] * pitchCosine >> 14) / velocityDivisor;
 						verticalAcceleration = 0;
 					}
