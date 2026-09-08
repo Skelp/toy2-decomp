@@ -562,13 +562,17 @@ switch ($Command) {
         if ($Action -eq "start") {
             New-Item -ItemType Directory -Force $Directory | Out-Null
             Build-Project
-            $Report = Join-Path $Root "build\decomp-baseline-report.json"
+            $Report = Join-Path $Directory "baseline-report.json"
+            $DataReport = Join-Path $Directory "baseline-data-report.json"
             Write-ComparisonReport $Report
+            Write-DataReport $DataReport
+            Update-FunctionSizes
             & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") metadata `
-                (Join-Path $Root "build\decomp-baseline-meta.json") --report $Report
+                (Join-Path $Directory "compiler-context.json") `
+                --report $Report `
+                --data-report $DataReport
             Assert-LastExit "Recording experiment baseline"
             & git diff --binary | Set-Content -Encoding utf8 (Join-Path $Directory "baseline.patch")
-            Copy-Item (Join-Path $Root "build\decomp-baseline-meta.json") (Join-Path $Directory "compiler-context.json")
         } elseif ($Action -eq "try") {
             if ($CommandArgs.Count -ne 3 -or $CommandArgs[2] -notmatch '^[A-Za-z0-9._-]+$') {
                 throw "Give the experiment a label with letters, numbers, dots, dashes, or underscores."
@@ -587,7 +591,7 @@ switch ($Command) {
                 Pop-Location
             }
             Copy-Item $Report (Join-Path $Directory "$Label.report.json")
-            Copy-Item (Join-Path $Root "build\decomp-baseline-meta.json") (Join-Path $Directory "$Label.compiler-context.json")
+            Copy-Item (Join-Path $Directory "compiler-context.json") (Join-Path $Directory "$Label.compiler-context.json")
             & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") experiment `
                 (Join-Path $Directory "$Label.report.json") $Address (Join-Path $Directory "$Label.normalized.json")
             Assert-LastExit "Recording normalized experiment data"

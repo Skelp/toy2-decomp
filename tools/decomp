@@ -293,9 +293,14 @@ experiment() {
     case "$action" in
         start)
             mkdir -p "$directory"
-            baseline
+            build
+            write_comparison_report "decomp-experiments/${address}/baseline-report.json"
+            write_data_report "decomp-experiments/${address}/baseline-data-report.json"
+            refresh_function_sizes
+            python tools/decomp_verify.py metadata "$directory/compiler-context.json" \
+                --report "$directory/baseline-report.json" \
+                --data-report "$directory/baseline-data-report.json"
             git diff --binary > "$directory/baseline.patch"
-            cp build/decomp-baseline-meta.json "$directory/compiler-context.json"
             echo "Started experiment $address in $directory."
             ;;
         try)
@@ -311,7 +316,7 @@ experiment() {
             (cd build && reccmp-reccmp --target TOY2 --no-color --verbose "$address") \
                 > "$directory/${label}.diff.txt"
             cp "build/decomp-experiment-${address}-${label}.json" "$directory/${label}.report.json"
-            cp build/decomp-baseline-meta.json "$directory/${label}.compiler-context.json"
+            cp "$directory/compiler-context.json" "$directory/${label}.compiler-context.json"
             python tools/decomp_verify.py experiment \
                 "$directory/${label}.report.json" "$address" "$directory/${label}.normalized.json"
             python tools/decomp_verify.py classify "$directory/${label}.report.json" "$address" \

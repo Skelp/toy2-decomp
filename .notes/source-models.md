@@ -20,3 +20,18 @@ include the compiled score or the evidence that rejected the model.
 - Confirmed: The dispatch slots use blend-75 behavior from adjacent formats.
 - Ruled out: The analogue pilots scored 19.98 percent and 15.09 percent.
 - Score limit: Stale map gaps limited the raw scores for both pilots.
+
+## 2026-09-08 | BarnEncounter | `0x00424490`
+
+- Mode: refinement.
+- Ruled out: Direct indexed minion scale and camera accesses with narrower
+  pointer lifetimes scored 48.20 percent. The baseline scored 50.61 percent.
+- Ruled out: Direct indexed minion scale updates with camera pointers retained
+  scored 45.43 percent.
+- Needed evidence: Determine the source form for the 0x88-byte retail stack
+  frame and the cold camera-selection block at `0x0042559E` through
+  `0x0042567F`.
+- Audit note: The campaign recorder rejected the result because the old
+  experiment command overwrote the immutable baseline. The abort records retain
+  the measured time. Campaign `ae64c1df-a577-48a0-9390-f745434f4d85` retains
+  the first-score time.

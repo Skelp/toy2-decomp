@@ -76,6 +76,13 @@ class NormativeInputTests(unittest.TestCase):
         )
         self.assertIn('"${campaign_global_arguments[@]}" abort', campaigns)
 
+        experiment = script_section(script, "experiment() {", "report() {")
+        self.assertIn("baseline-report.json", experiment)
+        self.assertIn("baseline-data-report.json", experiment)
+        self.assertIn('$directory/compiler-context.json', experiment)
+        self.assertNotIn("build/decomp-baseline-report.json", experiment)
+        self.assertNotIn("build/decomp-baseline-meta.json", experiment)
+
     def test_windows_campaign_dispatch_has_lifecycle_parity(self):
         script = (ROOT / "tools" / "decomp.ps1").read_text(encoding="utf-8")
         commands = re.search(r"\[ValidateSet\((.*?)\)\]", script, re.DOTALL)
@@ -143,6 +150,10 @@ class NormativeInputTests(unittest.TestCase):
             self.assertIn(argument, bc)
 
         experiment = script_section(script, '    "experiment" {', '    "report" {')
+        self.assertIn('Join-Path $Directory "baseline-report.json"', experiment)
+        self.assertIn('Join-Path $Directory "baseline-data-report.json"', experiment)
+        self.assertNotIn(r"build\decomp-baseline-report.json", experiment)
+        self.assertNotIn(r"build\decomp-baseline-meta.json", experiment)
         trial = experiment[experiment.index('$Action -eq "try"') :]
         self.assertLess(
             trial.index("Build-Project"), trial.index("Write-ComparisonReport")
