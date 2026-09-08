@@ -62,6 +62,8 @@ LEAF_MAX_SIZE = 200
 CLUSTER_MAX_SIZE = 600
 LARGE_GOAL_MIN_SIZE = 1000
 INDEPENDENT_REFINEMENT_MIN_BYTES = 100
+MAP_DEFECT_SCORE_CEILING = 0.6
+ZERO_YIELD_PENALTY_FLOOR = 0.05
 BLOCKER_KINDS = (
     "semantic",
     "layout",
@@ -121,6 +123,7 @@ class Candidate:
     rank: float = 0.0
     prior_attempts: int = 0
     prior_zero_yield_attempts: int = 0
+    penalty_attempts: int | None = None
     prior_minutes: float = 0.0
     prior_effective_bytes: float = 0.0
     prior_initialized_bytes: int = 0
@@ -150,6 +153,31 @@ class Candidate:
             return float(self.size)
         effective_match = 1.0 if self.binary_terminal else self.match
         return self.size * max(0.0, 1.0 - effective_match)
+
+    @property
+    def score_ceiling(self) -> float | None:
+        if (
+            self.state not in ("STUB", "NOT_STARTED")
+            or self.size_source != "ghidra-snapshot"
+            or self.map_size <= 0
+        ):
+            return None
+        return min(self.size / self.map_size, 1.0)
+
+    @property
+    def map_defect(self) -> bool:
+        ceiling = self.score_ceiling
+        return ceiling is not None and ceiling < MAP_DEFECT_SCORE_CEILING
+
+    @property
+    def work_target(self) -> bool:
+        return not self.map_defect
+
+    @property
+    def active_penalty_attempts(self) -> int:
+        if self.penalty_attempts is None:
+            return self.prior_zero_yield_attempts
+        return self.penalty_attempts
 
     @property
     def address_text(self) -> str:
@@ -478,6 +506,7 @@ def build_candidates() -> list[Candidate]:
                 blocker_kind=deferral.kind if deferral.reason else "",
                 prior_attempts=history.attempts if history else 0,
                 prior_zero_yield_attempts=(history.zero_yield_attempts if history else 0),
+                penalty_attempts=history.penalty_attempts if history else 0,
                 prior_minutes=history.minutes if history else 0.0,
                 prior_effective_bytes=history.effective_bytes if history else 0.0,
                 prior_initialized_bytes=history.initialized_bytes if history else 0,
@@ -728,6 +757,11 @@ def score(candidate: Candidate) -> None:
         reasons.append(
             f"retail body size replaces {candidate.map_size}-byte map gap"
         )
+    if candidate.score_ceiling is not None:
+        reasons.append(f"score ceiling {candidate.score_ceiling * 100:.1f}%")
+    if candidate.map_defect:
+        rank -= 1000.0
+        reasons.append("map defect: score ceiling is below 60%")
 
     if candidate.siblings >= 3:
         rank += 20.0
@@ -767,17 +801,22 @@ def score(candidate: Candidate) -> None:
         reasons.append(f"{blocker_state}: {candidate.deferred_reason}")
         reasons.append(f"advisory blocker kind {candidate.blocker_kind or 'semantic'}")
 
-    if candidate.prior_zero_yield_attempts:
-        penalty = min(candidate.prior_zero_yield_attempts * 220.0, 500.0)
+    if candidate.active_penalty_attempts:
+        penalty = min(candidate.active_penalty_attempts * 220.0, 500.0)
         rank -= penalty
         reasons.append(
-            f"{candidate.prior_zero_yield_attempts} prior zero-yield campaign(s) "
+            f"{candidate.active_penalty_attempts} prior zero-yield campaign(s) "
             f"used {candidate.prior_minutes:.1f} minute(s)"
         )
     elif candidate.prior_attempts:
         retained = candidate.prior_effective_bytes + candidate.prior_initialized_bytes
         reasons.append(
             f"{candidate.prior_attempts} prior campaign(s) retained {retained:.1f} byte(s)"
+        )
+    if candidate.active_penalty_attempts != candidate.prior_zero_yield_attempts:
+        reasons.append(
+            f"new evidence reset {candidate.prior_zero_yield_attempts} historical "
+            "zero-yield campaign(s)"
         )
 
     if candidate.dependency_component >= 0:
@@ -847,7 +886,14 @@ def estimate_yield(candidate: Candidate, queue: str | None) -> None:
         confidence *= 0.75
     if candidate.quality_prerequisite:
         confidence *= 1.2
-    confidence *= 0.15 ** candidate.prior_zero_yield_attempts
+    retry_penalty = max(
+        0.15 ** candidate.active_penalty_attempts,
+        ZERO_YIELD_PENALTY_FLOOR,
+    )
+    confidence *= retry_penalty
+
+    if candidate.map_defect:
+        confidence = 0.0
 
     candidate.expected_retained_bytes = candidate.unresolved_bytes * confidence
     candidate.expected_minutes = expected_minutes
@@ -942,8 +988,9 @@ def select(
     if yield_order:
         chosen.sort(
             key=lambda item: (
+                item.map_defect,
                 -item.expected_bytes_per_minute,
-                item.prior_zero_yield_attempts,
+                item.active_penalty_attempts,
                 -item.rank,
                 item.address,
             )
@@ -951,6 +998,7 @@ def select(
     elif queue == "refinement":
         chosen.sort(
             key=lambda item: (
+                item.map_defect,
                 not item.quality_prerequisite,
                 -item.unresolved_bytes,
                 not item.source_debt,
@@ -961,6 +1009,7 @@ def select(
     elif new_work_only:
         chosen.sort(
             key=lambda item: (
+                item.map_defect,
                 not item.dependency_ready,
                 item.manual_blocker,
                 -item.immediate_unlocks,
@@ -975,7 +1024,9 @@ def select(
             )
         )
     else:
-        chosen.sort(key=lambda item: (-item.rank, item.size, item.address))
+        chosen.sort(
+            key=lambda item: (item.map_defect, -item.rank, item.size, item.address)
+        )
     return chosen
 
 
@@ -991,7 +1042,9 @@ def print_table(
 
     show_dependencies = any(item.dependency_component >= 0 for item in shown)
     dependency_header = f"  {'DEPS':>7}  {'UNLOCK':>6}" if show_dependencies else ""
-    yield_header = f"  {'EST B/M':>8}" if show_yield else ""
+    yield_header = (
+        f"  {'EST B':>8}  {'EST MIN':>7}  {'EST B/M':>8}" if show_yield else ""
+    )
     print(
         f"{'ADDRESS':<11}{'NAME':<{name_width + 2}}{'STATE':<13}{'SIZE':>6}  "
         f"{'MATCH':>7}{dependency_header}{yield_header}  TU"
@@ -999,13 +1052,19 @@ def print_table(
     print("-" * (11 + name_width + 2 + 13 + 6 + 9 + len(dependency_header) + len(yield_header) + 4))
     for item in shown:
         name = item.name if len(item.name) <= name_width else item.name[: name_width - 1] + "~"
+        state = "MAP_REPAIR" if item.map_defect else item.state
         dependency_text = ""
         if show_dependencies:
             status = "ready" if item.dependency_ready else str(len(item.unresolved_dependencies))
             dependency_text = f"  {status:>7}  {item.immediate_unlocks:>6}"
-        yield_text = f"  {item.expected_bytes_per_minute:>8.1f}" if show_yield else ""
+        yield_text = (
+            f"  {item.expected_retained_bytes:>8.1f}  "
+            f"{item.expected_minutes:>7.1f}  {item.expected_bytes_per_minute:>8.1f}"
+            if show_yield
+            else ""
+        )
         print(
-            f"{item.address_text:<11}{name:<{name_width + 2}}{item.state:<13}"
+            f"{item.address_text:<11}{name:<{name_width + 2}}{state:<13}"
             f"{item.size:>6}  {item.match_text:>7}{dependency_text}{yield_text}  {item.source or '-'}"
         )
         if show_reasons:
@@ -1056,7 +1115,7 @@ def main() -> int:
     parser.add_argument(
         "--refine",
         action="store_true",
-        help="only provisional, tool-only, or source-debt functions",
+        help="rank all provisional, tool-only, and source-debt functions",
     )
     parser.add_argument(
         "--refine-independent",
@@ -1168,6 +1227,8 @@ def main() -> int:
         parser.error(
             "--refine-independent cannot be combined with --near, --debt, or --quality"
         )
+    if args.refine_independent and args.target_address is not None:
+        parser.error("--refine-independent cannot be combined with --for")
     limit_explicit = args.limit is not None or args.all
     if args.all:
         args.limit = 0
@@ -1266,7 +1327,7 @@ def main() -> int:
         max_size=args.max_size,
         exclude_capped=not args.include_capped,
         debt_only=args.debt or args.quality,
-        new_work_only=dependency_mode and not args.refine_independent,
+        new_work_only=dependency_mode and queue != "refinement",
         include_deferred=include_blocked,
         allow_large=True,
         queue=queue if not (args.near or args.debt or args.quality) else None,
@@ -1289,6 +1350,9 @@ def main() -> int:
                     "size": item.size,
                     "map_size": item.map_size,
                     "size_source": item.size_source,
+                    "score_ceiling": item.score_ceiling,
+                    "map_defect": item.map_defect,
+                    "work_target": item.work_target,
                     "match": item.match,
                     "effective": item.effective,
                     "tool_artifact": item.tool_artifact,
@@ -1325,6 +1389,7 @@ def main() -> int:
                     "unresolved_bytes": item.unresolved_bytes,
                     "prior_attempts": item.prior_attempts,
                     "prior_zero_yield_attempts": item.prior_zero_yield_attempts,
+                    "penalty_attempts": item.active_penalty_attempts,
                     "prior_minutes": item.prior_minutes,
                     "expected_retained_bytes": item.expected_retained_bytes,
                     "expected_minutes": item.expected_minutes,

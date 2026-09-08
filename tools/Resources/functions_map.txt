@@ -403,11 +403,14 @@
 0x0045D110 SoftwareRenderer::RasterizeAdditiveTexturedPolygon555
 0x0045DB80 SoftwareRenderer::RasterizeTexturedRect555
 0x0045E390 SoftwareRenderer::UnkRenderAPI13
+0x004617D0 SoftwareRenderer::UnkFunc4617D0
+0x00461890 SoftwareRenderer::UnkFunc461890
 0x00461D20 SoftwareRenderer::RasterizeTexturedRect565
 0x00463090 SoftwareRenderer::RasterizeTexturedPolygon565
 0x00463B80 SoftwareRenderer::RasterizeBlend25TexturedPolygon565
 0x00464690 SoftwareRenderer::RasterizeBlend50TexturedPolygon565
 0x00465180 SoftwareRenderer::UnkRenderAPI24
+0x00465C90 SoftwareRenderer::UnkFunc465C90
 0x00467080 SoftwareRenderer::UnkRenderAPI17
 0x00468430 SoftwareRenderer::RasterizeSubtractiveTexturedPolygon565
 0x00468E90 SoftwareRenderer::RasterizeAdditiveTexturedPolygon565
@@ -430,6 +433,7 @@
 0x00472E70 SoftwareRenderer::UnkRenderAPI31
 0x00474190 SoftwareRenderer::RasterizeTexturedPolygon8
 0x00474C80 SoftwareRenderer::UnkRenderAPI33
+0x00475780 SoftwareRenderer::UnkFunc475780
 0x00476340 SoftwareRenderer::RasterizeSubtractiveTexturedPolygon8
 0x00476D00 SoftwareRenderer::RasterizeAdditiveTexturedPolygon8
 0x004776C0 SoftwareRenderer::RasterizeSolidQuad8

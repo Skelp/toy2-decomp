@@ -8,13 +8,15 @@ This wrapper resolves the project's Ghidra project location from the `ghidra`
 CLI configuration, stops the interactive Ghidra bridge so the local project can
 be opened exclusively, runs the importer, then restarts the bridge.
 
-`check` validates `functions_map.txt` structurally: sorted ascending, free of
-duplicate addresses, every entry named, and every address inside the retail
-executable's `.text` section. It does not depend on Ghidra or a current build.
+`check` validates the order, names, and retail code range in
+`functions_map.txt`. It also checks saved retail body sizes for source-work
+targets. A body must cover at least 80 percent of its map gap. The check does
+not query Ghidra or rebuild the project.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import struct
 import subprocess
@@ -27,6 +29,12 @@ ROOT = Path(__file__).resolve().parents[1]
 MAP_PATH = ROOT / "tools" / "Resources" / "functions_map.txt"
 EXE_PATH = ROOT / "original" / "toy2.exe"
 BUILD_DIR = ROOT / "build"
+SOURCE_ROOT = ROOT / "src"
+FUNCTION_SIZES_PATH = BUILD_DIR / "decomp-function-sizes.json"
+MINIMUM_COVERAGE_BODY_RATIO = 0.8
+
+sys.path.insert(0, str(ROOT))
+from tools.decomp_annotations import read_source_annotations  # noqa: E402
 
 # Matches the address/name format produced by decomp_utils.parse_functions_map.
 _MAP_LINE_RE = __import__("re").compile(r"^(?:0x)?([0-9A-Fa-f]{6,8})(?:\s+(.+))?$")
@@ -135,7 +143,7 @@ def cmd_sync(args: SimpleNamespace) -> int:
 
 
 # --------------------------------------------------------------------------- #
-# check: functions_map.txt structural validation
+# check: functions_map.txt consistency validation
 # --------------------------------------------------------------------------- #
 
 def _parse_map(path: Path = MAP_PATH) -> list[tuple[int, str, str]]:
@@ -208,6 +216,82 @@ def _check_structure(entries: list[tuple[int, str, str]]) -> list[str]:
     return problems
 
 
+def _read_snapshot_sizes(path: Path = FUNCTION_SIZES_PATH) -> dict[int, int]:
+    """Return mapped retail body sizes from the saved Ghidra snapshot."""
+
+    if not path.is_file():
+        raise ValueError(
+            f"function-size snapshot is missing: {path}. "
+            "Run tools/decomp baseline with Ghidra available."
+        )
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(
+            f"function-size snapshot is invalid: {path}: {error}. "
+            "Run tools/decomp baseline with Ghidra available."
+        ) from error
+    rows = payload.get("data", []) if isinstance(payload, dict) else payload
+    if not isinstance(rows, list):
+        raise ValueError(
+            f"function-size snapshot must contain a JSON list: {path}. "
+            "Run tools/decomp baseline with Ghidra available."
+        )
+    sizes: dict[int, int] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        try:
+            address = int(str(row.get("address", "")), 16)
+            size = int(row.get("original_size", row.get("size", 0)))
+        except (TypeError, ValueError):
+            continue
+        if size > 1:
+            sizes[address] = size
+    if not sizes:
+        raise ValueError(
+            f"function-size snapshot has no usable address and size rows: {path}. "
+            "Run tools/decomp baseline with Ghidra available."
+        )
+    return sizes
+
+
+def _non_coverage_addresses(source_root: Path = SOURCE_ROOT) -> frozenset[int]:
+    """Return addresses that cannot enter the coverage queue."""
+
+    return frozenset(
+        int(annotation.address, 16)
+        for annotation in read_source_annotations(source_root)
+        if annotation.kind in ("function", "library")
+    )
+
+
+def _check_coverage_map_gaps(
+    entries: list[tuple[int, str, str]],
+    snapshot_sizes: dict[int, int],
+    non_coverage_addresses: frozenset[int],
+    minimum_ratio: float = MINIMUM_COVERAGE_BODY_RATIO,
+) -> list[str]:
+    """Flag stale map gaps only for STUB or unstarted source-work targets."""
+
+    problems: list[str] = []
+    for entry, following in zip(entries, entries[1:]):
+        address, canonical, name = entry
+        if address in non_coverage_addresses or address not in snapshot_sizes:
+            continue
+        gap_size = following[0] - address
+        body_size = snapshot_sizes[address]
+        if gap_size <= 0 or body_size >= gap_size * minimum_ratio:
+            continue
+        ratio = body_size / gap_size
+        problems.append(
+            f"  {canonical}  {name}: retail body {body_size} bytes / "
+            f"map gap {gap_size} bytes ({ratio:.1%})\n"
+            "    Add the missing function start before source work."
+        )
+    return problems
+
+
 def cmd_check(args: SimpleNamespace) -> int:
     entries = _parse_map()
     structure = _check_structure(entries)
@@ -215,13 +299,33 @@ def cmd_check(args: SimpleNamespace) -> int:
           f"{len(structure)} problem(s)")
     for line in structure:
         print(line)
+    snapshot_problem = ""
+    try:
+        snapshot_sizes = _read_snapshot_sizes()
+    except ValueError as error:
+        snapshot_sizes = {}
+        snapshot_problem = f"  {error}"
+    coverage_gaps = _check_coverage_map_gaps(
+        entries, snapshot_sizes, _non_coverage_addresses()
+    )
+    if snapshot_problem:
+        coverage_gaps.insert(0, snapshot_problem)
+    print(
+        "\n== source-work map gaps (retail body / map gap >= 80%): "
+        f"{len(coverage_gaps)} problem(s)"
+    )
+    for line in coverage_gaps:
+        print(line)
     print("\n" + "=" * 60)
-    if structure:
-        print(f"{len(structure)} consistency problem(s) found.")
-        print("Ensure addresses fall within .text and keep the list sorted and "
-              "deduplicated.")
+    problem_count = len(structure) + len(coverage_gaps)
+    if problem_count:
+        print(f"{problem_count} consistency problem(s) found.")
+        if structure:
+            print("Keep each named address in .text. Sort and deduplicate the map.")
+        if coverage_gaps:
+            print("Fix each source-work map gap before reconstruction.")
         return 1
-    print("functions_map.txt structure is consistent.")
+    print("functions_map.txt is consistent.")
     return 0
 
 
@@ -235,7 +339,7 @@ def main() -> int:
         print(__doc__)
         print("\nUsage: tools/ghidra_sync.py <command> [args]")
         print("  sync [reccmp-ghidra-import args]  import into Ghidra via reccmp")
-        print("  check                            validate functions_map.txt structure")
+        print("  check                            validate functions_map.txt consistency")
         return 0 if not argv else 0
 
     command, remainder = argv[0], argv[1:]

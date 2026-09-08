@@ -16,15 +16,20 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 
 ROOT = Path(__file__).resolve().parents[1]
+SOURCE_ROOT = ROOT / "src"
 EXCLUSIONS_PATH = ROOT / "tools" / "Resources" / "function-discovery-exclusions.tsv"
 sys.path.insert(0, str(ROOT))
 
 from tools import decomp_binary  # noqa: E402
+from tools.decomp_annotations import read_source_annotations  # noqa: E402
 from tools.decomp_candidates import parse_map  # noqa: E402
 from tools.decomp_dependencies import DependencyUnavailable, _capstone  # noqa: E402
 
 
 CONFIDENCE_ORDER = {"high": 0, "medium": 1, "low": 2}
+BASE_RELOCATION_DIRECTORY_INDEX = 5
+IMAGE_REL_BASED_HIGHLOW = 3
+IMAGE_SCN_MEM_EXECUTE = 0x20000000
 
 
 @dataclass(frozen=True)
@@ -51,6 +56,7 @@ class Discovery:
     jump_callers: tuple[int, ...]
     called_project_targets: tuple[int, ...]
     data_references: tuple[int, ...]
+    relocation_references: tuple[int, ...]
     previous_map_address: int | None
     previous_map_name: str
     next_map_address: int | None
@@ -64,6 +70,12 @@ class Discovery:
         if self.jump_callers:
             count = len(self.jump_callers)
             return f"{count} cross-function retail JMP caller{'s' if count != 1 else ''}"
+        if self.relocation_references:
+            count = len(self.relocation_references)
+            return (
+                f"{count} annotated-global relocation"
+                f"{'s' if count != 1 else ''}"
+            )
         if self.data_references:
             count = len(self.data_references)
             return f"{count} aligned retail data reference{'s' if count != 1 else ''}"
@@ -226,6 +238,104 @@ def scan_data_references(
     }
 
 
+def read_base_relocation_addresses(
+    path: Path = decomp_binary.EXE_PATH,
+) -> frozenset[int]:
+    """Return image addresses that have PE32 HIGHLOW base relocations."""
+
+    data = path.read_bytes()
+    metadata = decomp_binary.read_image_metadata(path)
+    if len(metadata.directories) <= BASE_RELOCATION_DIRECTORY_INDEX:
+        return frozenset()
+    directory = metadata.directories[BASE_RELOCATION_DIRECTORY_INDEX]
+    if directory.virtual_address == 0 or directory.size == 0:
+        return frozenset()
+    offset = decomp_binary.address_to_file_offset(
+        metadata, metadata.image_base + directory.virtual_address
+    )
+    if offset is None or offset + directory.size > len(data):
+        raise ValueError("The retail executable has an invalid base relocation table.")
+
+    addresses: set[int] = set()
+    end = offset + directory.size
+    while offset + 8 <= end:
+        page_rva, block_size = struct.unpack_from("<II", data, offset)
+        if block_size < 8 or offset + block_size > end or block_size % 2 != 0:
+            raise ValueError(
+                "The retail executable has an invalid base relocation block."
+            )
+        for entry_offset in range(offset + 8, offset + block_size, 2):
+            entry = struct.unpack_from("<H", data, entry_offset)[0]
+            relocation_type = entry >> 12
+            if relocation_type == IMAGE_REL_BASED_HIGHLOW:
+                addresses.add(
+                    metadata.image_base + page_rva + (entry & 0x0FFF)
+                )
+        offset += block_size
+    return frozenset(addresses)
+
+
+def annotated_global_addresses(source_root: Path = SOURCE_ROOT) -> frozenset[int]:
+    """Return the retail addresses of source-annotated globals."""
+
+    return frozenset(
+        int(annotation.address, 16)
+        for annotation in read_source_annotations(source_root)
+        if annotation.kind == "global"
+    )
+
+
+def scan_annotated_relocation_targets(
+    globals_: frozenset[int] | None = None,
+    relocations: frozenset[int] | None = None,
+) -> dict[int, frozenset[int]]:
+    """Find code targets in relocation runs that start at annotated globals."""
+
+    if not decomp_binary.available():
+        raise DependencyUnavailable(
+            "The retail executable is unavailable. "
+            "Run the repository setup command first."
+        )
+    globals_ = annotated_global_addresses() if globals_ is None else globals_
+    relocations = (
+        read_base_relocation_addresses() if relocations is None else relocations
+    )
+    code_ranges = tuple(
+        (section.virtual_address, section.virtual_address + section.virtual_size)
+        for section in decomp_binary.sections()
+        if section.name == ".text" or section.characteristics & IMAGE_SCN_MEM_EXECUTE
+    )
+    references: dict[int, set[int]] = defaultdict(set)
+    for global_address in globals_:
+        source = global_address
+        while source in relocations:
+            word = decomp_binary.read_bytes(source, 4)
+            if word is None or len(word) != 4:
+                break
+            target = struct.unpack("<I", word)[0]
+            if any(start <= target < end for start, end in code_ranges):
+                references[target].add(source)
+            source += 4
+    return {
+        target: frozenset(addresses) for target, addresses in references.items()
+    }
+
+
+def add_relocation_target_starts(
+    functions: list[GhidraFunction],
+    relocation_references: dict[int, frozenset[int]],
+) -> list[GhidraFunction]:
+    """Add relocation-only starts that Ghidra did not define as functions."""
+
+    starts = {function.address for function in functions}
+    added = [
+        GhidraFunction(address, 0, "")
+        for address in relocation_references
+        if address not in starts
+    ]
+    return sorted([*functions, *added], key=lambda item: item.address)
+
+
 def import_thunk_addresses(functions: list[GhidraFunction]) -> frozenset[int]:
     """Return six-byte x86 indirect jumps through the import address table."""
 
@@ -247,6 +357,7 @@ def discover(
     exclusions: tuple[tuple[int, int], ...] = (),
     excluded_addresses: frozenset[int] = frozenset(),
     data_references: dict[int, frozenset[int]] | None = None,
+    relocation_references: dict[int, frozenset[int]] | None = None,
 ) -> list[Discovery]:
     """Return ranked unmapped starts inside the confirmed game/engine range."""
 
@@ -275,6 +386,7 @@ def discover(
     threshold = CONFIDENCE_ORDER[minimum_confidence]
     results: list[Discovery] = []
     data_references = data_references or {}
+    relocation_references = relocation_references or {}
 
     for function in functions:
         if function.address in mapped_names:
@@ -285,7 +397,10 @@ def discover(
             continue
         if any(start <= function.address < end for start, end in exclusions):
             continue
-        if any(start < function.address < end for start, end in mapped_ranges):
+        relocated_at = tuple(sorted(relocation_references.get(function.address, ())))
+        if not relocated_at and any(
+            start < function.address < end for start, end in mapped_ranges
+        ):
             continue
         evidence = transfers.get(
             function.address, TransferEvidence(frozenset(), frozenset())
@@ -296,7 +411,7 @@ def discover(
         referenced_at = tuple(sorted(data_references.get(function.address, ())))
         if evidence.call_callers:
             confidence = "high"
-        elif evidence.jump_callers or referenced_at or project_calls:
+        elif evidence.jump_callers or relocated_at or referenced_at or project_calls:
             confidence = "medium"
         else:
             confidence = "low"
@@ -306,7 +421,11 @@ def discover(
         insertion = bisect.bisect_left(mapped_addresses, function.address)
         previous = entries[insertion - 1] if insertion else (None, "")
         following = entries[insertion] if insertion < len(entries) else (None, "")
-        if following[0] is not None and function.address + function.size > following[0]:
+        if (
+            function.size > 0
+            and following[0] is not None
+            and function.address + function.size > following[0]
+        ):
             continue
         results.append(
             Discovery(
@@ -318,6 +437,7 @@ def discover(
                 jump_callers=tuple(sorted(evidence.jump_callers)),
                 called_project_targets=project_calls,
                 data_references=referenced_at,
+                relocation_references=relocated_at,
                 previous_map_address=previous[0],
                 previous_map_name=previous[1],
                 next_map_address=following[0],
@@ -348,6 +468,9 @@ def json_row(item: Discovery) -> dict[str, object]:
     row["data_references"] = [
         f"0x{address:08X}" for address in item.data_references
     ]
+    row["relocation_references"] = [
+        f"0x{address:08X}" for address in item.relocation_references
+    ]
     for key in ("previous_map_address", "next_map_address"):
         value = row[key]
         row[key] = None if value is None else f"0x{value:08X}"
@@ -375,7 +498,8 @@ def main() -> int:
     try:
         functions = read_ghidra_functions()
         transfers = scan_transfers(functions)
-    except DependencyUnavailable as error:
+        relocation_references = scan_annotated_relocation_targets()
+    except (DependencyUnavailable, OSError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
     minimum = "low" if args.all else args.min_confidence
@@ -384,14 +508,16 @@ def main() -> int:
     except ValueError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
+    entries = parse_map()
     results = discover(
-        parse_map(),
-        functions,
+        entries,
+        add_relocation_target_starts(functions, relocation_references),
         transfers,
         minimum,
         exclusions,
         import_thunk_addresses(functions),
         scan_data_references(functions),
+        relocation_references,
     )
     shown = results if args.limit == 0 else results[: args.limit]
 
@@ -406,8 +532,9 @@ def main() -> int:
     print("Ghidra names are local hints. Do not copy them into the map without evidence.\n")
     for item in shown:
         hint = f"  hint={item.ghidra_name}" if item.ghidra_name else ""
+        size = f"{item.size:5} bytes" if item.size > 0 else "size unknown"
         print(
-            f"0x{item.address:08X}  {item.confidence:<6}  {item.size:5} bytes  "
+            f"0x{item.address:08X}  {item.confidence:<6}  {size:>12}  "
             f"{item.reason}{hint}"
         )
         previous = (

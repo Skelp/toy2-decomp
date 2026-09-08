@@ -26,24 +26,24 @@ configure() {
 
 build() {
     if [[ ! -f build/build.ninja ]]; then
-        configure
+        configure || return
     fi
-    cmake --build build -- "-j${build_jobs}"
+    cmake --build build -- "-j${build_jobs}" || return
     (
         cd build
         reccmp-project detect --what recompiled
-    )
+    ) || return
 }
 
 build_game() {
     if [[ ! -f build/build.ninja ]]; then
-        configure
+        configure || return
     fi
-    cmake --build build --target toy2decomp -- "-j${build_jobs}"
+    cmake --build build --target toy2decomp -- "-j${build_jobs}" || return
     (
         cd build
         reccmp-project detect --what recompiled
-    )
+    ) || return
 }
 
 # Print only the per-function similarity verdict for each given address. One
@@ -53,9 +53,20 @@ score() {
         echo "Usage: tools/decomp score <address> [address...]" >&2
         return 2
     fi
+    for argument in "$@"; do
+        if [[ $argument == -h || $argument == --help ]]; then
+            python tools/decomp_verify.py score --help
+            return
+        fi
+    done
     ensure_build
     write_comparison_report decomp-score-report.json
     python tools/decomp_verify.py score build/decomp-score-report.json "$@"
+    for address in "$@"; do
+        if [[ $address =~ ^0x[0-9A-Fa-f]{1,8}$ ]]; then
+            python tools/decomp_campaigns.py first-score --address "$address" --quiet
+        fi
+    done
 }
 
 ensure_build() {
@@ -80,14 +91,61 @@ write_data_report() {
         --output "build/$output_name"
 }
 
+function_sizes_are_valid() {
+    python -c \
+        'import sys; from pathlib import Path; from tools.ghidra_sync import _read_snapshot_sizes; _read_snapshot_sizes(Path(sys.argv[1]))' \
+        "$1" >/dev/null 2>&1
+}
+
+refresh_function_sizes() {
+    local function_sizes="build/decomp-function-sizes.json"
+    local temporary_sizes="build/decomp-function-sizes.json.tmp"
+    if command -v ghidra >/dev/null 2>&1; then
+        if ghidra function list --json --limit 0 --fields address,size > "$temporary_sizes" && \
+            function_sizes_are_valid "$temporary_sizes"; then
+            mv "$temporary_sizes" "$function_sizes" || return
+        else
+            rm -f "$temporary_sizes"
+            echo "warning: kept the existing function-size snapshot" >&2
+        fi
+    else
+        echo "warning: Ghidra is unavailable; kept the existing function-size snapshot" >&2
+    fi
+    if ! function_sizes_are_valid "$function_sizes"; then
+        echo "error: no valid retail function-size snapshot is available" >&2
+        return 1
+    fi
+}
+
 baseline() {
-    build
-    write_comparison_report decomp-baseline-report.json
-    write_data_report decomp-baseline-data-report.json
+    if [[ $# -gt 0 ]]; then
+        for argument in "$@"; do
+            if [[ $argument == -h || $argument == --help ]]; then
+                echo "Usage: tools/decomp baseline"
+                return
+            fi
+        done
+        echo "error: baseline does not accept arguments" >&2
+        return 2
+    fi
+    build || return
+    write_comparison_report decomp-baseline-report.json || return
+    write_data_report decomp-baseline-data-report.json || return
+    refresh_function_sizes || return
     python tools/decomp_verify.py metadata build/decomp-baseline-meta.json \
         --report build/decomp-baseline-report.json \
-        --data-report build/decomp-baseline-data-report.json
-    echo "Wrote build/decomp-baseline-report.json for $(git rev-parse --short HEAD)."
+        --data-report build/decomp-baseline-data-report.json || return
+    local revision
+    revision=$(git rev-parse --short HEAD) || return
+    echo "Wrote build/decomp-baseline-report.json for $revision."
+}
+
+campaign_state_is_finalizing() {
+    local state_path="$1"
+    [[ -f $state_path ]] || return 1
+    python -c \
+        'import json,sys; sys.exit(0 if json.load(open(sys.argv[1], encoding="utf-8")).get("phase") == "finalizing" else 1)' \
+        "$state_path" >/dev/null 2>&1
 }
 
 validate() {
@@ -214,6 +272,9 @@ validate() {
         verify_args+=(--accounting-correction "$accounting_correction")
     fi
     python tools/decomp_verify.py "${verify_args[@]}"
+    for target in "${targets[@]}"; do
+        python tools/decomp_campaigns.py first-score --address "$target" --quiet
+    done
     if [[ $staged -eq 1 ]]; then
         python tools/decomp_lint.py --staged --warnings-as-errors
     fi
@@ -255,6 +316,7 @@ experiment() {
                 "$directory/${label}.report.json" "$address" "$directory/${label}.normalized.json"
             python tools/decomp_verify.py classify "$directory/${label}.report.json" "$address" \
                 | tee "$directory/${label}.summary.txt"
+            python tools/decomp_campaigns.py first-score --address "$address" --quiet
             ;;
         report)
             find "$directory" -maxdepth 1 -name '*.summary.txt' -print -exec sed -n '1,4p' {} \;
@@ -289,9 +351,7 @@ report() {
     ) > "$report_summary"
     cat "$report_summary"
 
-    if command -v ghidra >/dev/null 2>&1; then
-        ghidra function list --json --limit 0 --fields address,size > "$function_sizes" || rm -f "$function_sizes"
-    fi
+    refresh_function_sizes
 
     python tools/generate-decomp-data-report.py \
         --original original/toy2.exe \
@@ -323,9 +383,9 @@ Commands:
   compare [args]    Run reccmp against the reference and recompiled EXEs
   score <addr>...   Print only the similarity verdict for one or more addresses
   bc <addr>         Build toy2.exe, then compare one address verbosely
-  notes <query>     Search bounded codegen, debt, and original-name notes
+  notes <query>     Search bounded codegen, source-model, debt, and name notes
   candidates [ns]   Rank reconstruction candidates (no Ghidra, no reccmp run)
-  campaigns [...]   Record campaign results and show retained-byte throughput
+  campaigns [...]   Measure campaign time, report deltas, and retained throughput
   discover [args]   Find credible Ghidra starts absent from the function map
   defer <addr> ...  Record a committed blocker or prerequisite
   undefer <addr>    Clear all committed blockers for one target
@@ -368,6 +428,21 @@ does not call Ghidra or reccmp. `evidence` makes bounded Ghidra queries:
 
 `score` avoids the assembly diff when you only need the percentage:
   tools/decomp score 0x00403640 0x004B99F0
+
+Start campaign measurement before the evidence preflight. Record the result
+after the final source state is ready:
+  tools/decomp campaigns start --mode refinement --address 0x00403640 \
+    --subsystem Animation
+  tools/decomp campaigns status
+  tools/decomp campaigns start --mode coverage --family --address 0x00465180 \
+    --expected-minutes 24 --expected-retained-bytes 120
+  tools/decomp campaigns record --result source
+  tools/decomp campaigns record --result no-source \
+    --model "The tested loop form scored 20 percent."
+  tools/decomp campaigns abort --reason "The user stopped the campaign."
+  tools/decomp campaigns add-target --address 0x004038E0
+  tools/decomp campaigns evidence --address 0x00403640 --kind analogue \
+    --note "A matching retail sibling now supplies the loop form."
 
 Routine output is bounded. `candidates` and `discover` show 10 rows.
 `blockers` shows 20 rows. Use `--limit 0` or `--all` for all rows.
@@ -426,7 +501,83 @@ case "$command" in
         exec python tools/decomp_candidates.py "$@"
         ;;
     campaigns)
-        exec python tools/decomp_campaigns.py "$@"
+        for campaign_argument in "$@"; do
+            if [[ $campaign_argument == -h || $campaign_argument == --help ]]; then
+                exec python tools/decomp_campaigns.py "$@"
+            fi
+        done
+        campaign_action=""
+        campaign_state_file="build/decomp-campaign-state.json"
+        campaign_global_arguments=()
+        campaign_arguments=("$@")
+        campaign_index=0
+        while [[ $campaign_index -lt ${#campaign_arguments[@]} ]]; do
+            campaign_argument="${campaign_arguments[$campaign_index]}"
+            case "$campaign_argument" in
+                --state-file)
+                    if [[ $((campaign_index + 1)) -ge ${#campaign_arguments[@]} ]]; then
+                        exec python tools/decomp_campaigns.py "$@"
+                    fi
+                    campaign_state_file="${campaign_arguments[$((campaign_index + 1))]}"
+                    campaign_global_arguments+=(
+                        "$campaign_argument"
+                        "${campaign_arguments[$((campaign_index + 1))]}"
+                    )
+                    campaign_index=$((campaign_index + 2))
+                    ;;
+                --state-file=*)
+                    campaign_state_file="${campaign_argument#*=}"
+                    campaign_global_arguments+=("$campaign_argument")
+                    campaign_index=$((campaign_index + 1))
+                    ;;
+                --file|--source-models|--functions-map|--function-sizes|--worktree-root|--source-root)
+                    if [[ $((campaign_index + 1)) -ge ${#campaign_arguments[@]} ]]; then
+                        exec python tools/decomp_campaigns.py "$@"
+                    fi
+                    campaign_global_arguments+=(
+                        "$campaign_argument"
+                        "${campaign_arguments[$((campaign_index + 1))]}"
+                    )
+                    campaign_index=$((campaign_index + 2))
+                    ;;
+                --file=*|--source-models=*|--functions-map=*|--function-sizes=*|--worktree-root=*|--source-root=*)
+                    campaign_global_arguments+=("$campaign_argument")
+                    campaign_index=$((campaign_index + 1))
+                    ;;
+                *)
+                    campaign_action="$campaign_argument"
+                    break
+                    ;;
+            esac
+        done
+        case "$campaign_action" in
+            start)
+                python tools/decomp_campaigns.py "$@"
+                if ! baseline; then
+                    python tools/decomp_campaigns.py "${campaign_global_arguments[@]}" abort \
+                        --reason "The campaign baseline command failed."
+                    exit 1
+                fi
+                if ! python tools/decomp_campaigns.py \
+                    "${campaign_global_arguments[@]}" set-baseline --quiet; then
+                    python tools/decomp_campaigns.py "${campaign_global_arguments[@]}" abort \
+                        --reason "The campaign baseline attachment failed."
+                    exit 1
+                fi
+                ;;
+            record)
+                if campaign_state_is_finalizing "$campaign_state_file"; then
+                    exec python tools/decomp_campaigns.py "$@"
+                fi
+                build
+                write_comparison_report decomp-current-report.json
+                write_data_report decomp-current-data-report.json
+                exec python tools/decomp_campaigns.py "$@"
+                ;;
+            *)
+                exec python tools/decomp_campaigns.py "$@"
+                ;;
+        esac
         ;;
     defer)
         if [[ $# -lt 3 ]]; then
@@ -485,7 +636,7 @@ case "$command" in
             echo "Usage: tools/decomp bc [--full] <address>" >&2
             exit 2
         fi
-        if [[ ! $1 =~ ^0x[0-9A-Fa-f]{8}$ ]]; then
+        if [[ ! $1 =~ ^0x[0-9A-Fa-f]{1,8}$ ]]; then
             echo "error: bc needs an address such as 0x00401230" >&2
             exit 2
         fi
@@ -493,11 +644,19 @@ case "$command" in
         mkdir -p build/decomp-diffs
         diff_path="build/decomp-diffs/${1}.txt"
         (cd build && reccmp-reccmp --target TOY2 --no-color --verbose "$1") > "$diff_path"
+        diff_args=(
+            "$diff_path"
+            --address "$1"
+            --functions-map tools/Resources/functions_map.txt
+            --function-sizes build/decomp-function-sizes.json
+            --source-root src
+        )
         if [[ $full -eq 1 ]]; then
-            python tools/decomp_diff.py "$diff_path" --full
+            python tools/decomp_diff.py "${diff_args[@]}" --full
         else
-            python tools/decomp_diff.py "$diff_path"
+            python tools/decomp_diff.py "${diff_args[@]}"
         fi
+        python tools/decomp_campaigns.py first-score --address "$1" --quiet
         ;;
     baseline)
         baseline "$@"
@@ -512,9 +671,19 @@ case "$command" in
         report "$@"
         ;;
     data)
+        for argument in "$@"; do
+            if [[ $argument == -h || $argument == --help ]]; then
+                exec python tools/decomp_data.py --help
+            fi
+        done
         ensure_build
         write_data_report decomp-data-report.json
-        exec python tools/decomp_data.py "$@"
+        python tools/decomp_data.py "$@"
+        for argument in "$@"; do
+            if [[ $argument =~ ^0x[0-9A-Fa-f]{1,8}$ ]]; then
+                python tools/decomp_campaigns.py first-score --address "$argument" --quiet
+            fi
+        done
         ;;
     session-summary)
         if [[ $# -eq 0 ]]; then

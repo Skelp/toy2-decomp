@@ -20,7 +20,9 @@ import json
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 sys.dont_write_bytecode = True
 
@@ -42,6 +44,7 @@ from tools.decomp_dependencies import (  # noqa: E402
     DependencyUnavailable,
     build_call_graph,
 )
+from tools.decomp_discover import scan_annotated_relocation_targets  # noqa: E402
 
 NEIGHBOR_COUNT = 3
 ROW_LIMIT = 12
@@ -52,6 +55,13 @@ DATA_ADDRESS_RE = re.compile(r"0x(00[0-9a-fA-F]{6})")
 # the leading zeroes the memory-operand form carries. Accept both widths and let
 # the section lookup reject anything unmapped.
 IMMEDIATE_ADDRESS_RE = re.compile(r"0x([0-9a-fA-F]{5,8})")
+
+
+@dataclass(frozen=True)
+class UnmappedStartEvidence:
+    ghidra_size: int | None
+    ghidra_name: str
+    relocation_references: tuple[int, ...]
 
 
 def run_ghidra(arguments: list[str]) -> object | None:
@@ -172,13 +182,52 @@ def ghidra_function_at(address: int) -> tuple[int, str] | None:
     return result[1], result[2]
 
 
+def resolve_unmapped_start(
+    address: int,
+    ghidra_target: tuple[int, str] | None,
+    relocation_references: dict[int, frozenset[int]],
+) -> UnmappedStartEvidence | None:
+    """Accept an exact Ghidra start or an annotated-global relocation target."""
+
+    references = tuple(sorted(relocation_references.get(address, ())))
+    if ghidra_target is not None:
+        return UnmappedStartEvidence(
+            ghidra_target[0], ghidra_target[1], references
+        )
+    if not references:
+        return None
+    return UnmappedStartEvidence(None, "", references)
+
+
+def resolve_padding_alignment(
+    address: int,
+    mapped_addresses: list[int],
+    read_bytes: Callable[[int, int], bytes | None],
+) -> int | None:
+    """Resolve an arithmetic body end through retail alignment padding."""
+
+    index = bisect.bisect_right(mapped_addresses, address)
+    if index >= len(mapped_addresses):
+        return None
+    following = mapped_addresses[index]
+    padding_size = following - address
+    if padding_size <= 0 or padding_size > 15:
+        return None
+    padding = read_bytes(address, padding_size)
+    if padding is None or len(padding) != padding_size:
+        return None
+    if not all(value in (0x90, 0xCC) for value in padding):
+        return None
+    return following
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Collect bounded evidence for one target.")
     parser.add_argument("address", help="retail address, e.g. 0x00403640")
     parser.add_argument(
         "--unmapped",
         action="store_true",
-        help="inspect a discovered Ghidra start before it enters the map",
+        help="inspect a discovered function start before it enters the map",
     )
     parser.add_argument("--disasm", action="store_true", help="also print the raw disassembly")
     parser.add_argument("--full", action="store_true", help="print all evidence rows and text")
@@ -206,6 +255,14 @@ def main() -> int:
     entries = parse_map()
     addresses = [item[0] for item in entries]
     names = dict(entries)
+    alignment_origin: int | None = None
+    if args.unmapped and address not in names:
+        aligned = resolve_padding_alignment(
+            address, addresses, decomp_binary.read_bytes
+        )
+        if aligned is not None:
+            alignment_origin = address
+            address = aligned
     functions, annotated_globals = annotation_index()
     global_names = global_symbol_names()
     matches = read_match_percentages()
@@ -213,6 +270,17 @@ def main() -> int:
 
     unmapped = address not in names
     ghidra_target = ghidra_function_at(address) if unmapped and args.unmapped else None
+    relocation_targets: dict[int, frozenset[int]] = {}
+    if unmapped and args.unmapped:
+        try:
+            relocation_targets = scan_annotated_relocation_targets()
+        except (DependencyUnavailable, OSError, ValueError):
+            relocation_targets = {}
+    unmapped_evidence = (
+        resolve_unmapped_start(address, ghidra_target, relocation_targets)
+        if unmapped and args.unmapped
+        else None
+    )
     if unmapped and not args.unmapped:
         print(f"error: 0x{address:08X} is not in {MAP_PATH.relative_to(ROOT)}", file=sys.stderr)
         print(
@@ -220,31 +288,95 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
-    if unmapped and ghidra_target is None:
+    if unmapped and unmapped_evidence is None:
         print(
-            f"error: 0x{address:08X} is not an exact Ghidra function start",
+            f"error: 0x{address:08X} has no supported function-start evidence",
             file=sys.stderr,
         )
         return 1
 
     index = bisect.bisect_left(addresses, address)
     if unmapped:
-        ghidra_size, ghidra_name = ghidra_target
-        following = address + ghidra_size
+        assert unmapped_evidence is not None
+        ghidra_size = unmapped_evidence.ghidra_size
+        ghidra_name = unmapped_evidence.ghidra_name
+        following = (
+            address + ghidra_size
+            if ghidra_size is not None
+            else addresses[index] if index < len(addresses) else address
+        )
         state, source, line = "UNMAPPED", "", 0
         match = None
-        target_name = f"(Ghidra hint: {ghidra_name or '?'})"
+        target_name = (
+            f"(Ghidra hint: {ghidra_name or '?'})"
+            if ghidra_size is not None
+            else "(annotated-global relocation target)"
+        )
     else:
         following = addresses[index + 1] if index + 1 < len(addresses) else address
         state, source, line = functions.get(address, ("NOT_STARTED", "", 0))
         match = matches.get(address)
         target_name = names[address]
 
+    if alignment_origin is not None:
+        print(
+            f"== alignment 0x{alignment_origin:08X} has "
+            f"{address - alignment_origin} retail padding byte(s); "
+            f"using mapped start 0x{address:08X}"
+        )
+        print()
     print(f"== target 0x{address:08X}  {target_name}")
     print(f"state            {state}" + (f"  ({source}:{line})" if source else ""))
     if unmapped:
-        print(f"Ghidra body size {following - address} bytes")
-        print("name status      local hint only; verify a durable name before map insertion")
+        if ghidra_size is not None:
+            print(f"Ghidra body size {following - address} bytes")
+            if unmapped_evidence.relocation_references:
+                print("start evidence   exact Ghidra start and annotated-global relocation")
+                for reference in unmapped_evidence.relocation_references:
+                    owner_address = max(
+                        (item for item in annotated_globals if item <= reference),
+                        default=None,
+                    )
+                    owner = (
+                        annotated_globals.get(owner_address)
+                        if owner_address is not None
+                        else None
+                    )
+                    symbol = (
+                        global_names.get(owner_address, "")
+                        if owner_address is not None
+                        else ""
+                    )
+                    detail = (
+                        f" in {symbol or '?'} ({owner[0]}:{owner[1]})"
+                        if owner is not None
+                        else ""
+                    )
+                    print(f"  relocation 0x{reference:08X}{detail}")
+            print(
+                "name status      local hint only. "
+                "Verify a durable name before insertion."
+            )
+        else:
+            print(f"approximate size {following - address} bytes (map-gap fallback)")
+            print("start evidence   annotated-global relocation target")
+            for reference in unmapped_evidence.relocation_references:
+                owner_address = max(
+                    (item for item in annotated_globals if item <= reference),
+                    default=None,
+                )
+                owner = annotated_globals.get(owner_address) if owner_address else None
+                symbol = global_names.get(owner_address, "") if owner_address else ""
+                detail = (
+                    f" in {symbol or '?'} ({owner[0]}:{owner[1]})"
+                    if owner is not None
+                    else ""
+                )
+                print(f"  relocation 0x{reference:08X}{detail}")
+            print(
+                "name status      no retail name. "
+                "Verify a durable name before insertion."
+            )
     else:
         if address in original_sizes:
             print(f"retail body size  {original_sizes[address]} bytes")

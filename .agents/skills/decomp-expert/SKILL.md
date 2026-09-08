@@ -11,18 +11,21 @@ work, or a concise no-source result after bounded pivots.
 ## Start
 
 1. Read `AGENTS.md`.
-2. Confirm the branch, supplied `HEAD`, and assigned mode.
+2. Confirm the branch, supplied `HEAD`, and assigned lowercase mode.
 3. Run `git status --short` and preserve unrelated drift.
 4. Run `tools/decomp progress --json` and record all global metrics.
 5. Run the candidate command for the assigned mode. Use `tools/decomp data
    --limit 10` for data work.
 6. Select one subsystem campaign.
 7. Record each target score and status.
-8. Run `tools/decomp baseline` once before source edits.
+8. Confirm the start output and baseline paths that the supervisor supplied.
 9. Inspect the target file's namespaces, includes, globals, and private helpers.
 10. Check nearby function-map entries and source-path evidence for file boundaries.
 11. Run `tools/decomp data --limit 10` and inspect relevant global differences.
-12. Run `tools/decomp campaigns summary` and inspect the assigned addresses.
+12. Run `tools/decomp campaigns summary` to inspect completed campaign history.
+
+The summary command does not show active campaign state. Run
+`tools/decomp campaigns status` to inspect that state.
 
 Do not record the campaign result. The supervisor records it after independent
 validation. This rule prevents duplicate records.
@@ -32,6 +35,12 @@ functions. A data campaign contains at most three related initialized globals.
 Rank work by unresolved bytes, evidence readiness, dependency impact, and
 source debt. Also use the estimated retained-byte rate. Do not select work only
 by address or easy percentage gain.
+
+A family campaign can contain more than three functions only when retail data
+shows parallel dispatch tables. Use functions from corresponding table slots.
+The retail body sizes for each corresponding slot must differ by no more than
+one percent. Test one anchor first. Apply one shared source model, and compare
+every family member. Confirm that active campaign status says `Family: yes`.
 
 Do not retry a zero-yield address unless the supervisor gives new evidence.
 Confirm that evidence before you edit source.
@@ -68,16 +77,26 @@ Write the simplest plausible C++. Build early. For function work, run
 `tools/decomp bc ADDRESS` after each meaningful model change. For data work,
 rebuild and run `tools/decomp data ADDRESS` after each meaningful change.
 
-Send the supervisor a preflight result within five minutes. Include the ABI,
-source model, affected byte range, file boundary, and expected retained bytes.
+Set `B` to the assigned `expected_minutes` value. The supervisor supplies the
+campaign start time and all absolute deadlines. The start time includes baseline
+creation and delegation overhead. Use the supplied deadlines. Do not start a
+new clock when your turn starts.
 
-Get the first score within eight minutes. Stop source trials after twelve
-minutes unless a score shows at least 100 likely retained bytes.
+Send the supervisor a preflight result by the absolute preflight deadline.
+Include the ABI, source model, affected byte range, file boundary, and expected
+retained bytes. The campaign tools do not record the preflight time.
+
+Get the first score by the absolute first-score deadline. Stop source trials at
+the absolute stop deadline. Use the extension deadline only when a score shows
+at least 100 likely retained bytes. The first successful `tools/decomp bc` or
+`score` command records the first-score time.
 
 For coverage, build a complete scored pilot before you refine the body. The
-pilot must include the ABI and one main control-flow path. Stop when the pilot
-is below 35 percent. Permit one more source model when the pilot is from 35
-through 49 percent.
+pilot must include the ABI and one main control-flow path. Read the score ceiling
+and ceiling-relative score from `tools/decomp bc`. Stop when the relative score
+is below 35 percent. Permit one more source model when the relative score is
+from 35 through 49 percent. Stop source work and report a map defect when the
+ceiling is below 60 percent.
 
 For refinement, name the saved-diff mismatch before the first edit. The first
 model must test that mismatch. Do not call register allocation or instruction
@@ -87,11 +106,14 @@ Do not add targets to a bundle until the anchor retains 100 bytes. You can use
 a bundle without an anchor when all targets already pass validation.
 
 If evidence rejects the target, pivot to a related target in the subsystem.
-Make at most two pivots. Record only blockers with a specific prerequisite. Do
-not create a metadata-only commit.
+Run `tools/decomp campaigns add-target --address ADDRESS` before work on the
+new target. Make at most two pivots. Record only blockers with a specific
+prerequisite. Do not create a metadata-only commit.
 
-Stop after two failed source models. Restore each failed model before the next
-test. Do not run the full report or sync for a no-source result.
+Do not test more than two failed source models for one target. Restore each
+failed model before the next test. Stop when the campaign clock expires or the
+available evidence is exhausted. Do not run the full report or sync for a
+no-source result.
 
 The final score must be at least 50 percent unless reccmp marks the target
 exact or effective. Keep a readable model when evidence supports its ABI,
@@ -102,16 +124,16 @@ behavior, side effects, and data model. Do not use
 
 For a source campaign:
 
+Use the lowercase mode that the supervisor assigned.
+
 1. Convert each completed `STUB` to `FUNCTION`.
 2. Update the function map when a name changes.
 3. Stage only the coherent campaign.
-4. Run `tools/decomp validate --mode MODE --target ADDRESS --staged`.
+4. Run the applicable lowercase mode command from `AGENTS.md`.
 5. Confirm the result meets the assigned mode contract.
 6. Run the full comparison, sync, and report once.
-7. Commit the source slice.
-8. Integrate current `origin/agent/continuous` safely.
-9. Rebuild and validate the integrated tree.
-10. Push the result.
+7. Return the staged source slice to the supervisor.
+8. Do not commit or push. The supervisor records and commits the campaign.
 
 Coverage must increase the implemented count. Refinement must increase a
 score, reach terminal status, or remove debt while terminal status remains.
@@ -122,14 +144,17 @@ does not count as source progress.
 Run tool unit tests only when the campaign changes tool code. A workflow fix
 must include focused tests. It must restore a concrete path to source work.
 
-If two pivots produce no supported source change, restore campaign-only edits.
-Make no commit. Return `NO_SOURCE` with targets and missing evidence.
+Return `no-source` when the campaign clock expires or evidence is exhausted
+within the two-pivot cap. Restore all campaign-only edits. Make no commit.
+Return the targets, missing evidence, and each rejected source model. The
+supervisor records these models in the campaign record and
+`.notes/source-models.md`.
 
 Return this compact summary:
 
 ```text
-MODE: COVERAGE | REFINEMENT | DATA
-RESULT: SOURCE | META_FIX | NO_SOURCE
+MODE: coverage | refinement | data
+RESULT: source | meta-fix | no-source
 BASE: <commit>
 COMMITS: <commit list or none>
 ADDRESSES: <address list or none>
@@ -149,9 +174,5 @@ DATA_BYTES_BEFORE: <address=explained/scored or none>
 DATA_BYTES_AFTER: <address=explained/scored or none>
 INITIALIZED_DATA_DELTA: <explained bytes>
 WHOLE_FILE_SECTIONS: <whole-file and section scores or none>
-ELAPSED_MINUTES: <total worker minutes>
-PREFLIGHT_MINUTES: <minutes to the evidence decision>
-FIRST_SCORE_MINUTES: <minutes to the first compiled score>
 MODEL_TRIALS: <tested models, retained models, reverted models>
-RETAINED_BYTES_PER_MINUTE: <code plus data bytes divided by source-work minutes>
 ```

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "discover", "evidence", "notes", "defer", "undefer", "blockers", "baseline", "validate", "experiment", "lint", "report", "session-summary", "progress", "run", "shell", "help")]
+    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "campaigns", "discover", "evidence", "notes", "defer", "undefer", "blockers", "baseline", "validate", "experiment", "lint", "data", "report", "session-summary", "progress", "run", "shell", "help")]
     [string] $Command = "help",
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -84,6 +84,70 @@ function Write-ComparisonReport([string] $Output) {
     }
 }
 
+function Write-DataReport([string] $Output) {
+    Ensure-Build
+    & $VenvPython (Join-Path $Root "tools\generate-decomp-data-report.py") `
+        --original (Join-Path $Root "original\toy2.exe") `
+        --recompiled (Join-Path $Root "build\toy2.exe") `
+        --pdb (Join-Path $Root "build\toy2.pdb") `
+        --source-root (Join-Path $Root "src") `
+        --output $Output
+    Assert-LastExit "Comparing global data"
+}
+
+function Test-FunctionSizes([string] $Path) {
+    & $VenvPython -c `
+        "import sys; from pathlib import Path; from tools.ghidra_sync import _read_snapshot_sizes; _read_snapshot_sizes(Path(sys.argv[1]))" `
+        $Path *> $null
+    return $LASTEXITCODE -eq 0
+}
+
+function Update-FunctionSizes {
+    $FunctionSizes = Join-Path $Root "build\decomp-function-sizes.json"
+    $TemporarySizes = "$FunctionSizes.tmp"
+    if (Get-Command ghidra -ErrorAction SilentlyContinue) {
+        try {
+            & ghidra function list --json --limit 0 --fields address,size |
+                Set-Content -Encoding utf8 $TemporarySizes
+            Assert-LastExit "Reading original function sizes"
+            if (-not (Test-FunctionSizes $TemporarySizes)) {
+                throw "The new function-size snapshot is invalid."
+            }
+            Move-Item -Force $TemporarySizes $FunctionSizes
+        } catch {
+            Remove-Item -Force $TemporarySizes -ErrorAction SilentlyContinue
+            Write-Warning "Could not refresh the function-size snapshot."
+        }
+    } else {
+        Write-Warning "Ghidra is unavailable. The existing function-size snapshot was kept."
+    }
+    if (-not (Test-FunctionSizes $FunctionSizes)) {
+        throw "No valid retail function-size snapshot is available."
+    }
+}
+
+function Save-Baseline {
+    Build-Project
+    $Report = Join-Path $Root "build\decomp-baseline-report.json"
+    $DataReport = Join-Path $Root "build\decomp-baseline-data-report.json"
+    Write-ComparisonReport $Report
+    Write-DataReport $DataReport
+    Update-FunctionSizes
+    & $VenvPython (Join-Path $Root "tools\decomp_verify.py") metadata `
+        (Join-Path $Root "build\decomp-baseline-meta.json") `
+        --report $Report `
+        --data-report $DataReport
+    Assert-LastExit "Recording baseline metadata"
+}
+
+function Stamp-FirstScore([string[]] $Addresses) {
+    foreach ($Address in $Addresses) {
+        & $VenvPython (Join-Path $Root "tools\decomp_campaigns.py") first-score `
+            --address $Address --quiet
+        Assert-LastExit "Recording the first-score time"
+    }
+}
+
 function New-DecompReport([string] $Output = "build\decomp-report.html") {
     Ensure-Build
     $ReportJson = Join-Path $Root "build\decomp-report-data.json"
@@ -103,10 +167,7 @@ function New-DecompReport([string] $Output = "build\decomp-report.html") {
         Pop-Location
     }
 
-    if (Get-Command ghidra -ErrorAction SilentlyContinue) {
-        & ghidra function list --json --limit 0 --fields address,size | Set-Content -Encoding utf8 $FunctionSizes
-        Assert-LastExit "Reading original function sizes"
-    }
+    Update-FunctionSizes
 
     & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\generate-decomp-data-report.py") `
         --original (Join-Path $Root "original\toy2.exe") `
@@ -141,9 +202,10 @@ Commands:
   compare [args]    Run reccmp against the reference and recompiled EXEs
   score <addr>...   Show exact/effective/tool/provisional verdicts
   candidates [args] Rank reconstruction candidates
+  campaigns [args] Measure campaign time, report changes, and retained throughput
   discover [args]   Find credible Ghidra starts absent from the function map
   evidence <addr>   Collect bounded evidence for a mapped or discovered target
-  notes <query>     Search bounded codegen, debt, and original-name notes
+  notes <query>     Search bounded codegen, source-model, debt, and name notes
   defer <addr> ...  Record a committed blocker or prerequisite
   undefer <addr>    Clear all committed blockers for one target
   blockers [addr]   Show committed blockers
@@ -166,6 +228,106 @@ build\decomp-diffs.
 Set-Location $Root
 if ($Command -eq "help") {
     Show-Help
+    exit 0
+}
+if ($Command -eq "campaigns") {
+    $CampaignScript = Join-Path $Root "tools\decomp_campaigns.py"
+    $CampaignHelp = $CommandArgs -contains "--help" -or $CommandArgs -contains "-h"
+    $CampaignAction = ""
+    $CampaignStateFile = Join-Path $Root "build\decomp-campaign-state.json"
+    $CampaignGlobalArgs = @()
+    $CampaignGlobalOptions = @(
+        "--file",
+        "--state-file",
+        "--source-models",
+        "--functions-map",
+        "--function-sizes",
+        "--worktree-root",
+        "--source-root"
+    )
+    $CampaignIndex = 0
+    while ($CampaignIndex -lt $CommandArgs.Count) {
+        $CampaignArgument = $CommandArgs[$CampaignIndex]
+        if ($CampaignArgument -in $CampaignGlobalOptions) {
+            if ($CampaignIndex + 1 -ge $CommandArgs.Count) { break }
+            $CampaignValue = $CommandArgs[$CampaignIndex + 1]
+            $CampaignGlobalArgs += @($CampaignArgument, $CampaignValue)
+            if ($CampaignArgument -eq "--state-file") {
+                $CampaignStateFile = $CampaignValue
+            }
+            $CampaignIndex += 2
+        } elseif ($CampaignArgument -match '^--state-file=(.*)$') {
+            $CampaignGlobalArgs += $CampaignArgument
+            $CampaignStateFile = $Matches[1]
+            $CampaignIndex++
+        } elseif ($CampaignArgument -match '^--(?:file|source-models|functions-map|function-sizes|worktree-root|source-root)=') {
+            $CampaignGlobalArgs += $CampaignArgument
+            $CampaignIndex++
+        } else {
+            $CampaignAction = $CampaignArgument
+            break
+        }
+    }
+    $CampaignFinalizing = $false
+    if (Test-Path $CampaignStateFile) {
+        try {
+            $CampaignState = Get-Content -Raw $CampaignStateFile | ConvertFrom-Json
+            $CampaignFinalizing = $CampaignState.phase -eq "finalizing"
+        } catch {
+            $CampaignFinalizing = $false
+        }
+    }
+    if ($CampaignHelp) {
+        & $VenvPython $CampaignScript @CommandArgs
+        Assert-LastExit "Showing campaign help"
+    } elseif ($CampaignAction -eq "start") {
+        & $VenvPython $CampaignScript @CommandArgs
+        Assert-LastExit "Starting campaign measurement"
+        try {
+            Import-VC6Environment
+            Save-Baseline
+            & $VenvPython $CampaignScript @CampaignGlobalArgs "set-baseline" "--quiet"
+            Assert-LastExit "Attaching the campaign baseline"
+        } catch {
+            $SetupError = $_
+            try {
+                & $VenvPython $CampaignScript @CampaignGlobalArgs "abort" `
+                    "--reason" "The campaign baseline setup failed."
+                Assert-LastExit "Aborting campaign measurement"
+            } catch {
+                throw "Campaign setup failed. The automatic abort also failed. Setup: $($SetupError.Exception.Message) Abort: $($_.Exception.Message)"
+            }
+            throw $SetupError
+        }
+    } elseif ($CampaignAction -eq "record" -and $CampaignFinalizing) {
+        & $VenvPython $CampaignScript @CommandArgs
+        Assert-LastExit "Finishing the campaign record"
+    } elseif ($CampaignAction -eq "record") {
+        Import-VC6Environment
+        Build-Project
+        Write-ComparisonReport (Join-Path $Root "build\decomp-current-report.json")
+        Write-DataReport (Join-Path $Root "build\decomp-current-data-report.json")
+        & $VenvPython $CampaignScript @CommandArgs
+        Assert-LastExit "Recording the campaign result"
+    } else {
+        & $VenvPython $CampaignScript @CommandArgs
+        Assert-LastExit "Running the campaign command"
+    }
+    exit 0
+}
+if (($CommandArgs -contains "--help" -or $CommandArgs -contains "-h") -and
+    $Command -in @("baseline", "score", "bc", "data")) {
+    if ($Command -eq "baseline") {
+        Write-Host "Usage: tools/decomp.ps1 baseline"
+    } elseif ($Command -eq "score") {
+        & $VenvPython (Join-Path $Root "tools\decomp_verify.py") score --help
+        Assert-LastExit "Showing score help"
+    } elseif ($Command -eq "data") {
+        & $VenvPython (Join-Path $Root "tools\decomp_data.py") --help
+        Assert-LastExit "Showing data help"
+    } else {
+        Write-Host "Usage: tools/decomp.ps1 bc [--full] <address>"
+    }
     exit 0
 }
 if ($Command -eq "lint") {
@@ -246,10 +408,13 @@ switch ($Command) {
     }
     "score" {
         if ($CommandArgs.Count -eq 0) { throw "Usage: tools/decomp.ps1 score <address>..." }
+        Build-Project
         $Report = Join-Path $Root "build\decomp-score-report.json"
         Write-ComparisonReport $Report
         & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") score $Report @CommandArgs
         Assert-LastExit "Classifying comparison results"
+        $ScoreTargets = @($CommandArgs | Where-Object { $_ -match '^0x[0-9A-Fa-f]{1,8}$' })
+        Stamp-FirstScore -Addresses $ScoreTargets
     }
     "bc" {
         $Full = $false
@@ -258,7 +423,7 @@ switch ($Command) {
             if ($Argument -eq "--full") { $Full = $true } else { $BcArgs += $Argument }
         }
         $CommandArgs = $BcArgs
-        if ($CommandArgs.Count -ne 1 -or $CommandArgs[0] -notmatch '^0x[0-9A-Fa-f]{8}$') {
+        if ($CommandArgs.Count -ne 1 -or $CommandArgs[0] -notmatch '^0x[0-9A-Fa-f]{1,8}$') {
             throw "Usage: tools/decomp.ps1 bc [--full] <address>"
         }
         Build-Project
@@ -272,27 +437,35 @@ switch ($Command) {
         } finally {
             Pop-Location
         }
-        $DiffArgs = @($Diff)
+        $DiffArgs = @(
+            $Diff
+            "--address"
+            $CommandArgs[0]
+            "--functions-map"
+            (Join-Path $Root "tools\Resources\functions_map.txt")
+            "--function-sizes"
+            (Join-Path $Root "build\decomp-function-sizes.json")
+            "--source-root"
+            (Join-Path $Root "src")
+        )
         if ($Full) { $DiffArgs += "--full" }
         & python (Join-Path $Root "tools\decomp_diff.py") @DiffArgs
         Assert-LastExit "Formatting the comparison"
+        Stamp-FirstScore -Addresses @($CommandArgs[0])
     }
     "baseline" {
-        Build-Project
-        $Report = Join-Path $Root "build\decomp-baseline-report.json"
-        Write-ComparisonReport $Report
-        & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") metadata `
-            (Join-Path $Root "build\decomp-baseline-meta.json") --report $Report
-        Assert-LastExit "Recording baseline metadata"
+        Save-Baseline
     }
     "validate" {
         $Baseline = Join-Path $Root "build\decomp-baseline-report.json"
         if (-not (Test-Path $Baseline)) { throw "No baseline exists. Run tools/decomp.ps1 baseline before you edit." }
-        Build-Project
-        $Current = Join-Path $Root "build\decomp-current-report.json"
-        Write-ComparisonReport $Current
+        $BaselineData = Join-Path $Root "build\decomp-baseline-data-report.json"
+        $CurrentData = Join-Path $Root "build\decomp-current-data-report.json"
+        $AccountingCorrection = ""
+        $Mode = ""
         $Targets = @()
         $AllowTargetRegression = $false
+        $MetaResolution = $false
         $Staged = $false
         for ($Index = 0; $Index -lt $CommandArgs.Count; $Index++) {
             if ($CommandArgs[$Index] -eq "--target" -and $Index + 1 -lt $CommandArgs.Count) {
@@ -300,6 +473,14 @@ switch ($Command) {
                 $Targets += $CommandArgs[$Index]
             } elseif ($CommandArgs[$Index] -eq "--allow-target-regression") {
                 $AllowTargetRegression = $true
+            } elseif ($CommandArgs[$Index] -eq "--mode" -and $Index + 1 -lt $CommandArgs.Count) {
+                $Index++
+                $Mode = $CommandArgs[$Index]
+            } elseif ($CommandArgs[$Index] -eq "--accounting-correction" -and $Index + 1 -lt $CommandArgs.Count) {
+                $Index++
+                $AccountingCorrection = $CommandArgs[$Index]
+            } elseif ($CommandArgs[$Index] -eq "--meta-resolution") {
+                $MetaResolution = $true
             } elseif ($CommandArgs[$Index] -eq "--staged") {
                 $Staged = $true
             } else {
@@ -307,9 +488,58 @@ switch ($Command) {
             }
         }
         if ($Targets.Count -eq 0) { throw "Validate needs at least one --target address." }
+        if ($Mode -and $Mode -notin @("coverage", "refinement", "data")) {
+            throw "Unknown validation mode: $Mode"
+        }
+        if (-not $MetaResolution -and -not $Mode) {
+            throw "Validate needs --mode coverage, refinement, or data."
+        }
+        if ($Mode -eq "data" -and $Targets.Count -gt 3) {
+            throw "A data campaign can have at most three targets."
+        }
+        if ($AllowTargetRegression -and -not $MetaResolution) {
+            throw "--allow-target-regression requires --meta-resolution."
+        }
+        if ($AccountingCorrection -and -not $MetaResolution) {
+            throw "--accounting-correction requires --meta-resolution."
+        }
+        if ($AccountingCorrection -and $Mode -ne "data") {
+            throw "--accounting-correction requires --mode data."
+        }
+        if ($Mode -eq "data" -and -not (Test-Path $BaselineData)) {
+            throw "No data baseline exists. Run tools/decomp.ps1 baseline before a data campaign."
+        }
+        if ($Mode -eq "data" -and $Staged -and -not $AccountingCorrection) {
+            $StagedSourcePaths = @(& git diff --cached --name-only -- src)
+            Assert-LastExit "Checking the staged source diff"
+            if ($StagedSourcePaths.Count -eq 0) {
+                throw "A staged data campaign must change the source tree."
+            }
+        }
+
+        Build-Project
+        $Current = Join-Path $Root "build\decomp-current-report.json"
+        Write-ComparisonReport $Current
+        if ($Mode -eq "data") {
+            Write-DataReport $CurrentData
+        }
         $VerifyArgs = @("validate", $Baseline, $Current) + $Targets
         $VerifyArgs += @("--metadata", (Join-Path $Root "build\decomp-baseline-meta.json"))
         if ($AllowTargetRegression) { $VerifyArgs += "--allow-target-regression" }
+        if ($MetaResolution) { $VerifyArgs += "--meta-resolution" }
+        if ($Staged) { $VerifyArgs += "--staged" }
+        if ($Mode) { $VerifyArgs += @("--mode", $Mode) }
+        if ($Mode -eq "data") {
+            $VerifyArgs += @(
+                "--baseline-data"
+                $BaselineData
+                "--current-data"
+                $CurrentData
+            )
+        }
+        if ($AccountingCorrection) {
+            $VerifyArgs += @("--accounting-correction", $AccountingCorrection)
+        }
         & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") @VerifyArgs
         Assert-LastExit "Validating comparison results"
         if ($Staged) {
@@ -320,6 +550,7 @@ switch ($Command) {
         Assert-LastExit "Checking the function map"
         & git diff --check
         Assert-LastExit "Checking the working tree diff"
+        Stamp-FirstScore -Addresses $Targets
     }
     "experiment" {
         if ($CommandArgs.Count -lt 2) {
@@ -363,6 +594,7 @@ switch ($Command) {
             & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") classify `
                 (Join-Path $Directory "$Label.report.json") $Address | Tee-Object -FilePath (Join-Path $Directory "$Label.summary.txt")
             Assert-LastExit "Classifying the experiment"
+            Stamp-FirstScore -Addresses @($Address)
         } elseif ($Action -eq "report") {
             Get-ChildItem $Directory -Filter "*.summary.txt" | Sort-Object Name | ForEach-Object {
                 Write-Host $_.FullName
@@ -380,17 +612,13 @@ switch ($Command) {
         New-DecompReport $Output
     }
     "data" {
-        Ensure-Build
+        Build-Project
         $DataReport = Join-Path $Root "build\decomp-data-report.json"
-        & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\generate-decomp-data-report.py") `
-            --original (Join-Path $Root "original\toy2.exe") `
-            --recompiled (Join-Path $Root "build\toy2.exe") `
-            --pdb (Join-Path $Root "build\toy2.pdb") `
-            --source-root (Join-Path $Root "src") `
-            --output $DataReport
-        Assert-LastExit "Comparing global data"
+        Write-DataReport $DataReport
         & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_data.py") @CommandArgs
         Assert-LastExit "Showing global-data evidence"
+        $DataTargets = @($CommandArgs | Where-Object { $_ -match '^0x[0-9A-Fa-f]{1,8}$' })
+        Stamp-FirstScore -Addresses $DataTargets
     }
     "progress" {
         if ($CommandArgs.Count -gt 2) {

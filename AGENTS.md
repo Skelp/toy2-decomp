@@ -51,12 +51,28 @@ tools/decomp progress --json
 tools/decomp candidates --coverage --why
 tools/decomp candidates --refine --why
 tools/decomp data --limit 10
-tools/decomp baseline
+tools/decomp campaigns start --mode coverage --address ADDRESS \
+  --expected-minutes MINUTES --expected-retained-bytes BYTES
 ```
 
-Use three campaign queues. A `COVERAGE` campaign reconstructs a `STUB` or an
-unstarted function. A `REFINEMENT` campaign improves provisional source,
-resolves a tool-only result, or removes source debt. A `DATA` campaign improves
+Use lowercase CLI modes. Replace `coverage` with `refinement` or `data` when
+necessary. The campaign start command reports the start time and saves the
+baseline. Add one `--address` option for each initial target. Supply the
+candidate `EST MIN` and `EST B` values with the matching estimate options.
+
+The campaign start time includes baseline creation and delegation overhead.
+Calculate all absolute campaign deadlines from this time. The worker must use
+these deadlines and must not start a new clock after delegation. If the
+campaign cannot start, run `tools/decomp campaigns abort --reason "REASON"`.
+
+The candidate `EST B` value is the retained-byte estimate. If the tool shows a
+range, use its lower bound for stop decisions. The `campaigns summary` command
+shows completed history only. Use `tools/decomp campaigns status` for active
+state.
+
+Use three campaign queues. A `coverage` campaign reconstructs a `STUB` or an
+unstarted function. A `refinement` campaign improves provisional source,
+resolves a tool-only result, or removes source debt. A `data` campaign improves
 typed evidence for initialized globals. Alternate all credible queues. Do not
 force a queue when it has no credible target.
 
@@ -65,6 +81,17 @@ and source debt. A provisional callee can support behavior reconstruction.
 Treat it as a high-priority refinement prerequisite. Select one large function
 or at most three related functions in one subsystem.
 A data campaign can select at most three related initialized globals.
+
+A family campaign can contain more than three functions only when retail data
+shows parallel dispatch tables. The functions must use corresponding slots.
+The retail body sizes for each corresponding slot must differ by no more than
+one percent. Test one anchor before you expand the family. Use one shared source
+model, and compare every family member. Start this campaign with one anchor and
+the `--family` option.
+
+Do not select a target when `candidates` marks it as a map defect. Recover the
+missing function starts first. Confirm each start with retail code, relocation
+data, or Ghidra evidence before you change the function map.
 
 Use `tools/decomp evidence ADDRESS` before editing. Confirm most of these facts:
 
@@ -83,9 +110,11 @@ Confirm each conclusion with callers, retail data, or DWARF evidence.
 Select data work with `tools/decomp data --limit 10`. Reject targets without
 caller, retail, or DWARF evidence. Do not select BSS or unscored globals.
 
-If the first target lacks evidence, pivot within the same subsystem. Make no
-more than two pivots per campaign. A blocker is useful only when it identifies
-evidence that can unlock an unfinished function. Record it with:
+If the first target lacks evidence, pivot within the same subsystem. Run
+`tools/decomp campaigns add-target --address ADDRESS` before work on the new
+target. Make no more than two pivots per campaign. Stop when the campaign clock
+expires or the available evidence is exhausted. A blocker is useful only when
+it identifies evidence that can unlock an unfinished function. Record it with:
 
 ```sh
 tools/decomp defer TARGET --blocked-by PREREQUISITE --kind layout \
@@ -93,8 +122,11 @@ tools/decomp defer TARGET --blocked-by PREREQUISITE --kind layout \
 ```
 
 Omit `--blocked-by` only when no function can supply the evidence. Blockers are
-advisory. Do not spend a campaign maintaining blocker prose. If two pivots
-produce no supported source work, stop without a commit.
+advisory. Do not spend a campaign maintaining blocker prose. If the campaign
+produces no supported source work, restore all source trials. Record each
+rejected source model with the no-source result. This applies when the clock
+expires or evidence is exhausted within the pivot cap. Search these notes with
+`tools/decomp notes QUERY --source models` before a new model test.
 
 Use `tools/decomp discover` only when the normal queue has no credible target.
 Confirm a result with `tools/decomp evidence --unmapped ADDRESS` before you add
@@ -161,9 +193,10 @@ evidence -> plausible source -> format -> build and compare -> explain -> revise
 ```
 
 Run `tools/decomp bc ADDRESS` after each meaningful function-model change. It
-saves the full diff and prints a bounded summary. For data work, rebuild and
-run `tools/decomp data ADDRESS`. Search compiler guidance with `tools/decomp
-notes QUERY --source codegen`. Do not read large note files.
+saves the full diff and prints a bounded summary. It also prints the score
+ceiling and the ceiling-relative score. For data work, rebuild and run
+`tools/decomp data ADDRESS`. Search compiler guidance with `tools/decomp notes
+QUERY --source codegen`. Do not read large note files.
 
 The final similarity must be at least 50 percent unless reccmp marks the
 function exact or effective. A low score often shows an incorrect source
@@ -206,6 +239,22 @@ explained typed bytes without regressions. All three campaign types are source
 progress. Use `tools/decomp progress --json` before and after each campaign.
 Record target scores and global metrics. Do not create a metadata-only success
 commit.
+
+After source validation, run `tools/decomp campaigns record --result source`.
+The tool creates fresh reports and measures the time and byte deltas. Stage the
+ledger with the source files. Commit the complete campaign once after
+independent validation.
+
+For a no-source result, restore all source trials before record creation. Add
+one `--model` option for each rejected source model. Do not run source
+validation, the full report, or sync. Stage only the ledger and source-model
+note. An audit-only memory commit does not count as source progress.
+
+For a meta-fix result, run the focused tool tests and applicable validation.
+Record the result with `--result meta-fix`. Stage the ledger with the workflow
+fix. Do not count this commit as source progress.
+
+Do not supply estimated times or byte counts to the record command.
 
 Run the full comparison, sync, and report once after a successful campaign.
 Inspect the whole-file and data scores in the report. Explain a score decrease

@@ -7,9 +7,11 @@ from tools import decomp_discover
 from tools.decomp_discover import (
     GhidraFunction,
     TransferEvidence,
+    add_relocation_target_starts,
     discover,
     import_thunk_addresses,
     parse_ghidra_functions,
+    scan_annotated_relocation_targets,
     scan_data_references,
     scan_transfers,
 )
@@ -115,6 +117,45 @@ class TransferTests(unittest.TestCase):
                 {0x401000: frozenset({0x500000})},
             )
 
+    def test_finds_code_targets_in_annotated_global_relocation_runs(self):
+        text = decomp_discover.decomp_binary.Section(
+            ".text", 0x401000, 0x3000, 0, 0x3000, 0x20000000
+        )
+        data = decomp_discover.decomp_binary.Section(
+            ".data", 0x500000, 0x1000, 0, 0x1000
+        )
+        words = {
+            0x500000: b"\x00\x10\x40\x00",
+            0x500004: b"\x00\x20\x40\x00",
+            0x50000C: b"\x10\x10\x40\x00",
+            0x500020: b"\x00\x00\x50\x00",
+        }
+        with (
+            patch.object(decomp_discover.decomp_binary, "available", return_value=True),
+            patch.object(
+                decomp_discover.decomp_binary,
+                "sections",
+                return_value=(text, data),
+            ),
+            patch.object(
+                decomp_discover.decomp_binary,
+                "read_bytes",
+                side_effect=lambda address, _size: words.get(address),
+            ),
+        ):
+            references = scan_annotated_relocation_targets(
+                frozenset({0x500000, 0x500020}),
+                frozenset({0x500000, 0x500004, 0x50000C, 0x500020}),
+            )
+
+        self.assertEqual(
+            references,
+            {
+                0x401000: frozenset({0x500000}),
+                0x402000: frozenset({0x500004}),
+            },
+        )
+
 
 class DiscoveryTests(unittest.TestCase):
     def setUp(self):
@@ -155,6 +196,38 @@ class DiscoveryTests(unittest.TestCase):
         promoted = next(item for item in results if item.address == 0x403800)
         self.assertEqual(promoted.confidence, "medium")
         self.assertEqual(promoted.called_project_targets, (0x401000,))
+
+    def test_relocation_adds_a_start_that_ghidra_did_not_define(self):
+        references = {0x402800: frozenset({0x500004})}
+        functions = add_relocation_target_starts(self.functions, references)
+        added = next(function for function in functions if function.address == 0x402800)
+        self.assertEqual(added.size, 0)
+        self.assertEqual(added.name, "")
+
+        results = discover(
+            self.entries,
+            functions,
+            self.transfers,
+            relocation_references=references,
+        )
+        found = next(item for item in results if item.address == 0x402800)
+        self.assertEqual(found.confidence, "medium")
+        self.assertEqual(found.relocation_references, (0x500004,))
+        self.assertIn("annotated-global relocation", found.reason)
+
+    def test_relocation_overrides_a_stale_ghidra_body_range(self):
+        functions = [
+            GhidraFunction(0x401000, 0x20, "A"),
+            GhidraFunction(0x404000, 0x10, "D"),
+        ]
+        references = {0x401010: frozenset({0x500000})}
+        results = discover(
+            self.entries,
+            add_relocation_target_starts(functions, references),
+            {},
+            relocation_references=references,
+        )
+        self.assertEqual([item.address for item in results], [0x401010])
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES = {
     "codegen": (ROOT / ".notes/codegen-patterns.md",),
+    "models": (ROOT / ".notes/source-models.md",),
     "debt": (ROOT / ".notes/refactor-debt.md",),
     "names": (ROOT / ".notes/original-names.md",),
 }
