@@ -46,7 +46,7 @@ namespace AudioManager
 	int16_t g_soundVolTable[12] = { 0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88 };
 
 	// GLOBAL: TOY2 0x004FCDB0
-	int32_t g_sfxVolume;
+	int32_t g_sfxVolume = 256;
 
 	// GLOBAL: TOY2 0x005282C8
 	int32_t g_musicVolumeLevel;
@@ -160,7 +160,7 @@ namespace AudioManager
 	LPDIRECTSOUND g_directSound;
 
 	// GLOBAL: TOY2 0x004FCDBC
-	int32_t g_loadedSfxPackIndex;
+	int32_t g_loadedSfxPackIndex = -1;
 
 	// GLOBAL: TOY2 0x00724E88
 	void* g_loadedWaveData;
@@ -597,7 +597,7 @@ namespace AudioManager
 	};
 
 	// GLOBAL: TOY2 0x004FCDC0
-	int32_t g_currentSfxLevelId;
+	int32_t g_currentSfxLevelId = 1;
 
 	// FUNCTION: TOY2 0x0047EDE0 [PROVISIONAL]
 	void Init()
