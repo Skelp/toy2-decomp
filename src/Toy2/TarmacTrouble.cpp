@@ -595,12 +595,12 @@ namespace Toy2
 				if (g_lightPuzzleInitialized == 0)
 					ResetLightPuzzle();
 
-				int8_t previousPuzzleState = (int8_t)g_lightPuzzleState;
+				int32_t previousPuzzleState = g_lightPuzzleState;
 				g_lightPuzzleInitialized = 1;
 				if ((g_lightPuzzleState & LIGHT_PUZZLE_TOP_ROW) == (g_lightPuzzleState & LIGHT_PUZZLE_BOTTOM_ROW) * 0x10 && g_remainingButtonPresses >= 0)
 				{
 					g_remainingButtonPresses = (g_remainingButtonPresses + Renderer::g_frameDelta) & 0x3F;
-					if ((uint32_t)g_remainingButtonPresses > 20 && previousPuzzleState == 0)
+					if (g_remainingButtonPresses > 20 && previousPuzzleState == 0)
 					{
 						g_lightPuzzleState = 0xFF;
 						UpdateBottomPuzzleLights();
@@ -629,7 +629,7 @@ namespace Toy2
 						Camera::g_cutsceneFocusPosition = position.pos;
 						g_puzzleCutsceneTimer += Renderer::g_frameDelta;
 						Nu3D::Link::GetCurrentPosFixed(0x74, &position.pos);
-						if (g_puzzleCutsceneTimer > 299)
+						if (g_puzzleCutsceneTimer >= 300)
 							g_puzzleCutsceneTimer = -1;
 					}
 				}
@@ -649,13 +649,15 @@ namespace Toy2
 							AudioManager::StartSoundSequenceOnActor(-6, &g_buzzActor.posAngles.pos);
 					}
 				}
-				else if (g_groundSlamTimer == -40 && g_footingType > 0x1F && g_footingType < 0x24)
+				else if (g_groundSlamTimer == -40 && g_footingType >= 0x20 && g_footingType <= 0x23)
 				{
 					g_remainingButtonPresses--;
 					for (int32_t linkId = 0x36; linkId < 0x3A; linkId++)
 					{
-						int32_t scale = linkId == g_remainingButtonPresses + 0x36 ? 0x1000 : 0;
-						Nu3D::Link::SetScaleFromFixedOffsets(linkId, scale, scale, scale);
+						if (linkId == g_remainingButtonPresses + 0x36)
+							Nu3D::Link::SetScaleFromFixedOffsets(linkId, 0x1000, 0x1000, 0x1000);
+						else
+							Nu3D::Link::SetScaleFromFixedOffsets(linkId, 0, 0, 0);
 					}
 					Levels::DeactivateAmbientEmitter(0, 1);
 					Levels::DeactivateAmbientEmitter(1, 1);
@@ -672,7 +674,7 @@ namespace Toy2
 			if (g_buttonResetTimer > 0)
 			{
 				g_buttonResetTimer -= Renderer::g_frameDelta;
-				if (g_buttonResetTimer < 1)
+				if (g_buttonResetTimer <= 0)
 				{
 					Nu3D::Link::SetScaleFromFixedOffsets(g_pressedButtonLink, 0x1000, 0x1000, 0x1000);
 					Nu3D::Link::SetScaleFromFixedOffsets(g_pressedButtonLink + 4, 0, 0, 0);
