@@ -85,3 +85,10 @@ include the compiled score or the evidence that rejected the model.
 
 - Mode: coverage.
 - Ruled out: Natural inline five-interpolant RGB565 colour-offset blend-25 rasterizer: clone RasterizeBlend25TexturedPolygon565’s min/max clipping, polygon edge topology, and keyed/unkeyed span loops; expand each edge and span across u, v, blue, green, and red; shade sampled texels through g_redRampLow/g_greenRampLow/g_blueRampLow using the interpolated offsets; add the 75-percent destination contribution with masks 0x7BEF and 0x39E7; preserve transparent texel 0x07C0.
+
+<!-- campaign-id: 79d8b101-0b81-4826-af94-3f506b4709e2 -->
+## 2026-09-08 | Input mapping table | 0x004ED398
+
+- Mode: data.
+- Ruled out: Change the g_inputMapping[25].name initializer even though the retail and build targets both contain the bytes for "(".
+- Ruled out: Add named character storage or another "(" literal only to alter string pooling and duplicate-match order, without retail source evidence.
