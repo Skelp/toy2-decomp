@@ -73,3 +73,9 @@ include the compiled score or the evidence that rejected the model.
 
 - Mode: coverage.
 - Ruled out: Complete RGB565 clipped textured-rectangle rasterizer using vertices 0 and 2, inclusive dimensions, fixed-point UV interpolation, transparent texel 0x07C0, odd-scanline skipping, and additive/subtractive/50-percent/opaque flag branches.
+
+<!-- campaign-id: aefac452-a232-4536-9e7c-70c5b145a85a -->
+## 2026-09-08 | SoftwareRenderer | 0x004617D0
+
+- Mode: coverage.
+- Ruled out: Complete 16-bit nearest-neighbor scaled texture blitter with nine cdecl integer arguments, inclusive destination bounds, signed fixed-point U/V steps, 256-pixel texture rows, and nested do-while loops.
