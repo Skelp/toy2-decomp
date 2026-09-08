@@ -191,11 +191,12 @@ namespace Toy2
 				AttachmentPosition orbitPositions[6];
 				int32_t bossWorldX = boss->pos.x;
 				int32_t bossWorldZ = boss->pos.z;
-				int32_t orbitPosition = g_orbitPosition;
 				uint32_t orbitAngle = g_orbitAngle;
-				for (int32_t actorIndex = 1; actorIndex < 7; actorIndex++)
+				int32_t orbitPosition = g_orbitPosition;
+				Actor::Toy2Actor* actor = &Actor::g_creatureActors[1];
+				AttachmentPosition* attachmentPosition = orbitPositions;
+				do
 				{
-					Actor::Toy2Actor* actor = &Actor::g_creatureActors[actorIndex];
 					actor->pos.x = bossWorldX;
 					actor->pos.z = bossWorldZ;
 					actor->yawAngle = static_cast<int16_t>(orbitAngle);
@@ -204,38 +205,41 @@ namespace Toy2
 						actor->animationFramePosition = orbitPosition;
 
 					orbitPosition += 0xC0000;
-					if (orbitPosition > 0x17FFFF)
+					if (orbitPosition >= 0x180000)
 						orbitPosition -= 0x180000;
 
-					AttachmentPosition& attachmentPosition = orbitPositions[actorIndex - 1];
-					attachmentPosition.vector.x = 0;
-					attachmentPosition.vector.y = 0x96;
-					attachmentPosition.vector.z = 0x5AA;
+					attachmentPosition->vector.x = 0;
+					attachmentPosition->vector.y = 0x96;
+					attachmentPosition->vector.z = 0x5AA;
 					orbitAngle = (orbitAngle + 0x2AB) & 0xFFF;
-					Actor::ResolveBoneAttachmentPos(&attachmentPosition.vector, actor, 1);
+					Actor::ResolveBoneAttachmentPos(&attachmentPosition->vector, actor, 1);
 					if (actor->actorPhase == 1)
 					{
-						Nu3D::Collision::GetGroundHeight(&attachmentPosition.groundProbe, 0x96);
-						if (Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &attachmentPosition.position, 0x4B) != 0)
+						Nu3D::Collision::GetGroundHeight(&attachmentPosition->groundProbe, 0x96);
+						if (Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &attachmentPosition->position, 0x4B) != 0)
 						{
 							uint32_t direction = Nu3D::Math::CartesianToFixedAngle(
-								g_buzzActor.posAngles.pos.x - attachmentPosition.position.x, g_buzzActor.posAngles.pos.z - attachmentPosition.position.z);
+								g_buzzActor.posAngles.pos.x - attachmentPosition->position.x, g_buzzActor.posAngles.pos.z - attachmentPosition->position.z);
 							Buzz::HandleDamage(direction, 1);
 						}
 					}
-				}
+					actor++;
+					attachmentPosition++;
+				} while (actor <= &Actor::g_creatureActors[6]);
 
 				int32_t orbitHeight = (Numerics::g_sinCosLUT[g_heightBobAngle] >> 3) + g_orbitHeight;
-				for (int32_t heightActorIndex = 0; heightActorIndex < 7; heightActorIndex++)
+				Actor::Toy2Actor* heightActor = &Actor::g_creatureActors[0];
+				do
 				{
-					Actor::g_creatureActors[heightActorIndex].pos.y = orbitHeight;
-					Actor::g_creatureActors[heightActorIndex].motionTargetPos.y = orbitHeight;
-				}
+					heightActor->pos.y = orbitHeight;
+					heightActor->motionTargetPos.y = orbitHeight;
+					heightActor++;
+				} while (heightActor <= &Actor::g_creatureActors[6]);
 
 				g_orbitAngle = (g_orbitAngle + Renderer::g_frameDelta * 4) & 0xFFF;
 				g_heightBobAngle = (g_heightBobAngle + Renderer::g_frameDelta * 0x20) & 0xFFF;
 				g_orbitPosition += Renderer::g_frameDelta * 0x4000;
-				if (g_orbitPosition > 0x17FFFF)
+				if (g_orbitPosition >= 0x180000)
 					g_orbitPosition -= 0x180000;
 				g_tintFlashToggle = (g_tintFlashToggle - 1) & 1;
 
