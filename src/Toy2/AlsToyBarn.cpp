@@ -316,7 +316,7 @@ namespace Toy2
 			Vector3I position;
 			Vector3I origin;
 
-			if (g_hayBaleRideTimer >= 2 && g_buzzActor.posAngles.pos.z >= -0x11202)
+			if (g_hayBaleRideTimer > 1 && g_buzzActor.posAngles.pos.z > -0x11203)
 			{
 				g_hayBaleRideTimer = 1;
 			}
@@ -329,7 +329,7 @@ namespace Toy2
 				g_hayBaleRideTimer -= Renderer::g_frameDelta;
 				if (g_hayBaleRideSpeed > 0x200)
 					g_hayBaleRideSpeed = 0x200;
-				if (g_hayBaleRideTimer < 1)
+				if (g_hayBaleRideTimer <= 0)
 				{
 					g_hayBaleRideTimer = 0;
 					Platform::SetRotationAngles(15, 0, 0, 0);
@@ -363,7 +363,8 @@ namespace Toy2
 			}
 			g_hayBaleRideAngle += g_hayBaleRideSpeed * Renderer::g_frameDelta / 16;
 
-			if (g_hayBaleRideTimer > 0 && (Platform::GetFlags(0) & Platform::PLATFORM_FLAG_BUZZ_CONTACT) != 0)
+			if (g_hayBaleRideTimer > 0 &&
+				(Platform::GetFlags(0) & Platform::PLATFORM_FLAG_BUZZ_CONTACT) == Platform::PLATFORM_FLAG_BUZZ_CONTACT)
 			{
 				g_hayBaleRideState = 1;
 				g_groundSlamTimer = 0;
@@ -382,24 +383,27 @@ namespace Toy2
 			position.y += Numerics::g_sinCosLUT[(g_hayBaleRideAngle * 7 / 6) & 0xFFF] / 2 - origin.y;
 			Platform::SetVelocity(0, 0, position.y, 0);
 			Platform::GetRotation(0, &position);
-			int32_t targetRoll = Numerics::g_sinCosLUT[g_hayBaleRideAngle & 0xFFF] / 32;
 			if (g_hayBaleRideState == HAY_BALE_RIDE_TIPPING)
 			{
-				int32_t rollDelta = -0x708 - position.z;
-				Platform::SetAngularVelocity(0, 0, 0, static_cast<int16_t>(rollDelta >> 2));
-				if (abs(rollDelta >> 2) < 8)
+				Platform::SetAngularVelocity(0, 0, 0, static_cast<int16_t>((-0x708 - position.z) >> 2));
+				if (abs((-0x708 - position.z) >> 2) < 8)
 					g_hayBaleRideState = HAY_BALE_RIDE_RECOVERING;
 			}
 			else if (g_hayBaleRideState == HAY_BALE_RIDE_RECOVERING)
 			{
-				int32_t rollDelta = targetRoll - position.z;
-				Platform::SetAngularVelocity(0, 0, 0, static_cast<int16_t>(rollDelta >> 3));
-				if (abs(rollDelta >> 3) < 8)
+				Platform::SetAngularVelocity(0,
+					0,
+					0,
+					static_cast<int16_t>((Numerics::g_sinCosLUT[g_hayBaleRideAngle & 0xFFF] / 32 - position.z) >> 3));
+				if (abs((Numerics::g_sinCosLUT[g_hayBaleRideAngle & 0xFFF] / 32 - position.z) >> 3) < 8)
 					g_hayBaleRideState = HAY_BALE_RIDE_STABLE;
 			}
 			else
 			{
-				Platform::SetAngularVelocity(0, 0, 0, static_cast<int16_t>((targetRoll - position.z) >> 2));
+				Platform::SetAngularVelocity(0,
+					0,
+					0,
+					static_cast<int16_t>((Numerics::g_sinCosLUT[g_hayBaleRideAngle & 0xFFF] / 32 - position.z) >> 2));
 			}
 			Platform::CommitRotationToLink(0, 0);
 			Nu3D::Link::SetPositionRawAndCommit(0, origin.x >> 5, origin.y >> 5, origin.z >> 5);
