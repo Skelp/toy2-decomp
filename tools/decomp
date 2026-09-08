@@ -153,6 +153,7 @@ validate() {
     local allow_target_regression=0
     local meta_resolution=0
     local mode=""
+    local resource=""
     local staged=0
     local targets=()
     while [[ $# -gt 0 ]]; do
@@ -172,6 +173,14 @@ validate() {
                     return 2
                 }
                 mode="$2"
+                shift 2
+                ;;
+            --resource)
+                [[ $# -ge 2 ]] || {
+                    echo "error: --resource needs TYPE,ID,LANGUAGE" >&2
+                    return 2
+                }
+                resource="$2"
                 shift 2
                 ;;
             --accounting-correction)
@@ -196,12 +205,24 @@ validate() {
                 ;;
         esac
     done
-    if [[ ${#targets[@]} -eq 0 ]]; then
+    if [[ $mode != resource && ${#targets[@]} -eq 0 ]]; then
         echo "error: validate needs at least one --target address" >&2
         return 2
     fi
-    if [[ -n $mode && $mode != coverage && $mode != refinement && $mode != data ]]; then
+    if [[ -n $mode && $mode != coverage && $mode != refinement && $mode != data && $mode != resource ]]; then
         echo "error: unknown validation mode: $mode" >&2
+        return 2
+    fi
+    if [[ $mode == resource && ${#targets[@]} -gt 0 ]]; then
+        echo "error: a resource campaign cannot have target addresses" >&2
+        return 2
+    fi
+    if [[ $mode == resource && -z $resource ]]; then
+        echo "error: a resource campaign needs exactly one --resource" >&2
+        return 2
+    fi
+    if [[ $mode != resource && -n $resource ]]; then
+        echo "error: --resource requires --mode resource" >&2
         return 2
     fi
     if [[ $meta_resolution -eq 0 && -z $mode ]]; then
@@ -228,7 +249,7 @@ validate() {
         echo "error: run tools/decomp baseline before you edit source" >&2
         return 2
     fi
-    if [[ $mode == data && ! -f build/decomp-baseline-data-report.json ]]; then
+    if [[ ( $mode == data || $mode == resource ) && ! -f build/decomp-baseline-data-report.json ]]; then
         echo "error: run tools/decomp baseline before a data campaign" >&2
         return 2
     fi
@@ -240,7 +261,7 @@ validate() {
 
     build
     write_comparison_report decomp-current-report.json
-    if [[ $mode == data ]]; then
+    if [[ $mode == data || $mode == resource ]]; then
         write_data_report decomp-current-data-report.json
     fi
     local verify_args=(
@@ -262,7 +283,10 @@ validate() {
     if [[ -n $mode ]]; then
         verify_args+=(--mode "$mode")
     fi
-    if [[ $mode == data ]]; then
+    if [[ -n $resource ]]; then
+        verify_args+=(--resource "$resource")
+    fi
+    if [[ $mode == data || $mode == resource ]]; then
         verify_args+=(
             --baseline-data build/decomp-baseline-data-report.json
             --current-data build/decomp-current-data-report.json
@@ -275,6 +299,9 @@ validate() {
     for target in "${targets[@]}"; do
         python tools/decomp_campaigns.py first-score --address "$target" --quiet
     done
+    if [[ $mode == resource ]]; then
+        python tools/decomp_campaigns.py resource-score --quiet
+    fi
     if [[ $staged -eq 1 ]]; then
         python tools/decomp_lint.py --staged --warnings-as-errors
     fi
@@ -397,7 +424,7 @@ Commands:
   blockers [addr]   Show committed blockers
   evidence <addr>   Collect bounded evidence for one target in a single call
   baseline          Save a fresh parent-state comparison before source edits
-  validate [args]   Enforce coverage, refinement, or data success and regressions
+  validate [args]   Enforce coverage, refinement, data, or resource success
   experiment [...] Record labeled source-form comparison trials
   lint [files]      Check reconstructed source for decompiler residue
   names             Re-extract .notes/original-names.md from the retail binary
@@ -441,6 +468,8 @@ after the final source state is ready:
   tools/decomp campaigns status
   tools/decomp campaigns start --mode coverage --family --address 0x00465180 \
     --expected-minutes 24 --expected-retained-bytes 120
+  tools/decomp campaigns start --mode resource --resource 2,127,2057 \
+    --expected-minutes 20 --expected-retained-bytes 77864
   tools/decomp campaigns record --result source
   tools/decomp campaigns record --result no-source \
     --model "The tested loop form scored 20 percent."

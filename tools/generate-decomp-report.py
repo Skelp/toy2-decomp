@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import json
 import re
 import sys
@@ -140,10 +141,15 @@ def score_resources(
     original = decomp_binary.parse_resources(original_data, original_metadata)
     recompiled = decomp_binary.parse_resources(recompiled_data, recompiled_metadata)
     recompiled_payloads = {item.data for item in recompiled}
+    recompiled_identities = Counter((item.path, item.data) for item in recompiled)
     rows = []
     explained = 0
     for item in original:
         match = item.data in recompiled_payloads
+        identity_key = (item.path, item.data)
+        identity_match = recompiled_identities[identity_key] > 0
+        if identity_match:
+            recompiled_identities[identity_key] -= 1
         if match:
             explained += len(item.data)
         rows.append(
@@ -152,6 +158,7 @@ def score_resources(
                 "size": len(item.data),
                 "code_page": item.code_page,
                 "match": match,
+                "identity_match": identity_match,
             }
         )
     return float(explained), rows

@@ -15,6 +15,25 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+try:
+    from tools.decomp_resources import (
+        format_resource,
+        parse_resource,
+        resource_rows,
+        resource_source_snapshot,
+        selected_evidence,
+        staged_resource_source_problems,
+    )
+except ModuleNotFoundError:  # Direct invocation uses tools/ as sys.path[0].
+    from decomp_resources import (  # type: ignore[no-redef]
+        format_resource,
+        parse_resource,
+        resource_rows,
+        resource_source_snapshot,
+        selected_evidence,
+        staged_resource_source_problems,
+    )
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_LEDGER = ROOT / "tools" / "Resources" / "campaign-ledger.jsonl"
@@ -772,6 +791,32 @@ def _campaign_deadlines(
     }
 
 
+def _validate_campaign_targets(state: dict[str, object]) -> None:
+    mode = str(state.get("mode", ""))
+    addresses = state.get("addresses")
+    if not isinstance(addresses, list) or not all(
+        isinstance(address, str) for address in addresses
+    ):
+        raise ValueError("active campaign has invalid addresses")
+    resource = state.get("resource")
+    if mode in ("coverage", "refinement", "data"):
+        if not addresses:
+            raise ValueError("a source campaign needs at least one --address")
+        if resource is not None:
+            raise ValueError("a source campaign cannot have a resource target")
+    elif mode == "resource":
+        if addresses:
+            raise ValueError("a resource campaign cannot have source targets")
+        if not isinstance(resource, str):
+            raise ValueError("a resource campaign needs exactly one resource")
+        parse_resource(resource)
+    elif mode == "meta":
+        if addresses or resource is not None:
+            raise ValueError("a meta campaign cannot have source targets")
+    else:
+        raise ValueError(f"active campaign has invalid mode: {mode}")
+
+
 def start_campaign(
     path: Path,
     mode: str,
@@ -786,13 +831,20 @@ def start_campaign(
     expected_minutes: float | None = None,
     expected_retained_bytes: float | None = None,
     family: bool = False,
+    resources: list[tuple[int, int, int]] | None = None,
 ) -> dict[str, object]:
+    resources = resources or []
     if path.exists():
         raise ValueError("an active campaign already exists. Record or abort it first")
-    if mode != "meta" and not addresses:
+    if mode in ("coverage", "refinement", "data") and not addresses:
         raise ValueError("a source campaign needs at least one --address")
-    if mode == "meta" and addresses:
-        raise ValueError("a meta campaign cannot have source targets")
+    if mode in ("meta", "resource") and addresses:
+        label = "meta" if mode == "meta" else "resource"
+        raise ValueError(f"a {label} campaign cannot have source targets")
+    if mode == "resource" and len(resources) != 1:
+        raise ValueError("a resource campaign needs exactly one --resource")
+    if mode != "resource" and resources:
+        raise ValueError("--resource requires --mode resource")
     if family and mode not in ("coverage", "refinement"):
         raise ValueError("--family requires --mode coverage or refinement")
     if family and len(addresses) != 1:
@@ -824,11 +876,13 @@ def start_campaign(
     index = source_index_snapshot(worktree_root)
     repository_worktree = repository_worktree_snapshot(worktree_root)
     repository_index = repository_index_snapshot(worktree_root)
+    resource_sources = resource_source_snapshot(worktree_root)
     state: dict[str, object] = {
         "schema_version": 2,
         "campaign_id": campaign_id or str(uuid.uuid4()),
         "mode": mode,
         "addresses": addresses,
+        "resource": format_resource(resources[0]) if resources else None,
         "target_events": [],
         "subsystem": subsystem.strip(),
         "family": family,
@@ -849,6 +903,8 @@ def start_campaign(
         "repository_worktree_sha256": _snapshot_hash(repository_worktree),
         "repository_index": repository_index,
         "repository_index_sha256": _snapshot_hash(repository_index),
+        "resource_sources": resource_sources,
+        "resource_sources_sha256": _snapshot_hash(resource_sources),
     }
     write_state(path, state)
     return state
@@ -887,6 +943,7 @@ def attach_baseline(
             raise ValueError("a family campaign baseline needs one anchor target")
         validate_family_size_values([str(addresses[0])], analyzed_sizes)
     mode = str(state.get("mode", ""))
+    _validate_campaign_targets(state)
     if mode in ("coverage", "refinement"):
         worktree_root = Path(str(state.get("source_worktree_root", ROOT)))
         campaign_source_root = source_root or worktree_root / "src"
@@ -902,6 +959,17 @@ def attach_baseline(
     analyzed_snapshot = _size_snapshot(analyzed_sizes)
     effective_before = effective_code_bytes(report_path, sizes)
     initialized_before = initialized_data_bytes(data_report_path)
+    resource_before = None
+    if mode == "resource":
+        resource = parse_resource(str(state["resource"]))
+        worktree_root = Path(str(state.get("source_worktree_root", ROOT)))
+        rows = resource_rows(
+            worktree_root / "original" / "toy2.exe",
+            worktree_root / "build" / "toy2.exe",
+        )
+        resource_before = selected_evidence(rows, resource)
+        if not resource_before["leaf_count"]:
+            raise ValueError(f"retail resource {state['resource']} does not exist")
     state.update(
         {
             "baseline_report": str(report_path.resolve()),
@@ -910,6 +978,7 @@ def attach_baseline(
             "baseline_data_report_sha256": file_hash(data_report_path),
             "effective_bytes_before": effective_before,
             "initialized_bytes_before": initialized_before,
+            "resource_before": resource_before,
             "baseline_at": timestamp(attached),
             "function_sizes": snapshot,
             "function_size_snapshot_sha256": _size_snapshot_hash(snapshot),
@@ -975,6 +1044,29 @@ def mark_first_score(
     return "recorded"
 
 
+def mark_resource_score(state_path: Path, now: datetime | None = None) -> str:
+    if not state_path.exists():
+        return "inactive"
+    state = read_state(state_path)
+    _validate_campaign_targets(state)
+    if state.get("mode") != "resource":
+        return "unrelated"
+    if state.get("first_score_at"):
+        return "already-recorded"
+    if not state.get("baseline_at"):
+        raise ValueError("attach the campaign baseline before recording a score")
+    scored = now or utc_now()
+    started = _parse_time(state.get("started_at"), "started_at")
+    baseline = _parse_time(state.get("baseline_at"), "baseline_at")
+    if scored < started or scored < baseline:
+        raise ValueError("the first-score time is before the campaign baseline")
+    state["first_score_at"] = timestamp(scored)
+    state["resource_score_at"] = state["first_score_at"]
+    state["phase"] = "scoring"
+    write_state(state_path, state)
+    return "recorded"
+
+
 def add_target(
     state_path: Path,
     address: str,
@@ -986,8 +1078,8 @@ def add_target(
     state = read_state(state_path)
     if state.get("phase") == "finalizing":
         raise ValueError("campaign finalization is pending. Retry campaigns record")
-    if state.get("mode") == "meta":
-        raise ValueError("a meta campaign cannot add a source target")
+    if state.get("mode") in ("meta", "resource"):
+        raise ValueError(f"a {state.get('mode')} campaign cannot add a source target")
     if not state.get("baseline_at"):
         raise ValueError("attach the campaign baseline before adding a target")
     addresses = state.get("addresses")
@@ -1080,6 +1172,7 @@ def append_source_models(
     subsystem: str,
     mode: str,
     addresses: list[str],
+    resource: str | None,
     models: list[str],
     note: str,
 ) -> None:
@@ -1087,7 +1180,7 @@ def append_source_models(
     existing = path.read_text(encoding="utf-8") if path.exists() else "# Source models\n"
     if marker in existing:
         return
-    target_text = ", ".join(addresses)
+    target_text = ", ".join(addresses) or resource or "-"
     heading = subsystem or "Unspecified subsystem"
     lines = [
         marker,
@@ -1115,6 +1208,7 @@ def _campaign_id(state: dict[str, object]) -> str:
             "started_at": state.get("started_at"),
             "mode": state.get("mode"),
             "addresses": state.get("addresses"),
+            "resource": state.get("resource"),
         },
         sort_keys=True,
     )
@@ -1131,6 +1225,7 @@ def _validate_result_mode(mode: str, result: str) -> None:
 def _validate_timeline(
     state: dict[str, object], ended: datetime
 ) -> tuple[datetime, datetime, datetime | None]:
+    _validate_campaign_targets(state)
     started = _parse_time(state.get("started_at"), "started_at")
     if ended < started:
         raise ValueError("the campaign end time is before its start time")
@@ -1209,6 +1304,14 @@ def _validate_timeline(
         previous_score = scored_at
     if seen_scores != set(scored_addresses):
         raise ValueError("active campaign scored addresses disagree with score events")
+
+    if state.get("mode") == "resource":
+        resource_score_value = state.get("resource_score_at")
+        if first_score_value and resource_score_value != first_score_value:
+            raise ValueError("the resource score disagrees with the first-score time")
+        if resource_score_value and not first_score_value:
+            raise ValueError("the active campaign has a resource score without a first score")
+        return started, baseline, first_score
 
     if first_score_value:
         scored_address = state.get("first_score_address")
@@ -1324,6 +1427,7 @@ def _finish_campaign_finalization(
     item = finalization.get("item")
     if not isinstance(item, dict):
         raise ValueError("active campaign has no pending campaign record")
+    _validate_campaign_targets(item)
     ledger_value = finalization.get("ledger_path")
     models_value = finalization.get("source_models_path")
     if not isinstance(ledger_value, str) or not isinstance(models_value, str):
@@ -1337,6 +1441,7 @@ def _finish_campaign_finalization(
                 str(item.get("subsystem", "")),
                 str(item.get("mode", "")),
                 list(item.get("addresses", [])),
+                str(item["resource"]) if item.get("resource") else None,
                 list(item.get("ruled_out_models", [])),
                 str(item.get("note", "")),
             )
@@ -1362,6 +1467,7 @@ def record_campaign(
     models: list[str] | None = None,
     supplied_mode: str | None = None,
     supplied_addresses: list[str] | None = None,
+    supplied_resources: list[tuple[int, int, int]] | None = None,
     supplied_minutes: float | None = None,
     supplied_effective_bytes: float | None = None,
     supplied_initialized_bytes: float | None = None,
@@ -1379,6 +1485,12 @@ def record_campaign(
             raise ValueError("--mode disagrees with the pending campaign finalization")
         if supplied_addresses and pending_item.get("addresses") != supplied_addresses:
             raise ValueError("--address disagrees with the pending campaign finalization")
+        if supplied_resources:
+            if len(supplied_resources) != 1:
+                raise ValueError("--resource disagrees with the pending campaign finalization")
+            supplied_resource = format_resource(supplied_resources[0])
+            if pending_item.get("resource") != supplied_resource:
+                raise ValueError("--resource disagrees with the pending campaign finalization")
         if commit is not None and pending_item.get("commit", "") != commit:
             raise ValueError("--commit disagrees with the pending campaign finalization")
         if note is not None:
@@ -1407,6 +1519,7 @@ def record_campaign(
         return _finish_campaign_finalization(state_path, state)
 
     mode = str(state.get("mode", ""))
+    _validate_campaign_targets(state)
     addresses = state.get("addresses", [])
     if not isinstance(addresses, list) or not all(isinstance(item, str) for item in addresses):
         raise ValueError("active campaign has invalid addresses")
@@ -1419,6 +1532,11 @@ def record_campaign(
         raise ValueError(f"--mode disagrees with the active campaign: {supplied_mode} != {mode}")
     if supplied_addresses and supplied_addresses != addresses:
         raise ValueError("--address disagrees with the active campaign")
+    if supplied_resources:
+        if len(supplied_resources) != 1 or state.get("resource") != format_resource(
+            supplied_resources[0]
+        ):
+            raise ValueError("--resource disagrees with the active campaign")
     models = [_single_line(model, "--model") for model in (models or [])]
     if result == "no-source" and not models:
         raise ValueError("a no-source campaign needs at least one --model")
@@ -1471,9 +1589,38 @@ def record_campaign(
     initialized_after = initialized_data_bytes(current_data_report)
     effective_delta = effective_after - effective_before
     initialized_delta = initialized_after - initialized_before
+    resource_after = None
+    resource_delta = 0
+    if mode == "resource":
+        resource = parse_resource(str(state["resource"]))
+        root = Path(str(state.get("source_worktree_root", ROOT)))
+        resource_after = selected_evidence(
+            resource_rows(
+                root / "original" / "toy2.exe", root / "build" / "toy2.exe"
+            ),
+            resource,
+        )
+        resource_before = state.get("resource_before")
+        if not isinstance(resource_before, dict):
+            raise ValueError("the active resource campaign has no baseline leaf evidence")
+        resource_delta = int(resource_after["explained_bytes"]) - int(
+            resource_before.get("explained_bytes", 0)
+        )
+        if result == "source" and resource_delta <= 0:
+            raise ValueError("the selected resource leaf did not improve explained bytes")
+        baseline_sources = state.get("resource_sources")
+        if (
+            not isinstance(baseline_sources, dict)
+            or _snapshot_hash(baseline_sources) != state.get("resource_sources_sha256")
+        ):
+            raise ValueError("the active campaign has no valid resource source fingerprint")
+        staged_problems = staged_resource_source_problems(root, baseline_sources)
+        if result == "source" and staged_problems:
+            raise ValueError(staged_problems[0])
     if result == "no-source" and (
         not math.isclose(effective_delta, 0.0, rel_tol=0.0, abs_tol=0.01)
         or not math.isclose(initialized_delta, 0.0, rel_tol=0.0, abs_tol=0.01)
+        or not math.isclose(resource_delta, 0.0, rel_tol=0.0, abs_tol=0.01)
     ):
         raise ValueError("--result no-source disagrees with the report deltas")
     _assert_close("--effective-bytes", supplied_effective_bytes, effective_delta)
@@ -1510,12 +1657,14 @@ def record_campaign(
         "timestamp": ended_at,
         "started_at": state["started_at"],
         "first_score_at": first_score_at,
+        "resource_score_at": state.get("resource_score_at"),
         "ended_at": ended_at,
         "first_score_minutes": first_score_minutes,
         "post_first_score_minutes": post_first_score_minutes,
         "mode": mode,
         "result": result,
         "addresses": addresses,
+        "resource": state.get("resource"),
         "target_events": state.get("target_events", []),
         "scored_addresses": scored_addresses,
         "score_events": state.get("score_events", []),
@@ -1527,6 +1676,9 @@ def record_campaign(
             current_data_report,
             sizes,
         ),
+        "resource_before": state.get("resource_before"),
+        "resource_after": resource_after,
+        "resource_explained_bytes": resource_delta,
         "subsystem": str(state.get("subsystem", "")),
         "family": state.get("family") is True,
         "minutes": elapsed_minutes,
@@ -1659,6 +1811,7 @@ def abort_campaign(
         "minutes": (ended - started).total_seconds() / 60.0,
         "mode": state.get("mode", ""),
         "addresses": state.get("addresses", []),
+        "resource": state.get("resource"),
         "target_events": state.get("target_events", []),
         "subsystem": state.get("subsystem", ""),
         "reason": clean_reason,
@@ -1696,6 +1849,9 @@ def print_summary(records: list[dict[str, object]], limit: int) -> None:
     ]
     effective = sum(float(item.get("effective_bytes", 0.0) or 0.0) for item in measured)
     initialized = sum(float(item.get("initialized_bytes", 0) or 0) for item in measured)
+    resources = sum(
+        float(item.get("resource_explained_bytes", 0) or 0) for item in measured
+    )
     minutes = sum(float(item.get("minutes", 0.0) or 0.0) for item in measured)
     sources = sum(item.get("result") == "source" for item in measured)
     no_sources = sum(item.get("result") == "no-source" for item in measured)
@@ -1706,8 +1862,11 @@ def print_summary(records: list[dict[str, object]], limit: int) -> None:
     print(f"Elapsed: {minutes:.1f} minutes")
     print(f"Effective code: {effective:+.2f} bytes")
     print(f"Initialized data: {initialized:+.2f} bytes")
+    print(f"Resources: {resources:+.2f} bytes")
     if minutes > 0:
-        print(f"Retained rate: {(effective + initialized) / minutes:.2f} bytes/minute")
+        print(
+            f"Retained rate: {(effective + initialized + resources) / minutes:.2f} bytes/minute"
+        )
     first_scores = [
         float(item["first_score_minutes"])
         for item in measured
@@ -1718,8 +1877,10 @@ def print_summary(records: list[dict[str, object]], limit: int) -> None:
     print("Recent results:")
     for item in selected:
         addresses = ",".join(str(value) for value in item.get("addresses", [])) or "-"
-        retained = float(item.get("effective_bytes", 0.0) or 0.0) + float(
-            item.get("initialized_bytes", 0) or 0
+        retained = (
+            float(item.get("effective_bytes", 0.0) or 0.0)
+            + float(item.get("initialized_bytes", 0) or 0)
+            + float(item.get("resource_explained_bytes", 0) or 0)
         )
         record_kind = "reports" if item.get("measurement") == "reports" else "legacy"
         print(
@@ -1747,6 +1908,7 @@ def print_status(state_path: Path, now: datetime | None = None) -> None:
     print(f"Phase: {state.get('phase', 'started')}")
     print(f"Family: {'yes' if state.get('family') is True else 'no'}")
     print(f"Targets: {', '.join(str(value) for value in addresses) or '-'}")
+    print(f"Resource: {state.get('resource') or '-'}")
     scored_addresses = state.get("scored_addresses", [])
     if not isinstance(scored_addresses, list):
         scored_addresses = []
@@ -1794,8 +1956,12 @@ def make_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     start = subparsers.add_parser("start", help="start a measured campaign")
-    start.add_argument("--mode", required=True, choices=("coverage", "refinement", "data", "meta"))
+    start.add_argument(
+        "--mode", required=True,
+        choices=("coverage", "refinement", "data", "resource", "meta"),
+    )
     start.add_argument("--address", action="append", default=[], type=parse_address)
+    start.add_argument("--resource", action="append", default=[], type=parse_resource)
     start.add_argument("--subsystem", default="")
     start.add_argument("--family", action="store_true")
     start.add_argument("--expected-minutes", type=float)
@@ -1812,6 +1978,11 @@ def make_parser() -> argparse.ArgumentParser:
     first_score.add_argument("--address", required=True, type=parse_address)
     first_score.add_argument("--quiet", action="store_true")
 
+    resource_score = subparsers.add_parser(
+        "resource-score", help="stamp the first resource comparison"
+    )
+    resource_score.add_argument("--quiet", action="store_true")
+
     add_target_parser = subparsers.add_parser(
         "add-target", help="add a campaign target or pivot"
     )
@@ -1821,7 +1992,7 @@ def make_parser() -> argparse.ArgumentParser:
     record.add_argument("--result", required=True, choices=("source", "no-source", "meta-fix"))
     record.add_argument(
         "--mode",
-        choices=("coverage", "refinement", "data", "meta"),
+        choices=("coverage", "refinement", "data", "resource", "meta"),
         help="optional assertion against the active campaign",
     )
     record.add_argument(
@@ -1830,6 +2001,10 @@ def make_parser() -> argparse.ArgumentParser:
         default=[],
         type=parse_address,
         help="optional assertion against the active targets",
+    )
+    record.add_argument(
+        "--resource", action="append", default=[], type=parse_resource,
+        help="optional assertion against the active resource target",
     )
     record.add_argument(
         "--minutes", type=float, help="optional assertion against measured minutes"
@@ -1901,6 +2076,7 @@ def main() -> int:
                 expected_minutes=args.expected_minutes,
                 expected_retained_bytes=args.expected_retained_bytes,
                 family=args.family,
+                resources=args.resource,
             )
             print(f"Started {state['mode']} campaign at {state['started_at']}.")
             return 0
@@ -1921,6 +2097,11 @@ def main() -> int:
             status = mark_first_score(args.state_file, args.address, utc_now())
             if not args.quiet and status != "inactive":
                 print(f"First-score stamp: {status}.")
+            return 0
+        if args.command == "resource-score":
+            status = mark_resource_score(args.state_file, utc_now())
+            if not args.quiet and status != "inactive":
+                print(f"First resource-score stamp: {status}.")
             return 0
         if args.command == "add-target":
             state = add_target(
@@ -1948,6 +2129,7 @@ def main() -> int:
                 models=args.model,
                 supplied_mode=args.mode,
                 supplied_addresses=args.address,
+                supplied_resources=args.resource,
                 supplied_minutes=args.minutes,
                 supplied_effective_bytes=args.effective_bytes,
                 supplied_initialized_bytes=args.initialized_bytes,
@@ -1957,6 +2139,7 @@ def main() -> int:
                 f"Recorded {item['mode']} {item['result']} campaign: "
                 f"{item['effective_bytes']:+.2f} code byte(s), "
                 f"{item['initialized_bytes']:+.2f} data byte(s), "
+                f"{item.get('resource_explained_bytes', 0):+.2f} resource byte(s), "
                 f"{item['minutes']:.2f} minute(s)."
             )
             return 0

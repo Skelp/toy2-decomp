@@ -70,11 +70,23 @@ range, use its lower bound for stop decisions. The `campaigns summary` command
 shows completed history only. Use `tools/decomp campaigns status` for active
 state.
 
-Use three campaign queues. A `coverage` campaign reconstructs a `STUB` or an
+Use four campaign queues. A `coverage` campaign reconstructs a `STUB` or an
 unstarted function. A `refinement` campaign improves provisional source,
 resolves a tool-only result, or removes source debt. A `data` campaign improves
 typed evidence for initialized globals. Alternate all credible queues. Do not
 force a queue when it has no credible target.
+
+A `resource` campaign reconstructs one retail PE resource leaf. Use one numeric
+type, ID, and language tuple. Do not add an address target.
+
+```sh
+tools/decomp campaigns start --mode resource --resource 2,127,2057 \
+  --expected-minutes MINUTES --expected-retained-bytes BYTES
+tools/decomp validate --mode resource --resource 2,127,2057 --staged
+```
+
+The selected leaf must improve. Stage each changed resource source file that
+the build used. The validation rejects unrelated evidence regressions.
 
 Rank work by unresolved retail bytes, evidence readiness, dependency impact,
 and source debt. A provisional callee can support behavior reconstruction.
@@ -216,6 +228,7 @@ Before a source commit, run:
 tools/decomp validate --mode coverage --target ADDRESS --staged
 tools/decomp validate --mode refinement --target ADDRESS --staged
 tools/decomp validate --mode data --target ADDRESS --staged
+tools/decomp validate --mode resource --resource TYPE,ID,LANGUAGE --staged
 tools/decomp check
 git diff --check
 ```

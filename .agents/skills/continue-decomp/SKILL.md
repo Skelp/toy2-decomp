@@ -27,7 +27,7 @@ external supervisor or use Goal mode inside a worker.
 
 ## Run campaigns
 
-Assign each campaign as `coverage`, `refinement`, or `data`. Alternate all
+Assign each campaign as `coverage`, `refinement`, `data`, or `resource`. Alternate all
 credible queues. Do not force a queue when it has no credible target.
 
 Use campaign history when you select work. Do not retry a zero-yield target
@@ -57,6 +57,7 @@ Apply these selection gates:
 7. A refinement target needs a specific mismatch from the saved comparison.
 8. The mismatch must affect a repeated region or at least 100 retail bytes.
 9. A data target needs retail bytes and one caller or DWARF fact.
+10. A resource target needs one retail type, ID, and language tuple.
 
 Set `B` to the target's `expected_minutes` value. Convert these intervals to
 absolute deadlines from the campaign start time:
@@ -77,8 +78,8 @@ comparison for every member. Start it with one anchor and `--family`.
 For data work, give the worker target byte scores and aggregate initialized
 bytes. Include known caller, retail, and DWARF evidence.
 
-Run `tools/decomp campaigns start` with a lowercase mode and all initial target
-addresses. Pass the selected `EST MIN` value with `--expected-minutes` and the
+Run `tools/decomp campaigns start` with a lowercase mode and all initial targets.
+Use one `--resource TYPE,ID,LANGUAGE` option for resource work. Pass the selected `EST MIN` value with `--expected-minutes` and the
 `EST B` value with `--expected-retained-bytes`. Include the subsystem when it is
 known. Add `--family` for a family campaign. Do not spawn the worker until this
 command succeeds. The command saves the baseline and reports the campaign start
@@ -177,9 +178,9 @@ Do not count a structure-only commit as source progress unless it removes
 tracked source debt. Prefer a supported file move as part of a valid coverage
 or refinement campaign. Require comparisons for all moved functions.
 
-Keep separate no-source counts for coverage, refinement, and data. Switch modes
-after a failure. Reset all counts after source progress. Stop only when all
-three counts reach three. Do not count metadata, notes, or blocker-only commits
+Keep separate no-source counts for coverage, refinement, data, and resource.
+Switch modes after a failure. Reset all counts after source progress. Stop only
+when all four counts reach three. Do not count metadata, notes, or blocker-only commits
 as source progress.
 
 Audit efficiency after every campaign. Review the last ten records after every
@@ -190,6 +191,7 @@ Use these audit signals:
 
 - retained code bytes per source-work minute.
 - retained data bytes per source-work minute.
+- retained resource bytes per source-work minute.
 - time to the first score.
 - time after the first score.
 - zero-yield campaign rate.
@@ -209,6 +211,6 @@ after the fix.
 
 Stop immediately when the user asks. Interrupt the active worker. Do not start
 a successor. Abort the active campaign record with a concise reason. Report the
-last pushed commit and changed addresses. Report all three queue failure counts.
+last pushed commit and changed targets. Report all four queue failure counts.
 Report implemented, terminal, effective-byte, and source-debt deltas. Report
 unresolved workflow failures.

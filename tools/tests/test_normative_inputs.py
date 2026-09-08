@@ -34,6 +34,14 @@ def script_section(script: str, start: str, end: str) -> str:
 
 
 class NormativeInputTests(unittest.TestCase):
+    def test_resource_validation_has_linux_and_windows_parity(self):
+        linux = (ROOT / "tools" / "decomp").read_text(encoding="utf-8")
+        windows = (ROOT / "tools" / "decomp.ps1").read_text(encoding="utf-8")
+        for script in (linux, windows):
+            self.assertIn("--resource", script)
+            self.assertIn("resource-score", script)
+            self.assertIn("resource campaign cannot have target addresses", script.casefold())
+
     def test_comparison_commands_refresh_the_game_build(self):
         script = (ROOT / "tools" / "decomp").read_text(encoding="utf-8")
         ensure_build = re.search(

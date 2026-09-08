@@ -24,6 +24,176 @@ spec.loader.exec_module(campaigns)
 
 
 class CampaignTests(unittest.TestCase):
+    def test_resource_mode_is_the_only_source_mode_without_addresses(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            for mode in ("coverage", "refinement", "data"):
+                with self.assertRaisesRegex(ValueError, "at least one --address"):
+                    campaigns.start_campaign(
+                        root / f"{mode}.json", mode, [], "Test", worktree_root=root
+                    )
+            with self.assertRaisesRegex(ValueError, "cannot have source targets"):
+                campaigns.start_campaign(
+                    root / "bad.json", "resource", ["0x00401000"], "Test",
+                    worktree_root=root, resources=[(2, 127, 2057)],
+                )
+            state_path = root / "resource.json"
+            state = campaigns.start_campaign(
+                state_path, "resource", [], "Test", worktree_root=root,
+                resources=[(2, 127, 2057)],
+            )
+            self.assertEqual(state["resource"], "2,127,2057")
+            state["baseline_at"] = state["started_at"]
+            campaigns.write_state(state_path, state)
+            with self.assertRaisesRegex(ValueError, "cannot add a source target"):
+                campaigns.add_target(state_path, "0x00401000")
+
+    def test_finalization_rechecks_the_resource_target_shape(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_path = root / "state.json"
+            campaigns.write_state(
+                state_path,
+                {
+                    "phase": "finalizing",
+                    "mode": "resource",
+                    "addresses": ["0x00401000"],
+                    "resource": "2,127,2057",
+                    "finalization": {
+                        "item": {
+                            "mode": "resource",
+                            "addresses": ["0x00401000"],
+                            "resource": "2,127,2057",
+                        },
+                        "ledger_path": str(root / "ledger.jsonl"),
+                        "source_models_path": str(root / "models.md"),
+                    },
+                },
+            )
+            with self.assertRaisesRegex(ValueError, "cannot have source targets"):
+                campaigns._finish_campaign_finalization(
+                    state_path, campaigns.read_state(state_path)
+                )
+
+    def test_resource_source_result_records_leaf_bytes_separately(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            (root / "resources").mkdir()
+            source = root / "resources" / "leaf.bmp"
+            source.write_bytes(b"old")
+            subprocess.run(["git", "add", "resources/leaf.bmp"], cwd=root, check=True)
+            (root / "original").mkdir()
+            (root / "build").mkdir()
+            (root / "original" / "toy2.exe").write_bytes(b"old")
+            (root / "build" / "toy2.exe").write_bytes(b"old")
+            function_map = root / "functions.txt"
+            function_map.write_text(
+                "0x00401000 One\n0x00401064 Two\n", encoding="utf-8"
+            )
+            sizes = root / "sizes.json"
+            sizes.write_text(
+                '[{"address":"00401000","size":100}]', encoding="utf-8"
+            )
+            report = root / "report.json"
+            data_report = root / "data.json"
+            self.write_code_report(report, 0.75)
+            self.write_data_report(data_report, 40)
+            state_path = root / "state.json"
+            started = datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc)
+            campaigns.start_campaign(
+                state_path,
+                "resource",
+                [],
+                "Resources",
+                started,
+                worktree_root=root,
+                resources=[(2, 127, 2057)],
+            )
+            before = [{
+                "path": ["2", "127", "2057"],
+                "size": 8,
+                "identity_match": False,
+            }]
+            after = [{
+                "path": ["2", "127", "2057"],
+                "size": 8,
+                "identity_match": True,
+            }]
+            with patch.object(campaigns, "resource_rows", return_value=before):
+                campaigns.attach_baseline(
+                    state_path,
+                    report,
+                    data_report,
+                    function_map,
+                    sizes,
+                    started + timedelta(minutes=1),
+                )
+            with patch.object(campaigns, "resource_rows", return_value=after):
+                with self.assertRaisesRegex(ValueError, "report deltas"):
+                    campaigns.record_campaign(
+                        root / "ledger.jsonl",
+                        state_path,
+                        root / "models.md",
+                        report,
+                        data_report,
+                        "no-source",
+                        models=["The resource model did not match."],
+                        now=started + timedelta(minutes=2),
+                    )
+            campaigns.mark_resource_score(
+                state_path, started + timedelta(minutes=2)
+            )
+            source.write_bytes(b"new")
+            subprocess.run(["git", "add", "resources/leaf.bmp"], cwd=root, check=True)
+            with patch.object(campaigns, "resource_rows", return_value=after):
+                item = campaigns.record_campaign(
+                    root / "ledger.jsonl",
+                    state_path,
+                    root / "models.md",
+                    report,
+                    data_report,
+                    "source",
+                    now=started + timedelta(minutes=3),
+                )
+            self.assertEqual(item["addresses"], [])
+            self.assertEqual(item["resource"], "2,127,2057")
+            self.assertEqual(item["resource_explained_bytes"], 8)
+            self.assertEqual(item["effective_bytes"], 0)
+            self.assertEqual(item["initialized_bytes"], 0)
+
+    def test_resource_no_source_note_uses_the_resource_target(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_path = root / "state.json"
+            models_path = root / "models.md"
+            item = {
+                "campaign_id": "resource-note",
+                "ended_at": "2026-08-03T12:03:00+00:00",
+                "subsystem": "Resources",
+                "mode": "resource",
+                "result": "no-source",
+                "addresses": [],
+                "resource": "2,127,2057",
+                "ruled_out_models": ["The payload model did not match."],
+                "note": "The source was restored.",
+            }
+            state = {
+                "phase": "finalizing",
+                "finalization": {
+                    "item": item,
+                    "ledger_path": str(root / "ledger.jsonl"),
+                    "source_models_path": str(models_path),
+                },
+            }
+            campaigns.write_state(state_path, state)
+            campaigns._finish_campaign_finalization(state_path, state)
+            self.assertIn(
+                "## 2026-08-03 | Resources | 2,127,2057",
+                models_path.read_text(encoding="utf-8"),
+            )
+
     @staticmethod
     def write_code_report(path: Path, score: float, *, effective: bool = False):
         row = {"address": "0x401000", "matching": score, "type": 1}

@@ -1,6 +1,6 @@
 ---
 name: decomp-expert
-description: Complete one bounded Toy Story 2 coverage, refinement, data, or workflow-resolution campaign for a supervisor. Use only after a continue-decomp supervisor delegates a fresh campaign and assigns its mode.
+description: Complete one bounded Toy Story 2 coverage, refinement, data, resource, or workflow-resolution campaign for a supervisor. Use only after a continue-decomp supervisor delegates a fresh campaign and assigns its mode.
 ---
 
 # Decomp expert
@@ -32,6 +32,7 @@ validation. This rule prevents duplicate records.
 
 A function campaign contains one large function or at most three related
 functions. A data campaign contains at most three related initialized globals.
+A resource campaign contains one numeric type, ID, and language tuple.
 Rank work by unresolved bytes, evidence readiness, dependency impact, and
 source debt. Also use the estimated retained-byte rate. Do not select work only
 by address or easy percentage gain.
@@ -58,6 +59,9 @@ change an unrelated global only to increase the whole-file score.
 For a data campaign, inspect each target with `tools/decomp data ADDRESS`.
 Confirm each change with callers, retail bytes, or DWARF evidence. Preserve
 storage class, pointer targets, layout, and initialization order.
+
+For a resource campaign, change a tracked resource source file. Preserve the
+exact type, ID, and language identity. Do not add an address target.
 
 Choose the likely original translation unit before you edit source. Do not add
 new code to a catch-all file only because the file already exists. Use retail
@@ -138,6 +142,7 @@ Use the lowercase mode that the supervisor assigned.
 Coverage must increase the implemented count. Refinement must increase a
 score, reach terminal status, or remove debt while terminal status remains.
 Data must improve typed bytes for each target without data regressions.
+Resource work must improve the selected leaf without unrelated regressions.
 Use `--accounting-correction "REASON"` only with `--meta-resolution`. This path
 does not count as source progress.
 
@@ -153,11 +158,12 @@ supervisor records these models in the campaign record and
 Return this compact summary:
 
 ```text
-MODE: coverage | refinement | data
+MODE: coverage | refinement | data | resource
 RESULT: source | meta-fix | no-source
 BASE: <commit>
 COMMITS: <commit list or none>
 ADDRESSES: <address list or none>
+RESOURCE: <type,id,language or none>
 IMPLEMENTED_BEFORE: <count>
 IMPLEMENTED_AFTER: <count>
 TERMINAL_BEFORE: <count>

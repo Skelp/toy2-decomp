@@ -26,6 +26,14 @@ from tools.decomp_status import (  # noqa: E402
 )
 from tools import decomp_lint  # noqa: E402
 from tools.decomp_annotations import read_source_annotations  # noqa: E402
+from tools.decomp_resources import (  # noqa: E402
+    ResourceId,
+    parse_resource,
+    resource_rows,
+    resource_source_snapshot,
+    selected_evidence,
+    staged_resource_source_problems,
+)
 
 TOOL_ARTIFACTS = ROOT / "tools" / "Resources" / "tool_artifacts.tsv"
 
@@ -182,6 +190,11 @@ def metadata(
         ROOT / ".tooling" / "msvc600-8168" / "VC98" / "Include"
     )
     values["source_dependency_sha256"] = tree_hash(ROOT / "src")
+    values["resource_sources"] = resource_source_snapshot(ROOT)
+    original = ROOT / "original" / "toy2.exe"
+    recompiled = ROOT / "build" / "toy2.exe"
+    if original.exists() and recompiled.exists():
+        values["resources"] = resource_rows(original, recompiled)
     values.update(source_state(ROOT / "src"))
     reccmp_head = subprocess.run(
         ["git", "-C", "external/submodules/reccmp", "rev-parse", "HEAD"],
@@ -403,6 +416,87 @@ def data_sections(payload: dict[str, object]) -> dict[str, dict]:
         for item in rows
         if isinstance(item, dict) and item.get("name")
     }
+
+
+def validate_resource_campaign(
+    baseline_rows: list[dict[str, object]],
+    current_rows: list[dict[str, object]],
+    resource: ResourceId,
+    baseline_data: dict[str, object],
+    current_data: dict[str, object],
+) -> list[str]:
+    """Validate one exact resource leaf and all unrelated scored evidence."""
+
+    problems: list[str] = []
+    before_variables = data_variables(baseline_data)
+    after_variables = data_variables(current_data)
+    for address, old_variable in before_variables.items():
+        new_variable = after_variables.get(address)
+        if new_variable is None:
+            problems.append(f"0x{address:08X}: data target disappeared")
+            continue
+        if float(new_variable.get("matched_bytes", 0)) + 1e-12 < float(
+            old_variable.get("matched_bytes", 0)
+        ):
+            problems.append(f"0x{address:08X}: data bytes regressed")
+        elif float(new_variable.get("score", 0)) + 1e-12 < float(
+            old_variable.get("score", 0)
+        ):
+            problems.append(f"0x{address:08X}: data score regressed")
+    before = selected_evidence(baseline_rows, resource)
+    after = selected_evidence(current_rows, resource)
+    label = ",".join(str(part) for part in resource)
+    if not before["leaf_count"]:
+        problems.append(f"retail resource {label} does not exist")
+    elif after["explained_bytes"] <= before["explained_bytes"]:
+        problems.append(f"resource {label} did not improve explained bytes")
+
+    paths = {
+        tuple(str(part) for part in row.get("path", []))
+        for row in baseline_rows
+        if isinstance(row, dict)
+    }
+    target_path = tuple(str(part) for part in resource)
+    for path in sorted(paths):
+        if path == target_path:
+            continue
+        old_explained = sum(
+            int(row.get("size", 0))
+            for row in baseline_rows
+            if tuple(str(part) for part in row.get("path", [])) == path
+            and row.get("identity_match") is True
+        )
+        new_explained = sum(
+            int(row.get("size", 0))
+            for row in current_rows
+            if tuple(str(part) for part in row.get("path", [])) == path
+            and row.get("identity_match") is True
+        )
+        if new_explained < old_explained:
+            problems.append(f"resource {','.join(path)}: unrelated resource bytes regressed")
+
+    before_sections = data_sections(baseline_data)
+    after_sections = data_sections(current_data)
+    for name, old in before_sections.items():
+        new = after_sections.get(name)
+        if new is None:
+            problems.append(f"{name}: scored section disappeared")
+            continue
+        if float(new.get("explained_bytes", 0)) + 1e-12 < float(
+            old.get("explained_bytes", 0)
+        ):
+            problems.append(f"{name}: explained section bytes regressed")
+        elif float(new.get("score", 0)) + 1e-12 < float(old.get("score", 0)):
+            problems.append(f"{name}: section score regressed")
+    for group_name in ("vtables", "imports", "relocations"):
+        old = baseline_data.get(group_name, {})
+        new = current_data.get(group_name, {})
+        if not isinstance(old, dict) or not isinstance(new, dict):
+            continue
+        key = "explained_bytes" if group_name == "vtables" else "matched_entries"
+        if float(new.get(key, 0)) + 1e-12 < float(old.get(key, 0)):
+            problems.append(f"{group_name}: data evidence regressed")
+    return problems
 
 
 def validate_data_campaign(
@@ -815,6 +909,7 @@ def validate(
     current_data_path: Path | None = None,
     accounting_correction: str | None = None,
     staged: bool = False,
+    resource: ResourceId | None = None,
 ) -> int:
     baseline = read_match_statuses(baseline_path)
     current = read_match_statuses(current_path)
@@ -825,7 +920,7 @@ def validate(
             validate_metadata(
                 metadata_path,
                 baseline_path,
-                baseline_data_path if mode == "data" else None,
+                baseline_data_path if mode in ("data", "resource") else None,
             )
         )
     source_debt = read_source_debt(source_root, staged=staged)
@@ -855,6 +950,16 @@ def validate(
         problems.append("--accounting-correction requires --meta-resolution")
     if accounting_correction is not None and mode != "data":
         problems.append("--accounting-correction requires --mode data")
+    if mode in ("coverage", "refinement", "data"):
+        if not targets:
+            problems.append(f"a {mode} campaign needs at least one target address")
+        if resource is not None:
+            problems.append("--resource requires --mode resource")
+    elif mode == "resource":
+        if targets:
+            problems.append("a resource campaign cannot have target addresses")
+        if resource is None:
+            problems.append("a resource campaign needs exactly one --resource")
     if lint_change.new_errors:
         problems.append(
             f"staged source has {lint_change.new_errors} new source-debt error(s)"
@@ -894,7 +999,7 @@ def validate(
                 f"({before.matching * 100:.2f}% -> {after.matching * 100:.2f}%)"
             )
 
-    function_targets = sorted(targets) if mode != "data" else []
+    function_targets = sorted(targets) if mode in ("coverage", "refinement") else []
     for address in function_targets:
         status = current.get(address)
         if status is None:
@@ -967,7 +1072,7 @@ def validate(
         if len(current_implemented) <= len(baseline_implemented):
             problems.append("coverage did not increase the implemented-function count")
 
-    if mode == "data":
+    if mode in ("data", "resource"):
         if has_baseline_state:
             for address in sorted(baseline_implemented - current_implemented):
                 problems.append(
@@ -980,6 +1085,7 @@ def validate(
                     f"0x{address:08X}: source debt increased: "
                     f"{', '.join(sorted(added_rules))}"
                 )
+    if mode == "data":
         baseline_source_hash = baseline_state.get("source_dependency_sha256")
         if accounting_correction is None:
             if baseline_source_hash is None:
@@ -996,6 +1102,34 @@ def validate(
                 accounting_correction,
             )
         )
+
+    if mode == "resource" and resource is not None:
+        baseline_rows = baseline_state.get("resources", [])
+        if not isinstance(baseline_rows, list):
+            problems.append("baseline metadata has no resource evidence")
+            baseline_rows = []
+        original = ROOT / "original" / "toy2.exe"
+        recompiled = ROOT / "build" / "toy2.exe"
+        if not original.exists() or not recompiled.exists():
+            problems.append("the resource executable input is missing")
+            current_rows: list[dict[str, object]] = []
+        else:
+            current_rows = resource_rows(original, recompiled)
+        problems.extend(
+            validate_resource_campaign(
+                baseline_rows,
+                current_rows,
+                resource,
+                read_data_report(baseline_data_path),
+                read_data_report(current_data_path),
+            )
+        )
+        if staged:
+            baseline_sources = baseline_state.get("resource_sources")
+            if not isinstance(baseline_sources, dict):
+                problems.append("baseline metadata has no resource source state")
+            else:
+                problems.extend(staged_resource_source_problems(ROOT, baseline_sources))
 
     newly_implemented = (
         current_implemented - baseline_implemented if has_baseline_state else set()
@@ -1058,11 +1192,12 @@ def main() -> int:
     validate_parser = subparsers.add_parser("validate")
     validate_parser.add_argument("baseline", type=Path)
     validate_parser.add_argument("current", type=Path)
-    validate_parser.add_argument("targets", nargs="+", type=parse_address)
+    validate_parser.add_argument("targets", nargs="*", type=parse_address)
     validate_parser.add_argument("--allow-target-regression", action="store_true")
     validate_parser.add_argument(
-        "--mode", choices=("coverage", "refinement", "data"), default="coverage"
+        "--mode", choices=("coverage", "refinement", "data", "resource"), default="coverage"
     )
+    validate_parser.add_argument("--resource", type=parse_resource)
     validate_parser.add_argument("--meta-resolution", action="store_true")
     validate_parser.add_argument("--baseline-data", type=Path)
     validate_parser.add_argument("--current-data", type=Path)
@@ -1122,6 +1257,7 @@ def main() -> int:
         args.current_data,
         args.accounting_correction,
         args.staged,
+        args.resource,
     )
 
 

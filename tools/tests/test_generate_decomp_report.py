@@ -205,6 +205,7 @@ class ReportMetricTests(unittest.TestCase):
 
         self.assertEqual(explained, len(b"payload"))
         self.assertTrue(rows[0]["match"])
+        self.assertFalse(rows[0]["identity_match"])
 
     def test_nb10_score_normalizes_only_the_pdb_basename(self):
         original = b"NB10" + b"\0" * 4 + b"\x01" * 8 + b"C:\\old\\toy2.pdb\0"

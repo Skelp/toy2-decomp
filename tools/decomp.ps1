@@ -463,6 +463,7 @@ switch ($Command) {
         $CurrentData = Join-Path $Root "build\decomp-current-data-report.json"
         $AccountingCorrection = ""
         $Mode = ""
+        $Resource = ""
         $Targets = @()
         $AllowTargetRegression = $false
         $MetaResolution = $false
@@ -476,6 +477,9 @@ switch ($Command) {
             } elseif ($CommandArgs[$Index] -eq "--mode" -and $Index + 1 -lt $CommandArgs.Count) {
                 $Index++
                 $Mode = $CommandArgs[$Index]
+            } elseif ($CommandArgs[$Index] -eq "--resource" -and $Index + 1 -lt $CommandArgs.Count) {
+                $Index++
+                $Resource = $CommandArgs[$Index]
             } elseif ($CommandArgs[$Index] -eq "--accounting-correction" -and $Index + 1 -lt $CommandArgs.Count) {
                 $Index++
                 $AccountingCorrection = $CommandArgs[$Index]
@@ -487,9 +491,18 @@ switch ($Command) {
                 throw "Unknown validate argument: $($CommandArgs[$Index])"
             }
         }
-        if ($Targets.Count -eq 0) { throw "Validate needs at least one --target address." }
-        if ($Mode -and $Mode -notin @("coverage", "refinement", "data")) {
+        if ($Mode -ne "resource" -and $Targets.Count -eq 0) { throw "Validate needs at least one --target address." }
+        if ($Mode -and $Mode -notin @("coverage", "refinement", "data", "resource")) {
             throw "Unknown validation mode: $Mode"
+        }
+        if ($Mode -eq "resource" -and $Targets.Count -gt 0) {
+            throw "A resource campaign cannot have target addresses."
+        }
+        if ($Mode -eq "resource" -and -not $Resource) {
+            throw "A resource campaign needs exactly one --resource."
+        }
+        if ($Mode -ne "resource" -and $Resource) {
+            throw "--resource requires --mode resource."
         }
         if (-not $MetaResolution -and -not $Mode) {
             throw "Validate needs --mode coverage, refinement, or data."
@@ -506,7 +519,7 @@ switch ($Command) {
         if ($AccountingCorrection -and $Mode -ne "data") {
             throw "--accounting-correction requires --mode data."
         }
-        if ($Mode -eq "data" -and -not (Test-Path $BaselineData)) {
+        if ($Mode -in @("data", "resource") -and -not (Test-Path $BaselineData)) {
             throw "No data baseline exists. Run tools/decomp.ps1 baseline before a data campaign."
         }
         if ($Mode -eq "data" -and $Staged -and -not $AccountingCorrection) {
@@ -520,7 +533,7 @@ switch ($Command) {
         Build-Project
         $Current = Join-Path $Root "build\decomp-current-report.json"
         Write-ComparisonReport $Current
-        if ($Mode -eq "data") {
+        if ($Mode -in @("data", "resource")) {
             Write-DataReport $CurrentData
         }
         $VerifyArgs = @("validate", $Baseline, $Current) + $Targets
@@ -529,7 +542,8 @@ switch ($Command) {
         if ($MetaResolution) { $VerifyArgs += "--meta-resolution" }
         if ($Staged) { $VerifyArgs += "--staged" }
         if ($Mode) { $VerifyArgs += @("--mode", $Mode) }
-        if ($Mode -eq "data") {
+        if ($Resource) { $VerifyArgs += @("--resource", $Resource) }
+        if ($Mode -in @("data", "resource")) {
             $VerifyArgs += @(
                 "--baseline-data"
                 $BaselineData
@@ -542,6 +556,10 @@ switch ($Command) {
         }
         & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") @VerifyArgs
         Assert-LastExit "Validating comparison results"
+        if ($Mode -eq "resource") {
+            & $VenvPython (Join-Path $Root "tools\decomp_campaigns.py") "resource-score" "--quiet"
+            Assert-LastExit "Recording the first resource score"
+        }
         if ($Staged) {
             & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_lint.py") --staged --warnings-as-errors
             Assert-LastExit "Validating staged source plausibility"
