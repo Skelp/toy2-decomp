@@ -652,43 +652,50 @@ namespace Toy2
 			soundPosition.z = (Camera::g_renderCameraTransform.pos.z - g_rotatingPlatformSoundPosition.z) * 3 / 4 + g_rotatingPlatformSoundPosition.z;
 			if (g_rotatingPlatformState != 0)
 			{
-				Vector3I rotation;
-				Platform::GetRotation(0x1A, &rotation);
+				Platform::GetRotation(0x1A, &position);
 				if (g_rotatingPlatformState == 1)
 				{
-					if (rotation.z < -0x998)
+					if (position.z > -0x999)
+					{
+						Platform::SetAngularVelocity(0x1A, 0, 0, static_cast<int16_t>(Renderer::g_frameDelta) * -8);
+						AudioManager::PlaySoundEffect(0x6E, &soundPosition);
+					}
+					else
 					{
 						g_rotatingPlatformState = 2;
 						Platform::SetAngularVelocity(0x1A, 0, 0, 0);
 						AudioManager::PlaySoundEffect(0x6D, &soundPosition);
 					}
-					else
-					{
-						Platform::SetAngularVelocity(0x1A, 0, 0, static_cast<int16_t>(Renderer::g_frameDelta) * -8);
-						AudioManager::PlaySoundEffect(0x6E, &soundPosition);
-					}
 				}
 				else
 				{
+					int32_t previousState = g_rotatingPlatformState;
 					g_rotatingPlatformState += Renderer::g_frameDelta;
+					if (previousState < 0xF0 && g_rotatingPlatformState >= 0xF0)
+						AudioManager::PlaySoundEffect(0x6D, &soundPosition);
 					if (g_rotatingPlatformState >= 0xF0)
 					{
-						if (rotation.z < -0x20)
+						if (position.z < -0x20)
+						{
 							Platform::SetAngularVelocity(0x1A, 0, 0, static_cast<int16_t>(Renderer::g_frameDelta) * 8);
-						else if (rotation.z < 0)
-							Platform::SetAngularVelocity(0x1A, 0, 0, static_cast<int16_t>(-rotation.z));
+							AudioManager::PlaySoundEffect(0x6E, &soundPosition);
+						}
+						else if (position.z < 0)
+						{
+							Platform::SetAngularVelocity(0x1A, 0, 0, static_cast<int16_t>(-position.z));
+							AudioManager::PlaySoundEffect(0x6E, &soundPosition);
+						}
 						else
 						{
 							Platform::SetAngularVelocity(0x1A, 0, 0, 0);
 							Platform::ClearFlags(0x1A, 8);
+							AudioManager::PlaySoundEffect(0x6D, &soundPosition);
 							g_rotatingPlatformState = 0;
 						}
-						AudioManager::PlaySoundEffect(g_rotatingPlatformState == 0 ? 0x6D : 0x6E, &soundPosition);
 					}
 				}
-				int32_t linkedRotation = rotation.z / 4 + 0x266;
-				Nu3D::Link::SetRotationRelative8bit(0x1C, 0, 0, linkedRotation);
-				Nu3D::Link::SetRotationRelative8bit(0x1D, 0, 0, linkedRotation);
+				Nu3D::Link::SetRotationRelative8bit(0x1C, 0, 0, position.z / 4 + 0x266);
+				Nu3D::Link::SetRotationRelative8bit(0x1D, 0, 0, position.z / 4 + 0x266);
 			}
 			else if (g_buzzActor.airborneMode != 0 && g_groundSlamTimer != 0 && g_footingType == 0x24)
 			{
