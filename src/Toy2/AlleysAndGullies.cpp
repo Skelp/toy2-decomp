@@ -981,7 +981,7 @@ namespace Toy2
 
 			Levels::RecordData* flareRecords = Levels::g_recordData[17];
 			int32_t nearestDistanceSquared = INT_MAX;
-			int32_t nearestFlareIndex = 0;
+			int32_t nearestFlareIndex;
 			for (int32_t flareIndex = 0; flareIndex < flareRecords->recordCount; flareIndex++)
 			{
 				int32_t cameraOffsetZ = (Camera::g_renderCameraTransform.pos.z - flareRecords->data[flareIndex].z * 0x20) >> 8;
