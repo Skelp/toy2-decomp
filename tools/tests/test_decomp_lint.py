@@ -402,31 +402,46 @@ class CrossFileTests(unittest.TestCase):
 class StagedSourceTests(unittest.TestCase):
     def test_staged_scan_reads_the_index_not_the_worktree(self):
         listed = subprocess_result(stdout="src/Probe.cpp\n")
-        indexed = subprocess_result(
-            stdout=b"// FUNCTION: TOY2 0x00401000\nvoid f() { int iVar2 = 0; }\n"
+        indexed = batch_result(
+            b"// FUNCTION: TOY2 0x00401000\nvoid f() { int iVar2 = 0; }\n"
         )
-        with patch.object(lint.subprocess, "run", side_effect=[listed, indexed]):
+        with patch.object(lint.subprocess, "run", side_effect=[listed, indexed]) as run:
             units = lint.target_units(True, [])
         self.assertEqual(len(units), 1)
+        self.assertEqual(run.call_count, 2)
+        self.assertEqual(run.call_args_list[1].args[0], ["git", "cat-file", "--batch"])
         self.assertIn("iVar2", units[0].text)
         self.assertIn("decompiler-identifier", {item.rule for item in lint.scan_units(units)})
 
     def test_staged_duplicate_is_compared_with_an_existing_index_file(self):
         listed = subprocess_result(stdout="src/Existing.cpp\nsrc/New.cpp\n")
-        existing = subprocess_result(stdout=b"struct Record { int id; };\n")
-        staged = subprocess_result(stdout=b"struct Record { int id; };\n")
-        with patch.object(lint.subprocess, "run", side_effect=[listed, existing, staged]):
+        indexed = batch_result(
+            b"struct Record { int id; };\n",
+            b"struct Record { int id; };\n",
+        )
+        with patch.object(lint.subprocess, "run", side_effect=[listed, indexed]):
             units = lint.target_units(True, [])
         repeated = [item for item in lint.scan_units(units) if item.rule == "repeated-private-type"]
         self.assertEqual(len(repeated), 2)
 
     def test_unstaged_duplicate_does_not_change_the_index_view(self):
         listed = subprocess_result(stdout="src/One.cpp\nsrc/Two.cpp\n")
-        first_index = subprocess_result(stdout=b"struct Record { int id; };\n")
-        second_index = subprocess_result(stdout=b"struct Record { int count; };\n")
-        with patch.object(lint.subprocess, "run", side_effect=[listed, first_index, second_index]):
+        indexed = batch_result(
+            b"struct Record { int id; };\n",
+            b"struct Record { int count; };\n",
+        )
+        with patch.object(lint.subprocess, "run", side_effect=[listed, indexed]):
             units = lint.target_units(True, [])
         self.assertNotIn("repeated-private-type", {item.rule for item in lint.scan_units(units)})
+
+    def test_each_source_unit_is_masked_once_per_scan(self):
+        unit = lint.SourceUnit(
+            Path("Probe.cpp"),
+            "// FUNCTION: TOY2 0x00401000\nvoid Probe(int value) { use(value); }\n",
+        )
+        with patch.object(lint, "_mask_source", wraps=lint._mask_source) as mask:
+            lint.scan_units([unit])
+        self.assertEqual(mask.call_count, 1)
 
     def test_staged_baseline_uses_the_index_and_keeps_stale_rows(self):
         row = b"src/Old.cpp\trepeated-private-type\tRecord\t123456789abc\tsrc/Old.cpp\n"
@@ -457,6 +472,15 @@ def subprocess_result(*, stdout):
             self.stdout = value
 
     return Result(stdout)
+
+
+def batch_result(*blobs: bytes):
+    output = bytearray()
+    for index, blob in enumerate(blobs, 1):
+        output.extend(f"{index:040x} blob {len(blob)}\n".encode())
+        output.extend(blob)
+        output.extend(b"\n")
+    return subprocess_result(stdout=bytes(output))
 
 
 if __name__ == "__main__":

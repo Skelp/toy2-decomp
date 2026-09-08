@@ -30,6 +30,23 @@ done
 export WINEPREFIX="$TOY2_TOOLING/wineprefix"
 export WINEDEBUG="${WINEDEBUG:--all}"
 
+# Keep Ghidra CLI state in the writable build cache. A restricted agent can use
+# the same state without access to the user's data directory.
+TOY2_DECOMP_CACHE="$TOY2_ROOT/build/decomp-cache"
+TOY2_GHIDRA_CACHE="$TOY2_DECOMP_CACHE/ghidra/cache"
+TOY2_GHIDRA_STATE="$TOY2_DECOMP_CACHE/ghidra/state"
+if [[ -z ${TOY2_GHIDRA_LIVE_DATA_HOME+x} ]]; then
+    export TOY2_GHIDRA_LIVE_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+fi
+mkdir -p "$TOY2_GHIDRA_CACHE" "$TOY2_GHIDRA_STATE"
+export XDG_CACHE_HOME="$TOY2_GHIDRA_CACHE"
+export XDG_DATA_HOME="$TOY2_GHIDRA_STATE"
+export GHIDRA_CLI_CACHE_DIR="$TOY2_GHIDRA_CACHE"
+export GHIDRA_CLI_STATE_DIR="$TOY2_GHIDRA_STATE"
+export GHIDRA_CLI_LOG_DIR="$TOY2_GHIDRA_CACHE"
+export GHIDRA_CLI_FULL_RESPONSE_LOGGING=0
+export RUST_LOG="${RUST_LOG:-warn}"
+
 # reccmp loads a Qt/EGL-backed dependency that prints "libEGL warning" and
 # "pci id for fd" lines to stderr on some GPU drivers. The warnings are
 # harmless, but they force every caller to add a grep filter, which can also

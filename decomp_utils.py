@@ -281,7 +281,7 @@ def count_progress(namespace_filter=None, verbose=False, json_output=False):
 
     implemented_percentage = (implemented_count / total_ida_functions) * 100
     started_percentage = ((implemented_count + unfinished_count) / total_ida_functions) * 100
-    match_statuses = read_match_statuses(Path("build/decomp-report-data.json"))
+    match_statuses = read_match_statuses(Path("build/decomp-current-report.json"))
     breakdown = progress_breakdown(source_functions, implemented_addresses, match_statuses)
     verified_count = breakdown["matched"] + breakdown["effective"] + breakdown["tool"]
     provisional_count = implemented_count - verified_count

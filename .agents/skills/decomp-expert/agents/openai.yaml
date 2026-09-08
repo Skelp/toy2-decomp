@@ -1,4 +1,4 @@
 interface:
   display_name: "Decomp Expert"
-  short_description: "Complete one bounded decompilation campaign"
-  default_prompt: "Use $decomp-expert to complete the assigned Toy Story 2 coverage or refinement campaign."
+  short_description: "Complete one evidence-bound writer campaign"
+  default_prompt: "Use $decomp-expert to complete one doctor-bound Toy Story 2 writer campaign and return its hash-valid finalization receipt."

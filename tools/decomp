@@ -64,7 +64,13 @@ score() {
     python tools/decomp_verify.py score build/decomp-score-report.json "$@"
     for address in "$@"; do
         if [[ $address =~ ^0x[0-9A-Fa-f]{1,8}$ ]]; then
-            python tools/decomp_campaigns.py first-score --address "$address" --quiet
+            python tools/decomp_campaigns.py first-score \
+                --address "$address" \
+                --report build/decomp-score-report.json \
+                --score-functions-map tools/Resources/functions_map.txt \
+                --score-function-sizes build/decomp-function-sizes.json \
+                --score-source-root src \
+                --quiet
         fi
     done
 }
@@ -75,26 +81,68 @@ ensure_build() {
 
 write_comparison_report() {
     local output_name="$1"
-    (
+    local report_path="$output_name"
+    local input_receipt="build/decomp-cache/provenance/report-input-${BASHPID}.json"
+    if [[ $report_path != /* ]]; then
+        report_path="build/$report_path"
+    fi
+    if ! python tools/decomp_provenance.py capture-input "$input_receipt" \
+        --output "$report_path" >/dev/null; then
+        return 1
+    fi
+    if ! (
         cd build
         reccmp-reccmp --target TOY2 --silent --no-color --json "$output_name"
-    ) >/dev/null
+    ) >/dev/null; then
+        rm -f "$input_receipt"
+        return 1
+    fi
+    if ! python tools/decomp_provenance.py seal-report "$report_path" \
+        --input-receipt "$input_receipt" >/dev/null; then
+        rm -f "$input_receipt"
+        return 1
+    fi
+    rm -f "$input_receipt"
 }
 
 write_data_report() {
     local output_name="$1"
-    python tools/generate-decomp-data-report.py \
+    local input_receipt="build/decomp-cache/provenance/data-input-${BASHPID}.json"
+    if ! python tools/decomp_provenance.py capture-input "$input_receipt" \
+        --output "build/$output_name" >/dev/null; then
+        return 1
+    fi
+    if ! python tools/generate-decomp-data-report.py \
         --original original/toy2.exe \
         --recompiled build/toy2.exe \
         --pdb build/toy2.pdb \
         --source-root src \
-        --output "build/$output_name"
+        --output "build/$output_name"; then
+        rm -f "$input_receipt"
+        return 1
+    fi
+    if ! python tools/decomp_provenance.py seal-report "build/$output_name" \
+        --input-receipt "$input_receipt" >/dev/null; then
+        rm -f "$input_receipt"
+        return 1
+    fi
+    rm -f "$input_receipt"
 }
 
 function_sizes_are_valid() {
     python -c \
         'import sys; from pathlib import Path; from tools.ghidra_sync import _read_snapshot_sizes; _read_snapshot_sizes(Path(sys.argv[1]))' \
         "$1" >/dev/null 2>&1
+}
+
+ensure_candidate_report() {
+    if python tools/decomp_provenance.py validate-report \
+        build/decomp-current-report.json >/dev/null 2>&1; then
+        return 0
+    fi
+    ensure_build || return
+    refresh_function_sizes || return
+    write_comparison_report decomp-current-report.json
 }
 
 refresh_function_sizes() {
@@ -131,21 +179,12 @@ baseline() {
     build || return
     write_comparison_report decomp-baseline-report.json || return
     write_data_report decomp-baseline-data-report.json || return
-    refresh_function_sizes || return
     python tools/decomp_verify.py metadata build/decomp-baseline-meta.json \
         --report build/decomp-baseline-report.json \
         --data-report build/decomp-baseline-data-report.json || return
     local revision
     revision=$(git rev-parse --short HEAD) || return
     echo "Wrote build/decomp-baseline-report.json for $revision."
-}
-
-campaign_state_is_finalizing() {
-    local state_path="$1"
-    [[ -f $state_path ]] || return 1
-    python -c \
-        'import json,sys; sys.exit(0 if json.load(open(sys.argv[1], encoding="utf-8")).get("phase") == "finalizing" else 1)' \
-        "$state_path" >/dev/null 2>&1
 }
 
 validate() {
@@ -297,7 +336,17 @@ validate() {
     fi
     python tools/decomp_verify.py "${verify_args[@]}"
     for target in "${targets[@]}"; do
-        python tools/decomp_campaigns.py first-score --address "$target" --quiet
+        score_artifact=(--report build/decomp-current-report.json)
+        if [[ $mode == data ]]; then
+            score_artifact=(--data-report build/decomp-current-data-report.json)
+        fi
+        python tools/decomp_campaigns.py first-score \
+            --address "$target" \
+            "${score_artifact[@]}" \
+            --score-functions-map tools/Resources/functions_map.txt \
+            --score-function-sizes build/decomp-function-sizes.json \
+            --score-source-root src \
+            --quiet
     done
     if [[ $mode == resource ]]; then
         python tools/decomp_campaigns.py resource-score --quiet
@@ -321,9 +370,9 @@ experiment() {
         start)
             mkdir -p "$directory"
             build
+            refresh_function_sizes
             write_comparison_report "decomp-experiments/${address}/baseline-report.json"
             write_data_report "decomp-experiments/${address}/baseline-data-report.json"
-            refresh_function_sizes
             python tools/decomp_verify.py metadata "$directory/compiler-context.json" \
                 --report "$directory/baseline-report.json" \
                 --data-report "$directory/baseline-data-report.json"
@@ -348,7 +397,13 @@ experiment() {
                 "$directory/${label}.report.json" "$address" "$directory/${label}.normalized.json"
             python tools/decomp_verify.py classify "$directory/${label}.report.json" "$address" \
                 | tee "$directory/${label}.summary.txt"
-            python tools/decomp_campaigns.py first-score --address "$address" --quiet
+            python tools/decomp_campaigns.py first-score \
+                --address "$address" \
+                --report "build/decomp-experiment-${address}-${label}.json" \
+                --score-functions-map tools/Resources/functions_map.txt \
+                --score-function-sizes build/decomp-function-sizes.json \
+                --score-source-root src \
+                --quiet
             ;;
         report)
             find "$directory" -maxdepth 1 -name '*.summary.txt' -print -exec sed -n '1,4p' {} \;
@@ -362,16 +417,20 @@ experiment() {
 
 report() {
     local output="${1:-build/decomp-report.html}"
-    local report_json="build/decomp-report-data.json"
+    local report_json="build/decomp-current-report.json"
     local report_summary="build/decomp-report-summary.txt"
     local function_sizes="build/decomp-function-sizes.json"
-    local data_report="build/decomp-data-report.json"
+    local data_report="build/decomp-current-data-report.json"
 
     if [[ $# -gt 1 ]]; then
         echo "Usage: tools/decomp report [output.html]" >&2
         return 2
     fi
     ensure_build
+    refresh_function_sizes
+    local report_input="build/decomp-cache/provenance/report-input-${BASHPID}.json"
+    python tools/decomp_provenance.py capture-input "$report_input" \
+        --output "$report_json" >/dev/null
 
     (
         cd build
@@ -382,15 +441,22 @@ report() {
             --json "$(basename "$report_json")"
     ) > "$report_summary"
     cat "$report_summary"
+    python tools/decomp_provenance.py seal-report "$report_json" \
+        --input-receipt "$report_input" >/dev/null
+    rm -f "$report_input"
 
-    refresh_function_sizes
-
+    local data_input="build/decomp-cache/provenance/data-input-${BASHPID}.json"
+    python tools/decomp_provenance.py capture-input "$data_input" \
+        --output "$data_report" >/dev/null
     python tools/generate-decomp-data-report.py \
         --original original/toy2.exe \
         --recompiled build/toy2.exe \
         --pdb build/toy2.pdb \
         --source-root src \
         --output "$data_report"
+    python tools/decomp_provenance.py seal-report "$data_report" \
+        --input-receipt "$data_input" >/dev/null
+    rm -f "$data_input"
 
     python tools/generate-decomp-report.py \
         --input "$report_json" \
@@ -416,7 +482,9 @@ Commands:
   score <addr>...   Print only the similarity verdict for one or more addresses
   bc <addr>         Build toy2.exe, then compare one address verbosely
   notes <query>     Search bounded codegen, source-model, debt, and name notes
-  candidates [ns]   Rank reconstruction candidates (no Ghidra, no reccmp run)
+  candidates [ns]   Refresh stale comparison evidence, then rank candidates
+  doctor [args]     Check source-work tools before a campaign starts
+  brief [args]      Build or read an immutable target evidence brief
   campaigns [...]   Measure campaign time, report deltas, and retained throughput
   discover [args]   Find credible Ghidra starts absent from the function map
   defer <addr> ...  Record a committed blocker or prerequisite
@@ -425,6 +493,7 @@ Commands:
   evidence <addr>   Collect bounded evidence for one target in a single call
   baseline          Save a fresh parent-state comparison before source edits
   validate [args]   Enforce coverage, refinement, data, or resource success
+  finalize [args]   Validate once and write a content-addressed receipt
   experiment [...] Record labeled source-form comparison trials
   lint [files]      Check reconstructed source for decompiler residue
   names             Re-extract .notes/original-names.md from the retail binary
@@ -437,8 +506,9 @@ Commands:
   shell             Start a shell with the decompilation environment active
   sync [args]       Import matched functions/types/globals into Ghidra via reccmp
 
-`candidates` reads the retail binary, committed files, and build reports. It
-does not call Ghidra or reccmp. `evidence` makes bounded Ghidra queries:
+`candidates` reads the retail binary, committed files, and build reports. The
+wrapper refreshes stale Ghidra size and reccmp evidence first. `evidence` makes
+bounded Ghidra queries:
   tools/decomp candidates --why
   tools/decomp candidates --coverage --why
   tools/decomp candidates --refine --why
@@ -461,22 +531,178 @@ does not call Ghidra or reccmp. `evidence` makes bounded Ghidra queries:
 `score` avoids the assembly diff when you only need the percentage:
   tools/decomp score 0x00403640 0x004B99F0
 
-Start campaign measurement before the evidence preflight. Record the result
-after the final source state is ready:
+A non-meta campaign uses the doctor, two independent read-only scout audits,
+and a doctor-bound brief before campaign measurement:
+  # Fetch and integrate origin/agent/continuous before candidate selection.
+  tools/decomp candidates --for 0x00403640 --lane closure --limit 1 \
+    --prediction-features-out build/decomp-cache/prediction-handoff.json --why
+  tools/decomp doctor --mode refinement --lane closure \
+    --target 0x00403640 --selection-started-at UTC_TIMESTAMP --json
+  # Scout A audits retail ABI, control flow, and evidence. Scout B audits
+  # callers, types, layouts, translation-unit evidence, and analogues.
+  tools/decomp brief --lane closure --target 0x00403640 \
+    --doctor-receipt build/decomp-cache/doctor/latest.json \
+    --scout-report build/decomp-cache/retail-scout.json \
+    --scout-report build/decomp-cache/context-scout.json --json
   tools/decomp campaigns start --mode refinement --address 0x00403640 \
-    --subsystem Animation
+    --lane closure --subsystem Animation \
+    --prediction-handoff build/decomp-cache/prediction-handoff.json \
+    --doctor-receipt build/decomp-cache/doctor/latest.json --brief BRIEF_PATH
   tools/decomp campaigns status
-  tools/decomp campaigns start --mode coverage --family --address 0x00465180 \
-    --expected-minutes 24 --expected-retained-bytes 120
+
+Each scout returns a schema-2 JSON file. Use distinct scout IDs and exactly the
+schema, scout_id, audit, lane, target, access, owns_mutations, doctor_receipt,
+and findings keys. Each finding has only category, claim, and evidence. Each
+evidence item has only source and locator. Set access to read-only and
+owns_mutations to false. Use the
+retail-abi-control-flow-evidence and callers-types-layout-translation-unit-analogue
+audits, distinct scout IDs, and nonempty findings. The doctor_receipt object has
+only receipt_id and sha256. Bind both reports to the canonical doctor identity.
+Keep the doctor artifacts, scout reports, and brief unchanged. Finalization
+revalidates them and rejects a HEAD change after the doctor.
+
+The closure and production features JSON must contain success_probability,
+cohort_sample_size, median_retained_bytes, and median_minutes. The two expected
+values must equal the median values. Use the lower bound for stop decisions.
+Other non-meta lanes need a nonempty features JSON, a version, both median
+values, and a lower bound. A selector output file is directly valid for
+--prediction-handoff. The start command validates its schema, lane, mode, and
+address. Pass the file directly; do not rebuild it with jq. Do not mix it with
+individual forecast options. A closure or production bundle needs one distinct
+selector export for each address. Repeat --prediction-handoff in address order.
+Use individual forecast options for resource, data, or research work without a
+selector export. For multi-target source work, prediction features need a
+per_target object keyed by every exact address. Start creates this object from
+the repeated selector handoffs for closure and production. Each entry needs
+median_retained_bytes and lower_retained_bytes. The target medians must sum to
+the campaign median.
+Add --json only when candidate output is also needed on stdout.
+The start wrapper does not run the doctor or create the brief. It requires the
+explicit receipt and one brief per ordered target.
+The doctor receipt expires 60 minutes after the doctor ends. Run the exact
+preflight again after expiry.
+Use refinement for closure and production. Use coverage for research with a
+STUB or unstarted target that has a specific blocker. Use refinement for an
+implemented FUNCTION with a specific blocker or a valid selector cooldown or
+circuit route. The brief and campaign start recompute this route. Use data for
+data and resource for resource. Invalid pairs fail before costly preflight.
+
+Production selection reads the sealed canonical report. After target
+selection, run tools/decomp bc ADDRESS before the doctor and brief. This
+creates the target-local, hash-bound verbose mismatch. The doctor and brief
+reject stale mismatch evidence.
+
+Evidence-only research occurs before measurement. A timed research campaign is
+a coverage or refinement source pilot, based on the target state, with a ready
+doctor-bound brief:
+  tools/decomp campaigns start --mode coverage --address 0x00465180 \
+    --lane research --subsystem SUBSYSTEM --expected-minutes MEDIAN_MINUTES \
+    --expected-retained-bytes MEDIAN_BYTES --prediction-version cohort-v1 \
+    --prediction-lower-bound-bytes LOWER_BYTES \
+    --prediction-features build/decomp-cache/research-prediction.json \
+    --doctor-receipt build/decomp-cache/doctor/latest.json --brief BRIEF_PATH
+
+Stamp preflight and get the first score by their absolute deadlines. Start
+finalization by the stop deadline, or by the displayed extension deadline when
+the forecast is at least 100 retained bytes. The finalizer rejects a late source
+result. It also rejects symbolic-link inputs and configured non-generated
+sources that are absent from the staged Git tree.
+
+Resource work uses the same preflight and the standard finalizer:
+  tools/decomp doctor --mode resource --lane resource --resource 2,127,2057 \
+    --selection-started-at UTC_TIMESTAMP --json
+  # Run the two required scout audits and save their bound reports.
+  tools/decomp brief --lane resource --target 2,127,2057 \
+    --doctor-receipt build/decomp-cache/doctor/latest.json \
+    --scout-report build/decomp-cache/retail-scout.json \
+    --scout-report build/decomp-cache/context-scout.json --json
   tools/decomp campaigns start --mode resource --resource 2,127,2057 \
-    --expected-minutes 20 --expected-retained-bytes 77864
-  tools/decomp campaigns record --result source
+    --lane resource --expected-minutes MEDIAN_MINUTES \
+    --expected-retained-bytes MEDIAN_BYTES --prediction-version resource-v1 \
+    --prediction-lower-bound-bytes LOWER_BYTES \
+    --prediction-features build/decomp-cache/resource-prediction.json \
+    --doctor-receipt build/decomp-cache/doctor/latest.json \
+    --brief RESOURCE_BRIEF
+  tools/decomp finalize --result source --mode resource \
+    --resource 2,127,2057 --staged
+
+For no-source, restore all source trials and keep --staged on finalization:
+  tools/decomp finalize --result no-source --mode MODE \
+    --target ADDRESS --staged
   tools/decomp campaigns record --result no-source \
     --model "The tested loop form scored 20 percent."
+Repeat --target for all active addresses in order. Use --resource for resource
+work.
+
+A meta campaign is one bounded workflow repair that blocks reliable source
+progress. It skips candidates, the doctor, scouts, and brief.
+It has no forecast or source deadlines after start. The fault does not have to
+block every source queue:
+  tools/decomp campaigns start --mode meta --lane meta
+  tools/decomp finalize --result meta-fix --mode meta --staged
+  tools/decomp campaigns record --result meta-fix
+
+Record the result after finalization. Add staged, then complete an independent
+acceptance review before you add accepted:
+  tools/decomp campaigns record --result source
+  tools/decomp campaigns delivery --campaign-id ID --status staged
+  tools/decomp campaigns delivery --campaign-id ID --status accepted
+
+Stage and commit the finalized files, campaign row, staged entry, and accepted
+entry. Fetch and rebase that commit onto current origin/agent/continuous. Set
+COMMIT to the resulting HEAD and BASE to its first parent. Then run:
+  COMMIT=$(git rev-parse HEAD)
+  BASE=$(git rev-parse HEAD^)
+  DELIVERY_RECEIPT=$(
+    tools/decomp campaigns delivery-verify --campaign-id ID \
+      --commit "$COMMIT" --base-commit "$BASE" | \
+      python -c 'import json, sys; print(json.load(sys.stdin)["path"])'
+  )
+  tools/decomp campaigns delivery --campaign-id ID --status integrated \
+    --base-commit "$BASE" --commit "$COMMIT" \
+    --delivery-receipt "$DELIVERY_RECEIPT"
+  tools/decomp campaigns delivery --campaign-id ID --status committed \
+    --commit "$COMMIT" --delivery-receipt "$DELIVERY_RECEIPT"
+  # Push "$COMMIT" to origin/agent/continuous.
+  tools/decomp campaigns delivery --campaign-id ID --status pushed \
+    --commit "$COMMIT" --delivery-receipt "$DELIVERY_RECEIPT"
   tools/decomp campaigns abort --reason "The user stopped the campaign."
-  tools/decomp campaigns add-target --address 0x004038E0
   tools/decomp campaigns evidence --address 0x00403640 --kind analogue \
-    --note "A matching retail sibling now supplies the loop form."
+    --failed-campaign-id FAILED_ID --failed-model "rejected loop form" \
+    --changed-source "A retail sibling now supplies the loop form." \
+    --note "Use the new sibling evidence for one bounded retry."
+
+The delivery receipt rejects a conflict on a finalized campaign path. Source
+delivery rebuilds and validates. Meta delivery runs focused tool
+tests. No-source delivery checks the tree, index, and exact ledger and model-note
+append. Do not build, create a report, or run Ghidra sync for no-source.
+
+The pushed command verifies that the remote contains COMMIT. Put integrated,
+committed, and pushed in one telemetry-only follow-up commit, then push it.
+These entries stay outside the campaign commit. This follow-up commit does not
+count as source progress. Do not reuse a receipt after HEAD, BASE, an input, or
+an artifact changes. A rejected entry ends delivery.
+
+Before a pivot, restore the current target trials. Run the doctor and two scout
+audits for only the new address. Create its doctor-bound brief, then add it.
+  tools/decomp candidates --lane production --limit 1 --for 0x004038E0 \
+    --prediction-features-out build/decomp-cache/prediction-handoff.json --why
+  tools/decomp bc 0x004038E0
+  tools/decomp doctor --mode refinement --lane production --target 0x004038E0 \
+    --selection-started-at PIVOT_SELECTION_UTC --json
+  # Run two independent read-only scout audits with this doctor receipt.
+  tools/decomp brief --lane production --target 0x004038E0 \
+    --doctor-receipt PIVOT_RECEIPT \
+    --scout-report build/decomp-cache/pivot-retail-scout.json \
+    --scout-report build/decomp-cache/pivot-context-scout.json --json
+  tools/decomp campaigns add-target --address 0x004038E0 \
+    --replace OLD_ADDRESS \
+    --prediction-handoff build/decomp-cache/prediction-handoff.json \
+    --doctor-receipt PIVOT_RECEIPT --brief PIVOT_BRIEF
+
+A family expansion omits --replace. Each new member still needs a fresh doctor
+receipt, brief, and forecast. Prediction events preserve each target forecast.
+The original campaign deadlines do not reset.
 
 Routine output is bounded. `candidates` and `discover` show 10 rows.
 `blockers` shows 20 rows. Use `--limit 0` or `--all` for all rows.
@@ -523,15 +749,43 @@ case "$command" in
         usage
         exit 0
         ;;
+    report)
+        if [[ $# -eq 1 && ($1 == -h || $1 == --help) ]]; then
+            echo "Usage: tools/decomp report [output.html]"
+            exit 0
+        fi
+        ;;
 esac
 
 source tools/linux-decomp-env.sh
 
+prune_ghidra_logs() {
+    python -c \
+        'from pathlib import Path; from tools.decomp_doctor import prune_ghidra_logs; prune_ghidra_logs(Path.cwd())' \
+        >/dev/null 2>&1 || true
+}
+trap prune_ghidra_logs EXIT
+
 case "$command" in
+    doctor)
+        python tools/decomp_doctor.py "$@"
+        ;;
+    brief)
+        python tools/decomp_brief.py "$@"
+        ;;
+    finalize)
+        python tools/decomp_campaigns.py finalize "$@"
+        ;;
     discover)
-        exec python tools/decomp_discover.py "$@"
+        python tools/decomp_discover.py "$@"
         ;;
     candidates)
+        for candidate_argument in "$@"; do
+            if [[ $candidate_argument == -h || $candidate_argument == --help ]]; then
+                exec python tools/decomp_candidates.py "$@"
+            fi
+        done
+        ensure_candidate_report
         exec python tools/decomp_candidates.py "$@"
         ;;
     campaigns)
@@ -541,7 +795,6 @@ case "$command" in
             fi
         done
         campaign_action=""
-        campaign_state_file="build/decomp-campaign-state.json"
         campaign_global_arguments=()
         campaign_arguments=("$@")
         campaign_index=0
@@ -552,7 +805,6 @@ case "$command" in
                     if [[ $((campaign_index + 1)) -ge ${#campaign_arguments[@]} ]]; then
                         exec python tools/decomp_campaigns.py "$@"
                     fi
-                    campaign_state_file="${campaign_arguments[$((campaign_index + 1))]}"
                     campaign_global_arguments+=(
                         "$campaign_argument"
                         "${campaign_arguments[$((campaign_index + 1))]}"
@@ -560,7 +812,6 @@ case "$command" in
                     campaign_index=$((campaign_index + 2))
                     ;;
                 --state-file=*)
-                    campaign_state_file="${campaign_argument#*=}"
                     campaign_global_arguments+=("$campaign_argument")
                     campaign_index=$((campaign_index + 1))
                     ;;
@@ -586,26 +837,92 @@ case "$command" in
         done
         case "$campaign_action" in
             start)
-                python tools/decomp_campaigns.py "$@"
-                if ! baseline; then
-                    python tools/decomp_campaigns.py "${campaign_global_arguments[@]}" abort \
-                        --reason "The campaign baseline command failed."
-                    exit 1
+                campaign_mode=""
+                campaign_lane=""
+                campaign_targets=()
+                campaign_resource=""
+                campaign_doctor_receipt=""
+                campaign_briefs=()
+                campaign_scan_index=0
+                while [[ $campaign_scan_index -lt ${#campaign_arguments[@]} ]]; do
+                    campaign_scan_argument="${campaign_arguments[$campaign_scan_index]}"
+                    case "$campaign_scan_argument" in
+                        --mode|--lane|--address|--resource|--doctor-receipt|--brief)
+                            if [[ $((campaign_scan_index + 1)) -lt ${#campaign_arguments[@]} ]]; then
+                                campaign_scan_value="${campaign_arguments[$((campaign_scan_index + 1))]}"
+                                case "$campaign_scan_argument" in
+                                    --mode) campaign_mode="$campaign_scan_value" ;;
+                                    --lane) campaign_lane="$campaign_scan_value" ;;
+                                    --address) campaign_targets+=("$campaign_scan_value") ;;
+                                    --resource) campaign_resource="$campaign_scan_value" ;;
+                                    --doctor-receipt) campaign_doctor_receipt="$campaign_scan_value" ;;
+                                    --brief) campaign_briefs+=("$campaign_scan_value") ;;
+                                esac
+                            fi
+                            campaign_scan_index=$((campaign_scan_index + 1))
+                            ;;
+                        --mode=*) campaign_mode="${campaign_scan_argument#*=}" ;;
+                        --lane=*) campaign_lane="${campaign_scan_argument#*=}" ;;
+                        --address=*) campaign_targets+=("${campaign_scan_argument#*=}") ;;
+                        --resource=*) campaign_resource="${campaign_scan_argument#*=}" ;;
+                        --doctor-receipt=*) campaign_doctor_receipt="${campaign_scan_argument#*=}" ;;
+                        --brief=*) campaign_briefs+=("${campaign_scan_argument#*=}") ;;
+                    esac
+                    campaign_scan_index=$((campaign_scan_index + 1))
+                done
+                if [[ -z $campaign_mode ]]; then
+                    exec python tools/decomp_campaigns.py "$@"
                 fi
-                if ! python tools/decomp_campaigns.py \
-                    "${campaign_global_arguments[@]}" set-baseline --quiet; then
-                    python tools/decomp_campaigns.py "${campaign_global_arguments[@]}" abort \
-                        --reason "The campaign baseline attachment failed."
-                    exit 1
+                if [[ -z $campaign_lane ]]; then
+                    case "$campaign_mode" in
+                        coverage) campaign_lane="research" ;;
+                        refinement) campaign_lane="production" ;;
+                        *) campaign_lane="$campaign_mode" ;;
+                    esac
+                fi
+                if [[ $campaign_mode != meta ]]; then
+                    if [[ -z $campaign_doctor_receipt ]]; then
+                        echo "error: a $campaign_mode campaign needs an explicit --doctor-receipt" >&2
+                        exit 2
+                    fi
+                    campaign_brief_count=${#campaign_targets[@]}
+                    if [[ $campaign_mode == resource ]]; then
+                        campaign_brief_count=1
+                    fi
+                    if [[ ${#campaign_briefs[@]} -ne $campaign_brief_count ]]; then
+                        echo "error: a $campaign_mode campaign needs one --brief for each ordered target" >&2
+                        exit 2
+                    fi
+                fi
+                campaign_progress="build/decomp-cache/campaign-progress-before.json"
+                mkdir -p build/decomp-cache
+                python decomp_utils.py --progress --json > "$campaign_progress"
+                campaign_arguments+=(--progress-before "$campaign_progress")
+                python tools/decomp_campaigns.py "${campaign_arguments[@]}"
+                if [[ $campaign_mode == meta ]]; then
+                    if ! python tools/decomp_campaigns.py \
+                        "${campaign_global_arguments[@]}" set-meta-baseline \
+                        --progress "$campaign_progress" --quiet; then
+                        python tools/decomp_campaigns.py "${campaign_global_arguments[@]}" abort \
+                            --reason "The meta campaign baseline attachment failed."
+                        exit 1
+                    fi
+                else
+                    if ! baseline; then
+                        python tools/decomp_campaigns.py "${campaign_global_arguments[@]}" abort \
+                            --reason "The campaign baseline command failed."
+                        exit 1
+                    fi
+                    if ! python tools/decomp_campaigns.py \
+                        "${campaign_global_arguments[@]}" set-baseline \
+                        --progress "$campaign_progress" --quiet; then
+                        python tools/decomp_campaigns.py "${campaign_global_arguments[@]}" abort \
+                            --reason "The campaign baseline attachment failed."
+                        exit 1
+                    fi
                 fi
                 ;;
             record)
-                if campaign_state_is_finalizing "$campaign_state_file"; then
-                    exec python tools/decomp_campaigns.py "$@"
-                fi
-                build
-                write_comparison_report decomp-current-report.json
-                write_data_report decomp-current-data-report.json
                 exec python tools/decomp_campaigns.py "$@"
                 ;;
             *)
@@ -635,7 +952,7 @@ case "$command" in
         exec python tools/decomp_candidates.py --list-blockers "$address" "$@"
         ;;
     evidence)
-        exec python tools/decomp_evidence.py "$@"
+        python tools/decomp_evidence.py "$@"
         ;;
     notes)
         exec python tools/decomp_notes.py "$@"
@@ -674,13 +991,17 @@ case "$command" in
             echo "error: bc needs an address such as 0x00401230" >&2
             exit 2
         fi
+        printf -v canonical_address '0x%08X' "$1"
         build_game
+        ensure_candidate_report
         mkdir -p build/decomp-diffs
-        diff_path="build/decomp-diffs/${1}.txt"
-        (cd build && reccmp-reccmp --target TOY2 --no-color --verbose "$1") > "$diff_path"
+        diff_path="build/decomp-diffs/${canonical_address}.txt"
+        (cd build && reccmp-reccmp --target TOY2 --no-color --verbose "$canonical_address") > "$diff_path"
+        python tools/decomp_provenance.py seal-diff "$diff_path" \
+            --address "$canonical_address" --report build/decomp-current-report.json >/dev/null
         diff_args=(
             "$diff_path"
-            --address "$1"
+            --address "$canonical_address"
             --functions-map tools/Resources/functions_map.txt
             --function-sizes build/decomp-function-sizes.json
             --source-root src
@@ -690,7 +1011,15 @@ case "$command" in
         else
             python tools/decomp_diff.py "${diff_args[@]}"
         fi
-        python tools/decomp_campaigns.py first-score --address "$1" --quiet
+        if [[ -f build/decomp-campaign-state.json ]]; then
+            python tools/decomp_campaigns.py first-score \
+                --address "$canonical_address" \
+                --diff "$diff_path" \
+                --score-functions-map tools/Resources/functions_map.txt \
+                --score-function-sizes build/decomp-function-sizes.json \
+                --score-source-root src \
+                --quiet
+        fi
         ;;
     baseline)
         baseline "$@"
@@ -711,11 +1040,14 @@ case "$command" in
             fi
         done
         ensure_build
-        write_data_report decomp-data-report.json
+        write_data_report decomp-current-data-report.json
         python tools/decomp_data.py "$@"
         for argument in "$@"; do
             if [[ $argument =~ ^0x[0-9A-Fa-f]{1,8}$ ]]; then
-                python tools/decomp_campaigns.py first-score --address "$argument" --quiet
+                python tools/decomp_campaigns.py first-score \
+                    --address "$argument" \
+                    --data-report build/decomp-current-data-report.json \
+                    --quiet
             fi
         done
         ;;
@@ -725,7 +1057,7 @@ case "$command" in
             exit 2
         fi
         exec python tools/decomp_verify.py session-summary \
-            build/decomp-baseline-report.json build/decomp-report-data.json "$@"
+            build/decomp-baseline-report.json build/decomp-current-report.json "$@"
         ;;
     progress)
         if [[ ${1:-} == "--json" ]]; then

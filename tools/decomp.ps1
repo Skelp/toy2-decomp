@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "campaigns", "discover", "evidence", "notes", "defer", "undefer", "blockers", "baseline", "validate", "experiment", "lint", "data", "report", "session-summary", "progress", "run", "shell", "help")]
+    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "doctor", "brief", "campaigns", "finalize", "discover", "evidence", "notes", "names", "defer", "undefer", "blockers", "baseline", "validate", "experiment", "lint", "data", "report", "session-summary", "progress", "check", "sync", "run", "shell", "help")]
     [string] $Command = "help",
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -17,6 +17,31 @@ $MsvcBase = Join-Path $Tooling "msvc600-8168"
 $VenvScripts = Join-Path $Tooling "venv\Scripts"
 $VenvPython = Join-Path $VenvScripts "python.exe"
 $Vcvars = Join-Path $MsvcBase "VC98\Bin\VCVARS32.BAT"
+$DecompCache = Join-Path $Root "build\decomp-cache"
+$GhidraCache = Join-Path $DecompCache "ghidra\cache"
+$GhidraState = Join-Path $DecompCache "ghidra\state"
+$LiveGhidraDataHome = $env:TOY2_GHIDRA_LIVE_DATA_HOME
+if (-not $LiveGhidraDataHome) { $LiveGhidraDataHome = $env:XDG_DATA_HOME }
+if (-not $LiveGhidraDataHome) {
+    $LiveGhidraDataHome = [Environment]::GetFolderPath(
+        [Environment+SpecialFolder]::ApplicationData
+    )
+}
+New-Item -ItemType Directory -Force $GhidraCache, $GhidraState | Out-Null
+$env:XDG_CACHE_HOME = $GhidraCache
+$env:XDG_DATA_HOME = $GhidraState
+$env:GHIDRA_CLI_CACHE_DIR = $GhidraCache
+$env:GHIDRA_CLI_STATE_DIR = $GhidraState
+$env:GHIDRA_CLI_LOG_DIR = $GhidraCache
+$env:GHIDRA_CLI_FULL_RESPONSE_LOGGING = "0"
+$env:TOY2_GHIDRA_LIVE_DATA_HOME = $LiveGhidraDataHome
+$env:RUST_LOG = if ($env:RUST_LOG) { $env:RUST_LOG } else { "warn" }
+
+function Prune-GhidraLogs {
+    & $VenvPython -c `
+        "from pathlib import Path; from tools.decomp_doctor import prune_ghidra_logs; prune_ghidra_logs(Path.cwd())" `
+        *> $null
+}
 
 function Assert-LastExit([string] $Action) {
     if ($LASTEXITCODE -ne 0) {
@@ -64,17 +89,14 @@ function Build-Project {
 }
 
 function Ensure-Build {
-    if (
-        -not (Test-Path (Join-Path $Root "build\reccmp-build.yml")) -or
-        -not (Test-Path (Join-Path $Root "build\toy2.exe")) -or
-        -not (Test-Path (Join-Path $Root "build\toy2.pdb"))
-    ) {
-        Build-Project
-    }
+    Build-Project
 }
 
 function Write-ComparisonReport([string] $Output) {
-    Ensure-Build
+    $ReportPath = if ([IO.Path]::IsPathRooted($Output)) { $Output } else { Join-Path $Root "build\$Output" }
+    $InputReceipt = Join-Path $DecompCache "provenance\report-input-$PID-$([guid]::NewGuid().ToString('N')).json"
+    & $VenvPython (Join-Path $Root "tools\decomp_provenance.py") capture-input $InputReceipt --output $ReportPath | Out-Null
+    Assert-LastExit "Capturing comparison inputs"
     Push-Location (Join-Path $Root "build")
     try {
         & reccmp-reccmp --target TOY2 --silent --no-color --json $Output | Out-Null
@@ -82,17 +104,36 @@ function Write-ComparisonReport([string] $Output) {
     } finally {
         Pop-Location
     }
+    & $VenvPython (Join-Path $Root "tools\decomp_provenance.py") seal-report $ReportPath --input-receipt $InputReceipt | Out-Null
+    Assert-LastExit "Sealing comparison provenance"
+    Remove-Item -Force $InputReceipt -ErrorAction SilentlyContinue
 }
 
 function Write-DataReport([string] $Output) {
-    Ensure-Build
+    $ReportPath = if ([IO.Path]::IsPathRooted($Output)) { $Output } else { Join-Path $Root "build\$Output" }
+    $InputReceipt = Join-Path $DecompCache "provenance\data-input-$PID-$([guid]::NewGuid().ToString('N')).json"
+    & $VenvPython (Join-Path $Root "tools\decomp_provenance.py") capture-input $InputReceipt --output $ReportPath | Out-Null
+    Assert-LastExit "Capturing data-report inputs"
     & $VenvPython (Join-Path $Root "tools\generate-decomp-data-report.py") `
         --original (Join-Path $Root "original\toy2.exe") `
         --recompiled (Join-Path $Root "build\toy2.exe") `
         --pdb (Join-Path $Root "build\toy2.pdb") `
         --source-root (Join-Path $Root "src") `
-        --output $Output
+        --output $ReportPath
     Assert-LastExit "Comparing global data"
+    & $VenvPython (Join-Path $Root "tools\decomp_provenance.py") seal-report $ReportPath --input-receipt $InputReceipt | Out-Null
+    Assert-LastExit "Sealing data-report provenance"
+    Remove-Item -Force $InputReceipt -ErrorAction SilentlyContinue
+}
+
+function Ensure-CandidateReport {
+    $Report = Join-Path $Root "build\decomp-current-report.json"
+    & $VenvPython (Join-Path $Root "tools\decomp_provenance.py") validate-report $Report *> $null
+    if ($LASTEXITCODE -eq 0) { return }
+    Import-VC6Environment
+    Build-Project
+    Update-FunctionSizes
+    Write-ComparisonReport $Report
 }
 
 function Test-FunctionSizes([string] $Path) {
@@ -106,6 +147,7 @@ function Update-FunctionSizes {
     $FunctionSizes = Join-Path $Root "build\decomp-function-sizes.json"
     $TemporarySizes = "$FunctionSizes.tmp"
     if (Get-Command ghidra -ErrorAction SilentlyContinue) {
+        Prune-GhidraLogs
         try {
             & ghidra function list --json --limit 0 --fields address,size |
                 Set-Content -Encoding utf8 $TemporarySizes
@@ -117,6 +159,8 @@ function Update-FunctionSizes {
         } catch {
             Remove-Item -Force $TemporarySizes -ErrorAction SilentlyContinue
             Write-Warning "Could not refresh the function-size snapshot."
+        } finally {
+            Prune-GhidraLogs
         }
     } else {
         Write-Warning "Ghidra is unavailable. The existing function-size snapshot was kept."
@@ -132,7 +176,6 @@ function Save-Baseline {
     $DataReport = Join-Path $Root "build\decomp-baseline-data-report.json"
     Write-ComparisonReport $Report
     Write-DataReport $DataReport
-    Update-FunctionSizes
     & $VenvPython (Join-Path $Root "tools\decomp_verify.py") metadata `
         (Join-Path $Root "build\decomp-baseline-meta.json") `
         --report $Report `
@@ -140,24 +183,45 @@ function Save-Baseline {
     Assert-LastExit "Recording baseline metadata"
 }
 
-function Stamp-FirstScore([string[]] $Addresses) {
+function Stamp-FirstScore(
+    [string[]] $Addresses,
+    [string] $Report = "",
+    [string] $Diff = "",
+    [string] $DataReport = ""
+) {
+    $ArtifactArgs = @()
+    if ($Report) {
+        $ArtifactArgs = @("--report", $Report)
+    } elseif ($Diff) {
+        $ArtifactArgs = @("--diff", $Diff)
+    } elseif ($DataReport) {
+        $ArtifactArgs = @("--data-report", $DataReport)
+    }
     foreach ($Address in $Addresses) {
         & $VenvPython (Join-Path $Root "tools\decomp_campaigns.py") first-score `
-            --address $Address --quiet
+            --address $Address @ArtifactArgs `
+            --score-functions-map (Join-Path $Root "tools\Resources\functions_map.txt") `
+            --score-function-sizes (Join-Path $Root "build\decomp-function-sizes.json") `
+            --score-source-root (Join-Path $Root "src") `
+            --quiet
         Assert-LastExit "Recording the first-score time"
     }
 }
 
 function New-DecompReport([string] $Output = "build\decomp-report.html") {
     Ensure-Build
-    $ReportJson = Join-Path $Root "build\decomp-report-data.json"
+    $ReportJson = Join-Path $Root "build\decomp-current-report.json"
     $ReportSummary = Join-Path $Root "build\decomp-report-summary.txt"
     $FunctionSizes = Join-Path $Root "build\decomp-function-sizes.json"
-    $DataReport = Join-Path $Root "build\decomp-data-report.json"
+    $DataReport = Join-Path $Root "build\decomp-current-data-report.json"
     if (-not [IO.Path]::IsPathRooted($Output)) {
         $Output = Join-Path $Root $Output
     }
 
+    Update-FunctionSizes
+    $ReportInput = Join-Path $DecompCache "provenance\report-input-$PID-$([guid]::NewGuid().ToString('N')).json"
+    & $VenvPython (Join-Path $Root "tools\decomp_provenance.py") capture-input $ReportInput --output $ReportJson | Out-Null
+    Assert-LastExit "Capturing comparison inputs"
     Push-Location (Join-Path $Root "build")
     try {
         & reccmp-reccmp --target TOY2 --silent --no-color --json $ReportJson |
@@ -166,9 +230,13 @@ function New-DecompReport([string] $Output = "build\decomp-report.html") {
     } finally {
         Pop-Location
     }
+    & $VenvPython (Join-Path $Root "tools\decomp_provenance.py") seal-report $ReportJson --input-receipt $ReportInput | Out-Null
+    Assert-LastExit "Sealing comparison provenance"
+    Remove-Item -Force $ReportInput -ErrorAction SilentlyContinue
 
-    Update-FunctionSizes
-
+    $DataInput = Join-Path $DecompCache "provenance\data-input-$PID-$([guid]::NewGuid().ToString('N')).json"
+    & $VenvPython (Join-Path $Root "tools\decomp_provenance.py") capture-input $DataInput --output $DataReport | Out-Null
+    Assert-LastExit "Capturing data-report inputs"
     & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\generate-decomp-data-report.py") `
         --original (Join-Path $Root "original\toy2.exe") `
         --recompiled (Join-Path $Root "build\toy2.exe") `
@@ -176,6 +244,9 @@ function New-DecompReport([string] $Output = "build\decomp-report.html") {
         --source-root (Join-Path $Root "src") `
         --output $DataReport
     Assert-LastExit "Comparing global data"
+    & $VenvPython (Join-Path $Root "tools\decomp_provenance.py") seal-report $DataReport --input-receipt $DataInput | Out-Null
+    Assert-LastExit "Sealing data-report provenance"
+    Remove-Item -Force $DataInput -ErrorAction SilentlyContinue
 
     & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\generate-decomp-report.py") `
         --input $ReportJson `
@@ -201,11 +272,16 @@ Commands:
   baseline          Build and save the pre-edit comparison
   compare [args]    Run reccmp against the reference and recompiled EXEs
   score <addr>...   Show exact/effective/tool/provisional verdicts
+  bc <addr>          Save and summarize one artifact-bound verbose diff
   candidates [args] Rank reconstruction candidates
+  doctor [args]     Check source-work tools before a campaign starts
+  brief [args]      Build or read an immutable target evidence brief
   campaigns [args] Measure campaign time, report changes, and retained throughput
+  finalize [args]  Validate once and write a content-addressed receipt
   discover [args]   Find credible Ghidra starts absent from the function map
   evidence <addr>   Collect bounded evidence for a mapped or discovered target
   notes <query>     Search bounded codegen, source-model, debt, and name notes
+  names [args]       Search retail names
   defer <addr> ...  Record a committed blocker or prerequisite
   undefer <addr>    Clear all committed blockers for one target
   blockers [addr]   Show committed blockers
@@ -216,8 +292,177 @@ Commands:
   report [file]     Generate the self-contained HTML decompilation dashboard
   session-summary   Summarize selected targets against the saved baseline
   progress [--json] [scope]  Show annotation progress
+  check              Check the function map
+  sync [args]        Synchronize supported Ghidra map changes
   run [args]        Run the recompiled toy2.exe
   shell             Start cmd.exe with the VC6 environment active
+
+A non-meta campaign uses the doctor, two independent read-only scout audits,
+and a doctor-bound brief before campaign measurement:
+  # Fetch and integrate origin/agent/continuous before candidate selection.
+  tools/decomp.ps1 candidates --for 0x00403640 --lane closure --limit 1 `
+    --prediction-features-out build\decomp-cache\prediction-handoff.json --why
+  tools/decomp.ps1 doctor --mode refinement --lane closure `
+    --target 0x00403640 --selection-started-at UTC_TIMESTAMP --json
+  # Scout A audits retail ABI, control flow, and evidence. Scout B audits
+  # callers, types, layouts, translation-unit evidence, and analogues.
+  tools/decomp.ps1 brief --lane closure --target 0x00403640 `
+    --doctor-receipt build\decomp-cache\doctor\latest.json `
+    --scout-report build\decomp-cache\retail-scout.json `
+    --scout-report build\decomp-cache\context-scout.json --json
+  tools/decomp.ps1 campaigns start --mode refinement --lane closure `
+    --address 0x00403640 `
+    --prediction-handoff build\decomp-cache\prediction-handoff.json `
+    --doctor-receipt build\decomp-cache\doctor\latest.json --brief BRIEF_PATH
+
+Each scout returns a schema-2 JSON file. Use distinct scout IDs and exactly the
+schema, scout_id, audit, lane, target, access, owns_mutations, doctor_receipt,
+and findings keys. Each finding has only category, claim, and evidence. Each
+evidence item has only source and locator. Set access to read-only and
+owns_mutations to false. Use the
+retail-abi-control-flow-evidence and callers-types-layout-translation-unit-analogue
+audits, distinct scout IDs, and nonempty findings. The doctor_receipt object has
+only receipt_id and sha256. Bind both reports to the canonical doctor identity.
+Keep the doctor artifacts, scout reports, and brief unchanged. Finalization
+revalidates them and rejects a HEAD change after the doctor.
+
+The closure and production features JSON must contain success_probability,
+cohort_sample_size, median_retained_bytes, and median_minutes. The two expected
+values must equal the median values. Use the lower bound for stop decisions.
+Other non-meta lanes need a nonempty features JSON, a version, both median
+values, and a lower bound. A selector output file is directly valid for
+--prediction-handoff. The start command validates its schema, lane, mode, and
+address. Pass the file directly; do not rebuild it with jq. Do not mix it with
+individual forecast options. A closure or production bundle needs one distinct
+selector export for each address. Repeat --prediction-handoff in address order.
+Use individual forecast options for resource, data, or research work without a
+selector export. For multi-target source work, prediction features need a
+per_target object keyed by every exact address. Start creates this object from
+the repeated selector handoffs for closure and production. Each entry needs
+median_retained_bytes and lower_retained_bytes. The target medians must sum to
+the campaign median.
+Add --json only when candidate output is also needed on stdout.
+The start wrapper does not run the doctor or create the brief. It requires the
+explicit receipt and one brief per ordered target.
+The doctor receipt expires 60 minutes after the doctor ends. Run the exact
+preflight again after expiry.
+Use refinement for closure and production. Use coverage for research with a
+STUB or unstarted target that has a specific blocker. Use refinement for an
+implemented FUNCTION with a specific blocker or a valid selector cooldown or
+circuit route. The brief and campaign start recompute this route. Use data for
+data and resource for resource. Invalid pairs fail before costly preflight.
+
+Production selection reads the sealed canonical report. After target
+selection, run tools/decomp.ps1 bc ADDRESS before the doctor and brief. This
+creates the target-local, hash-bound verbose mismatch. The doctor and brief
+reject stale mismatch evidence.
+
+Evidence-only research occurs before measurement. A timed research campaign is
+a coverage or refinement source pilot, based on the target state, with a ready
+doctor-bound brief:
+  tools/decomp.ps1 campaigns start --mode coverage --lane research `
+    --address 0x00465180 --subsystem SUBSYSTEM `
+    --expected-minutes MEDIAN_MINUTES `
+    --expected-retained-bytes MEDIAN_BYTES --prediction-version cohort-v1 `
+    --prediction-lower-bound-bytes LOWER_BYTES `
+    --prediction-features build\decomp-cache\research-prediction.json `
+    --doctor-receipt build\decomp-cache\doctor\latest.json --brief BRIEF_PATH
+
+Stamp preflight and get the first score by their absolute deadlines. Start
+finalization by the stop deadline, or by the displayed extension deadline when
+the forecast is at least 100 retained bytes. The finalizer rejects a late source
+result. It also rejects symbolic-link inputs and configured non-generated
+sources that are absent from the staged Git tree.
+
+Resource work uses the same preflight and the standard finalizer:
+  tools/decomp.ps1 doctor --mode resource --lane resource `
+    --resource '2,127,2057' --selection-started-at UTC_TIMESTAMP --json
+  # Run the two required scout audits and save their bound reports.
+  tools/decomp.ps1 brief --lane resource --target '2,127,2057' `
+    --doctor-receipt build\decomp-cache\doctor\latest.json `
+    --scout-report build\decomp-cache\retail-scout.json `
+    --scout-report build\decomp-cache\context-scout.json --json
+  tools/decomp.ps1 campaigns start --mode resource --lane resource `
+    --resource '2,127,2057' --expected-minutes MEDIAN_MINUTES `
+    --expected-retained-bytes MEDIAN_BYTES --prediction-version resource-v1 `
+    --prediction-lower-bound-bytes LOWER_BYTES `
+    --prediction-features build\decomp-cache\resource-prediction.json `
+    --doctor-receipt build\decomp-cache\doctor\latest.json `
+    --brief RESOURCE_BRIEF
+  tools/decomp.ps1 finalize --result source --mode resource `
+    --resource '2,127,2057' --staged
+
+For no-source, restore all source trials and keep --staged on finalization:
+  tools/decomp.ps1 finalize --result no-source --mode MODE `
+    --target ADDRESS --staged
+  tools/decomp.ps1 campaigns record --result no-source `
+    --model "The tested loop form scored 20 percent."
+Repeat --target for all active addresses in order. Use --resource for resource
+work.
+
+A meta campaign is one bounded workflow repair that blocks reliable source
+progress. It skips candidates, the doctor, scouts, and brief.
+It has no forecast or source deadlines after start. The fault does not have to
+block every source queue:
+  tools/decomp.ps1 campaigns start --mode meta --lane meta
+  tools/decomp.ps1 finalize --result meta-fix --mode meta --staged
+  tools/decomp.ps1 campaigns record --result meta-fix
+
+Record the result after finalization. Add staged, then complete an independent
+acceptance review before you add accepted:
+  tools/decomp.ps1 campaigns record --result source
+  tools/decomp.ps1 campaigns delivery --campaign-id ID --status staged
+  tools/decomp.ps1 campaigns delivery --campaign-id ID --status accepted
+
+Stage and commit the finalized files, campaign row, staged entry, and accepted
+entry. Fetch and rebase that commit onto current origin/agent/continuous. Set
+COMMIT to the resulting HEAD and BASE to its first parent. Then run:
+  `$COMMIT = git rev-parse HEAD
+  `$BASE = git rev-parse HEAD^
+  `$DELIVERY_RECEIPT = (tools/decomp.ps1 campaigns delivery-verify `
+    --campaign-id ID --commit `$COMMIT --base-commit `$BASE | `
+    ConvertFrom-Json).path
+  tools/decomp.ps1 campaigns delivery --campaign-id ID --status integrated `
+    --base-commit `$BASE --commit `$COMMIT `
+    --delivery-receipt `$DELIVERY_RECEIPT
+  tools/decomp.ps1 campaigns delivery --campaign-id ID --status committed `
+    --commit `$COMMIT --delivery-receipt `$DELIVERY_RECEIPT
+  # Push `$COMMIT to origin/agent/continuous.
+  tools/decomp.ps1 campaigns delivery --campaign-id ID --status pushed `
+    --commit `$COMMIT --delivery-receipt `$DELIVERY_RECEIPT
+
+The delivery receipt rejects a conflict on a finalized campaign path. Source
+delivery rebuilds and validates. Meta delivery runs focused tool
+tests. No-source delivery checks the tree, index, and exact ledger and model-note
+append. Do not build, create a report, or run Ghidra sync for no-source.
+
+The pushed command verifies that the remote contains COMMIT. Put integrated,
+committed, and pushed in one telemetry-only follow-up commit, then push it.
+These entries stay outside the campaign commit. This follow-up commit does not
+count as source progress. Do not reuse a receipt after HEAD, BASE, an input, or
+an artifact changes. A rejected entry ends delivery.
+
+Before a pivot, restore the current target trials. Run the doctor and two scout
+audits for only the new address. Create its doctor-bound brief, then add it:
+  tools/decomp.ps1 candidates --lane production --limit 1 --for 0x004038E0 `
+    --prediction-features-out build\decomp-cache\prediction-handoff.json --why
+  tools/decomp.ps1 bc 0x004038E0
+  tools/decomp.ps1 doctor --mode refinement --lane production `
+    --target 0x004038E0 `
+    --selection-started-at PIVOT_SELECTION_UTC --json
+  # Run two independent read-only scout audits with this doctor receipt.
+  tools/decomp.ps1 brief --lane production --target 0x004038E0 `
+    --doctor-receipt PIVOT_RECEIPT `
+    --scout-report build\decomp-cache\pivot-retail-scout.json `
+    --scout-report build\decomp-cache\pivot-context-scout.json --json
+  tools/decomp.ps1 campaigns add-target --address 0x004038E0 `
+    --replace OLD_ADDRESS `
+    --prediction-handoff build\decomp-cache\prediction-handoff.json `
+    --doctor-receipt PIVOT_RECEIPT --brief PIVOT_BRIEF
+
+A family expansion omits --replace. Each new member still needs a fresh doctor
+receipt, brief, and forecast. Prediction events preserve each target forecast.
+The original campaign deadlines do not reset.
 
 Routine output is bounded. Use --limit 0, --all, or --full when a command
 reports omitted evidence. The bc command saves its complete output under
@@ -230,11 +475,32 @@ if ($Command -eq "help") {
     Show-Help
     exit 0
 }
+if ($Command -in @("doctor", "brief")) {
+    Import-VC6Environment
+    $Script = if ($Command -eq "doctor") {
+        "tools\decomp_doctor.py"
+    } else {
+        "tools\decomp_brief.py"
+    }
+    Prune-GhidraLogs
+    try {
+        & $VenvPython (Join-Path $Root $Script) @CommandArgs
+        Assert-LastExit "Running $Command"
+    } finally {
+        Prune-GhidraLogs
+    }
+    exit 0
+}
+if ($Command -eq "finalize") {
+    Import-VC6Environment
+    & $VenvPython (Join-Path $Root "tools\decomp_campaigns.py") finalize @CommandArgs
+    Assert-LastExit "Finalizing the campaign"
+    exit 0
+}
 if ($Command -eq "campaigns") {
     $CampaignScript = Join-Path $Root "tools\decomp_campaigns.py"
     $CampaignHelp = $CommandArgs -contains "--help" -or $CommandArgs -contains "-h"
     $CampaignAction = ""
-    $CampaignStateFile = Join-Path $Root "build\decomp-campaign-state.json"
     $CampaignGlobalArgs = @()
     $CampaignGlobalOptions = @(
         "--file",
@@ -252,13 +518,9 @@ if ($Command -eq "campaigns") {
             if ($CampaignIndex + 1 -ge $CommandArgs.Count) { break }
             $CampaignValue = $CommandArgs[$CampaignIndex + 1]
             $CampaignGlobalArgs += @($CampaignArgument, $CampaignValue)
-            if ($CampaignArgument -eq "--state-file") {
-                $CampaignStateFile = $CampaignValue
-            }
             $CampaignIndex += 2
         } elseif ($CampaignArgument -match '^--state-file=(.*)$') {
             $CampaignGlobalArgs += $CampaignArgument
-            $CampaignStateFile = $Matches[1]
             $CampaignIndex++
         } elseif ($CampaignArgument -match '^--(?:file|source-models|functions-map|function-sizes|worktree-root|source-root)=') {
             $CampaignGlobalArgs += $CampaignArgument
@@ -268,26 +530,91 @@ if ($Command -eq "campaigns") {
             break
         }
     }
-    $CampaignFinalizing = $false
-    if (Test-Path $CampaignStateFile) {
-        try {
-            $CampaignState = Get-Content -Raw $CampaignStateFile | ConvertFrom-Json
-            $CampaignFinalizing = $CampaignState.phase -eq "finalizing"
-        } catch {
-            $CampaignFinalizing = $false
-        }
-    }
     if ($CampaignHelp) {
         & $VenvPython $CampaignScript @CommandArgs
         Assert-LastExit "Showing campaign help"
     } elseif ($CampaignAction -eq "start") {
+        Import-VC6Environment
+        $CampaignMode = ""
+        $CampaignLane = ""
+        $CampaignTargets = @()
+        $CampaignResource = ""
+        $DoctorReceipt = ""
+        $BriefPaths = @()
+        for ($OptionIndex = 0; $OptionIndex -lt $CommandArgs.Count; $OptionIndex++) {
+            $Option = $CommandArgs[$OptionIndex]
+            if ($Option -in @("--mode", "--lane", "--address", "--resource", "--doctor-receipt", "--brief")) {
+                if ($OptionIndex + 1 -ge $CommandArgs.Count) { continue }
+                $Value = $CommandArgs[++$OptionIndex]
+                switch ($Option) {
+                    "--mode" { $CampaignMode = $Value }
+                    "--lane" { $CampaignLane = $Value }
+                    "--address" { $CampaignTargets += $Value }
+                    "--resource" { $CampaignResource = $Value }
+                    "--doctor-receipt" { $DoctorReceipt = $Value }
+                    "--brief" { $BriefPaths += $Value }
+                }
+            } elseif ($Option -match '^--mode=(.*)$') {
+                $CampaignMode = $Matches[1]
+            } elseif ($Option -match '^--lane=(.*)$') {
+                $CampaignLane = $Matches[1]
+            } elseif ($Option -match '^--address=(.*)$') {
+                $CampaignTargets += $Matches[1]
+            } elseif ($Option -match '^--resource=(.*)$') {
+                $CampaignResource = $Matches[1]
+            } elseif ($Option -match '^--doctor-receipt=(.*)$') {
+                $DoctorReceipt = $Matches[1]
+            } elseif ($Option -match '^--brief=(.*)$') {
+                $BriefPaths += $Matches[1]
+            }
+        }
+        if (-not $CampaignLane) {
+            $CampaignLane = switch ($CampaignMode) {
+                "coverage" { "research" }
+                "refinement" { "production" }
+                default { $CampaignMode }
+            }
+        }
+        if ($CampaignMode -and $CampaignMode -ne "meta") {
+            if (-not $DoctorReceipt) {
+                throw "A $CampaignMode campaign needs an explicit --doctor-receipt."
+            }
+            $BriefCount = if ($CampaignMode -eq "resource") {
+                1
+            } else {
+                $CampaignTargets.Count
+            }
+            if ($BriefPaths.Count -ne $BriefCount) {
+                throw "A $CampaignMode campaign needs one --brief for each ordered target."
+            }
+        }
+        $CacheDirectory = Join-Path $Root "build\decomp-cache"
+        New-Item -ItemType Directory -Force $CacheDirectory | Out-Null
+        $ProgressPath = Join-Path $CacheDirectory "campaign-progress-before.json"
+        $ProgressLines = @(
+            & $VenvPython (Join-Path $Root "decomp_utils.py") --progress --json
+        )
+        Assert-LastExit "Reading campaign progress"
+        $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+        [IO.File]::WriteAllText(
+            $ProgressPath,
+            ($ProgressLines -join "`n") + "`n",
+            $Utf8NoBom
+        )
+        $CommandArgs += @("--progress-before", $ProgressPath)
         & $VenvPython $CampaignScript @CommandArgs
         Assert-LastExit "Starting campaign measurement"
         try {
-            Import-VC6Environment
-            Save-Baseline
-            & $VenvPython $CampaignScript @CampaignGlobalArgs "set-baseline" "--quiet"
-            Assert-LastExit "Attaching the campaign baseline"
+            if ($CampaignMode -eq "meta") {
+                & $VenvPython $CampaignScript @CampaignGlobalArgs "set-meta-baseline" `
+                    "--progress" $ProgressPath "--quiet"
+                Assert-LastExit "Attaching the meta campaign baseline"
+            } else {
+                Save-Baseline
+                & $VenvPython $CampaignScript @CampaignGlobalArgs "set-baseline" `
+                    "--progress" $ProgressPath "--quiet"
+                Assert-LastExit "Attaching the campaign baseline"
+            }
         } catch {
             $SetupError = $_
             try {
@@ -299,16 +626,13 @@ if ($Command -eq "campaigns") {
             }
             throw $SetupError
         }
-    } elseif ($CampaignAction -eq "record" -and $CampaignFinalizing) {
-        & $VenvPython $CampaignScript @CommandArgs
-        Assert-LastExit "Finishing the campaign record"
     } elseif ($CampaignAction -eq "record") {
-        Import-VC6Environment
-        Build-Project
-        Write-ComparisonReport (Join-Path $Root "build\decomp-current-report.json")
-        Write-DataReport (Join-Path $Root "build\decomp-current-data-report.json")
         & $VenvPython $CampaignScript @CommandArgs
         Assert-LastExit "Recording the campaign result"
+    } elseif ($CampaignAction -eq "delivery-verify") {
+        Import-VC6Environment
+        & $VenvPython $CampaignScript @CommandArgs
+        Assert-LastExit "Verifying the integrated campaign"
     } else {
         & $VenvPython $CampaignScript @CommandArgs
         Assert-LastExit "Running the campaign command"
@@ -316,7 +640,7 @@ if ($Command -eq "campaigns") {
     exit 0
 }
 if (($CommandArgs -contains "--help" -or $CommandArgs -contains "-h") -and
-    $Command -in @("baseline", "score", "bc", "data")) {
+    $Command -in @("baseline", "score", "bc", "data", "report")) {
     if ($Command -eq "baseline") {
         Write-Host "Usage: tools/decomp.ps1 baseline"
     } elseif ($Command -eq "score") {
@@ -325,25 +649,47 @@ if (($CommandArgs -contains "--help" -or $CommandArgs -contains "-h") -and
     } elseif ($Command -eq "data") {
         & $VenvPython (Join-Path $Root "tools\decomp_data.py") --help
         Assert-LastExit "Showing data help"
+    } elseif ($Command -eq "report") {
+        Write-Host "Usage: tools/decomp.ps1 report [output.html]"
     } else {
         Write-Host "Usage: tools/decomp.ps1 bc [--full] <address>"
     }
     exit 0
 }
 if ($Command -eq "lint") {
-    & python (Join-Path $Root "tools\decomp_lint.py") @CommandArgs
+    & $VenvPython (Join-Path $Root "tools\decomp_lint.py") @CommandArgs
     Assert-LastExit "Checking source plausibility"
     exit 0
 }
 if ($Command -eq "notes") {
-    & python (Join-Path $Root "tools\decomp_notes.py") @CommandArgs
+    & $VenvPython (Join-Path $Root "tools\decomp_notes.py") @CommandArgs
     Assert-LastExit "Searching reconstruction notes"
+    exit 0
+}
+if ($Command -eq "names") {
+    & $VenvPython (Join-Path $Root "tools\decomp_original_names.py") @CommandArgs
+    Assert-LastExit "Searching retail names"
+    exit 0
+}
+if ($Command -eq "check") {
+    & $VenvPython (Join-Path $Root "tools\ghidra_sync.py") check @CommandArgs
+    Assert-LastExit "Checking the function map"
+    exit 0
+}
+if ($Command -eq "sync") {
+    & $VenvPython (Join-Path $Root "tools\ghidra_sync.py") sync @CommandArgs
+    Assert-LastExit "Synchronizing the function map"
     exit 0
 }
 if ($Command -in @("discover", "evidence")) {
     $Script = if ($Command -eq "discover") { "tools\decomp_discover.py" } else { "tools\decomp_evidence.py" }
-    & python (Join-Path $Root $Script) @CommandArgs
-    Assert-LastExit "Reading decompilation evidence"
+    Prune-GhidraLogs
+    try {
+        & $VenvPython (Join-Path $Root $Script) @CommandArgs
+        Assert-LastExit "Reading decompilation evidence"
+    } finally {
+        Prune-GhidraLogs
+    }
     exit 0
 }
 if ($Command -eq "defer") {
@@ -380,13 +726,16 @@ if ($Command -eq "session-summary") {
     if ($CommandArgs.Count -eq 0) {
         throw "Usage: tools/decomp.ps1 session-summary <address> [address...]"
     }
-    & python (Join-Path $Root "tools\decomp_verify.py") session-summary `
+    & $VenvPython (Join-Path $Root "tools\decomp_verify.py") session-summary `
         (Join-Path $Root "build\decomp-baseline-report.json") `
-        (Join-Path $Root "build\decomp-report-data.json") @CommandArgs
+        (Join-Path $Root "build\decomp-current-report.json") @CommandArgs
     Assert-LastExit "Summarizing the session"
     exit 0
 }
 if ($Command -eq "candidates") {
+    if ($CommandArgs -notcontains "-h" -and $CommandArgs -notcontains "--help") {
+        Ensure-CandidateReport
+    }
     & $VenvPython (Join-Path $Root "tools\decomp_candidates.py") @CommandArgs
     Assert-LastExit "Ranking decompilation candidates"
     exit 0
@@ -414,7 +763,7 @@ switch ($Command) {
         & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") score $Report @CommandArgs
         Assert-LastExit "Classifying comparison results"
         $ScoreTargets = @($CommandArgs | Where-Object { $_ -match '^0x[0-9A-Fa-f]{1,8}$' })
-        Stamp-FirstScore -Addresses $ScoreTargets
+        Stamp-FirstScore -Addresses $ScoreTargets -Report $Report
     }
     "bc" {
         $Full = $false
@@ -426,21 +775,29 @@ switch ($Command) {
         if ($CommandArgs.Count -ne 1 -or $CommandArgs[0] -notmatch '^0x[0-9A-Fa-f]{1,8}$') {
             throw "Usage: tools/decomp.ps1 bc [--full] <address>"
         }
+        $CanonicalAddress = "0x{0:X8}" -f [Convert]::ToUInt32(
+            $CommandArgs[0].Substring(2), 16
+        )
         Build-Project
+        $CurrentReport = Join-Path $Root "build\decomp-current-report.json"
+        Ensure-CandidateReport
         $DiffDirectory = Join-Path $Root "build\decomp-diffs"
         New-Item -ItemType Directory -Force $DiffDirectory | Out-Null
-        $Diff = Join-Path $DiffDirectory "$($CommandArgs[0]).txt"
+        $Diff = Join-Path $DiffDirectory "$CanonicalAddress.txt"
         Push-Location (Join-Path $Root "build")
         try {
-            & reccmp-reccmp --target TOY2 --no-color --verbose $CommandArgs[0] | Set-Content -Encoding utf8 $Diff
+            & reccmp-reccmp --target TOY2 --no-color --verbose $CanonicalAddress | Set-Content -Encoding utf8 $Diff
             Assert-LastExit "Comparing the target"
         } finally {
             Pop-Location
         }
+        & $VenvPython (Join-Path $Root "tools\decomp_provenance.py") seal-diff `
+            $Diff --address $CanonicalAddress --report $CurrentReport | Out-Null
+        Assert-LastExit "Sealing mismatch provenance"
         $DiffArgs = @(
             $Diff
             "--address"
-            $CommandArgs[0]
+            $CanonicalAddress
             "--functions-map"
             (Join-Path $Root "tools\Resources\functions_map.txt")
             "--function-sizes"
@@ -449,9 +806,11 @@ switch ($Command) {
             (Join-Path $Root "src")
         )
         if ($Full) { $DiffArgs += "--full" }
-        & python (Join-Path $Root "tools\decomp_diff.py") @DiffArgs
+        & $VenvPython (Join-Path $Root "tools\decomp_diff.py") @DiffArgs
         Assert-LastExit "Formatting the comparison"
-        Stamp-FirstScore -Addresses @($CommandArgs[0])
+        if (Test-Path (Join-Path $Root "build\decomp-campaign-state.json")) {
+            Stamp-FirstScore -Addresses @($CanonicalAddress) -Diff $Diff
+        }
     }
     "baseline" {
         Save-Baseline
@@ -568,7 +927,11 @@ switch ($Command) {
         Assert-LastExit "Checking the function map"
         & git diff --check
         Assert-LastExit "Checking the working tree diff"
-        Stamp-FirstScore -Addresses $Targets
+        if ($Mode -eq "data") {
+            Stamp-FirstScore -Addresses $Targets -DataReport $CurrentData
+        } else {
+            Stamp-FirstScore -Addresses $Targets -Report $Current
+        }
     }
     "experiment" {
         if ($CommandArgs.Count -lt 2) {
@@ -580,11 +943,11 @@ switch ($Command) {
         if ($Action -eq "start") {
             New-Item -ItemType Directory -Force $Directory | Out-Null
             Build-Project
+            Update-FunctionSizes
             $Report = Join-Path $Directory "baseline-report.json"
             $DataReport = Join-Path $Directory "baseline-data-report.json"
             Write-ComparisonReport $Report
             Write-DataReport $DataReport
-            Update-FunctionSizes
             & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") metadata `
                 (Join-Path $Directory "compiler-context.json") `
                 --report $Report `
@@ -616,7 +979,8 @@ switch ($Command) {
             & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") classify `
                 (Join-Path $Directory "$Label.report.json") $Address | Tee-Object -FilePath (Join-Path $Directory "$Label.summary.txt")
             Assert-LastExit "Classifying the experiment"
-            Stamp-FirstScore -Addresses @($Address)
+            Stamp-FirstScore -Addresses @($Address) `
+                -Report $Report
         } elseif ($Action -eq "report") {
             Get-ChildItem $Directory -Filter "*.summary.txt" | Sort-Object Name | ForEach-Object {
                 Write-Host $_.FullName
@@ -635,12 +999,12 @@ switch ($Command) {
     }
     "data" {
         Build-Project
-        $DataReport = Join-Path $Root "build\decomp-data-report.json"
+        $DataReport = Join-Path $Root "build\decomp-current-data-report.json"
         Write-DataReport $DataReport
         & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_data.py") @CommandArgs
         Assert-LastExit "Showing global-data evidence"
         $DataTargets = @($CommandArgs | Where-Object { $_ -match '^0x[0-9A-Fa-f]{1,8}$' })
-        Stamp-FirstScore -Addresses $DataTargets
+        Stamp-FirstScore -Addresses $DataTargets -DataReport $DataReport
     }
     "progress" {
         if ($CommandArgs.Count -gt 2) {

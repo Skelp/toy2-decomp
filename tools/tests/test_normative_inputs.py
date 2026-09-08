@@ -65,11 +65,11 @@ class NormativeInputTests(unittest.TestCase):
             "build || return",
             "write_comparison_report decomp-baseline-report.json || return",
             "write_data_report decomp-baseline-data-report.json || return",
-            "refresh_function_sizes || return",
             "--data-report build/decomp-baseline-data-report.json || return",
             "revision=$(git rev-parse --short HEAD) || return",
         ):
             self.assertIn(command, baseline)
+        self.assertNotIn("refresh_function_sizes", baseline)
         size_refresh = script_section(
             script, "function_sizes_are_valid() {", "baseline() {"
         )
@@ -78,11 +78,31 @@ class NormativeInputTests(unittest.TestCase):
 
         campaigns = script_section(script, "    campaigns)", "    defer)")
         self.assertIn("campaign_global_arguments", campaigns)
-        self.assertIn('campaign_state_is_finalizing "$campaign_state_file"', campaigns)
-        self.assertIn(
-            '"${campaign_global_arguments[@]}" set-baseline --quiet', campaigns
-        )
+        self.assertNotIn("tools/decomp_doctor.py", campaigns)
+        self.assertIn("campaign-progress-before.json", campaigns)
+        self.assertIn('"${campaign_global_arguments[@]}" set-baseline', campaigns)
+        self.assertIn('"${campaign_global_arguments[@]}" set-meta-baseline', campaigns)
+        self.assertIn('--progress "$campaign_progress" --quiet', campaigns)
         self.assertIn('"${campaign_global_arguments[@]}" abort', campaigns)
+        self.assertIn('campaign_arguments=("$@")', campaigns)
+        self.assertIn('campaign_mode != meta', campaigns)
+        self.assertIn('coverage) campaign_lane="research"', campaigns)
+        self.assertIn('refinement) campaign_lane="production"', campaigns)
+        self.assertIn("campaign_briefs=()", campaigns)
+        self.assertIn("explicit --doctor-receipt", campaigns)
+        self.assertIn("one --brief for each ordered target", campaigns)
+        start = campaigns[campaigns.index("            start)") :]
+        self.assertLess(
+            start.index("explicit --doctor-receipt"),
+            start.index('tools/decomp_campaigns.py "${campaign_arguments[@]}"'),
+        )
+        self.assertLess(
+            start.index("one --brief for each ordered target"),
+            start.index("campaign_progress="),
+        )
+        record = start[start.index("            record)") :]
+        self.assertNotIn("write_comparison_report", record)
+        self.assertNotIn("write_data_report", record)
 
         experiment = script_section(script, "experiment() {", "report() {")
         self.assertIn("baseline-report.json", experiment)
@@ -108,18 +128,34 @@ class NormativeInputTests(unittest.TestCase):
         self.assertIn('$CampaignAction -eq "record"', campaign)
         self.assertIn('$CampaignHelp', campaign)
         self.assertIn("$CampaignGlobalArgs", campaign)
-        self.assertIn("$CampaignFinalizing", campaign)
         self.assertIn('$CommandArgs -contains "--help"', campaign)
-        self.assertIn('@CampaignGlobalArgs "set-baseline" "--quiet"', campaign)
+        self.assertNotIn("decomp_doctor.py", campaign)
+        self.assertIn("campaign-progress-before.json", campaign)
+        self.assertIn('@CampaignGlobalArgs "set-baseline"', campaign)
+        self.assertIn('@CampaignGlobalArgs "set-meta-baseline"', campaign)
+        self.assertIn('"--progress" $ProgressPath "--quiet"', campaign)
         self.assertIn("The campaign baseline setup failed.", campaign)
-        self.assertIn("decomp-current-report.json", campaign)
-        self.assertIn("decomp-current-data-report.json", campaign)
+        self.assertIn('$CampaignMode -ne "meta"', campaign)
+        self.assertIn('"coverage" { "research" }', campaign)
+        self.assertIn('"refinement" { "production" }', campaign)
+        self.assertIn("$CommandArgs += @(\"--progress-before\", $ProgressPath)", campaign)
+        self.assertIn("$BriefPaths = @()", campaign)
+        self.assertIn("explicit --doctor-receipt", campaign)
+        self.assertIn("one --brief for each ordered target", campaign)
+        self.assertLess(
+            campaign.index("one --brief for each ordered target"),
+            campaign.index("$CacheDirectory ="),
+        )
+        record = campaign[campaign.index('$CampaignAction -eq "record"') :]
+        self.assertNotIn("Build-Project", record)
+        self.assertNotIn("Write-ComparisonReport", record)
+        self.assertNotIn("Write-DataReport", record)
 
         baseline = script_section(
             script, "function Save-Baseline", "function Stamp-FirstScore"
         )
         self.assertIn("decomp-baseline-data-report.json", baseline)
-        self.assertIn("Update-FunctionSizes", baseline)
+        self.assertNotIn("Update-FunctionSizes", baseline)
         size_update = script_section(
             script, "function Test-FunctionSizes", "function Save-Baseline"
         )
@@ -134,6 +170,291 @@ class NormativeInputTests(unittest.TestCase):
         for command in ("baseline", "score", "bc", "data"):
             self.assertIn(f'"{command}"', help_dispatch)
 
+    def test_preflight_brief_and_finalize_have_wrapper_parity(self):
+        linux = (ROOT / "tools" / "decomp").read_text(encoding="utf-8")
+        windows = (ROOT / "tools" / "decomp.ps1").read_text(encoding="utf-8")
+        for command in ("doctor", "brief", "finalize"):
+            self.assertIn(f"  {command}", linux)
+            self.assertIn(f"{command}", windows)
+        for script_name in (
+            "tools/decomp_doctor.py",
+            "tools/decomp_brief.py",
+            "tools/decomp_campaigns.py finalize",
+        ):
+            self.assertIn(script_name, linux)
+        self.assertIn('"doctor", "brief"', windows)
+        self.assertIn('$Command -eq "finalize"', windows)
+        self.assertIn('"tools\\decomp_campaigns.py") finalize', windows)
+
+        linux_help = script_section(linux, "usage() {", 'command="${1:-}"')
+        windows_help = script_section(
+            windows, "function Show-Help", "Set-Location $Root"
+        )
+        for help_text in (linux_help, windows_help):
+            for token in (
+                "--doctor-receipt",
+                "--brief",
+                "--prediction-version",
+                "--prediction-lower-bound-bytes",
+                "--prediction-features",
+                "--prediction-features-out",
+                "--prediction-handoff",
+                "--scout-report",
+                "--expected-retained-bytes MEDIAN_BYTES",
+                "--mode meta --lane meta",
+                "--result meta-fix --mode meta --staged",
+                "finalize --result source --mode resource",
+            ):
+                self.assertIn(token, help_text)
+            self.assertIn("success_probability", help_text)
+            self.assertIn("cohort_sample_size", help_text)
+            self.assertIn("median_retained_bytes", help_text)
+            self.assertIn("median_minutes", help_text)
+            self.assertIn("retail-abi-control-flow-evidence", help_text)
+            self.assertIn(
+                "callers-types-layout-translation-unit-analogue", help_text
+            )
+            self.assertIn("expires 60 minutes", help_text)
+            self.assertIn("Add --json only when candidate output", help_text)
+            self.assertIn("rejects a HEAD change after the doctor", help_text)
+            self.assertIn("refinement for closure and production", help_text)
+            self.assertIn("coverage for research", help_text)
+            self.assertNotIn("validate --mode resource", help_text)
+
+            source_preflight = help_text[
+                help_text.index("--lane closure --limit 1") :
+                help_text.index("The closure and production features JSON")
+            ]
+            normalized_source_preflight = source_preflight.replace("\\", "/")
+            self.assertEqual(source_preflight.count("--scout-report"), 2)
+            self.assertIn(
+                "--prediction-features-out build/decomp-cache/prediction-handoff.json",
+                normalized_source_preflight,
+            )
+            self.assertIn(
+                "--prediction-handoff build/decomp-cache/prediction-handoff.json",
+                normalized_source_preflight,
+            )
+            self.assertNotIn("--expected-retained-bytes", source_preflight)
+
+            meta = help_text[
+                help_text.index("A meta campaign is one bounded") :
+                help_text.index("Record", help_text.index("A meta campaign is one bounded"))
+            ]
+            self.assertIn("--mode meta --lane meta", meta)
+            self.assertIn("--result meta-fix --mode meta --staged", meta)
+            self.assertNotIn(" doctor --mode", meta)
+            self.assertIn("no forecast", meta)
+
+            resource = help_text[
+                help_text.index("Resource work uses the same preflight") :
+                help_text.index("For no-source")
+            ]
+            self.assertIn("doctor --mode resource --lane resource", resource)
+            self.assertEqual(resource.count("--scout-report"), 2)
+            self.assertIn("finalize --result source --mode resource", resource)
+
+            no_source = help_text[
+                help_text.index("For no-source") :
+                help_text.index("A meta campaign is one bounded")
+            ]
+            self.assertIn("finalize --result no-source --mode MODE", no_source)
+            self.assertIn("--target ADDRESS --staged", no_source)
+        linux_sequence = (
+            linux_help.index("integrate origin/agent/continuous"),
+            linux_help.index("--lane closure --limit 1"),
+            linux_help.index("tools/decomp doctor --mode"),
+            linux_help.index("tools/decomp brief --lane"),
+            linux_help.index("tools/decomp campaigns start --mode refinement"),
+        )
+        windows_sequence = (
+            windows_help.index("integrate origin/agent/continuous"),
+            windows_help.index("--lane closure --limit 1"),
+            windows_help.index("tools/decomp.ps1 doctor --mode"),
+            windows_help.index("tools/decomp.ps1 brief --lane"),
+            windows_help.index(
+                "tools/decomp.ps1 campaigns start --mode refinement"
+            ),
+        )
+        self.assertEqual(linux_sequence, tuple(sorted(linux_sequence)))
+        self.assertEqual(windows_sequence, tuple(sorted(windows_sequence)))
+
+    def test_delivery_contract_has_wrapper_help_parity(self):
+        linux = (ROOT / "tools" / "decomp").read_text(encoding="utf-8")
+        windows = (ROOT / "tools" / "decomp.ps1").read_text(encoding="utf-8")
+        linux_help = script_section(linux, "usage() {", 'command="${1:-}"')
+        windows_help = script_section(
+            windows, "function Show-Help", "Set-Location $Root"
+        )
+        for help_text in (linux_help, windows_help):
+            flat_help = " ".join(help_text.split())
+            offsets = [
+                help_text.index(f"--status {status}")
+                for status in (
+                    "staged",
+                    "accepted",
+                    "integrated",
+                    "committed",
+                    "pushed",
+                )
+            ]
+            self.assertEqual(offsets, sorted(offsets))
+            self.assertIn("campaigns delivery-verify", help_text)
+            self.assertEqual(help_text.count("--delivery-receipt"), 3)
+            self.assertIn("telemetry-only follow-up commit", flat_help)
+            self.assertIn("campaign row", flat_help)
+            self.assertIn("staged entry", flat_help)
+            self.assertIn("accepted entry", flat_help)
+            self.assertIn("committed, and pushed", flat_help)
+            self.assertIn("does not count as source progress", flat_help)
+            self.assertIn("rejected entry ends delivery", flat_help)
+
+        self.assertIn("COMMIT=$(git rev-parse HEAD)", linux_help)
+        self.assertIn("BASE=$(git rev-parse HEAD^)", linux_help)
+        self.assertIn("DELIVERY_RECEIPT=$(", linux_help)
+        self.assertIn(
+            '--commit "$COMMIT" --base-commit "$BASE"', linux_help
+        )
+        self.assertEqual(linux_help.count('--commit "$COMMIT"'), 4)
+        self.assertEqual(
+            linux_help.count('--delivery-receipt "$DELIVERY_RECEIPT"'), 3
+        )
+        self.assertIn('json.load(sys.stdin)["path"]', linux_help)
+
+        self.assertIn("`$COMMIT = git rev-parse HEAD", windows_help)
+        self.assertIn("`$BASE = git rev-parse HEAD^", windows_help)
+        self.assertIn("`$DELIVERY_RECEIPT = (", windows_help)
+        self.assertIn(
+            "--commit `$COMMIT --base-commit `$BASE", windows_help
+        )
+        self.assertEqual(windows_help.count("--commit `$COMMIT"), 4)
+        self.assertEqual(
+            windows_help.count("--delivery-receipt `$DELIVERY_RECEIPT"), 3
+        )
+        self.assertIn("ConvertFrom-Json).path", windows_help)
+
+    def test_pivot_help_requires_fresh_preflight_artifacts(self):
+        linux = (ROOT / "tools" / "decomp").read_text(encoding="utf-8")
+        windows = (ROOT / "tools" / "decomp.ps1").read_text(encoding="utf-8")
+        linux_help = script_section(linux, "usage() {", 'command="${1:-}"')
+        windows_help = script_section(
+            windows, "function Show-Help", "Set-Location $Root"
+        )
+        for help_text in (linux_help, windows_help):
+            pivot = help_text[help_text.index("Before a pivot") :]
+            flat_pivot = " ".join(pivot.split())
+            normalized_pivot = pivot.replace("\\", "/")
+            self.assertIn("--replace OLD_ADDRESS", pivot)
+            self.assertIn("--doctor-receipt PIVOT_RECEIPT", pivot)
+            self.assertIn("--brief PIVOT_BRIEF", pivot)
+            self.assertIn("candidates --lane production --limit 1", pivot)
+            self.assertIn(
+                "doctor --mode refinement --lane production", flat_pivot
+            )
+            self.assertIn("brief --lane production", flat_pivot)
+            self.assertIn(
+                "--prediction-features-out build/decomp-cache/prediction-handoff.json",
+                normalized_pivot,
+            )
+            self.assertIn(
+                "--prediction-handoff build/decomp-cache/prediction-handoff.json",
+                normalized_pivot,
+            )
+            self.assertEqual(pivot.count("--scout-report"), 2)
+            self.assertIn("only the new address", flat_pivot)
+            self.assertIn("--selection-started-at PIVOT_SELECTION_UTC", help_text)
+            self.assertIn("family expansion omits --replace", help_text.casefold())
+            self.assertIn(
+                "prediction events preserve each target forecast",
+                flat_pivot.casefold(),
+            )
+            self.assertIn("deadlines do not reset", flat_pivot)
+
+    def test_wrappers_bound_ghidra_state_and_prune_logs(self):
+        linux = (ROOT / "tools" / "decomp").read_text(encoding="utf-8")
+        linux_environment = (ROOT / "tools" / "linux-decomp-env.sh").read_text(
+            encoding="utf-8"
+        )
+        windows = (ROOT / "tools" / "decomp.ps1").read_text(encoding="utf-8")
+        for name in (
+            "GHIDRA_CLI_CACHE_DIR",
+            "GHIDRA_CLI_STATE_DIR",
+            "GHIDRA_CLI_LOG_DIR",
+            "GHIDRA_CLI_FULL_RESPONSE_LOGGING",
+        ):
+            self.assertIn(name, linux_environment)
+            self.assertIn(name, windows)
+        self.assertIn(
+            '${XDG_DATA_HOME:-$HOME/.local/share}', linux_environment
+        )
+        self.assertLess(
+            linux_environment.index("TOY2_GHIDRA_LIVE_DATA_HOME"),
+            linux_environment.index('export XDG_DATA_HOME="$TOY2_GHIDRA_STATE"'),
+        )
+        self.assertIn("[Environment+SpecialFolder]::ApplicationData", windows)
+        self.assertLess(
+            windows.index("$LiveGhidraDataHome ="),
+            windows.index("$env:XDG_DATA_HOME = $GhidraState"),
+        )
+        self.assertIn("trap prune_ghidra_logs EXIT", linux)
+        for command in (
+            "decomp_doctor.py",
+            "decomp_brief.py",
+            "decomp_campaigns.py finalize",
+        ):
+            self.assertNotIn(f"exec python tools/{command}", linux)
+
+        function_sizes = script_section(
+            windows, "function Update-FunctionSizes", "function Save-Baseline"
+        )
+        self.assertGreaterEqual(function_sizes.count("Prune-GhidraLogs"), 2)
+        self.assertIn("finally", function_sizes)
+        preflight = script_section(
+            windows,
+            'if ($Command -in @("doctor", "brief"))',
+            'if ($Command -eq "finalize")',
+        )
+        self.assertGreaterEqual(preflight.count("Prune-GhidraLogs"), 2)
+        self.assertIn("finally", preflight)
+
+    def test_report_help_exits_before_toolchain_setup(self):
+        linux = (ROOT / "tools" / "decomp").read_text(encoding="utf-8")
+        windows = (ROOT / "tools" / "decomp.ps1").read_text(encoding="utf-8")
+        early_linux = script_section(linux, 'case "$command" in', "source tools/linux-decomp-env.sh")
+        self.assertIn("report)", early_linux)
+        self.assertIn("Usage: tools/decomp report [output.html]", early_linux)
+        early_windows = script_section(
+            windows,
+            'if (($CommandArgs -contains "--help"',
+            'if ($Command -eq "lint")',
+        )
+        self.assertIn('"report"', early_windows)
+        self.assertIn("Usage: tools/decomp.ps1 report [output.html]", early_windows)
+
+    def test_linux_score_paths_bind_generated_artifacts(self):
+        script = (ROOT / "tools" / "decomp").read_text(encoding="utf-8")
+        score = script_section(script, "score() {", "ensure_build() {")
+        self.assertLess(
+            score.index("write_comparison_report"), score.index("first-score")
+        )
+        self.assertIn("--report build/decomp-score-report.json", score)
+        for argument in (
+            "--score-functions-map",
+            "--score-function-sizes",
+            "--score-source-root",
+        ):
+            self.assertIn(argument, score)
+
+        bc = script_section(script, "    bc)", "    baseline)")
+        self.assertLess(bc.index("reccmp-reccmp"), bc.index("first-score"))
+        self.assertIn('--diff "$diff_path"', bc)
+        for argument in (
+            "--score-functions-map",
+            "--score-function-sizes",
+            "--score-source-root",
+        ):
+            self.assertIn(argument, bc)
+
     def test_windows_score_paths_build_and_stamp_after_success(self):
         script = (ROOT / "tools" / "decomp.ps1").read_text(encoding="utf-8")
         score = script_section(script, '    "score" {', '    "bc" {')
@@ -145,6 +466,9 @@ class NormativeInputTests(unittest.TestCase):
         )
         self.assertIn("$ScoreTargets", score)
         self.assertIn("^0x[0-9A-Fa-f]{1,8}$", score)
+        self.assertIn(
+            "Stamp-FirstScore -Addresses $ScoreTargets -Report $Report", score
+        )
 
         bc = script_section(script, '    "bc" {', '    "baseline" {')
         self.assertLess(bc.index("Build-Project"), bc.index("reccmp-reccmp"))
@@ -156,6 +480,8 @@ class NormativeInputTests(unittest.TestCase):
             '"--source-root"',
         ):
             self.assertIn(argument, bc)
+        self.assertIn("Stamp-FirstScore", bc)
+        self.assertIn("-Diff $Diff", bc)
 
         experiment = script_section(script, '    "experiment" {', '    "report" {')
         self.assertIn('Join-Path $Directory "baseline-report.json"', experiment)

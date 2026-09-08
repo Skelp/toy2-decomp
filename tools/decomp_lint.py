@@ -21,6 +21,7 @@ import re
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, replace
+from functools import cached_property
 from pathlib import Path
 
 sys.dont_write_bytecode = True
@@ -205,6 +206,18 @@ class Finding:
 class SourceUnit:
     path: Path
     text: str
+
+    @cached_property
+    def masked(self) -> str:
+        return _mask_source(self.text)
+
+    @cached_property
+    def owners(self) -> list[Owner]:
+        return _owners_by_line(self.text)
+
+    @cached_property
+    def allowed(self) -> dict[int, set[str]]:
+        return _allowed_rules(self.text)
 
 
 @dataclass(frozen=True)
@@ -412,11 +425,18 @@ def _balanced_body(masked: str, opening: int) -> tuple[int, int] | None:
     return None
 
 
-def check_text(path: Path, text: str) -> list[Finding]:
+def check_text(
+    path: Path,
+    text: str,
+    *,
+    masked: str | None = None,
+    owners: list[Owner] | None = None,
+    allowed: dict[int, set[str]] | None = None,
+) -> list[Finding]:
     findings: list[Finding] = []
-    masked = _mask_source(text)
-    owners = _owners_by_line(text)
-    allowed = _allowed_rules(text)
+    masked = _mask_source(text) if masked is None else masked
+    owners = _owners_by_line(text) if owners is None else owners
+    allowed = _allowed_rules(text) if allowed is None else allowed
 
     parameter_offsets: set[int] = set()
 
@@ -782,8 +802,8 @@ def check_file(path: Path) -> list[Finding]:
 
 
 def _signature_records(unit: SourceUnit) -> list[tuple[str, tuple[str, ...], int, Owner]]:
-    masked = _mask_source(unit.text)
-    owners = _owners_by_line(unit.text)
+    masked = unit.masked
+    owners = unit.owners
     records: list[tuple[str, tuple[str, ...], int, Owner]] = []
     # This intentionally accepts only ordinary project declarations, not function pointers.
     signature = re.compile(
@@ -806,8 +826,8 @@ def _signature_records(unit: SourceUnit) -> list[tuple[str, tuple[str, ...], int
 def _typed_signature_records(
     unit: SourceUnit,
 ) -> list[tuple[str, tuple[str, ...], int, Owner]]:
-    masked = _mask_source(unit.text)
-    owners = _owners_by_line(unit.text)
+    masked = unit.masked
+    owners = unit.owners
     records: list[tuple[str, tuple[str, ...], int, Owner]] = []
     signature = re.compile(
         r"(?m)^\s*(?:inline\s+|static\s+|virtual\s+)?[A-Za-z_]\w*(?:::\w+)*(?:\s*[&*])?\s+"
@@ -868,8 +888,8 @@ def check_signature_concealment(units: list[SourceUnit]) -> list[Finding]:
         rf"reinterpret_cast\s*<\s*(?P<cpp>{TYPE_WORD}\s*\*+)\s*>)"
     )
     for unit in units:
-        masked = _mask_source(unit.text)
-        owners = _owners_by_line(unit.text)
+        masked = unit.masked
+        owners = unit.owners
         for call in re.finditer(r"\b([A-Za-z_]\w*)\s*\(", masked):
             name = call.group(1)
             line, _ = _line_column(unit.text, call.start())
@@ -960,7 +980,7 @@ def _private_type_records(unit: SourceUnit) -> list[tuple[str, str, int, str, st
     if any(part.lower() in {"external", "generated", "build"} for part in unit.path.parts):
         return []
 
-    masked = _mask_source(unit.text)
+    masked = unit.masked
     namespaces = _namespace_ranges(masked)
     records: list[tuple[str, str, int, str, str]] = []
     declaration = re.compile(r"\b(struct|union)\s+([A-Za-z_]\w*)\s*\{")
@@ -1013,6 +1033,44 @@ def check_repeated_private_types(units: list[SourceUnit]) -> list[Finding]:
     return findings
 
 
+def _git_batch_blobs(specifications: list[str]) -> dict[str, bytes]:
+    if not specifications:
+        return {}
+    result = subprocess.run(
+        ["git", "cat-file", "--batch"],
+        input=("\n".join(specifications) + "\n").encode(),
+        capture_output=True,
+        check=False,
+        cwd=ROOT,
+    )
+    if result.returncode != 0:
+        return {}
+    output = result.stdout.encode() if isinstance(result.stdout, str) else result.stdout
+    position = 0
+    blobs: dict[str, bytes] = {}
+    for specification in specifications:
+        line_end = output.find(b"\n", position)
+        if line_end < 0:
+            break
+        header = output[position:line_end].decode("utf-8", errors="replace")
+        position = line_end + 1
+        fields = header.rsplit(" ", 2)
+        if header.endswith(" missing"):
+            continue
+        if len(fields) != 3 or fields[1] != "blob":
+            break
+        try:
+            size = int(fields[2])
+        except ValueError:
+            break
+        end = position + size
+        if end > len(output):
+            break
+        blobs[specification] = output[position:end]
+        position = end + (1 if output[end:end + 1] == b"\n" else 0)
+    return blobs
+
+
 def target_units(
     staged: bool, explicit: list[str], *, revision: str | None = None
 ) -> list[SourceUnit]:
@@ -1026,17 +1084,19 @@ def target_units(
             else ["git", "ls-files", "src"],
             capture_output=True, text=True, check=False, cwd=ROOT,
         )
+        names = [
+            name
+            for name in result.stdout.splitlines()
+            if (ROOT / name).suffix in SOURCE_SUFFIXES
+        ]
+        specifications = [f"{revision}:{name}" if revision else f":{name}" for name in names]
+        blobs = _git_batch_blobs(specifications)
         units: list[SourceUnit] = []
-        for name in result.stdout.splitlines():
+        for name, specification in zip(names, specifications):
             path = ROOT / name
-            if path.suffix not in SOURCE_SUFFIXES:
-                continue
-            shown = subprocess.run(
-                ["git", "show", f"{revision}:{name}" if revision else f":{name}"],
-                capture_output=True, check=False, cwd=ROOT,
-            )
-            if shown.returncode == 0:
-                units.append(SourceUnit(path, shown.stdout.decode("utf-8", errors="ignore")))
+            blob = blobs.get(specification)
+            if blob is not None:
+                units.append(SourceUnit(path, blob.decode("utf-8", errors="ignore")))
         return units
     return [
         SourceUnit(path, path.read_text(encoding="utf-8", errors="ignore"))
@@ -1045,7 +1105,17 @@ def target_units(
 
 
 def scan_units(units: list[SourceUnit], *, cross_file: bool = True) -> list[Finding]:
-    findings = [finding for unit in units for finding in check_text(unit.path, unit.text)]
+    findings = [
+        finding
+        for unit in units
+        for finding in check_text(
+            unit.path,
+            unit.text,
+            masked=unit.masked,
+            owners=unit.owners,
+            allowed=unit.allowed,
+        )
+    ]
     if cross_file:
         findings.extend(check_signature_drift(units))
         findings.extend(check_signature_concealment(units))
