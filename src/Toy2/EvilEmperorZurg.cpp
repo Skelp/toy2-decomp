@@ -99,26 +99,22 @@ namespace Toy2
 			Actor::Toy2Actor* zurg = &Actor::g_creatureActors[0];
 			AudioManager::PlaySoundEffect(0x67, 0);
 
+			int32_t attackFrame = 0;
 			Levels::RecordData* flareRecords = Levels::g_recordData[0];
 			int32_t nearestDistanceSquared = INT_MAX;
-			int32_t nearestFlareIndex = 0;
+			int32_t nearestFlareIndex;
 			for (int32_t flareIndex = 0; flareIndex < flareRecords->recordCount; flareIndex++)
 			{
-				int32_t cameraOffsetY = (Camera::g_renderCameraTransform.pos.y - flareRecords->data[flareIndex].y * 0x20) >> 8;
-				int32_t cameraOffsetZ = (Camera::g_renderCameraTransform.pos.z - flareRecords->data[flareIndex].z * 0x20) >> 8;
-				int32_t cameraOffsetX = (Camera::g_renderCameraTransform.pos.x - flareRecords->data[flareIndex].x * 0x20) >> 8;
+				Vector3I* flare = &flareRecords->data[flareIndex];
+				int32_t cameraOffsetY = (Camera::g_renderCameraTransform.pos.y - flare->y * 0x20) >> 8;
+				int32_t cameraOffsetZ = (Camera::g_renderCameraTransform.pos.z - flare->z * 0x20) >> 8;
+				int32_t cameraOffsetX = (Camera::g_renderCameraTransform.pos.x - flare->x * 0x20) >> 8;
 				if (cameraOffsetZ * cameraOffsetZ + cameraOffsetY * cameraOffsetY + cameraOffsetX * cameraOffsetX < 1000000)
 				{
-					Renderer::LensFlare::RegisterLight(flareRecords->data[flareIndex].x * 0x20,
-						flareRecords->data[flareIndex].y * 0x20,
-						flareRecords->data[flareIndex].z * 0x20,
-						0x80,
-						0x80,
-						0x80,
-						0x40);
-					int32_t buzzOffsetZ = (g_buzzActor.posAngles.pos.z - flareRecords->data[flareIndex].z * 0x20) >> 8;
-					int32_t buzzOffsetY = (g_buzzActor.posAngles.pos.y - flareRecords->data[flareIndex].y * 0x20 - 0x2000) >> 8;
-					int32_t buzzOffsetX = (g_buzzActor.posAngles.pos.x - flareRecords->data[flareIndex].x * 0x20) >> 8;
+					Renderer::LensFlare::RegisterLight(flare->x * 0x20, flare->y * 0x20, flare->z * 0x20, 0x80, 0x80, 0x80, 0x40);
+					int32_t buzzOffsetZ = (g_buzzActor.posAngles.pos.z - flare->z * 0x20) >> 8;
+					int32_t buzzOffsetY = (g_buzzActor.posAngles.pos.y - flare->y * 0x20 - 0x2000) >> 8;
+					int32_t buzzOffsetX = (g_buzzActor.posAngles.pos.x - flare->x * 0x20) >> 8;
 					int32_t distanceSquared = buzzOffsetX * buzzOffsetX + buzzOffsetZ * buzzOffsetZ + buzzOffsetY * buzzOffsetY;
 					if (distanceSquared < nearestDistanceSquared)
 					{
@@ -128,11 +124,10 @@ namespace Toy2
 				}
 			}
 
-			if (nearestDistanceSquared <= 0xFFFF)
+			if (nearestDistanceSquared < 0x10000)
 			{
 				Vector3I* nearestFlare = &flareRecords->data[nearestFlareIndex];
 				Lighting::DynamicLight* light = &Lighting::g_lightingState.dynamicLights[1];
-				light->sourceId = reinterpret_cast<int32_t>(nearestFlare);
 				light->position.x = nearestFlare->x << 5;
 				light->position.y = nearestFlare->y << 5;
 				light->position.z = nearestFlare->z << 5;
@@ -140,13 +135,13 @@ namespace Toy2
 				light->colour.g = 0xFF;
 				light->colour.b = 0xFF;
 				light->lifetime = 1;
+				light->sourceId = reinterpret_cast<int32_t>(nearestFlare);
 			}
 			else
 			{
 				Lighting::g_lightingState.dynamicLights[1].lifetime = 0;
 			}
 
-			int32_t attackFrame = 0;
 			g_damageFlashToggle = (g_damageFlashToggle - 1) & 1;
 			if (g_encounterState > ENCOUNTER_INTRO)
 			{
