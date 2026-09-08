@@ -51,3 +51,11 @@ include the compiled score or the evidence that rejected the model.
 - Mode: coverage.
 - Ruled out: Complete 555 Blend75 control skeleton with exclusive edge walks, separate keyed and unkeyed loops, 565 key 0x07C0, and 565 blend masks scored 19.98 percent.
 - Result note: The corrected map confirms a near-100-percent ceiling. Refine 0x0045B0B0's shared edge and declaration source form before retrying the rasterizer family.
+
+<!-- campaign-id: 541acdac-54f0-45ed-902d-f0c121ee6ebe -->
+## 2026-09-08 | SoftwareRenderer | 0x0045B0B0
+
+- Mode: refinement.
+- Ruled out: Target-local branch-directional two-interpolant edge macro with direct scalar arms and quad-first topology scored 41.24 percent.
+- Ruled out: The same branch-directional model with topY declared before bottomY scored 43.49 percent.
+- Result note: The edge topology is supported, but the original declaration lifetimes and 0x20 stack-frame layout remain unresolved.
