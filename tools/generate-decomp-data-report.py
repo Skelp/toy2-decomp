@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from reccmp.compare import Compare
-from reccmp.compare.db import ReccmpMatch
+from reccmp.compare.db import EntityDb, ReccmpMatch
 from reccmp.compare.variables import (
     BssState,
     ComparedOffset,
@@ -20,7 +20,7 @@ from reccmp.compare.variables import (
 from reccmp.cvdump.cvinfo import CvdumpTypeKey
 from reccmp.cvdump.types import CvdumpIntegrityError, CvdumpKeyError
 from reccmp.project.detect import GhidraConfig, RecCmpTarget, ReportConfig
-from reccmp.types import ImageId
+from reccmp.types import EntityType, ImageId
 
 
 class UnionStorage(NamedTuple):
@@ -29,6 +29,26 @@ class UnionStorage(NamedTuple):
     offset: int
     size: int
     name: str
+
+
+def matching_string_literals(
+    database: EntityDb, original_pointer: int, recompiled_pointer: int
+) -> bool:
+    """Return true when exact pointer targets identify the same string literal."""
+
+    original = database.get(ImageId.ORIG, original_pointer)
+    recompiled = database.get(ImageId.RECOMP, recompiled_pointer)
+    if original is None or recompiled is None:
+        return False
+
+    original_type = original.get("type")
+    if original_type not in (EntityType.STRING, EntityType.WIDECHAR):
+        return False
+    if recompiled.get("type") != original_type:
+        return False
+
+    original_name = original.get("name")
+    return original_name is not None and original_name == recompiled.get("name")
 
 
 def union_storage_ranges(types, type_key, base: int = 0, name: str = ""):
@@ -115,6 +135,12 @@ def union_storage_comparison(
                 original_pointer, recompiled_pointer
             ) or comparator.is_pointer_match_to_offset(
                 original_pointer, recompiled_pointer
+            ) or (
+                offset in original_relocations
+                and offset in recompiled_relocations
+                and matching_string_literals(
+                    comparator.db, original_pointer, recompiled_pointer
+                )
             )
             match = match and pointer_match
             pointer_values.append(
@@ -232,19 +258,13 @@ def pointer_literal_comparison(
     scalar,
     compared: ComparedOffset,
 ) -> ComparedOffset:
-    """Compare a non-relocated pointer scalar as an exact stored literal."""
+    """Correct pointer results with relocation and stored-literal evidence."""
 
     if not scalar.is_pointer:
         return compared
 
     original_address = variable.orig_addr + scalar.offset
     recompiled_address = variable.recomp_addr + scalar.offset
-    if (
-        original_address in comparator.orig_bin.relocations
-        or recompiled_address in comparator.recomp_bin.relocations
-    ):
-        return compared
-
     start = scalar.offset
     end = start + scalar.size
     original_bytes = original.data[start:end]
@@ -252,6 +272,19 @@ def pointer_literal_comparison(
     bss_conflict = (
         original.bss == BssState.NO and recompiled.bss == BssState.YES
     ) or (recompiled.bss == BssState.NO and original.bss == BssState.YES)
+    original_relocated = original_address in comparator.orig_bin.relocations
+    recompiled_relocated = recompiled_address in comparator.recomp_bin.relocations
+    if original_relocated or recompiled_relocated:
+        if compared.match or not (original_relocated and recompiled_relocated):
+            return compared
+        original_pointer = int.from_bytes(original_bytes, "little")
+        recompiled_pointer = int.from_bytes(recompiled_bytes, "little")
+        if not bss_conflict and matching_string_literals(
+            comparator.db, original_pointer, recompiled_pointer
+        ):
+            return compared._replace(match=True)
+        return compared
+
     literal_match = original_bytes == recompiled_bytes and not bss_conflict
     if compared.match == literal_match:
         return compared
