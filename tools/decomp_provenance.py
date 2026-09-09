@@ -132,9 +132,21 @@ def _reccmp_runtime_identity(root: Path) -> dict[str, object]:
     spec = importlib.util.find_spec("reccmp")
     origin = Path(spec.origin).resolve() if spec and spec.origin else None
     executables: dict[str, dict[str, object]] = {}
+    script_directory = (
+        root / ".tooling" / "venv" / ("Scripts" if os.name == "nt" else "bin")
+    )
     for name in ("reccmp-project", "reccmp-reccmp"):
-        found = shutil.which(name)
-        resolved = Path(found).resolve() if found else None
+        local_names = (f"{name}.exe", name) if os.name == "nt" else (name,)
+        local = next(
+            (
+                script_directory / candidate
+                for candidate in local_names
+                if (script_directory / candidate).is_file()
+            ),
+            None,
+        )
+        found = str(local) if local is not None else shutil.which(name)
+        resolved = Path(found).resolve() if found is not None else None
         executables[name] = {
             "path": str(resolved) if resolved is not None else None,
             "sha256": file_hash(resolved) if resolved is not None else None,
@@ -162,12 +174,14 @@ def validation_tool_identity(
         "tools/decomp_campaigns.py",
         "tools/decomp_diff.py",
         "tools/decomp_lint.py",
+        "tools/decomp_oracle.py",
         "tools/decomp_status.py",
         "tools/decomp_verify.py",
         "tools/decomp_provenance.py",
         "tools/generate-decomp-data-report.py",
         "tools/decomp_resources.py",
         "tools/ghidra_sync.py",
+        "tools/Resources/leaf-oracles.json",
     )
     return {
         "files": {

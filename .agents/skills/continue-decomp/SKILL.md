@@ -345,11 +345,14 @@ For a `source` result:
 1. Confirm that the coherent source work is staged.
 2. Confirm that no source input is a symbolic link or an untracked CMake source.
 3. Require a valid content-addressed finalization receipt.
-4. Review the staged diff and receipt without another build.
-5. Inspect file placement, linkage, headers, and CMake entries.
-6. Revalidate only when a relevant receipt input hash changed.
-7. Record the result with `tools/decomp campaigns record --result source`.
-8. Count the valid result as source progress.
+4. For a new coverage or refinement source result, require one frozen
+   leaf-oracle artifact. The oracle scope must contain `0x004B0740`. The
+   selected target must be only `0x004B0740`, and the status must be `passed`.
+5. Review the staged diff and receipt without another build.
+6. Inspect file placement, linkage, headers, and CMake entries.
+7. Revalidate only when a relevant receipt input hash changed.
+8. Record the result with `tools/decomp campaigns record --result source`.
+9. Count the valid result as source progress.
 
 For a `no-source` result:
 

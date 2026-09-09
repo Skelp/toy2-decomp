@@ -18,6 +18,7 @@ import json
 import math
 import os
 import re
+import stat
 import subprocess
 import tempfile
 from collections import deque
@@ -119,16 +120,35 @@ def _git_blob_oid(content: bytes, width: int) -> str:
     raise ImpactError("A Git object ID has an invalid width.")
 
 
+def _cache_entry_matches(path: Path, content: str) -> bool:
+    """Compare one impact cache entry without an unbounded read."""
+
+    expected = content.encode("utf-8")
+    if not expected or len(expected) > MAX_DOCUMENT_BYTES:
+        return False
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as stream:
+            metadata = os.fstat(stream.fileno())
+            if (
+                not stat.S_ISREG(metadata.st_mode)
+                or metadata.st_size != len(expected)
+            ):
+                return False
+            actual = stream.read(len(expected) + 1)
+        return actual == expected
+    except OSError:
+        return False
+
+
 def _atomic_cache_write(path: Path, content: str, collision_error: str) -> None:
     """Write one cache file atomically and preserve content addressing."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
-        try:
-            if not path.is_symlink() and path.read_text(encoding="utf-8") == content:
-                return
-        except (OSError, UnicodeError):
-            pass
+        if _cache_entry_matches(path, content):
+            return
         raise ImpactError(collision_error)
     temporary: Path | None = None
     try:
@@ -145,13 +165,7 @@ def _atomic_cache_write(path: Path, content: str, collision_error: str) -> None:
         try:
             os.link(temporary, path)
         except FileExistsError:
-            try:
-                same = not path.is_symlink() and path.read_text(
-                    encoding="utf-8"
-                ) == content
-            except (OSError, UnicodeError):
-                same = False
-            if not same:
+            if not _cache_entry_matches(path, content):
                 raise ImpactError(collision_error)
         temporary.unlink()
         temporary = None
@@ -214,27 +228,48 @@ def _strict_keys(
         raise ImpactError(f"{label} has invalid fields: {', '.join(detail)}.")
 
 
+def _read_bounded_bytes(
+    path: Path,
+    label: str,
+    *,
+    max_bytes: int = MAX_DOCUMENT_BYTES,
+) -> bytes:
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as stream:
+            metadata = os.fstat(stream.fileno())
+            raw = stream.read(max_bytes + 1)
+    except OSError as error:
+        raise ImpactError(f"The {label} does not exist: {path}") from error
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_size <= 0
+        or metadata.st_size > max_bytes
+        or len(raw) != metadata.st_size
+    ):
+        raise ImpactError(f"The {label} size is invalid.")
+    return raw
+
+
+def _decode_json(raw: bytes, label: str) -> dict[str, object]:
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ImpactError(f"The {label} is not valid JSON.") from error
+    if not isinstance(value, dict):
+        raise ImpactError(f"The {label} must contain a JSON object.")
+    return value
+
+
 def _read_json(
     path: Path,
     label: str,
     *,
     max_bytes: int = MAX_DOCUMENT_BYTES,
 ) -> dict[str, object]:
-    if path.is_symlink():
-        raise ImpactError(f"The {label} cannot be a symbolic link.")
-    try:
-        size = path.stat().st_size
-    except OSError as error:
-        raise ImpactError(f"The {label} does not exist: {path}") from error
-    if size <= 0 or size > max_bytes:
-        raise ImpactError(f"The {label} size is invalid.")
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as error:
-        raise ImpactError(f"The {label} is not valid JSON.") from error
-    if not isinstance(value, dict):
-        raise ImpactError(f"The {label} must contain a JSON object.")
-    return value
+    raw = _read_bounded_bytes(path, label, max_bytes=max_bytes)
+    return _decode_json(raw, label)
 
 
 def _diff_hash(value: object) -> str:
@@ -2511,23 +2546,50 @@ def impact_artifact(
     immutable_by_source = {
         row.get("source_path"): row for row in immutable if row.get("source_path")
     }
+    campaign_id = _cache_component(
+        finalize_receipt.get("campaign_id"), "The campaign ID"
+    )
+    root_value = key_payload.get("source_root")
+    expected_parent: Path | None = None
+    if isinstance(root_value, str):
+        source_root = Path(root_value)
+        if source_root.is_absolute() and source_root.resolve() == source_root:
+            expected_parent = (
+                source_root
+                / "build"
+                / "decomp-cache"
+                / "impact"
+                / campaign_id
+            )
+    if key_payload.get("leaf_oracle_required") is True and expected_parent is None:
+        raise ImpactError("The finalization receipt source root is invalid.")
     candidates: list[tuple[dict[str, object], dict[str, str]]] = []
     for descriptor in descriptors:
-        frozen = immutable_by_source.get(str(Path(descriptor["path"]).resolve()))
+        source = Path(descriptor["path"])
+        if expected_parent is not None and (
+            source.parent != expected_parent
+            or re.fullmatch(r"[0-9a-f]{64}\.json", source.name) is None
+        ):
+            continue
+        frozen = immutable_by_source.get(str(source.resolve()))
         if frozen is None or frozen.get("sha256") != descriptor["sha256"]:
             raise ImpactError("A source-scan artifact has no immutable copy.")
         frozen_path = Path(frozen["path"])
-        if _file_hash(frozen_path) != frozen["sha256"]:
+        try:
+            raw = _read_bounded_bytes(frozen_path, "source-scan artifact")
+        except ImpactError:
+            continue
+        if hashlib.sha256(raw).hexdigest() != frozen["sha256"]:
             raise ImpactError("An immutable source-scan artifact changed.")
         try:
-            document = _read_json(frozen_path, "source-scan artifact")
+            document = _decode_json(raw, "source-scan artifact")
         except ImpactError:
             continue
         if document.get("kind") != IMPACT_KIND:
             continue
         pack = validate_impact_pack(
             document,
-            campaign_id=str(finalize_receipt.get("campaign_id", "")),
+            campaign_id=campaign_id,
         )
         _validate_pack_receipt_binding(pack, finalize_receipt)
         candidates.append(
@@ -3058,7 +3120,7 @@ def create_review_receipt(
     )
     identity: dict[str, object] = {
         "path": str(path.resolve()),
-        "file_sha256": _file_hash(path),
+        "file_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
         "content_sha256": receipt["content_sha256"],
         "impact_pack_sha256": artifact["sha256"],
         "reviewer_id": receipt["reviewer_id"],
@@ -3102,9 +3164,10 @@ def validate_review_identity(
     ).resolve()
     if path.resolve() != expected_path or path_value != str(expected_path):
         raise ImpactError("The accepted review receipt path is not canonical.")
-    if _file_hash(path) != identity.get("file_sha256"):
+    raw = _read_bounded_bytes(path, "accepted review receipt")
+    if hashlib.sha256(raw).hexdigest() != identity.get("file_sha256"):
         raise ImpactError("The accepted review receipt file changed.")
-    receipt = _read_json(path, "accepted review receipt")
+    receipt = _decode_json(raw, "accepted review receipt")
     _strict_keys(
         receipt,
         {

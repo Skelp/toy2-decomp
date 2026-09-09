@@ -388,6 +388,45 @@ class NormativeInputTests(unittest.TestCase):
         )
         self.assertNotIn("> build/decomp-cache/review-", windows_help)
 
+    def test_leaf_oracle_has_wrapper_and_help_parity(self):
+        linux = (ROOT / "tools" / "decomp").read_text(encoding="utf-8")
+        windows = (ROOT / "tools" / "decomp.ps1").read_text(encoding="utf-8")
+        linux_help = script_section(linux, "usage() {", 'command="${1:-}"')
+        windows_help = script_section(
+            windows, "function Show-Help", "Set-Location $Root"
+        )
+        for help_text in (linux_help, windows_help):
+            flat = " ".join(help_text.split())
+            self.assertIn("oracle list", flat)
+            self.assertIn("oracle run --target 0x004B0740", flat)
+            self.assertIn(
+                "oracle verify --receipt RECEIPT --current --require-pass", flat
+            )
+            self.assertIn("does not claim semantic equivalence", flat)
+            self.assertIn("finalization runs and freezes this check", flat)
+        linux_dispatch = script_section(
+            linux, 'case "$command" in', "source tools/linux-decomp-env.sh"
+        )
+        self.assertIn("-m tools.decomp_oracle", linux_dispatch)
+        self.assertLess(
+            linux.index("-m tools.decomp_oracle"),
+            linux.index("source tools/linux-decomp-env.sh"),
+        )
+        windows_dispatch = script_section(
+            windows,
+            'if ($Command -eq "oracle") {',
+            "$Vcvars =",
+        )
+        self.assertIn('"oracle"', windows.split("$ErrorActionPreference", 1)[0])
+        self.assertIn("Set-Location $Root", windows_dispatch)
+        self.assertIn(
+            "& $VenvPython -m tools.decomp_oracle @CommandArgs",
+            windows_dispatch,
+        )
+        self.assertIn("exit $LASTEXITCODE", windows_dispatch)
+        for setup_token in ("New-Item", "VC6", "Ghidra"):
+            self.assertNotIn(setup_token, windows_dispatch)
+
     def test_pivot_help_requires_fresh_preflight_artifacts(self):
         linux = (ROOT / "tools" / "decomp").read_text(encoding="utf-8")
         windows = (ROOT / "tools" / "decomp.ps1").read_text(encoding="utf-8")

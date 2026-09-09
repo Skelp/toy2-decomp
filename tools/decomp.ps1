@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "doctor", "brief", "context", "impact", "campaigns", "finalize", "discover", "evidence", "notes", "names", "defer", "undefer", "blockers", "baseline", "validate", "experiment", "lint", "data", "report", "session-summary", "progress", "check", "sync", "run", "shell", "help")]
+    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "doctor", "brief", "context", "impact", "oracle", "campaigns", "finalize", "discover", "evidence", "notes", "names", "defer", "undefer", "blockers", "baseline", "validate", "experiment", "lint", "data", "report", "session-summary", "progress", "check", "sync", "run", "shell", "help")]
     [string] $Command = "help",
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -24,6 +24,11 @@ if ($Command -eq "context") {
 if ($Command -eq "impact") {
     Set-Location $Root
     & $VenvPython -m tools.decomp_impact @CommandArgs
+    exit $LASTEXITCODE
+}
+if ($Command -eq "oracle") {
+    Set-Location $Root
+    & $VenvPython -m tools.decomp_oracle @CommandArgs
     exit $LASTEXITCODE
 }
 $Vcvars = Join-Path $MsvcBase "VC98\Bin\VCVARS32.BAT"
@@ -288,6 +293,7 @@ Commands:
   brief [args]      Build or read an immutable target evidence brief
   context --brief   Validate and display one brief's function context pack
   impact [args]     Create or verify an independent impact review
+  oracle [args]     Run or verify a finite allowlisted leaf check
   campaigns [args] Measure campaign time, report changes, and retained throughput
   finalize [args]  Validate once and write a content-addressed receipt
   discover [args]   Find credible Ghidra starts absent from the function map
@@ -419,6 +425,15 @@ block every source queue:
   tools/decomp.ps1 campaigns start --mode meta --lane meta
   tools/decomp.ps1 finalize --result meta-fix --mode meta --staged
   tools/decomp.ps1 campaigns record --result meta-fix
+
+The leaf oracle runs a finite, allowlisted IA-32 check. It does not execute
+native code and does not claim semantic equivalence:
+  tools/decomp.ps1 oracle list
+  tools/decomp.ps1 oracle run --target 0x004B0740
+  tools/decomp.ps1 oracle verify --receipt RECEIPT --current --require-pass
+Plain verify checks the stored document. --current or --require-pass repeats
+the check with the current inputs. New coverage and refinement source
+finalization runs and freezes this check automatically.
 
 Record the result after finalization. Add staged. A new coverage or refinement
 source result requires a sealed independent impact review. The reviewer edits

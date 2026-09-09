@@ -596,6 +596,7 @@ Commands:
   brief [args]      Build or read an immutable target evidence brief
   context --brief   Validate and display one brief's function context pack
   impact [...]      Create or verify an independent impact review
+  oracle [...]      Run or verify a finite allowlisted leaf check
   campaigns [...]   Measure campaign time, report deltas, and retained throughput
   discover [args]   Find credible Ghidra starts absent from the function map
   defer <addr> ...  Record a committed blocker or prerequisite
@@ -753,6 +754,15 @@ block every source queue:
   tools/decomp finalize --result meta-fix --mode meta --staged
   tools/decomp campaigns record --result meta-fix
 
+The leaf oracle runs a finite, allowlisted IA-32 check. It does not execute
+native code and does not claim semantic equivalence:
+  tools/decomp oracle list
+  tools/decomp oracle run --target 0x004B0740
+  tools/decomp oracle verify --receipt RECEIPT --current --require-pass
+Plain verify checks the stored document. --current or --require-pass repeats
+the check with the current inputs. New coverage and refinement source
+finalization runs and freezes this check automatically.
+
 Record the result after finalization. Add staged. A new coverage or refinement
 source result requires a sealed independent impact review. The reviewer edits
 all decision and status fields after review. Keep the exact generated
@@ -887,6 +897,9 @@ case "$command" in
         ;;
     impact)
         exec "$ROOT/.tooling/venv/bin/python" -m tools.decomp_impact "$@"
+        ;;
+    oracle)
+        exec "$ROOT/.tooling/venv/bin/python" -m tools.decomp_oracle "$@"
         ;;
 esac
 

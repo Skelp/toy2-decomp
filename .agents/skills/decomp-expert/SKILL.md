@@ -239,10 +239,13 @@ Use the lowercase mode that the supervisor assigned.
 5. Confirm that the content-addressed receipt is complete and hash-valid.
 6. For coverage or refinement, confirm that the receipt has the immutable
    post-write impact pack and its baseline evidence.
-7. Confirm that the result meets the mode and lane contracts.
-8. Return the staged source slice and receipt to the supervisor.
-9. Do not run the HTML report or Ghidra sync.
-10. Do not commit or push. The supervisor records and commits the campaign.
+7. For coverage or refinement, confirm that the receipt has one immutable
+   leaf-oracle artifact. Its scope contains `0x004B0740`, its selected target
+   is only `0x004B0740`, and its status is `passed`.
+8. Confirm that the result meets the mode and lane contracts.
+9. Return the staged source slice and receipt to the supervisor.
+10. Do not run the HTML report or Ghidra sync.
+11. Do not commit or push. The supervisor records and commits the campaign.
 
 Coverage must increase the implemented count. Refinement must increase a
 score, reach terminal status, or remove debt while terminal status remains.

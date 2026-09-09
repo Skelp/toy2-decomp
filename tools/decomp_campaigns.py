@@ -10,8 +10,10 @@ import json
 import math
 import os
 import re
+import stat
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from collections import Counter, defaultdict
@@ -58,7 +60,11 @@ DEFAULT_FINALIZE_CACHE = ROOT / "build" / "decomp-cache" / "finalize"
 SCHEMA_VERSION = 3
 FINALIZE_RECEIPT_VERSION = 2
 LEGACY_FINALIZE_RECEIPT_VERSION = 1
+MAX_FINALIZATION_ARTIFACT_BYTES = 256 * 1024 * 1024
+MAX_FINALIZE_RECEIPT_BYTES = 32 * 1024 * 1024
+MAX_CAMPAIGN_RECORD_RECEIPT_BYTES = 8 * 1024 * 1024
 DELIVERY_RECEIPT_VERSION = 2
+MAX_DELIVERY_RECEIPT_BYTES = 32 * 1024 * 1024
 DOCTOR_RECEIPT_MAX_AGE = timedelta(minutes=60)
 PREDICTION_HANDOFF_MAX_AGE = timedelta(minutes=60)
 FINALIZE_STEPS = (
@@ -1297,16 +1303,149 @@ def is_duplicate(records: list[dict[str, object]], record: dict[str, object]) ->
     )
 
 
-def _read_json_object(path: Path, description: str) -> dict[str, object]:
+def _read_bounded_regular_file(
+    path: Path,
+    description: str,
+    *,
+    max_bytes: int,
+) -> bytes:
+    """Read one regular file without following its final path component."""
+
+    if any(candidate.is_symlink() for candidate in (path, *path.parents)):
+        raise ValueError(f"cannot read {description}: {path}")
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as stream:
+            before = os.fstat(stream.fileno())
+            content = stream.read(max_bytes + 1)
+            after = os.fstat(stream.fileno())
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_size < 1
+            or before.st_size > max_bytes
+            or after.st_size != before.st_size
+            or len(content) != before.st_size
+        ):
+            raise OSError
+        return content
     except FileNotFoundError as error:
         raise ValueError(f"{description} does not exist: {path}") from error
-    except (OSError, json.JSONDecodeError) as error:
+    except OSError as error:
+        raise ValueError(f"cannot read {description}: {path}") from error
+
+
+def _read_json_object(
+    path: Path,
+    description: str,
+    *,
+    max_bytes: int | None = None,
+    expected_sha256: str | None = None,
+) -> dict[str, object]:
+    try:
+        if max_bytes is None:
+            raw = path.read_bytes()
+        else:
+            raw = _read_bounded_regular_file(
+                path,
+                description,
+                max_bytes=max_bytes,
+            )
+    except FileNotFoundError as error:
+        raise ValueError(f"{description} does not exist: {path}") from error
+    except OSError as error:
+        raise ValueError(f"cannot read {description}: {path}: {error}") from error
+    if expected_sha256 is not None and hashlib.sha256(raw).hexdigest() != (
+        expected_sha256
+    ):
+        raise ValueError(f"{description} changed")
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ValueError(f"cannot read {description}: {path}: {error}") from error
     if not isinstance(payload, dict):
         raise ValueError(f"{description} must contain a JSON object: {path}")
     return payload
+
+
+def _bounded_cache_entry_matches(
+    path: Path,
+    content: str,
+    *,
+    max_bytes: int,
+) -> bool:
+    """Compare one bounded cache entry without following its final link."""
+
+    expected = content.encode("utf-8")
+    if not expected or len(expected) > max_bytes:
+        return False
+    try:
+        actual = _read_bounded_regular_file(
+            path,
+            "cached receipt",
+            max_bytes=max_bytes,
+        )
+    except ValueError:
+        return False
+    return actual == expected
+
+
+def _publish_bounded_cache_text(
+    path: Path,
+    content: str,
+    *,
+    description: str,
+    max_bytes: int,
+) -> None:
+    """Publish one bounded cache entry without replacing existing content."""
+
+    encoded = content.encode("utf-8")
+    if not encoded or len(encoded) > max_bytes:
+        raise ValueError(f"the {description} exceeds its size limit")
+    if not path.is_absolute() or any(
+        candidate.is_symlink() for candidate in (path, *path.parents)
+    ):
+        raise ValueError(f"the {description} cache path is not canonical")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        if _bounded_cache_entry_matches(path, content, max_bytes=max_bytes):
+            return
+        raise ValueError(f"the {description} cache contains different content")
+    temporary: Path | None = None
+    try:
+        descriptor, temporary_name = tempfile.mkstemp(
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+        )
+        temporary = Path(temporary_name)
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(encoded)
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.link(temporary, path)
+        except FileExistsError:
+            if not _bounded_cache_entry_matches(
+                path,
+                content,
+                max_bytes=max_bytes,
+            ):
+                raise ValueError(
+                    f"the {description} cache contains different content"
+                )
+        temporary.unlink()
+        temporary = None
+    except ValueError:
+        raise
+    except OSError as error:
+        raise ValueError(f"cannot write the {description} cache: {path}") from error
+    finally:
+        if temporary is not None:
+            try:
+                temporary.unlink()
+            except OSError:
+                pass
 
 
 def file_hash(path: Path) -> str:
@@ -2162,6 +2301,10 @@ def start_campaign(
         mode in ("coverage", "refinement")
         and not _legacy_skip_impact_review
     )
+    leaf_oracle_required = (
+        mode in ("coverage", "refinement")
+        and not _legacy_skip_impact_review
+    )
     if len(addresses) != len(set(addresses)):
         raise ValueError("the initial campaign targets contain a duplicate address")
     if len(addresses) > 3:
@@ -2386,6 +2529,7 @@ def start_campaign(
         "briefs": brief_receipts,
         "briefs_required": require_brief,
         "impact_review_required": impact_review_required,
+        "leaf_oracle_required": leaf_oracle_required,
         "first_score_at": None,
         "scored_addresses": [],
         "score_events": [],
@@ -3520,14 +3664,15 @@ def _bind_campaign_record_receipt(item: dict[str, object]) -> None:
         / f"{document['content_sha256']}.json"
     )
     encoded = json.dumps(document, indent=2, sort_keys=True) + "\n"
-    if path.exists():
-        if path.read_text(encoding="utf-8") != encoded:
-            raise ValueError("the campaign record receipt cache has different content")
-    else:
-        write_text(path, encoded)
+    _publish_bounded_cache_text(
+        path,
+        encoded,
+        description="campaign record receipt",
+        max_bytes=MAX_CAMPAIGN_RECORD_RECEIPT_BYTES,
+    )
     item["campaign_record_receipt"] = {
         "path": str(path),
-        "file_sha256": file_hash(path),
+        "file_sha256": hashlib.sha256(encoded.encode("utf-8")).hexdigest(),
         "content_sha256": document["content_sha256"],
     }
 
@@ -3539,12 +3684,41 @@ def _validate_campaign_record_receipt(
     if not isinstance(identity, dict):
         raise ValueError("the campaign has no immutable record receipt")
     path_value = identity.get("path")
-    if not isinstance(path_value, str):
+    saved_file_hash = identity.get("file_sha256")
+    content_hash = identity.get("content_sha256")
+    finalize_identity = campaign.get("finalize_receipt")
+    finalize_path_value = (
+        finalize_identity.get("path")
+        if isinstance(finalize_identity, Mapping)
+        else None
+    )
+    if (
+        not isinstance(path_value, str)
+        or not isinstance(saved_file_hash, str)
+        or not isinstance(content_hash, str)
+        or re.fullmatch(r"[0-9a-f]{64}", content_hash) is None
+        or not isinstance(finalize_path_value, str)
+    ):
         raise ValueError("the campaign record receipt identity is invalid")
     path = Path(path_value)
-    if file_hash(path) != identity.get("file_sha256"):
-        raise ValueError("the campaign record receipt file changed")
-    document = _read_json_object(path, "campaign record receipt")
+    expected_path = (
+        Path(finalize_path_value).resolve().parent
+        / "campaign-records"
+        / f"{content_hash}.json"
+    )
+    if (
+        not path.is_absolute()
+        or path != expected_path
+        or path.resolve() != expected_path
+        or any(candidate.is_symlink() for candidate in (path, *path.parents))
+    ):
+        raise ValueError("the campaign record receipt path is invalid")
+    document = _read_json_object(
+        path,
+        "campaign record receipt",
+        max_bytes=MAX_CAMPAIGN_RECORD_RECEIPT_BYTES,
+        expected_sha256=saved_file_hash,
+    )
     if (
         document.get("schema_version") != SCHEMA_VERSION
         or document.get("record_type") != "campaign-record-receipt"
@@ -3553,7 +3727,6 @@ def _validate_campaign_record_receipt(
         or document.get("content_sha256") != identity.get("content_sha256")
     ):
         raise ValueError("the campaign record receipt is invalid")
-    finalize_identity = campaign.get("finalize_receipt")
     expected_finalize = (
         finalize_identity.get("content_sha256")
         if isinstance(finalize_identity, dict)
@@ -3680,6 +3853,7 @@ def _record_meta_campaign(
         "briefs": state.get("briefs", []),
         "briefs_required": state.get("briefs_required") is True,
         "impact_review_required": False,
+        "leaf_oracle_required": False,
         "phase_timestamps": phases,
         "finalize_receipt": state.get("finalize_receipt"),
         "deadlines": state.get("deadlines", {}),
@@ -4090,6 +4264,9 @@ def record_campaign(
         "impact_review_required": (
             state.get("impact_review_required") is True and result == "source"
         ),
+        "leaf_oracle_required": (
+            state.get("leaf_oracle_required") is True and result == "source"
+        ),
         "phase_timestamps": phases,
         "finalize_receipt": state.get("finalize_receipt"),
         "deadlines": state.get("deadlines", {}),
@@ -4493,15 +4670,24 @@ def _campaign_finalize_receipt(
     if not isinstance(path_value, str) or not isinstance(key, str):
         raise ValueError("the campaign finalization receipt identity is invalid")
     path = Path(path_value)
-    if file_hash(path) != identity.get("file_sha256"):
-        raise ValueError("the campaign finalization receipt file changed")
+    saved_file_hash = identity.get("file_sha256")
+    if not isinstance(saved_file_hash, str):
+        raise ValueError("the campaign finalization receipt identity is invalid")
     receipt = _load_finalize_receipt(
-        path, key, validate_artifacts=validate_artifacts
+        path,
+        key,
+        validate_artifacts=validate_artifacts,
+        expected_file_sha256=saved_file_hash,
     )
     if receipt is None or receipt.get("receipt_sha256") != identity.get(
         "content_sha256"
     ):
         raise ValueError("the campaign finalization receipt content changed")
+    key_payload = receipt.get("key_payload")
+    if not isinstance(key_payload, Mapping) or (
+        campaign.get("leaf_oracle_required") is True
+    ) != (key_payload.get("leaf_oracle_required") is True):
+        raise ValueError("the campaign leaf-oracle policy changed after finalization")
     return receipt
 
 
@@ -4619,6 +4805,31 @@ def _requires_typed_data_gate(campaign: Mapping[str, object]) -> bool:
     )
 
 
+def _requires_leaf_oracle(campaign: Mapping[str, object]) -> bool:
+    """Return true for a new function-source result with the oracle gate."""
+
+    return (
+        campaign.get("mode") in ("coverage", "refinement")
+        and campaign.get("leaf_oracle_required") is True
+    )
+
+
+LEAF_ORACLE_CANARY = "0x004B0740"
+
+
+def _validate_required_leaf_oracle(
+    document: Mapping[str, object], scope: object
+) -> None:
+    """Require the one canary result for a new source campaign."""
+
+    if not isinstance(scope, list) or LEAF_ORACLE_CANARY not in scope:
+        raise ValueError("the required oracle scope omits the leaf canary")
+    inputs = document.get("inputs")
+    selected = inputs.get("selected_targets") if isinstance(inputs, Mapping) else None
+    if selected != [LEAF_ORACLE_CANARY] or document.get("status") != "passed":
+        raise ValueError("the required leaf differential oracle did not pass")
+
+
 def _delivery_artifacts(
     root: Path, campaign: Mapping[str, object]
 ) -> list[dict[str, str]]:
@@ -4690,6 +4901,164 @@ def _matching_resource_bytes(original: Path, recompiled: Path) -> dict[str, int]
     return dict(resources)
 
 
+def _bind_frozen_leaf_oracle_inputs(
+    document: Mapping[str, object],
+    receipt: Mapping[str, object],
+    source_root: Path,
+    immutable: Mapping[Path, Mapping[str, object]],
+) -> None:
+    """Bind a frozen oracle document to its finalization inputs and outputs."""
+
+    inputs = document.get("inputs")
+    key_payload = receipt.get("key_payload")
+    if not isinstance(inputs, Mapping) or not isinstance(key_payload, Mapping):
+        raise ValueError("the frozen leaf-oracle identity is invalid")
+    repository = inputs.get("repository")
+    worktree_snapshot = key_payload.get("source_worktree_snapshot")
+    index_snapshot = key_payload.get("source_index_snapshot")
+    if (
+        not isinstance(repository, Mapping)
+        or not isinstance(worktree_snapshot, Mapping)
+        or not isinstance(index_snapshot, Mapping)
+        or key_payload.get("campaign_head")
+        != key_payload.get("campaign_ledger_base_commit")
+        or key_payload.get("source_worktree_sha256")
+        != _snapshot_hash(worktree_snapshot)
+        or key_payload.get("source_index_sha256")
+        != _snapshot_hash(index_snapshot)
+        or repository != {
+            "head": key_payload.get("campaign_head"),
+            "source_worktree_sha256": key_payload.get(
+                "source_worktree_sha256"
+            ),
+            "source_index_sha256": key_payload.get("source_index_sha256"),
+        }
+    ):
+        raise ValueError("the frozen leaf-oracle repository identity changed")
+    finalization_inputs = key_payload.get("inputs")
+    files = (
+        finalization_inputs.get("files")
+        if isinstance(finalization_inputs, Mapping)
+        else None
+    )
+    file_sizes = (
+        finalization_inputs.get("file_sizes")
+        if isinstance(finalization_inputs, Mapping)
+        else None
+    )
+    if not isinstance(files, Mapping) or not isinstance(file_sizes, Mapping):
+        raise ValueError("the finalization receipt has no oracle input hashes")
+
+    def input_hash(value: object, relative: str, label: str) -> None:
+        if not isinstance(value, Mapping):
+            raise ValueError(f"the frozen {label} identity is invalid")
+        expected = source_root / relative
+        if (
+            value.get("path") != relative
+            or files.get(str(expected)) != value.get("sha256")
+            or file_sizes.get(str(expected)) != value.get("size")
+        ):
+            raise ValueError(f"the frozen {label} identity changed")
+
+    input_hash(inputs.get("policy"), "tools/Resources/leaf-oracles.json", "policy")
+    input_hash(inputs.get("tool"), "tools/decomp_oracle.py", "oracle tool")
+    decoder = inputs.get("decoder")
+    input_hash(
+        decoder.get("binary_reader") if isinstance(decoder, Mapping) else None,
+        "tools/decomp_binary.py",
+        "binary reader",
+    )
+    support = inputs.get("support_tools")
+    input_hash(
+        support.get("snapshot") if isinstance(support, Mapping) else None,
+        "tools/decomp_campaigns.py",
+        "snapshot tool",
+    )
+    input_hash(
+        support.get("provenance") if isinstance(support, Mapping) else None,
+        "tools/decomp_provenance.py",
+        "provenance tool",
+    )
+    input_hash(
+        inputs.get("function_map"),
+        "tools/Resources/functions_map.txt",
+        "function map",
+    )
+    input_hash(inputs.get("retail_image"), "original/toy2.exe", "retail image")
+    expected_runtime = finalization_inputs.get("python_runtime")
+    if inputs.get("python_runtime") != expected_runtime:
+        raise ValueError("the frozen leaf-oracle Python runtime changed")
+
+    def output_path(key: str, relative: str, label: str) -> Path:
+        value = inputs.get(key)
+        if not isinstance(value, Mapping):
+            raise ValueError(f"the frozen {label} identity is invalid")
+        source = source_root / relative
+        frozen = immutable.get(source)
+        if not isinstance(frozen, Mapping):
+            raise ValueError(f"the finalization receipt has no frozen {label}")
+        path = Path(str(frozen.get("path")))
+        try:
+            metadata = path.stat()
+        except OSError as error:
+            raise ValueError(f"the frozen {label} is missing") from error
+        if (
+            path.is_symlink()
+            or not path.is_file()
+            or frozen.get("sha256") != value.get("sha256")
+            or metadata.st_size != value.get("size")
+        ):
+            raise ValueError(f"the frozen {label} identity changed")
+        return path
+
+    report = output_path(
+        "comparison_report", "build/decomp-current-report.json", "code report"
+    )
+    output_path(
+        "comparison_provenance",
+        "build/decomp-current-report.json.provenance.json",
+        "code-report provenance",
+    )
+    current_image = output_path("current_image", "build/toy2.exe", "current image")
+    output_path("current_symbols", "build/toy2.pdb", "current symbols")
+
+    from tools.decomp_oracle import _binary_code, _comparison_row
+
+    targets = document.get("targets")
+    if not isinstance(targets, list) or len(targets) != 1:
+        raise ValueError("the frozen leaf oracle does not have one target")
+    target = targets[0]
+    if not isinstance(target, Mapping):
+        raise ValueError("the frozen leaf-oracle target is invalid")
+    row = _comparison_row(report, int(LEAF_ORACLE_CANARY, 16))
+    current_value = row.get("recomp")
+    if not isinstance(current_value, str):
+        raise ValueError("the frozen code report has an invalid current address")
+    try:
+        current_address = int(current_value, 16)
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            "the frozen code report has an invalid current address"
+        ) from error
+    current_code = target.get("current_code")
+    if (
+        row.get("name") != target.get("name")
+        or type(row.get("type")) is not int
+        or row.get("type") != 1
+        or not isinstance(current_code, Mapping)
+        or current_code.get("address") != f"0x{current_address:08X}"
+        or not isinstance(current_code.get("size"), int)
+    ):
+        raise ValueError("the frozen leaf-oracle report mapping changed")
+    size = int(current_code["size"])
+    extracted = _binary_code(current_image, current_address, size)
+    if (
+        current_code.get("bytes") != extracted.hex()
+        or current_code.get("sha256") != hashlib.sha256(extracted).hexdigest()
+    ):
+        raise ValueError("the frozen leaf-oracle current code changed")
+
+
 def _validate_resource_reference(
     prior: Mapping[str, object], current: Mapping[str, int]
 ) -> None:
@@ -4698,6 +5067,114 @@ def _validate_resource_reference(
             str(resource_key), 0
         ) < prior_value:
             raise ValueError(f"integrated resource {resource_key} regressed")
+
+
+def _leaf_oracle_artifact(
+    receipt: Mapping[str, object],
+) -> tuple[dict[str, object], dict[str, str]] | None:
+    """Return the immutable leaf-oracle artifact from finalization."""
+
+    key_payload = receipt.get("key_payload")
+    required = (
+        isinstance(key_payload, Mapping)
+        and key_payload.get("leaf_oracle_required") is True
+    )
+    if not required:
+        return None
+    from tools.decomp_impact import impact_artifact
+    from tools.decomp_oracle import (
+        MAX_RECEIPT_BYTES,
+        OracleError,
+        _file_hash as oracle_file_hash,
+        _reject_lexical_symlinks,
+        read_document,
+        validate_document,
+    )
+
+    impact = impact_artifact(receipt)
+    if impact is None:
+        raise ValueError("the required leaf oracle has no impact scope")
+    impact_pack, _impact_descriptor = impact
+    scope_value = impact_pack.get("scope")
+    functions = scope_value.get("functions") if isinstance(scope_value, Mapping) else None
+    if not isinstance(functions, list):
+        raise ValueError("the required leaf oracle has no function scope")
+    root_value = key_payload.get("source_root")
+    if not isinstance(root_value, str) or not Path(root_value).is_absolute():
+        raise ValueError("the leaf-oracle receipt has no source root")
+    source_root = Path(root_value)
+    if source_root.resolve() != source_root:
+        raise ValueError("the leaf-oracle source root is not canonical")
+    steps = receipt.get("step_results")
+    source_scan = steps.get("source_scan") if isinstance(steps, Mapping) else None
+    if not isinstance(source_scan, Mapping):
+        raise ValueError("the finalization receipt has no source-scan result")
+    descriptors = _step_artifact_descriptors(source_scan, "source_scan")
+    immutable = _immutable_artifact_map(receipt, validate_content=False)
+    expected_cache = source_root / "build" / "decomp-cache" / "oracle"
+    candidates: list[tuple[dict[str, object], dict[str, str]]] = []
+    for descriptor in descriptors:
+        source_lexical = Path(descriptor["path"])
+        if (
+            source_lexical.parent != expected_cache
+            or re.fullmatch(r"[0-9a-f]{64}\.json", source_lexical.name) is None
+        ):
+            continue
+        try:
+            _reject_lexical_symlinks(
+                source_lexical, "The leaf-oracle source path"
+            )
+        except OracleError as error:
+            raise ValueError(f"the leaf-oracle source path is invalid: {error}") from error
+        source = source_lexical.resolve()
+        frozen = immutable.get(source)
+        if frozen is None or frozen.get("sha256") != descriptor["sha256"]:
+            raise ValueError("a source-scan artifact has no immutable copy")
+        frozen_path = Path(str(frozen["path"]))
+        try:
+            if oracle_file_hash(
+                frozen_path, max_size=MAX_RECEIPT_BYTES
+            ) != frozen.get("sha256"):
+                raise OracleError("The immutable oracle content hash changed.")
+            document = read_document(frozen_path)
+            validate_document(
+                document,
+                require_pass=True,
+                expected_scope=functions,
+            )
+        except OracleError as error:
+            raise ValueError(f"the immutable leaf oracle is invalid: {error}") from error
+        _validate_required_leaf_oracle(document, functions)
+        expected_source = (
+            source_root
+            / "build"
+            / "decomp-cache"
+            / "oracle"
+            / f"{document['content_sha256']}.json"
+        )
+        if (
+            source_root.resolve() != source_root
+            or source_lexical != expected_source
+            or source != expected_source
+            or source.resolve() != expected_source
+        ):
+            raise ValueError("the leaf-oracle source path is not canonical")
+        _bind_frozen_leaf_oracle_inputs(
+            document, receipt, source_root, immutable
+        )
+        candidates.append(
+            (
+                document,
+                {
+                    "path": str(frozen_path.resolve()),
+                    "sha256": str(frozen["sha256"]),
+                    "content_sha256": str(document["content_sha256"]),
+                },
+            )
+        )
+    if len(candidates) != 1:
+        raise ValueError("the finalization receipt does not have one leaf oracle")
+    return candidates[0]
 
 
 def _delivery_reference(
@@ -4740,6 +5217,18 @@ def _delivery_reference(
         reference["resources"] = _matching_resource_bytes(
             root / "original/toy2.exe", finalized_executable
         )
+    if _requires_leaf_oracle(campaign):
+        from tools.decomp_oracle import replay_identity
+
+        found = _leaf_oracle_artifact(receipt)
+        if found is None:
+            raise ValueError("the delivery has no finalized leaf oracle")
+        oracle_document, oracle_artifact = found
+        reference["leaf_oracle"] = {
+            "document": oracle_document,
+            "artifact": oracle_artifact,
+            "replay": replay_identity(oracle_document),
+        }
     return reference
 
 
@@ -4809,6 +5298,57 @@ def _validate_delivery_command_results(
             raise ValueError("the delivery receipt command results are invalid")
 
 
+def _run_integrated_leaf_oracle(
+    reference: Mapping[str, object], root: Path, code_report: Path
+) -> tuple[dict[str, object], dict[str, str]]:
+    """Run and compare the leaf canary after repository integration."""
+
+    from tools.decomp_oracle import replay_identity, run_oracle
+
+    finalized = reference.get("leaf_oracle")
+    if not isinstance(finalized, Mapping):
+        raise ValueError("the delivery has no finalized leaf-oracle reference")
+    finalized_replay = finalized.get("replay")
+    artifact = finalized.get("artifact")
+    document = finalized.get("document")
+    if (
+        not isinstance(finalized_replay, Mapping)
+        or not isinstance(artifact, Mapping)
+        or not isinstance(document, Mapping)
+    ):
+        raise ValueError("the finalized leaf-oracle reference is invalid")
+    scope = finalized_replay.get("scope")
+    if not isinstance(scope, list):
+        raise ValueError("the finalized leaf-oracle scope is invalid")
+    _validate_required_leaf_oracle(document, scope)
+    integrated_oracle, integrated_path = run_oracle(
+        scope,
+        root=root,
+        report_path=code_report,
+    )
+    integrated_replay = replay_identity(integrated_oracle)
+    if integrated_replay != finalized_replay:
+        raise ValueError(
+            "the integrated leaf-oracle policy, code, corpus, or outcomes changed"
+        )
+    _validate_required_leaf_oracle(integrated_oracle, scope)
+    integrated_artifact = _finalize_artifact(integrated_path)
+    proof = {
+        "scope": scope,
+        "finalized": {
+            "artifact": dict(artifact),
+            "content_sha256": document["content_sha256"],
+            "replay_sha256": _snapshot_hash(finalized_replay),
+        },
+        "integrated": {
+            "artifact": integrated_artifact,
+            "content_sha256": integrated_oracle["content_sha256"],
+            "replay_sha256": _snapshot_hash(integrated_replay),
+        },
+    }
+    return proof, integrated_artifact
+
+
 def _run_delivery_validation(
     campaign: Mapping[str, object],
     root: Path,
@@ -4818,6 +5358,8 @@ def _run_delivery_validation(
     result = str(campaign.get("result", ""))
     commands: list[list[str]] = []
     results: list[dict[str, object]] = []
+    extra_artifacts: list[dict[str, str]] = []
+    leaf_oracle_validation: dict[str, object] | None = None
 
     def run(command: list[str], *, cwd: Path | None = None) -> None:
         completed = _standard_command(command, root, cwd=cwd)
@@ -5022,6 +5564,13 @@ def _run_delivery_validation(
                     root / "original/toy2.exe", root / "build/toy2.exe"
                 )
                 _validate_resource_reference(prior_resources, current_resources)
+        if _requires_leaf_oracle(campaign):
+            if not isinstance(reference, Mapping):
+                raise ValueError("the delivery has no finalized leaf-oracle reference")
+            leaf_oracle_validation, integrated_artifact = (
+                _run_integrated_leaf_oracle(reference, root, code_report)
+            )
+            extra_artifacts.append(integrated_artifact)
         current_metrics = metrics.get("metrics")
         if not isinstance(current_metrics, dict):
             raise ValueError("delivery source metrics are invalid")
@@ -5047,11 +5596,14 @@ def _run_delivery_validation(
         inputs = _standard_input_hashes(root)
     if commands != _delivery_validation_command_plan(campaign, root):
         raise ValueError("the delivery validation command plan changed")
-    return {
+    validation: dict[str, object] = {
         "commands": results,
         "inputs": inputs,
-        "artifacts": _delivery_artifacts(root, campaign),
+        "artifacts": _delivery_artifacts(root, campaign) + extra_artifacts,
     }
+    if leaf_oracle_validation is not None:
+        validation["leaf_oracle"] = leaf_oracle_validation
+    return validation
 
 
 def _delivery_relevant_changes(root: Path, ledger_path: Path) -> list[str]:
@@ -5078,6 +5630,122 @@ def _delivery_relevant_changes(root: Path, ledger_path: Path) -> list[str]:
         for path in paths
         if path != allowed and _finalizer_relevant_path(path)
     )
+
+
+def _validate_delivery_leaf_oracle(
+    validation: Mapping[str, object],
+    campaign: Mapping[str, object],
+    finalize_receipt: Mapping[str, object],
+    *,
+    root: Path,
+) -> dict[str, object] | None:
+    """Validate the finalized and integrated leaf-oracle proofs."""
+
+    value = validation.get("leaf_oracle")
+    artifacts = validation.get("artifacts")
+    oracle_root = root.resolve() / "build" / "decomp-cache" / "oracle"
+    oracle_artifacts = []
+    if isinstance(artifacts, list):
+        oracle_artifacts = [
+            artifact
+            for artifact in artifacts
+            if isinstance(artifact, Mapping)
+            and isinstance(artifact.get("path"), str)
+            and Path(str(artifact["path"])).parent == oracle_root
+        ]
+    if not _requires_leaf_oracle(campaign):
+        if "leaf_oracle" in validation or oracle_artifacts:
+            raise ValueError("the delivery has an unexpected leaf oracle")
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("the delivery has no leaf-oracle proof")
+    if set(value) != {"scope", "finalized", "integrated"}:
+        raise ValueError("the delivery leaf-oracle proof has invalid fields")
+    from tools.decomp_oracle import (
+        OracleError,
+        replay_identity,
+        validate_receipt,
+    )
+
+    found = _leaf_oracle_artifact(finalize_receipt)
+    if found is None:
+        raise ValueError("the finalization receipt has no leaf oracle")
+    finalized_document, finalized_artifact = found
+    finalized_replay = replay_identity(finalized_document)
+    _validate_required_leaf_oracle(
+        finalized_document, finalized_replay.get("scope")
+    )
+    if value.get("scope") != finalized_replay.get("scope"):
+        raise ValueError("the delivery leaf-oracle scope changed")
+    finalized = value.get("finalized")
+    integrated = value.get("integrated")
+    if not isinstance(finalized, Mapping) or set(finalized) != {
+        "artifact",
+        "content_sha256",
+        "replay_sha256",
+    }:
+        raise ValueError("the finalized leaf-oracle proof is invalid")
+    expected_finalized = {
+        "artifact": finalized_artifact,
+        "content_sha256": finalized_document["content_sha256"],
+        "replay_sha256": _snapshot_hash(finalized_replay),
+    }
+    if dict(finalized) != expected_finalized:
+        raise ValueError("the finalized leaf-oracle proof changed")
+    if not isinstance(integrated, Mapping) or set(integrated) != {
+        "artifact",
+        "content_sha256",
+        "replay_sha256",
+    }:
+        raise ValueError("the integrated leaf-oracle proof is invalid")
+    artifact = integrated.get("artifact")
+    if not isinstance(artifact, Mapping) or set(artifact) != {"path", "sha256"}:
+        raise ValueError("the integrated leaf-oracle artifact is invalid")
+    path_value = artifact.get("path")
+    saved_hash = artifact.get("sha256")
+    content_hash = integrated.get("content_sha256")
+    if (
+        not isinstance(path_value, str)
+        or not isinstance(saved_hash, str)
+        or not isinstance(content_hash, str)
+        or Path(path_value)
+        != root.resolve()
+        / "build"
+        / "decomp-cache"
+        / "oracle"
+        / f"{content_hash}.json"
+        or _finalization_artifact_hash(Path(path_value)) != saved_hash
+    ):
+        raise ValueError("the integrated leaf-oracle artifact changed")
+    if (
+        not isinstance(artifacts, list)
+        or oracle_artifacts != [artifact]
+        or dict(artifact) not in artifacts
+    ):
+        raise ValueError("the delivery artifacts omit the integrated leaf oracle")
+    try:
+        integrated_document = validate_receipt(
+            Path(path_value),
+            root=root,
+            current=True,
+            require_pass=True,
+            expected_scope=list(finalized_replay["scope"]),
+        )
+    except OracleError as error:
+        raise ValueError(f"the integrated leaf oracle is invalid: {error}") from error
+    integrated_replay = replay_identity(integrated_document)
+    _validate_required_leaf_oracle(
+        integrated_document, integrated_replay.get("scope")
+    )
+    if (
+        integrated_document.get("content_sha256") != content_hash
+        or integrated.get("replay_sha256") != _snapshot_hash(integrated_replay)
+        or integrated_replay != finalized_replay
+    ):
+        raise ValueError(
+            "the integrated leaf-oracle policy, code, corpus, or outcomes changed"
+        )
+    return dict(value)
 
 
 def create_delivery_receipt(
@@ -5159,6 +5827,12 @@ def create_delivery_receipt(
     reference = _delivery_reference(finalize_receipt, campaign, root)
     validation = _run_delivery_validation(campaign, root, reference)
     _validate_delivery_command_results(validation, campaign, root)
+    _validate_delivery_leaf_oracle(
+        validation,
+        campaign,
+        finalize_receipt,
+        root=root,
+    )
     if _git_head(root) != source_commit:
         raise ValueError("the delivery HEAD changed during validation")
     _verify_campaign_in_commit(
@@ -5217,11 +5891,13 @@ def create_delivery_receipt(
         receipt["accepted_review"] = accepted_review
     receipt["content_sha256"] = _delivery_receipt_hash(receipt)
     path = cache_root / campaign_id / f"{receipt['content_sha256']}.json"
-    existing = _read_json_object(path, "delivery receipt") if path.exists() else None
-    if existing is not None and existing != receipt:
-        raise ValueError("the delivery receipt cache contains different content")
-    if existing is None:
-        write_text(path, json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+    serialized = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
+    _publish_bounded_cache_text(
+        path,
+        serialized,
+        description="delivery receipt",
+        max_bytes=MAX_DELIVERY_RECEIPT_BYTES,
+    )
     result = dict(receipt)
     result["path"] = str(path.resolve())
     return result
@@ -5234,7 +5910,26 @@ def _validated_delivery_receipt(
     *,
     root: Path,
 ) -> dict[str, object]:
-    receipt = _read_json_object(path, "delivery receipt")
+    canonical_parent = (
+        root.resolve()
+        / "build"
+        / "decomp-cache"
+        / "delivery"
+        / str(campaign["campaign_id"])
+    )
+    if (
+        not path.is_absolute()
+        or path.parent != canonical_parent
+        or any(candidate.is_symlink() for candidate in (path, *path.parents))
+    ):
+        raise ValueError(
+            "the delivery receipt is not in its canonical content-addressed path"
+        )
+    receipt = _read_json_object(
+        path,
+        "delivery receipt",
+        max_bytes=MAX_DELIVERY_RECEIPT_BYTES,
+    )
     if (
         receipt.get("schema_version") != SCHEMA_VERSION
         or receipt.get("receipt_version") != DELIVERY_RECEIPT_VERSION
@@ -5250,13 +5945,10 @@ def _validated_delivery_receipt(
     ):
         raise ValueError("the delivery receipt belongs to another campaign")
     content_hash = str(receipt["content_sha256"])
-    canonical_root = (root / "build" / "decomp-cache" / "delivery").resolve()
     canonical_path = (
-        canonical_root
-        / str(campaign["campaign_id"])
-        / f"{content_hash}.json"
+        canonical_parent / f"{content_hash}.json"
     )
-    if path.resolve() != canonical_path:
+    if path != canonical_path or path.resolve() != canonical_path:
         raise ValueError(
             "the delivery receipt is not in its canonical content-addressed path"
         )
@@ -5270,10 +5962,15 @@ def _validated_delivery_receipt(
         raise ValueError("the delivery receipt commit identity is stale")
     _validate_campaign_record_receipt(campaign)
     _verify_campaign_in_commit(root, ledger_path, campaign, commit, base)
-    if campaign.get("impact_review_required") is True:
+    finalize_receipt: Mapping[str, object] = {}
+    if (
+        campaign.get("impact_review_required") is True
+        or _requires_leaf_oracle(campaign)
+    ):
         finalize_receipt = _campaign_finalize_receipt(
             campaign, validate_artifacts=False
         )
+    if campaign.get("impact_review_required") is True:
         accepted_review = _accepted_review_from_records(
             _committed_ledger_records(root, ledger_path, commit),
             campaign,
@@ -5298,7 +5995,8 @@ def _validated_delivery_receipt(
             not isinstance(artifact, dict)
             or not isinstance(artifact.get("path"), str)
             or not isinstance(artifact.get("sha256"), str)
-            or file_hash(Path(str(artifact["path"]))) != artifact["sha256"]
+            or _finalization_artifact_hash(Path(str(artifact["path"])))
+            != artifact["sha256"]
         ):
             raise ValueError("a delivery validation artifact changed")
     mode = str(campaign.get("mode", ""))
@@ -5308,6 +6006,12 @@ def _validated_delivery_receipt(
     if not isinstance(validation, dict) or validation.get("inputs") != expected_inputs:
         raise ValueError("a delivery validation input changed")
     _validate_delivery_command_results(validation, campaign, root)
+    _validate_delivery_leaf_oracle(
+        validation,
+        campaign,
+        finalize_receipt,
+        root=root,
+    )
     if mode != "meta" and campaign.get("result") == "source":
         from tools.decomp_provenance import validate_report
 
@@ -5604,10 +6308,81 @@ def _finalize_receipt_hash(receipt: Mapping[str, object]) -> str:
     return _snapshot_hash(payload)
 
 
+def _is_leaf_oracle_cache_path(path: Path) -> bool:
+    """Return true for a content-addressed leaf-oracle cache path."""
+
+    return (
+        path.is_absolute()
+        and re.fullmatch(r"[0-9a-f]{64}\.json", path.name) is not None
+        and tuple(path.parent.parts[-3:]) == ("build", "decomp-cache", "oracle")
+    )
+
+
+def _finalization_artifact_hash(
+    path: Path, *, source_path: Path | None = None
+) -> str:
+    """Hash one regular finalization artifact within its size limit."""
+
+    limit = MAX_FINALIZATION_ARTIFACT_BYTES
+    if _is_leaf_oracle_cache_path(source_path or path):
+        from tools.decomp_oracle import MAX_RECEIPT_BYTES
+
+        limit = MAX_RECEIPT_BYTES
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags)
+        digest = hashlib.sha256()
+        total = 0
+        with os.fdopen(descriptor, "rb") as stream:
+            metadata = os.fstat(stream.fileno())
+            if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > limit:
+                raise OSError
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                total += len(block)
+                if total > limit:
+                    raise OSError
+                digest.update(block)
+        if total != metadata.st_size:
+            raise OSError
+        return digest.hexdigest()
+    except OSError as error:
+        raise ValueError("the finalization artifact is invalid") from error
+
+
+def _read_finalization_artifact(
+    path: Path, *, source_path: Path | None = None
+) -> bytes:
+    """Read one regular finalization artifact within its size limit."""
+
+    limit = MAX_FINALIZATION_ARTIFACT_BYTES
+    if _is_leaf_oracle_cache_path(source_path or path):
+        from tools.decomp_oracle import MAX_RECEIPT_BYTES
+
+        limit = MAX_RECEIPT_BYTES
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as stream:
+            metadata = os.fstat(stream.fileno())
+            content = stream.read(limit + 1)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_size > limit
+            or len(content) != metadata.st_size
+        ):
+            raise OSError
+        return content
+    except OSError as error:
+        raise ValueError("the finalization artifact is invalid") from error
+
+
 def _finalize_artifact(path: Path) -> dict[str, str]:
     if not path.is_file():
         raise ValueError(f"a finalization artifact does not exist: {path}")
-    return {"path": str(path.resolve()), "sha256": file_hash(path)}
+    return {
+        "path": str(path.resolve()),
+        "sha256": _finalization_artifact_hash(path.absolute()),
+    }
 
 
 def _step_artifact_descriptors(
@@ -5665,15 +6440,23 @@ def _cache_finalize_artifact(
     expected_sha256: str | None = None,
 ) -> dict[str, str]:
     try:
-        content = source.read_bytes()
-    except OSError as error:
-        raise ValueError(f"cannot read a finalization artifact: {source}: {error}") from error
+        content = _read_finalization_artifact(source.absolute())
+    except ValueError as error:
+        raise ValueError(
+            f"cannot read a finalization artifact: {source}: {error}"
+        ) from error
     digest = hashlib.sha256(content).hexdigest()
     if expected_sha256 is not None and digest != expected_sha256:
         raise ValueError(f"a finalization artifact changed before it was cached: {source}")
     cached = (cache_root / "artifacts" / "sha256" / digest).resolve()
     if cached.exists():
-        if not cached.is_file() or file_hash(cached) != digest:
+        if (
+            not cached.is_file()
+            or _finalization_artifact_hash(
+                cached, source_path=source.absolute()
+            )
+            != digest
+        ):
             raise ValueError("the finalization artifact cache has different content")
     else:
         cached.parent.mkdir(parents=True, exist_ok=True)
@@ -5809,7 +6592,9 @@ def _immutable_artifact_map(
             raise ValueError("the immutable finalization artifact cache path is invalid")
         if validate_content:
             try:
-                current_hash = file_hash(path)
+                current_hash = _finalization_artifact_hash(
+                    path, source_path=source
+                )
             except ValueError as error:
                 raise ValueError("an immutable finalization artifact is missing") from error
             if current_hash != saved_hash:
@@ -6016,6 +6801,7 @@ def _finalize_key_payload(
         raise ValueError("the campaign ledger changed after campaign start")
     return {
         "receipt_version": FINALIZE_RECEIPT_VERSION,
+        "source_root": str(root.resolve()),
         "campaign_id": _campaign_id(dict(state)),
         "result": result,
         "mode": state.get("mode"),
@@ -6037,6 +6823,9 @@ def _finalize_key_payload(
         "briefs_required": state.get("briefs_required") is True,
         "impact_review_required": (
             state.get("impact_review_required") is True and result == "source"
+        ),
+        "leaf_oracle_required": (
+            state.get("leaf_oracle_required") is True and result == "source"
         ),
         "started_at": state.get("started_at"),
         "baseline_report_sha256": state.get("baseline_report_sha256"),
@@ -6096,11 +6885,26 @@ def _finalize_key_payload(
 
 
 def _load_finalize_receipt(
-    path: Path, expected_key: str, *, validate_artifacts: bool = True
+    path: Path,
+    expected_key: str,
+    *,
+    validate_artifacts: bool = True,
+    expected_file_sha256: str | None = None,
 ) -> dict[str, object] | None:
     if not path.exists():
         return None
-    receipt = _read_json_object(path, "finalization receipt")
+    if (
+        not path.is_absolute()
+        or path.resolve() != path
+        or path.name != f"{expected_key}.json"
+    ):
+        raise ValueError("the cached finalization receipt path is invalid")
+    receipt = _read_json_object(
+        path,
+        "finalization receipt",
+        max_bytes=MAX_FINALIZE_RECEIPT_BYTES,
+        expected_sha256=expected_file_sha256,
+    )
     receipt_version = receipt.get("receipt_version")
     if (
         receipt.get("schema_version") != SCHEMA_VERSION
@@ -6176,6 +6980,12 @@ def _load_finalize_receipt(
             artifact_path = Path(path_value).resolve()
             if not artifact_path.is_file() or file_hash(artifact_path) != saved_hash:
                 raise ValueError("a cached finalization artifact changed")
+    key_payload = receipt.get("key_payload")
+    if (
+        isinstance(key_payload, Mapping)
+        and key_payload.get("leaf_oracle_required") is True
+    ):
+        _leaf_oracle_artifact(receipt)
     return receipt
 
 
@@ -6185,9 +6995,14 @@ def _save_finalize_receipt_on_state(
     receipt_path: Path,
     receipt: Mapping[str, object],
 ) -> None:
+    serialized = _read_bounded_regular_file(
+        receipt_path,
+        "finalization receipt",
+        max_bytes=MAX_FINALIZE_RECEIPT_BYTES,
+    )
     state["finalize_receipt"] = {
         "path": str(receipt_path.resolve()),
-        "file_sha256": file_hash(receipt_path),
+        "file_sha256": hashlib.sha256(serialized).hexdigest(),
         "content_sha256": receipt.get("receipt_sha256"),
         "receipt_key": receipt.get("receipt_key"),
     }
@@ -6211,9 +7026,13 @@ def _validated_finalize_receipt(
         raise ValueError("the active campaign has an invalid finalization receipt")
     path = Path(path_value)
     saved_file_hash = identity.get("file_sha256")
-    if not isinstance(saved_file_hash, str) or file_hash(path) != saved_file_hash:
+    if not isinstance(saved_file_hash, str):
         raise ValueError("the finalization receipt file changed")
-    receipt = _load_finalize_receipt(path, key)
+    receipt = _load_finalize_receipt(
+        path,
+        key,
+        expected_file_sha256=saved_file_hash,
+    )
     if receipt is None:
         raise ValueError("the finalization receipt does not exist")
     if identity.get("content_sha256") != receipt.get("receipt_sha256"):
@@ -6231,6 +7050,7 @@ def _validated_finalize_receipt(
     if not isinstance(key_payload, dict) or not isinstance(root_value, str):
         raise ValueError("the finalization receipt has invalid input identity")
     expected_identity = {
+        "source_root": str(Path(root_value).resolve()),
         "campaign_id": _campaign_id(dict(state)),
         "mode": state.get("mode"),
         "lane": _campaign_lane(state),
@@ -6251,6 +7071,9 @@ def _validated_finalize_receipt(
         "briefs_required": state.get("briefs_required") is True,
         "impact_review_required": (
             state.get("impact_review_required") is True and result == "source"
+        ),
+        "leaf_oracle_required": (
+            state.get("leaf_oracle_required") is True and result == "source"
         ),
         "started_at": state.get("started_at"),
         "baseline_report_sha256": state.get("baseline_report_sha256"),
@@ -6725,7 +7548,15 @@ def finalize_campaign(
         "phase_timestamps": phases,
     }
     receipt["receipt_sha256"] = _finalize_receipt_hash(receipt)
-    write_text(receipt_path, json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+    if key_payload.get("leaf_oracle_required") is True:
+        _leaf_oracle_artifact(receipt)
+    serialized = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
+    _publish_bounded_cache_text(
+        receipt_path,
+        serialized,
+        description="finalization receipt",
+        max_bytes=MAX_FINALIZE_RECEIPT_BYTES,
+    )
     _save_finalize_receipt_on_state(state_path, state, receipt_path, receipt)
     result_value = dict(receipt)
     result_value["reused"] = False
@@ -6979,29 +7810,52 @@ def _standard_source_scan(
     return public, context
 
 
+def _python_runtime_identity() -> dict[str, object]:
+    """Return the Python runtime identity used by validation tools."""
+
+    executable = Path(sys.executable).resolve()
+    return {
+        "implementation": sys.implementation.name,
+        "version": list(sys.version_info[:3]),
+        "executable": {
+            "path": str(executable),
+            "sha256": file_hash(executable),
+        },
+    }
+
+
 def _standard_input_hashes(root: Path) -> dict[str, object]:
     from tools.decomp_dependencies import decoder_identity
 
     paths = (
         Path(__file__),
         root / "tools" / "decomp_impact.py",
+        root / "tools" / "decomp_oracle.py",
         root / "tools" / "decomp_annotations.py",
         root / "tools" / "decomp_dependencies.py",
         root / "tools" / "decomp_binary.py",
+        root / "tools" / "decomp_provenance.py",
         root / "tools" / "decomp_verify.py",
         root / "tools" / "decomp_lint.py",
         root / "tools" / "generate-decomp-data-report.py",
         root / "tools" / "Resources" / "functions_map.txt",
+        root / "tools" / "Resources" / "leaf-oracles.json",
         root / "build" / "build.ninja",
         root / "build" / "Makefile",
         root / "build" / "CMakeCache.txt",
         root / "original" / "toy2.exe",
     )
     return {
-        "standard_finalize_version": 2,
+        "standard_finalize_version": 3,
         "decoder": decoder_identity(),
+        "python_runtime": _python_runtime_identity(),
         "files": {
             str(path.resolve()): file_hash(path)
+            for path in paths
+            if path.is_file()
+        },
+        "file_sizes": {
+            str(path.resolve()): path.stat().st_size
             for path in paths
             if path.is_file()
         },
@@ -7013,18 +7867,27 @@ def _meta_input_hashes(root: Path) -> dict[str, object]:
     paths = (
         Path(__file__),
         root / "tools" / "decomp_impact.py",
+        root / "tools" / "decomp_oracle.py",
         root / "tools" / "decomp_annotations.py",
         root / "tools" / "decomp_dependencies.py",
         root / "tools" / "decomp_binary.py",
+        root / "tools" / "decomp_provenance.py",
         root / "tools" / "decomp",
         root / "tools" / "decomp.ps1",
         root / "tools" / "decomp_lint.py",
         root / "tools" / "ghidra_sync.py",
+        root / "tools" / "Resources" / "leaf-oracles.json",
     )
     return {
-        "meta_finalize_version": 2,
+        "meta_finalize_version": 3,
+        "python_runtime": _python_runtime_identity(),
         "files": {
             str(path.resolve()): file_hash(path)
+            for path in paths
+            if path.is_file()
+        },
+        "file_sizes": {
+            str(path.resolve()): path.stat().st_size
             for path in paths
             if path.is_file()
         },
@@ -7387,6 +8250,7 @@ def _meta_workflow_path(path: str) -> bool:
         "docs/decomp-agent.md",
         "tools/decomp",
         "tools/decomp.ps1",
+        "tools/Resources/leaf-oracles.json",
         "tools/linux-decomp-env.sh",
     }:
         return True
@@ -7528,6 +8392,7 @@ def _standard_finalize_actions(
             state, current_report, staged=staged
         )
         scan_context.update(private)
+        source_scan_artifacts: list[Path] = []
         if state.get("impact_review_required") is True:
             from tools.decomp_impact import build_impact_pack, write_impact_pack
             from tools.decomp_provenance import provenance_path
@@ -7541,14 +8406,34 @@ def _standard_finalize_actions(
                 root=root,
             )
             impact_path = write_impact_pack(impact_pack, root)
-            public["artifacts"] = [
+            source_scan_artifacts.extend([
                 impact_path,
                 baseline_report,
                 provenance_path(baseline_report),
                 baseline_data_report,
                 provenance_path(baseline_data_report),
-            ]
+            ])
             scan_context["impact_pack"] = impact_pack
+        if _requires_leaf_oracle(state):
+            from tools.decomp_oracle import run_oracle
+
+            impact_pack = scan_context.get("impact_pack")
+            scope = impact_pack.get("scope") if isinstance(impact_pack, Mapping) else None
+            functions = scope.get("functions") if isinstance(scope, Mapping) else None
+            if not isinstance(functions, list):
+                raise ValueError("the required impact scope has no function list")
+            oracle_receipt, oracle_path = run_oracle(
+                functions,
+                root=root,
+                report_path=current_report,
+            )
+            _validate_required_leaf_oracle(oracle_receipt, functions)
+            source_scan_artifacts.append(oracle_path)
+            scan_context["leaf_oracle"] = oracle_receipt
+            scan_context["leaf_oracle_path"] = oracle_path
+            scan_context["leaf_oracle_scope"] = functions
+        if source_scan_artifacts:
+            public["artifacts"] = source_scan_artifacts
         return public
 
     def validation_action() -> object:
@@ -7561,6 +8446,21 @@ def _standard_finalize_actions(
             raise ValueError("staged source has new source-debt warnings")
         if scan_context["stale"]:
             raise ValueError("staged lint baseline has stale rows")
+        if _requires_leaf_oracle(state):
+            from tools.decomp_oracle import validate_receipt
+
+            oracle_path = scan_context.get("leaf_oracle_path")
+            oracle_scope = scan_context.get("leaf_oracle_scope")
+            if not isinstance(oracle_path, Path) or not isinstance(oracle_scope, list):
+                raise ValueError("the required leaf differential oracle is missing")
+            oracle_receipt = validate_receipt(
+                oracle_path,
+                root=root,
+                current=True,
+                require_pass=True,
+                expected_scope=oracle_scope,
+            )
+            _validate_required_leaf_oracle(oracle_receipt, oracle_scope)
         if _campaign_lane(state) == "closure":
             from tools.decomp_status import read_match_statuses
 

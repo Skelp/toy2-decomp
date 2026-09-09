@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import importlib.util
 import hashlib
 import json
@@ -836,6 +837,9 @@ class CampaignTests(unittest.TestCase):
 
             self.assertTrue(
                 campaigns.read_state(paths["state"])["impact_review_required"]
+            )
+            self.assertTrue(
+                campaigns.read_state(paths["state"])["leaf_oracle_required"]
             )
 
     @staticmethod
@@ -2419,7 +2423,7 @@ class CampaignTests(unittest.TestCase):
                     return_value=[Path("src/Targets.cpp")],
                 ),
                 patch.object(campaigns, "_standard_input_hashes", return_value={}),
-                patch.object(campaigns, "_delivery_artifacts", return_value={}),
+                patch.object(campaigns, "_delivery_artifacts", return_value=[]),
             ):
                 with self.assertRaisesRegex(ValueError, "not a valid function"):
                     campaigns._run_delivery_validation(
@@ -4094,6 +4098,7 @@ class CampaignTests(unittest.TestCase):
                 now=paths["started"] + timedelta(minutes=3),
             )
             self.assertFalse(campaign["impact_review_required"])
+            self.assertFalse(campaign["leaf_oracle_required"])
             campaigns.record_delivery(
                 paths["ledger"],
                 campaign["campaign_id"],
@@ -5998,6 +6003,1249 @@ class CampaignTests(unittest.TestCase):
                 for command in reviewed_commands
             )
         )
+
+
+class LeafOracleLifecycleTests(unittest.TestCase):
+    @staticmethod
+    def _passed_document():
+        from tools.tests.test_decomp_oracle import synthetic_receipt
+
+        return synthetic_receipt()
+
+    def _frozen_fixture(self, root: Path):
+        from tools import decomp_oracle as oracle
+
+        root = root.resolve()
+        document = self._passed_document()
+        worktree_snapshot = {"src/Target.cpp": "1" * 64}
+        index_snapshot = {"src/Target.cpp": ["100644 " + "2" * 40 + " 0"]}
+        repository = {
+            "head": "a" * 40,
+            "source_worktree_sha256": campaigns._snapshot_hash(worktree_snapshot),
+            "source_index_sha256": campaigns._snapshot_hash(index_snapshot),
+        }
+        document["inputs"]["repository"] = repository
+        static = {
+            "policy": ("tools/Resources/leaf-oracles.json", document["inputs"]["policy"]),
+            "tool": ("tools/decomp_oracle.py", document["inputs"]["tool"]),
+            "reader": (
+                "tools/decomp_binary.py",
+                document["inputs"]["decoder"]["binary_reader"],
+            ),
+            "snapshot": (
+                "tools/decomp_campaigns.py",
+                document["inputs"]["support_tools"]["snapshot"],
+            ),
+            "provenance": (
+                "tools/decomp_provenance.py",
+                document["inputs"]["support_tools"]["provenance"],
+            ),
+            "map": (
+                "tools/Resources/functions_map.txt",
+                document["inputs"]["function_map"],
+            ),
+            "retail": ("original/toy2.exe", document["inputs"]["retail_image"]),
+        }
+        files = {}
+        sizes = {}
+        for index, (relative, descriptor) in enumerate(static.values(), start=1):
+            digest = f"{index:064x}"
+            descriptor["sha256"] = digest
+            descriptor["size"] = index
+            files[str(root / relative)] = digest
+            sizes[str(root / relative)] = index
+        immutable = {}
+        frozen_root = (
+            root
+            / "build"
+            / "decomp-cache"
+            / "finalize"
+            / "artifacts"
+            / "sha256"
+        )
+        outputs = (
+            ("comparison_report", "build/decomp-current-report.json", b"report"),
+            (
+                "comparison_provenance",
+                "build/decomp-current-report.json.provenance.json",
+                b"provenance",
+            ),
+            ("current_image", "build/toy2.exe", b"executable"),
+            ("current_symbols", "build/toy2.pdb", b"symbols"),
+        )
+        for key, relative, content in outputs:
+            digest = hashlib.sha256(content).hexdigest()
+            frozen = frozen_root / digest
+            frozen.parent.mkdir(parents=True, exist_ok=True)
+            frozen.write_bytes(content)
+            document["inputs"][key]["sha256"] = digest
+            document["inputs"][key]["size"] = len(content)
+            immutable[root / relative] = {
+                "path": str(frozen),
+                "sha256": digest,
+                "source_path": str(root / relative),
+            }
+        document["content_sha256"] = oracle._document_hash(document)
+        oracle.validate_document(document, require_pass=True)
+        key_payload = {
+            "source_root": str(root),
+            "leaf_oracle_required": True,
+            "campaign_head": repository["head"],
+            "campaign_ledger_base_commit": repository["head"],
+            "source_worktree_sha256": repository["source_worktree_sha256"],
+            "source_worktree_snapshot": worktree_snapshot,
+            "source_index_sha256": repository["source_index_sha256"],
+            "source_index_snapshot": index_snapshot,
+            "inputs": {
+                "files": files,
+                "file_sizes": sizes,
+                "python_runtime": copy.deepcopy(document["inputs"]["python_runtime"]),
+            },
+        }
+        return document, {"key_payload": key_payload}, immutable
+
+    def test_oracle_marker_is_bounded_to_new_function_source_results(self):
+        self.assertTrue(
+            campaigns._requires_leaf_oracle(
+                {
+                    "mode": "coverage",
+                    "result": "source",
+                    "leaf_oracle_required": True,
+                }
+            )
+        )
+        self.assertTrue(
+            campaigns._requires_leaf_oracle(
+                {"mode": "refinement", "leaf_oracle_required": True}
+            )
+        )
+        for campaign in (
+            {"mode": "refinement"},
+            {"mode": "refinement", "leaf_oracle_required": False},
+            {"mode": "data", "leaf_oracle_required": True},
+            {"mode": "resource", "leaf_oracle_required": True},
+            {"mode": "meta", "leaf_oracle_required": True},
+        ):
+            with self.subTest(campaign=campaign):
+                self.assertFalse(campaigns._requires_leaf_oracle(campaign))
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state = {
+                "source_worktree_root": str(root),
+                "campaign_id": "oracle-marker",
+                "mode": "refinement",
+                "lane": "production",
+                "leaf_oracle_required": True,
+                "campaign_head": "a" * 40,
+            }
+            with patch.object(
+                campaigns, "source_worktree_snapshot", return_value={}
+            ), patch.object(
+                campaigns, "source_index_snapshot", return_value={}
+            ), patch.object(
+                campaigns, "repository_worktree_snapshot", return_value={}
+            ), patch.object(
+                campaigns, "repository_index_snapshot", return_value={}
+            ):
+                source_key = campaigns._finalize_key_payload(
+                    state, "source", [], {}, False
+                )
+                no_source_key = campaigns._finalize_key_payload(
+                    state, "no-source", [], {}, False
+                )
+            self.assertTrue(source_key["leaf_oracle_required"])
+            self.assertFalse(no_source_key["leaf_oracle_required"])
+
+    def test_pending_source_record_preserves_the_oracle_marker(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_path = root / "state.json"
+            ledger = root / "ledger.jsonl"
+            models = root / "models.md"
+            item = {
+                "schema_version": campaigns.SCHEMA_VERSION,
+                "record_type": "campaign",
+                "campaign_id": "oracle-record",
+                "mode": "refinement",
+                "result": "source",
+                "addresses": ["0x00401000"],
+                "active_addresses": ["0x00401000"],
+                "leaf_oracle_required": True,
+            }
+            campaigns.write_state(
+                state_path,
+                {
+                    "schema_version": campaigns.SCHEMA_VERSION,
+                    "phase": "finalizing",
+                    "finalization": {
+                        "item": item,
+                        "ledger_path": str(ledger.resolve()),
+                        "source_models_path": str(models.resolve()),
+                    },
+                },
+            )
+            with patch.object(
+                campaigns, "_validate_campaign_targets"
+            ), patch.object(
+                campaigns, "_validate_source_deadlines"
+            ), patch.object(
+                campaigns, "_requires_finalize_receipt", return_value=False
+            ):
+                recorded = campaigns.record_campaign(
+                    ledger,
+                    state_path,
+                    models,
+                    root / "unused-code.json",
+                    root / "unused-data.json",
+                    "source",
+                )
+            self.assertTrue(recorded["leaf_oracle_required"])
+            self.assertTrue(campaigns.read_records(ledger)[0]["leaf_oracle_required"])
+
+    @staticmethod
+    def _bind(document, receipt, root, immutable):
+        target = document["targets"][0]
+        row = {
+            "name": target["name"],
+            "type": 1,
+            "recomp": "0x00401E50",
+        }
+        code = bytes.fromhex(
+            "8b4c2404b8100000003bc87e06d1e03bc17cfac3"
+        )
+        with patch("tools.decomp_oracle._comparison_row", return_value=row), patch(
+            "tools.decomp_oracle._binary_code", return_value=code
+        ):
+            campaigns._bind_frozen_leaf_oracle_inputs(
+                document, receipt, root.resolve(), immutable
+            )
+
+    def test_frozen_oracle_binds_finalization_inputs_outputs_and_mapping(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document, receipt, immutable = self._frozen_fixture(root)
+            self._bind(document, receipt, root, immutable)
+
+    def test_report_row_type_and_current_address_are_strict(self):
+        from tools import decomp_oracle as oracle
+
+        policy_target = oracle.load_policy()["targets"][0]
+        with patch.object(
+            oracle,
+            "_function_map_name",
+            return_value=policy_target["function_map_name"],
+        ), patch.object(
+            oracle,
+            "_comparison_row",
+            return_value={
+                "name": policy_target["name"],
+                "type": True,
+                "recomp": "0x00401E50",
+            },
+        ), patch.object(
+            oracle, "_binary_code", return_value=bytes.fromhex(
+                "8b4c2404b8100000003bc87e06d1e03bc17cfac3"
+            )
+        ), self.assertRaisesRegex(oracle.OracleError, "identity changed"):
+            oracle._run_target(Path("."), Path("report.json"), policy_target)
+
+        for row in (
+            {"name": policy_target["name"], "type": True, "recomp": "0x00401E50"},
+            {"name": policy_target["name"], "type": 1, "recomp": True},
+        ):
+            with self.subTest(row=row), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                document, receipt, immutable = self._frozen_fixture(root)
+                with patch.object(
+                    oracle, "_comparison_row", return_value=row
+                ), patch.object(
+                    oracle,
+                    "_binary_code",
+                    return_value=bytes.fromhex(
+                        "8b4c2404b8100000003bc87e06d1e03bc17cfac3"
+                    ),
+                ), self.assertRaises(ValueError):
+                    campaigns._bind_frozen_leaf_oracle_inputs(
+                        document, receipt, root.resolve(), immutable
+                    )
+
+    def test_frozen_oracle_rejects_each_forged_input_identity(self):
+        from tools import decomp_oracle as oracle
+
+        def alternate_current_body(value):
+            policy_target = oracle.load_policy()["targets"][0]
+            alternate = bytes.fromhex(
+                "8b542404b8100000003bd07e06d1e03bc27cfac3"
+            )
+            value["targets"] = [
+                oracle._evaluate_target(
+                    policy_target,
+                    map_name=policy_target["function_map_name"],
+                    current_address=0x401E50,
+                    retail_code=bytes.fromhex(
+                        "8b4c2404b8100000003bc87e06d1e03bc17cfac3"
+                    ),
+                    current_code=alternate,
+                )
+            ]
+
+        mutations = {
+            "head": lambda value: value["inputs"]["repository"].__setitem__(
+                "head", "d" * 40
+            ),
+            "worktree": lambda value: value["inputs"]["repository"].__setitem__(
+                "source_worktree_sha256", "d" * 64
+            ),
+            "index": lambda value: value["inputs"]["repository"].__setitem__(
+                "source_index_sha256", "d" * 64
+            ),
+            "policy-hash": lambda value: value["inputs"]["policy"].__setitem__(
+                "sha256", "d" * 64
+            ),
+            "policy-size": lambda value: value["inputs"]["policy"].__setitem__(
+                "size", value["inputs"]["policy"]["size"] + 1
+            ),
+            "tool": lambda value: value["inputs"]["tool"].__setitem__(
+                "sha256", "d" * 64
+            ),
+            "reader": lambda value: value["inputs"]["decoder"][
+                "binary_reader"
+            ].__setitem__("sha256", "d" * 64),
+            "snapshot": lambda value: value["inputs"]["support_tools"][
+                "snapshot"
+            ].__setitem__("sha256", "d" * 64),
+            "provenance": lambda value: value["inputs"]["support_tools"][
+                "provenance"
+            ].__setitem__("sha256", "d" * 64),
+            "map": lambda value: value["inputs"]["function_map"].__setitem__(
+                "sha256", "d" * 64
+            ),
+            "retail": lambda value: value["inputs"]["retail_image"].__setitem__(
+                "sha256", "d" * 64
+            ),
+            "runtime": lambda value: value["inputs"]["python_runtime"].__setitem__(
+                "version", [9, 9, 9]
+            ),
+            "report": lambda value: value["inputs"]["comparison_report"].__setitem__(
+                "sha256", "d" * 64
+            ),
+            "report-sidecar": lambda value: value["inputs"][
+                "comparison_provenance"
+            ].__setitem__("sha256", "d" * 64),
+            "current-image": lambda value: value["inputs"]["current_image"].__setitem__(
+                "sha256", "d" * 64
+            ),
+            "symbols": lambda value: value["inputs"]["current_symbols"].__setitem__(
+                "sha256", "d" * 64
+            ),
+            "current-address": lambda value: value["targets"][0][
+                "current_code"
+            ].__setitem__("address", "0x12345678"),
+            "current-code": alternate_current_body,
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                document, receipt, immutable = self._frozen_fixture(root)
+                mutate(document)
+                document["content_sha256"] = oracle._document_hash(document)
+                oracle.validate_document(document, require_pass=True)
+                with self.assertRaises(ValueError):
+                    self._bind(document, receipt, root, immutable)
+
+    def test_frozen_oracle_rejects_forged_key_head_and_snapshot_hashes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document, receipt, immutable = self._frozen_fixture(root)
+            receipt["key_payload"]["campaign_ledger_base_commit"] = "d" * 40
+            with self.assertRaisesRegex(ValueError, "repository identity"):
+                self._bind(document, receipt, root, immutable)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document, receipt, immutable = self._frozen_fixture(root)
+            receipt["key_payload"]["source_worktree_sha256"] = "d" * 64
+            document["inputs"]["repository"]["source_worktree_sha256"] = "d" * 64
+            from tools import decomp_oracle as oracle
+
+            document["content_sha256"] = oracle._document_hash(document)
+            with self.assertRaisesRegex(ValueError, "repository identity"):
+                self._bind(document, receipt, root, immutable)
+
+    def test_required_source_gate_rejects_not_applicable_and_scope_omission(self):
+        from tools.tests.test_decomp_oracle import synthetic_receipt
+
+        passed = synthetic_receipt()
+        campaigns._validate_required_leaf_oracle(passed, ["0x004B0740"])
+        with self.assertRaisesRegex(ValueError, "omits"):
+            campaigns._validate_required_leaf_oracle(passed, ["0x00401000"])
+        with self.assertRaisesRegex(ValueError, "did not pass"):
+            campaigns._validate_required_leaf_oracle(
+                synthetic_receipt(selected=False), ["0x004B0740"]
+            )
+
+    def test_finalization_finds_one_exact_frozen_oracle_artifact(self):
+        from tools import decomp_oracle as oracle
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            document, receipt, immutable = self._frozen_fixture(root)
+            receipt["step_results"] = {"source_scan": {}}
+            source = oracle.write_receipt(document, root=root)
+            saved_hash = campaigns.file_hash(source)
+            frozen = (
+                root
+                / "build"
+                / "decomp-cache"
+                / "finalize"
+                / "artifacts"
+                / "sha256"
+                / saved_hash
+            )
+            frozen.parent.mkdir(parents=True, exist_ok=True)
+            frozen.write_bytes(source.read_bytes())
+            source_descriptor = {"path": str(source), "sha256": saved_hash}
+            immutable[source] = {
+                "path": str(frozen),
+                "sha256": saved_hash,
+                "source_path": str(source),
+            }
+            receipt["immutable_artifacts"] = list(immutable.values())
+            impact = ({"scope": {"functions": ["0x004B0740"]}}, {})
+            target = document["targets"][0]
+            row = {
+                "name": target["name"],
+                "type": 1,
+                "recomp": target["current_code"]["address"],
+            }
+            code = bytes.fromhex(target["current_code"]["bytes"])
+
+            def find(descriptors):
+                with patch(
+                    "tools.decomp_impact.impact_artifact", return_value=impact
+                ), patch.object(
+                    campaigns, "_step_artifact_descriptors", return_value=descriptors
+                ), patch.object(
+                    oracle, "_comparison_row", return_value=row
+                ), patch.object(
+                    oracle, "_binary_code", return_value=code
+                ), patch.object(
+                    campaigns,
+                    "_read_json_object",
+                    side_effect=AssertionError("unbounded artifact read"),
+                ), patch.object(
+                    campaigns,
+                    "file_hash",
+                    side_effect=AssertionError("unbounded immutable read"),
+                ):
+                    return campaigns._leaf_oracle_artifact(receipt)
+
+            found = find([source_descriptor])
+            self.assertEqual(found[0], document)
+            self.assertEqual(found[1]["content_sha256"], document["content_sha256"])
+
+            unrelated_source = root / "build" / "oversized-source-scan.json"
+            unrelated_frozen = frozen.parent / ("d" * 64)
+            with unrelated_frozen.open("wb") as stream:
+                stream.truncate(oracle.MAX_RECEIPT_BYTES + 1)
+            unrelated_descriptor = {
+                "path": str(unrelated_source),
+                "sha256": "d" * 64,
+            }
+            immutable[unrelated_source] = {
+                "path": str(unrelated_frozen),
+                "sha256": "d" * 64,
+                "source_path": str(unrelated_source),
+            }
+            receipt["immutable_artifacts"] = list(immutable.values())
+            found = find([unrelated_descriptor, source_descriptor])
+            self.assertEqual(found[0], document)
+
+            relative = dict(source_descriptor)
+            relative["path"] = source.relative_to(root).as_posix()
+            immutable[Path(relative["path"]).resolve()] = immutable[source]
+            with self.assertRaisesRegex(ValueError, "one leaf oracle"):
+                find([relative])
+            immutable.pop(Path(relative["path"]).resolve())
+            with self.assertRaisesRegex(ValueError, "one leaf oracle"):
+                find([source_descriptor, source_descriptor])
+            tampered = copy.deepcopy(document)
+            tampered["targets"][0]["cases"][0]["passed"] = False
+            frozen.write_text(json.dumps(tampered), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "immutable leaf oracle"):
+                find([source_descriptor])
+
+    def test_finalization_artifact_reads_are_bounded_before_hash_and_copy(self):
+        from tools import decomp_oracle as oracle
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            oracle_source = (
+                root
+                / "build"
+                / "decomp-cache"
+                / "oracle"
+                / f"{'a' * 64}.json"
+            )
+            oracle_source.parent.mkdir(parents=True)
+            with oracle_source.open("wb") as stream:
+                stream.truncate(1025)
+            with patch.object(
+                oracle, "MAX_RECEIPT_BYTES", 1024
+            ), patch.object(
+                campaigns,
+                "file_hash",
+                side_effect=AssertionError("unbounded artifact hash"),
+            ):
+                with self.assertRaises(ValueError):
+                    campaigns._finalize_artifact(oracle_source)
+                with self.assertRaises(ValueError):
+                    campaigns._cache_finalize_artifact(
+                        oracle_source,
+                        root / "build" / "decomp-cache" / "finalize",
+                    )
+
+            oracle_source.write_bytes(b"{}\n")
+            digest = hashlib.sha256(oracle_source.read_bytes()).hexdigest()
+            cache_root = root / "build" / "decomp-cache" / "finalize"
+            existing = cache_root / "artifacts" / "sha256" / digest
+            existing.parent.mkdir(parents=True)
+            with existing.open("wb") as stream:
+                stream.truncate(1025)
+            with patch.object(
+                oracle, "MAX_RECEIPT_BYTES", 1024
+            ), patch.object(
+                campaigns,
+                "file_hash",
+                side_effect=AssertionError("unbounded cache hash"),
+            ), self.assertRaises(ValueError):
+                campaigns._cache_finalize_artifact(oracle_source, cache_root)
+
+            unrelated_source = root / "build" / "unrelated.json"
+            with unrelated_source.open("wb") as stream:
+                stream.truncate(1025)
+            with patch.object(
+                campaigns, "MAX_FINALIZATION_ARTIFACT_BYTES", 1024
+            ), patch.object(
+                campaigns,
+                "file_hash",
+                side_effect=AssertionError("unbounded unrelated copy"),
+            ), self.assertRaises(ValueError):
+                campaigns._cache_finalize_artifact(
+                    unrelated_source, cache_root
+                )
+
+            unrelated_frozen = (
+                cache_root / "artifacts" / "sha256" / ("d" * 64)
+            )
+            with unrelated_frozen.open("wb") as stream:
+                stream.truncate(1025)
+            immutable_receipt = {
+                "immutable_artifacts": [
+                    {
+                        "path": str(unrelated_frozen),
+                        "sha256": "d" * 64,
+                        "source_path": str(unrelated_source),
+                    }
+                ]
+            }
+            with patch.object(
+                campaigns, "MAX_FINALIZATION_ARTIFACT_BYTES", 1024
+            ), patch.object(
+                campaigns,
+                "file_hash",
+                side_effect=AssertionError("unbounded immutable hash"),
+            ), self.assertRaises(ValueError):
+                campaigns._immutable_artifact_map(immutable_receipt)
+
+    def test_source_scan_runs_canary_after_impact_and_preserves_artifacts(self):
+        from tools import decomp_oracle as oracle
+        from tools.decomp_provenance import provenance_path
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            build = root / "build"
+            build.mkdir()
+            (build / "Makefile").write_text("all:\n", encoding="utf-8")
+            baseline = build / "baseline.json"
+            baseline_data = build / "baseline-data.json"
+            current = build / "decomp-current-report.json"
+            current_data = build / "decomp-current-data-report.json"
+            for path in (baseline, baseline_data, current, current_data):
+                path.write_text("{}\n", encoding="utf-8")
+                provenance_path(path).write_text("{}\n", encoding="utf-8")
+            impact_path = build / "impact.json"
+            oracle_path = build / "decomp-cache" / "oracle" / "receipt.json"
+            impact_path.write_text("{}\n", encoding="utf-8")
+            oracle_path.parent.mkdir(parents=True)
+            oracle_path.write_text("{}\n", encoding="utf-8")
+            private = {
+                "debt": {},
+                "lint_change": object(),
+                "new_errors": [],
+                "new_warnings": [],
+                "stale": [],
+            }
+            state = {
+                "source_worktree_root": str(root),
+                "mode": "refinement",
+                "lane": "production",
+                "impact_review_required": True,
+                "leaf_oracle_required": True,
+                "baseline_report": str(baseline),
+                "baseline_data_report": str(baseline_data),
+            }
+            passed = self._passed_document()
+            scope = ["0x00401000", "0x004B0740"]
+            impact = {"scope": {"functions": scope}}
+            with patch(
+                "tools.decomp_provenance.validate_report",
+                return_value={"input_identity": {}},
+            ), patch.object(
+                campaigns, "_standard_source_scan", return_value=({"ok": True}, private)
+            ), patch(
+                "tools.decomp_impact.build_impact_pack", return_value=impact
+            ), patch(
+                "tools.decomp_impact.write_impact_pack", return_value=impact_path
+            ), patch.object(
+                oracle, "run_oracle", return_value=(passed, oracle_path)
+            ) as run, patch.object(
+                oracle, "validate_receipt", return_value=passed
+            ) as validate, patch(
+                "tools.decomp_verify.validate", return_value=0
+            ), patch.object(
+                campaigns,
+                "_standard_command",
+                return_value=subprocess.CompletedProcess([], 0, "", ""),
+            ):
+                actions = campaigns._standard_finalize_actions(
+                    state,
+                    mode="refinement",
+                    targets=["0x00401000"],
+                    resource=None,
+                    staged=True,
+                )
+                result = actions["source_scan"]()
+                self.assertEqual(actions["validation"](), {"ok": True})
+            self.assertEqual(result["artifacts"][-1], oracle_path)
+            self.assertIn(impact_path, result["artifacts"])
+            run.assert_called_once_with(scope, root=root, report_path=current)
+            validate.assert_called_once_with(
+                oracle_path,
+                root=root,
+                current=True,
+                require_pass=True,
+                expected_scope=scope,
+            )
+
+    def test_source_scan_rejects_an_impact_scope_without_the_canary(self):
+        from tools import decomp_oracle as oracle
+        from tools.tests.test_decomp_oracle import synthetic_receipt
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            build = root / "build"
+            build.mkdir()
+            (build / "Makefile").write_text("all:\n", encoding="utf-8")
+            baseline = build / "baseline.json"
+            baseline_data = build / "baseline-data.json"
+            current = build / "decomp-current-report.json"
+            current_data = build / "decomp-current-data-report.json"
+            for path in (baseline, baseline_data, current, current_data):
+                path.write_text("{}\n", encoding="utf-8")
+                path.with_name(path.name + ".provenance.json").write_text(
+                    "{}\n", encoding="utf-8"
+                )
+            state = {
+                "source_worktree_root": str(root),
+                "mode": "coverage",
+                "lane": "research",
+                "impact_review_required": True,
+                "leaf_oracle_required": True,
+                "baseline_report": str(baseline),
+                "baseline_data_report": str(baseline_data),
+            }
+            private = {
+                "debt": {},
+                "lint_change": object(),
+                "new_errors": [],
+                "new_warnings": [],
+                "stale": [],
+            }
+            with patch(
+                "tools.decomp_provenance.validate_report",
+                return_value={"input_identity": {}},
+            ), patch.object(
+                campaigns, "_standard_source_scan", return_value=({"ok": True}, private)
+            ), patch(
+                "tools.decomp_impact.build_impact_pack",
+                return_value={"scope": {"functions": ["0x00401000"]}},
+            ), patch(
+                "tools.decomp_impact.write_impact_pack", return_value=build / "impact.json"
+            ), patch.object(
+                oracle,
+                "run_oracle",
+                return_value=(synthetic_receipt(selected=False), build / "oracle.json"),
+            ), self.assertRaisesRegex(ValueError, "omits"):
+                campaigns._standard_finalize_actions(
+                    state,
+                    mode="coverage",
+                    targets=["0x00401000"],
+                    resource=None,
+                    staged=True,
+                )["source_scan"]()
+
+    def test_delivery_leaf_proof_requires_one_current_matching_artifact(self):
+        from tools import decomp_oracle as oracle
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            document = self._passed_document()
+            path = oracle.write_receipt(document, root=root)
+            artifact = campaigns._finalize_artifact(path)
+            finalized_artifact = {
+                "path": str(root / "frozen-oracle.json"),
+                "sha256": "e" * 64,
+                "content_sha256": document["content_sha256"],
+            }
+            replay = oracle.replay_identity(document)
+            validation = {
+                "artifacts": [artifact],
+                "leaf_oracle": {
+                    "scope": ["0x004B0740"],
+                    "finalized": {
+                        "artifact": finalized_artifact,
+                        "content_sha256": document["content_sha256"],
+                        "replay_sha256": campaigns._snapshot_hash(replay),
+                    },
+                    "integrated": {
+                        "artifact": artifact,
+                        "content_sha256": document["content_sha256"],
+                        "replay_sha256": campaigns._snapshot_hash(replay),
+                    },
+                },
+            }
+            campaign = {
+                "mode": "refinement",
+                "leaf_oracle_required": True,
+            }
+            with patch.object(
+                campaigns,
+                "_leaf_oracle_artifact",
+                return_value=(document, finalized_artifact),
+            ), patch.object(
+                oracle, "validate_receipt", return_value=document
+            ) as validate:
+                campaigns._validate_delivery_leaf_oracle(
+                    validation, campaign, {}, root=root
+                )
+                validate.assert_called_once_with(
+                    path,
+                    root=root,
+                    current=True,
+                    require_pass=True,
+                    expected_scope=["0x004B0740"],
+                )
+                for name, changed in (
+                    ("omitted-proof", {"artifacts": [artifact]}),
+                    (
+                        "duplicate-artifact",
+                        {**validation, "artifacts": [artifact, artifact]},
+                    ),
+                ):
+                    with self.subTest(name=name), self.assertRaises(ValueError):
+                        campaigns._validate_delivery_leaf_oracle(
+                            changed, campaign, {}, root=root
+                        )
+                mutations = {
+                    "scope": lambda value: value["leaf_oracle"].__setitem__(
+                        "scope", ["0x00401000"]
+                    ),
+                    "finalized-artifact": lambda value: value["leaf_oracle"][
+                        "finalized"
+                    ]["artifact"].__setitem__("sha256", "1" * 64),
+                    "finalized-content": lambda value: value["leaf_oracle"][
+                        "finalized"
+                    ].__setitem__("content_sha256", "1" * 64),
+                    "finalized-replay": lambda value: value["leaf_oracle"][
+                        "finalized"
+                    ].__setitem__("replay_sha256", "1" * 64),
+                    "integrated-artifact": lambda value: value["leaf_oracle"][
+                        "integrated"
+                    ]["artifact"].__setitem__("sha256", "1" * 64),
+                    "integrated-content": lambda value: value["leaf_oracle"][
+                        "integrated"
+                    ].__setitem__("content_sha256", "1" * 64),
+                    "integrated-replay": lambda value: value["leaf_oracle"][
+                        "integrated"
+                    ].__setitem__("replay_sha256", "1" * 64),
+                }
+                for name, mutate in mutations.items():
+                    with self.subTest(name=name):
+                        changed = copy.deepcopy(validation)
+                        mutate(changed)
+                        with self.assertRaises(ValueError):
+                            campaigns._validate_delivery_leaf_oracle(
+                                changed, campaign, {}, root=root
+                            )
+
+                policy_target = oracle.load_policy()["targets"][0]
+                different = copy.deepcopy(document)
+                different["targets"] = [
+                    oracle._evaluate_target(
+                        policy_target,
+                        map_name=policy_target["function_map_name"],
+                        current_address=0x401E50,
+                        retail_code=bytes.fromhex(
+                            "8b4c2404b8100000003bc87e06d1e03bc17cfac3"
+                        ),
+                        current_code=bytes.fromhex(
+                            "8b542404b8100000003bd07e06d1e03bc27cfac3"
+                        ),
+                    )
+                ]
+                different["content_sha256"] = oracle._document_hash(different)
+                with patch.object(
+                    oracle, "validate_receipt", return_value=different
+                ), self.assertRaisesRegex(ValueError, "outcomes changed"):
+                    campaigns._validate_delivery_leaf_oracle(
+                        validation, campaign, {}, root=root
+                    )
+
+                with path.open("wb") as stream:
+                    stream.truncate(oracle.MAX_RECEIPT_BYTES + 1)
+                with patch.object(
+                    campaigns,
+                    "file_hash",
+                    side_effect=AssertionError("unbounded delivery hash"),
+                ), self.assertRaises(ValueError):
+                    campaigns._validate_delivery_leaf_oracle(
+                        validation, campaign, {}, root=root
+                    )
+            with self.assertRaisesRegex(ValueError, "unexpected"):
+                campaigns._validate_delivery_leaf_oracle(
+                    validation,
+                    {"mode": "data", "leaf_oracle_required": False},
+                    {},
+                    root=root,
+                )
+            with self.assertRaisesRegex(ValueError, "unexpected"):
+                campaigns._validate_delivery_leaf_oracle(
+                    {"artifacts": [], "leaf_oracle": None},
+                    {"mode": "data"},
+                    {},
+                    root=root,
+                )
+
+    def test_integrated_delivery_runs_a_fresh_oracle_and_compares_replay(self):
+        from tools import decomp_oracle as oracle
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            code_report = root / "build" / "decomp-current-report.json"
+            document = self._passed_document()
+            finalized_artifact = {
+                "path": str(root / "frozen.json"),
+                "sha256": "e" * 64,
+                "content_sha256": document["content_sha256"],
+            }
+            reference = {
+                "leaf_oracle": {
+                    "document": document,
+                    "artifact": finalized_artifact,
+                    "replay": oracle.replay_identity(document),
+                }
+            }
+            path = oracle.write_receipt(document, root=root)
+            with patch.object(
+                oracle, "run_oracle", return_value=(document, path)
+            ) as run:
+                proof, artifact = campaigns._run_integrated_leaf_oracle(
+                    reference, root, code_report
+                )
+            run.assert_called_once_with(
+                ["0x004B0740"], root=root, report_path=code_report
+            )
+            self.assertEqual(artifact, campaigns._finalize_artifact(path))
+            self.assertEqual(proof["integrated"]["artifact"], artifact)
+
+            changed = copy.deepcopy(document)
+            policy_target = oracle.load_policy()["targets"][0]
+            changed["targets"] = [
+                oracle._evaluate_target(
+                    policy_target,
+                    map_name=policy_target["function_map_name"],
+                    current_address=0x401E50,
+                    retail_code=bytes.fromhex(
+                        "8b4c2404b8100000003bc87e06d1e03bc17cfac3"
+                    ),
+                    current_code=bytes.fromhex(
+                        "8b542404b8100000003bd07e06d1e03bc27cfac3"
+                    ),
+                )
+            ]
+            changed["content_sha256"] = oracle._document_hash(changed)
+            changed_path = oracle.write_receipt(changed, root=root)
+            with patch.object(
+                oracle, "run_oracle", return_value=(changed, changed_path)
+            ), self.assertRaisesRegex(ValueError, "outcomes changed"):
+                campaigns._run_integrated_leaf_oracle(
+                    reference, root, code_report
+                )
+
+    def test_delivery_receipt_revalidation_calls_the_semantic_oracle_gate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            ledger = root / "ledger.jsonl"
+            campaign = {
+                "schema_version": 3,
+                "record_type": "campaign",
+                "campaign_id": "oracle-campaign",
+                "mode": "refinement",
+                "result": "source",
+                "leaf_oracle_required": True,
+                "impact_review_required": False,
+            }
+            commit = "a" * 40
+            base = "b" * 40
+            receipt = {
+                "schema_version": campaigns.SCHEMA_VERSION,
+                "receipt_version": campaigns.DELIVERY_RECEIPT_VERSION,
+                "record_type": "delivery-receipt",
+                "status": "passed",
+                "campaign_id": campaign["campaign_id"],
+                "campaign_fingerprint": campaigns._record_fingerprint(campaign),
+                "campaign_record_sha256": campaigns._snapshot_hash(campaign),
+                "source_commit": commit,
+                "base_commit": base,
+                "head": commit,
+                "resolved_paths": [],
+                "validation": {"artifacts": [], "inputs": {}, "commands": []},
+                "validation_tool_identity": {},
+            }
+            oracle_path = (
+                root
+                / "build"
+                / "decomp-cache"
+                / "oracle"
+                / f"{'d' * 64}.json"
+            )
+            oracle_path.parent.mkdir(parents=True)
+            oracle_path.write_text("{}\n", encoding="utf-8")
+            receipt["validation"]["artifacts"] = [
+                {
+                    "path": str(oracle_path),
+                    "sha256": hashlib.sha256(b"{}\n").hexdigest(),
+                }
+            ]
+            receipt["content_sha256"] = campaigns._delivery_receipt_hash(receipt)
+            path = (
+                root
+                / "build"
+                / "decomp-cache"
+                / "delivery"
+                / "oracle-campaign"
+                / f"{receipt['content_sha256']}.json"
+            )
+            with patch.object(
+                campaigns, "_read_json_object", return_value=receipt
+            ), patch.object(
+                campaigns, "_git_commit", side_effect=lambda _root, value, _label: value
+            ), patch.object(
+                campaigns, "_git_head", return_value=commit
+            ), patch.object(
+                campaigns, "_git_first_parent", return_value=base
+            ), patch.object(
+                campaigns, "_validate_campaign_record_receipt"
+            ), patch.object(
+                campaigns, "_verify_campaign_in_commit"
+            ), patch.object(
+                campaigns, "_campaign_finalize_receipt", return_value={}
+            ), patch.object(
+                campaigns, "_verify_finalized_campaign_tree", return_value=[]
+            ), patch.object(
+                campaigns, "_standard_input_hashes", return_value={}
+            ), patch.object(
+                campaigns, "_validate_delivery_command_results"
+            ), patch.object(
+                campaigns, "_validate_delivery_leaf_oracle"
+            ) as validate_leaf, patch(
+                "tools.decomp_provenance.validate_report", return_value={}
+            ), patch(
+                "tools.decomp_provenance.validation_tool_identity", return_value={}
+            ), patch.object(
+                campaigns, "_delivery_relevant_changes", return_value=[]
+            ), patch.object(
+                campaigns,
+                "file_hash",
+                side_effect=AssertionError("unbounded delivery hash"),
+            ):
+                campaigns._validated_delivery_receipt(
+                    path, campaign, ledger, root=root
+                )
+            validate_leaf.assert_called_once_with(
+                receipt["validation"], campaign, {}, root=root
+            )
+
+    def test_delivery_receipt_rejects_final_and_parent_symlinks_before_read(self):
+        campaign = {"campaign_id": "oracle-campaign"}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            parent = (
+                root
+                / "build"
+                / "decomp-cache"
+                / "delivery"
+                / "oracle-campaign"
+            )
+            parent.mkdir(parents=True)
+            target = root / "target.json"
+            target.write_text("{}", encoding="utf-8")
+            path = parent / f"{'a' * 64}.json"
+            path.symlink_to(target)
+            with self.assertRaisesRegex(
+                ValueError, "canonical content-addressed"
+            ):
+                campaigns._validated_delivery_receipt(
+                    path, campaign, root / "ledger.jsonl", root=root
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            real_build = root / "real-build"
+            real_build.mkdir()
+            (root / "build").symlink_to(real_build, target_is_directory=True)
+            path = (
+                root
+                / "build"
+                / "decomp-cache"
+                / "delivery"
+                / "oracle-campaign"
+                / f"{'a' * 64}.json"
+            )
+            with self.assertRaisesRegex(
+                ValueError, "canonical content-addressed"
+            ):
+                campaigns._validated_delivery_receipt(
+                    path, campaign, root / "ledger.jsonl", root=root
+                )
+
+    def test_campaign_receipt_reads_are_bounded_before_hash_or_parse(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            key = "a" * 64
+            finalize_path = root / f"{key}.json"
+            finalize_path.write_bytes(b"x" * 65)
+            campaign = {
+                "finalize_receipt": {
+                    "path": str(finalize_path),
+                    "file_sha256": "b" * 64,
+                    "content_sha256": "c" * 64,
+                    "receipt_key": key,
+                }
+            }
+            with patch.object(
+                campaigns, "MAX_FINALIZE_RECEIPT_BYTES", 64
+            ), patch.object(
+                Path,
+                "read_bytes",
+                side_effect=AssertionError("unbounded finalization receipt read"),
+            ), patch.object(
+                campaigns,
+                "file_hash",
+                side_effect=AssertionError("unbounded finalization receipt hash"),
+            ), self.assertRaisesRegex(ValueError, "cannot read finalization receipt"):
+                campaigns._campaign_finalize_receipt(campaign)
+
+            delivery_path = (
+                root
+                / "build"
+                / "decomp-cache"
+                / "delivery"
+                / "oracle-campaign"
+                / f"{'d' * 64}.json"
+            )
+            delivery_path.parent.mkdir(parents=True)
+            delivery_path.write_bytes(b"x" * 65)
+            with patch.object(
+                campaigns, "MAX_DELIVERY_RECEIPT_BYTES", 64
+            ), patch.object(
+                Path,
+                "read_bytes",
+                side_effect=AssertionError("unbounded delivery receipt read"),
+            ), self.assertRaisesRegex(ValueError, "cannot read delivery receipt"):
+                campaigns._validated_delivery_receipt(
+                    delivery_path,
+                    {"campaign_id": "oracle-campaign"},
+                    root / "ledger.jsonl",
+                    root=root,
+                )
+
+            record_hash = "e" * 64
+            finalize_path = root / "finalize" / f"{key}.json"
+            record_path = (
+                finalize_path.parent
+                / "campaign-records"
+                / f"{record_hash}.json"
+            )
+            record_path.parent.mkdir(parents=True)
+            record_path.write_bytes(b"x" * 65)
+            recorded_campaign = {
+                "finalize_receipt": {
+                    "path": str(finalize_path),
+                    "content_sha256": "c" * 64,
+                },
+                "campaign_record_receipt": {
+                    "path": str(record_path),
+                    "file_sha256": "f" * 64,
+                    "content_sha256": record_hash,
+                },
+            }
+            with patch.object(
+                campaigns, "MAX_CAMPAIGN_RECORD_RECEIPT_BYTES", 64
+            ), patch.object(
+                Path,
+                "read_bytes",
+                side_effect=AssertionError("unbounded campaign receipt read"),
+            ), patch.object(
+                campaigns,
+                "file_hash",
+                side_effect=AssertionError("unbounded campaign receipt hash"),
+            ), self.assertRaisesRegex(ValueError, "cannot read campaign record"):
+                campaigns._validate_campaign_record_receipt(recorded_campaign)
+
+    def test_campaign_receipt_cache_publish_is_bounded_and_collision_safe(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            path = root / "receipt.json"
+            path.write_bytes(b"xxxxx")
+            with patch.object(
+                Path,
+                "read_bytes",
+                side_effect=AssertionError("unbounded receipt collision read"),
+            ), self.assertRaisesRegex(ValueError, "different content"):
+                campaigns._publish_bounded_cache_text(
+                    path,
+                    "{}\n",
+                    description="finalization receipt",
+                    max_bytes=4,
+                )
+
+            path.unlink()
+
+            def racing_link(_source, destination):
+                Path(destination).write_bytes(b"xxxxx")
+                raise FileExistsError
+
+            with patch.object(
+                campaigns.os, "link", side_effect=racing_link
+            ), patch.object(
+                Path,
+                "read_bytes",
+                side_effect=AssertionError("unbounded racing collision read"),
+            ), self.assertRaisesRegex(ValueError, "different content"):
+                campaigns._publish_bounded_cache_text(
+                    path,
+                    "{}\n",
+                    description="delivery receipt",
+                    max_bytes=4,
+                )
+
+            path.unlink()
+            with patch.object(
+                campaigns.tempfile,
+                "mkstemp",
+                side_effect=AssertionError("oversized receipt was written"),
+            ), self.assertRaisesRegex(ValueError, "exceeds its size limit"):
+                campaigns._publish_bounded_cache_text(
+                    path,
+                    "xxxxx",
+                    description="delivery receipt",
+                    max_bytes=4,
+                )
+
+            finalize_path = root / "finalize" / f"{'a' * 64}.json"
+            campaign = {
+                "campaign_id": "record-collision",
+                "finalize_receipt": {
+                    "path": str(finalize_path),
+                    "content_sha256": "b" * 64,
+                },
+            }
+            document = {
+                "schema_version": campaigns.SCHEMA_VERSION,
+                "record_type": "campaign-record-receipt",
+                "finalize_receipt_sha256": "b" * 64,
+                "campaign": copy.deepcopy(campaign),
+            }
+            document["content_sha256"] = campaigns._campaign_record_receipt_hash(
+                document
+            )
+            serialized = json.dumps(document, indent=2, sort_keys=True) + "\n"
+            record_path = (
+                finalize_path.parent
+                / "campaign-records"
+                / f"{document['content_sha256']}.json"
+            )
+            record_path.parent.mkdir(parents=True)
+            record_path.write_bytes(b"x" * (len(serialized.encode("utf-8")) + 1))
+            with patch.object(
+                campaigns,
+                "MAX_CAMPAIGN_RECORD_RECEIPT_BYTES",
+                len(serialized.encode("utf-8")),
+            ), patch.object(
+                Path,
+                "read_text",
+                side_effect=AssertionError("unbounded campaign collision read"),
+            ), self.assertRaisesRegex(ValueError, "different content"):
+                campaigns._bind_campaign_record_receipt(campaign)
+
+    def test_meta_allowlist_and_input_identity_include_oracle_producers(self):
+        self.assertTrue(
+            campaigns._meta_workflow_path("tools/Resources/leaf-oracles.json")
+        )
+        self.assertFalse(
+            campaigns._meta_workflow_path("tools/Resources/other-policy.json")
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            resources = tools / "Resources"
+            build = root / "build"
+            original = root / "original"
+            for path in (resources, build, original):
+                path.mkdir(parents=True, exist_ok=True)
+            for name in (
+                "decomp_campaigns.py",
+                "decomp_impact.py",
+                "decomp_oracle.py",
+                "decomp_annotations.py",
+                "decomp_dependencies.py",
+                "decomp_binary.py",
+                "decomp_provenance.py",
+                "decomp_verify.py",
+                "decomp_lint.py",
+                "generate-decomp-data-report.py",
+                "decomp",
+                "decomp.ps1",
+                "ghidra_sync.py",
+            ):
+                (tools / name).write_text(name, encoding="utf-8")
+            (resources / "functions_map.txt").write_text("map", encoding="utf-8")
+            (resources / "leaf-oracles.json").write_text("{}", encoding="utf-8")
+            (original / "toy2.exe").write_bytes(b"retail")
+            with patch.object(campaigns, "__file__", str(tools / "decomp_campaigns.py")), patch(
+                "tools.decomp_dependencies.decoder_identity", return_value={}
+            ), patch.object(campaigns, "standard_finalize_commands", return_value={}):
+                standard = campaigns._standard_input_hashes(root)
+                meta = campaigns._meta_input_hashes(root)
+            for identity in (standard, meta):
+                self.assertIn("python_runtime", identity)
+                self.assertEqual(set(identity["files"]), set(identity["file_sizes"]))
+                self.assertIn(
+                    str((tools / "decomp_provenance.py").resolve()),
+                    identity["files"],
+                )
 
 
 if __name__ == "__main__":

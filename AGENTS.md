@@ -535,6 +535,27 @@ source scan, and one validation. It writes a content-addressed receipt under
 `build/decomp-cache`. It must fail when an input hash or artifact hash does not
 match. Do not accept a partial receipt.
 
+A new coverage or refinement source result also runs the allowlisted leaf
+differential oracle. The impact scope must contain `0x004B0740`. The oracle
+must select this one canary and report `passed`. Finalization freezes the
+oracle receipt with the impact evidence. Post-commit delivery creates a new
+report, runs the same vectors again, and compares the policy, code, corpus,
+ABI results, and coverage with the frozen receipt. A finite oracle result is
+regression evidence. It is not a semantic-equivalence claim.
+
+Use these commands to inspect or run the oracle directly:
+
+```sh
+tools/decomp oracle list
+tools/decomp oracle run --target 0x004B0740
+tools/decomp oracle verify --receipt RECEIPT --current --require-pass
+```
+
+Plain `oracle verify` checks the receipt document and its content-addressed
+path. `--current` or `--require-pass` runs the oracle again with the current
+bound inputs. Promotion paths always run this current check. Do not supply a
+standalone receipt to finalization.
+
 The worker stages and finalizes its campaign. The supervisor reviews the staged
 diff and receipt without another build. Revalidate only when a relevant input
 hash changes. The campaign record must use the exact receipt artifacts.

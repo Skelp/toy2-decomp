@@ -839,10 +839,17 @@ class ImpactValidationTests(unittest.TestCase):
             path = Path(directory) / "cache/value.json"
 
             def racing_link(_temporary: Path, destination: Path) -> None:
-                destination.write_text("other\n", encoding="utf-8")
+                with destination.open("wb") as stream:
+                    stream.truncate(impact.MAX_DOCUMENT_BYTES + 1)
                 raise FileExistsError
 
-            with mock.patch.object(impact.os, "link", side_effect=racing_link):
+            with mock.patch.object(
+                impact.os, "link", side_effect=racing_link
+            ), mock.patch.object(
+                Path,
+                "read_text",
+                side_effect=AssertionError("unbounded cache read"),
+            ):
                 with self.assertRaisesRegex(impact.ImpactError, "collision"):
                     impact._atomic_cache_write(
                         path,
@@ -850,7 +857,97 @@ class ImpactValidationTests(unittest.TestCase):
                         "cache collision",
                     )
 
-            self.assertEqual(path.read_text(encoding="utf-8"), "other\n")
+            self.assertEqual(path.stat().st_size, impact.MAX_DOCUMENT_BYTES + 1)
+
+    def test_impact_cache_rejects_an_oversized_existing_collision(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "cache/value.json"
+            path.parent.mkdir(parents=True)
+            with path.open("wb") as stream:
+                stream.truncate(impact.MAX_DOCUMENT_BYTES + 1)
+            with mock.patch.object(
+                Path,
+                "read_text",
+                side_effect=AssertionError("unbounded cache read"),
+            ), self.assertRaisesRegex(impact.ImpactError, "collision"):
+                impact._atomic_cache_write(
+                    path,
+                    "expected\n",
+                    "cache collision",
+                )
+
+    def test_required_impact_discovery_skips_an_oversized_oracle_artifact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            finalize, pack, _frozen = self.make_finalize(root)
+            source_descriptor = finalize["step_results"]["source_scan"][
+                "artifacts"
+            ][0]
+            old_source = Path(source_descriptor["path"])
+            new_source = (
+                root
+                / "build"
+                / "decomp-cache"
+                / "impact"
+                / "campaign-1"
+                / f"{pack['content_sha256']}.json"
+            )
+            old_source.replace(new_source)
+            source_descriptor["path"] = str(new_source)
+            impact_immutable = next(
+                row
+                for row in finalize["immutable_artifacts"]
+                if row["source_path"] == str(old_source)
+            )
+            impact_immutable["source_path"] = str(new_source)
+
+            oracle_source = (
+                root
+                / "build"
+                / "decomp-cache"
+                / "oracle"
+                / f"{'e' * 64}.json"
+            )
+            oracle_frozen = root / "cache" / "artifacts" / "sha256" / ("e" * 64)
+            with oracle_frozen.open("wb") as stream:
+                stream.truncate(impact.MAX_DOCUMENT_BYTES + 1)
+            finalize["step_results"]["source_scan"]["artifacts"].append(
+                {"path": str(oracle_source), "sha256": "e" * 64}
+            )
+            finalize["immutable_artifacts"].append(
+                {
+                    "path": str(oracle_frozen),
+                    "sha256": "e" * 64,
+                    "source_path": str(oracle_source),
+                }
+            )
+            finalize["key_payload"].update(
+                {"leaf_oracle_required": True, "source_root": str(root)}
+            )
+            finalize["receipt_key"] = impact._json_hash(finalize["key_payload"])
+            finalize["receipt_sha256"] = impact._json_hash(finalize)
+
+            real_file_hash = impact._file_hash
+
+            def bounded_only(path: Path) -> str:
+                if Path(path).resolve() == oracle_frozen:
+                    raise AssertionError("unbounded unrelated artifact read")
+                return real_file_hash(Path(path))
+
+            with mock.patch.object(
+                impact, "_file_hash", side_effect=bounded_only
+            ):
+                found, _artifact = impact.impact_artifact(finalize)
+            self.assertEqual(found, pack)
+
+            for source_root in ("relative", str(root / "root-link")):
+                with self.subTest(source_root=source_root):
+                    if source_root != "relative":
+                        Path(source_root).symlink_to(root, target_is_directory=True)
+                    changed = copy.deepcopy(finalize)
+                    changed["key_payload"]["source_root"] = source_root
+                    with self.assertRaisesRegex(impact.ImpactError, "source root"):
+                        impact.impact_artifact(changed)
 
     def test_impact_cache_enforces_the_serialized_document_bound(self):
         def escaped_pack(blob_size: int) -> dict[str, object]:
@@ -1303,6 +1400,38 @@ class ImpactValidationTests(unittest.TestCase):
                 ),
                 receipt,
             )
+
+    def test_review_identity_rejects_oversized_content_before_hash_or_parse(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            finalize, _pack, _frozen = self.make_finalize(root)
+            report = impact.make_review_template(finalize, "acceptance-reviewer")
+            accept_template(report)
+            report["content_sha256"] = impact._document_hash(report)
+            report_path = root / "review.json"
+            report_path.write_text(json_text(report), encoding="utf-8")
+            _receipt, identity = impact.create_review_receipt(
+                finalize_receipt=finalize,
+                review_report_path=report_path,
+                cache_root=root / "reviews",
+            )
+            with Path(str(identity["path"])).open("wb") as stream:
+                stream.truncate(impact.MAX_DOCUMENT_BYTES + 1)
+
+            with mock.patch.object(
+                impact,
+                "_file_hash",
+                side_effect=AssertionError("unbounded accepted-review hash"),
+            ), mock.patch.object(
+                Path,
+                "read_bytes",
+                side_effect=AssertionError("unbounded accepted-review read"),
+            ), self.assertRaisesRegex(impact.ImpactError, "size is invalid"):
+                impact.validate_review_identity(
+                    identity,
+                    finalize_receipt=finalize,
+                    cache_root=root / "reviews",
+                )
 
     def test_review_rejects_writer_or_scout_as_reviewer(self):
         for reviewer_id in ("source-writer", "retail-scout"):

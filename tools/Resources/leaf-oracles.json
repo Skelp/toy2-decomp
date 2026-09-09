@@ -1,0 +1,140 @@
+{
+  "kind": "leaf-oracle-policy",
+  "schema_version": 1,
+  "targets": [
+    {
+      "abi": {
+        "callee_saved": [
+          "ebx",
+          "esi",
+          "edi",
+          "ebp"
+        ],
+        "calling_convention": "cdecl",
+        "memory_effects": "none",
+        "parameters": [
+          {
+            "location": "stack+4",
+            "name": "number",
+            "type": "int32"
+          }
+        ],
+        "return": {
+          "location": "eax",
+          "type": "int32"
+        },
+        "stack_delta": 4
+      },
+      "address": "0x004B0740",
+      "backend": "python-ia32-subset-v1",
+      "cases": [
+        {
+          "expected": 16,
+          "id": "int-min",
+          "input": -2147483648
+        },
+        {
+          "expected": 16,
+          "id": "negative-one",
+          "input": -1
+        },
+        {
+          "expected": 16,
+          "id": "zero",
+          "input": 0
+        },
+        {
+          "expected": 16,
+          "id": "one",
+          "input": 1
+        },
+        {
+          "expected": 16,
+          "id": "below-minimum",
+          "input": 15
+        },
+        {
+          "expected": 16,
+          "id": "minimum",
+          "input": 16
+        },
+        {
+          "expected": 32,
+          "id": "above-minimum",
+          "input": 17
+        },
+        {
+          "expected": 32,
+          "id": "below-32",
+          "input": 31
+        },
+        {
+          "expected": 32,
+          "id": "power-32",
+          "input": 32
+        },
+        {
+          "expected": 64,
+          "id": "above-32",
+          "input": 33
+        },
+        {
+          "expected": 256,
+          "id": "below-256",
+          "input": 255
+        },
+        {
+          "expected": 256,
+          "id": "power-256",
+          "input": 256
+        },
+        {
+          "expected": 512,
+          "id": "above-256",
+          "input": 257
+        },
+        {
+          "expected": 65536,
+          "id": "below-65536",
+          "input": 65535
+        },
+        {
+          "expected": 65536,
+          "id": "power-65536",
+          "input": 65536
+        },
+        {
+          "expected": 131072,
+          "id": "above-65536",
+          "input": 65537
+        },
+        {
+          "expected": 1073741824,
+          "id": "above-power-29",
+          "input": 536870913
+        },
+        {
+          "expected": 1073741824,
+          "id": "power-30",
+          "input": 1073741824
+        }
+      ],
+      "function_map_name": "Nu3D::Math::RoundUpToPowerOf2",
+      "limits": {
+        "entry_esp": "0x0012FF00",
+        "max_branches": 64,
+        "max_instructions": 128,
+        "require_full_code_coverage": true,
+        "stack_base": "0x0012FE00",
+        "stack_size": 512
+      },
+      "name": "Numerics::RoundUpToPowerOf2",
+      "retail": {
+        "address": "0x004B0740",
+        "bytes": "8b4c2404b8100000003bc87e06d1e03bc17cfac3",
+        "sha256": "f22477b047d671f6b3313b7f88eb22c3b85a56de71d2eb797a8c2553de588a4c",
+        "size": 20
+      }
+    }
+  ]
+}
