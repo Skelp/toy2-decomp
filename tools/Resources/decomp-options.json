@@ -1,0 +1,12 @@
+{
+  "kind": "decomp-option-registry",
+  "options": [],
+  "preregistrations": [],
+  "route_training": {
+    "activation_study_id": null,
+    "data_gate_receipt_sha256": null,
+    "enabled": false,
+    "kind": "route-policy"
+  },
+  "schema_version": 1
+}

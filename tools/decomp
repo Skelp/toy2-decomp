@@ -5,6 +5,17 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+case "${1:-}" in
+    options)
+        shift
+        exec "$ROOT/.tooling/venv/bin/python" -m tools.decomp_options "$@"
+        ;;
+    study)
+        shift
+        exec "$ROOT/.tooling/venv/bin/python" -m tools.decomp_study "$@"
+        ;;
+esac
+
 if [[ -f .decomp-local ]]; then
     source .decomp-local
 fi
@@ -624,6 +635,8 @@ Commands:
   experiment [...] Record labeled source-form comparison trials
   replay [...]     Enroll and certify the private replay benchmark
   route advise     Give route advice only after replay certification
+  options [...]    Show the default-off option and training registry
+  study [...]      Store and evaluate private unverified study corpora
   lint [files]      Check reconstructed source for decompiler residue
   names             Re-extract .notes/original-names.md from the retail binary
   data [addr]       Show type-aware initialized-global differences

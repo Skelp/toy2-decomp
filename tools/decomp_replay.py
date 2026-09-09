@@ -635,6 +635,8 @@ def _prepare_private_temp_at(
     directory_fd: int,
     temporary: str,
     content: bytes,
+    *,
+    reject_unknown_content: bool = False,
 ) -> tuple[int, int]:
     """Create or recover one deterministic, owner-only temporary file."""
 
@@ -658,6 +660,8 @@ def _prepare_private_temp_at(
         identity = (metadata.st_dev, metadata.st_ino)
         if saved == content:
             return identity
+        if reject_unknown_content:
+            raise ReplayError("the private replay temporary file has unknown content")
         _unlink_private_identity_at(directory_fd, temporary, identity)
 
     descriptor = -1
@@ -717,7 +721,13 @@ def _prepare_private_temp_at(
             os.close(descriptor)
 
 
-def _write_exclusive_at(directory_fd: int, name: str, content: bytes) -> None:
+def _write_exclusive_at(
+    directory_fd: int,
+    name: str,
+    content: bytes,
+    *,
+    reject_unknown_temporary: bool = False,
+) -> None:
     if "/" in name or "\\" in name or name in {".", ".."}:
         raise ReplayError("the private replay document name is invalid")
     temporary = f".{name}.tmp"
@@ -742,7 +752,7 @@ def _write_exclusive_at(directory_fd: int, name: str, content: bytes) -> None:
         else:
             if existing == content:
                 try:
-                    _, temporary_metadata = _read_private_file_at(
+                    temporary_content, temporary_metadata = _read_private_file_at(
                         directory_fd,
                         temporary,
                         MAX_TRAJECTORY_BYTES,
@@ -760,6 +770,10 @@ def _write_exclusive_at(directory_fd: int, name: str, content: bytes) -> None:
                         os.fsync(directory_fd)
                         return
                     raise
+                if reject_unknown_temporary and temporary_content != content:
+                    raise ReplayError(
+                        "the private replay temporary file has unknown content"
+                    )
                 _unlink_private_identity_at(
                     directory_fd,
                     temporary,
@@ -772,6 +786,7 @@ def _write_exclusive_at(directory_fd: int, name: str, content: bytes) -> None:
             directory_fd,
             temporary,
             content,
+            reject_unknown_content=reject_unknown_temporary,
         )
         try:
             rename_noreplace = ctypes.CDLL(None, use_errno=True).renameat2

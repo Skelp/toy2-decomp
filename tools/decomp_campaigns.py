@@ -8318,6 +8318,7 @@ def _meta_input_hashes(root: Path) -> dict[str, object]:
     paths = (
         Path(__file__),
         root / ".gitignore",
+        root / "tools" / "Resources" / "decomp-options.json",
         root / "tools" / "Resources" / "private-replay-manifest.json",
         root / "tools" / "__init__.py",
         root / "tools" / "decomp_experiment.py",
@@ -8327,10 +8328,12 @@ def _meta_input_hashes(root: Path) -> dict[str, object]:
         root / "tools" / "decomp_mismatch.py",
         root / "tools" / "decomp_impact.py",
         root / "tools" / "decomp_oracle.py",
+        root / "tools" / "decomp_options.py",
         root / "tools" / "decomp_annotations.py",
         root / "tools" / "decomp_dependencies.py",
         root / "tools" / "decomp_binary.py",
         root / "tools" / "decomp_provenance.py",
+        root / "tools" / "decomp_study.py",
         root / "tools" / "decomp",
         root / "tools" / "decomp.ps1",
         root / "tools" / "decomp_lint.py",
@@ -8338,7 +8341,7 @@ def _meta_input_hashes(root: Path) -> dict[str, object]:
         root / "tools" / "Resources" / "leaf-oracles.json",
     )
     return {
-        "meta_finalize_version": 3,
+        "meta_finalize_version": 4,
         "python_runtime": _python_runtime_identity(),
         "files": {
             str(path.resolve()): file_hash(path)
@@ -8725,6 +8728,7 @@ def _meta_workflow_path(path: str) -> bool:
         "docs/decomp-agent.md",
         "tools/decomp",
         "tools/decomp.ps1",
+        "tools/Resources/decomp-options.json",
         "tools/Resources/leaf-oracles.json",
         "tools/Resources/private-replay-manifest.json",
         "tools/linux-decomp-env.sh",

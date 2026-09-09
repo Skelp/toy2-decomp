@@ -10,5 +10,11 @@
   - [ ] Enroll the required verified private cases.
   - [ ] Issue a passing certificate and enable route advice.
 - [ ] 7. Add option-gated population tool studies. Project training requires verified study data and an explicit data gate.
+  - [x] Add the default-off registry, exact evaluators, immutable private storage, aggregate failed receipts, and command infrastructure.
+  - [ ] Add an authoritative acquisition controller and acquisition receipts.
+  - [ ] Run a preregistered real private population and find one unique safe winner.
+  - [ ] Activate the winner in a later meta commit with a current passing receipt.
+  - [ ] Collect a qualified route corpus and issue a passing data-gate receipt.
+  - [ ] Train and enable the route policy.
 
 One canonical writer remains required for all source changes. Dynamic evidence cannot replace the exact or effective completion rules.

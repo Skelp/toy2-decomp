@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "doctor", "brief", "context", "impact", "oracle", "campaigns", "finalize", "discover", "evidence", "notes", "names", "defer", "undefer", "blockers", "baseline", "validate", "experiment", "replay", "route", "lint", "data", "report", "session-summary", "progress", "check", "sync", "run", "shell", "help")]
+    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "doctor", "brief", "context", "impact", "oracle", "campaigns", "finalize", "discover", "evidence", "notes", "names", "defer", "undefer", "blockers", "baseline", "validate", "experiment", "replay", "route", "options", "study", "lint", "data", "report", "session-summary", "progress", "check", "sync", "run", "shell", "help")]
     [string] $Command = "help",
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -29,6 +29,16 @@ if ($Command -eq "impact") {
 if ($Command -eq "oracle") {
     Set-Location $Root
     & $VenvPython -m tools.decomp_oracle @CommandArgs
+    exit $LASTEXITCODE
+}
+if ($Command -in @("options", "study")) {
+    Set-Location $Root
+    $Module = if ($Command -eq "options") {
+        "tools.decomp_options"
+    } else {
+        "tools.decomp_study"
+    }
+    & $VenvPython -m $Module @CommandArgs
     exit $LASTEXITCODE
 }
 if ($Command -eq "replay") {
@@ -317,6 +327,8 @@ Commands:
   experiment [args] Store and compare one source-form experiment
   replay [args]     Enroll and certify the private replay benchmark
   route advise      Give route advice only after replay certification
+  options [args]    Show the default-off option and training registry
+  study [args]      Store and evaluate private unverified study corpora
   lint [args]       Check reconstructed source plausibility
   data [addr]       Show type-aware initialized-global differences
   report [file]     Generate the self-contained HTML decompilation dashboard

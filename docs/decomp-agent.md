@@ -297,3 +297,138 @@ external append-only service. The local Python interpreter, import machinery,
 import cache, external entrypoints, and pre-finalization host are trusted. The
 certificate still binds and revalidates the tracked source of every semantic
 dependency and the immutable delivered evidence.
+
+## Option population studies
+
+The option-study registry is
+`tools/Resources/decomp-options.json`. Its schema requires each option and the
+route-training policy to be disabled. Activation receipt fields must be
+`null`. The current registry has no options and no study preregistrations.
+Thus, all options and route training are unavailable.
+
+Use these commands to inspect the public state:
+
+```sh
+tools/decomp options status --json
+tools/decomp options training-status --json
+tools/decomp options require OPTION --json
+tools/decomp study list
+```
+
+The `require` command always fails closed. The status and list commands read
+only the tracked registry. An empty registry does not create, lock, or inspect
+`.decomp-replay`.
+
+### Preregister a study
+
+A future meta campaign must add the complete preregistration to the tracked
+registry before it collects a result. The preregistration fixes these items:
+
+- The private population through opaque case, campaign, and target
+  commitments.
+- The baseline, all treatments, and each complete option map.
+- The primary metric and its direction.
+- Each protected metric and its direction.
+- The exact per-case budget and the no-early-stop policy.
+- The missing, error, invalid, and extra-row failure policy.
+- Whether the declaration or corpus is synthetic.
+
+The study ID is the SHA-256 value of the normalized preregistration. Do not put
+an introduction commit in the preregistration. That value would create a Git
+self-reference. Give the introduction commit to the ingest command instead.
+The tool proves that this commit contains the exact preregistration. It also
+proves that the commit is an ancestor of the current local and origin branch.
+Its commit time must not be later than an observation time.
+
+Each study uses the exact Cartesian product of the declared population and the
+baseline plus all treatments. The certifier enumerates the one stored corpus.
+It rejects a missing, extra, duplicate, conflicting, error, invalid, or
+incomplete-budget row. It does not accept a selected result list. An exact
+logical retry is idempotent. A different result corpus or rerun requires a new
+preregistration.
+
+### Store and inspect an unverified corpus
+
+The input file must be a bounded, owner-only regular file with mode `0600` and
+one link. The reader does not follow symbolic links. Use these commands only on
+Linux or another POSIX system that provides the required secure file
+operations:
+
+```sh
+tools/decomp study ingest STUDY_ID \
+  --preregistration-commit COMMIT --input PRIVATE_OBSERVATIONS.json
+tools/decomp study evaluate STUDY_ID --require-pass
+tools/decomp study certify STUDY_ID --require-pass
+tools/decomp study verify STUDY_ID RECEIPT_SHA256 --require-pass
+```
+
+The PowerShell wrapper has the same command dispatch and help. It provides
+parity only. All option and study registry commands fail closed on native
+Windows because the required descriptor-relative checks are unavailable. Run
+the POSIX command in a trusted Linux or WSL environment.
+
+The commands store private corpora and content-addressed receipts below
+`.decomp-replay/studies`. Directories use mode `0700`, and files use mode
+`0600`. Keep this ignored directory private. Public output contains only
+opaque commitments, content descriptors, aggregate counts, and stable failure
+codes. It does not contain individual rows, private names or paths, per-row
+metric values or scores, or per-row labels. Aggregate primary values, route
+counts, label counts, and win, tie, and loss counts can be public.
+
+Each storage or receipt operation requires the symbolic `agent/continuous`
+branch. `HEAD` must equal its local origin-tracking ref. The index must be
+clean, and the trusted study tools, registry, and wrappers must exactly match
+`HEAD`. The committed ignore rule must be root-anchored. The full `HEAD`
+history must not contain the private root. Each receipt also binds and
+revalidates the Git and Python runtime identities.
+
+All command-line inputs have acquisition class `unverified-external`. A caller
+cannot change this class with `synthetic: false` or with plausible hashes. The
+`certify` command can issue only a failed receipt with
+`unverified-acquisition`. Synthetic fixtures also fail. A future authoritative
+controller can use the internal verified-evidence evaluator after its own
+receipt design is complete. This campaign does not provide that controller.
+
+### Study acceptance rule
+
+A verified future study passes only when all these conditions are true:
+
+- There are at least 20 distinct cases, 20 campaigns, and 20 targets.
+- A treatment is eligible only if it has at least 10 non-tied pairs, zero
+  primary losses, and zero protected-metric regressions.
+- Exactly one treatment is eligible and has the unique best primary
+  aggregate.
+- Every declared treatment is complete and remains in the correction count.
+- The exact one-sided sign-test value satisfies
+  `sum(comb(n, i), i = wins..n) / 2**n <= 1 / (20 * N)`, where `N` is the
+  number of declared treatments.
+
+For one treatment, `n` excludes ties. The sign test uses integer combinations
+and rational arithmetic. It does not use a floating-point approximation. A
+tie for the best aggregate, a missing value, or an invalid value fails the
+study.
+
+### Route-policy data gate
+
+The route corpus must name an exact, current, content-addressed, passing study
+receipt. The gate reopens and revalidates that receipt. It does not accept a
+caller status object. Store and inspect a route corpus with these commands:
+
+```sh
+tools/decomp study training-ingest STUDY_ID \
+  --study-receipt STUDY_RECEIPT_SHA256 --input PRIVATE_ROUTES.json
+tools/decomp study training-evaluate STUDY_ID --require-pass
+tools/decomp study training-certify STUDY_ID --require-pass
+tools/decomp study training-verify STUDY_ID GATE_RECEIPT_SHA256 --require-pass
+```
+
+A future verified data gate requires at least 200 valid rows, 50 campaigns,
+and 50 targets. It also requires at least five canonical routes with 20 rows
+each, 50 positive labels, and 50 negative labels. The train and test sets must
+both be nonempty. Each campaign-and-target group must be wholly in one set.
+Duplicate row commitments, commitment namespace overlap, group overlap,
+unknown routes, unexpected fields, and invalid rows fail the gate.
+
+The current route ingest path is also `unverified-external`. Therefore, it can
+issue only a failed gate receipt. A synthetic route corpus also fails. The tool
+does not train a model, change the route policy, or activate an option.

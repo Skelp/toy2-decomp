@@ -4253,9 +4253,15 @@ class CampaignTests(unittest.TestCase):
     def test_meta_workflow_scope_accepts_only_the_root_roadmap(self):
         self.assertTrue(campaigns._meta_workflow_path("ROADMAP.md"))
         self.assertTrue(campaigns._meta_workflow_path("docs/decomp-agent.md"))
+        self.assertTrue(
+            campaigns._meta_workflow_path("tools/Resources/decomp-options.json")
+        )
         self.assertFalse(campaigns._meta_workflow_path("docs/ROADMAP.md"))
         self.assertFalse(campaigns._meta_workflow_path("docs/decomp-worker.md"))
         self.assertFalse(campaigns._meta_workflow_path("README.md"))
+        self.assertFalse(
+            campaigns._meta_workflow_path("tools/Resources/options-private.json")
+        )
         for generated in (
             "tools/tests/__pycache__/test_decomp_replay.cpython-313.pyc",
             "tools/__pycache__/decomp_replay.pyo",
@@ -7375,9 +7381,12 @@ class LeafOracleLifecycleTests(unittest.TestCase):
             ), self.assertRaisesRegex(ValueError, "different content"):
                 campaigns._bind_campaign_record_receipt(campaign)
 
-    def test_meta_allowlist_and_input_identity_include_oracle_producers(self):
+    def test_meta_allowlist_and_input_identity_include_workflow_producers(self):
         self.assertTrue(
             campaigns._meta_workflow_path("tools/Resources/leaf-oracles.json")
+        )
+        self.assertTrue(
+            campaigns._meta_workflow_path("tools/Resources/decomp-options.json")
         )
         self.assertFalse(
             campaigns._meta_workflow_path("tools/Resources/other-policy.json")
@@ -7394,6 +7403,8 @@ class LeafOracleLifecycleTests(unittest.TestCase):
                 "decomp_campaigns.py",
                 "decomp_impact.py",
                 "decomp_oracle.py",
+                "decomp_options.py",
+                "decomp_study.py",
                 "decomp_annotations.py",
                 "decomp_dependencies.py",
                 "decomp_binary.py",
@@ -7408,6 +7419,7 @@ class LeafOracleLifecycleTests(unittest.TestCase):
                 (tools / name).write_text(name, encoding="utf-8")
             (resources / "functions_map.txt").write_text("map", encoding="utf-8")
             (resources / "leaf-oracles.json").write_text("{}", encoding="utf-8")
+            (resources / "decomp-options.json").write_text("{}", encoding="utf-8")
             (original / "toy2.exe").write_bytes(b"retail")
             with patch.object(campaigns, "__file__", str(tools / "decomp_campaigns.py")), patch(
                 "tools.decomp_dependencies.decoder_identity", return_value={}
@@ -7421,6 +7433,36 @@ class LeafOracleLifecycleTests(unittest.TestCase):
                     str((tools / "decomp_provenance.py").resolve()),
                     identity["files"],
                 )
+            for relative in (
+                tools / "decomp_options.py",
+                tools / "decomp_study.py",
+                resources / "decomp-options.json",
+            ):
+                self.assertIn(str(relative.resolve()), meta["files"])
+                self.assertNotIn(str(relative.resolve()), standard["files"])
+
+    def test_population_study_changes_update_meta_input_identity_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            resources = tools / "Resources"
+            resources.mkdir(parents=True)
+            paths = (
+                tools / "decomp_options.py",
+                tools / "decomp_study.py",
+                resources / "decomp-options.json",
+            )
+            for path in paths:
+                path.write_text(f"{path.name} v1\n", encoding="utf-8")
+            meta_before = campaigns._meta_input_hashes(root)
+            standard_before = campaigns._standard_input_hashes(root)
+            for path in paths:
+                path.write_text(f"{path.name} v2\n", encoding="utf-8")
+                meta_after = campaigns._meta_input_hashes(root)
+                standard_after = campaigns._standard_input_hashes(root)
+                self.assertNotEqual(meta_before, meta_after)
+                self.assertEqual(standard_before, standard_after)
+                path.write_text(f"{path.name} v1\n", encoding="utf-8")
 
 
 if __name__ == "__main__":
