@@ -867,6 +867,59 @@ class CandidateTests(unittest.TestCase):
         self.assertTrue(good.production_eligible)
         self.assertGreaterEqual(good.unresolved_bytes, 100.0)
 
+    def test_production_restores_prior_yield_order_and_keeps_cohort_forecast(self):
+        higher_prior_yield = make(
+            0x402000,
+            "N::HigherPriorYield",
+            size=1000,
+            state="FUNCTION",
+            source="N.cpp",
+            match=0.60,
+            actionable_mismatch=True,
+        )
+        higher_cohort_forecast = make(
+            0x401000,
+            "N::HigherCohortForecast",
+            size=500,
+            state="FUNCTION",
+            source="N.cpp",
+            match=0.60,
+            actionable_mismatch=True,
+        )
+
+        def apply_forecasts(items, records, queue):
+            del records, queue
+            for item in items:
+                item.lane = "production"
+                item.production_eligible = True
+                item.lane_eligible = True
+                item.success_probability = 0.5
+                item.median_minutes = 10.0
+            higher_prior_yield.median_retained_bytes = 10.0
+            higher_prior_yield.expected_retained_bytes = 10.0
+            higher_prior_yield.expected_minutes = 10.0
+            higher_prior_yield.expected_bytes_per_minute = 1.0
+            higher_cohort_forecast.median_retained_bytes = 100.0
+            higher_cohort_forecast.expected_retained_bytes = 100.0
+            higher_cohort_forecast.expected_minutes = 10.0
+            higher_cohort_forecast.expected_bytes_per_minute = 10.0
+
+        with patch.object(candidates, "apply_lane_model", apply_forecasts):
+            chosen = select_lane(
+                [higher_cohort_forecast, higher_prior_yield],
+                "production",
+                queue="refinement",
+            )
+
+        self.assertEqual(
+            [item.address for item in chosen],
+            [higher_prior_yield.address, higher_cohort_forecast.address],
+        )
+        self.assertEqual(higher_prior_yield.expected_retained_bytes, 10.0)
+        self.assertEqual(higher_cohort_forecast.expected_retained_bytes, 100.0)
+        self.assertEqual(higher_prior_yield.expected_bytes_per_minute, 1.0)
+        self.assertEqual(higher_cohort_forecast.expected_bytes_per_minute, 10.0)
+
     def test_production_accepts_a_current_score_without_a_saved_diff(self):
         target = make(
             0x401000, "N::Target", size=1000, state="FUNCTION", match=0.60

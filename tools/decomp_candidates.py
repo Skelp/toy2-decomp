@@ -1561,6 +1561,12 @@ def estimate_yield(candidate: Candidate, queue: str | None) -> None:
     )
 
 
+def _production_ranking_yield_rate(candidate: Candidate) -> float:
+    ranking_candidate = replace(candidate)
+    estimate_yield(ranking_candidate, "refinement")
+    return float(ranking_candidate.expected_bytes_per_minute or 0.0)
+
+
 def _record_time(record: dict[str, object]) -> str:
     for field_name in ("ended_at", "timestamp", "started_at"):
         value = record.get(field_name)
@@ -2762,13 +2768,10 @@ def select(
     if lane == "production":
         chosen.sort(
             key=lambda item: (
-                item.prior_attempts > 0,
-                -(
-                    float(item.median_retained_bytes or 0.0)
-                    / float(item.median_minutes or 1.0)
-                ),
-                -float(item.success_probability or 0.0),
-                item.circuit_breaker_open,
+                item.map_defect,
+                -_production_ranking_yield_rate(item),
+                item.active_penalty_attempts,
+                -item.rank,
                 item.address,
             )
         )
