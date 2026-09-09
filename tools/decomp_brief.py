@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from tools.decomp_campaigns import LANE_MODES  # noqa: E402
+from tools.decomp_mismatch import classify_report_diff, empty_taxonomy  # noqa: E402
 from tools.decomp_doctor import (  # noqa: E402
     CACHE_RELATIVE as DOCTOR_CACHE_RELATIVE,
     RECEIPT_DIRECTORY_RELATIVE,
@@ -58,6 +59,7 @@ TOOL_INPUTS = (
     Path("tools/decomp_provenance.py"),
     Path("tools/decomp_lint.py"),
     Path("tools/decomp_status.py"),
+    Path("tools/decomp_mismatch.py"),
 )
 SCOUT_REPORT_SCHEMA = 2
 SCOUT_REPORT_MAX_BYTES = 64 * 1024
@@ -1036,7 +1038,12 @@ def _mismatch_class(diff: object, matching: float, effective: bool) -> str:
 
 def _mismatch_summary(row: dict[str, object] | None) -> dict[str, object]:
     if row is None:
-        return {"available": False, "class": "missing-report-entry", "clusters": []}
+        return {
+            "available": False,
+            "class": "missing-report-entry",
+            "taxonomy": empty_taxonomy(),
+            "clusters": [],
+        }
     try:
         matching = float(row.get("matching", 0.0))
     except (TypeError, ValueError):
@@ -1070,6 +1077,7 @@ def _mismatch_summary(row: dict[str, object] | None) -> dict[str, object]:
         "matching": matching,
         "effective": bool(row.get("effective")),
         "class": _mismatch_class(diff, matching, bool(row.get("effective"))),
+        "taxonomy": classify_report_diff(diff),
         "clusters": clusters,
     }
 

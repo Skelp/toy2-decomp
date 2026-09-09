@@ -26,6 +26,7 @@ from tools.decomp_status import (  # noqa: E402
 )
 from tools import decomp_lint  # noqa: E402
 from tools.decomp_annotations import read_source_annotations  # noqa: E402
+from tools.decomp_mismatch import classify_report_diff  # noqa: E402
 from tools.decomp_resources import (  # noqa: E402
     ResourceId,
     parse_resource,
@@ -772,6 +773,7 @@ def experiment_record(report: Path, address: int) -> dict[str, object]:
         "reccmp_effective": status.effective,
         "binary_status": verification_status(status, tool_artifact=tool),
         "normalized_diff": normalized,
+        "mismatch_taxonomy": classify_report_diff(status.diff),
         "structural_changes": {
             "row_count_groups": row_count_changes,
             "opcode_rows": opcode_changes,

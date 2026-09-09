@@ -1012,6 +1012,25 @@ class BriefTests(unittest.TestCase):
             reasons,
         )
 
+    def test_mismatch_summary_keeps_legacy_class_and_adds_taxonomy(self):
+        diff = [
+            [
+                "@@ -0x401000,1 +0x501000,1 @@",
+                [
+                    {
+                        "orig": [["0x401000", "call Original"]],
+                        "recomp": [["0x501000", "call Recompiled"]],
+                    }
+                ],
+            ]
+        ]
+        summary = brief._mismatch_summary(
+            {"matching": 0.6, "effective": False, "diff": diff}
+        )
+        self.assertEqual(summary["class"], "call-shape")
+        self.assertEqual(summary["taxonomy"]["schema_version"], 1)
+        self.assertEqual(summary["taxonomy"]["primary_route"], "call")
+
     def test_research_route_uses_a_specific_hash_bound_blocker(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

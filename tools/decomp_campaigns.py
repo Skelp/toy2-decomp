@@ -7250,6 +7250,7 @@ def _meta_workflow_path(path: str) -> bool:
     relative = Path(path)
     if path in {
         "AGENTS.md",
+        "ROADMAP.md",
         "decomp_utils.py",
         "tools/decomp",
         "tools/decomp.ps1",

@@ -4152,6 +4152,11 @@ class CampaignTests(unittest.TestCase):
                     )
                 self.assertTrue(state_path.is_file())
 
+    def test_meta_workflow_scope_accepts_only_the_root_roadmap(self):
+        self.assertTrue(campaigns._meta_workflow_path("ROADMAP.md"))
+        self.assertFalse(campaigns._meta_workflow_path("docs/ROADMAP.md"))
+        self.assertFalse(campaigns._meta_workflow_path("README.md"))
+
     def test_schema_two_baseline_ledger_is_not_an_unstaged_change(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

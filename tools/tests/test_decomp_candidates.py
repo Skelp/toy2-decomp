@@ -953,6 +953,28 @@ class CandidateTests(unittest.TestCase):
             candidates.mismatch_artifact_is_current(artifacts[0x401000], 0.7)
         )
 
+    def test_candidate_taxonomy_is_additive_to_legacy_labels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "0x00401000.txt"
+            path.write_text(
+                "@@ -0x401000,1 +0x501000,1 @@\n"
+                "0x401000 : -call Original\n"
+                "         : +call Recompiled\n",
+                encoding="utf-8",
+            )
+            target = make(
+                0x401000,
+                "N::Target",
+                size=100,
+                actionable_mismatch=True,
+                mismatch_artifact=str(path),
+                mismatch_classifications=("instruction",),
+            )
+            taxonomy = candidates.mismatch_taxonomy(target)
+        self.assertEqual(target.mismatch_classifications, ("instruction",))
+        self.assertEqual(taxonomy["schema_version"], 1)
+        self.assertEqual(taxonomy["primary_route"], "call")
+
     def test_research_lane_uses_evidence_value_without_a_byte_forecast(self):
         dependency = make(
             0x401000, "N::Dependency", size=1000, state="STUB"

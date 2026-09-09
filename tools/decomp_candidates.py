@@ -66,6 +66,11 @@ from tools.decomp_dependencies import (  # noqa: E402
     strongly_connected_components,
 )
 from tools.decomp_campaigns import address_stats, read_records  # noqa: E402
+from tools.decomp_mismatch import (  # noqa: E402
+    classify_text_diff,
+    empty_taxonomy,
+    legacy_candidate_classifications,
+)
 
 # A leaf-sized function is small enough that one decompilation shows the whole
 # body. The threshold is a heuristic on the gap to the next map address.
@@ -582,28 +587,7 @@ def _mismatch_change_kind(line: str) -> str:
 
 
 def _classify_mismatch_window(lines: list[str]) -> tuple[str, ...]:
-    text = "\n".join(lines).lower()
-    classes: list[str] = []
-    if any(
-        token in text
-        for token in (
-            " jmp ",
-            " je ",
-            " jne ",
-            " jg ",
-            " jl ",
-            " call ",
-            " ret ",
-        )
-    ):
-        classes.append("control-flow")
-    if "[" in text or "(data)" in text or "(offset)" in text:
-        classes.append("data-access")
-    if " esp" in text or " ebp" in text:
-        classes.append("stack-frame")
-    if any(token in text for token in (" fld", " fst", " fmul", " fadd", " fsub")):
-        classes.append("floating-point")
-    return tuple(classes or ("instruction",))
+    return legacy_candidate_classifications(lines)
 
 
 def read_actionable_mismatches(
@@ -705,6 +689,23 @@ def mismatch_artifact_is_current(
         rel_tol=0.0,
         abs_tol=0.000051,
     )
+
+
+def mismatch_taxonomy(candidate: Candidate, *, root: Path = ROOT) -> dict[str, object]:
+    """Return additive route data for a candidate saved diff."""
+
+    if not candidate.has_actionable_mismatch:
+        return empty_taxonomy()
+    path = Path(candidate.mismatch_artifact)
+    if not path.is_absolute():
+        path = root / path
+    try:
+        if path.stat().st_size > 10_000_000:
+            return empty_taxonomy()
+        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    except OSError:
+        return empty_taxonomy()
+    return classify_text_diff(lines)
 
 
 def build_candidates() -> list[Candidate]:
@@ -3438,6 +3439,7 @@ def main() -> int:
                     "mismatch_artifact": item.mismatch_artifact,
                     "mismatch_windows": item.mismatch_windows,
                     "mismatch_classifications": item.mismatch_classifications,
+                    "mismatch_taxonomy": mismatch_taxonomy(item),
                     "source": item.source,
                     "siblings": item.siblings,
                     "lint_errors": item.lint_errors,

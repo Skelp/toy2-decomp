@@ -55,6 +55,51 @@ class VerifyRegressionTests(unittest.TestCase):
         path.write_text(json.dumps({"data": rows}), encoding="utf-8")
         return path
 
+    def test_experiment_record_adds_taxonomy_without_changing_structural_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report = self.write_report(
+                directory,
+                "report.json",
+                [
+                    {
+                        "address": "0x00401000",
+                        "matching": 0.6,
+                        "diff": [
+                            [
+                                "@@ -0x401000,1 +0x501000,2 @@",
+                                [
+                                    {
+                                        "orig": [["0x401000", "call Original"]],
+                                        "recomp": [["0x501000", "call Recompiled"]],
+                                    },
+                                    {
+                                        "orig": [],
+                                        "recomp": [["0x501005", "push eax"]],
+                                    },
+                                ],
+                            ]
+                        ],
+                    }
+                ],
+            )
+            record = VERIFY.experiment_record(report, 0x401000)
+        self.assertEqual(
+            record["structural_changes"],
+            {
+                "row_count_groups": 1,
+                "opcode_rows": 0,
+                "register_rows": 0,
+                "stack_or_frame_rows": 0,
+                "control_flow_rows": 1,
+            },
+        )
+        self.assertEqual(len(record["normalized_diff"]), 1)
+        self.assertEqual(record["mismatch_taxonomy"]["schema_version"], 1)
+        self.assertEqual(
+            record["mismatch_taxonomy"]["row_changes"],
+            {"replace": 1, "insert": 1, "delete": 0},
+        )
+
     def write_data_report(
         self,
         directory,
