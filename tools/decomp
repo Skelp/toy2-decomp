@@ -107,9 +107,13 @@ write_comparison_report() {
 
 write_data_report() {
     local output_name="$1"
+    local report_path="$output_name"
     local input_receipt="build/decomp-cache/provenance/data-input-${BASHPID}.json"
+    if [[ $report_path != /* ]]; then
+        report_path="build/$report_path"
+    fi
     if ! python tools/decomp_provenance.py capture-input "$input_receipt" \
-        --output "build/$output_name" >/dev/null; then
+        --output "$report_path" >/dev/null; then
         return 1
     fi
     if ! python tools/generate-decomp-data-report.py \
@@ -117,11 +121,11 @@ write_data_report() {
         --recompiled build/toy2.exe \
         --pdb build/toy2.pdb \
         --source-root src \
-        --output "build/$output_name"; then
+        --output "$report_path"; then
         rm -f "$input_receipt"
         return 1
     fi
-    if ! python tools/decomp_provenance.py seal-report "build/$output_name" \
+    if ! python tools/decomp_provenance.py seal-report "$report_path" \
         --input-receipt "$input_receipt" >/dev/null; then
         rm -f "$input_receipt"
         return 1
@@ -360,56 +364,161 @@ validate() {
 
 experiment() {
     local action="${1:-}"
-    local address="${2:-}"
-    if [[ -z "$action" || -z "$address" ]]; then
-        echo "Usage: tools/decomp experiment start|try|report <address> [label]" >&2
+    shift || true
+    if [[ -z "$action" ]]; then
+        echo "Usage: tools/decomp experiment start|try|status|best|advise|report <address> [label] [options]" >&2
         return 2
     fi
-    local directory="build/decomp-experiments/${address}"
     case "$action" in
         start)
-            mkdir -p "$directory"
-            build
-            refresh_function_sizes
-            write_comparison_report "decomp-experiments/${address}/baseline-report.json"
-            write_data_report "decomp-experiments/${address}/baseline-data-report.json"
-            python tools/decomp_verify.py metadata "$directory/compiler-context.json" \
-                --report "$directory/baseline-report.json" \
-                --data-report "$directory/baseline-data-report.json"
-            git diff --binary > "$directory/baseline.patch"
-            echo "Started experiment $address in $directory."
+            local address="${1:-}"
+            [[ -n "$address" ]] || {
+                echo "error: experiment start needs an address" >&2
+                return 2
+            }
+            shift
+            local plan_text
+            plan_text=$(python tools/decomp_experiment.py begin-session \
+                "$address" "$@" --format lines) || return
+            local plan=()
+            mapfile -t plan <<< "$plan_text"
+            [[ ${#plan[@]} -eq 7 ]] || {
+                echo "error: the experiment session plan is incomplete" >&2
+                return 2
+            }
+            local session_id="${plan[0]}"
+            local session_directory="${plan[1]}"
+            local baseline_report="${plan[2]}"
+            local baseline_data_report="${plan[3]}"
+            local compiler_context="${plan[4]}"
+            local source_patch="${plan[5]}"
+            local build_lock="${plan[6]}"
+            (
+                flock 9
+                build || return
+                refresh_function_sizes || return
+                write_comparison_report "$baseline_report" || return
+                write_data_report "$baseline_data_report" || return
+                python tools/decomp_verify.py metadata "$compiler_context" \
+                    --report "$baseline_report" \
+                    --data-report "$baseline_data_report" || return
+                git diff --binary > "$source_patch" || return
+                python tools/decomp_experiment.py attach-baseline "$address" \
+                    --session "$session_id" >/dev/null || return
+            ) 9>"$build_lock" || return
+            echo "Started experiment $address in $session_directory."
             ;;
         try)
-            local label="${3:-}"
-            if [[ ! "$label" =~ ^[A-Za-z0-9._-]+$ ]]; then
-                echo "error: give the trial a label with letters, numbers, dot, dash, or underscore" >&2
+            local address="${1:-}"
+            local label="${2:-}"
+            if [[ -z "$address" || -z "$label" ]]; then
+                echo "error: experiment try needs an address and a label" >&2
                 return 2
             fi
-            mkdir -p "$directory"
-            build_game
-            write_comparison_report "decomp-experiment-${address}-${label}.json"
-            git diff --binary > "$directory/${label}.patch"
-            (cd build && reccmp-reccmp --target TOY2 --no-color --verbose "$address") \
-                > "$directory/${label}.diff.txt"
-            cp "build/decomp-experiment-${address}-${label}.json" "$directory/${label}.report.json"
-            cp "$directory/compiler-context.json" "$directory/${label}.compiler-context.json"
-            python tools/decomp_verify.py experiment \
-                "$directory/${label}.report.json" "$address" "$directory/${label}.normalized.json"
-            python tools/decomp_verify.py classify "$directory/${label}.report.json" "$address" \
-                | tee "$directory/${label}.summary.txt"
-            python tools/decomp_campaigns.py first-score \
-                --address "$address" \
-                --report "build/decomp-experiment-${address}-${label}.json" \
-                --score-functions-map tools/Resources/functions_map.txt \
-                --score-function-sizes build/decomp-function-sizes.json \
-                --score-source-root src \
-                --quiet
+            shift 2
+            local trial_plan_text
+            trial_plan_text=$(python tools/decomp_experiment.py reserve \
+                "$address" "$label" "$@" --format lines) || return
+            local trial_plan=()
+            mapfile -t trial_plan <<< "$trial_plan_text"
+            [[ ${#trial_plan[@]} -eq 8 ]] || {
+                echo "error: the experiment trial plan is incomplete" >&2
+                return 2
+            }
+            local session_id="${trial_plan[0]}"
+            local trial_id="${trial_plan[1]}"
+            local trial_directory="${trial_plan[2]}"
+            local trial_report="${trial_plan[3]}"
+            local trial_diff="${trial_plan[4]}"
+            local source_patch="${trial_plan[5]}"
+            local compiler_context="${trial_plan[6]}"
+            local build_lock="${trial_plan[7]}"
+            (
+                trap 'python tools/decomp_experiment.py fail "$address" --session "$session_id" --trial "$trial_id" --stage interrupted --message "The experiment wrapper was interrupted." >/dev/null 2>&1 || true; exit 130' INT TERM HUP
+                flock 9
+                local failure_code
+                if build_game; then
+                    :
+                else
+                    failure_code=$?
+                    python tools/decomp_experiment.py fail "$address" --session "$session_id" \
+                        --trial "$trial_id" --stage build --exit-code "$failure_code" \
+                        --message "The experiment build failed." >/dev/null || true
+                    return "$failure_code"
+                fi
+                if write_comparison_report "$trial_report"; then
+                    :
+                else
+                    failure_code=$?
+                    python tools/decomp_experiment.py fail "$address" --session "$session_id" \
+                        --trial "$trial_id" --stage comparison --exit-code "$failure_code" \
+                        --message "The experiment comparison failed." >/dev/null || true
+                    return "$failure_code"
+                fi
+                if git diff --binary > "$source_patch"; then
+                    :
+                else
+                    failure_code=$?
+                    python tools/decomp_experiment.py fail "$address" --session "$session_id" \
+                        --trial "$trial_id" --stage normalize --exit-code "$failure_code" \
+                        --message "The experiment source patch failed." >/dev/null || true
+                    return "$failure_code"
+                fi
+                if (cd build && reccmp-reccmp --target TOY2 --no-color --verbose "$address") \
+                    > "$trial_diff"; then
+                    :
+                else
+                    failure_code=$?
+                    python tools/decomp_experiment.py fail "$address" --session "$session_id" \
+                        --trial "$trial_id" --stage diff --exit-code "$failure_code" \
+                        --message "The verbose experiment comparison failed." >/dev/null || true
+                    return "$failure_code"
+                fi
+                if python tools/decomp_provenance.py seal-diff "$trial_diff" \
+                    --address "$address" --report "$trial_report" >/dev/null; then
+                    :
+                else
+                    failure_code=$?
+                    python tools/decomp_experiment.py fail "$address" --session "$session_id" \
+                        --trial "$trial_id" --stage diff --exit-code "$failure_code" \
+                        --message "The verbose experiment provenance failed." >/dev/null || true
+                    return "$failure_code"
+                fi
+                if python tools/decomp_verify.py metadata "$compiler_context" \
+                    --report "$trial_report"; then
+                    :
+                else
+                    failure_code=$?
+                    python tools/decomp_experiment.py fail "$address" --session "$session_id" \
+                        --trial "$trial_id" --stage normalize --exit-code "$failure_code" \
+                        --message "The experiment compiler context failed." >/dev/null || true
+                    return "$failure_code"
+                fi
+                if python tools/decomp_experiment.py record "$address" \
+                    --session "$session_id" --trial "$trial_id"; then
+                    :
+                else
+                    failure_code=$?
+                    python tools/decomp_experiment.py fail "$address" --session "$session_id" \
+                        --trial "$trial_id" --stage normalize --exit-code "$failure_code" \
+                        --message "The experiment record failed." >/dev/null || true
+                    return "$failure_code"
+                fi
+                trap - INT TERM HUP
+                python tools/decomp_campaigns.py first-score \
+                    --address "$address" \
+                    --report "$trial_report" \
+                    --score-functions-map tools/Resources/functions_map.txt \
+                    --score-function-sizes build/decomp-function-sizes.json \
+                    --score-source-root src \
+                    --quiet
+            ) 9>"$build_lock"
             ;;
-        report)
-            find "$directory" -maxdepth 1 -name '*.summary.txt' -print -exec sed -n '1,4p' {} \;
+        status|best|advise|report)
+            python tools/decomp_experiment.py "$action" "$@"
             ;;
         *)
-            echo "error: experiment action must be start, try, or report" >&2
+            echo "error: experiment action must be start, try, status, best, advise, or report" >&2
             return 2
             ;;
     esac

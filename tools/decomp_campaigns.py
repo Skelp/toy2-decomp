@@ -7252,6 +7252,7 @@ def _meta_workflow_path(path: str) -> bool:
         "AGENTS.md",
         "ROADMAP.md",
         "decomp_utils.py",
+        "docs/decomp-agent.md",
         "tools/decomp",
         "tools/decomp.ps1",
         "tools/linux-decomp-env.sh",

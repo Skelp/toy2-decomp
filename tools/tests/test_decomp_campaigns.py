@@ -4154,7 +4154,9 @@ class CampaignTests(unittest.TestCase):
 
     def test_meta_workflow_scope_accepts_only_the_root_roadmap(self):
         self.assertTrue(campaigns._meta_workflow_path("ROADMAP.md"))
+        self.assertTrue(campaigns._meta_workflow_path("docs/decomp-agent.md"))
         self.assertFalse(campaigns._meta_workflow_path("docs/ROADMAP.md"))
+        self.assertFalse(campaigns._meta_workflow_path("docs/decomp-worker.md"))
         self.assertFalse(campaigns._meta_workflow_path("README.md"))
 
     def test_schema_two_baseline_ledger_is_not_an_unstaged_change(self):

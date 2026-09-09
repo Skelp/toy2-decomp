@@ -934,60 +934,140 @@ switch ($Command) {
         }
     }
     "experiment" {
-        if ($CommandArgs.Count -lt 2) {
-            throw "Usage: tools/decomp.ps1 experiment start|try|report <address> [label]"
+        if ($CommandArgs.Count -lt 1) {
+            throw "Usage: tools/decomp.ps1 experiment start|try|status|best|advise|report <address> [label] [options]"
         }
         $Action = $CommandArgs[0]
-        $Address = $CommandArgs[1]
-        $Directory = Join-Path $Root "build\decomp-experiments\$Address"
         if ($Action -eq "start") {
-            New-Item -ItemType Directory -Force $Directory | Out-Null
-            Build-Project
-            Update-FunctionSizes
-            $Report = Join-Path $Directory "baseline-report.json"
-            $DataReport = Join-Path $Directory "baseline-data-report.json"
-            Write-ComparisonReport $Report
-            Write-DataReport $DataReport
-            & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") metadata `
-                (Join-Path $Directory "compiler-context.json") `
-                --report $Report `
-                --data-report $DataReport
-            Assert-LastExit "Recording experiment baseline"
-            & git diff --binary | Set-Content -Encoding utf8 (Join-Path $Directory "baseline.patch")
-        } elseif ($Action -eq "try") {
-            if ($CommandArgs.Count -ne 3 -or $CommandArgs[2] -notmatch '^[A-Za-z0-9._-]+$') {
-                throw "Give the experiment a label with letters, numbers, dots, dashes, or underscores."
+            if ($CommandArgs.Count -lt 2) {
+                throw "Experiment start needs an address."
             }
-            $Label = $CommandArgs[2]
-            New-Item -ItemType Directory -Force $Directory | Out-Null
-            Build-Project
-            $Report = Join-Path $Root "build\decomp-experiment-$Address-$Label.json"
-            Write-ComparisonReport $Report
-            & git diff --binary | Set-Content -Encoding utf8 (Join-Path $Directory "$Label.patch")
-            Push-Location (Join-Path $Root "build")
+            $Address = $CommandArgs[1]
+            $Extra = @()
+            if ($CommandArgs.Count -gt 2) {
+                $Extra = $CommandArgs[2..($CommandArgs.Count - 1)]
+            }
+            $Plan = @(& $VenvPython (Join-Path $Root "tools\decomp_experiment.py") `
+                begin-session $Address @Extra --format lines)
+            Assert-LastExit "Preparing the experiment session"
+            if ($Plan.Count -ne 7) {
+                throw "The experiment session plan is incomplete."
+            }
+            $SessionId = $Plan[0]
+            $SessionDirectory = $Plan[1]
+            $BaselineReport = $Plan[2]
+            $BaselineDataReport = $Plan[3]
+            $CompilerContext = $Plan[4]
+            $SourcePatch = $Plan[5]
+            $BuildLock = $Plan[6]
+            $LockStream = $null
             try {
-                & reccmp-reccmp --target TOY2 --no-color --verbose $Address | Set-Content -Encoding utf8 (Join-Path $Directory "$Label.diff.txt")
-                Assert-LastExit "Comparing the experiment"
+                $LockStream = [IO.File]::Open(
+                    $BuildLock,
+                    [IO.FileMode]::OpenOrCreate,
+                    [IO.FileAccess]::ReadWrite,
+                    [IO.FileShare]::None
+                )
+                Build-Project
+                Update-FunctionSizes
+                Write-ComparisonReport $BaselineReport
+                Write-DataReport $BaselineDataReport
+                & $VenvPython (Join-Path $Root "tools\decomp_verify.py") metadata `
+                    $CompilerContext --report $BaselineReport --data-report $BaselineDataReport
+                Assert-LastExit "Recording the experiment baseline"
+                & git diff --binary | Set-Content -Encoding utf8 $SourcePatch
+                Assert-LastExit "Recording the experiment source patch"
+                & $VenvPython (Join-Path $Root "tools\decomp_experiment.py") `
+                    attach-baseline $Address --session $SessionId | Out-Null
+                Assert-LastExit "Attaching the experiment baseline"
             } finally {
-                Pop-Location
+                if ($null -ne $LockStream) { $LockStream.Dispose() }
             }
-            Copy-Item $Report (Join-Path $Directory "$Label.report.json")
-            Copy-Item (Join-Path $Directory "compiler-context.json") (Join-Path $Directory "$Label.compiler-context.json")
-            & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") experiment `
-                (Join-Path $Directory "$Label.report.json") $Address (Join-Path $Directory "$Label.normalized.json")
-            Assert-LastExit "Recording normalized experiment data"
-            & (Join-Path $VenvScripts "python.exe") (Join-Path $Root "tools\decomp_verify.py") classify `
-                (Join-Path $Directory "$Label.report.json") $Address | Tee-Object -FilePath (Join-Path $Directory "$Label.summary.txt")
-            Assert-LastExit "Classifying the experiment"
-            Stamp-FirstScore -Addresses @($Address) `
-                -Report $Report
-        } elseif ($Action -eq "report") {
-            Get-ChildItem $Directory -Filter "*.summary.txt" | Sort-Object Name | ForEach-Object {
-                Write-Host $_.FullName
-                Get-Content $_.FullName -TotalCount 4
+            Write-Host "Started experiment $Address in $SessionDirectory."
+        } elseif ($Action -eq "try") {
+            if ($CommandArgs.Count -lt 3) {
+                throw "Experiment try needs an address and a label."
             }
+            $Address = $CommandArgs[1]
+            $Label = $CommandArgs[2]
+            $Extra = @()
+            if ($CommandArgs.Count -gt 3) {
+                $Extra = $CommandArgs[3..($CommandArgs.Count - 1)]
+            }
+            $TrialPlan = @(& $VenvPython (Join-Path $Root "tools\decomp_experiment.py") `
+                reserve $Address $Label @Extra --format lines)
+            Assert-LastExit "Reserving the experiment trial"
+            if ($TrialPlan.Count -ne 8) {
+                throw "The experiment trial plan is incomplete."
+            }
+            $SessionId = $TrialPlan[0]
+            $TrialId = $TrialPlan[1]
+            $TrialDirectory = $TrialPlan[2]
+            $Report = $TrialPlan[3]
+            $Diff = $TrialPlan[4]
+            $SourcePatch = $TrialPlan[5]
+            $CompilerContext = $TrialPlan[6]
+            $BuildLock = $TrialPlan[7]
+            $LockStream = $null
+            $FailureStage = "build"
+            try {
+                $LockStream = [IO.File]::Open(
+                    $BuildLock,
+                    [IO.FileMode]::OpenOrCreate,
+                    [IO.FileAccess]::ReadWrite,
+                    [IO.FileShare]::None
+                )
+                Build-Project
+                $FailureStage = "comparison"
+                Write-ComparisonReport $Report
+                $FailureStage = "normalize"
+                & git diff --binary | Set-Content -Encoding utf8 $SourcePatch
+                Assert-LastExit "Recording the experiment source patch"
+                $FailureStage = "diff"
+                Push-Location (Join-Path $Root "build")
+                try {
+                    & reccmp-reccmp --target TOY2 --no-color --verbose $Address |
+                        Set-Content -Encoding utf8 $Diff
+                    Assert-LastExit "Comparing the experiment"
+                } finally {
+                    Pop-Location
+                }
+                & $VenvPython (Join-Path $Root "tools\decomp_provenance.py") seal-diff `
+                    $Diff --address $Address --report $Report | Out-Null
+                Assert-LastExit "Sealing the experiment diff"
+                $FailureStage = "normalize"
+                & $VenvPython (Join-Path $Root "tools\decomp_verify.py") metadata `
+                    $CompilerContext --report $Report
+                Assert-LastExit "Recording the experiment compiler context"
+                & $VenvPython (Join-Path $Root "tools\decomp_experiment.py") record `
+                    $Address --session $SessionId --trial $TrialId
+                Assert-LastExit "Recording the experiment trial"
+            } catch {
+                $FailureCode = if ($LASTEXITCODE) { $LASTEXITCODE } else { 1 }
+                $FailureMessage = $_.Exception.Message
+                if ($FailureMessage.Length -gt 2000) {
+                    $FailureMessage = $FailureMessage.Substring(0, 2000)
+                }
+                & $VenvPython (Join-Path $Root "tools\decomp_experiment.py") fail `
+                    $Address --session $SessionId --trial $TrialId --stage $FailureStage `
+                    --exit-code $FailureCode --message $FailureMessage | Out-Null
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Warning "The experiment controller could not record the trial failure."
+                }
+                throw
+            } finally {
+                if ($null -ne $LockStream) { $LockStream.Dispose() }
+            }
+            Stamp-FirstScore -Addresses @($Address) -Report $Report
+        } elseif ($Action -in @("status", "best", "advise", "report")) {
+            if ($CommandArgs.Count -lt 2) {
+                throw "Experiment $Action needs an address."
+            }
+            & $VenvPython (Join-Path $Root "tools\decomp_experiment.py") $Action `
+                @($CommandArgs[1..($CommandArgs.Count - 1)])
+            Assert-LastExit "Reading the experiment session"
         } else {
-            throw "The experiment action must be start, try, or report."
+            throw "The experiment action must be start, try, status, best, advise, or report."
         }
     }
     "report" {

@@ -105,11 +105,51 @@ class NormativeInputTests(unittest.TestCase):
         self.assertNotIn("write_data_report", record)
 
         experiment = script_section(script, "experiment() {", "report() {")
-        self.assertIn("baseline-report.json", experiment)
-        self.assertIn("baseline-data-report.json", experiment)
-        self.assertIn('$directory/compiler-context.json', experiment)
+        self.assertIn("decomp_experiment.py begin-session", experiment)
+        self.assertIn("decomp_experiment.py attach-baseline", experiment)
+        self.assertIn('write_comparison_report "$baseline_report"', experiment)
+        self.assertIn('write_data_report "$baseline_data_report"', experiment)
         self.assertNotIn("build/decomp-baseline-report.json", experiment)
         self.assertNotIn("build/decomp-baseline-meta.json", experiment)
+
+    def test_experiment_controller_has_linux_and_windows_parity(self):
+        linux = script_section(
+            (ROOT / "tools/decomp").read_text(encoding="utf-8"),
+            "experiment() {",
+            "report() {",
+        )
+        windows = script_section(
+            (ROOT / "tools/decomp.ps1").read_text(encoding="utf-8"),
+            '    "experiment" {',
+            '    "report" {',
+        )
+        for script in (linux, windows):
+            for operation in (
+                "begin-session",
+                "attach-baseline",
+                "reserve",
+                "fail",
+                "record",
+                "status",
+                "best",
+                "advise",
+                "report",
+            ):
+                self.assertIn(operation, script)
+            self.assertIn("seal-diff", script)
+            self.assertIn("build.lock", (ROOT / "tools/decomp_experiment.py").read_text(encoding="utf-8"))
+
+        linux_trial = linux[linux.index("        try)") :]
+        windows_trial = windows[windows.index('$Action -eq "try"') :]
+        self.assertLess(linux_trial.index(" reserve "), linux_trial.index("build_game"))
+        self.assertLess(
+            windows_trial.index(" reserve "), windows_trial.index("Build-Project")
+        )
+        self.assertIn("flock 9", linux)
+        self.assertNotIn("if ! build_game", linux)
+        self.assertIn("if build_game; then", linux)
+        self.assertIn("[IO.FileShare]::None", windows)
+        self.assertNotIn("decomp-experiment-$Address-$Label.json", windows)
 
     def test_windows_campaign_dispatch_has_lifecycle_parity(self):
         script = (ROOT / "tools" / "decomp.ps1").read_text(encoding="utf-8")
@@ -484,8 +524,10 @@ class NormativeInputTests(unittest.TestCase):
         self.assertIn("-Diff $Diff", bc)
 
         experiment = script_section(script, '    "experiment" {', '    "report" {')
-        self.assertIn('Join-Path $Directory "baseline-report.json"', experiment)
-        self.assertIn('Join-Path $Directory "baseline-data-report.json"', experiment)
+        self.assertIn("begin-session $Address", experiment)
+        self.assertIn("attach-baseline $Address", experiment)
+        self.assertIn("Write-ComparisonReport $BaselineReport", experiment)
+        self.assertIn("Write-DataReport $BaselineDataReport", experiment)
         self.assertNotIn(r"build\decomp-baseline-report.json", experiment)
         self.assertNotIn(r"build\decomp-baseline-meta.json", experiment)
         trial = experiment[experiment.index('$Action -eq "try"') :]
