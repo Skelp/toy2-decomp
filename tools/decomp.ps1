@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "doctor", "brief", "context", "campaigns", "finalize", "discover", "evidence", "notes", "names", "defer", "undefer", "blockers", "baseline", "validate", "experiment", "lint", "data", "report", "session-summary", "progress", "check", "sync", "run", "shell", "help")]
+    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "doctor", "brief", "context", "impact", "campaigns", "finalize", "discover", "evidence", "notes", "names", "defer", "undefer", "blockers", "baseline", "validate", "experiment", "lint", "data", "report", "session-summary", "progress", "check", "sync", "run", "shell", "help")]
     [string] $Command = "help",
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -19,6 +19,11 @@ $VenvPython = Join-Path $VenvScripts "python.exe"
 if ($Command -eq "context") {
     Set-Location $Root
     & $VenvPython (Join-Path $Root "tools\decomp_context.py") @CommandArgs
+    exit $LASTEXITCODE
+}
+if ($Command -eq "impact") {
+    Set-Location $Root
+    & $VenvPython -m tools.decomp_impact @CommandArgs
     exit $LASTEXITCODE
 }
 $Vcvars = Join-Path $MsvcBase "VC98\Bin\VCVARS32.BAT"
@@ -282,6 +287,7 @@ Commands:
   doctor [args]     Check source-work tools before a campaign starts
   brief [args]      Build or read an immutable target evidence brief
   context --brief   Validate and display one brief's function context pack
+  impact [args]     Create or verify an independent impact review
   campaigns [args] Measure campaign time, report changes, and retained throughput
   finalize [args]  Validate once and write a content-addressed receipt
   discover [args]   Find credible Ghidra starts absent from the function map
@@ -414,11 +420,28 @@ block every source queue:
   tools/decomp.ps1 finalize --result meta-fix --mode meta --staged
   tools/decomp.ps1 campaigns record --result meta-fix
 
-Record the result after finalization. Add staged, then complete an independent
-acceptance review before you add accepted:
+Record the result after finalization. Add staged. A new coverage or refinement
+source result requires a sealed independent impact review. The reviewer edits
+all decision and status fields after review. Keep the exact generated
+citations:
   tools/decomp.ps1 campaigns record --result source
   tools/decomp.ps1 campaigns delivery --campaign-id ID --status staged
-  tools/decomp.ps1 campaigns delivery --campaign-id ID --status accepted
+  tools/decomp.ps1 impact template --finalize-receipt RECEIPT `
+    --reviewer-id REVIEWER --json `
+    | Set-Content -Encoding ASCII build/decomp-cache/review-pending.json
+  # The independent reviewer edits review-pending.json.
+  tools/decomp.ps1 impact seal-review --finalize-receipt RECEIPT `
+    --review-report build/decomp-cache/review-pending.json --json `
+    | Set-Content -Encoding ASCII build/decomp-cache/review-sealed.json
+  tools/decomp.ps1 impact verify-review --finalize-receipt RECEIPT `
+    --review-report build/decomp-cache/review-sealed.json --json
+  tools/decomp.ps1 campaigns delivery --campaign-id ID --status accepted `
+    --review-report build/decomp-cache/review-sealed.json
+
+The first reviewed acceptance rejects a missing report. An exact accepted
+retry can omit the report and revalidates the cached review. A supplied retry
+must use the same semantic report. Legacy, no-source, data, resource, and meta
+results do not use this impact review.
 
 Stage and commit the finalized files, campaign row, staged entry, and accepted
 entry. Fetch and rebase that commit onto current origin/agent/continuous. Set

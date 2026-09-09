@@ -5,13 +5,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import statistics
 import subprocess
 import sys
 from hashlib import sha256
 from pathlib import Path
-from typing import NamedTuple
+from typing import Mapping, NamedTuple
 
 sys.dont_write_bytecode = True
 
@@ -417,6 +418,265 @@ def data_sections(payload: dict[str, object]) -> dict[str, dict]:
         for item in rows
         if isinstance(item, dict) and item.get("name")
     }
+
+
+def typed_data_regression_problems(
+    baseline: Mapping[str, object], current: Mapping[str, object]
+) -> list[str]:
+    """Return every lost typed-data, section, and image-identity result."""
+
+    problems: list[str] = []
+    required_groups = (
+        "variables",
+        "sections",
+        "vtables",
+        "imports",
+        "relocations",
+        "debug",
+    )
+    for name in required_groups:
+        if not isinstance(baseline.get(name), Mapping):
+            problems.append(f"baseline typed-data group {name} is missing")
+        if not isinstance(current.get(name), Mapping):
+            problems.append(f"current typed-data group {name} is missing")
+    if problems:
+        return problems
+
+    def finite_number(value: object) -> float | None:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        result = float(value)
+        return result if math.isfinite(result) and result >= 0.0 else None
+
+    def rows_by_key(
+        payload: Mapping[str, object], group_name: str, row_name: str, key: str
+    ) -> dict[object, Mapping[str, object]] | None:
+        group = payload[group_name]
+        assert isinstance(group, Mapping)
+        rows = group.get(row_name)
+        if not isinstance(rows, list):
+            return None
+        result: dict[object, Mapping[str, object]] = {}
+        for row in rows:
+            if not isinstance(row, Mapping) or row.get(key) is None:
+                return None
+            identity = row.get(key)
+            if identity in result:
+                return None
+            result[identity] = row
+        return result
+
+    baseline_variables = rows_by_key(
+        baseline, "variables", "variables", "original_address"
+    )
+    current_variables = rows_by_key(
+        current, "variables", "variables", "original_address"
+    )
+    if baseline_variables is None or current_variables is None:
+        problems.append("typed-data variable rows are invalid")
+    else:
+        for raw_address, before in baseline_variables.items():
+            try:
+                address = int(raw_address)
+            except (TypeError, ValueError):
+                problems.append("a typed-data variable address is invalid")
+                continue
+            after = current_variables.get(raw_address)
+            if after is None:
+                problems.append(f"0x{address:08X}: data item disappeared")
+                continue
+            for key, label in (
+                ("size", "scored size"),
+                ("matched_bytes", "bytes"),
+                ("score", "score"),
+            ):
+                old_value = finite_number(before.get(key))
+                new_value = finite_number(after.get(key))
+                if (
+                    old_value is None
+                    or new_value is None
+                    or (key == "score" and (old_value > 1.0 or new_value > 1.0))
+                ):
+                    problems.append(f"0x{address:08X}: data {label} is invalid")
+                elif new_value + 1e-12 < old_value:
+                    problems.append(f"0x{address:08X}: data {label} regressed")
+
+    baseline_sections = rows_by_key(baseline, "sections", "sections", "name")
+    current_sections = rows_by_key(current, "sections", "sections", "name")
+    if baseline_sections is None or current_sections is None:
+        problems.append("typed-data section rows are invalid")
+    else:
+        for name, before in baseline_sections.items():
+            after = current_sections.get(name)
+            if after is None:
+                problems.append(f"{name}: scored data section disappeared")
+                continue
+            for key, label in (
+                ("size", "section size"),
+                ("evidence_bytes", "section evidence bytes"),
+                ("explained_bytes", "explained section bytes"),
+                ("score", "data section score"),
+            ):
+                old_value = finite_number(before.get(key))
+                new_value = finite_number(after.get(key))
+                if (
+                    old_value is None
+                    or new_value is None
+                    or (key == "score" and (old_value > 1.0 or new_value > 1.0))
+                ):
+                    problems.append(f"{name}: {label} is invalid")
+                elif new_value + 1e-12 < old_value:
+                    problems.append(f"{name}: {label} regressed")
+
+    baseline_vtables = rows_by_key(
+        baseline, "vtables", "tables", "original_address"
+    )
+    current_vtables = rows_by_key(
+        current, "vtables", "tables", "original_address"
+    )
+    if baseline_vtables is None or current_vtables is None:
+        problems.append("typed-data vtable rows are invalid")
+    else:
+        for raw_address, before in baseline_vtables.items():
+            try:
+                address = int(raw_address)
+            except (TypeError, ValueError):
+                problems.append("a typed-data vtable address is invalid")
+                continue
+            after = current_vtables.get(raw_address)
+            if after is None:
+                problems.append(f"0x{address:08X}: vtable disappeared")
+                continue
+            for key, label in (
+                ("size", "vtable size"),
+                ("matched_bytes", "vtable bytes"),
+                ("score", "vtable score"),
+            ):
+                old_value = finite_number(before.get(key))
+                new_value = finite_number(after.get(key))
+                if (
+                    old_value is None
+                    or new_value is None
+                    or (key == "score" and (old_value > 1.0 or new_value > 1.0))
+                ):
+                    problems.append(f"0x{address:08X}: {label} is invalid")
+                elif new_value + 1e-12 < old_value:
+                    problems.append(f"0x{address:08X}: {label} regressed")
+
+    def import_rows(
+        payload: Mapping[str, object],
+    ) -> dict[tuple[str, str | None, int | None], Mapping[str, object]] | None:
+        group = payload["imports"]
+        assert isinstance(group, Mapping)
+        rows = group.get("entries")
+        if not isinstance(rows, list):
+            return None
+        result: dict[
+            tuple[str, str | None, int | None], Mapping[str, object]
+        ] = {}
+        for row in rows:
+            if not isinstance(row, Mapping):
+                return None
+            module = row.get("module")
+            name = row.get("name")
+            ordinal = row.get("ordinal")
+            if (
+                not isinstance(module, str)
+                or not module.strip()
+                or (name is not None and not isinstance(name, str))
+                or (
+                    ordinal is not None
+                    and (
+                        isinstance(ordinal, bool)
+                        or not isinstance(ordinal, int)
+                    )
+                )
+                or (not name and ordinal is None)
+                or not isinstance(row.get("match"), bool)
+            ):
+                return None
+            identity = (module.casefold(), name, ordinal)
+            if identity in result:
+                return None
+            result[identity] = row
+        return result
+
+    baseline_imports = import_rows(baseline)
+    current_imports = import_rows(current)
+    if baseline_imports is None or current_imports is None:
+        problems.append("typed-data import rows are invalid")
+    else:
+        for identity, before in baseline_imports.items():
+            after = current_imports.get(identity)
+            import_name = identity[1] or f"#{identity[2]}"
+            label = f"{identity[0]}:{import_name}"
+            if after is None:
+                problems.append(f"{label}: import disappeared")
+            elif before.get("match") is True and after.get("match") is not True:
+                problems.append(f"{label}: import match regressed")
+
+    for group_name in ("imports", "relocations"):
+        old_group = baseline[group_name]
+        new_group = current[group_name]
+        assert isinstance(old_group, Mapping) and isinstance(new_group, Mapping)
+        old_count = finite_number(old_group.get("entry_count"))
+        new_count = finite_number(new_group.get("entry_count"))
+        if old_count is None or new_count is None:
+            problems.append(f"{group_name} item coverage is invalid")
+        elif new_count != old_count:
+            problems.append(f"{group_name} item coverage changed")
+        old_score = finite_number(old_group.get("score"))
+        new_score = finite_number(new_group.get("score"))
+        if (
+            old_score is None
+            or new_score is None
+            or old_score > 1.0
+            or new_score > 1.0
+        ):
+            problems.append(f"{group_name} score is invalid")
+        elif new_score + 1e-12 < old_score:
+            problems.append(f"{group_name} score regressed")
+
+    scalar_metrics = (
+        ("variables", "variable_count", "initialized-data item coverage"),
+        ("variables", "scored_bytes", "initialized-data scored bytes"),
+        ("variables", "explained_bytes", "initialized-data explained bytes"),
+        ("sections", "scored_bytes", "data-section scored bytes"),
+        ("sections", "explained_bytes", "data-section explained bytes"),
+        ("vtables", "table_count", "vtables item coverage"),
+        ("vtables", "scored_bytes", "vtables scored bytes"),
+        ("vtables", "explained_bytes", "vtables data evidence"),
+        ("imports", "matched_entries", "imports data evidence"),
+        ("relocations", "mapped_entries", "relocations mapped evidence"),
+        ("relocations", "matched_entries", "relocations data evidence"),
+    )
+    for group_name, key, label in scalar_metrics:
+        old_group = baseline[group_name]
+        new_group = current[group_name]
+        assert isinstance(old_group, Mapping) and isinstance(new_group, Mapping)
+        old_value = finite_number(old_group.get(key))
+        new_value = finite_number(new_group.get(key))
+        if old_value is None or new_value is None:
+            problems.append(f"{label} is invalid")
+        elif new_value + 1e-12 < old_value:
+            problems.append(f"{label} regressed")
+
+    old_debug = baseline["debug"]
+    new_debug = current["debug"]
+    assert isinstance(old_debug, Mapping) and isinstance(new_debug, Mapping)
+    for name, value in (("baseline", old_debug), ("current", new_debug)):
+        if any(
+            not isinstance(value.get(key), str) or not str(value.get(key)).strip()
+            for key in ("original_pdb", "recompiled_pdb")
+        ):
+            problems.append(f"{name} debug identity is invalid")
+    if (
+        isinstance(old_debug.get("original_pdb"), str)
+        and isinstance(new_debug.get("original_pdb"), str)
+        and old_debug.get("original_pdb") != new_debug.get("original_pdb")
+    ):
+        problems.append("original PDB identity changed")
+    return problems
 
 
 def validate_resource_campaign(
@@ -922,7 +1182,7 @@ def validate(
             validate_metadata(
                 metadata_path,
                 baseline_path,
-                baseline_data_path if mode in ("data", "resource") else None,
+                baseline_data_path,
             )
         )
     source_debt = read_source_debt(source_root, staged=staged)
@@ -1074,19 +1334,29 @@ def validate(
         if len(current_implemented) <= len(baseline_implemented):
             problems.append("coverage did not increase the implemented-function count")
 
-    if mode in ("data", "resource"):
+    if mode in ("coverage", "refinement") and (
+        baseline_data_path is not None or current_data_path is not None
+    ):
+        problems.extend(
+            typed_data_regression_problems(
+                read_data_report(baseline_data_path),
+                read_data_report(current_data_path),
+            )
+        )
+
+    if mode in ("coverage", "refinement", "data", "resource"):
         if has_baseline_state:
             for address in sorted(baseline_implemented - current_implemented):
                 problems.append(
                     f"0x{address:08X}: implemented function disappeared"
                 )
-        for address, rules in source_debt.items():
-            added_rules = set(rules) - set(baseline_debt.get(address, []))
-            if added_rules:
-                problems.append(
-                    f"0x{address:08X}: source debt increased: "
-                    f"{', '.join(sorted(added_rules))}"
-                )
+            for address, rules in source_debt.items():
+                added_rules = set(rules) - set(baseline_debt.get(address, []))
+                if added_rules:
+                    problems.append(
+                        f"0x{address:08X}: source debt increased: "
+                        f"{', '.join(sorted(added_rules))}"
+                    )
     if mode == "data":
         baseline_source_hash = baseline_state.get("source_dependency_sha256")
         if accounting_correction is None:

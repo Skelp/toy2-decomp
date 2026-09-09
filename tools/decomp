@@ -595,6 +595,7 @@ Commands:
   doctor [args]     Check source-work tools before a campaign starts
   brief [args]      Build or read an immutable target evidence brief
   context --brief   Validate and display one brief's function context pack
+  impact [...]      Create or verify an independent impact review
   campaigns [...]   Measure campaign time, report deltas, and retained throughput
   discover [args]   Find credible Ghidra starts absent from the function map
   defer <addr> ...  Record a committed blocker or prerequisite
@@ -752,11 +753,27 @@ block every source queue:
   tools/decomp finalize --result meta-fix --mode meta --staged
   tools/decomp campaigns record --result meta-fix
 
-Record the result after finalization. Add staged, then complete an independent
-acceptance review before you add accepted:
+Record the result after finalization. Add staged. A new coverage or refinement
+source result requires a sealed independent impact review. The reviewer edits
+all decision and status fields after review. Keep the exact generated
+citations:
   tools/decomp campaigns record --result source
   tools/decomp campaigns delivery --campaign-id ID --status staged
-  tools/decomp campaigns delivery --campaign-id ID --status accepted
+  tools/decomp impact template --finalize-receipt RECEIPT \
+    --reviewer-id REVIEWER --json > build/decomp-cache/review-pending.json
+  # The independent reviewer edits review-pending.json.
+  tools/decomp impact seal-review --finalize-receipt RECEIPT \
+    --review-report build/decomp-cache/review-pending.json --json \
+    > build/decomp-cache/review-sealed.json
+  tools/decomp impact verify-review --finalize-receipt RECEIPT \
+    --review-report build/decomp-cache/review-sealed.json --json
+  tools/decomp campaigns delivery --campaign-id ID --status accepted \
+    --review-report build/decomp-cache/review-sealed.json
+
+The first reviewed acceptance rejects a missing report. An exact accepted
+retry can omit the report and revalidates the cached review. A supplied retry
+must use the same semantic report. Legacy, no-source, data, resource, and meta
+results do not use this impact review.
 
 Stage and commit the finalized files, campaign row, staged entry, and accepted
 entry. Fetch and rebase that commit onto current origin/agent/continuous. Set
@@ -867,6 +884,9 @@ case "$command" in
         ;;
     context)
         exec "$ROOT/.tooling/venv/bin/python" tools/decomp_context.py "$@"
+        ;;
+    impact)
+        exec "$ROOT/.tooling/venv/bin/python" -m tools.decomp_impact "$@"
         ;;
 esac
 

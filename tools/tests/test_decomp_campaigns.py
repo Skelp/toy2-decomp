@@ -668,7 +668,15 @@ class CampaignTests(unittest.TestCase):
                     "variables": {
                         "explained_bytes": explained,
                         "variables": variables or [],
-                    }
+                    },
+                    "sections": {"sections": []},
+                    "vtables": {"explained_bytes": 0},
+                    "imports": {"matched_entries": 0},
+                    "relocations": {"matched_entries": 0},
+                    "debug": {
+                        "original_pdb": "C:\\retail\\toy2.pdb",
+                        "recompiled_pdb": "Z:\\build\\toy2.pdb",
+                    },
                 }
             ),
             encoding="utf-8",
@@ -704,6 +712,7 @@ class CampaignTests(unittest.TestCase):
         family: bool = False,
         family_sizes: dict[int, int] | None = None,
         legacy: bool = True,
+        impact_review: bool = False,
     ):
         if not (root / ".git").exists():
             subprocess.run(["git", "init", "-q"], cwd=root, check=True)
@@ -763,6 +772,9 @@ class CampaignTests(unittest.TestCase):
         baseline_identity = self.seal_report_pair(root, before, before_data)
         self.seal_report_pair(root, after, after_data)
         started = datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc)
+        start_options: dict[str, object] = {}
+        if not impact_review:
+            start_options["_legacy_skip_impact_review"] = True
         campaigns.start_campaign(
             state,
             mode,
@@ -779,6 +791,7 @@ class CampaignTests(unittest.TestCase):
                 addresses=addresses or ["0x00401000"],
                 sizes_path=function_sizes if family else None,
             ),
+            **start_options,
         )
         with patch(
             "tools.decomp_provenance.current_identity",
@@ -810,6 +823,20 @@ class CampaignTests(unittest.TestCase):
             "after_data": after_data,
             "started": started,
         }
+
+    def test_new_function_source_campaign_enables_impact_review_by_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with patch(
+                "tools.decomp_provenance.reccmp_user_identity",
+                return_value={"retail_sha256": "0" * 64},
+            ):
+                paths = self.make_measured_campaign(
+                    Path(directory), legacy=False, impact_review=True
+                )
+
+            self.assertTrue(
+                campaigns.read_state(paths["state"])["impact_review_required"]
+            )
 
     @staticmethod
     def set_source_deadlines(
@@ -4036,6 +4063,53 @@ class CampaignTests(unittest.TestCase):
             self.assertEqual(calls["source_scan"], 1)
             self.assertEqual(calls["validation"], 1)
 
+    def test_new_function_no_source_delivery_does_not_require_review(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch(
+                "tools.decomp_provenance.reccmp_user_identity",
+                return_value={"retail_sha256": "0" * 64},
+            ):
+                paths = self.make_measured_campaign(
+                    root, legacy=False, impact_review=True
+                )
+            self.write_code_report(paths["after"], 0.25)
+            self.write_data_report(paths["after_data"], 40)
+            campaigns.finalize_campaign(
+                paths["state"],
+                "no-source",
+                {},
+                cache_root=root / "build/decomp-cache/finalize",
+                inputs={"fixture": "no-source-impact-policy"},
+                clock=lambda: paths["started"] + timedelta(minutes=2),
+            )
+            campaign = campaigns.record_campaign(
+                paths["ledger"],
+                paths["state"],
+                paths["models"],
+                paths["after"],
+                paths["after_data"],
+                "no-source",
+                models=["The trial source model was not supported."],
+                now=paths["started"] + timedelta(minutes=3),
+            )
+            self.assertFalse(campaign["impact_review_required"])
+            campaigns.record_delivery(
+                paths["ledger"],
+                campaign["campaign_id"],
+                "staged",
+                root=root,
+                now=paths["started"] + timedelta(minutes=4),
+            )
+            accepted = campaigns.record_delivery(
+                paths["ledger"],
+                campaign["campaign_id"],
+                "accepted",
+                root=root,
+                now=paths["started"] + timedelta(minutes=5),
+            )
+            self.assertNotIn("accepted_review", accepted)
+
     def test_meta_baseline_and_finalizer_do_not_require_build_reports(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -4428,6 +4502,114 @@ class CampaignTests(unittest.TestCase):
             )
             self.assertEqual(set(actions), set(campaigns.FINALIZE_STEPS))
 
+    def test_impact_producer_changes_update_finalize_input_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir()
+            for name in (
+                "decomp_impact.py",
+                "decomp_annotations.py",
+                "decomp_dependencies.py",
+                "decomp_binary.py",
+            ):
+                (tools / name).write_text(f"{name} v1\n", encoding="utf-8")
+
+            standard_before = campaigns._standard_input_hashes(root)
+            meta_before = campaigns._meta_input_hashes(root)
+            (tools / "decomp_dependencies.py").write_text(
+                "decomp_dependencies.py v2\n", encoding="utf-8"
+            )
+            standard_after = campaigns._standard_input_hashes(root)
+            meta_after = campaigns._meta_input_hashes(root)
+
+            self.assertNotEqual(standard_before, standard_after)
+            self.assertNotEqual(meta_before, meta_after)
+            for name in (
+                "decomp_impact.py",
+                "decomp_annotations.py",
+                "decomp_dependencies.py",
+                "decomp_binary.py",
+            ):
+                path = str((tools / name).resolve())
+                self.assertIn(path, standard_after["files"])
+                self.assertIn(path, meta_after["files"])
+
+    def test_reviewed_source_scan_freezes_impact_and_baseline_evidence(self):
+        from tools.decomp_provenance import provenance_path
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            build = root / "build"
+            build.mkdir()
+            (build / "Makefile").write_text("all:\n", encoding="utf-8")
+            baseline = build / "decomp-baseline-report.json"
+            baseline_data = build / "decomp-baseline-data-report.json"
+            current = build / "decomp-current-report.json"
+            current_data = build / "decomp-current-data-report.json"
+            for path in (baseline, baseline_data, current, current_data):
+                path.write_text("{}\n", encoding="utf-8")
+                provenance_path(path).write_text("{}\n", encoding="utf-8")
+            impact_path = build / "decomp-cache/impact/campaign/pack.json"
+            impact_path.parent.mkdir(parents=True)
+            impact_path.write_text("{}\n", encoding="utf-8")
+            state = {
+                "source_worktree_root": str(root),
+                "baseline_report": str(baseline),
+                "baseline_data_report": str(baseline_data),
+                "impact_review_required": True,
+            }
+            scan_context = {
+                "debt": {},
+                "lint_change": object(),
+                "new_errors": [],
+                "new_warnings": [],
+                "stale": [],
+            }
+            with (
+                patch(
+                    "tools.decomp_provenance.validate_report",
+                    return_value={"input_identity": {"build": "same"}},
+                ),
+                patch.object(
+                    campaigns,
+                    "_standard_source_scan",
+                    return_value=({"ok": True}, scan_context),
+                ),
+                patch(
+                    "tools.decomp_impact.build_impact_pack",
+                    return_value={"kind": "test-impact"},
+                ) as build_pack,
+                patch(
+                    "tools.decomp_impact.write_impact_pack",
+                    return_value=impact_path,
+                ),
+            ):
+                result = campaigns._standard_finalize_actions(
+                    state,
+                    mode="refinement",
+                    targets=["0x00401000"],
+                    resource=None,
+                    staged=True,
+                )["source_scan"]()
+
+            self.assertEqual(
+                result["artifacts"],
+                [
+                    impact_path,
+                    baseline,
+                    provenance_path(baseline),
+                    baseline_data,
+                    provenance_path(baseline_data),
+                ],
+            )
+            build_pack.assert_called_once_with(
+                state=state,
+                baseline_report=baseline,
+                current_report=current,
+                root=root,
+            )
+
     def test_score_artifact_metadata_cannot_be_overridden(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -4618,6 +4800,277 @@ class CampaignTests(unittest.TestCase):
                     "campaign-1",
                     "rejected",
                     now=datetime(2026, 8, 3, 12, 7, tzinfo=timezone.utc),
+                )
+
+    def test_new_source_delivery_requires_and_binds_independent_review(self):
+        from tools import decomp_impact as impact
+        from tools.tests.test_decomp_impact import (
+            ImpactValidationTests,
+            accept_template,
+            json_text,
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ledger = root / "ledger.jsonl"
+            campaigns.write_records(
+                ledger,
+                [
+                    {
+                        "schema_version": 3,
+                        "record_type": "campaign",
+                        "campaign_id": "campaign-1",
+                        "timestamp": "2026-08-03T12:00:00+00:00",
+                        "ended_at": "2026-08-03T12:00:00+00:00",
+                        "mode": "refinement",
+                        "lane": "production",
+                        "addresses": ["0x00401000"],
+                        "impact_review_required": True,
+                        "finalize_receipt": {
+                            "content_sha256": "b" * 64,
+                        },
+                    }
+                ],
+            )
+            self.bind_campaign_record_receipt(ledger)
+            finalize, _pack, _frozen = ImpactValidationTests().make_finalize(root)
+            campaigns.record_delivery(
+                ledger,
+                "campaign-1",
+                "staged",
+                root=root,
+                now=datetime(2026, 8, 3, 12, 1, tzinfo=timezone.utc),
+            )
+            with (
+                patch.object(
+                    campaigns,
+                    "_campaign_finalize_receipt",
+                    return_value=finalize,
+                ),
+                self.assertRaisesRegex(ValueError, "needs --review-report"),
+            ):
+                campaigns.record_delivery(
+                    ledger,
+                    "campaign-1",
+                    "accepted",
+                    root=root,
+                    now=datetime(2026, 8, 3, 12, 2, tzinfo=timezone.utc),
+                )
+
+            report = impact.make_review_template(finalize, "acceptance-reviewer")
+            accept_template(report)
+            report["content_sha256"] = impact._document_hash(report)
+            report_path = root / "review.json"
+            report_path.write_text(json_text(report), encoding="utf-8")
+            with patch.object(
+                campaigns,
+                "_campaign_finalize_receipt",
+                return_value=finalize,
+            ):
+                accepted = campaigns.record_delivery(
+                    ledger,
+                    "campaign-1",
+                    "accepted",
+                    review_report_path=report_path,
+                    root=root,
+                    now=datetime(2026, 8, 3, 12, 2, tzinfo=timezone.utc),
+                )
+                repeated = campaigns.record_delivery(
+                    ledger,
+                    "campaign-1",
+                    "accepted",
+                    review_report_path=report_path,
+                    root=root,
+                    now=datetime(2026, 8, 3, 12, 3, tzinfo=timezone.utc),
+                )
+                repeated_without_report = campaigns.record_delivery(
+                    ledger,
+                    "campaign-1",
+                    "accepted",
+                    root=root,
+                    now=datetime(2026, 8, 3, 12, 3, tzinfo=timezone.utc),
+                )
+                report_path.write_text(json.dumps(report), encoding="utf-8")
+                whitespace_retry = campaigns.record_delivery(
+                    ledger,
+                    "campaign-1",
+                    "accepted",
+                    review_report_path=report_path,
+                    root=root,
+                    now=datetime(2026, 8, 3, 12, 3, tzinfo=timezone.utc),
+                )
+            self.assertEqual(repeated, accepted)
+            self.assertEqual(repeated_without_report, accepted)
+            self.assertEqual(whitespace_retry, accepted)
+            self.assertEqual(
+                accepted["accepted_claims"], list(impact.PROMOTION_CLAIMS)
+            )
+            self.assertEqual(
+                accepted["accepted_review"]["reviewer_id"],
+                "acceptance-reviewer",
+            )
+
+            changed = dict(report)
+            changed["reviewer_id"] = "different-reviewer"
+            changed["content_sha256"] = impact._document_hash(changed)
+            report_path.write_text(json_text(changed), encoding="utf-8")
+            with (
+                patch.object(
+                    campaigns,
+                    "_campaign_finalize_receipt",
+                    return_value=finalize,
+                ),
+                self.assertRaisesRegex(ValueError, "existing delivery"),
+            ):
+                campaigns.record_delivery(
+                    ledger,
+                    "campaign-1",
+                    "accepted",
+                    review_report_path=report_path,
+                    root=root,
+                    now=datetime(2026, 8, 3, 12, 4, tzinfo=timezone.utc),
+                )
+
+    def test_delivery_receipt_revalidates_the_accepted_review(self):
+        from tools import decomp_impact as impact
+        from tools.tests.test_decomp_impact import (
+            ImpactValidationTests,
+            accept_template,
+            json_text,
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            commit_command = [
+                "git",
+                "-c",
+                "user.name=Delivery Tests",
+                "-c",
+                "user.email=delivery@example.invalid",
+                "commit",
+                "-qm",
+            ]
+            subprocess.run(
+                [*commit_command, "Base", "--allow-empty"], cwd=root, check=True
+            )
+            base = campaigns._git_head(root)
+            ledger = root / "tools/Resources/campaign-ledger.jsonl"
+            campaigns.write_records(
+                ledger,
+                [
+                    {
+                        "schema_version": 3,
+                        "record_type": "campaign",
+                        "campaign_id": "campaign-1",
+                        "timestamp": "2026-08-03T12:00:00+00:00",
+                        "ended_at": "2026-08-03T12:00:00+00:00",
+                        "mode": "refinement",
+                        "lane": "production",
+                        "addresses": ["0x00401000"],
+                        "impact_review_required": True,
+                        "finalize_receipt": {
+                            "content_sha256": "b" * 64,
+                        },
+                    }
+                ],
+            )
+            campaign = self.bind_campaign_record_receipt(ledger)
+            finalize, _pack, _frozen = ImpactValidationTests().make_finalize(root)
+            campaigns.record_delivery(
+                ledger,
+                "campaign-1",
+                "staged",
+                root=root,
+                now=datetime(2026, 8, 3, 12, 1, tzinfo=timezone.utc),
+            )
+            report = impact.make_review_template(finalize, "acceptance-reviewer")
+            accept_template(report)
+            report["content_sha256"] = impact._document_hash(report)
+            report_path = root / "review.json"
+            report_path.write_text(json_text(report), encoding="utf-8")
+            with patch.object(
+                campaigns,
+                "_campaign_finalize_receipt",
+                return_value=finalize,
+            ):
+                accepted = campaigns.record_delivery(
+                    ledger,
+                    "campaign-1",
+                    "accepted",
+                    review_report_path=report_path,
+                    root=root,
+                    now=datetime(2026, 8, 3, 12, 2, tzinfo=timezone.utc),
+                )
+            subprocess.run(["git", "add", "-f", "tools"], cwd=root, check=True)
+            subprocess.run([*commit_command, "Campaign"], cwd=root, check=True)
+            head = campaigns._git_head(root)
+            validation = {"commands": [], "inputs": {}, "artifacts": []}
+            with (
+                patch.object(
+                    campaigns,
+                    "_campaign_finalize_receipt",
+                    return_value=finalize,
+                ),
+                patch.object(campaigns, "_verify_campaign_in_commit"),
+                patch.object(
+                    campaigns, "_verify_finalized_campaign_tree", return_value=[]
+                ),
+                patch.object(campaigns, "_delivery_reference", return_value={}),
+                patch.object(
+                    campaigns, "_run_delivery_validation", return_value=validation
+                ),
+                patch.object(campaigns, "_validate_delivery_command_results"),
+                patch(
+                    "tools.decomp_provenance.validation_tool_identity",
+                    return_value={},
+                ),
+            ):
+                receipt = campaigns.create_delivery_receipt(
+                    ledger,
+                    "campaign-1",
+                    head,
+                    base,
+                    root=root,
+                    now=datetime(2026, 8, 3, 12, 3, tzinfo=timezone.utc),
+                )
+            self.assertEqual(receipt["accepted_review"], accepted["accepted_review"])
+
+            receipt_path = Path(str(receipt["path"]))
+            with (
+                patch.object(
+                    campaigns,
+                    "_campaign_finalize_receipt",
+                    return_value=finalize,
+                ),
+                patch.object(campaigns, "_verify_campaign_in_commit"),
+                patch.object(
+                    campaigns, "_verify_finalized_campaign_tree", return_value=[]
+                ),
+                patch.object(campaigns, "_standard_input_hashes", return_value={}),
+                patch.object(campaigns, "_validate_delivery_command_results"),
+                patch(
+                    "tools.decomp_provenance.validation_tool_identity",
+                    return_value={},
+                ),
+            ):
+                campaigns._validated_delivery_receipt(
+                    receipt_path, campaign, ledger, root=root
+                )
+
+            accepted_path = Path(str(accepted["accepted_review"]["path"]))
+            accepted_path.write_text("{}\n", encoding="utf-8")
+            with (
+                patch.object(
+                    campaigns,
+                    "_campaign_finalize_receipt",
+                    return_value=finalize,
+                ),
+                patch.object(campaigns, "_verify_campaign_in_commit"),
+                self.assertRaisesRegex(ValueError, "accepted impact review"),
+            ):
+                campaigns._validated_delivery_receipt(
+                    receipt_path, campaign, ledger, root=root
                 )
 
     def test_delivery_rejects_wrong_receipt_and_commit_identity(self):
@@ -5350,34 +5803,144 @@ class CampaignTests(unittest.TestCase):
     def test_typed_data_regression_check_covers_each_evidence_group(self):
         before = {
             "variables": {
+                "variable_count": 2,
+                "scored_bytes": 20,
                 "explained_bytes": 20,
                 "variables": [
                     {
                         "original_address": 0x501000,
+                        "size": 10,
                         "matched_bytes": 10,
                         "score": 1.0,
                     },
                     {
                         "original_address": 0x502000,
+                        "size": 10,
                         "matched_bytes": 10,
                         "score": 0.5,
                     },
                 ],
             },
             "sections": {
+                "scored_bytes": 40,
+                "explained_bytes": 20,
                 "sections": [
-                    {"name": ".data", "explained_bytes": 20, "score": 0.5}
+                    {
+                        "name": ".data",
+                        "size": 40,
+                        "evidence_bytes": 20,
+                        "explained_bytes": 20,
+                        "score": 0.5,
+                    }
                 ]
             },
-            "vtables": {"explained_bytes": 8},
-            "imports": {"matched_entries": 4},
-            "relocations": {"matched_entries": 6},
+            "vtables": {
+                "table_count": 2,
+                "scored_bytes": 16,
+                "explained_bytes": 8,
+                "tables": [
+                    {
+                        "original_address": 0x510000,
+                        "size": 8,
+                        "matched_bytes": 8,
+                        "score": 1.0,
+                    },
+                    {
+                        "original_address": 0x510100,
+                        "size": 8,
+                        "matched_bytes": 0,
+                        "score": 0.0,
+                    },
+                ],
+            },
+            "imports": {
+                "entry_count": 4,
+                "matched_entries": 4,
+                "score": 1.0,
+                "entries": [
+                    {
+                        "module": "KERNEL32.dll",
+                        "name": "CreateFileA",
+                        "ordinal": None,
+                        "match": True,
+                    },
+                    {
+                        "module": "KERNEL32.dll",
+                        "name": "CloseHandle",
+                        "ordinal": None,
+                        "match": True,
+                    },
+                    {
+                        "module": "USER32.dll",
+                        "name": "MessageBoxA",
+                        "ordinal": None,
+                        "match": True,
+                    },
+                    {
+                        "module": "WINMM.dll",
+                        "name": "timeGetTime",
+                        "ordinal": None,
+                        "match": True,
+                    },
+                ],
+            },
+            "relocations": {
+                "entry_count": 8,
+                "mapped_entries": 7,
+                "matched_entries": 6,
+                "score": 0.75,
+            },
+            "debug": {
+                "original_pdb": "C:\\retail\\toy2.pdb",
+                "recompiled_pdb": "Z:\\build\\toy2.pdb",
+            },
         }
         after = json.loads(json.dumps(before))
         after["variables"]["variables"][0]["matched_bytes"] = 9
         after["variables"]["variables"][1]["matched_bytes"] = 11
         problems = campaigns._data_regression_problems(before, after)
         self.assertIn("0x00501000: data bytes regressed", problems)
+
+        masked_vtable = json.loads(json.dumps(before))
+        masked_vtable["vtables"]["tables"][0]["matched_bytes"] = 4
+        masked_vtable["vtables"]["tables"][0]["score"] = 0.5
+        masked_vtable["vtables"]["tables"][1]["matched_bytes"] = 4
+        masked_vtable["vtables"]["tables"][1]["score"] = 0.5
+        self.assertIn(
+            "0x00510000: vtable bytes regressed",
+            campaigns._data_regression_problems(before, masked_vtable),
+        )
+
+        masked_import = json.loads(json.dumps(before))
+        masked_import["imports"]["entries"][0]["match"] = False
+        masked_import["imports"]["entries"].append(
+            {
+                "module": "ADVAPI32.dll",
+                "name": "RegCloseKey",
+                "ordinal": None,
+                "match": True,
+            }
+        )
+        self.assertIn(
+            "kernel32.dll:CreateFileA: import match regressed",
+            campaigns._data_regression_problems(before, masked_import),
+        )
+
+        lost_mapping = json.loads(json.dumps(before))
+        lost_mapping["relocations"]["mapped_entries"] -= 1
+        self.assertIn(
+            "relocations mapped evidence regressed",
+            campaigns._data_regression_problems(before, lost_mapping),
+        )
+
+        for group in ("imports", "relocations"):
+            with self.subTest(score_group=group):
+                lower_score = json.loads(json.dumps(before))
+                lower_score[group]["score"] -= 0.1
+                self.assertIn(
+                    f"{group} score regressed",
+                    campaigns._data_regression_problems(before, lower_score),
+                )
 
         for group, key in (
             ("vtables", "explained_bytes"),
@@ -5388,15 +5951,53 @@ class CampaignTests(unittest.TestCase):
                 changed = json.loads(json.dumps(before))
                 changed[group][key] -= 1
                 self.assertIn(
-                    f"{group}: data evidence regressed",
+                    f"{group} data evidence regressed",
                     campaigns._data_regression_problems(before, changed),
                 )
                 missing = json.loads(json.dumps(before))
                 del missing[group]
                 self.assertIn(
-                    f"{group}: data evidence regressed",
+                    f"current typed-data group {group} is missing",
                     campaigns._data_regression_problems(before, missing),
                 )
+
+        moved = json.loads(json.dumps(before))
+        moved["debug"]["recompiled_pdb"] = "D:\\other\\toy2.pdb"
+        self.assertEqual(campaigns._data_regression_problems(before, moved), [])
+        changed = json.loads(json.dumps(before))
+        changed["debug"]["original_pdb"] = "C:\\other\\toy2.pdb"
+        self.assertIn(
+            "original PDB identity changed",
+            campaigns._data_regression_problems(before, changed),
+        )
+
+    def test_source_delivery_adds_typed_data_only_for_the_new_review_policy(self):
+        legacy = {"mode": "refinement", "result": "source"}
+        reviewed = {
+            "mode": "refinement",
+            "result": "source",
+            "impact_review_required": True,
+        }
+
+        legacy_commands = campaigns._delivery_validation_command_plan(
+            legacy, campaigns.ROOT
+        )
+        reviewed_commands = campaigns._delivery_validation_command_plan(
+            reviewed, campaigns.ROOT
+        )
+
+        self.assertFalse(
+            any(
+                any("generate-decomp-data-report.py" in part for part in command)
+                for command in legacy_commands
+            )
+        )
+        self.assertTrue(
+            any(
+                any("generate-decomp-data-report.py" in part for part in command)
+                for command in reviewed_commands
+            )
+        )
 
 
 if __name__ == "__main__":

@@ -371,17 +371,43 @@ For a `meta-fix` result:
 Record delivery after the campaign record:
 
 1. Record `delivery --campaign-id ID --status staged`.
-2. Give the staged files and finalization receipt to an independent reviewer.
-3. Record `delivery --campaign-id ID --status accepted` after acceptance.
-4. Stage the finalized files, campaign row, and these two delivery entries.
-5. Inspect the full staged diff and commit it once.
-6. Fetch and rebase this commit onto current `origin/agent/continuous`.
-7. Set `COMMIT` to the resulting `HEAD` and `BASE` to its first parent.
-8. Run `delivery-verify` and keep the returned immutable receipt path.
-9. Record `integrated`, then `committed`, with that receipt.
-10. Push `COMMIT` to `origin/agent/continuous`.
-11. Record `pushed` with the same receipt.
-12. Stage the three post-commit events, commit them as telemetry, and push them.
+2. For a new coverage or refinement source result, generate an impact review
+   template. Use an independent reviewer ID.
+3. Give the staged files, finalization receipt, and template to the reviewer.
+4. The reviewer inspects each cited record. The reviewer sets the decision and
+   all claim statuses to `accepted`. The reviewer sets all refuter statuses to
+   `passed`. Keep each generated citation unchanged.
+5. Seal and verify the edited report. Record `accepted` with the sealed report.
+6. Stage the finalized files, campaign row, and these two delivery entries.
+7. Inspect the full staged diff and commit it once.
+8. Fetch and rebase this commit onto current `origin/agent/continuous`.
+9. Set `COMMIT` to the resulting `HEAD` and `BASE` to its first parent.
+10. Run `delivery-verify` and keep the returned immutable receipt path.
+11. Record `integrated`, then `committed`, with that receipt.
+12. Push `COMMIT` to `origin/agent/continuous`.
+13. Record `pushed` with the same receipt.
+14. Stage the three post-commit events, commit them as telemetry, and push them.
+
+Use this review flow for a new coverage or refinement source result:
+
+```sh
+tools/decomp impact template --finalize-receipt FINALIZE_RECEIPT \
+  --reviewer-id REVIEWER_ID --json > build/decomp-cache/review-pending.json
+# The independent reviewer edits review-pending.json.
+tools/decomp impact seal-review --finalize-receipt FINALIZE_RECEIPT \
+  --review-report build/decomp-cache/review-pending.json --json \
+  > build/decomp-cache/review-sealed.json
+tools/decomp impact verify-review --finalize-receipt FINALIZE_RECEIPT \
+  --review-report build/decomp-cache/review-sealed.json --json
+tools/decomp campaigns delivery --campaign-id ID --status accepted \
+  --review-report build/decomp-cache/review-sealed.json
+```
+
+The first reviewed `accepted` event rejects a missing report. An exact retry
+can omit `--review-report`; the command revalidates the cached accepted review.
+A supplied retry report must have the same semantic content. A different
+report is rejected. Legacy campaigns, no-source results, data results,
+resource results, and meta fixes do not use this impact review.
 
 Use these commands after the rebase:
 

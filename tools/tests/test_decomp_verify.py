@@ -612,6 +612,58 @@ class VerifyRegressionTests(unittest.TestCase):
                 1,
             )
 
+    def test_coverage_rejects_an_implemented_loss_hidden_by_two_additions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src"
+            source.mkdir()
+            (source / "test.cpp").write_text(
+                "// FUNCTION: TOY2 0x00401000 [PROVISIONAL]\nvoid Target() {}\n"
+                "// FUNCTION: TOY2 0x00402000 [PROVISIONAL]\nvoid Extra() {}\n"
+                "// LIBRARY: TOY2 0x00403000\nvoid Lost() {}\n",
+                encoding="utf-8",
+            )
+            metadata = root / "meta.json"
+            metadata.write_text(
+                json.dumps(
+                    {
+                        "implemented_addresses": [0x403000],
+                        "source_debt": {},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            baseline = self.write_report(
+                root,
+                "before.json",
+                [
+                    {"address": "0x401000", "matching": 0.0, "stub": True},
+                    {"address": "0x402000", "matching": 0.0, "stub": True},
+                    {"address": "0x403000", "matching": 0.8},
+                ],
+            )
+            current = self.write_report(
+                root,
+                "after.json",
+                [
+                    {"address": "0x401000", "matching": 0.6},
+                    {"address": "0x402000", "matching": 0.6},
+                    {"address": "0x403000", "matching": 0.8},
+                ],
+            )
+
+            self.assertEqual(
+                self.validate(
+                    baseline,
+                    current,
+                    {0x401000},
+                    source_root=source,
+                    mode="coverage",
+                    metadata=metadata,
+                ),
+                1,
+            )
+
     def test_data_campaign_accepts_improved_typed_bytes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

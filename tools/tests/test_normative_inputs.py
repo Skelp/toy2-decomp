@@ -349,6 +349,16 @@ class NormativeInputTests(unittest.TestCase):
             self.assertIn("committed, and pushed", flat_help)
             self.assertIn("does not count as source progress", flat_help)
             self.assertIn("rejected entry ends delivery", flat_help)
+            for token in (
+                "impact template",
+                "impact seal-review",
+                "impact verify-review",
+                "--review-report build/decomp-cache/review-sealed.json",
+                "first reviewed acceptance rejects a missing report",
+                "exact accepted retry can omit the report",
+                "Legacy, no-source, data, resource, and meta",
+            ):
+                self.assertIn(token, flat_help)
 
         self.assertIn("COMMIT=$(git rev-parse HEAD)", linux_help)
         self.assertIn("BASE=$(git rev-parse HEAD^)", linux_help)
@@ -373,6 +383,10 @@ class NormativeInputTests(unittest.TestCase):
             windows_help.count("--delivery-receipt `$DELIVERY_RECEIPT"), 3
         )
         self.assertIn("ConvertFrom-Json).path", windows_help)
+        self.assertEqual(
+            windows_help.count("Set-Content -Encoding ASCII"), 2
+        )
+        self.assertNotIn("> build/decomp-cache/review-", windows_help)
 
     def test_pivot_help_requires_fresh_preflight_artifacts(self):
         linux = (ROOT / "tools" / "decomp").read_text(encoding="utf-8")

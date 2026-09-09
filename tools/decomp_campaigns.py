@@ -18,7 +18,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable, Mapping
+from typing import Callable, Mapping, Sequence
 
 try:
     from tools.decomp_annotations import active_source_lines
@@ -2140,6 +2140,7 @@ def start_campaign(
     require_prediction_metadata: bool = False,
     campaign_records: list[dict[str, object]] | None = None,
     campaign_ledger_path: Path | None = None,
+    _legacy_skip_impact_review: bool = False,
 ) -> dict[str, object]:
     resources = resources or []
     if path.exists():
@@ -2157,6 +2158,10 @@ def start_campaign(
         raise ValueError("--family requires --mode coverage or refinement")
     if family and len(addresses) != 1:
         raise ValueError("a family campaign must start with one anchor target")
+    impact_review_required = (
+        mode in ("coverage", "refinement")
+        and not _legacy_skip_impact_review
+    )
     if len(addresses) != len(set(addresses)):
         raise ValueError("the initial campaign targets contain a duplicate address")
     if len(addresses) > 3:
@@ -2380,6 +2385,7 @@ def start_campaign(
         "campaign_head": campaign_head,
         "briefs": brief_receipts,
         "briefs_required": require_brief,
+        "impact_review_required": impact_review_required,
         "first_score_at": None,
         "scored_addresses": [],
         "score_events": [],
@@ -3673,6 +3679,7 @@ def _record_meta_campaign(
         "campaign_head": state.get("campaign_head"),
         "briefs": state.get("briefs", []),
         "briefs_required": state.get("briefs_required") is True,
+        "impact_review_required": False,
         "phase_timestamps": phases,
         "finalize_receipt": state.get("finalize_receipt"),
         "deadlines": state.get("deadlines", {}),
@@ -4080,6 +4087,9 @@ def record_campaign(
         "campaign_head": state.get("campaign_head"),
         "briefs": state.get("briefs", []),
         "briefs_required": state.get("briefs_required") is True,
+        "impact_review_required": (
+            state.get("impact_review_required") is True and result == "source"
+        ),
         "phase_timestamps": phases,
         "finalize_receipt": state.get("finalize_receipt"),
         "deadlines": state.get("deadlines", {}),
@@ -4280,6 +4290,72 @@ def _committed_ledger_records(
     return _records_from_text(content, "committed campaign ledger")
 
 
+def _validated_accepted_review(
+    campaign: Mapping[str, object],
+    accepted: Mapping[str, object],
+    finalize_receipt: Mapping[str, object],
+    *,
+    root: Path,
+) -> dict[str, object] | None:
+    """Validate the independent review in one accepted delivery row."""
+
+    from tools.decomp_impact import (
+        ImpactError,
+        PROMOTION_CLAIMS,
+        review_required,
+        validate_review_identity,
+    )
+
+    try:
+        required = review_required(finalize_receipt)
+        if required != (campaign.get("impact_review_required") is True):
+            raise ValueError(
+                "the campaign impact-review policy changed after finalization"
+            )
+        identity = accepted.get("accepted_review")
+        claims = accepted.get("accepted_claims")
+        if not required:
+            if identity is not None or claims is not None:
+                raise ValueError("the accepted delivery has an unexpected review")
+            return None
+        if not isinstance(identity, Mapping):
+            raise ValueError("the accepted delivery has no independent review")
+        if claims != list(PROMOTION_CLAIMS):
+            raise ValueError("the accepted delivery has invalid promotion claims")
+        validate_review_identity(
+            identity,
+            finalize_receipt=finalize_receipt,
+            cache_root=root / "build" / "decomp-cache" / "reviews",
+        )
+        return dict(identity)
+    except ImpactError as error:
+        raise ValueError(f"the accepted impact review is invalid: {error}") from error
+
+
+def _accepted_review_from_records(
+    records: Sequence[Mapping[str, object]],
+    campaign: Mapping[str, object],
+    finalize_receipt: Mapping[str, object],
+    *,
+    root: Path,
+) -> dict[str, object] | None:
+    rows = [
+        item
+        for item in records
+        if item.get("record_type") == "delivery"
+        and item.get("campaign_id") == campaign.get("campaign_id")
+        and item.get("status") == "accepted"
+    ]
+    if len(rows) != 1:
+        raise ValueError("the campaign needs one accepted delivery row")
+    return _validated_accepted_review(
+        campaign,
+        rows[0],
+        finalize_receipt,
+        root=root,
+    )
+
+
 def _verify_campaign_in_commit(
     root: Path,
     ledger_path: Path,
@@ -4354,6 +4430,12 @@ def _verify_campaign_in_commit(
         raise ValueError("the committed campaign ledger format is invalid")
     pre_campaign_text = "".join(lines[:campaign_index])
     receipt = _campaign_finalize_receipt(campaign, validate_artifacts=False)
+    _validated_accepted_review(
+        campaign,
+        delivery_rows[1],
+        receipt,
+        root=root,
+    )
     key = receipt.get("key_payload")
     if not isinstance(key, dict) or key.get("campaign_ledger_relative") != relative:
         raise ValueError("the finalization receipt names another campaign ledger")
@@ -4529,7 +4611,18 @@ def _delivery_receipt_hash(receipt: Mapping[str, object]) -> str:
     return _snapshot_hash(payload)
 
 
-def _delivery_artifacts(root: Path, mode: str) -> list[dict[str, str]]:
+def _requires_typed_data_gate(campaign: Mapping[str, object]) -> bool:
+    mode = campaign.get("mode")
+    return mode in ("data", "resource") or (
+        mode in ("coverage", "refinement")
+        and campaign.get("impact_review_required") is True
+    )
+
+
+def _delivery_artifacts(
+    root: Path, campaign: Mapping[str, object]
+) -> list[dict[str, str]]:
+    mode = str(campaign.get("mode", ""))
     if mode == "meta":
         return []
     paths = [root / "build/toy2.exe", root / "build/toy2.pdb"]
@@ -4537,7 +4630,7 @@ def _delivery_artifacts(root: Path, mode: str) -> list[dict[str, str]]:
 
     code = root / "build/decomp-current-report.json"
     paths.extend((code, provenance_path(code)))
-    if mode in ("data", "resource"):
+    if _requires_typed_data_gate(campaign):
         data = root / "build/decomp-current-data-report.json"
         paths.extend((data, provenance_path(data)))
     return [_finalize_artifact(path) for path in paths if path.is_file()]
@@ -4630,7 +4723,7 @@ def _delivery_reference(
         }
     }
     mode = str(campaign.get("mode", ""))
-    if mode in ("data", "resource"):
+    if _requires_typed_data_gate(campaign):
         data_report = _receipt_step_artifact(receipt, "data_report")
         reference["data_payload"] = _read_json_object(
             data_report, "finalized typed-data report"
@@ -4655,74 +4748,9 @@ def _data_regression_problems(
 ) -> list[str]:
     """Return all typed-data evidence that regressed after integration."""
 
-    from tools.decomp_verify import data_sections
+    from tools.decomp_verify import typed_data_regression_problems
 
-    problems: list[str] = []
-
-    def variables(payload: Mapping[str, object]) -> dict[int, Mapping[str, object]]:
-        group = payload.get("variables")
-        rows = group.get("variables", []) if isinstance(group, Mapping) else []
-        values: dict[int, Mapping[str, object]] = {}
-        if not isinstance(rows, list):
-            return values
-        for row in rows:
-            if not isinstance(row, Mapping):
-                continue
-            address = _address_int(row.get("original_address"))
-            if address is not None:
-                values[address] = row
-        return values
-
-    before_variables = variables(before)
-    after_variables = variables(after)
-    for address, old in before_variables.items():
-        new = after_variables.get(address)
-        if new is None:
-            problems.append(f"0x{address:08X}: data item disappeared")
-            continue
-        if float(new.get("matched_bytes", 0)) + 1e-12 < float(
-            old.get("matched_bytes", 0)
-        ):
-            problems.append(f"0x{address:08X}: data bytes regressed")
-        elif float(new.get("score", 0)) + 1e-12 < float(old.get("score", 0)):
-            problems.append(f"0x{address:08X}: data score regressed")
-
-    before_group = before.get("variables")
-    after_group = after.get("variables")
-    if not isinstance(before_group, Mapping) or not isinstance(after_group, Mapping):
-        problems.append("typed-data totals are missing")
-    elif float(after_group.get("explained_bytes", 0)) + 1e-12 < float(
-        before_group.get("explained_bytes", 0)
-    ):
-        problems.append("initialized-data explained bytes regressed")
-
-    before_sections = data_sections(dict(before))
-    after_sections = data_sections(dict(after))
-    for name, old in before_sections.items():
-        new = after_sections.get(name)
-        if new is None:
-            problems.append(f"{name}: scored data section disappeared")
-            continue
-        if float(new.get("explained_bytes", 0)) + 1e-12 < float(
-            old.get("explained_bytes", 0)
-        ):
-            problems.append(f"{name}: explained section bytes regressed")
-        elif float(new.get("score", 0)) + 1e-12 < float(old.get("score", 0)):
-            problems.append(f"{name}: data section score regressed")
-
-    for group_name in ("vtables", "imports", "relocations"):
-        old = before.get(group_name, {})
-        new = after.get(group_name, {})
-        if not isinstance(old, Mapping):
-            problems.append(f"{group_name}: finalized data reference is invalid")
-            continue
-        if not isinstance(new, Mapping):
-            problems.append(f"{group_name}: integrated data evidence is invalid")
-            continue
-        key = "explained_bytes" if group_name == "vtables" else "matched_entries"
-        if float(new.get(key, 0)) + 1e-12 < float(old.get(key, 0)):
-            problems.append(f"{group_name}: data evidence regressed")
-    return problems
+    return typed_data_regression_problems(before, after)
 
 
 def _delivery_validation_command_plan(
@@ -4743,7 +4771,7 @@ def _delivery_validation_command_plan(
     standard = standard_finalize_commands(root)
     commands = [list(command) for command in standard["build"]]
     commands.extend(list(command) for command in standard["code_report"])
-    if mode in ("data", "resource"):
+    if _requires_typed_data_gate(campaign):
         commands.extend(list(command) for command in standard["data_report"])
     commands.extend(
         (
@@ -4832,7 +4860,7 @@ def _run_delivery_validation(
             expected_identity=identity,
             expected_artifact=code_before,
         )
-        if mode in ("data", "resource"):
+        if _requires_typed_data_gate(campaign):
             data_report = build / "decomp-current-data-report.json"
             identity = current_identity(root)
             data_before = _artifact_state(data_report)
@@ -4892,7 +4920,7 @@ def _run_delivery_validation(
                 raise ValueError(f"integrated function {address_text} regressed")
 
         current_data: dict[int, float] = {}
-        if mode in ("data", "resource"):
+        if _requires_typed_data_gate(campaign):
             prior_data_payload = (
                 reference.get("data_payload")
                 if isinstance(reference, Mapping)
@@ -5022,7 +5050,7 @@ def _run_delivery_validation(
     return {
         "commands": results,
         "inputs": inputs,
-        "artifacts": _delivery_artifacts(root, mode),
+        "artifacts": _delivery_artifacts(root, campaign),
     }
 
 
@@ -5097,6 +5125,7 @@ def create_delivery_receipt(
     _verify_campaign_in_commit(
         root, ledger_path, campaign, source_commit, integrated_base
     )
+    accepted_review: dict[str, object] | None = None
     resolved_paths = _verify_finalized_campaign_tree(
         root,
         ledger_path,
@@ -5116,6 +5145,16 @@ def create_delivery_receipt(
     if campaign.get("result") == "source" and campaign.get("mode") != "meta":
         _validate_configured_build_sources(
             root, integrated_tree, "delivery commit tree"
+        )
+    if campaign.get("impact_review_required") is True:
+        committed_records = _committed_ledger_records(
+            root, ledger_path, source_commit
+        )
+        accepted_review = _accepted_review_from_records(
+            committed_records,
+            campaign,
+            finalize_receipt,
+            root=root,
         )
     reference = _delivery_reference(finalize_receipt, campaign, root)
     validation = _run_delivery_validation(campaign, root, reference)
@@ -5140,6 +5179,17 @@ def create_delivery_receipt(
     )
     if current_resolved_paths != resolved_paths:
         raise ValueError("the delivery commit tree changed during validation")
+    if campaign.get("impact_review_required") is True:
+        current_committed_records = _committed_ledger_records(
+            root, ledger_path, source_commit
+        )
+        if _accepted_review_from_records(
+            current_committed_records,
+            campaign,
+            current_finalize_receipt,
+            root=root,
+        ) != accepted_review:
+            raise ValueError("the accepted impact review changed during validation")
     dirty = _delivery_relevant_changes(root, ledger_path)
     if dirty:
         raise ValueError("delivery validation changed a tracked workflow file")
@@ -5163,6 +5213,8 @@ def create_delivery_receipt(
             root, require_reccmp_user=campaign.get("mode") != "meta"
         ),
     }
+    if accepted_review is not None:
+        receipt["accepted_review"] = accepted_review
     receipt["content_sha256"] = _delivery_receipt_hash(receipt)
     path = cache_root / campaign_id / f"{receipt['content_sha256']}.json"
     existing = _read_json_object(path, "delivery receipt") if path.exists() else None
@@ -5218,6 +5270,20 @@ def _validated_delivery_receipt(
         raise ValueError("the delivery receipt commit identity is stale")
     _validate_campaign_record_receipt(campaign)
     _verify_campaign_in_commit(root, ledger_path, campaign, commit, base)
+    if campaign.get("impact_review_required") is True:
+        finalize_receipt = _campaign_finalize_receipt(
+            campaign, validate_artifacts=False
+        )
+        accepted_review = _accepted_review_from_records(
+            _committed_ledger_records(root, ledger_path, commit),
+            campaign,
+            finalize_receipt,
+            root=root,
+        )
+        if receipt.get("accepted_review") != accepted_review:
+            raise ValueError("the delivery receipt impact review changed")
+    elif "accepted_review" in receipt:
+        raise ValueError("the delivery receipt has an unexpected impact review")
     resolved_paths = _verify_finalized_campaign_tree(
         root, ledger_path, campaign, commit, base
     )
@@ -5246,7 +5312,7 @@ def _validated_delivery_receipt(
         from tools.decomp_provenance import validate_report
 
         validate_report(root / "build/decomp-current-report.json", root=root)
-        if mode in ("data", "resource"):
+        if _requires_typed_data_gate(campaign):
             validate_report(root / "build/decomp-current-data-report.json", root=root)
     from tools.decomp_provenance import validation_tool_identity
 
@@ -5303,6 +5369,7 @@ def record_delivery(
     now: datetime | None = None,
     delivery_id: str | None = None,
     root: Path = ROOT,
+    review_report_path: Path | None = None,
 ) -> dict[str, object]:
     if status not in DELIVERY_STATUSES:
         raise ValueError(f"unknown delivery status: {status}")
@@ -5320,12 +5387,59 @@ def record_delivery(
     if campaign is None:
         raise ValueError("--campaign-id does not identify a completed campaign")
     _validate_campaign_record_receipt(campaign)
+    if review_report_path is not None and status != "accepted":
+        raise ValueError("--review-report requires accepted delivery status")
     delivery_records = [
         item
         for item in records
         if item.get("record_type") == "delivery"
         and item.get("campaign_id") == clean_campaign_id
     ]
+    existing_status = next(
+        (item for item in delivery_records if item.get("status") == status),
+        None,
+    )
+    accepted_review: dict[str, object] | None = None
+    accepted_claims: list[str] | None = None
+    if status == "accepted" and campaign.get("impact_review_required") is True:
+        from tools.decomp_impact import (
+            ImpactError,
+            create_review_receipt,
+            review_required,
+        )
+
+        finalize_receipt = _campaign_finalize_receipt(
+            campaign, validate_artifacts=True
+        )
+        try:
+            needs_review = review_required(finalize_receipt)
+            if not needs_review:
+                raise ValueError(
+                    "the finalization receipt has no required impact review"
+                )
+            if existing_status is not None and review_report_path is None:
+                accepted_review = _validated_accepted_review(
+                    campaign,
+                    existing_status,
+                    finalize_receipt,
+                    root=root,
+                )
+                accepted_claims = list(existing_status.get("accepted_claims", []))
+            elif review_report_path is None:
+                raise ValueError(
+                    "accepted source delivery needs --review-report"
+                )
+            else:
+                _review, accepted_review = create_review_receipt(
+                    finalize_receipt=finalize_receipt,
+                    review_report_path=review_report_path,
+                    cache_root=root / "build" / "decomp-cache" / "reviews",
+                )
+                accepted_claims = list(accepted_review["accepted_claims"])
+        except ImpactError as error:
+            raise ValueError(f"the independent impact review is invalid: {error}") from error
+    elif status == "accepted" and review_report_path is not None:
+        raise ValueError("this campaign does not accept --review-report")
     prior_statuses = [str(item.get("status", "")) for item in delivery_records]
     recorded = now or utc_now()
     recorded_at = timestamp(recorded)
@@ -5419,10 +5533,6 @@ def record_delivery(
     if status != "rejected" and artifact_hash is None and receipt_hash is None:
         raise ValueError("a delivery event needs a bound artifact or receipt SHA-256 value")
     clean_note = _clean_optional_line(note, "--note") or ""
-    existing_status = next(
-        (item for item in delivery_records if item.get("status") == status),
-        None,
-    )
     if existing_status is not None:
         supplied_identity = {
             "artifact_sha256": artifact_hash,
@@ -5434,6 +5544,8 @@ def record_delivery(
                 if delivery_receipt_path is not None
                 else None
             ),
+            "accepted_review": accepted_review,
+            "accepted_claims": accepted_claims,
         }
         for field, supplied in supplied_identity.items():
             if supplied is not None and existing_status.get(field) != supplied:
@@ -5479,6 +5591,9 @@ def record_delivery(
         ),
         "note": clean_note,
     }
+    if accepted_review is not None:
+        item["accepted_review"] = accepted_review
+        item["accepted_claims"] = accepted_claims
     append_record(ledger_path, item, expected_records=records)
     return item
 
@@ -5920,6 +6035,9 @@ def _finalize_key_payload(
         "campaign_head": state.get("campaign_head"),
         "briefs": state.get("briefs"),
         "briefs_required": state.get("briefs_required") is True,
+        "impact_review_required": (
+            state.get("impact_review_required") is True and result == "source"
+        ),
         "started_at": state.get("started_at"),
         "baseline_report_sha256": state.get("baseline_report_sha256"),
         "baseline_report_provenance_sha256": state.get(
@@ -6131,6 +6249,9 @@ def _validated_finalize_receipt(
         "campaign_head": state.get("campaign_head"),
         "briefs": state.get("briefs"),
         "briefs_required": state.get("briefs_required") is True,
+        "impact_review_required": (
+            state.get("impact_review_required") is True and result == "source"
+        ),
         "started_at": state.get("started_at"),
         "baseline_report_sha256": state.get("baseline_report_sha256"),
         "baseline_report_provenance_sha256": state.get(
@@ -6859,8 +6980,14 @@ def _standard_source_scan(
 
 
 def _standard_input_hashes(root: Path) -> dict[str, object]:
+    from tools.decomp_dependencies import decoder_identity
+
     paths = (
         Path(__file__),
+        root / "tools" / "decomp_impact.py",
+        root / "tools" / "decomp_annotations.py",
+        root / "tools" / "decomp_dependencies.py",
+        root / "tools" / "decomp_binary.py",
         root / "tools" / "decomp_verify.py",
         root / "tools" / "decomp_lint.py",
         root / "tools" / "generate-decomp-data-report.py",
@@ -6871,7 +6998,8 @@ def _standard_input_hashes(root: Path) -> dict[str, object]:
         root / "original" / "toy2.exe",
     )
     return {
-        "standard_finalize_version": 1,
+        "standard_finalize_version": 2,
+        "decoder": decoder_identity(),
         "files": {
             str(path.resolve()): file_hash(path)
             for path in paths
@@ -6884,13 +7012,17 @@ def _standard_input_hashes(root: Path) -> dict[str, object]:
 def _meta_input_hashes(root: Path) -> dict[str, object]:
     paths = (
         Path(__file__),
+        root / "tools" / "decomp_impact.py",
+        root / "tools" / "decomp_annotations.py",
+        root / "tools" / "decomp_dependencies.py",
+        root / "tools" / "decomp_binary.py",
         root / "tools" / "decomp",
         root / "tools" / "decomp.ps1",
         root / "tools" / "decomp_lint.py",
         root / "tools" / "ghidra_sync.py",
     )
     return {
-        "meta_finalize_version": 1,
+        "meta_finalize_version": 2,
         "files": {
             str(path.resolve()): file_hash(path)
             for path in paths
@@ -7396,6 +7528,27 @@ def _standard_finalize_actions(
             state, current_report, staged=staged
         )
         scan_context.update(private)
+        if state.get("impact_review_required") is True:
+            from tools.decomp_impact import build_impact_pack, write_impact_pack
+            from tools.decomp_provenance import provenance_path
+
+            baseline_report = Path(str(state["baseline_report"]))
+            baseline_data_report = Path(str(state["baseline_data_report"]))
+            impact_pack = build_impact_pack(
+                state=state,
+                baseline_report=baseline_report,
+                current_report=current_report,
+                root=root,
+            )
+            impact_path = write_impact_pack(impact_pack, root)
+            public["artifacts"] = [
+                impact_path,
+                baseline_report,
+                provenance_path(baseline_report),
+                baseline_data_report,
+                provenance_path(baseline_data_report),
+            ]
+            scan_context["impact_pack"] = impact_pack
         return public
 
     def validation_action() -> object:
@@ -7448,11 +7601,13 @@ def _standard_finalize_actions(
                     mode=mode,
                     baseline_data_path=(
                         Path(str(state["baseline_data_report"]))
-                        if mode in ("data", "resource")
+                        if _requires_typed_data_gate(state)
                         else None
                     ),
                     current_data_path=(
-                        current_data if mode in ("data", "resource") else None
+                        current_data
+                        if _requires_typed_data_gate(state)
+                        else None
                     ),
                     staged=staged,
                     resource=parse_resource(resource) if resource else None,
@@ -8438,6 +8593,7 @@ def make_parser() -> argparse.ArgumentParser:
     delivery.add_argument("--artifact-sha256")
     delivery.add_argument("--receipt-sha256")
     delivery.add_argument("--delivery-receipt", type=Path)
+    delivery.add_argument("--review-report", type=Path)
     delivery.add_argument("--base-commit")
     delivery.add_argument("--commit")
     delivery.add_argument("--note")
@@ -8857,6 +9013,7 @@ def main() -> int:
                 artifact_sha256=args.artifact_sha256,
                 receipt_sha256=args.receipt_sha256,
                 delivery_receipt_path=args.delivery_receipt,
+                review_report_path=args.review_report,
                 base_commit=args.base_commit,
                 commit=args.commit,
                 note=args.note,

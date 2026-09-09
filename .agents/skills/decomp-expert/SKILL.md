@@ -237,10 +237,12 @@ Use the lowercase mode that the supervisor assigned.
 3. Stage only the coherent campaign.
 4. Run the applicable `tools/decomp finalize` command from `AGENTS.md`.
 5. Confirm that the content-addressed receipt is complete and hash-valid.
-6. Confirm that the result meets the mode and lane contracts.
-7. Return the staged source slice and receipt to the supervisor.
-8. Do not run the HTML report or Ghidra sync.
-9. Do not commit or push. The supervisor records and commits the campaign.
+6. For coverage or refinement, confirm that the receipt has the immutable
+   post-write impact pack and its baseline evidence.
+7. Confirm that the result meets the mode and lane contracts.
+8. Return the staged source slice and receipt to the supervisor.
+9. Do not run the HTML report or Ghidra sync.
+10. Do not commit or push. The supervisor records and commits the campaign.
 
 Coverage must increase the implemented count. Refinement must increase a
 score, reach terminal status, or remove debt while terminal status remains.
@@ -253,6 +255,8 @@ The supervisor records and commits the accepted campaign, rebases it onto the
 current remote, and creates the post-integration delivery receipt. That receipt
 rejects a conflict on a finalized campaign path. Do not run
 `campaigns delivery-verify` or record delivery events as the writer.
+The independent reviewer creates and seals the impact review. The writer does
+not act as the reviewer.
 
 Outside a meta campaign, run tool unit tests only when the campaign changes
 tool code. A workflow fix must run its focused tool tests. It must restore a

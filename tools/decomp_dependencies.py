@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections import defaultdict
 from dataclasses import dataclass
+from pathlib import Path
 
 from tools import decomp_binary
 
@@ -19,6 +21,47 @@ class DependencyGraph:
     callers: dict[int, frozenset[int]]
     indirect_calls: dict[int, int]
     indirect_jumps: dict[int, int]
+
+
+def _file_identity(path: Path | None) -> dict[str, str | None]:
+    if path is None or not path.is_file():
+        return {"path": None, "sha256": None}
+    resolved = path.resolve()
+    return {
+        "path": str(resolved),
+        "sha256": hashlib.sha256(resolved.read_bytes()).hexdigest(),
+    }
+
+
+def decoder_identity() -> dict[str, object]:
+    """Return the Python and native identities for the x86 decoder."""
+
+    try:
+        import capstone
+    except ImportError:
+        return {
+            "engine": "unavailable",
+            "version": None,
+            "api_version": None,
+            "architecture": "x86",
+            "mode": 32,
+            "detail": False,
+            "module": {"path": None, "sha256": None},
+            "library": {"path": None, "sha256": None},
+        }
+    module_path = Path(str(capstone.__file__)) if capstone.__file__ else None
+    library_name = getattr(getattr(capstone, "_cs", None), "_name", None)
+    library_path = Path(library_name) if isinstance(library_name, str) else None
+    return {
+        "engine": "capstone",
+        "version": str(capstone.__version__),
+        "api_version": list(capstone.cs_version()),
+        "architecture": "x86",
+        "mode": 32,
+        "detail": True,
+        "module": _file_identity(module_path),
+        "library": _file_identity(library_path),
+    }
 
 
 def _capstone():
@@ -36,13 +79,41 @@ def _capstone():
 
 def build_call_graph(
     entries: list[tuple[int, str]],
+    *,
+    image_path: Path | None = None,
 ) -> DependencyGraph:
     """Return direct calls and tail jumps between mapped retail functions."""
 
-    if not decomp_binary.available():
-        raise DependencyUnavailable(
-            "The retail executable is unavailable. Run the repository setup command first."
-        )
+    if image_path is None:
+        if not decomp_binary.available():
+            raise DependencyUnavailable(
+                "The retail executable is unavailable. Run the repository setup command first."
+            )
+        sections = decomp_binary.sections()
+        read_bytes = decomp_binary.read_bytes
+    else:
+        if not image_path.is_file():
+            raise DependencyUnavailable(
+                "The retail executable is unavailable. Run the repository setup command first."
+            )
+        image = image_path.read_bytes()
+        metadata = decomp_binary.parse_image_metadata(image)
+        sections = metadata.sections
+
+        def read_bytes(address: int, size: int) -> bytes | None:
+            if size < 0:
+                raise ValueError("size must not be negative")
+            for section in sections:
+                section_end = section.virtual_address + section.raw_size
+                if section.virtual_address <= address <= section_end:
+                    available_size = section_end - address
+                    if size > available_size:
+                        return None
+                    offset = section.raw_pointer + (
+                        address - section.virtual_address
+                    )
+                    return image[offset : offset + size]
+            return None
 
     disassembler, immediate_operand = _capstone()
     mapped = {address for address, _ in entries}
@@ -53,7 +124,7 @@ def build_call_graph(
     text_end = max(
         (
             section.virtual_address + section.raw_size
-            for section in decomp_binary.sections()
+            for section in sections
             if section.name == ".text"
         ),
         default=entries[-1][0] if entries else 0,
@@ -63,7 +134,7 @@ def build_call_graph(
         size = next_address - address
         if size <= 0:
             continue
-        code = decomp_binary.read_bytes(address, size)
+        code = read_bytes(address, size)
         if code is None:
             continue
         for instruction in disassembler.disasm(code, address):

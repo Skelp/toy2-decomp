@@ -586,18 +586,40 @@ count this commit as source progress.
 Do not supply estimated times or byte counts to the record command.
 
 After the record command, add the `staged` delivery event. An independent
-reviewer then examines the staged files and the finalization receipt. Add the
-`accepted` event only after this review passes. Stage the finalized campaign
-files, the campaign row, and the `staged` and `accepted` entries. Commit this
-set once. For a no-source result, the commit contains only the exact ledger and
-source-model-note append. Post-commit delivery telemetry must not be in this
-campaign commit.
+reviewer then examines the staged files and the finalization receipt. A new
+coverage or refinement source result requires a sealed impact review. The
+reviewer ID must differ from the writer and scout IDs. Generate the pending
+form, then give the form, staged files, and receipt to the reviewer. The
+reviewer must inspect each cited record. The reviewer then sets the decision
+and each claim status to `accepted`, and sets each refuter status to `passed`.
+The generated citations are exact. Do not replace or remove them. Seal and
+verify the edited form before you add the `accepted` event:
 
 ```sh
 tools/decomp campaigns delivery --campaign-id CAMPAIGN_ID --status staged
-# Complete the independent acceptance review.
-tools/decomp campaigns delivery --campaign-id CAMPAIGN_ID --status accepted
+tools/decomp impact template --finalize-receipt FINALIZE_RECEIPT \
+  --reviewer-id REVIEWER_ID --json > build/decomp-cache/review-pending.json
+# The independent reviewer edits review-pending.json.
+tools/decomp impact seal-review --finalize-receipt FINALIZE_RECEIPT \
+  --review-report build/decomp-cache/review-pending.json --json \
+  > build/decomp-cache/review-sealed.json
+tools/decomp impact verify-review --finalize-receipt FINALIZE_RECEIPT \
+  --review-report build/decomp-cache/review-sealed.json --json
+tools/decomp campaigns delivery --campaign-id CAMPAIGN_ID --status accepted \
+  --review-report build/decomp-cache/review-sealed.json
 ```
+
+The first `accepted` event for a reviewed source result rejects a missing or
+different report. An exact retry can omit `--review-report`; the command then
+revalidates the cached accepted review. A retry that supplies a report must
+use the same semantic report. A different report is rejected. Legacy
+campaigns, no-source results, data results, resource results, and meta fixes do
+not use this impact review.
+
+Stage the finalized campaign files, the campaign row, and the `staged` and
+`accepted` entries. Commit this set once. For a no-source result, the commit
+contains only the exact ledger and source-model-note append. Post-commit
+delivery telemetry must not be in this campaign commit.
 
 Fetch current `origin/agent/continuous` and rebase the campaign commit onto it.
 If the upstream branch changed a finalized campaign path, reject the delivery
