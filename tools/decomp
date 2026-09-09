@@ -366,7 +366,7 @@ experiment() {
     local action="${1:-}"
     shift || true
     if [[ -z "$action" ]]; then
-        echo "Usage: tools/decomp experiment start|try|status|best|advise|report <address> [label] [options]" >&2
+        echo "Usage: tools/decomp experiment start|branch|measure|try|seal|status|best|advise|report <address> [label] [options]" >&2
         return 2
     fi
     case "$action" in
@@ -408,17 +408,32 @@ experiment() {
             ) 9>"$build_lock" || return
             echo "Started experiment $address in $session_directory."
             ;;
-        try)
+        branch)
             local address="${1:-}"
             local label="${2:-}"
             if [[ -z "$address" || -z "$label" ]]; then
-                echo "error: experiment try needs an address and a label" >&2
+                echo "error: experiment branch needs an address and a label" >&2
+                return 2
+            fi
+            shift 2
+            python tools/decomp_experiment.py branch "$address" "$label" "$@"
+            ;;
+        try|measure)
+            local address="${1:-}"
+            local label="${2:-}"
+            if [[ -z "$address" || -z "$label" ]]; then
+                echo "error: experiment $action needs an address and a label or trial ID" >&2
                 return 2
             fi
             shift 2
             local trial_plan_text
-            trial_plan_text=$(python tools/decomp_experiment.py reserve \
-                "$address" "$label" "$@" --format lines) || return
+            if [[ $action == try ]]; then
+                trial_plan_text=$(python tools/decomp_experiment.py reserve \
+                    "$address" "$label" "$@" --format lines) || return
+            else
+                trial_plan_text=$(python tools/decomp_experiment.py measure-plan \
+                    "$address" --trial "$label" "$@" --format lines) || return
+            fi
             local trial_plan=()
             mapfile -t trial_plan <<< "$trial_plan_text"
             [[ ${#trial_plan[@]} -eq 8 ]] || {
@@ -514,11 +529,11 @@ experiment() {
                     --quiet
             ) 9>"$build_lock"
             ;;
-        status|best|advise|report)
+        status|best|advise|report|seal)
             python tools/decomp_experiment.py "$action" "$@"
             ;;
         *)
-            echo "error: experiment action must be start, try, status, best, advise, or report" >&2
+            echo "error: experiment action must be start, branch, measure, try, seal, status, best, advise, or report" >&2
             return 2
             ;;
     esac
@@ -607,6 +622,8 @@ Commands:
   validate [args]   Enforce coverage, refinement, data, or resource success
   finalize [args]   Validate once and write a content-addressed receipt
   experiment [...] Record labeled source-form comparison trials
+  replay [...]     Enroll and certify the private replay benchmark
+  route advise     Give route advice only after replay certification
   lint [files]      Check reconstructed source for decompiler residue
   names             Re-extract .notes/original-names.md from the retail binary
   data [addr]       Show type-aware initialized-global differences
@@ -1175,6 +1192,12 @@ case "$command" in
         ;;
     experiment)
         experiment "$@"
+        ;;
+    replay)
+        exec python tools/decomp_replay.py "$@"
+        ;;
+    route)
+        exec python tools/decomp_route.py "$@"
         ;;
     report)
         report "$@"

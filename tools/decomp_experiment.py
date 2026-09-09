@@ -8,14 +8,17 @@ comparison generation, so controller failures cannot trigger hidden work.
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
+import ctypes
 from datetime import datetime, timezone
 import hashlib
+import errno
 import json
 import math
 import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -28,6 +31,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from tools.decomp_mismatch import ROUTE_ORDER  # noqa: E402
+from tools.decomp_quality import candidate_quality  # noqa: E402
+from tools.decomp_campaigns import (  # noqa: E402
+    _snapshot_hash,
+    attach_replay_experiment,
+    source_worktree_snapshot,
+)
 from tools.decomp_provenance import (  # noqa: E402
     file_hash,
     provenance_path,
@@ -48,8 +57,10 @@ MAX_DIFF_BYTES = 32 * 1024 * 1024
 MAX_PATCH_BYTES = 32 * 1024 * 1024
 MAX_CONTEXT_BYTES = 4 * 1024 * 1024
 MAX_BRIEF_BYTES = 16 * 1024 * 1024
+MAX_TRAJECTORY_BYTES = 16 * 1024 * 1024
 MAX_NORMALIZED_ROWS = 128
 MAX_NORMALIZED_TEXT = 240
+MAX_TRIAL_DIRECTORY_ENTRIES = MAX_MAX_TRIALS + 16
 SCORE_EPSILON = 1e-12
 
 EXPERIMENTS_RELATIVE = Path("build/decomp-experiments")
@@ -80,12 +91,15 @@ STATUS_RANK = {"provisional": 1, "effective": 2, "exact": 3}
 TOOL_FILES = (
     "reccmp-project.yml",
     "reccmp-user.yml",
+    "tools/__init__.py",
     "tools/decomp",
     "tools/decomp.ps1",
+    "tools/decomp_campaigns.py",
     "tools/decomp_experiment.py",
     "tools/decomp_diff.py",
     "tools/decomp_mismatch.py",
     "tools/decomp_provenance.py",
+    "tools/decomp_quality.py",
     "tools/decomp_status.py",
     "tools/decomp_verify.py",
     "tools/generate-decomp-data-report.py",
@@ -100,10 +114,25 @@ COMPILER_CONTEXT_KEYS = (
     "vc6_headers_sha256",
     "reccmp_git_head",
 )
+SOURCE_SNAPSHOT_FIELD = "source_worktree_snapshot"
+PARENT_SNAPSHOT_FIELD = "parent_source_worktree_snapshot"
 
 
 class ExperimentError(ValueError):
     """Report an invalid experiment operation."""
+
+
+def _reject_json_constant(_value: str) -> object:
+    raise ExperimentError("an experiment JSON document contains a non-finite number")
+
+
+def _strict_json_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    value: dict[str, object] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ExperimentError("an experiment JSON document contains a duplicate key")
+        value[key] = item
+    return value
 
 
 def _now() -> datetime:
@@ -160,16 +189,25 @@ def _root(path: Path) -> Path:
 def _safe_relative(path: Path, root: Path, *, must_exist: bool = True) -> str:
     root = _root(root)
     candidate = path if path.is_absolute() else root / path
-    resolved = candidate.resolve(strict=must_exist)
+    lexical = Path(os.path.abspath(candidate))
     try:
-        relative = resolved.relative_to(root)
+        relative = lexical.relative_to(root)
     except ValueError as error:
         raise ExperimentError("an experiment path escapes the repository") from error
     current = root
     for part in relative.parts:
         current = current / part
-        if current.exists() and current.is_symlink():
+        try:
+            metadata = os.lstat(current)
+        except FileNotFoundError:
+            if must_exist:
+                raise ExperimentError("an experiment path is missing")
+            break
+        if stat.S_ISLNK(metadata.st_mode):
             raise ExperimentError("an experiment path uses a symbolic link")
+    resolved = lexical.resolve(strict=must_exist)
+    if resolved != lexical:
+        raise ExperimentError("an experiment path uses a symbolic link")
     return relative.as_posix()
 
 
@@ -177,35 +215,151 @@ def _resolve_relative(relative: object, root: Path, *, parent: Path | None = Non
     if not isinstance(relative, str) or not relative or Path(relative).is_absolute():
         raise ExperimentError("an experiment receipt has an invalid path")
     root = _root(root)
-    path = (root / relative).resolve()
+    lexical = root / relative
+    safe_relative = _safe_relative(lexical, root, must_exist=False)
+    path = root / safe_relative
     try:
-        path.relative_to(_root(parent or root))
+        path.resolve().relative_to(_root(parent or root))
     except ValueError as error:
         raise ExperimentError("an experiment receipt path escapes its directory") from error
-    _safe_relative(path, root, must_exist=False)
     return path
+
+
+def _open_read_nofollow(path: Path) -> int:
+    """Open one absolute file through no-follow directory descriptors on POSIX."""
+
+    absolute = Path(os.path.abspath(path))
+    if os.name != "posix" or os.open not in os.supports_dir_fd:
+        for candidate in (absolute, *absolute.parents):
+            try:
+                if stat.S_ISLNK(os.lstat(candidate).st_mode):
+                    raise OSError
+            except FileNotFoundError:
+                raise OSError
+        return os.open(absolute, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    parts = absolute.parts
+    directory = os.open(parts[0], os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in parts[1:-1]:
+            child = os.open(
+                part,
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=directory,
+            )
+            os.close(directory)
+            directory = child
+        return os.open(
+            parts[-1],
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=directory,
+        )
+    finally:
+        os.close(directory)
+
+
+def _open_directory_nofollow(path: Path) -> int:
+    """Open one absolute directory while holding every no-follow component."""
+
+    absolute = Path(os.path.abspath(path))
+    if os.name != "posix" or os.open not in os.supports_dir_fd:
+        for candidate in (absolute, *absolute.parents):
+            try:
+                if stat.S_ISLNK(os.lstat(candidate).st_mode):
+                    raise OSError
+            except FileNotFoundError:
+                raise OSError
+        return os.open(absolute, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    parts = absolute.parts
+    directory = os.open(parts[0], os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in parts[1:]:
+            child = os.open(
+                part,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                dir_fd=directory,
+            )
+            os.close(directory)
+            directory = child
+        return directory
+    except Exception:
+        os.close(directory)
+        raise
+
+
+def _ensure_directory_nofollow(path: Path) -> int:
+    """Create missing directory components without following symbolic links."""
+
+    absolute = Path(os.path.abspath(path))
+    if os.name != "posix" or os.mkdir not in os.supports_dir_fd:
+        absolute.mkdir(parents=True, exist_ok=True)
+        return _open_directory_nofollow(absolute)
+    parts = absolute.parts
+    directory = os.open(parts[0], os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in parts[1:]:
+            try:
+                os.mkdir(part, 0o700, dir_fd=directory)
+            except FileExistsError:
+                pass
+            child = os.open(
+                part,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                dir_fd=directory,
+            )
+            os.close(directory)
+            directory = child
+        return directory
+    except Exception:
+        os.close(directory)
+        raise
 
 
 def _read_bytes(
     path: Path, maximum: int, description: str, *, allow_empty: bool = False
 ) -> bytes:
-    if path.is_symlink():
-        raise ExperimentError(f"the {description} uses a symbolic link")
-    if not path.is_file():
-        raise ExperimentError(f"the {description} is missing or is not a regular file")
-    size = path.stat().st_size
-    if size > maximum or (size == 0 and not allow_empty):
-        raise ExperimentError(f"the {description} has an invalid size")
     try:
-        return path.read_bytes()
+        descriptor = _open_read_nofollow(path)
+        with os.fdopen(descriptor, "rb") as stream:
+            before = os.fstat(stream.fileno())
+            content = stream.read(maximum + 1)
+            after = os.fstat(stream.fileno())
+        current_uid = os.geteuid() if hasattr(os, "geteuid") else None
+        stable = (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        ) == (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        )
+        if (
+            not stat.S_ISREG(after.st_mode)
+            or after.st_nlink != 1
+            or (current_uid is not None and after.st_uid != current_uid)
+            or not stable
+            or after.st_size > maximum
+            or (after.st_size == 0 and not allow_empty)
+            or len(content) != after.st_size
+        ):
+            raise OSError
+        return content
     except OSError as error:
-        raise ExperimentError(f"cannot read the {description}: {error}") from error
+        raise ExperimentError(f"the {description} is missing or invalid") from error
 
 
 def _read_json(path: Path, maximum: int, description: str) -> dict[str, object]:
     raw = _read_bytes(path, maximum, description)
     try:
-        value = json.loads(raw.decode("utf-8-sig"))
+        value = json.loads(
+            raw.decode("utf-8-sig"),
+            object_pairs_hook=_strict_json_pairs,
+            parse_constant=_reject_json_constant,
+        )
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ExperimentError(f"the {description} is not a JSON object") from error
     if not isinstance(value, dict):
@@ -214,25 +368,133 @@ def _read_json(path: Path, maximum: int, description: str) -> dict[str, object]:
 
 
 def _atomic_write(path: Path, content: bytes, *, exclusive: bool = False) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if exclusive and path.exists():
-        raise ExperimentError(f"the immutable receipt already exists: {path}")
-    descriptor, temporary_name = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-    )
+    if os.name != "posix" or os.open not in os.supports_dir_fd:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+        )
+        try:
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(content)
+                stream.flush()
+                os.fsync(stream.fileno())
+            if exclusive:
+                os.link(temporary_name, path, follow_symlinks=False)
+            else:
+                os.replace(temporary_name, path)
+        except FileExistsError as error:
+            raise ExperimentError("the immutable experiment receipt already exists") from error
+        finally:
+            try:
+                os.unlink(temporary_name)
+            except FileNotFoundError:
+                pass
+        return
+
+    directory = -1
+    descriptor = -1
+    temporary_name = f".{path.name}.{uuid.uuid4().hex}.tmp"
+    temporary_identity: tuple[int, int] | None = None
+    immutable_published = False
     try:
+        directory = _ensure_directory_nofollow(path.parent)
+        descriptor = os.open(
+            temporary_name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            0o600,
+            dir_fd=directory,
+        )
         with os.fdopen(descriptor, "wb") as stream:
+            descriptor = -1
             stream.write(content)
             stream.flush()
             os.fsync(stream.fileno())
-        if exclusive and path.exists():
-            raise ExperimentError(f"the immutable receipt already exists: {path}")
-        os.replace(temporary_name, path)
+            metadata = os.fstat(stream.fileno())
+            current_uid = os.geteuid() if hasattr(os, "geteuid") else None
+            if (
+                not stat.S_ISREG(metadata.st_mode)
+                or metadata.st_nlink != 1
+                or (current_uid is not None and metadata.st_uid != current_uid)
+            ):
+                raise OSError
+            temporary_identity = (metadata.st_dev, metadata.st_ino)
+        if exclusive:
+            try:
+                rename_noreplace = ctypes.CDLL(None, use_errno=True).renameat2
+            except AttributeError as error:
+                raise ExperimentError("secure experiment receipt publication is unavailable") from error
+            rename_noreplace.argtypes = [
+                ctypes.c_int,
+                ctypes.c_char_p,
+                ctypes.c_int,
+                ctypes.c_char_p,
+                ctypes.c_uint,
+            ]
+            rename_noreplace.restype = ctypes.c_int
+            if rename_noreplace(
+                directory,
+                os.fsencode(temporary_name),
+                directory,
+                os.fsencode(path.name),
+                1,
+            ) != 0:
+                saved_errno = ctypes.get_errno()
+                if saved_errno == errno.EEXIST:
+                    error = FileExistsError(path.name)
+                else:
+                    raise OSError(saved_errno, os.strerror(saved_errno))
+                raise ExperimentError("the immutable experiment receipt already exists") from error
+            immutable_published = True
+        else:
+            os.replace(
+                temporary_name,
+                path.name,
+                src_dir_fd=directory,
+                dst_dir_fd=directory,
+            )
+        published = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory)
+        with os.fdopen(published, "rb") as stream:
+            published_metadata = os.fstat(stream.fileno())
+            saved = stream.read(len(content) + 1)
+        current_uid = os.geteuid() if hasattr(os, "geteuid") else None
+        if (
+            not stat.S_ISREG(published_metadata.st_mode)
+            or published_metadata.st_nlink != 1
+            or (current_uid is not None and published_metadata.st_uid != current_uid)
+            or published_metadata.st_dev != metadata.st_dev
+            or published_metadata.st_ino != metadata.st_ino
+            or saved != content
+            or published_metadata.st_size != len(content)
+        ):
+            raise OSError
+        os.fsync(directory)
+    except ExperimentError:
+        raise
+    except OSError as error:
+        if immutable_published and temporary_identity is not None and directory >= 0:
+            try:
+                published = os.open(
+                    path.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory
+                )
+                try:
+                    current = os.fstat(published)
+                finally:
+                    os.close(published)
+                if (current.st_dev, current.st_ino) == temporary_identity:
+                    os.unlink(path.name, dir_fd=directory)
+                    os.fsync(directory)
+            except OSError:
+                pass
+        raise ExperimentError("cannot publish the experiment receipt") from error
     finally:
-        try:
-            os.unlink(temporary_name)
-        except FileNotFoundError:
-            pass
+        if descriptor >= 0:
+            os.close(descriptor)
+        if directory >= 0:
+            try:
+                os.unlink(temporary_name, dir_fd=directory)
+            except FileNotFoundError:
+                pass
+            os.close(directory)
 
 
 def write_receipt(path: Path, document: Mapping[str, object]) -> dict[str, object]:
@@ -251,7 +513,10 @@ def read_receipt(
     path: Path, *, kind: str | None = None, maximum: int = MAX_RECORD_BYTES
 ) -> dict[str, object]:
     value = _read_json(path, maximum, "experiment receipt")
-    if value.get("schema_version") != SCHEMA_VERSION:
+    if (
+        type(value.get("schema_version")) is not int
+        or value.get("schema_version") != SCHEMA_VERSION
+    ):
         raise ExperimentError("the experiment receipt schema is invalid")
     saved_id = value.get("receipt_id")
     if not isinstance(saved_id, str) or saved_id != receipt_id(value):
@@ -262,10 +527,44 @@ def read_receipt(
 
 
 @contextmanager
+def _close_descriptor(descriptor: int) -> Iterator[None]:
+    try:
+        yield
+    finally:
+        os.close(descriptor)
+
+
+@contextmanager
 def _state_lock(root: Path) -> Iterator[None]:
     path = _root(root) / EXPERIMENTS_RELATIVE / ".state.lock"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a+b") as stream:
+    if os.name == "posix" and os.open in os.supports_dir_fd:
+        directory = _ensure_directory_nofollow(path.parent)
+        try:
+            descriptor = os.open(
+                path.name,
+                os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW,
+                0o600,
+                dir_fd=directory,
+            )
+        except OSError as error:
+            os.close(directory)
+            raise ExperimentError("the experiment state lock is invalid") from error
+        stream_context = os.fdopen(descriptor, "a+b")
+        directory_context = _close_descriptor(directory)
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        stream_context = path.open("a+b")
+        directory_context = nullcontext()
+    with directory_context, stream_context as stream:
+        metadata = os.fstat(stream.fileno())
+        current_uid = os.geteuid() if hasattr(os, "geteuid") else None
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or getattr(metadata, "st_nlink", 1) != 1
+            or metadata.st_mode & 0o077
+            or (current_uid is not None and metadata.st_uid != current_uid)
+        ):
+            raise ExperimentError("the experiment state lock is invalid")
         if os.name == "nt":
             import msvcrt
 
@@ -285,6 +584,16 @@ def _state_lock(root: Path) -> Iterator[None]:
 
             fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
             try:
+                entry = os.stat(
+                    path.name,
+                    dir_fd=directory,
+                    follow_symlinks=False,
+                )
+                if (
+                    entry.st_dev,
+                    entry.st_ino,
+                ) != (metadata.st_dev, metadata.st_ino):
+                    raise ExperimentError("the experiment state lock changed")
                 yield
             finally:
                 fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
@@ -309,6 +618,17 @@ def _tool_identity(root: Path) -> dict[str, object]:
         relative: file_hash(root / relative) if (root / relative).is_file() else None
         for relative in TOOL_FILES
     }
+
+
+def _bound_source_snapshot(
+    root: Path, comparison_identity: Mapping[str, object]
+) -> dict[str, str]:
+    """Return the full source snapshot that one comparison measured."""
+
+    snapshot = source_worktree_snapshot(root)
+    if _snapshot_hash(snapshot) != comparison_identity.get("source_worktree_sha256"):
+        raise ExperimentError("the comparison source snapshot is stale")
+    return snapshot
 
 
 def _descriptor(
@@ -418,7 +738,9 @@ def _campaign_context(root: Path) -> dict[str, object] | None:
     return {
         "campaign_id": campaign_id,
         "mode": value.get("mode"),
+        "lane": value.get("lane"),
         "active_addresses": [normalize_address(item) for item in addresses],
+        "campaign_head": value.get("campaign_head"),
         "deadline": deadline,
     }
 
@@ -603,6 +925,7 @@ def attach_baseline(
             or files.get("functions_map") != function_map.get("sha256")
         ):
             raise ExperimentError("the baseline report uses another function map")
+        source_snapshot = _bound_source_snapshot(root, report_identity)
         context_path = baseline / "compiler-context.json"
         context = _read_json(context_path, MAX_CONTEXT_BYTES, "compiler context")
         if context.get("git_head") != start.get("head"):
@@ -642,6 +965,7 @@ def attach_baseline(
                 ),
             },
             "comparison_identity": report_identity,
+            SOURCE_SNAPSHOT_FIELD: source_snapshot,
         }
         session = write_receipt(session_path, document)
         pointer = {
@@ -714,6 +1038,15 @@ def read_session(
             or data_receipt.get("input_identity") != session.get("comparison_identity")
         ):
             raise ExperimentError("the baseline report input identity changed")
+        source_snapshot = session.get(SOURCE_SNAPSHOT_FIELD)
+        comparison_identity = session.get("comparison_identity")
+        if source_snapshot is not None and (
+            not isinstance(source_snapshot, dict)
+            or not isinstance(comparison_identity, dict)
+            or _snapshot_hash(source_snapshot)
+            != comparison_identity.get("source_worktree_sha256")
+        ):
+            raise ExperimentError("the baseline source snapshot identity changed")
         _validate_descriptor(
             artifacts.get("compiler_context"),
             root,
@@ -778,11 +1111,25 @@ def _trial_receipts(directory: Path) -> list[tuple[Path, dict[str, object], str]
     trials = directory / "trials"
     if not trials.exists():
         return []
+    descriptor = _open_directory_nofollow(trials)
+    try:
+        with os.scandir(descriptor) as scan:
+            entries = []
+            for entry in scan:
+                if len(entries) >= MAX_TRIAL_DIRECTORY_ENTRIES:
+                    raise ExperimentError("the experiment session has too many trial entries")
+                if not entry.is_dir(follow_symlinks=False):
+                    raise ExperimentError("the experiment session has an invalid trial directory")
+                entries.append(entry.name)
+    finally:
+        os.close(descriptor)
     result = []
-    for path in sorted(trials.iterdir()):
-        if not path.is_dir() or path.is_symlink() or TRIAL_RE.fullmatch(path.name) is None:
+    for name in sorted(entries):
+        path = trials / name
+        if TRIAL_RE.fullmatch(path.name) is None:
             raise ExperimentError("the experiment session has an invalid trial directory")
         pending = read_receipt(path / "pending.json", kind="experiment-trial-pending")
+        reservation = dict(pending)
         terminal = "pending"
         terminal_path = None
         for name, kind in (
@@ -798,9 +1145,91 @@ def _trial_receipts(directory: Path) -> list[tuple[Path, dict[str, object], str]
                 receipt = read_receipt(candidate, kind=kind)
                 if receipt.get("pending_receipt_id") != pending.get("receipt_id"):
                     raise ExperimentError("the trial terminal receipt names another reservation")
+                for field in (
+                    "address",
+                    "session_id",
+                    "session_receipt_id",
+                    "trial_id",
+                    "sequence",
+                    "label",
+                    "reserved_at",
+                    "parent",
+                    "question",
+                    "route",
+                    "model",
+                    PARENT_SNAPSHOT_FIELD,
+                ):
+                    if receipt.get(field) != reservation.get(field):
+                        raise ExperimentError(
+                            "the trial terminal receipt changed its reservation"
+                        )
                 pending = receipt
         result.append((path, pending, terminal))
     return result
+
+
+def _declared_parent_snapshot(
+    session: Mapping[str, object],
+    trials: Sequence[tuple[Path, Mapping[str, object], str]],
+    parent: str,
+) -> dict[str, str]:
+    """Return the full source snapshot for one declared parent."""
+
+    if parent == "baseline":
+        value = session.get(SOURCE_SNAPSHOT_FIELD)
+    else:
+        matches = [
+            _receipt_source_snapshot(receipt)
+            for _, receipt, state in trials
+            if state == "completed" and receipt.get("trial_id") == parent
+        ]
+        value = matches[0] if len(matches) == 1 else None
+    if not isinstance(value, dict) or not all(
+        isinstance(path, str) and isinstance(digest, str)
+        for path, digest in value.items()
+    ):
+        raise ExperimentError("the declared parent has no bound source snapshot")
+    return dict(value)
+
+
+def _receipt_source_snapshot(receipt: Mapping[str, object]) -> dict[str, str]:
+    """Validate and return one completed trial source snapshot."""
+
+    value = receipt.get(SOURCE_SNAPSHOT_FIELD)
+    identity = receipt.get("comparison_identity")
+    if (
+        not isinstance(value, dict)
+        or not isinstance(identity, dict)
+        or not all(
+            isinstance(path, str) and isinstance(digest, str)
+            for path, digest in value.items()
+        )
+        or _snapshot_hash(value) != identity.get("source_worktree_sha256")
+    ):
+        raise ExperimentError("the completed trial source snapshot is invalid")
+    return dict(value)
+
+
+def _validate_parent_snapshot_binding(
+    directory: Path,
+    session: Mapping[str, object],
+    pending: Mapping[str, object],
+) -> dict[str, str]:
+    """Validate one prepared trial against its declared parent receipt."""
+
+    parent = pending.get("parent")
+    if not isinstance(parent, str):
+        raise ExperimentError("the prepared trial has no declared parent")
+    trials = [
+        row
+        for row in _trial_receipts(directory)
+        if row[1].get("trial_id") != pending.get("trial_id")
+    ]
+    expected = _declared_parent_snapshot(session, trials, parent)
+    saved = pending.get(PARENT_SNAPSHOT_FIELD)
+    if not isinstance(saved, dict) or saved != expected:
+        raise ExperimentError("the prepared trial parent snapshot is invalid")
+    return expected
 
 
 def reserve_trial(
@@ -813,6 +1242,7 @@ def reserve_trial(
     parent: str | None = None,
     route: str | None = None,
     model: str | None = None,
+    bind_parent: bool = False,
 ) -> dict[str, object]:
     root = _root(root)
     address = normalize_address(address_value)
@@ -863,6 +1293,15 @@ def reserve_trial(
             if len(matches) != 1:
                 raise ExperimentError("--parent must name the baseline or one completed trial")
             parent_value = str(matches[0].get("trial_id"))
+        parent_snapshot = None
+        if bind_parent:
+            parent_snapshot = _declared_parent_snapshot(
+                session, trials, parent_value
+            )
+            if source_worktree_snapshot(root) != parent_snapshot:
+                raise ExperimentError(
+                    "the worktree source does not equal the declared parent"
+                )
         sequence = len(trials) + 1
         trial_id = f"{sequence:03d}-{label}"
         trial_directory = directory / "trials" / trial_id
@@ -882,6 +1321,7 @@ def reserve_trial(
                 "question": question,
                 "route": route,
                 "model": model,
+                PARENT_SNAPSHOT_FIELD: parent_snapshot,
             },
         )
     return {
@@ -896,6 +1336,38 @@ def reserve_trial(
         "compiler_context": str(trial_directory / "compiler-context.json"),
         "build_lock": str(root / EXPERIMENTS_RELATIVE / "build.lock"),
         "pending_receipt_id": pending["receipt_id"],
+    }
+
+
+def measure_plan(
+    address_value: str | int,
+    trial_id: str,
+    *,
+    root: Path = ROOT,
+    session_id: str | None = None,
+) -> dict[str, object]:
+    """Return paths for a prepared replay-eligible trial."""
+
+    root = _root(root)
+    address = normalize_address(address_value)
+    with _state_lock(root):
+        directory, session, trial_directory, pending = _pending_trial(
+            root, address, session_id, trial_id
+        )
+        _session_is_current(root, session)
+        _validate_parent_snapshot_binding(directory, session, pending)
+    return {
+        "address": address,
+        "session_id": session.get("session_id"),
+        "trial_id": trial_id,
+        "sequence": pending.get("sequence"),
+        "trial_directory": str(trial_directory),
+        "report": str(trial_directory / "report.json"),
+        "diff": str(trial_directory / "diff.txt"),
+        "source_patch": str(trial_directory / "source.patch"),
+        "compiler_context": str(trial_directory / "compiler-context.json"),
+        "build_lock": str(root / EXPERIMENTS_RELATIVE / "build.lock"),
+        "pending_receipt_id": pending.get("receipt_id"),
     }
 
 
@@ -958,6 +1430,7 @@ def fail_trial(
                 "question": pending.get("question"),
                 "route": pending.get("route"),
                 "model": pending.get("model"),
+                PARENT_SNAPSHOT_FIELD: pending.get(PARENT_SNAPSHOT_FIELD),
                 "result": "failed",
                 "failure_stage": stage,
                 "exit_code": exit_code,
@@ -1160,6 +1633,10 @@ def record_trial(
             "validation_tools"
         ):
             raise ExperimentError("the trial report uses another comparison tool identity")
+        parent_snapshot = pending.get(PARENT_SNAPSHOT_FIELD)
+        if parent_snapshot is not None:
+            _validate_parent_snapshot_binding(directory, session, pending)
+        source_snapshot = _bound_source_snapshot(root, report_identity)
         diff_path = trial_directory / "diff.txt"
         _read_bytes(diff_path, MAX_DIFF_BYTES, "verbose diff")
         try:
@@ -1242,6 +1719,8 @@ def record_trial(
                 "question": pending.get("question"),
                 "route": pending.get("route"),
                 "model": pending.get("model"),
+                PARENT_SNAPSHOT_FIELD: parent_snapshot,
+                SOURCE_SNAPSHOT_FIELD: source_snapshot,
                 "result": "comparison",
                 "artifacts": {
                     "report": report_descriptor,
@@ -1332,6 +1811,15 @@ def _validate_completed_artifacts(
     )
     if report_receipt.get("input_identity") != receipt.get("comparison_identity"):
         raise ExperimentError("the completed trial report identity changed")
+    source_snapshot = receipt.get(SOURCE_SNAPSHOT_FIELD)
+    comparison_identity = receipt.get("comparison_identity")
+    if source_snapshot is not None and (
+        not isinstance(source_snapshot, dict)
+        or not isinstance(comparison_identity, dict)
+        or _snapshot_hash(source_snapshot)
+        != comparison_identity.get("source_worktree_sha256")
+    ):
+        raise ExperimentError("the completed trial source snapshot identity changed")
     diff_descriptor = artifacts.get("diff")
     if not isinstance(diff_descriptor, dict):
         raise ExperimentError("the completed trial has no verbose diff")
@@ -1379,6 +1867,534 @@ def _validate_completed_artifacts(
         raise ExperimentError("the completed trial report names another target")
 
 
+def _trajectory_receipt_descriptor(
+    path: Path,
+    root: Path,
+    receipt: Mapping[str, object],
+) -> dict[str, object]:
+    """Bind one immutable experiment receipt and its exact bytes."""
+
+    descriptor = _descriptor(
+        path,
+        root,
+        maximum=MAX_RECORD_BYTES,
+        description="experiment trajectory receipt",
+    )
+    saved_id = receipt.get("receipt_id")
+    if not isinstance(saved_id, str) or HASH_RE.fullmatch(saved_id) is None:
+        raise ExperimentError("the experiment trajectory receipt ID is invalid")
+    descriptor["receipt_id"] = saved_id
+    return descriptor
+
+
+def _trajectory_identity_unlocked(
+    address_value: str | int,
+    session_id: str,
+    *,
+    root: Path,
+) -> dict[str, object]:
+    """Build the exact identity for one prepared experiment trajectory."""
+
+    root = _root(root)
+    address = normalize_address(address_value)
+    directory, session = read_session(
+        address,
+        root=root,
+        session_id=session_id,
+        validate_artifacts=True,
+    )
+    limits = session.get("limits")
+    if (
+        not isinstance(limits, dict)
+        or type(limits.get("max_trials")) is not int
+        or limits.get("max_trials") != DEFAULT_MAX_TRIALS
+        or type(limits.get("max_non_improving")) is not int
+        or limits.get("max_non_improving") != DEFAULT_MAX_NON_IMPROVING
+    ):
+        raise ExperimentError("the replay experiment limits are invalid")
+    baseline_snapshot = session.get(SOURCE_SNAPSHOT_FIELD)
+    comparison_identity = session.get("comparison_identity")
+    artifacts = session.get("artifacts")
+    function_map = session.get("function_map")
+    baseline_files = (
+        comparison_identity.get("files")
+        if isinstance(comparison_identity, dict)
+        else None
+    )
+    if (
+        not isinstance(baseline_snapshot, dict)
+        or not isinstance(comparison_identity, dict)
+        or not isinstance(artifacts, dict)
+        or not isinstance(function_map, dict)
+        or not isinstance(baseline_files, dict)
+        or comparison_identity.get("head") != session.get("head")
+        or baseline_files.get("functions_map") != function_map.get("sha256")
+        or _snapshot_hash(baseline_snapshot)
+        != comparison_identity.get("source_worktree_sha256")
+    ):
+        raise ExperimentError("the replay experiment baseline is not snapshot-bound")
+
+    trials = _trial_receipts(directory)
+    if not 2 <= len(trials) <= DEFAULT_MAX_TRIALS:
+        raise ExperimentError("a replay experiment needs two or three completed trials")
+    if any(state != "completed" for _, _, state in trials):
+        raise ExperimentError("a replay experiment has an incomplete trial")
+
+    known_snapshots: dict[str, dict[str, str]] = {
+        "baseline": dict(baseline_snapshot)
+    }
+    rows: list[dict[str, object]] = []
+    for expected_sequence, (trial_directory, receipt, state) in enumerate(
+        trials, start=1
+    ):
+        del state
+        sequence = receipt.get("sequence")
+        trial_id = receipt.get("trial_id")
+        parent = receipt.get("parent")
+        route = receipt.get("route")
+        if (
+            type(sequence) is not int
+            or sequence != expected_sequence
+            or not isinstance(trial_id, str)
+            or TRIAL_RE.fullmatch(trial_id) is None
+            or not isinstance(parent, str)
+            or parent not in known_snapshots
+            or not isinstance(route, str)
+            or route not in ROUTE_ORDER
+        ):
+            raise ExperimentError("the replay experiment trial graph is invalid")
+        parent_snapshot = receipt.get(PARENT_SNAPSHOT_FIELD)
+        if parent_snapshot != known_snapshots[parent]:
+            raise ExperimentError("the replay experiment parent snapshot is invalid")
+        _validate_completed_artifacts(receipt, directory, root)
+        result_snapshot = _receipt_source_snapshot(receipt)
+        known_snapshots[trial_id] = result_snapshot
+        trial_artifacts = receipt.get("artifacts")
+        trial_identity = receipt.get("comparison_identity")
+        if not isinstance(trial_artifacts, dict) or not isinstance(
+            trial_identity, dict
+        ):
+            raise ExperimentError("the replay experiment trial identity is invalid")
+        trial_files = trial_identity.get("files")
+        if (
+            not isinstance(trial_files, dict)
+            or trial_identity.get("head") != session.get("head")
+            or trial_files.get("functions_map") != function_map.get("sha256")
+            or trial_identity.get("validation_tools")
+            != comparison_identity.get("validation_tools")
+        ):
+            raise ExperimentError("the replay experiment trial input identity changed")
+        pending = read_receipt(
+            trial_directory / "pending.json",
+            kind="experiment-trial-pending",
+        )
+        terminal = read_receipt(
+            trial_directory / "completed.json",
+            kind="experiment-trial",
+        )
+        if terminal != receipt:
+            raise ExperimentError("the replay experiment terminal receipt changed")
+        rows.append(
+            {
+                "sequence": sequence,
+                "trial_id": trial_id,
+                "parent": parent,
+                "route": route,
+                "pending_receipt": _trajectory_receipt_descriptor(
+                    trial_directory / "pending.json", root, pending
+                ),
+                "terminal_receipt": _trajectory_receipt_descriptor(
+                    trial_directory / "completed.json", root, terminal
+                ),
+                "artifact_identity_sha256": _snapshot_hash(trial_artifacts),
+                "comparison_identity_sha256": _snapshot_hash(trial_identity),
+                PARENT_SNAPSHOT_FIELD: dict(parent_snapshot),
+                SOURCE_SNAPSHOT_FIELD: result_snapshot,
+            }
+        )
+
+    session_path = directory / "session.json"
+    identity: dict[str, object] = {
+        "schema_version": SCHEMA_VERSION,
+        "kind": "experiment-trajectory-identity",
+        "address": address,
+        "session_id": session_id,
+        "head": session.get("head"),
+        "campaign": session.get("campaign"),
+        "brief": session.get("brief"),
+        "doctor_receipt": session.get("doctor_receipt"),
+        "limits": dict(limits),
+        "session_receipt": _trajectory_receipt_descriptor(
+            session_path, root, session
+        ),
+        "baseline": {
+            "artifact_identity_sha256": _snapshot_hash(artifacts),
+            "comparison_identity_sha256": _snapshot_hash(comparison_identity),
+            SOURCE_SNAPSHOT_FIELD: dict(baseline_snapshot),
+        },
+        "trials": rows,
+    }
+    identity["trajectory_sha256"] = _snapshot_hash(identity)
+    return identity
+
+
+def trajectory_identity(
+    address_value: str | int,
+    session_id: str,
+    *,
+    root: Path = ROOT,
+) -> dict[str, object]:
+    """Return a stable, artifact-validated experiment trajectory identity."""
+
+    with _state_lock(_root(root)):
+        return _trajectory_identity_unlocked(
+            address_value,
+            session_id,
+            root=_root(root),
+        )
+
+
+def _trajectory_seal_hash(document: Mapping[str, object]) -> str:
+    payload = dict(document)
+    payload.pop("content_sha256", None)
+    return _snapshot_hash(payload)
+
+
+def _validate_trajectory_descriptor(value: object) -> dict[str, object]:
+    if not isinstance(value, dict) or set(value) != {
+        "path",
+        "sha256",
+        "bytes",
+        "receipt_id",
+    }:
+        raise ExperimentError("an experiment trajectory receipt descriptor is invalid")
+    path = value.get("path")
+    byte_count = value.get("bytes")
+    if (
+        not isinstance(path, str)
+        or not path
+        or Path(path).is_absolute()
+        or ".." in Path(path).parts
+        or not isinstance(value.get("sha256"), str)
+        or HASH_RE.fullmatch(str(value.get("sha256"))) is None
+        or type(byte_count) is not int
+        or not 0 < byte_count <= MAX_RECORD_BYTES
+        or not isinstance(value.get("receipt_id"), str)
+        or HASH_RE.fullmatch(str(value.get("receipt_id"))) is None
+    ):
+        raise ExperimentError("an experiment trajectory receipt descriptor is invalid")
+    return value
+
+
+def _validate_trajectory_snapshot(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise ExperimentError("an experiment trajectory source snapshot is invalid")
+    for path, saved_hash in value.items():
+        if (
+            not isinstance(path, str)
+            or not path
+            or Path(path).is_absolute()
+            or ".." in Path(path).parts
+            or not isinstance(saved_hash, str)
+            or (saved_hash != "missing" and HASH_RE.fullmatch(saved_hash) is None)
+        ):
+            raise ExperimentError("an experiment trajectory source snapshot is invalid")
+    return value
+
+
+def _validate_optional_artifact_descriptor(value: object) -> None:
+    if value is None:
+        return
+    if not isinstance(value, dict) or set(value) != {"path", "sha256", "bytes"}:
+        raise ExperimentError("an experiment trajectory artifact descriptor is invalid")
+    path = value.get("path")
+    byte_count = value.get("bytes")
+    if (
+        not isinstance(path, str)
+        or not path
+        or Path(path).is_absolute()
+        or ".." in Path(path).parts
+        or not isinstance(value.get("sha256"), str)
+        or HASH_RE.fullmatch(str(value.get("sha256"))) is None
+        or type(byte_count) is not int
+        or not 0 < byte_count <= MAX_BRIEF_BYTES
+    ):
+        raise ExperimentError("an experiment trajectory artifact descriptor is invalid")
+
+
+def _validate_trajectory_identity(identity: object) -> dict[str, object]:
+    if not isinstance(identity, dict) or set(identity) != {
+        "schema_version",
+        "kind",
+        "address",
+        "session_id",
+        "head",
+        "campaign",
+        "brief",
+        "doctor_receipt",
+        "limits",
+        "session_receipt",
+        "baseline",
+        "trials",
+        "trajectory_sha256",
+    }:
+        raise ExperimentError("the experiment trajectory identity is invalid")
+    saved_hash = identity.get("trajectory_sha256")
+    payload = dict(identity)
+    payload.pop("trajectory_sha256", None)
+    if (
+        type(identity.get("schema_version")) is not int
+        or identity.get("schema_version") != SCHEMA_VERSION
+        or identity.get("kind") != "experiment-trajectory-identity"
+        or not isinstance(saved_hash, str)
+        or HASH_RE.fullmatch(saved_hash) is None
+        or saved_hash != _snapshot_hash(payload)
+    ):
+        raise ExperimentError("the experiment trajectory identity is invalid")
+    try:
+        address = normalize_address(identity.get("address", ""))
+    except ExperimentError as error:
+        raise ExperimentError("the experiment trajectory identity is invalid") from error
+    campaign = identity.get("campaign")
+    limits = identity.get("limits")
+    baseline = identity.get("baseline")
+    trials = identity.get("trials")
+    if (
+        address != identity.get("address")
+        or not isinstance(identity.get("session_id"), str)
+        or SESSION_RE.fullmatch(str(identity.get("session_id"))) is None
+        or not isinstance(identity.get("head"), str)
+        or not re.fullmatch(r"[0-9a-f]{40,64}", str(identity.get("head")))
+        or not isinstance(campaign, dict)
+        or set(campaign) != {
+            "campaign_id",
+            "mode",
+            "lane",
+            "active_addresses",
+            "campaign_head",
+            "deadline",
+        }
+        or not isinstance(campaign.get("campaign_id"), str)
+        or campaign.get("mode") not in {"coverage", "refinement"}
+        or campaign.get("lane") not in {"closure", "production", "research"}
+        or (campaign.get("lane"), campaign.get("mode"))
+        not in {
+            ("closure", "refinement"),
+            ("production", "refinement"),
+            ("research", "coverage"),
+            ("research", "refinement"),
+        }
+        or not isinstance(campaign.get("active_addresses"), list)
+        or any(
+            not isinstance(item, str) or normalize_address(item) != item
+            for item in campaign.get("active_addresses", [])
+        )
+        or campaign.get("campaign_head") != identity.get("head")
+        or (
+            campaign.get("deadline") is not None
+            and not isinstance(campaign.get("deadline"), str)
+        )
+        or not isinstance(limits, dict)
+        or set(limits) != {"max_trials", "max_non_improving"}
+        or type(limits.get("max_trials")) is not int
+        or limits.get("max_trials") != DEFAULT_MAX_TRIALS
+        or type(limits.get("max_non_improving")) is not int
+        or limits.get("max_non_improving") != DEFAULT_MAX_NON_IMPROVING
+        or not isinstance(baseline, dict)
+        or set(baseline) != {
+            "artifact_identity_sha256",
+            "comparison_identity_sha256",
+            SOURCE_SNAPSHOT_FIELD,
+        }
+        or not isinstance(trials, list)
+        or not 2 <= len(trials) <= DEFAULT_MAX_TRIALS
+    ):
+        raise ExperimentError("the experiment trajectory identity is invalid")
+    _validate_optional_artifact_descriptor(identity.get("brief"))
+    _validate_optional_artifact_descriptor(identity.get("doctor_receipt"))
+    _validate_trajectory_descriptor(identity.get("session_receipt"))
+    for key in ("artifact_identity_sha256", "comparison_identity_sha256"):
+        if not isinstance(baseline.get(key), str) or HASH_RE.fullmatch(
+            str(baseline.get(key))
+        ) is None:
+            raise ExperimentError("the experiment trajectory baseline is invalid")
+    known_parents = {"baseline"}
+    _validate_trajectory_snapshot(baseline.get(SOURCE_SNAPSHOT_FIELD))
+    for expected_sequence, row in enumerate(trials, start=1):
+        if not isinstance(row, dict) or set(row) != {
+            "sequence",
+            "trial_id",
+            "parent",
+            "route",
+            "pending_receipt",
+            "terminal_receipt",
+            "artifact_identity_sha256",
+            "comparison_identity_sha256",
+            PARENT_SNAPSHOT_FIELD,
+            SOURCE_SNAPSHOT_FIELD,
+        }:
+            raise ExperimentError("an experiment trajectory trial is invalid")
+        trial_id = row.get("trial_id")
+        if (
+            type(row.get("sequence")) is not int
+            or row.get("sequence") != expected_sequence
+            or not isinstance(trial_id, str)
+            or TRIAL_RE.fullmatch(trial_id) is None
+            or row.get("parent") not in known_parents
+            or row.get("route") not in ROUTE_ORDER
+            or any(
+                not isinstance(row.get(key), str)
+                or HASH_RE.fullmatch(str(row.get(key))) is None
+                for key in (
+                    "artifact_identity_sha256",
+                    "comparison_identity_sha256",
+                )
+            )
+        ):
+            raise ExperimentError("an experiment trajectory trial is invalid")
+        _validate_trajectory_descriptor(row.get("pending_receipt"))
+        _validate_trajectory_descriptor(row.get("terminal_receipt"))
+        _validate_trajectory_snapshot(row.get(PARENT_SNAPSHOT_FIELD))
+        _validate_trajectory_snapshot(row.get(SOURCE_SNAPSHOT_FIELD))
+        known_parents.add(trial_id)
+    return identity
+
+
+def _validate_trajectory_seal_document(document: object) -> dict[str, object]:
+    """Validate one strict content-addressed trajectory seal document."""
+
+    if not isinstance(document, dict) or set(document) != {
+        "schema_version",
+        "kind",
+        "trajectory",
+        "content_sha256",
+    }:
+        raise ExperimentError("the experiment trajectory seal is invalid")
+    saved_hash = document.get("content_sha256")
+    if (
+        type(document.get("schema_version")) is not int
+        or document.get("schema_version") != SCHEMA_VERSION
+        or document.get("kind") != "experiment-trajectory-seal"
+        or not isinstance(saved_hash, str)
+        or HASH_RE.fullmatch(saved_hash) is None
+        or saved_hash != _trajectory_seal_hash(document)
+    ):
+        raise ExperimentError("the experiment trajectory seal is invalid")
+    _validate_trajectory_identity(document.get("trajectory"))
+    return document
+
+
+def validate_trajectory_binding(
+    binding: object,
+    *,
+    root: Path = ROOT,
+    assume_locked: bool = False,
+) -> dict[str, object]:
+    """Validate an active campaign's exact trajectory seal binding."""
+
+    root = _root(root)
+    if not isinstance(binding, dict):
+        raise ExperimentError("the campaign replay experiment binding is invalid")
+    if (
+        type(binding.get("schema_version")) is not int
+        or binding.get("schema_version") != SCHEMA_VERSION
+        or binding.get("kind") != "campaign-replay-experiment-commitment"
+        or set(binding)
+        != {
+            "schema_version",
+            "kind",
+            "content_sha256",
+            "sha256",
+            "bytes",
+        }
+    ):
+        raise ExperimentError("the campaign replay experiment binding is invalid")
+    content_sha256 = binding.get("content_sha256")
+    saved_sha256 = binding.get("sha256")
+    saved_bytes = binding.get("bytes")
+    if (
+        not isinstance(content_sha256, str)
+        or HASH_RE.fullmatch(content_sha256) is None
+        or not isinstance(saved_sha256, str)
+        or HASH_RE.fullmatch(saved_sha256) is None
+        or type(saved_bytes) is not int
+        or not 0 < saved_bytes <= MAX_TRAJECTORY_BYTES
+    ):
+        raise ExperimentError("the campaign replay experiment descriptor is invalid")
+    from tools.decomp_replay import read_private_trajectory
+
+    try:
+        seal = read_private_trajectory(
+            binding,
+            root=root,
+            assume_locked=assume_locked,
+        )
+    except ValueError as error:
+        raise ExperimentError("the campaign replay experiment seal changed") from error
+    _validate_trajectory_seal_document(seal)
+    return binding
+
+
+def trajectory_from_binding(
+    binding: object,
+    *,
+    root: Path = ROOT,
+    assume_locked: bool = False,
+) -> dict[str, object]:
+    """Load the private seal named by one opaque campaign commitment."""
+
+    root = _root(root)
+    validated = validate_trajectory_binding(
+        binding,
+        root=root,
+        assume_locked=assume_locked,
+    )
+    from tools.decomp_replay import read_private_trajectory
+
+    document = read_private_trajectory(
+        validated,
+        root=root,
+        assume_locked=assume_locked,
+    )
+    return _validate_trajectory_seal_document(document)
+
+
+def seal_trajectory(
+    address_value: str | int,
+    session_id: str,
+    *,
+    root: Path = ROOT,
+    campaign_state: Path = CAMPAIGN_STATE_RELATIVE,
+) -> dict[str, object]:
+    """Seal one trajectory and attach it to its active source campaign."""
+
+    root = _root(root)
+    address = normalize_address(address_value)
+    with _state_lock(root):
+        identity = _trajectory_identity_unlocked(
+            address,
+            session_id,
+            root=root,
+        )
+        seal: dict[str, object] = {
+            "schema_version": SCHEMA_VERSION,
+            "kind": "experiment-trajectory-seal",
+            "trajectory": identity,
+        }
+        seal["content_sha256"] = _trajectory_seal_hash(seal)
+    from tools.decomp_replay import publish_private_trajectory
+
+    try:
+        binding = publish_private_trajectory(seal, root=root)
+        state_path = (
+            campaign_state if campaign_state.is_absolute() else root / campaign_state
+        )
+        attach_replay_experiment(state_path, binding)
+    except Exception as error:
+        raise ExperimentError("cannot seal the replay experiment") from error
+    return binding
+
+
 def _candidate_from_trial(receipt: Mapping[str, object]) -> dict[str, object]:
     target = receipt.get("target")
     if not isinstance(target, dict):
@@ -1396,15 +2412,13 @@ def _candidate_from_trial(receipt: Mapping[str, object]) -> dict[str, object]:
     }
 
 
-def _rank(candidate: Mapping[str, object]) -> tuple[float, float, float, float, float]:
-    status = str(candidate.get("status", "provisional"))
-    return (
-        float(STATUS_RANK.get(status, 0)),
-        float(candidate.get("score", -1.0)),
-        float(candidate.get("repository_effective_score", -1.0)),
-        -float(candidate.get("changed_patch_lines", 1 << 30)),
-        -float(candidate.get("sequence", 1 << 30)),
-    )
+def _rank(candidate: Mapping[str, object]) -> int:
+    """Return the replay-compatible target-only integer quality."""
+
+    try:
+        return candidate_quality(candidate.get("status"), candidate.get("score"))
+    except ValueError as error:
+        raise ExperimentError("the experiment candidate quality is invalid") from error
 
 
 def select_best(
@@ -1722,6 +2736,20 @@ def _parser() -> argparse.ArgumentParser:
     reserve.add_argument("--route")
     reserve.add_argument("--model")
     reserve.add_argument("--format", choices=("json", "lines"), default="json")
+    branch = subparsers.add_parser("branch")
+    branch.add_argument("address")
+    branch.add_argument("label")
+    branch.add_argument("--session")
+    branch.add_argument("--question")
+    branch.add_argument("--parent", required=True)
+    branch.add_argument("--route", required=True)
+    branch.add_argument("--model")
+    branch.add_argument("--format", choices=("json", "lines"), default="json")
+    measure = subparsers.add_parser("measure-plan")
+    measure.add_argument("address")
+    measure.add_argument("--session")
+    measure.add_argument("--trial", required=True)
+    measure.add_argument("--format", choices=("json", "lines"), default="json")
     fail = subparsers.add_parser("fail")
     fail.add_argument("address")
     fail.add_argument("--session")
@@ -1734,6 +2762,9 @@ def _parser() -> argparse.ArgumentParser:
     record.add_argument("--session")
     record.add_argument("--trial", required=True)
     record.add_argument("--format", choices=("json", "summary"), default="summary")
+    seal = subparsers.add_parser("seal")
+    seal.add_argument("address")
+    seal.add_argument("--session", required=True)
     for name in ("status", "best", "advise", "report"):
         command = subparsers.add_parser(name)
         command.add_argument("address")
@@ -1780,6 +2811,33 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(_plan_lines(value, TRIAL_PLAN_FIELDS))
             else:
                 _print_document(value, "json")
+        elif arguments.action == "branch":
+            value = reserve_trial(
+                arguments.address,
+                arguments.label,
+                root=root,
+                session_id=arguments.session,
+                question=arguments.question,
+                parent=arguments.parent,
+                route=arguments.route,
+                model=arguments.model,
+                bind_parent=True,
+            )
+            if arguments.format == "lines":
+                print(_plan_lines(value, TRIAL_PLAN_FIELDS))
+            else:
+                _print_document(value, "json")
+        elif arguments.action == "measure-plan":
+            value = measure_plan(
+                arguments.address,
+                arguments.trial,
+                root=root,
+                session_id=arguments.session,
+            )
+            if arguments.format == "lines":
+                print(_plan_lines(value, TRIAL_PLAN_FIELDS))
+            else:
+                _print_document(value, "json")
         elif arguments.action == "fail":
             _print_document(
                 fail_trial(
@@ -1802,6 +2860,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                     session_id=arguments.session,
                 ),
                 arguments.format,
+            )
+        elif arguments.action == "seal":
+            _print_document(
+                seal_trajectory(
+                    arguments.address,
+                    arguments.session,
+                    root=root,
+                ),
+                "json",
             )
         elif arguments.action == "status":
             value = status_document(

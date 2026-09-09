@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "doctor", "brief", "context", "impact", "oracle", "campaigns", "finalize", "discover", "evidence", "notes", "names", "defer", "undefer", "blockers", "baseline", "validate", "experiment", "lint", "data", "report", "session-summary", "progress", "check", "sync", "run", "shell", "help")]
+    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "doctor", "brief", "context", "impact", "oracle", "campaigns", "finalize", "discover", "evidence", "notes", "names", "defer", "undefer", "blockers", "baseline", "validate", "experiment", "replay", "route", "lint", "data", "report", "session-summary", "progress", "check", "sync", "run", "shell", "help")]
     [string] $Command = "help",
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -29,6 +29,16 @@ if ($Command -eq "impact") {
 if ($Command -eq "oracle") {
     Set-Location $Root
     & $VenvPython -m tools.decomp_oracle @CommandArgs
+    exit $LASTEXITCODE
+}
+if ($Command -eq "replay") {
+    Set-Location $Root
+    & $VenvPython (Join-Path $Root "tools\decomp_replay.py") @CommandArgs
+    exit $LASTEXITCODE
+}
+if ($Command -eq "route") {
+    Set-Location $Root
+    & $VenvPython (Join-Path $Root "tools\decomp_route.py") @CommandArgs
     exit $LASTEXITCODE
 }
 $Vcvars = Join-Path $MsvcBase "VC98\Bin\VCVARS32.BAT"
@@ -305,6 +315,8 @@ Commands:
   blockers [addr]   Show committed blockers
   validate [args]   Build and reject comparison or source-quality regressions
   experiment [args] Store and compare one source-form experiment
+  replay [args]     Enroll and certify the private replay benchmark
+  route advise      Give route advice only after replay certification
   lint [args]       Check reconstructed source plausibility
   data [addr]       Show type-aware initialized-global differences
   report [file]     Generate the self-contained HTML decompilation dashboard
@@ -979,7 +991,7 @@ switch ($Command) {
     }
     "experiment" {
         if ($CommandArgs.Count -lt 1) {
-            throw "Usage: tools/decomp.ps1 experiment start|try|status|best|advise|report <address> [label] [options]"
+            throw "Usage: tools/decomp.ps1 experiment start|branch|measure|try|seal|status|best|advise|report <address> [label] [options]"
         }
         $Action = $CommandArgs[0]
         if ($Action -eq "start") {
@@ -1028,9 +1040,16 @@ switch ($Command) {
                 if ($null -ne $LockStream) { $LockStream.Dispose() }
             }
             Write-Host "Started experiment $Address in $SessionDirectory."
-        } elseif ($Action -eq "try") {
+        } elseif ($Action -eq "branch") {
             if ($CommandArgs.Count -lt 3) {
-                throw "Experiment try needs an address and a label."
+                throw "Experiment branch needs an address and a label."
+            }
+            & $VenvPython (Join-Path $Root "tools\decomp_experiment.py") branch `
+                @($CommandArgs[1..($CommandArgs.Count - 1)])
+            Assert-LastExit "Preparing the experiment branch"
+        } elseif ($Action -in @("try", "measure")) {
+            if ($CommandArgs.Count -lt 3) {
+                throw "Experiment $Action needs an address and a label or trial ID."
             }
             $Address = $CommandArgs[1]
             $Label = $CommandArgs[2]
@@ -1038,9 +1057,15 @@ switch ($Command) {
             if ($CommandArgs.Count -gt 3) {
                 $Extra = $CommandArgs[3..($CommandArgs.Count - 1)]
             }
-            $TrialPlan = @(& $VenvPython (Join-Path $Root "tools\decomp_experiment.py") `
-                reserve $Address $Label @Extra --format lines)
-            Assert-LastExit "Reserving the experiment trial"
+            if ($Action -eq "try") {
+                $TrialPlan = @(& $VenvPython (Join-Path $Root "tools\decomp_experiment.py") `
+                    reserve $Address $Label @Extra --format lines)
+                Assert-LastExit "Reserving the experiment trial"
+            } else {
+                $TrialPlan = @(& $VenvPython (Join-Path $Root "tools\decomp_experiment.py") `
+                    measure-plan $Address --trial $Label @Extra --format lines)
+                Assert-LastExit "Loading the prepared experiment trial"
+            }
             if ($TrialPlan.Count -ne 8) {
                 throw "The experiment trial plan is incomplete."
             }
@@ -1103,7 +1128,7 @@ switch ($Command) {
                 if ($null -ne $LockStream) { $LockStream.Dispose() }
             }
             Stamp-FirstScore -Addresses @($Address) -Report $Report
-        } elseif ($Action -in @("status", "best", "advise", "report")) {
+        } elseif ($Action -in @("status", "best", "advise", "report", "seal")) {
             if ($CommandArgs.Count -lt 2) {
                 throw "Experiment $Action needs an address."
             }
@@ -1111,7 +1136,7 @@ switch ($Command) {
                 @($CommandArgs[1..($CommandArgs.Count - 1)])
             Assert-LastExit "Reading the experiment session"
         } else {
-            throw "The experiment action must be start, try, status, best, advise, or report."
+            throw "The experiment action must be start, branch, measure, try, seal, status, best, advise, or report."
         }
     }
     "report" {

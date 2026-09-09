@@ -128,8 +128,11 @@ class NormativeInputTests(unittest.TestCase):
                 "begin-session",
                 "attach-baseline",
                 "reserve",
+                "branch",
+                "measure-plan",
                 "fail",
                 "record",
+                "seal",
                 "status",
                 "best",
                 "advise",
@@ -139,8 +142,10 @@ class NormativeInputTests(unittest.TestCase):
             self.assertIn("seal-diff", script)
             self.assertIn("build.lock", (ROOT / "tools/decomp_experiment.py").read_text(encoding="utf-8"))
 
-        linux_trial = linux[linux.index("        try)") :]
-        windows_trial = windows[windows.index('$Action -eq "try"') :]
+        linux_trial = linux[linux.index("        try|measure)") :]
+        windows_trial = windows[
+            windows.index('$Action -in @("try", "measure")') :
+        ]
         self.assertLess(linux_trial.index(" reserve "), linux_trial.index("build_game"))
         self.assertLess(
             windows_trial.index(" reserve "), windows_trial.index("Build-Project")

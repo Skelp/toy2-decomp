@@ -1617,6 +1617,7 @@ def context_input_descriptor(root: Path) -> dict[str, object]:
 
     root = root.resolve()
     tools = (
+        "tools/__init__.py",
         "tools/decomp_context.py",
         "tools/decomp_annotations.py",
         "tools/decomp_dependencies.py",

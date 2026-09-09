@@ -185,6 +185,9 @@ class ExperimentControllerTests(unittest.TestCase):
     ) -> tuple[dict[str, object], Path, dict[str, object], dict[str, object]]:
         identity = {
             "head": self.head,
+            "source_worktree_sha256": experiment._snapshot_hash(
+                experiment.source_worktree_snapshot(self.root)
+            ),
             "files": {
                 "functions_map": experiment.file_hash(
                     self.root / "tools/Resources/functions_map.txt"
@@ -292,6 +295,128 @@ class ExperimentControllerTests(unittest.TestCase):
         self.assertEqual(pending["question"], "Does the loop use a signed bound?")
         self.assertFalse((trial / "report.json").exists())
 
+    def test_branch_binds_declared_parent_and_legacy_reserve_cannot_measure(self):
+        directory, session = self._session()
+        snapshot = experiment.source_worktree_snapshot(self.root)
+        session[experiment.SOURCE_SNAPSHOT_FIELD] = snapshot
+        with (
+            mock.patch.object(
+                experiment, "read_session", return_value=(directory, session)
+            ),
+            mock.patch.object(experiment, "_session_is_current"),
+            mock.patch.object(
+                experiment,
+                "select_best",
+                return_value={"status": "provisional"},
+            ),
+            mock.patch.object(
+                experiment,
+                "_baseline_candidate",
+                return_value={"status": "provisional", "score": 0.5},
+            ),
+            mock.patch.object(experiment, "_trajectory", return_value=(0, [])),
+        ):
+            plan = experiment.reserve_trial(
+                "0x00401000",
+                "prepared",
+                root=self.root,
+                parent="baseline",
+                route="abi",
+                bind_parent=True,
+            )
+        pending = experiment.read_receipt(
+            Path(str(plan["trial_directory"])) / "pending.json",
+            kind="experiment-trial-pending",
+        )
+        self.assertEqual(pending[experiment.PARENT_SNAPSHOT_FIELD], snapshot)
+        with (
+            mock.patch.object(
+                experiment, "read_session", return_value=(directory, session)
+            ),
+            mock.patch.object(experiment, "_session_is_current"),
+        ):
+            measured = experiment.measure_plan(
+                "0x00401000", str(plan["trial_id"]), root=self.root
+            )
+        self.assertEqual(measured["pending_receipt_id"], pending["receipt_id"])
+
+        with mock.patch.object(
+            experiment, "read_session", return_value=(directory, session)
+        ):
+            experiment.fail_trial(
+                "0x00401000",
+                str(plan["trial_id"]),
+                root=self.root,
+                stage="interrupted",
+            )
+        legacy = self._reserve(directory, session, "legacy", route="call")
+        with (
+            mock.patch.object(
+                experiment, "read_session", return_value=(directory, session)
+            ),
+            mock.patch.object(experiment, "_session_is_current"),
+        ):
+            with self.assertRaisesRegex(experiment.ExperimentError, "source snapshot"):
+                experiment.measure_plan(
+                    "0x00401000", str(legacy["trial_id"]), root=self.root
+                )
+
+    def test_branch_rejects_a_worktree_that_differs_from_the_declared_parent(self):
+        directory, session = self._session()
+        baseline_snapshot = {"src/Baseline.cpp": "a" * 64}
+        session[experiment.SOURCE_SNAPSHOT_FIELD] = baseline_snapshot
+        completed_snapshot = {"src/Trial.cpp": "b" * 64}
+        completed = {
+            "trial_id": "001-first",
+            "label": "first",
+            experiment.SOURCE_SNAPSHOT_FIELD: completed_snapshot,
+            "comparison_identity": {
+                "source_worktree_sha256": experiment._snapshot_hash(
+                    completed_snapshot
+                )
+            },
+        }
+        for parent, trials in (
+            ("baseline", []),
+            ("first", [(directory / "trials/001-first", completed, "completed")]),
+        ):
+            with (
+                self.subTest(parent=parent),
+                mock.patch.object(
+                    experiment, "read_session", return_value=(directory, session)
+                ),
+                mock.patch.object(experiment, "_session_is_current"),
+                mock.patch.object(experiment, "_trial_receipts", return_value=trials),
+                mock.patch.object(
+                    experiment,
+                    "select_best",
+                    return_value={"status": "provisional"},
+                ),
+                mock.patch.object(
+                    experiment,
+                    "_baseline_candidate",
+                    return_value={"status": "provisional", "score": 0.5},
+                ),
+                mock.patch.object(experiment, "_trajectory", return_value=(0, [])),
+                mock.patch.object(
+                    experiment,
+                    "source_worktree_snapshot",
+                    return_value={"src/Different.cpp": "c" * 64},
+                ),
+                self.assertRaisesRegex(
+                    experiment.ExperimentError,
+                    "does not equal the declared parent",
+                ),
+            ):
+                experiment.reserve_trial(
+                    "0x00401000",
+                    f"child-{parent}",
+                    root=self.root,
+                    parent=parent,
+                    route="abi",
+                    bind_parent=True,
+                )
+
     def test_reserve_rejects_pending_and_duplicate_labels(self):
         directory, session = self._session()
         first = self._reserve(directory, session, "shape")
@@ -365,7 +490,7 @@ class ExperimentControllerTests(unittest.TestCase):
 
         oversized = self.root / "build/oversized.json"
         oversized.write_bytes(b"x" * (experiment.MAX_RECORD_BYTES + 1))
-        with self.assertRaisesRegex(experiment.ExperimentError, "size"):
+        with self.assertRaisesRegex(experiment.ExperimentError, "missing or invalid"):
             experiment.read_receipt(oversized)
         with self.assertRaisesRegex(experiment.ExperimentError, "escapes"):
             experiment._resolve_relative("../outside", self.root)
@@ -529,9 +654,12 @@ class ExperimentControllerTests(unittest.TestCase):
 
         fewer_lines = dict(effective, changed_patch_lines=4, sequence=2)
         more_lines = dict(effective, changed_patch_lines=5, sequence=1)
-        self.assertGreater(experiment._rank(fewer_lines), experiment._rank(more_lines))
+        self.assertEqual(experiment._rank(fewer_lines), experiment._rank(more_lines))
         earlier = dict(effective, changed_patch_lines=4, sequence=1)
-        self.assertGreater(experiment._rank(earlier), experiment._rank(fewer_lines))
+        self.assertEqual(experiment._rank(earlier), experiment._rank(fewer_lines))
+
+        rounded_tie = dict(effective, score=0.8000004)
+        self.assertEqual(experiment._rank(rounded_tie), experiment._rank(effective))
 
     def test_advice_covers_finalize_deadline_budget_evidence_and_repair(self):
         base = {
@@ -588,8 +716,11 @@ class ExperimentControllerTests(unittest.TestCase):
             "begin-session",
             "attach-baseline",
             "reserve",
+            "branch",
+            "measure-plan",
             "fail",
             "record",
+            "seal",
             "status",
             "best",
             "advise",

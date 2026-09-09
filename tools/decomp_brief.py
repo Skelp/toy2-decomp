@@ -56,6 +56,7 @@ DWARF_PATH = Path(
 SOURCE_LANES = {"closure", "production", "research"}
 LANES = tuple(sorted(SOURCE_LANES | {"data", "resource"}))
 TOOL_INPUTS = (
+    Path("tools/__init__.py"),
     Path("tools/decomp_brief.py"),
     Path("tools/decomp_context.py"),
     Path("tools/decomp_annotations.py"),
@@ -286,24 +287,14 @@ def _doctor_descriptor(
     return descriptor
 
 
-def _scout_report_descriptor(
-    root: Path,
+def _validated_scout_report_content(
     lane: str,
     target: str,
-    path: Path,
+    report: object,
     doctor_receipt: Mapping[str, object],
 ) -> dict[str, object]:
-    resolved = (path if path.is_absolute() else root / path).resolve()
-    try:
-        raw = resolved.read_bytes()
-    except OSError as error:
-        raise BriefError(f"cannot read the scout report {resolved}: {error}") from error
-    if not raw or len(raw) > SCOUT_REPORT_MAX_BYTES:
-        raise BriefError("a scout report must contain 1 through 65536 bytes")
-    try:
-        report = json.loads(raw.decode("utf-8-sig"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise BriefError(f"the scout report is not valid JSON: {resolved}") from error
+    """Validate one embedded scout document without reopening its source path."""
+
     if not isinstance(report, dict) or set(report) != SCOUT_REPORT_KEYS:
         raise BriefError("the scout report does not match schema 2")
     if report.get("schema") != SCOUT_REPORT_SCHEMA:
@@ -375,6 +366,33 @@ def _scout_report_descriptor(
     )
     if findings_size > SCOUT_FINDINGS_MAX_BYTES:
         raise BriefError("the scout report findings exceed 8192 bytes")
+    return report
+
+
+def _scout_report_descriptor(
+    root: Path,
+    lane: str,
+    target: str,
+    path: Path,
+    doctor_receipt: Mapping[str, object],
+) -> dict[str, object]:
+    resolved = (path if path.is_absolute() else root / path).resolve()
+    try:
+        raw = resolved.read_bytes()
+    except OSError as error:
+        raise BriefError(f"cannot read the scout report {resolved}: {error}") from error
+    if not raw or len(raw) > SCOUT_REPORT_MAX_BYTES:
+        raise BriefError("a scout report must contain 1 through 65536 bytes")
+    try:
+        parsed = json.loads(raw.decode("utf-8-sig"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise BriefError(f"the scout report is not valid JSON: {resolved}") from error
+    report = _validated_scout_report_content(
+        lane,
+        target,
+        parsed,
+        doctor_receipt,
+    )
     return {
         "path": str(resolved),
         "sha256": hashlib.sha256(raw).hexdigest(),

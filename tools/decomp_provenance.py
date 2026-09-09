@@ -169,6 +169,7 @@ def validation_tool_identity(
     relatives = (
         "reccmp-project.yml",
         "reccmp-user.yml",
+        "tools/__init__.py",
         "tools/decomp",
         "tools/decomp.ps1",
         "tools/decomp_campaigns.py",

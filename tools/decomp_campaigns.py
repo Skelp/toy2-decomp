@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import hashlib
 import json
 import math
@@ -19,6 +19,7 @@ import uuid
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from functools import wraps
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
@@ -65,6 +66,9 @@ MAX_FINALIZE_RECEIPT_BYTES = 32 * 1024 * 1024
 MAX_CAMPAIGN_RECORD_RECEIPT_BYTES = 8 * 1024 * 1024
 DELIVERY_RECEIPT_VERSION = 2
 MAX_DELIVERY_RECEIPT_BYTES = 32 * 1024 * 1024
+MAX_CAMPAIGN_STATE_BYTES = 4 * 1024 * 1024
+MAX_HISTORICAL_TEXT_BYTES = 64 * 1024 * 1024
+MAX_HISTORICAL_TREE_BYTES = 64 * 1024 * 1024
 DOCTOR_RECEIPT_MAX_AGE = timedelta(minutes=60)
 PREDICTION_HANDOFF_MAX_AGE = timedelta(minutes=60)
 FINALIZE_STEPS = (
@@ -1309,23 +1313,106 @@ def _read_bounded_regular_file(
     *,
     max_bytes: int,
 ) -> bytes:
-    """Read one regular file without following its final path component."""
+    """Read one stable regular file through no-follow directory descriptors."""
 
-    if any(candidate.is_symlink() for candidate in (path, *path.parents)):
-        raise ValueError(f"cannot read {description}: {path}")
+    absolute = Path(os.path.abspath(path))
+    if os.name != "posix" or os.open not in os.supports_dir_fd:
+        try:
+            lexical_metadata = os.lstat(absolute)
+            for component in (absolute, *absolute.parents):
+                metadata = os.lstat(component)
+                attributes = getattr(metadata, "st_file_attributes", 0)
+                if stat.S_ISLNK(metadata.st_mode) or attributes & 0x400:
+                    raise OSError
+            descriptor = os.open(
+                absolute, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            )
+            with os.fdopen(descriptor, "rb") as stream:
+                before = os.fstat(stream.fileno())
+                content = stream.read(max_bytes + 1)
+                after = os.fstat(stream.fileno())
+            stable = (
+                before.st_dev,
+                before.st_ino,
+                before.st_mode,
+                before.st_size,
+                before.st_mtime_ns,
+                before.st_ctime_ns,
+            ) == (
+                after.st_dev,
+                after.st_ino,
+                after.st_mode,
+                after.st_size,
+                after.st_mtime_ns,
+                after.st_ctime_ns,
+            )
+            if (
+                not stat.S_ISREG(after.st_mode)
+                or (after.st_dev, after.st_ino, after.st_mode)
+                != (
+                    lexical_metadata.st_dev,
+                    lexical_metadata.st_ino,
+                    lexical_metadata.st_mode,
+                )
+                or getattr(after, "st_nlink", 1) != 1
+                or not stable
+                or after.st_size < 1
+                or after.st_size > max_bytes
+                or len(content) != after.st_size
+            ):
+                raise OSError
+            return content
+        except (FileNotFoundError, OSError) as error:
+            raise ValueError(f"cannot read {description}: {path}") from error
+    parts = absolute.parts
+    directory = -1
+    descriptor = -1
     try:
-        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-        descriptor = os.open(path, flags)
+        directory = os.open(parts[0], os.O_RDONLY | os.O_DIRECTORY)
+        for part in parts[1:-1]:
+            child = os.open(
+                part,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                dir_fd=directory,
+            )
+            os.close(directory)
+            directory = child
+        descriptor = os.open(
+            parts[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory
+        )
         with os.fdopen(descriptor, "rb") as stream:
+            descriptor = -1
             before = os.fstat(stream.fileno())
             content = stream.read(max_bytes + 1)
             after = os.fstat(stream.fileno())
+        current_uid = os.geteuid() if hasattr(os, "geteuid") else None
+        stable = (
+            before.st_dev,
+            before.st_ino,
+            before.st_mode,
+            before.st_nlink,
+            before.st_uid,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        ) == (
+            after.st_dev,
+            after.st_ino,
+            after.st_mode,
+            after.st_nlink,
+            after.st_uid,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        )
         if (
-            not stat.S_ISREG(before.st_mode)
-            or before.st_size < 1
-            or before.st_size > max_bytes
-            or after.st_size != before.st_size
-            or len(content) != before.st_size
+            not stat.S_ISREG(after.st_mode)
+            or after.st_nlink != 1
+            or (current_uid is not None and after.st_uid != current_uid)
+            or not stable
+            or after.st_size < 1
+            or after.st_size > max_bytes
+            or len(content) != after.st_size
         ):
             raise OSError
         return content
@@ -1333,6 +1420,11 @@ def _read_bounded_regular_file(
         raise ValueError(f"{description} does not exist: {path}") from error
     except OSError as error:
         raise ValueError(f"cannot read {description}: {path}") from error
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if directory >= 0:
+            os.close(directory)
 
 
 def _read_json_object(
@@ -1343,14 +1435,11 @@ def _read_json_object(
     expected_sha256: str | None = None,
 ) -> dict[str, object]:
     try:
-        if max_bytes is None:
-            raw = path.read_bytes()
-        else:
-            raw = _read_bounded_regular_file(
-                path,
-                description,
-                max_bytes=max_bytes,
-            )
+        raw = _read_bounded_regular_file(
+            path,
+            description,
+            max_bytes=max_bytes or MAX_FINALIZATION_ARTIFACT_BYTES,
+        )
     except FileNotFoundError as error:
         raise ValueError(f"{description} does not exist: {path}") from error
     except OSError as error:
@@ -1603,19 +1692,247 @@ def write_state(path: Path, state: dict[str, object]) -> None:
     write_text(path, json.dumps(state, indent=2, sort_keys=True) + "\n")
 
 
-def write_text(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+def _open_created_directory(path: Path) -> int:
+    """Open or create one absolute directory without following links."""
+
+    absolute = Path(os.path.abspath(path))
+    parts = absolute.parts
+    descriptor = os.open(parts[0], os.O_RDONLY | os.O_DIRECTORY)
     try:
-        temporary.write_text(content, encoding="utf-8")
-        temporary.replace(path)
+        for part in parts[1:]:
+            try:
+                os.mkdir(part, 0o755, dir_fd=descriptor)
+            except FileExistsError:
+                pass
+            child = os.open(
+                part,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                dir_fd=descriptor,
+            )
+            os.close(descriptor)
+            descriptor = child
+        return descriptor
+    except Exception:
+        os.close(descriptor)
+        raise
+
+
+def write_text(path: Path, content: str) -> None:
+    if os.name != "posix" or os.open not in os.supports_dir_fd:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            temporary.write_text(content, encoding="utf-8")
+            temporary.replace(path)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+        return
+    encoded = content.encode("utf-8")
+    temporary = f".{path.name}.{uuid.uuid4().hex}.tmp"
+    directory = -1
+    descriptor = -1
+    try:
+        directory = _open_created_directory(path.parent)
+        descriptor = os.open(
+            temporary,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            0o644,
+            dir_fd=directory,
+        )
+        with os.fdopen(descriptor, "wb") as stream:
+            descriptor = -1
+            stream.write(encoded)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(
+            temporary,
+            path.name,
+            src_dir_fd=directory,
+            dst_dir_fd=directory,
+        )
+        os.fsync(directory)
+        if _read_bounded_regular_file(
+            path, "published campaign file", max_bytes=max(len(encoded), 1)
+        ) != encoded:
+            raise OSError("published campaign file changed")
     finally:
-        if temporary.exists():
-            temporary.unlink()
+        if descriptor >= 0:
+            os.close(descriptor)
+        if directory >= 0:
+            try:
+                os.unlink(temporary, dir_fd=directory)
+            except FileNotFoundError:
+                pass
+            os.close(directory)
 
 
 def read_state(path: Path) -> dict[str, object]:
-    return _read_json_object(path, "active campaign state")
+    return _read_json_object(
+        path,
+        "active campaign state",
+        max_bytes=MAX_CAMPAIGN_STATE_BYTES,
+    )
+
+
+@contextmanager
+def _close_descriptor(descriptor: int):
+    try:
+        yield
+    finally:
+        os.close(descriptor)
+
+
+@contextmanager
+def _campaign_state_lock(path: Path):
+    """Serialize replay attachment and campaign finalization."""
+
+    lock_path = Path(os.path.abspath(path)).with_name(f".{path.name}.lock")
+    directory = -1
+    if os.name == "posix" and os.open in os.supports_dir_fd:
+        directory = _open_created_directory(lock_path.parent)
+        try:
+            descriptor = os.open(
+                lock_path.name,
+                os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW,
+                0o600,
+                dir_fd=directory,
+            )
+        except OSError as error:
+            os.close(directory)
+            raise ValueError("the campaign state lock is invalid") from error
+        stream_context = os.fdopen(descriptor, "a+b")
+        directory_context = _close_descriptor(directory)
+    else:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        stream_context = lock_path.open("a+b")
+        directory_context = nullcontext()
+    with directory_context, stream_context as stream:
+        metadata = os.fstat(stream.fileno())
+        current_uid = os.geteuid() if hasattr(os, "geteuid") else None
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or getattr(metadata, "st_nlink", 1) != 1
+            or metadata.st_mode & 0o077
+            or (current_uid is not None and metadata.st_uid != current_uid)
+        ):
+            raise ValueError("the campaign state lock is invalid")
+        if os.name == "nt":
+            import msvcrt
+
+            stream.seek(0, os.SEEK_END)
+            if stream.tell() == 0:
+                stream.write(b"0")
+                stream.flush()
+            stream.seek(0)
+            msvcrt.locking(stream.fileno(), msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                stream.seek(0)
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
+            try:
+                entry = os.stat(
+                    lock_path.name,
+                    dir_fd=directory,
+                    follow_symlinks=False,
+                )
+                if (
+                    entry.st_dev,
+                    entry.st_ino,
+                ) != (metadata.st_dev, metadata.st_ino):
+                    raise ValueError("the campaign state lock changed")
+                yield
+            finally:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+
+
+def _locked_campaign_state(position: int):
+    """Serialize one active-state read-modify-write operation."""
+
+    def decorate(function):
+        @wraps(function)
+        def locked(*args, **kwargs):
+            value = args[position] if len(args) > position else kwargs.get("state_path")
+            if value is None and position == 0:
+                value = kwargs.get("path")
+            if value is None:
+                raise ValueError("the campaign state path is missing")
+            with _campaign_state_lock(Path(value)):
+                return function(*args, **kwargs)
+
+        return locked
+
+    return decorate
+
+
+def attach_replay_experiment(
+    state_path: Path,
+    binding: Mapping[str, object],
+) -> dict[str, object]:
+    """Attach one immutable experiment trajectory to an active campaign."""
+
+    from tools.decomp_experiment import (
+        trajectory_from_binding,
+        validate_trajectory_binding,
+    )
+
+    with _campaign_state_lock(state_path):
+        state = read_state(state_path)
+        root_value = state.get("source_worktree_root")
+        if not isinstance(root_value, str):
+            raise ValueError("the active campaign has no source root")
+        root = Path(root_value).resolve()
+        validated = validate_trajectory_binding(dict(binding), root=root)
+        if (
+            state.get("finalize_receipt") is not None
+            or state.get("finalization") is not None
+            or str(state.get("phase", "")).startswith("finalize")
+            or state.get("phase") in {"finalized", "finalizing", "aborting"}
+        ):
+            raise ValueError("the campaign is already finalizing")
+        seal = trajectory_from_binding(validated, root=root)
+        trajectory = seal.get("trajectory")
+        campaign = (
+            trajectory.get("campaign")
+            if isinstance(trajectory, Mapping)
+            else None
+        )
+        address = trajectory.get("address") if isinstance(trajectory, Mapping) else None
+        expected_campaign = {
+            "campaign_id": _campaign_id(state),
+            "mode": state.get("mode"),
+            "lane": _campaign_lane(state),
+            "active_addresses": _active_addresses(state),
+            "campaign_head": state.get("campaign_head"),
+        }
+        if (
+            not isinstance(trajectory, Mapping)
+            or not isinstance(campaign, Mapping)
+            or any(campaign.get(key) != value for key, value in expected_campaign.items())
+            or trajectory.get("head") != state.get("campaign_head")
+            or address not in _active_addresses(state)
+            or (_campaign_lane(state), state.get("mode"))
+            not in {
+                ("research", "coverage"),
+                ("research", "refinement"),
+                ("closure", "refinement"),
+                ("production", "refinement"),
+            }
+        ):
+            raise ValueError("the replay experiment names another campaign")
+        current = state.get("replay_experiment")
+        if current is not None:
+            if current != validated:
+                raise ValueError("the campaign already has another replay experiment")
+            return state
+        state["replay_experiment"] = dict(validated)
+        write_state(state_path, state)
+        return state
 
 
 def _validate_baseline_report_artifacts(
@@ -2253,6 +2570,7 @@ def _validate_research_start_routes(
             raise ValueError("the research target state does not match the campaign mode")
 
 
+@_locked_campaign_state(0)
 def start_campaign(
     path: Path,
     mode: str,
@@ -2282,7 +2600,11 @@ def start_campaign(
     _legacy_skip_impact_review: bool = False,
 ) -> dict[str, object]:
     resources = resources or []
-    if path.exists():
+    try:
+        os.lstat(path)
+    except FileNotFoundError:
+        pass
+    else:
         raise ValueError("an active campaign already exists. Record or abort it first")
     if mode in ("coverage", "refinement", "data") and not addresses:
         raise ValueError("a source campaign needs at least one --address")
@@ -2528,6 +2850,7 @@ def start_campaign(
         "campaign_head": campaign_head,
         "briefs": brief_receipts,
         "briefs_required": require_brief,
+        "replay_experiment": None,
         "impact_review_required": impact_review_required,
         "leaf_oracle_required": leaf_oracle_required,
         "first_score_at": None,
@@ -2579,6 +2902,7 @@ def start_campaign(
     return state
 
 
+@_locked_campaign_state(0)
 def attach_baseline(
     state_path: Path,
     report_path: Path,
@@ -2704,6 +3028,7 @@ def attach_baseline(
     return state
 
 
+@_locked_campaign_state(0)
 def attach_meta_baseline(
     state_path: Path,
     now: datetime | None = None,
@@ -2751,6 +3076,7 @@ def _score_value(value: float | None, field: str) -> float | None:
     return float(value)
 
 
+@_locked_campaign_state(0)
 def mark_first_score(
     state_path: Path,
     address: str,
@@ -2837,6 +3163,7 @@ def mark_first_score(
     return "recorded"
 
 
+@_locked_campaign_state(0)
 def mark_resource_score(
     state_path: Path,
     now: datetime | None = None,
@@ -2886,6 +3213,7 @@ def mark_resource_score(
     return "recorded"
 
 
+@_locked_campaign_state(0)
 def mark_phase(
     state_path: Path, name: str, now: datetime | None = None
 ) -> dict[str, object]:
@@ -2901,6 +3229,7 @@ def mark_phase(
     return state
 
 
+@_locked_campaign_state(0)
 def add_target(
     state_path: Path,
     address: str,
@@ -3852,6 +4181,7 @@ def _record_meta_campaign(
         "campaign_head": state.get("campaign_head"),
         "briefs": state.get("briefs", []),
         "briefs_required": state.get("briefs_required") is True,
+        "replay_experiment": state.get("replay_experiment"),
         "impact_review_required": False,
         "leaf_oracle_required": False,
         "phase_timestamps": phases,
@@ -3869,6 +4199,7 @@ def _record_meta_campaign(
     return _finish_campaign_finalization(state_path, state)
 
 
+@_locked_campaign_state(1)
 def record_campaign(
     ledger_path: Path,
     state_path: Path,
@@ -4261,6 +4592,7 @@ def record_campaign(
         "campaign_head": state.get("campaign_head"),
         "briefs": state.get("briefs", []),
         "briefs_required": state.get("briefs_required") is True,
+        "replay_experiment": state.get("replay_experiment"),
         "impact_review_required": (
             state.get("impact_review_required") is True and result == "source"
         ),
@@ -4442,18 +4774,44 @@ def _committed_file_text(
     *,
     allow_missing: bool = False,
 ) -> str:
-    completed = subprocess.run(
-        ["git", "show", f"{commit}:{relative}"],
+    object_name = f"{commit}:{relative}"
+    size = subprocess.run(
+        ["git", "cat-file", "-s", object_name],
         cwd=root,
         check=False,
         capture_output=True,
-        text=True,
     )
-    if completed.returncode != 0:
+    if size.returncode != 0:
         if allow_missing:
             return ""
         raise ValueError(f"the delivery commit does not contain {relative}")
-    return completed.stdout
+    try:
+        expected_size = int(size.stdout.decode("ascii").strip())
+    except (UnicodeDecodeError, ValueError) as error:
+        raise ValueError("the committed file size is invalid") from error
+    if not 0 <= expected_size <= MAX_HISTORICAL_TEXT_BYTES:
+        raise ValueError("the committed file exceeds its size limit")
+    try:
+        process = subprocess.Popen(
+            ["git", "cat-file", "blob", object_name],
+            cwd=root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        assert process.stdout is not None
+        with process.stdout:
+            content = process.stdout.read(MAX_HISTORICAL_TEXT_BYTES + 1)
+        if len(content) > MAX_HISTORICAL_TEXT_BYTES:
+            process.kill()
+        returncode = process.wait()
+    except OSError as error:
+        raise ValueError("cannot read the committed file") from error
+    if returncode != 0 or len(content) != expected_size:
+        raise ValueError("cannot read the committed file")
+    try:
+        return content.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ValueError("the committed file is not UTF-8") from error
 
 
 def _committed_ledger_records(
@@ -4637,16 +4995,25 @@ def _verify_campaign_in_commit(
 
 
 def _git_tree_snapshot(root: Path, commit: str) -> dict[str, list[str]]:
-    completed = subprocess.run(
-        ["git", "ls-tree", "-r", "-z", commit],
-        cwd=root,
-        check=False,
-        capture_output=True,
-    )
-    if completed.returncode != 0:
+    try:
+        process = subprocess.Popen(
+            ["git", "ls-tree", "-r", "-z", commit],
+            cwd=root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        assert process.stdout is not None
+        with process.stdout:
+            content = process.stdout.read(MAX_HISTORICAL_TREE_BYTES + 1)
+        if len(content) > MAX_HISTORICAL_TREE_BYTES:
+            process.kill()
+        returncode = process.wait()
+    except OSError as error:
+        raise ValueError("cannot read the delivery commit tree") from error
+    if returncode != 0 or len(content) > MAX_HISTORICAL_TREE_BYTES:
         raise ValueError("cannot read the delivery commit tree")
     snapshot: dict[str, list[str]] = {}
-    for raw in completed.stdout.split(b"\0"):
+    for raw in content.split(b"\0"):
         if not raw or b"\t" not in raw:
             continue
         metadata, encoded_path = raw.split(b"\t", 1)
@@ -4684,10 +5051,14 @@ def _campaign_finalize_receipt(
     ):
         raise ValueError("the campaign finalization receipt content changed")
     key_payload = receipt.get("key_payload")
-    if not isinstance(key_payload, Mapping) or (
-        campaign.get("leaf_oracle_required") is True
-    ) != (key_payload.get("leaf_oracle_required") is True):
-        raise ValueError("the campaign leaf-oracle policy changed after finalization")
+    if (
+        not isinstance(key_payload, Mapping)
+        or (campaign.get("leaf_oracle_required") is True)
+        != (key_payload.get("leaf_oracle_required") is True)
+        or campaign.get("replay_experiment")
+        != key_payload.get("replay_experiment")
+    ):
+        raise ValueError("the campaign finalization policy changed after finalization")
     return receipt
 
 
@@ -6729,6 +7100,53 @@ def _finalize_step_result(
     return {"kind": "result", "value_sha256": _snapshot_hash(None)}, artifacts
 
 
+def _validated_replay_experiment(
+    state: Mapping[str, object],
+    *,
+    root: Path,
+) -> dict[str, object] | None:
+    """Recompute one attached trajectory before finalization can reuse work."""
+
+    binding = state.get("replay_experiment")
+    if binding is None:
+        return None
+    from tools.decomp_experiment import (
+        trajectory_from_binding,
+        trajectory_identity,
+        validate_trajectory_binding,
+    )
+
+    validated = validate_trajectory_binding(binding, root=root)
+    seal = trajectory_from_binding(validated, root=root)
+    saved = seal.get("trajectory")
+    if not isinstance(saved, Mapping):
+        raise ValueError("the replay experiment trajectory is invalid")
+    address = saved.get("address")
+    session_id = saved.get("session_id")
+    if not isinstance(address, str) or not isinstance(session_id, str):
+        raise ValueError("the replay experiment identity is invalid")
+    current = trajectory_identity(address, session_id, root=root)
+    expected_campaign = {
+        "campaign_id": _campaign_id(dict(state)),
+        "mode": state.get("mode"),
+        "lane": _campaign_lane(state),
+        "active_addresses": _active_addresses(state),
+        "campaign_head": state.get("campaign_head"),
+    }
+    if (
+        current != saved
+        or not isinstance(saved.get("campaign"), Mapping)
+        or any(
+            saved["campaign"].get(key) != value
+            for key, value in expected_campaign.items()
+        )
+        or saved.get("head") != state.get("campaign_head")
+        or address not in _active_addresses(state)
+    ):
+        raise ValueError("the replay experiment changed after it was attached")
+    return dict(validated)
+
+
 def _finalize_key_payload(
     state: Mapping[str, object],
     result: str,
@@ -6740,6 +7158,7 @@ def _finalize_key_payload(
     if not isinstance(root_value, str) or not root_value:
         raise ValueError("the active campaign has no source root")
     root = Path(root_value)
+    replay_experiment = _validated_replay_experiment(state, root=root.resolve())
     if result == "no-source" and reuse_no_source_baseline:
         source_worktree = state.get("source_worktree")
         source_index = state.get("source_index")
@@ -6821,6 +7240,7 @@ def _finalize_key_payload(
         "campaign_head": state.get("campaign_head"),
         "briefs": state.get("briefs"),
         "briefs_required": state.get("briefs_required") is True,
+        "replay_experiment": replay_experiment,
         "impact_review_required": (
             state.get("impact_review_required") is True and result == "source"
         ),
@@ -7069,6 +7489,7 @@ def _validated_finalize_receipt(
         "campaign_head": state.get("campaign_head"),
         "briefs": state.get("briefs"),
         "briefs_required": state.get("briefs_required") is True,
+        "replay_experiment": state.get("replay_experiment"),
         "impact_review_required": (
             state.get("impact_review_required") is True and result == "source"
         ),
@@ -7350,6 +7771,30 @@ def _receipt_step_artifact(receipt: Mapping[str, object], name: str) -> Path:
 
 
 def finalize_campaign(
+    state_path: Path,
+    result: str,
+    actions: Mapping[str, Callable[[], object]],
+    *,
+    cache_root: Path = DEFAULT_FINALIZE_CACHE,
+    inputs: Mapping[str, object] | None = None,
+    reuse_no_source_baseline: bool = True,
+    clock: Callable[[], datetime] = utc_now,
+) -> dict[str, object]:
+    """Finalize one campaign while replay attachment is locked."""
+
+    with _campaign_state_lock(state_path):
+        return _finalize_campaign_locked(
+            state_path,
+            result,
+            actions,
+            cache_root=cache_root,
+            inputs=inputs,
+            reuse_no_source_baseline=reuse_no_source_baseline,
+            clock=clock,
+        )
+
+
+def _finalize_campaign_locked(
     state_path: Path,
     result: str,
     actions: Mapping[str, Callable[[], object]],
@@ -7829,6 +8274,12 @@ def _standard_input_hashes(root: Path) -> dict[str, object]:
 
     paths = (
         Path(__file__),
+        root / "tools" / "__init__.py",
+        root / "tools" / "decomp_experiment.py",
+        root / "tools" / "decomp_quality.py",
+        root / "tools" / "decomp_replay.py",
+        root / "tools" / "decomp_route.py",
+        root / "tools" / "decomp_mismatch.py",
         root / "tools" / "decomp_impact.py",
         root / "tools" / "decomp_oracle.py",
         root / "tools" / "decomp_annotations.py",
@@ -7866,6 +8317,14 @@ def _standard_input_hashes(root: Path) -> dict[str, object]:
 def _meta_input_hashes(root: Path) -> dict[str, object]:
     paths = (
         Path(__file__),
+        root / ".gitignore",
+        root / "tools" / "Resources" / "private-replay-manifest.json",
+        root / "tools" / "__init__.py",
+        root / "tools" / "decomp_experiment.py",
+        root / "tools" / "decomp_quality.py",
+        root / "tools" / "decomp_replay.py",
+        root / "tools" / "decomp_route.py",
+        root / "tools" / "decomp_mismatch.py",
         root / "tools" / "decomp_impact.py",
         root / "tools" / "decomp_oracle.py",
         root / "tools" / "decomp_annotations.py",
@@ -7969,6 +8428,13 @@ def _ensure_staged_reproducible(
             }
         )
     unstaged, untracked = path_sets
+    mode = state.get("mode")
+
+    def finalizer_relevant(path: str) -> bool:
+        if mode == "meta":
+            return _meta_workflow_path(path)
+        return _finalizer_relevant_path(path)
+
     ledger_relative_value = state.get("campaign_ledger_relative")
     ledger_relative = (
         ledger_relative_value
@@ -8003,7 +8469,7 @@ def _ensure_staged_reproducible(
     relevant_untracked = {
         path
         for path in untracked
-        if _finalizer_relevant_path(path) and not retained_ledger(path)
+        if finalizer_relevant(path) and not retained_ledger(path)
     }
     if relevant_untracked:
         raise ValueError(
@@ -8013,7 +8479,7 @@ def _ensure_staged_reproducible(
     relevant = {
         path
         for path in unstaged
-        if _finalizer_relevant_path(path) and not retained_ledger(path)
+        if finalizer_relevant(path) and not retained_ledger(path)
     }
     if relevant:
         raise ValueError(
@@ -8167,14 +8633,17 @@ def _configured_build_sources(root: Path) -> list[dict[str, object]]:
 
 
 def _validate_relevant_git_modes(
-    snapshot: Mapping[str, list[str]], description: str
+    snapshot: Mapping[str, list[str]],
+    description: str,
+    *,
+    relevant: Callable[[str], bool] = _finalizer_relevant_path,
 ) -> None:
     """Require regular stage-zero blobs for all tracked campaign files."""
 
     symbolic_links: list[str] = []
     invalid: list[str] = []
     for path, entries in snapshot.items():
-        if not _finalizer_relevant_path(path):
+        if not relevant(path):
             continue
         parsed = [entry.split() for entry in entries]
         if any(fields and fields[0] == "120000" for fields in parsed):
@@ -8243,7 +8712,13 @@ def _meta_workflow_path(path: str) -> bool:
     """Return true for files that a meta-fix campaign may deliver."""
 
     relative = Path(path)
+    if (
+        "__pycache__" in relative.parts
+        or relative.suffix in {".pyc", ".pyo"}
+    ):
+        return False
     if path in {
+        ".gitignore",
         "AGENTS.md",
         "ROADMAP.md",
         "decomp_utils.py",
@@ -8251,6 +8726,7 @@ def _meta_workflow_path(path: str) -> bool:
         "tools/decomp",
         "tools/decomp.ps1",
         "tools/Resources/leaf-oracles.json",
+        "tools/Resources/private-replay-manifest.json",
         "tools/linux-decomp-env.sh",
     }:
         return True
@@ -8283,14 +8759,124 @@ def _normal_campaign_path(mode: str, path: str) -> bool:
     return False
 
 
+def _normal_bookkeeping_path(result: str, path: str) -> bool:
+    """Return true for the two exact no-source audit append paths."""
+
+    return result == "no-source" and path in {
+        "tools/Resources/campaign-ledger.jsonl",
+        ".notes/source-models.md",
+    }
+
+
+def _validate_staged_campaign_scope(
+    mode: str, result: str, staged_paths: Sequence[str]
+) -> None:
+    """Reject private storage and files outside the selected campaign scope."""
+
+    private = [
+        path
+        for path in staged_paths
+        if Path(path).parts[:1] == (".decomp-replay",)
+    ]
+    if private:
+        raise ValueError("a campaign cannot stage private replay storage")
+    if mode == "meta":
+        invalid = [path for path in staged_paths if not _meta_workflow_path(path)]
+        description = "a meta-fix cannot include files outside workflow scope"
+    else:
+        invalid = [
+            path
+            for path in staged_paths
+            if not _normal_campaign_path(mode, path)
+            and not _normal_bookkeeping_path(result, path)
+        ]
+        description = "a normal campaign cannot change workflow or validation files"
+    if invalid:
+        raise ValueError(f"{description}: " + ", ".join(sorted(invalid)[:8]))
+
+
+def _require_clean_private_replay_ignore(
+    root: Path,
+    repository_index: Mapping[str, list[str]],
+    *,
+    require_head_equal: bool = True,
+) -> None:
+    """Require the staged root ignore file to protect private replay storage."""
+
+    relative = ".gitignore"
+    entries = repository_index.get(relative)
+    parsed = [entry.split() for entry in entries] if isinstance(entries, list) else []
+    if (
+        len(parsed) != 1
+        or len(parsed[0]) != 3
+        or parsed[0][0] != "100644"
+        or parsed[0][2] != "0"
+    ):
+        raise ValueError("the private replay ignore file is not a regular staged blob")
+    commands = [["git", "diff", "--quiet", "--", relative]]
+    if require_head_equal:
+        commands.append(["git", "diff", "--cached", "--quiet", "--", relative])
+    for command in commands:
+        if subprocess.run(
+            command, cwd=root, check=False, capture_output=True
+        ).returncode != 0:
+            raise ValueError("stage or restore the private replay ignore file")
+    current = _read_bounded_regular_file(
+        root / relative,
+        "private replay ignore file",
+        max_bytes=1024 * 1024,
+    )
+    if require_head_equal:
+        try:
+            head = _committed_file_text(root, relative, _git_head(root)).encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise ValueError("the private replay ignore file is invalid") from error
+        if current != head:
+            raise ValueError("the private replay ignore rule is missing or changed")
+    if "/.decomp-replay/" not in current.decode(
+        "utf-8", errors="strict"
+    ).splitlines():
+        raise ValueError("the private replay ignore rule is missing or changed")
+    ignored = subprocess.run(
+        [
+            "git",
+            "check-ignore",
+            "-v",
+            "--no-index",
+            "--",
+            ".decomp-replay/probe",
+        ],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    prefix = ignored.stdout.split("\t", 1)[0] if ignored.stdout else ""
+    fields = prefix.rsplit(":", 2)
+    if (
+        ignored.returncode != 0
+        or len(fields) != 3
+        or fields[0] != ".gitignore"
+        or fields[2] != "/.decomp-replay/"
+    ):
+        raise ValueError("the private replay ignore rule is not effective")
+
+
 def _ensure_normal_validation_inputs_unchanged(
-    state: Mapping[str, object], root: Path, staged_paths: list[str]
+    state: Mapping[str, object],
+    root: Path,
+    staged_paths: list[str],
+    *,
+    result: str,
 ) -> None:
     """Reject self-modified validators and runtime inputs."""
 
     mode = str(state.get("mode", ""))
     invalid_staged = [
-        path for path in staged_paths if not _normal_campaign_path(mode, path)
+        path
+        for path in staged_paths
+        if not _normal_campaign_path(mode, path)
+        and not _normal_bookkeeping_path(result, path)
     ]
     if invalid_staged:
         raise ValueError(
@@ -8303,7 +8889,10 @@ def _ensure_normal_validation_inputs_unchanged(
     current = repository_worktree_snapshot(root)
     changed = source_worktree_changes(baseline, current)
     invalid_changes = sorted(
-        path for path in changed if not _normal_campaign_path(mode, path)
+        path
+        for path in changed
+        if not _normal_campaign_path(mode, path)
+        and not _normal_bookkeeping_path(result, path)
     )
     if invalid_changes:
         raise ValueError(
@@ -8543,6 +9132,32 @@ def finalize_standard(
     cache_root: Path = DEFAULT_FINALIZE_CACHE,
     clock: Callable[[], datetime] = utc_now,
 ) -> dict[str, object]:
+    """Derive and run standard finalization under one campaign-state lock."""
+
+    with _campaign_state_lock(state_path):
+        return _finalize_standard_locked(
+            state_path,
+            result,
+            mode=mode,
+            targets=targets,
+            resource=resource,
+            staged=staged,
+            cache_root=cache_root,
+            clock=clock,
+        )
+
+
+def _finalize_standard_locked(
+    state_path: Path,
+    result: str,
+    *,
+    mode: str,
+    targets: list[str] | None = None,
+    resource: str | None = None,
+    staged: bool = False,
+    cache_root: Path = DEFAULT_FINALIZE_CACHE,
+    clock: Callable[[], datetime] = utc_now,
+) -> dict[str, object]:
     state = read_state(state_path)
     active_mode = str(state.get("mode", ""))
     if mode != active_mode:
@@ -8559,12 +9174,22 @@ def finalize_standard(
     root = Path(str(state.get("source_worktree_root", ROOT)))
     _ensure_staged_reproducible(state, root)
     staged_paths = _staged_paths(root)
+    _validate_staged_campaign_scope(mode, result, staged_paths)
     repository_index = repository_index_snapshot(root)
-    _validate_relevant_git_modes(repository_index, "campaign repository index")
+    _validate_relevant_git_modes(
+        repository_index,
+        "campaign repository index",
+        relevant=_meta_workflow_path if mode == "meta" else _finalizer_relevant_path,
+    )
     if result == "source" and mode != "meta":
         _validate_configured_build_sources(
             root, repository_index, "staged Git tree"
         )
+    _require_clean_private_replay_ignore(
+        root,
+        repository_index,
+        require_head_equal=mode != "meta",
+    )
     if mode == "meta":
         workflow_paths = [
             path for path in staged_paths if _meta_workflow_path(path)
@@ -8581,7 +9206,7 @@ def finalize_standard(
             )
     else:
         _ensure_normal_validation_inputs_unchanged(
-            state, root, _staged_relevant_paths(root)
+            state, root, staged_paths, result=result
         )
     if result == "no-source":
         actions: dict[str, Callable[[], object]] = {}
@@ -8595,7 +9220,7 @@ def finalize_standard(
             resource=resource,
             staged=staged,
         )
-    return finalize_campaign(
+    return _finalize_campaign_locked(
         state_path,
         result,
         actions,
@@ -8610,6 +9235,7 @@ def finalize_standard(
     )
 
 
+@_locked_campaign_state(1)
 def abort_campaign(
     ledger_path: Path,
     state_path: Path,
@@ -8689,6 +9315,7 @@ def abort_campaign(
         "doctor_receipt": state.get("doctor_receipt"),
         "doctor_receipts": state.get("doctor_receipts", []),
         "briefs": state.get("briefs", []),
+        "replay_experiment": state.get("replay_experiment"),
         "metrics_before": state.get("metrics_before"),
         "implemented_before": state.get("implemented_before"),
         "terminal_before": state.get("terminal_before"),

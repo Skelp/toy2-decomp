@@ -106,6 +106,7 @@ class CampaignTests(unittest.TestCase):
         ignore = root / ".gitignore"
         fixture_ignores = {
             "*.json",
+            "*.lock",
             "build/",
             "state.json",
             "first.json",
@@ -4119,6 +4120,24 @@ class CampaignTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            (root / ".gitignore").write_text(
+                "/.decomp-replay/\n", encoding="utf-8"
+            )
+            subprocess.run(["git", "add", ".gitignore"], cwd=root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Meta Tests",
+                    "-c",
+                    "user.email=meta@example.invalid",
+                    "commit",
+                    "-qm",
+                    "Base",
+                ],
+                cwd=root,
+                check=True,
+            )
             state_path = root / "state.json"
             started = datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc)
             campaigns.start_campaign(
@@ -4237,6 +4256,127 @@ class CampaignTests(unittest.TestCase):
         self.assertFalse(campaigns._meta_workflow_path("docs/ROADMAP.md"))
         self.assertFalse(campaigns._meta_workflow_path("docs/decomp-worker.md"))
         self.assertFalse(campaigns._meta_workflow_path("README.md"))
+        for generated in (
+            "tools/tests/__pycache__/test_decomp_replay.cpython-313.pyc",
+            "tools/__pycache__/decomp_replay.pyo",
+            "tools/tests/replay.pyc",
+        ):
+            with self.subTest(generated=generated):
+                self.assertFalse(campaigns._meta_workflow_path(generated))
+
+    def test_staged_scope_rejects_private_storage_and_unsafe_ignore_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            ignore = root / ".gitignore"
+            source = root / "src/Target.cpp"
+            private = root / ".decomp-replay/cases/private.json"
+            source.parent.mkdir(parents=True)
+            private.parent.mkdir(parents=True)
+            ignore.write_text("/.decomp-replay/\n", encoding="utf-8")
+            source.write_text("// baseline\n", encoding="utf-8")
+            private.write_text("private\n", encoding="utf-8")
+            subprocess.run(["git", "add", ".gitignore", "src/Target.cpp"], cwd=root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Meta Tests",
+                    "-c",
+                    "user.email=meta@example.invalid",
+                    "commit",
+                    "-qm",
+                    "Base",
+                ],
+                cwd=root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "add", "-f", ".decomp-replay/cases/private.json"],
+                cwd=root,
+                check=True,
+            )
+            with self.assertRaisesRegex(ValueError, "private replay storage"):
+                campaigns._validate_staged_campaign_scope(
+                    "refinement", "source", campaigns._staged_paths(root)
+                )
+
+        for staged in (False, True):
+            with self.subTest(staged=staged), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+                (root / ".gitignore").write_text(
+                    "/.decomp-replay/\n", encoding="utf-8"
+                )
+                subprocess.run(["git", "add", ".gitignore"], cwd=root, check=True)
+                subprocess.run(
+                    [
+                        "git",
+                        "-c",
+                        "user.name=Meta Tests",
+                        "-c",
+                        "user.email=meta@example.invalid",
+                        "commit",
+                        "-qm",
+                        "Base",
+                    ],
+                    cwd=root,
+                    check=True,
+                )
+                (root / ".gitignore").write_text("changed\n", encoding="utf-8")
+                if staged:
+                    subprocess.run(["git", "add", ".gitignore"], cwd=root, check=True)
+                    with self.assertRaisesRegex(ValueError, "normal campaign"):
+                        campaigns._validate_staged_campaign_scope(
+                            "refinement", "source", campaigns._staged_paths(root)
+                        )
+                with self.assertRaisesRegex(ValueError, "stage or restore"):
+                    campaigns._require_clean_private_replay_ignore(
+                        root, campaigns.repository_index_snapshot(root)
+                    )
+
+    def test_meta_staged_ignore_must_be_a_regular_blob(self):
+        snapshot = {".gitignore": [f"120000 {'a' * 40} 0"]}
+        with self.assertRaisesRegex(ValueError, "symbolic links"):
+            campaigns._validate_relevant_git_modes(
+                snapshot,
+                "campaign repository index",
+                relevant=campaigns._meta_workflow_path,
+            )
+
+    def test_meta_staged_ignore_cannot_remove_or_negate_private_storage_rule(self):
+        for content in (
+            "# rule removed\n",
+            "/.decomp-replay/\n!/.decomp-replay/\n!/.decomp-replay/probe\n",
+        ):
+            with self.subTest(content=content), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+                ignore = root / ".gitignore"
+                ignore.write_text("/.decomp-replay/\n", encoding="utf-8")
+                subprocess.run(["git", "add", ".gitignore"], cwd=root, check=True)
+                subprocess.run(
+                    [
+                        "git",
+                        "-c",
+                        "user.name=Meta Tests",
+                        "-c",
+                        "user.email=meta@example.invalid",
+                        "commit",
+                        "-qm",
+                        "Base",
+                    ],
+                    cwd=root,
+                    check=True,
+                )
+                ignore.write_text(content, encoding="utf-8")
+                subprocess.run(["git", "add", ".gitignore"], cwd=root, check=True)
+                with self.assertRaisesRegex(ValueError, "private replay ignore"):
+                    campaigns._require_clean_private_replay_ignore(
+                        root,
+                        campaigns.repository_index_snapshot(root),
+                        require_head_equal=False,
+                    )
 
     def test_schema_two_baseline_ledger_is_not_an_unstaged_change(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -4273,6 +4413,41 @@ class CampaignTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(ValueError, "stage or restore"):
                 campaigns._ensure_staged_reproducible(state, root)
+
+    def test_meta_finalization_rejects_an_unstaged_workflow_input(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            ignore = root / ".gitignore"
+            tool = root / "tools/decomp_replay.py"
+            tool.parent.mkdir(parents=True)
+            ignore.write_text("/.decomp-replay/\n", encoding="utf-8")
+            tool.write_text("# baseline\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Meta Tests",
+                    "-c",
+                    "user.email=meta@example.invalid",
+                    "commit",
+                    "-qm",
+                    "Base",
+                ],
+                cwd=root,
+                check=True,
+            )
+            tool.write_text("# staged workflow fix\n", encoding="utf-8")
+            subprocess.run(
+                ["git", "add", "tools/decomp_replay.py"], cwd=root, check=True
+            )
+            ignore.write_text(
+                "/.decomp-replay/\n# unstaged change\n", encoding="utf-8"
+            )
+
+            with self.assertRaisesRegex(ValueError, "stage or restore"):
+                campaigns._ensure_staged_reproducible({"mode": "meta"}, root)
 
     def test_start_rejects_a_tracked_source_symlink(self):
         with tempfile.TemporaryDirectory() as directory:
