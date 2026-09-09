@@ -22,6 +22,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from tools.decomp_campaigns import LANE_MODES  # noqa: E402
+from tools.decomp_context import (  # noqa: E402
+    ContextError,
+    build_context_pack,
+    context_input_descriptor,
+    validate_context_pack,
+)
 from tools.decomp_mismatch import classify_report_diff, empty_taxonomy  # noqa: E402
 from tools.decomp_doctor import (  # noqa: E402
     CACHE_RELATIVE as DOCTOR_CACHE_RELATIVE,
@@ -51,6 +57,10 @@ SOURCE_LANES = {"closure", "production", "research"}
 LANES = tuple(sorted(SOURCE_LANES | {"data", "resource"}))
 TOOL_INPUTS = (
     Path("tools/decomp_brief.py"),
+    Path("tools/decomp_context.py"),
+    Path("tools/decomp_annotations.py"),
+    Path("tools/decomp_dependencies.py"),
+    Path("tools/decomp_binary.py"),
     Path("tools/decomp_doctor.py"),
     Path("tools/decomp_diff.py"),
     Path("tools/decomp_evidence.py"),
@@ -59,6 +69,7 @@ TOOL_INPUTS = (
     Path("tools/decomp_provenance.py"),
     Path("tools/decomp_lint.py"),
     Path("tools/decomp_status.py"),
+    Path("tools/decomp_verify.py"),
     Path("tools/decomp_mismatch.py"),
 )
 SCOUT_REPORT_SCHEMA = 2
@@ -493,6 +504,9 @@ def _input_descriptor(
             if lane == "production"
             else None
         ),
+        "context_inputs": (
+            context_input_descriptor(root) if lane in SOURCE_LANES else None
+        ),
     }
     required = {
         "map": descriptor["map_hash"],
@@ -672,6 +686,26 @@ def build_brief(
         gate = evidence.get("source_evidence") if isinstance(evidence, dict) else None
         if not isinstance(gate, dict) or not gate.get("disassembly_nonempty") or not gate.get("decompilation_nonempty"):
             raise BriefError("source briefs need nonempty disassembly and decompilation")
+        doctor_descriptor = descriptor.get("doctor_receipt")
+        if isinstance(doctor_descriptor, dict):
+            retail_size = _function_size(root, int(normalized, 0))
+            try:
+                context_pack = build_context_pack(
+                    root,
+                    normalized,
+                    doctor=doctor_descriptor,
+                    evidence=evidence,
+                    size=retail_size,
+                )
+                validate_context_pack(
+                    context_pack,
+                    target=normalized,
+                    size=int(context_pack["size"]),
+                )
+            except ContextError as error:
+                raise BriefError(f"the target context pack is invalid: {error}") from error
+            evidence = dict(evidence)
+            evidence["context_pack"] = context_pack
     after = _input_descriptor(
         root,
         lane,
@@ -786,6 +820,19 @@ def validate_brief(
             )
     if not isinstance(evidence, dict) or evidence.get("readiness") is not True:
         raise BriefError("the target brief is not ready")
+    if lane in SOURCE_LANES and descriptor.get("doctor_receipt") is not None:
+        context_pack = evidence.get("context_pack")
+        retail_size = _function_size(root, int(normalized, 0))
+        if retail_size is None:
+            raise BriefError("the target context pack has no current retail size")
+        try:
+            validate_context_pack(
+                context_pack,
+                target=normalized,
+                size=retail_size,
+            )
+        except ContextError as error:
+            raise BriefError(f"the target context pack is invalid: {error}") from error
     roles = document.get("roles")
     scouts = roles.get("scouts") if isinstance(roles, dict) else None
     bound_reports = descriptor.get("scout_reports")

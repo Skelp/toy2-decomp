@@ -28,6 +28,29 @@ all source work.
 No repository tool starts Codex. This workflow does not use App Server, an MCP
 server, or an external supervisor process.
 
+## Function context packs
+
+Each new function brief contains a bounded `evidence.context_pack`. The pack
+uses schema version 1 and cached doctor artifacts. It does not start Ghidra.
+It records the x86-32 instructions, control flow, memory operands, direct call
+neighbors, and as many as three accepted-source examples. Each derived row has
+a locator for its doctor artifact.
+
+The pack records an unknown reason when evidence is missing or ambiguous. Do
+not use an incomplete control-flow or memory section as proof. The builder does
+not guess an indirect branch target or a jump table.
+
+Use this read-only command to inspect and validate the pack:
+
+```sh
+tools/decomp context --brief build/decomp-cache/briefs/BRIEF.json
+tools/decomp context --brief build/decomp-cache/briefs/BRIEF.json --json
+```
+
+The command checks the brief hash, pack hash, target, retail size, and current
+repository inputs. It rejects linked, changed, large, or non-cache brief files.
+The brief tools can still read historical briefs that do not contain a pack.
+
 ## Bounded source experiments
 
 Use `tools/decomp experiment` to compare distinct source models for one

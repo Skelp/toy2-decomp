@@ -166,6 +166,22 @@ map, and tool hashes. Reject a stale brief. It must include the ABI, control
 flow, callers, callees, globals, layouts, DWARF evidence, mismatch classes,
 history, cooldown, file evidence, and a readiness decision.
 
+Each new function brief contains a schema-1 `evidence.context_pack`. The pack
+uses the cached doctor artifacts. It does not start Ghidra. It binds the
+decoder, retail image, repository inputs, and accepted-source receipts. An
+unknown reason means that the related part is not complete. Do not infer a
+jump table or a memory access from an incomplete part.
+
+Inspect a pack with this read-only command:
+
+```sh
+tools/decomp context --brief BRIEF_PATH [--json]
+```
+
+The command rejects a changed brief, a changed context pack, and a stale
+repository input. Historical briefs can still be read by the brief tools, but
+they do not have a context pack.
+
 Use one supervisor, two read-only scouts, and one writer. Run two independent
 scout audits in parallel before writer work. Scout A audits the retail ABI,
 control flow, and direct evidence. Scout B audits callers, types, layouts,

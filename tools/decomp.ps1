@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "doctor", "brief", "campaigns", "finalize", "discover", "evidence", "notes", "names", "defer", "undefer", "blockers", "baseline", "validate", "experiment", "lint", "data", "report", "session-summary", "progress", "check", "sync", "run", "shell", "help")]
+    [ValidateSet("configure", "build", "compare", "score", "bc", "candidates", "doctor", "brief", "context", "campaigns", "finalize", "discover", "evidence", "notes", "names", "defer", "undefer", "blockers", "baseline", "validate", "experiment", "lint", "data", "report", "session-summary", "progress", "check", "sync", "run", "shell", "help")]
     [string] $Command = "help",
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -16,6 +16,11 @@ $Tooling = Join-Path $Root ".tooling"
 $MsvcBase = Join-Path $Tooling "msvc600-8168"
 $VenvScripts = Join-Path $Tooling "venv\Scripts"
 $VenvPython = Join-Path $VenvScripts "python.exe"
+if ($Command -eq "context") {
+    Set-Location $Root
+    & $VenvPython (Join-Path $Root "tools\decomp_context.py") @CommandArgs
+    exit $LASTEXITCODE
+}
 $Vcvars = Join-Path $MsvcBase "VC98\Bin\VCVARS32.BAT"
 $DecompCache = Join-Path $Root "build\decomp-cache"
 $GhidraCache = Join-Path $DecompCache "ghidra\cache"
@@ -276,6 +281,7 @@ Commands:
   candidates [args] Rank reconstruction candidates
   doctor [args]     Check source-work tools before a campaign starts
   brief [args]      Build or read an immutable target evidence brief
+  context --brief   Validate and display one brief's function context pack
   campaigns [args] Measure campaign time, report changes, and retained throughput
   finalize [args]  Validate once and write a content-addressed receipt
   discover [args]   Find credible Ghidra starts absent from the function map

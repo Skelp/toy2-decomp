@@ -594,6 +594,7 @@ Commands:
   candidates [ns]   Refresh stale comparison evidence, then rank candidates
   doctor [args]     Check source-work tools before a campaign starts
   brief [args]      Build or read an immutable target evidence brief
+  context --brief   Validate and display one brief's function context pack
   campaigns [...]   Measure campaign time, report deltas, and retained throughput
   discover [args]   Find credible Ghidra starts absent from the function map
   defer <addr> ...  Record a committed blocker or prerequisite
@@ -863,6 +864,9 @@ case "$command" in
             echo "Usage: tools/decomp report [output.html]"
             exit 0
         fi
+        ;;
+    context)
+        exec "$ROOT/.tooling/venv/bin/python" tools/decomp_context.py "$@"
         ;;
 esac
 

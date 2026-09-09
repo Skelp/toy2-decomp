@@ -213,16 +213,17 @@ class NormativeInputTests(unittest.TestCase):
     def test_preflight_brief_and_finalize_have_wrapper_parity(self):
         linux = (ROOT / "tools" / "decomp").read_text(encoding="utf-8")
         windows = (ROOT / "tools" / "decomp.ps1").read_text(encoding="utf-8")
-        for command in ("doctor", "brief", "finalize"):
+        for command in ("doctor", "brief", "context", "finalize"):
             self.assertIn(f"  {command}", linux)
             self.assertIn(f"{command}", windows)
         for script_name in (
             "tools/decomp_doctor.py",
             "tools/decomp_brief.py",
+            "tools/decomp_context.py",
             "tools/decomp_campaigns.py finalize",
         ):
             self.assertIn(script_name, linux)
-        self.assertIn('"doctor", "brief"', windows)
+        self.assertIn('if ($Command -eq "context")', windows)
         self.assertIn('$Command -eq "finalize"', windows)
         self.assertIn('"tools\\decomp_campaigns.py") finalize', windows)
 
@@ -456,6 +457,42 @@ class NormativeInputTests(unittest.TestCase):
         )
         self.assertGreaterEqual(preflight.count("Prune-GhidraLogs"), 2)
         self.assertIn("finally", preflight)
+
+    def test_windows_context_dispatch_is_standalone_and_read_only(self):
+        linux = (ROOT / "tools" / "decomp").read_text(encoding="utf-8")
+        windows = (ROOT / "tools" / "decomp.ps1").read_text(encoding="utf-8")
+        context_dispatch = script_section(
+            windows,
+            'if ($Command -eq "context")',
+            '$Vcvars = Join-Path $MsvcBase',
+        )
+
+        self.assertIn('"tools\\decomp_context.py"', context_dispatch)
+        self.assertIn("$VenvPython", context_dispatch)
+        self.assertIn("Set-Location $Root", context_dispatch)
+        self.assertIn("@CommandArgs", context_dispatch)
+        self.assertIn("exit $LASTEXITCODE", context_dispatch)
+        self.assertEqual(windows.count('if ($Command -eq "context")'), 1)
+        self.assertNotIn("Import-VC6Environment", context_dispatch)
+        self.assertNotIn("Prune-GhidraLogs", context_dispatch)
+        self.assertNotIn("New-Item", context_dispatch)
+        self.assertLess(
+            windows.index('if ($Command -eq "context")'),
+            windows.index("New-Item -ItemType Directory"),
+        )
+        self.assertNotIn('"context"', windows[windows.index('if ($Command -in @("doctor", "brief"))'):])
+        linux_dispatch = script_section(
+            linux,
+            'case "$command" in',
+            "source tools/linux-decomp-env.sh",
+        )
+        self.assertIn("context)", linux_dispatch)
+        self.assertIn('exec "$ROOT/.tooling/venv/bin/python"', linux_dispatch)
+        self.assertEqual(linux.count("context)"), 1)
+        self.assertLess(
+            linux.index("context)"), linux.index("source tools/linux-decomp-env.sh")
+        )
+        self.assertLess(linux.index("context)"), linux.index("trap prune_ghidra_logs EXIT"))
 
     def test_report_help_exits_before_toolchain_setup(self):
         linux = (ROOT / "tools" / "decomp").read_text(encoding="utf-8")

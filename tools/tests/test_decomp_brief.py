@@ -62,7 +62,7 @@ def source_receipt(root: Path) -> dict[str, object]:
         root,
         target,
         "disassembly",
-        [{"address": target, "mnemonic": "ret"}],
+        [{"address": target, "bytes": "c3", "mnemonic": "ret", "operands": []}],
     )
     decompilation = doctor._store_ghidra_artifact(
         root,
@@ -658,6 +658,19 @@ class BriefTests(unittest.TestCase):
                     runner=HeadRunner(),
                     doctor_receipt_path=receipt_path,
                 )
+                tampered = json.loads(result.path.read_text(encoding="utf-8"))
+                tampered["evidence"]["context_pack"]["size"] = 9
+                tampered["content_sha256"] = brief._content_hash(tampered)
+                result.path.write_text(json.dumps(tampered), encoding="utf-8")
+                with self.assertRaisesRegex(brief.BriefError, "context pack"):
+                    brief.validate_brief(
+                        result.path,
+                        "production",
+                        "0x00401000",
+                        root=root,
+                        runner=HeadRunner(),
+                        doctor_receipt_path=receipt_path,
+                    )
 
         self.assertEqual(
             [item["scout_id"] for item in result.brief["scout_findings"]],
@@ -671,6 +684,14 @@ class BriefTests(unittest.TestCase):
             {"abi", "control-flow", "retail-evidence"},
         )
         self.assertEqual(len(checked["scout_reports"]), 2)
+        context_pack = result.brief["evidence"]["context_pack"]
+        self.assertEqual(context_pack["schema"], 1)
+        self.assertEqual(context_pack["target"], "0x00401000")
+        self.assertEqual(context_pack["size"], 8)
+        self.assertEqual(
+            context_pack["bindings"]["doctor_receipt"]["sha256"],
+            result.brief["inputs"]["doctor_receipt"]["sha256"],
+        )
         self.assertTrue(
             all("content" in item for item in result.brief["inputs"]["scout_reports"])
         )
