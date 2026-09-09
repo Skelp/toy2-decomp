@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 try:
+    from tools.decomp_annotations import active_source_lines
     from tools.decomp_resources import (
         format_resource,
         parse_resource,
@@ -30,6 +31,7 @@ try:
         staged_resource_source_problems,
     )
 except ModuleNotFoundError:  # Direct invocation uses tools/ as sys.path[0].
+    from decomp_annotations import active_source_lines  # type: ignore[no-redef]
     from decomp_resources import (  # type: ignore[no-redef]
         format_resource,
         parse_resource,
@@ -155,6 +157,14 @@ DEADLINE_FACTORS = {
 SOURCE_ANNOTATION_RE = re.compile(
     r"//\s*(FUNCTION|LIBRARY|STUB):\s*TOY2\s+0x([0-9a-fA-F]+)"
 )
+
+
+def _active_source_annotation_matches(text: str) -> list[tuple[str, str]]:
+    return [
+        match
+        for _, line in active_source_lines(text)
+        for match in SOURCE_ANNOTATION_RE.findall(line)
+    ]
 
 
 @dataclass(frozen=True)
@@ -1735,7 +1745,7 @@ def _source_annotations(source_root: Path) -> dict[int, str]:
         if not path.is_file() or not _is_source_path(path):
             continue
         text = path.read_text(encoding="utf-8", errors="ignore")
-        for state, address in SOURCE_ANNOTATION_RE.findall(text):
+        for state, address in _active_source_annotation_matches(text):
             addresses[int(address, 16)] = state
     return addresses
 
@@ -4913,7 +4923,7 @@ def _run_delivery_validation(
                 text = source_path.read_text(encoding="utf-8", errors="ignore")
                 implemented.update(
                     int(address, 16)
-                    for kind, address in SOURCE_ANNOTATION_RE.findall(text)
+                    for kind, address in _active_source_annotation_matches(text)
                     if kind == "FUNCTION"
                 )
             for address_text in active:
@@ -6779,7 +6789,7 @@ def _standard_source_scan(
     for unit in units:
         implemented.update(
             int(address, 16)
-            for kind, address in SOURCE_ANNOTATION_RE.findall(unit.text)
+            for kind, address in _active_source_annotation_matches(unit.text)
             if kind == "FUNCTION"
         )
     snapshot = state.get("function_sizes")

@@ -2218,6 +2218,194 @@ class CampaignTests(unittest.TestCase):
                     "0x00402000", "coverage", function_map, sizes, source_root
                 )
 
+    def test_source_target_validation_uses_only_active_annotations(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_root = root / "src"
+            source_root.mkdir()
+            (source_root / "Targets.cpp").write_text(
+                "#if 0\n"
+                "// FUNCTION: TOY2 0x00401000\n"
+                "#else\n"
+                "// STUB: TOY2 0x00402000\n"
+                "#endif\n"
+                "// FUNCTION: TOY2 0x00403000\n",
+                encoding="utf-8",
+            )
+            function_map = root / "functions_map.txt"
+            function_map.write_text(
+                "0x00401000 Inactive\n"
+                "0x00402000 ElseStub\n"
+                "0x00403000 Active\n"
+                "0x00404000 Next\n",
+                encoding="utf-8",
+            )
+            sizes = root / "sizes.json"
+            sizes.write_text(
+                json.dumps(
+                    [
+                        {"address": "00401000", "size": 0x1000},
+                        {"address": "00402000", "size": 0x1000},
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            campaigns.validate_source_target(
+                "0x00401000", "coverage", function_map, sizes, source_root
+            )
+            campaigns.validate_source_target(
+                "0x00402000", "coverage", function_map, sizes, source_root
+            )
+            campaigns.validate_source_target(
+                "0x00403000", "refinement", function_map, sizes, source_root
+            )
+            with self.assertRaisesRegex(ValueError, "is unannotated"):
+                campaigns.validate_source_target(
+                    "0x00401000", "refinement", function_map, sizes, source_root
+                )
+
+    def test_standard_source_scan_uses_only_active_function_annotations(self):
+        source = (
+            "#if 0\n"
+            "// FUNCTION: TOY2 0x00401000\n"
+            "#else\n"
+            "// FUNCTION: TOY2 0x00402000\n"
+            "#endif\n"
+            "// FUNCTION: TOY2 0x00403000\n"
+        )
+        statuses = {
+            address: argparse.Namespace(matching=1.0, effective=False)
+            for address in (0x00401000, 0x00402000, 0x00403000)
+        }
+        state = {
+            "mode": "coverage",
+            "function_sizes": {
+                "0x00401000": 10,
+                "0x00402000": 20,
+                "0x00403000": 30,
+            },
+        }
+        with (
+            patch(
+                "tools.decomp_lint.target_units",
+                return_value=[argparse.Namespace(text=source)],
+            ),
+            patch("tools.decomp_lint.scan_units", return_value=[]),
+            patch("tools.decomp_lint.read_baseline", return_value=[]),
+            patch("tools.decomp_lint.apply_baseline", return_value=([], [])),
+            patch("tools.decomp_status.read_match_statuses", return_value=statuses),
+            patch.object(campaigns, "effective_code_bytes", return_value=50),
+        ):
+            scan, _ = campaigns._standard_source_scan(
+                state, Path("report.json"), staged=True
+            )
+
+        self.assertEqual(scan["metrics"]["implemented"], 2)
+        self.assertEqual(scan["metrics"]["terminal"], 2)
+        self.assertEqual(scan["metrics"]["terminal_bytes"], 50)
+
+    def test_integrated_delivery_uses_only_active_function_annotations(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src" / "Targets.cpp"
+            source.parent.mkdir()
+            source.write_text(
+                "#if 0\n"
+                "// FUNCTION: TOY2 0x00401000\n"
+                "#else\n"
+                "// FUNCTION: TOY2 0x00402000\n"
+                "#endif\n"
+                "// FUNCTION: TOY2 0x00403000\n",
+                encoding="utf-8",
+            )
+            commands = {
+                "build": [["build-tool"]],
+                "code_report": [["code-report-tool"]],
+                "data_report": [],
+                "source_scan": [],
+                "validation": [],
+            }
+            completed = argparse.Namespace(returncode=0, stdout="", stderr="")
+            statuses = {
+                address: argparse.Namespace(
+                    matching=1.0, effective=False, exact=True
+                )
+                for address in (0x00401000, 0x00402000, 0x00403000)
+            }
+            sizes = {
+                0x00401000: 10,
+                0x00402000: 20,
+                0x00403000: 30,
+            }
+            metrics = {
+                "implemented": 2,
+                "terminal": 2,
+                "terminal_bytes": 50,
+                "effective_bytes": 50,
+                "source_debt": 0,
+            }
+
+            def campaign(active: list[str]) -> dict[str, object]:
+                return {
+                    "mode": "refinement",
+                    "lane": "production",
+                    "result": "source",
+                    "active_addresses": active,
+                    "target_deltas": {
+                        address: {"effective_after": 10} for address in active
+                    },
+                    "implemented_after": 0,
+                    "terminal_after": 0,
+                    "terminal_bytes_after": 0,
+                    "effective_bytes_after": 0,
+                    "source_debt_after": 0,
+                }
+
+            with (
+                patch.object(
+                    campaigns, "standard_finalize_commands", return_value=commands
+                ),
+                patch.object(
+                    campaigns, "_standard_command", return_value=completed
+                ),
+                patch("tools.decomp_provenance._artifact_state", return_value={}),
+                patch("tools.decomp_provenance.current_identity", return_value={}),
+                patch("tools.decomp_provenance.seal_report"),
+                patch("tools.decomp_provenance.validate_report"),
+                patch.object(campaigns, "read_function_sizes", return_value=sizes),
+                patch.object(
+                    campaigns,
+                    "_standard_source_scan",
+                    return_value=(
+                        {"metrics": metrics},
+                        {"new_errors": [], "new_warnings": [], "stale": []},
+                    ),
+                ),
+                patch("tools.decomp_status.read_match_statuses", return_value=statuses),
+                patch.object(
+                    campaigns, "effective_code_by_address", return_value=sizes
+                ),
+                patch.object(
+                    campaigns,
+                    "_source_paths",
+                    return_value=[Path("src/Targets.cpp")],
+                ),
+                patch.object(campaigns, "_standard_input_hashes", return_value={}),
+                patch.object(campaigns, "_delivery_artifacts", return_value={}),
+            ):
+                with self.assertRaisesRegex(ValueError, "not a valid function"):
+                    campaigns._run_delivery_validation(
+                        campaign(["0x00401000"]), root, {"code": {}}
+                    )
+                result = campaigns._run_delivery_validation(
+                    campaign(["0x00402000", "0x00403000"]),
+                    root,
+                    {"code": {}},
+                )
+
+        self.assertEqual(len(result["commands"]), 4)
+
     def test_baseline_attachment_rechecks_a_coverage_map_defect(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
