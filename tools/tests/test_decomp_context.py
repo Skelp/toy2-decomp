@@ -410,6 +410,94 @@ class ContextPackTests(unittest.TestCase):
             context.normalize_disassembly(shuffled, decoder=decoder),
         )
 
+    def test_normalization_accepts_equivalent_x86_condition_aliases(self):
+        aliases = [
+            ("jz", "je", "7400"),
+            ("jnz", "jne", "7500"),
+            ("jc", "jb", "7200"),
+            ("jnae", "jb", "7200"),
+            ("jnb", "jae", "7300"),
+            ("jnc", "jae", "7300"),
+            ("jna", "jbe", "7600"),
+            ("jnbe", "ja", "7700"),
+            ("jpe", "jp", "7a00"),
+            ("jpo", "jnp", "7b00"),
+            ("jnge", "jl", "7c00"),
+            ("jnl", "jge", "7d00"),
+            ("jng", "jle", "7e00"),
+            ("jnle", "jg", "7f00"),
+            ("loopz", "loope", "e100"),
+            ("loopnz", "loopne", "e000"),
+        ]
+        for alias, capstone_name, encoded in aliases:
+            for artifact_name, decoded_name in (
+                (alias.upper(), capstone_name),
+                (capstone_name.upper(), alias),
+            ):
+                with self.subTest(
+                    artifact=artifact_name,
+                    decoded=decoded_name,
+                ):
+                    code = bytes.fromhex(encoded)
+                    decoded = context.DecodedInstruction(
+                        0x401000,
+                        len(code),
+                        decoded_name,
+                        "0x401002",
+                        direct_target=0x401002,
+                    )
+                    result = context.normalize_disassembly(
+                        [
+                            {
+                                "address": "00401000",
+                                "bytes": encoded,
+                                "mnemonic": artifact_name,
+                            }
+                        ],
+                        decoder=lambda _code, _address: decoded,
+                    )
+
+                    self.assertEqual(result[0]["mnemonic"], decoded_name)
+
+    def test_normalization_accepts_the_zipline_jz_artifact(self):
+        decoded = context.DecodedInstruction(
+            0x4359DF,
+            6,
+            "je",
+            "0x435f18",
+            direct_target=0x435F18,
+        )
+
+        result = context.normalize_disassembly(
+            [
+                {
+                    "address": "004359df",
+                    "bytes": "0f8433050000",
+                    "mnemonic": "JZ",
+                    "operands": ["0x00435f18"],
+                }
+            ],
+            decoder=lambda _code, _address: decoded,
+        )
+
+        self.assertEqual(result[0]["mnemonic"], "je")
+        self.assertEqual(result[0]["direct_target"], "0x00435F18")
+
+    def test_normalization_rejects_a_different_x86_condition(self):
+        decoded = context.DecodedInstruction(0x401000, 2, "jne", "0x401002")
+
+        with self.assertRaisesRegex(context.ContextError, "artifact row"):
+            context.normalize_disassembly(
+                [
+                    {
+                        "address": "00401000",
+                        "bytes": "7400",
+                        "mnemonic": "JZ",
+                    }
+                ],
+                decoder=lambda _code, _address: decoded,
+            )
+
     def test_straight_line_call_and_return_stay_in_one_block(self):
         rows = [
             self.instruction(0x401000, "mov"),

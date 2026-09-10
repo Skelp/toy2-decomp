@@ -57,6 +57,26 @@ _CONDITIONAL_JUMPS = frozenset(
 _UNCONDITIONAL_JUMPS = frozenset({"jmp", "ljmp"})
 _RETURNS = frozenset({"ret", "retf", "iret", "iretd"})
 
+# Map equivalent x86 condition aliases to the spellings that Capstone emits.
+_X86_MNEMONIC_ALIASES: Final = {
+    "jc": "jb",
+    "jnae": "jb",
+    "jnb": "jae",
+    "jnc": "jae",
+    "jz": "je",
+    "jnz": "jne",
+    "jna": "jbe",
+    "jnbe": "ja",
+    "jpe": "jp",
+    "jpo": "jnp",
+    "jnge": "jl",
+    "jnl": "jge",
+    "jng": "jle",
+    "jnle": "jg",
+    "loopz": "loope",
+    "loopnz": "loopne",
+}
+
 
 class ContextError(RuntimeError):
     """Report that a context pack cannot be built or trusted."""
@@ -213,6 +233,11 @@ def _address(value: object) -> int:
     return address
 
 
+def _normalized_mnemonic(value: object) -> str:
+    mnemonic = str(value).strip().lower()
+    return _X86_MNEMONIC_ALIASES.get(mnemonic, mnemonic)
+
+
 def _artifact_decoder(rows: list[object]) -> Decoder:
     by_address = {
         _address(row.get("address", row.get("addr"))): row
@@ -312,7 +337,9 @@ def normalize_disassembly(
         if instruction.address != address or instruction.size != len(code):
             raise ContextError(f"instruction 0x{address:08X} does not match its bytes")
         retail_mnemonic = str(row.get("mnemonic", "")).strip().lower()
-        if retail_mnemonic and retail_mnemonic != instruction.mnemonic.lower():
+        if retail_mnemonic and _normalized_mnemonic(
+            retail_mnemonic
+        ) != _normalized_mnemonic(instruction.mnemonic):
             raise ContextError(f"instruction 0x{address:08X} does not match its artifact row")
         result.append(
             {
