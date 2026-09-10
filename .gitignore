@@ -48,7 +48,11 @@ __pycache__/
 .agents/skills/*
 !.agents/skills/continue-decomp/
 !.agents/skills/continue-decomp/SKILL.md
+!.agents/skills/continue-decomp/agents/
+!.agents/skills/continue-decomp/agents/openai.yaml
 !.agents/skills/decomp-expert/
 !.agents/skills/decomp-expert/SKILL.md
 !.agents/skills/decomp-expert/agents/
 !.agents/skills/decomp-expert/agents/openai.yaml
+!.agents/skills/ste-writing/
+!.agents/skills/ste-writing/SKILL.md

@@ -1,4 +1,4 @@
 interface:
   display_name: "Decomp Expert"
-  short_description: "Complete one evidence-bound writer campaign"
-  default_prompt: "Use $decomp-expert to complete one doctor-bound Toy Story 2 writer campaign and return its hash-valid finalization receipt."
+  short_description: "Complete one reconstruction campaign"
+  default_prompt: "Use $decomp-expert to complete one Toy Story 2 reconstruction campaign under the attempt budget."

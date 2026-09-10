@@ -1,4 +1,4 @@
 interface:
   display_name: "Continue Decompilation"
-  short_description: "Supervise audited reconstruction campaigns"
-  default_prompt: "Use $continue-decomp to supervise Toy Story 2 reconstruction through two read-only scouts, one writer, and receipt-bound delivery."
+  short_description: "Run reconstruction campaigns"
+  default_prompt: "Use $continue-decomp to run Toy Story 2 reconstruction campaigns from the candidate queue."
