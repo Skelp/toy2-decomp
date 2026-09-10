@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_REPORT = ROOT / "build" / "decomp-current-data-report.json"
+DEFAULT_REPORT = ROOT / "build" / "decomp-data-report.json"
 
 
 def parse_address(value: str) -> int:
