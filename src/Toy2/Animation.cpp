@@ -179,13 +179,13 @@ namespace Toy2
 					transform->translation.y = (((nextSample->translationY >> 2) - (sample->translationY >> 2)) * fraction >> 16) + (sample->translationY >> 2);
 					transform->translation.z = (((nextSample->translationZ >> 2) - (sample->translationZ >> 2)) * fraction >> 16) + (sample->translationZ >> 2);
 
-					uint32_t packedRotation = sample->packedRotationLow | (sample->packedRotationHigh << 16);
+					int32_t packedRotation = (sample->packedRotationHigh << 16) + sample->packedRotationLow;
 					g_keyframeRotation.angles.x = (int16_t)((packedRotation >> 18) & 0xffc) | (sample->translationX & 3);
 					g_keyframeRotation.angles.y = (int16_t)((packedRotation >> 8) & 0xffc) | (sample->translationY & 3);
 					g_keyframeRotation.angles.z = (int16_t)((packedRotation & 0x3ff) << 2) | (sample->translationZ & 3);
 					Nu3D::Math::SetRotationXYZ(&g_keyframeRotation.angles, &g_keyframeRotation.matrix);
 
-					packedRotation = nextSample->packedRotationLow | (nextSample->packedRotationHigh << 16);
+					packedRotation = (nextSample->packedRotationHigh << 16) + nextSample->packedRotationLow;
 					g_nextKeyframeRotation.angles.x = (int16_t)((packedRotation >> 18) & 0xffc) | (nextSample->translationX & 3);
 					g_nextKeyframeRotation.angles.y = (int16_t)((packedRotation >> 8) & 0xffc) | (nextSample->translationY & 3);
 					g_nextKeyframeRotation.angles.z = (int16_t)((packedRotation & 0x3ff) << 2) | (nextSample->translationZ & 3);
@@ -215,7 +215,7 @@ namespace Toy2
 					transform->translation.x = sample->translationX >> 2;
 					transform->translation.y = sample->translationY >> 2;
 					transform->translation.z = sample->translationZ >> 2;
-					uint32_t packedRotation = sample->packedRotationLow | (sample->packedRotationHigh << 16);
+					int32_t packedRotation = (sample->packedRotationHigh << 16) + sample->packedRotationLow;
 					transform->rotationAngles.x = (int16_t)((packedRotation >> 18) & 0xffc) | (sample->translationX & 3);
 					transform->rotationAngles.y = (int16_t)((packedRotation >> 8) & 0xffc) | (sample->translationY & 3);
 					transform->rotationAngles.z = (int16_t)((packedRotation & 0x3ff) << 2) | (sample->translationZ & 3);
