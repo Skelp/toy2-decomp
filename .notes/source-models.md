@@ -105,3 +105,9 @@ include the compiled score or the evidence that rejected the model.
 
 - Mode: refinement.
 - Ruled out: Move each X and Z actor-coordinate load into both sign branches to match the retail load and branch order. This model was not scored because the first-score gate expired.
+
+<!-- campaign-id: 8df14259-cc8b-4d29-9319-0f5902730299 -->
+## 2026-09-10 | Toy2 | 0x0049C420
+
+- Mode: refinement.
+- Ruled out: Cache g_controlConfigFirstVisibleRow once before the visible-row loop. Use it with a separate row index and ControlConfigEntry cursor to calculate each Y position. The score increased from 63.41 percent to 64.74 percent. The typed-data oracle rejected relocation and data-section regressions.
