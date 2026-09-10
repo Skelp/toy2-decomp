@@ -33,6 +33,17 @@ order of operations.
 7. Pivot at most twice inside the subsystem with
    `tools/decomp campaigns add-target --address NEW`.
 
+## Batches and handoff
+
+A long context re-reads every earlier step on every call, so a campaign runs
+as batches of about four attempts, each in a fresh context. At the end of a
+batch write `build/decomp-cache/handoff/ADDRESS.md` (under 40 lines): best
+score and attempt, whether the tree holds the best model, every idea tried
+with its score, the open hypotheses in priority order, and the source lines
+touched. A resumed batch reads that file, the region index and only the
+regions it needs, and continues from the open hypotheses. Finish the
+campaign only when the assignment says so.
+
 ## Finish
 
 Source result: convert each completed `STUB` to `FUNCTION`; update the map
