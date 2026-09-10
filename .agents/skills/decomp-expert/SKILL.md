@@ -11,21 +11,38 @@ order of operations.
 ## Procedure
 
 1. Confirm the branch, the assigned mode and addresses, and that
-   `tools/decomp campaigns status` shows the campaign started.
-2. `tools/decomp evidence ADDRESS`. Read the strings section first, then
-   callers, callees, globals and the decompilation. Search
-   `tools/decomp notes QUERY --source models` and `--source codegen`.
+   `tools/decomp campaigns status` shows the campaign started. The contract is
+   already in your context; do not re-read `AGENTS.md` or this file.
+2. `tools/decomp evidence ADDRESS` (once; `--full` only for a named gap). Read
+   the strings section first, then callers, callees, globals and the
+   decompilation. Search `tools/decomp notes QUERY --source models`.
 3. Establish the ABI, data model, control flow, ownership and supported names
    before writing the body. Choose the translation unit from evidence.
-4. Write the simplest plausible C++. `clang-format -i` the file.
-   `tools/decomp bc ADDRESS`. Read the attempt line and the first mismatch
-   windows. Change one source-level idea per cycle. Keep the best model; the
-   best-scoring patch is saved under `build/decomp-cache/best/`.
-5. Stop at the budget line, at five attempts without a half-point gain, or when
+4. `tools/decomp bc ADDRESS` for the baseline. It prints the score and a region
+   index (one line per mismatch region with its source lines). Read
+   `build/decomp-diffs/ADDRESS.compact.txt` once, in one call; never page
+   through the raw diff. After each later `bc`, read only the index and
+   `tools/decomp bc ADDRESS --hunk N` for the regions you are working on.
+5. Write the simplest plausible C++; format only the changed lines
+   (`clang-format -i --lines=A:B FILE`). One source-level idea per `bc`. Batch
+   independent reads into one command. Keep the best model; the best-scoring
+   patch is saved under `build/decomp-cache/best/`.
+6. Stop at the budget line, at five attempts without a half-point gain, or when
    no trial tests a concrete model question. For data work rebuild and run
    `tools/decomp data ADDRESS` instead of `bc`.
-6. Pivot at most twice inside the subsystem with
+7. Pivot at most twice inside the subsystem with
    `tools/decomp campaigns add-target --address NEW`.
+
+## Batches and handoff
+
+A long context re-reads every earlier step on every call, so a campaign runs
+as batches of about four attempts, each in a fresh context. At the end of a
+batch write `build/decomp-cache/handoff/ADDRESS.md` (under 40 lines): best
+score and attempt, whether the tree holds the best model, every idea tried
+with its score, the open hypotheses in priority order, and the source lines
+touched. A resumed batch reads that file, the region index and only the
+regions it needs, and continues from the open hypotheses. Finish the
+campaign only when the assignment says so.
 
 ## Finish
 
