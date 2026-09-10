@@ -3534,6 +3534,31 @@ class CampaignTests(unittest.TestCase):
         self.assertEqual(summary["forecast_band_hits"], 0)
         self.assertEqual(summary["forecast_lower_bound_hits"], 0)
 
+    def test_summary_excludes_a_zero_forecast_lower_bound(self):
+        record = {
+            "schema_version": 3,
+            "record_type": "campaign",
+            "campaign_id": "zero-lower-bound",
+            "timestamp": "2026-08-03T12:10:00+00:00",
+            "started_at": "2026-08-03T12:00:00+00:00",
+            "ended_at": "2026-08-03T12:10:00+00:00",
+            "mode": "refinement",
+            "lane": "production",
+            "result": "no-source",
+            "minutes": 10,
+            "effective_bytes": 0,
+            "prediction": {
+                "expected_retained_bytes": 100,
+                "lower_bound_retained_bytes": 0,
+            },
+        }
+        summary = campaigns.summarize_records([record], window=1)
+        self.assertEqual(summary["forecast_count"], 1)
+        self.assertEqual(summary["forecast_lower_bound_count"], 0)
+        self.assertEqual(summary["forecast_lower_bound_hits"], 0)
+        self.assertEqual(summary["forecast_lower_bound_coverage"], 0)
+        self.assertIsNone(summary["forecast_lower_bound_hit_rate"])
+
     def test_summary_includes_selection_and_delivery_latency(self):
         records = [
             {

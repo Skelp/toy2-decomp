@@ -32,7 +32,7 @@ import os
 import re
 import sys
 from collections import defaultdict, deque
-from dataclasses import asdict, dataclass, field, fields, replace
+from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -1562,10 +1562,21 @@ def estimate_yield(candidate: Candidate, queue: str | None) -> None:
     )
 
 
-def _production_ranking_yield_rate(candidate: Candidate) -> float:
-    ranking_candidate = replace(candidate)
-    estimate_yield(ranking_candidate, "refinement")
-    return float(ranking_candidate.expected_bytes_per_minute or 0.0)
+def _production_forecast_yield_rate(candidate: Candidate) -> float:
+    expected_bytes = candidate.expected_retained_bytes
+    expected_minutes = candidate.expected_minutes
+    if (
+        isinstance(expected_bytes, bool)
+        or not isinstance(expected_bytes, (int, float))
+        or not math.isfinite(float(expected_bytes))
+        or expected_bytes <= 0.0
+        or isinstance(expected_minutes, bool)
+        or not isinstance(expected_minutes, (int, float))
+        or not math.isfinite(float(expected_minutes))
+        or expected_minutes <= 0.0
+    ):
+        return 0.0
+    return float(expected_bytes) / float(expected_minutes)
 
 
 def _record_time(record: dict[str, object]) -> str:
@@ -2770,7 +2781,8 @@ def select(
         chosen.sort(
             key=lambda item: (
                 item.map_defect,
-                -_production_ranking_yield_rate(item),
+                _production_forecast_yield_rate(item) <= 0.0,
+                -_production_forecast_yield_rate(item),
                 item.active_penalty_attempts,
                 -item.rank,
                 item.address,

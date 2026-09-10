@@ -9734,7 +9734,7 @@ def summarize_records(
                 <= forecast_retained
                 <= float(expected) * 1.5
             )
-        if isinstance(lower, (int, float)) and lower >= 0:
+        if isinstance(lower, (int, float)) and lower > 0:
             lower_bound_count += 1
             lower_bound_hits += int(forecast_retained >= float(lower))
         before = record.get("terminal_before")
