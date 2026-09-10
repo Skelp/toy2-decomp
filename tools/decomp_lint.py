@@ -220,6 +220,21 @@ class BaselineEntry:
         return self.owner, self.rule, self.subject, self.fingerprint
 
 
+def _macro_definition_lines(text: str) -> set[int]:
+    """Return the 1-based line numbers inside #define bodies, continuations included."""
+
+    lines: set[int] = set()
+    continued = False
+    for number, raw in enumerate(text.splitlines(), 1):
+        stripped = raw.strip()
+        if continued or stripped.startswith("#define"):
+            lines.add(number)
+            continued = stripped.endswith("\\")
+        else:
+            continued = False
+    return lines
+
+
 def _mask_source(text: str) -> str:
     """Replace comments, strings, and inactive #if 0 text while preserving positions."""
 
@@ -700,9 +715,14 @@ def check_text(path: Path, text: str) -> list[Finding]:
         )
 
     # More than two gotos is advisory. Cleanup/error functions remain possible.
+    # A goto inside a #define body belongs to the macro's users, not to the
+    # function that happens to precede the definition, so it is not counted.
+    macro_lines = _macro_definition_lines(text)
     goto_by_owner: dict[str, list[re.Match[str]]] = {}
     for match in re.finditer(r"\bgoto\s+([A-Za-z_]\w*)\s*;", masked):
         line, _ = _line_column(text, match.start())
+        if line in macro_lines:
+            continue
         owner = _owner_at(owners, line)
         if owner.kind == "function":
             goto_by_owner.setdefault(owner.key, []).append(match)

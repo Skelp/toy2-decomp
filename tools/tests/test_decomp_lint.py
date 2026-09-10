@@ -265,6 +265,21 @@ class ControlFlowTests(unittest.TestCase):
         )
         self.assertNotIn("unstructured-control-flow", rules(source))
 
+    def test_gotos_inside_a_macro_body_are_not_charged_to_the_preceding_function(self):
+        # A shared edge-walker macro defined between two functions expands into
+        # its users; its literal gotos are not the previous function's flow.
+        source = (
+            "// FUNCTION: TOY2 0x00401000\n"
+            "void f(int value) { use(value); }\n"
+            "#define WALK(a) \\\n"
+            "    if (a == 1) goto first; \\\n"
+            "    if (a == 2) goto second; \\\n"
+            "    goto third;\n"
+            "// FUNCTION: TOY2 0x00402000\n"
+            "void g(int value) { WALK(value); first: use(1); second: use(2); third: use(3); }\n"
+        )
+        self.assertNotIn("unstructured-control-flow", rules(source))
+
 
 class LayoutAssertionTests(unittest.TestCase):
     def test_qualified_nested_struct_size_assertion_is_accepted(self):
