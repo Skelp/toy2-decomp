@@ -18,8 +18,12 @@ include the compiled score or the evidence that rejected the model.
 
 - Targets: `0x00465180` and `0x00474C80`.
 - Confirmed: The dispatch slots use blend-75 behavior from adjacent formats.
-- Ruled out: The analogue pilots scored 19.98 percent and 15.09 percent.
-- Score limit: Stale map gaps limited the raw scores for both pilots.
+- Superseded: The analogue pilots scored 19.98 percent and 15.09 percent
+  against stale map gaps of 7,936 and 5,824 bytes. Ceiling-relative, those
+  scores are about 56 percent and 31 percent of the 2,824-byte and 2,813-byte
+  bodies. The 2026-09-08 map repair set both ceilings above 99 percent, so the
+  analogue model is not ruled out. Retry it from the current
+  `RasterizeBlend75TexturedPolygon555` form.
 
 ## 2026-09-08 | BarnEncounter | `0x00424490`
 

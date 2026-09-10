@@ -16,5 +16,9 @@ namespace Nu3D
 	}
 
 	// STUB: TOY2 0x004B9D70
-	void DrawTimingGraph();
+	void DrawTimingGraph()
+	{
+		// The retail body is not reconstructed yet. An empty definition gives
+		// the comparison a symbol to score.
+	}
 }
