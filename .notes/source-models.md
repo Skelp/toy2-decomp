@@ -99,3 +99,9 @@ include the compiled score or the evidence that rejected the model.
 - Mode: refinement.
 - Ruled out: Inline second-loop position arguments and use one shared rotation call. This model reduced similarity to 64.96 percent.
 - Ruled out: Cache first-loop sine and cosine values before coordinate transforms. This model reduced similarity to 49.13 percent.
+
+<!-- campaign-id: 1ed08bbe-172c-42a1-aea4-3a060f2a4ae0 -->
+## 2026-09-10 | Toy2::Buzz | 0x004359D0
+
+- Mode: refinement.
+- Ruled out: Move each X and Z actor-coordinate load into both sign branches to match the retail load and branch order. This model was not scored because the first-score gate expired.
