@@ -123,10 +123,10 @@ function. A move must accompany source progress. Keep a large initializer (a
 
 `validate --mode MODE --target ADDRESS --staged` rejects: a regression of any
 untouched function, loss of terminal status, new lint debt, a coverage target
-below 50 percent, a refinement that did not improve similarity, reach terminal
-status or remove debt. A refinement that raises a function that was below 50
-percent is accepted even if it stays below 50, because a doubled score is real
-progress. Typed-data deltas print as warnings on code campaigns. Coverage must
+below 50 percent (a complete body over 2,048 bytes passes at a quarter of its
+ceiling, as PROVISIONAL), a refinement that did not improve similarity, reach
+terminal status or remove debt. A refinement that raises a sub-50 function is
+accepted below 50. Typed-data deltas print as warnings. Coverage must
 convert a `STUB` or unstarted function to `FUNCTION` and change C++; a
 metadata-only commit is not progress. Run `tools/decomp check` after a map
 edit; `tools/decomp report` and `tools/decomp sync` once per session. Never

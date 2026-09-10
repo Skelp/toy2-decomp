@@ -178,6 +178,48 @@ class VerifyRegressionTests(unittest.TestCase):
             ])
             self.assertEqual(self.validate(baseline, current, {0x401000}), 0)
 
+    def test_large_coverage_body_is_accepted_provisionally_below_50_percent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 0.0, "stub": True}
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.37}
+            ])
+            with mock.patch.object(
+                VERIFY, "provisional_coverage_ok", return_value=(True, "2270 retail bytes")
+            ):
+                self.assertEqual(self.validate(baseline, current, {0x401000}), 0)
+            with mock.patch.object(
+                VERIFY, "provisional_coverage_ok", return_value=(False, "300 retail bytes")
+            ):
+                self.assertEqual(self.validate(baseline, current, {0x401000}), 1)
+
+    def test_provisional_coverage_needs_a_large_body_and_a_quarter_of_the_ceiling(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            functions_map = root / "functions_map.txt"
+            functions_map.write_text(
+                "0x00401000 Big\n0x00402000 Small\n0x00402100 Next\n", encoding="utf-8"
+            )
+            sizes = root / "sizes.json"
+            sizes.write_text(
+                json.dumps([
+                    {"address": "00401000", "size": 4000},
+                    {"address": "00402000", "size": 256},
+                ]),
+                encoding="utf-8",
+            )
+            accepted, why = VERIFY.provisional_coverage_ok(0x401000, 0.30, functions_map, sizes)
+            self.assertTrue(accepted, why)
+            self.assertIn("4000 retail bytes", why)
+            # 4000 of a 4096-byte gap: the ceiling lifts 0.24 raw above 0.25.
+            self.assertTrue(VERIFY.provisional_coverage_ok(0x401000, 0.245, functions_map, sizes)[0])
+            self.assertFalse(VERIFY.provisional_coverage_ok(0x401000, 0.20, functions_map, sizes)[0])
+            self.assertFalse(VERIFY.provisional_coverage_ok(0x402000, 0.40, functions_map, sizes)[0])
+
     def test_target_source_debt_still_fails(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -36,6 +36,31 @@ from tools.decomp_resources import (  # noqa: E402
 )
 
 TOOL_ARTIFACTS = ROOT / "tools" / "Resources" / "tool_artifacts.tsv"
+FUNCTIONS_MAP = ROOT / "tools" / "Resources" / "functions_map.txt"
+FUNCTION_SIZES = ROOT / "build" / "decomp-function-sizes.json"
+# A coverage body this large is accepted below 50 percent when it reaches this
+# share of its score ceiling: the STUB becomes a FUNCTION and refinement
+# continues later instead of discarding thousands of retail bytes of work.
+PROVISIONAL_COVERAGE_MIN_SIZE = 2048
+PROVISIONAL_COVERAGE_MIN_SCORE = 0.25
+
+
+def provisional_coverage_ok(
+    address: int, matching: float, functions_map: Path, function_sizes: Path
+) -> tuple[bool, str]:
+    """Return (accepted, reason) for a coverage target that scores below 50 percent."""
+
+    import decomp_utils  # noqa: PLC0415  (decomp_utils imports this module)
+    from tools.decomp_diff import read_score_ceiling  # noqa: PLC0415
+
+    try:
+        size = decomp_utils.read_mapped_sizes(functions_map, function_sizes).get(address, 0)
+    except (OSError, ValueError, KeyError, TypeError):
+        size = 0
+    ceiling = read_score_ceiling(address, functions_map, function_sizes) or 1.0
+    relative = matching / ceiling if ceiling else matching
+    accepted = size >= PROVISIONAL_COVERAGE_MIN_SIZE and relative >= PROVISIONAL_COVERAGE_MIN_SCORE
+    return accepted, f"{size} retail bytes, {relative * 100:.1f}% of the score ceiling"
 
 
 class LintDebtChange(NamedTuple):
@@ -951,6 +976,8 @@ def validate(
     accounting_correction: str | None = None,
     staged: bool = False,
     resource: ResourceId | None = None,
+    functions_map: Path = FUNCTIONS_MAP,
+    function_sizes: Path = FUNCTION_SIZES,
 ) -> int:
     baseline = read_match_statuses(baseline_path)
     current = read_match_statuses(current_path)
@@ -1065,6 +1092,15 @@ def validate(
                 and status.matching > before.matching + 1e-9
             )
         )
+        if not final_acceptable and mode == "coverage":
+            # A complete body for a large function is worth keeping below 50
+            # percent: it converts a STUB and its refinement continues later.
+            accepted, why = provisional_coverage_ok(
+                address, status.matching, functions_map, function_sizes
+            )
+            if accepted:
+                print(f"0x{address:08X}  accepted as PROVISIONAL coverage ({why})")
+                final_acceptable = True
         if not final_acceptable:
             problems.append(
                 f"0x{address:08X}: target finishes below 50% similarity"
