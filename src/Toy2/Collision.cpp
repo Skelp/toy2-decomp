@@ -3139,11 +3139,207 @@ namespace Nu3D
 {
 	namespace Collision
 	{
-		// STUB: TOY2 0x0048B750
+		// The sweep keeps its hit normal as an 8-byte record: the retail copies a plane
+		// normal as two dwords, taking the word after the 6-byte Vector3I16. Declared here
+		// rather than in Numerics.h because the shared declaration shifts VC6 register
+		// allocation in unrelated level functions.
+		struct Vector4I16
+		{
+			int16_t x;
+			int16_t y;
+			int16_t z;
+			int16_t w;
+		};
+
+		int32_t SweepAgainstEdges(int32_t* nearestFraction,
+			int32_t* startDistance,
+			int32_t* endDistance,
+			Vector3I16* hitNormal,
+			const Vector4I* start,
+			const Vector4I* movement,
+			int32_t radius);
+
+		// FUNCTION: TOY2 0x0048B750 [PROVISIONAL]
 		int32_t SweepAgainstCandidates(const Vector4I* movement, Vector4I* position, int32_t radius)
 		{
-			// The retail body is not reconstructed yet. An empty definition gives
-			// the comparison a symbol to score.
+			int16_t hitCount = 0;
+			int32_t nearestFraction = 0x7FFFFFFF;
+			int32_t startDistance;
+			int32_t endDistance;
+			union
+			{
+				Vector3I16 xyz;
+				Vector4I16 xyzw;
+			} hitNormal;
+			int16_t preparedMeshIndex = -1;
+			Vector3I localStart;
+			Vector3I localEnd;
+
+			for (int32_t triangleIndex = Toy2::Collision::g_collisionTriangleCount - 1; triangleIndex >= 0; triangleIndex--)
+			{
+				int16_t meshIndex = Toy2::Collision::g_collisionTriangleMeshIndices[triangleIndex];
+				Toy2::Collision::PackedCollisionFace* face = Toy2::Collision::g_collisionTriangles[triangleIndex];
+				if (meshIndex != preparedMeshIndex)
+				{
+					Vector4I start = *position;
+					Vector4I delta = *movement;
+					preparedMeshIndex = meshIndex;
+					if (Toy2::Collision::g_collisionMeshInstances[meshIndex].typeFlags == Toy2::Collision::COLLISION_MESH_MOVING
+						&& (Toy2::Platform::g_platformStates[Toy2::Collision::g_collisionMeshInstances[meshIndex].platformIdx].flags
+							   & Toy2::Platform::PLATFORM_FLAG_ROTATED)
+							!= 0)
+					{
+						Toy2::Platform::PlatformState& platform =
+							Toy2::Platform::g_platformStates[Toy2::Collision::g_collisionMeshInstances[meshIndex].platformIdx];
+						Vector3I16 angles;
+						angles.x = platform.rotationAnglesFixed.x >> 2;
+						angles.y = platform.rotationAnglesFixed.y >> 2;
+						angles.z = platform.rotationAnglesFixed.z >> 2;
+						const Matrix3x3I16& rotation = Toy2::Animation::g_keyframeRotation.matrix;
+						Math::SetRotationXYZ(&angles, &Toy2::Animation::g_keyframeRotation.matrix);
+						int32_t relativeX = start.x - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.x;
+						int32_t relativeY = start.y - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.y;
+						int32_t relativeZ = start.z - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.z;
+						localStart.x = (rotation.m00 * relativeX + rotation.m10 * relativeY + rotation.m20 * relativeZ) / 0x1000;
+						localStart.y = (rotation.m01 * relativeX + rotation.m11 * relativeY + rotation.m21 * relativeZ) / 0x1000;
+						localStart.z = (rotation.m02 * relativeX + rotation.m12 * relativeY + rotation.m22 * relativeZ) / 0x1000;
+						relativeX = delta.x - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.x + start.x;
+						relativeY = delta.y - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.y + start.y;
+						relativeZ = delta.z - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.z + start.z;
+						localEnd.x = (rotation.m00 * relativeX + rotation.m10 * relativeY + rotation.m20 * relativeZ) / 0x1000;
+						localEnd.y = (rotation.m01 * relativeX + rotation.m11 * relativeY + rotation.m21 * relativeZ) / 0x1000;
+						localEnd.z = (rotation.m02 * relativeX + rotation.m12 * relativeY + rotation.m22 * relativeZ) / 0x1000;
+					}
+					else
+					{
+						localStart.x = start.x - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.x;
+						localStart.y = start.y - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.y;
+						localStart.z = start.z - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.z;
+						localEnd.x = delta.x - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.x + start.x;
+						localEnd.y = delta.y - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.y + start.y;
+						localEnd.z = delta.z - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.z + start.z;
+					}
+				}
+
+				int32_t endX = localEnd.x >> 5;
+				int32_t endY = localEnd.y >> 5;
+				int32_t endZ = localEnd.z >> 5;
+				const Vector3I16& normal = face->firstPlaneNormal;
+				int32_t endDistanceFromPlane =
+					((endX - face->vertex0.x) * normal.x + (endY - face->vertex0.y) * normal.y + (endZ - face->vertex0.z) * normal.z >> 14) - radius / 32;
+				if (endDistanceFromPlane < 0)
+				{
+					int32_t startDistanceFromPlane =
+						(((localStart.x >> 5) - face->vertex0.x) * normal.x + ((localStart.y >> 5) - face->vertex0.y) * normal.y
+								+ ((localStart.z >> 5) - face->vertex0.z) * normal.z
+							>> 14)
+						- radius / 32;
+					if (startDistanceFromPlane >= 0)
+					{
+						int32_t distanceRange = startDistanceFromPlane - endDistanceFromPlane;
+						int32_t hitX = localStart.x + (localEnd.x - localStart.x) * startDistanceFromPlane / distanceRange - (normal.x * radius >> 14);
+						int32_t hitY = localStart.y + (localEnd.y - localStart.y) * startDistanceFromPlane / distanceRange - (normal.y * radius >> 14);
+						int32_t hitZ = localStart.z + (localEnd.z - localStart.z) * startDistanceFromPlane / distanceRange - (normal.z * radius >> 14);
+						if (Math::InsidePolLines((hitX >> 5) - face->vertex0.x,
+								(hitY >> 5) - face->vertex0.y,
+								(hitZ >> 5) - face->vertex0.z,
+								face->vertex1Offset.x,
+								face->vertex1Offset.y,
+								face->vertex1Offset.z,
+								face->vertex2Offset.x,
+								face->vertex2Offset.y,
+								face->vertex2Offset.z,
+								&face->firstPlaneNormal,
+								radius)
+							!= 0)
+						{
+							int32_t fraction = (startDistanceFromPlane << 14) / distanceRange;
+							if (fraction < nearestFraction)
+							{
+								startDistance = startDistanceFromPlane;
+								endDistance = endDistanceFromPlane;
+								nearestFraction = fraction;
+								hitNormal.xyzw = *reinterpret_cast<const Vector4I16*>(&face->firstPlaneNormal);
+								hitCount++;
+							}
+						}
+					}
+				}
+
+				if (face->secondPlaneNormal.y != 0x7FFF)
+				{
+					const Vector3I16& secondNormal = face->secondPlaneNormal;
+					int32_t endDistanceFromPlane =
+						(((endX - face->vertex1Offset.x) - face->vertex0.x) * secondNormal.x
+								+ ((endY - face->vertex1Offset.y) - face->vertex0.y) * secondNormal.y
+								+ ((endZ - face->vertex1Offset.z) - face->vertex0.z) * secondNormal.z
+							>> 14)
+						- radius / 32;
+					if (endDistanceFromPlane < 0)
+					{
+						int32_t startDistanceFromPlane =
+							((((localStart.x >> 5) - face->vertex1Offset.x) - face->vertex0.x) * secondNormal.x
+									+ (((localStart.y >> 5) - face->vertex1Offset.y) - face->vertex0.y) * secondNormal.y
+									+ (((localStart.z >> 5) - face->vertex1Offset.z) - face->vertex0.z) * secondNormal.z
+								>> 14)
+							- radius / 32;
+						if (startDistanceFromPlane >= 0)
+						{
+							int32_t distanceRange = startDistanceFromPlane - endDistanceFromPlane;
+							int32_t hitX =
+								localStart.x + (localEnd.x - localStart.x) * startDistanceFromPlane / distanceRange - (secondNormal.x * radius >> 14);
+							int32_t hitY =
+								localStart.y + (localEnd.y - localStart.y) * startDistanceFromPlane / distanceRange - (secondNormal.y * radius >> 14);
+							int32_t hitZ =
+								localStart.z + (localEnd.z - localStart.z) * startDistanceFromPlane / distanceRange - (secondNormal.z * radius >> 14);
+							if (Math::InsidePolLines(((hitX >> 5) - face->vertex1Offset.x) - face->vertex0.x,
+									((hitY >> 5) - face->vertex1Offset.y) - face->vertex0.y,
+									((hitZ >> 5) - face->vertex1Offset.z) - face->vertex0.z,
+									face->vertex3Offset.x - face->vertex1Offset.x,
+									face->vertex3Offset.y - face->vertex1Offset.y,
+									face->vertex3Offset.z - face->vertex1Offset.z,
+									face->vertex2Offset.x - face->vertex1Offset.x,
+									face->vertex2Offset.y - face->vertex1Offset.y,
+									face->vertex2Offset.z - face->vertex1Offset.z,
+									&face->secondPlaneNormal,
+									radius)
+								!= 0)
+							{
+								int32_t fraction = (startDistanceFromPlane << 14) / distanceRange;
+								if (fraction < nearestFraction)
+								{
+									startDistance = startDistanceFromPlane;
+									endDistance = endDistanceFromPlane;
+									nearestFraction = fraction;
+									hitNormal.xyzw = *reinterpret_cast<const Vector4I16*>(&secondNormal);
+									hitCount++;
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if (SweepAgainstEdges(&nearestFraction, &startDistance, &endDistance, &hitNormal.xyz, position, movement, radius) == 1)
+			{
+				hitCount++;
+			}
+
+			if (hitCount > 0)
+			{
+				int32_t distanceRange = startDistance - endDistance;
+				position->x += movement->x * startDistance / distanceRange;
+				position->y += movement->y * startDistance / distanceRange;
+				position->z += movement->z * startDistance / distanceRange;
+				Toy2::Collision::g_groundNormal.x = hitNormal.xyz.x;
+				Toy2::Collision::g_groundNormal.y = hitNormal.xyz.y;
+				Toy2::Collision::g_groundNormal.z = hitNormal.xyz.z;
+				return 1;
+			}
+
+			position->x += movement->x;
+			position->y += movement->y;
+			position->z += movement->z;
 			return 0;
 		}
 
@@ -3231,8 +3427,8 @@ namespace Nu3D
 			int32_t* startDistance,
 			int32_t* endDistance,
 			Vector3I16* hitNormal,
-			const Vector3I* start,
-			const Vector3I* movement,
+			const Vector4I* start,
+			const Vector4I* movement,
 			int32_t radius)
 		{
 			if (Toy2::Collision::g_collisionEdgeVertexCount == 0)

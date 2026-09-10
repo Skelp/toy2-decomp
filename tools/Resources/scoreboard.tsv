@@ -1,4 +1,4 @@
-# reccmp_head=f9ef6b39 generated_by=report
+# reccmp_head=f9ef6b39 generated_by=validate
 address	size	matching	exact	effective	debt
 0x00401000	285	0.790698	0	0	0
 0x004011D0	2035	0.480315	0	0	0
@@ -522,7 +522,7 @@ address	size	matching	exact	effective	debt
 0x0048ACC0	2316	0.124642	0	0	0
 0x0048B640	29	1.000000	1	0	0
 0x0048B660	226	1.000000	1	0	0
-0x0048B750	2270	0.000000	0	0	0
+0x0048B750	2270	0.394696	0	0	0
 0x0048C030	2096	0.000000	0	0	0
 0x0048C860	3274	0.000000	0	0	0
 0x0048D530	3193	0.000000	0	0	0
