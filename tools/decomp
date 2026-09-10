@@ -31,10 +31,12 @@ build() {
     cmake --build build -- "-j${build_jobs}" || return
     (
         cd build
-        reccmp-project detect --what recompiled
+        reccmp-project detect --what recompiled 2> >(grep -v '^\[INFO\]' >&2)
     ) || return
 }
 
+# The reccmp "[INFO] Found ..." lines carry no signal for a writer, so only
+# warnings and errors reach the terminal.
 build_game() {
     if [[ ! -f build/build.ninja ]]; then
         configure || return
@@ -42,7 +44,7 @@ build_game() {
     cmake --build build --target toy2decomp -- "-j${build_jobs}" || return
     (
         cd build
-        reccmp-project detect --what recompiled
+        reccmp-project detect --what recompiled 2> >(grep -v '^\[INFO\]' >&2)
     ) || return
 }
 
@@ -77,7 +79,8 @@ write_comparison_report() {
     local output_name="$1"
     (
         cd build
-        reccmp-reccmp --target TOY2 --silent --no-color --json "$output_name"
+        reccmp-reccmp --target TOY2 --silent --no-color --json "$output_name" \
+            2> >(grep -v '^\[INFO\]' >&2)
     ) >/dev/null
 }
 
@@ -615,30 +618,54 @@ case "$command" in
         score "$@"
         ;;
     bc)
+        # bc ADDRESS            build, compare, log the attempt, print the region index
+        # bc ADDRESS --hunk N   print one mismatch region from the saved diff (no build)
+        # bc ADDRESS --hunks    print the region index from the saved diff (no build)
+        # bc ADDRESS --compact  print the compact diff (changed lines only, no build)
+        # bc ADDRESS --full     build, compare, then print the raw diff
         full=0
+        view=()
         bc_args=()
-        for argument in "$@"; do
-            if [[ $argument == "--full" ]]; then full=1; else bc_args+=("$argument"); fi
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --full) full=1 ;;
+                --hunks|--compact) view=("$1") ;;
+                --hunk) view=(--hunk "$2"); shift ;;
+                *) bc_args+=("$1") ;;
+            esac
+            shift
         done
         set -- "${bc_args[@]}"
         if [[ $# -ne 1 ]]; then
-            echo "Usage: tools/decomp bc [--full] <address>" >&2
+            echo "Usage: tools/decomp bc [--full | --hunks | --hunk N | --compact] <address>" >&2
             exit 2
         fi
         if [[ ! $1 =~ ^0x[0-9A-Fa-f]{1,8}$ ]]; then
             echo "error: bc needs an address such as 0x00401230" >&2
             exit 2
         fi
-        build_game
         mkdir -p build/decomp-diffs
         diff_path="build/decomp-diffs/${1}.txt"
-        (cd build && reccmp-reccmp --target TOY2 --no-color --verbose "$1") > "$diff_path"
+        compact_path="build/decomp-diffs/${1}.compact.txt"
+        if [[ ${#view[@]} -gt 0 ]]; then
+            if [[ ! -f $diff_path ]]; then
+                echo "error: no saved diff for $1; run tools/decomp bc $1 first" >&2
+                exit 2
+            fi
+            exec python tools/decomp_diff.py "$diff_path" "${view[@]}"
+        fi
+        build_game
+        (cd build && reccmp-reccmp --target TOY2 --no-color --verbose "$1") \
+            > "$diff_path" 2> "$diff_path.stderr" || true
+        grep -v '^\[INFO\]' "$diff_path.stderr" >&2 || true
+        rm -f "$diff_path.stderr"
         diff_args=(
             "$diff_path"
             --address "$1"
             --functions-map tools/Resources/functions_map.txt
             --function-sizes build/decomp-function-sizes.json
             --source-root src
+            --write-compact "$compact_path"
         )
         if [[ $full -eq 1 ]]; then
             python tools/decomp_diff.py "${diff_args[@]}" --full

@@ -13,9 +13,7 @@ instruction diff against the retail `toy2.exe` is the only judge of a match.
 
 A function is terminal when reccmp marks it exact or effective and it has no
 unsuppressed source-debt finding. Provisional, `STUB` and unstarted functions
-are open work. Progress means a validated source commit; the scoreboard
-(`tools/decomp throughput`) is the measure, not self-reported minutes.
-`toy2_gameplay_context.md` gives game context for an unfamiliar subsystem.
+are open work. Progress is a validated source commit (`tools/decomp throughput`).
 
 ## The loop
 
@@ -34,8 +32,10 @@ git commit && git push origin agent/continuous
 
 `campaigns start` saves the baseline that `validate` and `record` compare
 against, so run it before the first edit. `bc` builds, compares one function,
-saves the full diff under `build/decomp-diffs/` and logs the attempt. `validate`
-is the only gate: it rebuilds, compares, checks lint and rejects regressions.
+logs the attempt and prints a region index; read the compact diff
+`build/decomp-diffs/ADDRESS.compact.txt` once, then `bc ADDRESS --hunk N` per
+region (no rebuild). The raw diff is mostly unchanged context. `validate` is
+the only gate: it rebuilds, compares, checks lint and rejects regressions.
 `record` measures the result from fresh reports and appends the ledger row.
 Commit the source, the ledger and `tools/Resources/scoreboard.tsv` together,
 because a commit is what preserves progress; push after every campaign.

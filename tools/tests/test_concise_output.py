@@ -30,16 +30,17 @@ class ConciseOutputTests(unittest.TestCase):
         self.assertEqual(evidence.decomp_lines(body, True, None), body.splitlines())
         self.assertEqual(evidence.decomp_lines(body, False, (10, 12)), ["line 9", "line 10", "line 11"])
 
-    def test_diff_caps_windows_and_full_file_is_lossless(self):
-        lines = [f"context {number}" for number in range(300)]
-        for number in (20, 120, 220, 260): lines[number] = "! mismatch"
+    def test_diff_summary_is_an_index_and_full_file_is_lossless(self):
+        lines = [f"0x{0x401000 + number:x} : context {number}" for number in range(300)]
+        for number in (20, 120, 220, 260):
+            lines[number] = f"0x{0x401000 + number:x} : -mov eax, edi"
         text = "Similarity: 50%\n" + "\n".join(lines) + "\n"
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "diff.txt"
             path.write_text(text)
             summary = diff.summarize(text, path)
-            self.assertLessEqual(len(summary.splitlines()), 160)
-            self.assertEqual(summary.count("--- mismatch"), 3)
+            self.assertLessEqual(len(summary.splitlines()), 8)
+            self.assertIn("Regions: 4; changed lines: 4 of", summary)
             self.assertEqual(path.read_text(), text)
 
     def test_diff_shows_score_ceiling_and_ceiling_relative_score(self):
