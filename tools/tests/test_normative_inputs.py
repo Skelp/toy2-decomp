@@ -322,5 +322,194 @@ class NormativeInputTests(unittest.TestCase):
         self.assertTrue(set(targets) <= unfinished)
 
 
+CONTRACT_LINE_LIMITS = {"AGENTS.md": 160, "docs/decomp-agent.md": 40}
+SKILL_LINE_LIMIT = 100
+USAGE_BODY_LINE_LIMIT = 80
+TOOL_MODULE_LINE_BUDGET = 20000
+TEST_LINE_BUDGET = 10000
+TOOL_MODULES = {
+    "annotations",
+    "attempts",
+    "binary",
+    "candidates",
+    "campaigns",
+    "data",
+    "dependencies",
+    "diff",
+    "discover",
+    "evidence",
+    "lint",
+    "notes",
+    "original_names",
+    "resources",
+    "similar",
+    "status",
+    "throughput",
+    "verify",
+}
+CEREMONY_WORDS = (
+    "receipt",
+    "doctor",
+    "brief",
+    "forecast",
+    "deadline",
+    "cohort",
+    "lane",
+    "fork_turns",
+    "spawn_agent",
+    "followup_task",
+    "interrupt_agent",
+)
+CEREMONY_PATTERN = re.compile(r"\b(" + "|".join(CEREMONY_WORDS) + r")\b", re.IGNORECASE)
+COMMAND_MENTION = re.compile(r"tools/decomp ([a-z][a-z0-9-]*)")
+CASE_LABEL = re.compile(r'^\s*([\w"|-]+)\)\s*$', re.MULTILINE)
+EXPERIMENT_COLUMNS = 8
+EXPERIMENT_OUTCOMES = {"PENDING", "KEEP", "REVERTED"}
+
+
+def line_count(path: Path) -> int:
+    return len(path.read_text(encoding="utf-8").splitlines())
+
+
+def relative(path: Path) -> str:
+    return path.relative_to(ROOT).as_posix()
+
+
+def skill_files() -> list[Path]:
+    return sorted((ROOT / ".agents" / "skills").glob("*/SKILL.md"))
+
+
+def contract_files() -> list[Path]:
+    """AGENTS.md, CLAUDE.md when present, and every skill: the agent contract."""
+    files = [ROOT / "AGENTS.md"]
+    if (ROOT / "CLAUDE.md").is_file():
+        files.append(ROOT / "CLAUDE.md")
+    return files + skill_files()
+
+
+def usage_body(script: str) -> str | None:
+    match = re.search(r"^usage\(\) \{\n(.*?)^\}", script, re.MULTILINE | re.DOTALL)
+    return None if match is None else match.group(1)
+
+
+def wrapper_case_labels(script: str) -> set[str]:
+    """Every NAME that has a ``NAME)`` case label in tools/decomp."""
+    labels: set[str] = set()
+    for match in CASE_LABEL.finditer(script):
+        labels.update(label.strip('"') for label in match.group(1).split("|"))
+    return labels
+
+
+def first_lines(text: str, pattern: re.Pattern) -> dict[str, int]:
+    """Map each distinct match (lower-cased) to the first line it appears on."""
+    found: dict[str, int] = {}
+    for number, line in enumerate(text.splitlines(), 1):
+        for word in pattern.findall(line):
+            found.setdefault(word.lower(), number)
+    return found
+
+
+def read_experiment_table(path: Path) -> tuple[list[str], list[tuple[int, list[str]]]]:
+    """Return the header columns and the (line number, cells) data rows.
+
+    The header is the first line naming an ``outcome`` column, whether it is a
+    ``# ...`` comment (the repository's TSV convention) or a plain first row.
+    """
+    header: list[str] = []
+    rows: list[tuple[int, list[str]]] = []
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        comment = line.startswith("#")
+        cells = [cell.strip() for cell in line.lstrip("#").strip().split("\t")]
+        if not header and "outcome" in [cell.lower() for cell in cells]:
+            header = [cell.lower() for cell in cells]
+        elif not comment:
+            rows.append((number, line.split("\t")))
+    return header, rows
+
+
+class AntiRegrowthTests(unittest.TestCase):
+    """The agent contract and the tooling must stay small and honest."""
+
+    def test_contract_size_limits(self):
+        for name, limit in CONTRACT_LINE_LIMITS.items():
+            with self.subTest(file=name):
+                count = line_count(ROOT / name)
+                self.assertLessEqual(count, limit, f"{name} is {count} lines; limit {limit}")
+        for skill in skill_files():
+            with self.subTest(file=relative(skill)):
+                count = line_count(skill)
+                self.assertLessEqual(
+                    count, SKILL_LINE_LIMIT, f"{relative(skill)} is {count} lines; limit {SKILL_LINE_LIMIT}"
+                )
+        with self.subTest(file="tools/decomp usage()"):
+            body = usage_body((ROOT / "tools" / "decomp").read_text(encoding="utf-8"))
+            self.assertIsNotNone(body, "tools/decomp has no usage() function")
+            count = len(body.splitlines())
+            self.assertLessEqual(
+                count, USAGE_BODY_LINE_LIMIT, f"usage() body is {count} lines; limit {USAGE_BODY_LINE_LIMIT}"
+            )
+        budgets = (
+            ("tools/decomp_*.py", TOOL_MODULE_LINE_BUDGET),
+            ("tools/tests/*.py", TEST_LINE_BUDGET),
+        )
+        for pattern, budget in budgets:
+            with self.subTest(file=pattern):
+                total = sum(line_count(path) for path in ROOT.glob(pattern))
+                self.assertLessEqual(total, budget, f"{pattern} totals {total} lines; budget {budget}")
+
+    def test_tool_module_allowlist(self):
+        modules = {path.stem.removeprefix("decomp_") for path in (ROOT / "tools").glob("decomp_*.py")}
+        self.assertTrue(modules)
+        self.assertLessEqual(
+            modules,
+            TOOL_MODULES,
+            f"tools/decomp_*.py modules outside the allowlist: {sorted(modules - TOOL_MODULES)}",
+        )
+
+    def test_contract_has_no_ceremony_vocabulary(self):
+        for path in contract_files():
+            with self.subTest(file=relative(path)):
+                hits = first_lines(path.read_text(encoding="utf-8"), CEREMONY_PATTERN)
+                self.assertEqual(
+                    hits, {}, f"{relative(path)} uses ceremony vocabulary (word: first line): {hits}"
+                )
+
+    def test_contract_names_only_existing_commands(self):
+        labels = wrapper_case_labels((ROOT / "tools" / "decomp").read_text(encoding="utf-8"))
+        self.assertIn("help", labels, "could not parse the case labels of tools/decomp")
+        for path in contract_files():
+            with self.subTest(file=relative(path)):
+                mentioned = first_lines(path.read_text(encoding="utf-8"), COMMAND_MENTION)
+                unknown = {name: line for name, line in mentioned.items() if name not in labels}
+                self.assertEqual(
+                    unknown,
+                    {},
+                    f"{relative(path)} names commands tools/decomp lacks (command: first line): {unknown}",
+                )
+
+    def test_tooling_experiments_rows_are_well_formed(self):
+        path = ROOT / "tools" / "Resources" / "tooling-experiments.tsv"
+        if not path.is_file():
+            self.skipTest(f"{relative(path)} is not present")
+        header, rows = read_experiment_table(path)
+        self.assertIn("outcome", header, f"{relative(path)} needs a header row naming the outcome column")
+        self.assertEqual(
+            len(header), EXPERIMENT_COLUMNS, f"{relative(path)} header has {len(header)} columns; expected 8"
+        )
+        outcome = header.index("outcome")
+        for number, cells in rows:
+            with self.subTest(line=number):
+                self.assertEqual(
+                    len(cells), EXPERIMENT_COLUMNS, f"line {number} has {len(cells)} columns; expected 8"
+                )
+                self.assertIn(
+                    cells[outcome],
+                    EXPERIMENT_OUTCOMES,
+                    f"line {number} outcome {cells[outcome]!r} is not one of {sorted(EXPERIMENT_OUTCOMES)}",
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

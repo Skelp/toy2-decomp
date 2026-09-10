@@ -261,8 +261,10 @@ validate() {
 
     build
     write_comparison_report decomp-current-report.json
-    if [[ $mode == data || $mode == resource ]]; then
+    local with_data_reports=0
+    if [[ $mode == data || $mode == resource || -f build/decomp-baseline-data-report.json ]]; then
         write_data_report decomp-current-data-report.json
+        with_data_reports=1
     fi
     local verify_args=(
         validate
@@ -286,7 +288,7 @@ validate() {
     if [[ -n $resource ]]; then
         verify_args+=(--resource "$resource")
     fi
-    if [[ $mode == data || $mode == resource ]]; then
+    if [[ $with_data_reports -eq 1 ]]; then
         verify_args+=(
             --baseline-data build/decomp-baseline-data-report.json
             --current-data build/decomp-current-data-report.json
@@ -296,6 +298,8 @@ validate() {
         verify_args+=(--accounting-correction "$accounting_correction")
     fi
     python tools/decomp_verify.py "${verify_args[@]}"
+    python tools/decomp_verify.py scoreboard build/decomp-current-report.json \
+        tools/Resources/scoreboard.tsv --generated-by validate
     for target in "${targets[@]}"; do
         python tools/decomp_campaigns.py first-score --address "$target" --quiet
     done
@@ -384,6 +388,8 @@ report() {
     cat "$report_summary"
 
     refresh_function_sizes
+    python tools/decomp_verify.py scoreboard "$report_json" \
+        tools/Resources/scoreboard.tsv --generated-by report
 
     python tools/generate-decomp-data-report.py \
         --original original/toy2.exe \
@@ -432,84 +438,33 @@ Commands:
   report [file]     Generate the self-contained HTML decompilation dashboard
   session-summary   Summarize selected targets against the saved baseline
   progress [--json] [scope]  Show annotation progress
+  throughput [args] Git-derived throughput meter (--experiments, --cap-check)
   check             Verify functions_map.txt is sorted, deduplicated, named, in-range
   run [args]        Run the recompiled toy2.exe through Wine
   shell             Start a shell with the decompilation environment active
   sync [args]       Import matched functions/types/globals into Ghidra via reccmp
 
-`candidates` reads the retail binary, committed files, and build reports. It
-does not call Ghidra or reccmp. `evidence` makes bounded Ghidra queries:
-  tools/decomp candidates --why
-  tools/decomp candidates --coverage --why
-  tools/decomp candidates --refine --why
-  tools/decomp candidates --refine --yield --why
-  tools/decomp campaigns summary
-  tools/decomp candidates --diagnose
-  tools/decomp candidates --for 0x00401230 --why
-  tools/decomp candidates --stubs --limit 10
-  tools/decomp candidates Nu3D --leaves --why
-  tools/decomp discover
-  tools/decomp discover --all
-  tools/decomp defer 0x00401230 --kind layout --blocked-by 0x00405670 \
-    --reason "needs the producer layout"
-  tools/decomp evidence 0x00403640
-  tools/decomp evidence --unmapped 0x00403640
-  tools/decomp evidence 0x00403640 --disasm
-  tools/decomp evidence 0x00403640 --decomp-range 80:160
-  tools/decomp evidence 0x00403640 --full
-
-`score` avoids the assembly diff when you only need the percentage:
-  tools/decomp score 0x00403640 0x004B99F0
-
-Start campaign measurement before the evidence preflight. Record the result
-after the final source state is ready:
+The loop (see AGENTS.md): candidates -> campaigns start -> evidence -> edit ->
+bc (repeat) -> validate --staged -> campaigns record -> commit -> push.
+  tools/decomp candidates --refine --yield --why      # or --coverage --why
+  tools/decomp candidates --for 0x00401230 --why      # explain one target
   tools/decomp campaigns start --mode refinement --address 0x00403640 \
     --subsystem Animation
-  tools/decomp campaigns status
-  tools/decomp campaigns start --mode coverage --family --address 0x00465180 \
-    --expected-minutes 24 --expected-retained-bytes 120
-  tools/decomp campaigns start --mode resource --resource 2,127,2057 \
-    --expected-minutes 20 --expected-retained-bytes 77864
+  tools/decomp evidence 0x00403640 [--disasm | --unmapped | --full]
+  tools/decomp bc 0x00403640          # logs the attempt, saves the best patch
+  tools/decomp validate --mode refinement --target 0x00403640 --staged
   tools/decomp campaigns record --result source
-  tools/decomp campaigns record --result no-source \
-    --model "The tested loop form scored 20 percent."
-  tools/decomp campaigns abort --reason "The user stopped the campaign."
-  tools/decomp campaigns add-target --address 0x004038E0
+  tools/decomp campaigns record --result no-source --model "rejected model"
   tools/decomp campaigns evidence --address 0x00403640 --kind analogue \
-    --note "A matching retail sibling now supplies the loop form."
+    --note "new evidence that clears a zero-yield penalty"
+  tools/decomp campaigns status | summary | abort --reason TEXT | add-target
 
-Routine output is bounded. `candidates` and `discover` show 10 rows.
-`blockers` shows 20 rows. Use `--limit 0` or `--all` for all rows.
-`evidence` shows 12 rows per category and 120 decompilation lines. Use
-`--full` for all evidence. `bc` saves the complete diff in
-build/decomp-diffs and prints three mismatch windows. Use `bc --full` or
-`compare --verbose` for the complete comparison. `notes` shows eight matches.
-
-`lint` measures source plausibility, which the comparison cannot see. An exact
-match that still states byte offsets is a transliteration, not a
-reconstruction:
-  tools/decomp lint                 # all of src/
-  tools/decomp lint --staged        # only what you are about to commit
-  tools/decomp lint --show all      # include the reviewed legacy backlog
-  tools/decomp lint --explain RULE  # rationale and required source form
-  tools/decomp lint --format json   # structured findings for other tools
-
-Reviewed old findings are in .notes/lint-baseline.tsv. They remain visible but
-do not stop unrelated work. New errors and stale baseline rows fail the gate.
-See .notes/lint-rules.md for the rule and suppression policy.
-
-`names` regenerates .notes/original-names.md, the developers' own structure and
-field names recovered from the retail assert strings. Those names outrank any
-name you would invent.
-
-`sync` runs reccmp's headless Ghidra importer (`reccmp-ghidra-import`) against
-the local Ghidra project. Extra arguments are forwarded to the importer, e.g.
-  tools/decomp sync --debug
-The Ghidra project location is read from the `ghidra` CLI configuration.
-
-TOY2_BUILD_JOBS sets the build parallelism for one command. The default is 4.
-Set TOY2_LOCAL_BUILD_JOBS in .decomp-local for this checkout. See
-docs/linux-decomp.md.
+Output is bounded: `candidates` and `discover` show 10 rows (`--limit 0` or
+`--all` for all), `evidence` 12 rows per category (`--full` for all), `bc`
+three mismatch windows (`bc --full` for the whole diff). `lint` measures source
+plausibility (`--staged`, `--explain RULE`, `--format json`); new errors fail
+validate. `throughput` reads git and tools/Resources/scoreboard.tsv.
+TOY2_BUILD_JOBS sets build parallelism (TOY2_LOCAL_BUILD_JOBS in .decomp-local).
 EOF
 }
 
@@ -690,6 +645,7 @@ case "$command" in
         else
             python tools/decomp_diff.py "${diff_args[@]}"
         fi
+        python tools/decomp_attempts.py attempt --address "$1" --diff "$diff_path" || true
         python tools/decomp_campaigns.py first-score --address "$1" --quiet
         ;;
     baseline)
@@ -726,6 +682,9 @@ case "$command" in
         fi
         exec python tools/decomp_verify.py session-summary \
             build/decomp-baseline-report.json build/decomp-report-data.json "$@"
+        ;;
+    throughput)
+        exec python tools/decomp_throughput.py "$@"
         ;;
     progress)
         if [[ ${1:-} == "--json" ]]; then

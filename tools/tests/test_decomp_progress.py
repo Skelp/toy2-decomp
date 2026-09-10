@@ -113,6 +113,26 @@ class ProgressBreakdownTests(unittest.TestCase):
         self.assertAlmostEqual(metrics["refinement_gap_bytes"], 3)
         self.assertEqual(metrics["source_debt_functions"], 1)
 
+    def test_one_byte_ghidra_sizes_are_kept(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            functions_map = root / "functions_map.txt"
+            functions_map.write_text(
+                "0x00449090 Nullsub3\n0x0044DD7F Next\n0x0044E000 Last\n",
+                encoding="utf-8",
+            )
+            sizes_path = root / "sizes.json"
+            sizes_path.write_text(json.dumps({"data": [
+                {"address": "0x00449090", "size": 1},
+                {"address": "0x0044DD7F", "size": 0},
+            ]}), encoding="utf-8")
+            sizes = decomp_utils.read_mapped_sizes(functions_map, sizes_path)
+            # A one-byte Ghidra body no longer absorbs the 19,695-byte map gap.
+            self.assertEqual(sizes[0x449090], 1)
+            # A zero-size row still falls back to the map gap.
+            self.assertEqual(sizes[0x44DD7F], 0x44E000 - 0x44DD7F)
+            self.assertEqual(sizes[0x44E000], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

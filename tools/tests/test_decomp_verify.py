@@ -459,7 +459,7 @@ class VerifyRegressionTests(unittest.TestCase):
         self.assertEqual(source_only.removed_errors, 0)
         self.assertEqual(source_only.stale_rows, 1)
 
-    def test_refinement_below_50_must_cross_the_gate(self):
+    def test_refinement_below_50_accepts_a_strict_improvement(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "src").mkdir()
@@ -468,6 +468,33 @@ class VerifyRegressionTests(unittest.TestCase):
             ])
             current = self.write_report(root, "after.json", [
                 {"address": "0x401000", "matching": 0.49}
+            ])
+            self.assertEqual(
+                self.validate(baseline, current, {0x401000}, mode="refinement"), 0
+            )
+            # Coverage keeps the 50% floor for the same scores.
+            self.assertEqual(
+                self.validate(baseline, current, {0x401000}, mode="coverage"), 1
+            )
+
+    def test_refinement_below_50_rejects_flat_or_regressed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 0.2}
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.2}
+            ])
+            self.assertEqual(
+                self.validate(baseline, current, {0x401000}, mode="refinement"), 1
+            )
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 0.3}
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.25}
             ])
             self.assertEqual(
                 self.validate(baseline, current, {0x401000}, mode="refinement"), 1
@@ -984,6 +1011,115 @@ class VerifyRegressionTests(unittest.TestCase):
                 ),
                 1,
             )
+
+    def test_code_campaign_prints_typed_data_regressions_as_warnings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            baseline = self.write_report(root, "before.json", [
+                {"address": "0x401000", "matching": 0.0, "stub": True}
+            ])
+            current = self.write_report(root, "after.json", [
+                {"address": "0x401000", "matching": 0.9}
+            ])
+            baseline_data = self.write_data_report(root, "before-data.json", [
+                {"original_address": 0x501000, "size": 4, "matched_bytes": 4, "score": 1.0}
+            ])
+            current_data = self.write_data_report(root, "after-data.json", [
+                {"original_address": 0x501000, "size": 4, "matched_bytes": 0, "score": 0.0}
+            ])
+            for mode in ("coverage", "refinement"):
+                with self.subTest(mode=mode):
+                    errors = io.StringIO()
+                    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(errors):
+                        result = self.validate(
+                            baseline,
+                            current,
+                            {0x401000},
+                            mode=mode,
+                            baseline_data=baseline_data,
+                            current_data=current_data,
+                        )
+                    self.assertEqual(result, 0)
+                    self.assertIn(
+                        "warning: 0x00501000: data bytes regressed", errors.getvalue()
+                    )
+                    self.assertIn(
+                        "warning: .data: explained section bytes regressed",
+                        errors.getvalue(),
+                    )
+                    self.assertNotIn("validation failed", errors.getvalue())
+
+    def test_scoreboard_writes_shared_format(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src"
+            source.mkdir()
+            (source / "test.cpp").write_text(
+                "// FUNCTION: TOY2 0x00401000 [MATCHED]\nvoid First() {}\n"
+                "// FUNCTION: TOY2 0x00401010 [EFFECTIVE]\nint Second(int value) { return value + 1; }\n"
+                "// FUNCTION: TOY2 0x00401040 [PROVISIONAL]\n"
+                "void Third(char* value) { *(int*)((char*)value + 4) = 1; }\n"
+                "// STUB: TOY2 0x00401080\nvoid Fourth() {}\n",
+                encoding="utf-8",
+            )
+            functions_map = root / "functions_map.txt"
+            functions_map.write_text(
+                "0x00401000 First\n0x00401010 Second\n0x00401040 Third\n"
+                "0x00401080 Fourth\n0x00401100 Fifth\n",
+                encoding="utf-8",
+            )
+            sizes = root / "sizes.json"
+            sizes.write_text(json.dumps({"data": [
+                {"address": "0x00401000", "size": 12},
+                {"address": "0x00401080", "size": 1},
+                {"address": "0x00401100", "size": 32},
+            ]}), encoding="utf-8")
+            report = self.write_report(root, "report.json", [
+                {"address": "0x401000", "matching": 1.0},
+                {"address": "0x401010", "matching": 0.8, "effective": True},
+                {"address": "0x401040", "matching": 0.25},
+                {"address": "0x401080", "matching": 0.3, "stub": True},
+            ])
+            output = root / "Resources" / "scoreboard.tsv"
+            with mock.patch.object(VERIFY, "reccmp_short_head", return_value="abc1234"):
+                VERIFY.write_scoreboard(
+                    report, output, functions_map, sizes, source, "report"
+                )
+            lines = output.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(lines[0], "# reccmp_head=abc1234 generated_by=report")
+            self.assertEqual(lines[1], "address\tsize\tmatching\texact\teffective\tdebt")
+            self.assertEqual(lines[2:], [
+                "0x00401000\t12\t1.000000\t1\t0\t0",
+                "0x00401010\t48\t1.000000\t0\t1\t0",
+                "0x00401040\t64\t0.250000\t0\t0\t2",
+                "0x00401080\t1\t0.000000\t0\t0\t0",
+                "0x00401100\t32\t0.000000\t0\t0\t0",
+            ])
+            rows = [line.split("\t") for line in lines[2:]]
+            effective_bytes = sum(int(row[1]) * float(row[2]) for row in rows)
+            self.assertAlmostEqual(effective_bytes, 12 + 48 + 64 * 0.25)
+            terminal = [
+                row[0]
+                for row in rows
+                if (row[3] == "1" or row[4] == "1") and row[5] == "0"
+            ]
+            self.assertEqual(terminal, ["0x00401000", "0x00401010"])
+
+            cli_output = root / "cli.tsv"
+            argv = [
+                "decomp_verify.py", "scoreboard", str(report), str(cli_output),
+                "--functions-map", str(functions_map),
+                "--function-sizes", str(sizes),
+                "--source-root", str(source),
+                "--generated-by", "validate",
+            ]
+            with mock.patch.object(VERIFY, "reccmp_short_head", return_value="unknown"), \
+                 mock.patch.object(VERIFY.sys, "argv", argv):
+                self.assertEqual(VERIFY.main(), 0)
+            cli_lines = cli_output.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(cli_lines[0], "# reccmp_head=unknown generated_by=validate")
+            self.assertEqual(cli_lines[1:], lines[1:])
 
 
 if __name__ == "__main__":

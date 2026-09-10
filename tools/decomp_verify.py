@@ -418,6 +418,47 @@ def data_sections(payload: dict[str, object]) -> dict[str, dict]:
     }
 
 
+def _regressed(after: dict, before: dict, key: str) -> bool:
+    return float(after.get(key, 0)) + 1e-12 < float(before.get(key, 0))
+
+
+def typed_data_regression_problems(
+    baseline: dict[str, object], current: dict[str, object]
+) -> list[str]:
+    """Return every typed-data variable, section, and evidence-group regression."""
+
+    if not baseline or not current:
+        return ["a typed-data report is missing or invalid"]
+    problems: list[str] = []
+    after_variables = data_variables(current)
+    for address, before in data_variables(baseline).items():
+        after = after_variables.get(address)
+        if after is None:
+            problems.append(f"0x{address:08X}: data target disappeared")
+        elif _regressed(after, before, "matched_bytes"):
+            problems.append(f"0x{address:08X}: data bytes regressed")
+        elif _regressed(after, before, "score"):
+            problems.append(f"0x{address:08X}: data score regressed")
+    after_sections = data_sections(current)
+    for name, before in data_sections(baseline).items():
+        after = after_sections.get(name)
+        if after is None:
+            problems.append(f"{name}: scored section disappeared")
+        elif _regressed(after, before, "explained_bytes"):
+            problems.append(f"{name}: explained section bytes regressed")
+        elif _regressed(after, before, "score"):
+            problems.append(f"{name}: section score regressed")
+    for group_name in ("vtables", "imports", "relocations"):
+        before = baseline.get(group_name, {})
+        after = current.get(group_name, {})
+        key = "explained_bytes" if group_name == "vtables" else "matched_entries"
+        if isinstance(before, dict) and isinstance(after, dict) and _regressed(
+            after, before, key
+        ):
+            problems.append(f"{group_name}: data evidence regressed")
+    return problems
+
+
 def validate_resource_campaign(
     baseline_rows: list[dict[str, object]],
     current_rows: list[dict[str, object]],
@@ -1012,7 +1053,18 @@ def validate(
             f"0x{address:08X}  {verified:<11} raw {status.matching * 100:6.2f}%"
             + ("  reccmp-effective" if status.effective else "")
         )
-        final_acceptable = status.matching >= 0.5 or status.exact or status.effective
+        before = baseline.get(address)
+        final_acceptable = (
+            status.matching >= 0.5
+            or status.exact
+            or status.effective
+            or (
+                mode == "refinement"
+                and before is not None
+                and before.matching < 0.5
+                and status.matching > before.matching + 1e-9
+            )
+        )
         if not final_acceptable:
             problems.append(
                 f"0x{address:08X}: target finishes below 50% similarity"
@@ -1023,7 +1075,6 @@ def validate(
                 f"{', '.join(sorted(set(debt)))}"
             )
 
-        before = baseline.get(address)
         before_rules = baseline_debt.get(address, [])
         promoted = bool(
             before
@@ -1071,6 +1122,15 @@ def validate(
     if mode == "coverage" and has_baseline_state:
         if len(current_implemented) <= len(baseline_implemented):
             problems.append("coverage did not increase the implemented-function count")
+
+    if mode in ("coverage", "refinement") and (
+        baseline_data_path is not None or current_data_path is not None
+    ):
+        for warning in typed_data_regression_problems(
+            read_data_report(baseline_data_path),
+            read_data_report(current_data_path),
+        ):
+            print(f"warning: {warning}", file=sys.stderr)
 
     if mode in ("data", "resource"):
         if has_baseline_state:
@@ -1166,6 +1226,76 @@ def validate(
     return 0
 
 
+SCOREBOARD_HEADER = "address\tsize\tmatching\texact\teffective\tdebt"
+
+
+def reccmp_short_head() -> str:
+    """Return the short reccmp submodule revision, or "unknown"."""
+
+    submodule = ROOT / "external" / "submodules" / "reccmp"
+    if not (submodule / ".git").exists():
+        return "unknown"
+    result = subprocess.run(
+        ["git", "-C", str(submodule), "rev-parse", "--short", "HEAD"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    head = result.stdout.strip()
+    return head if result.returncode == 0 and head else "unknown"
+
+
+def scoreboard_rows(
+    report: Path, functions_map: Path, function_sizes: Path, source_root: Path
+) -> list[tuple[int, int, float, bool, bool, int]]:
+    """Score every mapped function as (address, size, matching, exact, effective, debt).
+
+    A STUB or a function absent from the report scores 0. The size is the Ghidra
+    snapshot size when it is at least one byte, else the gap to the next map address.
+    """
+
+    import decomp_utils  # noqa: PLC0415  (decomp_utils imports this module)
+
+    statuses = read_match_statuses(report)
+    state = source_state(source_root)
+    stubs = set(state["stub_addresses"])
+    debt = {int(address): len(rules) for address, rules in state["source_debt"].items()}
+    sizes = decomp_utils.read_mapped_sizes(functions_map, function_sizes)
+    rows = []
+    for address_text in decomp_utils.parse_functions_map(functions_map):
+        address = int(address_text, 16)
+        status = None if address in stubs else statuses.get(address)
+        exact = bool(status and status.exact)
+        effective = bool(status and status.effective)
+        matching = 1.0 if exact or effective else (status.matching if status else 0.0)
+        rows.append(
+            (address, sizes.get(address, 0), matching, exact, effective, debt.get(address, 0))
+        )
+    return rows
+
+
+def write_scoreboard(
+    report: Path,
+    output: Path,
+    functions_map: Path,
+    function_sizes: Path,
+    source_root: Path,
+    generated_by: str,
+) -> None:
+    """Write the shared per-function scoreboard TSV."""
+
+    lines = [f"# reccmp_head={reccmp_short_head()} generated_by={generated_by}", SCOREBOARD_HEADER]
+    for address, size, matching, exact, effective, debt in scoreboard_rows(
+        report, functions_map, function_sizes, source_root
+    ):
+        lines.append(
+            f"0x{address:08X}\t{size}\t{matching:.6f}\t{int(exact)}\t{int(effective)}\t{debt}"
+        )
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def parse_address(value: str) -> int:
     return int(value, 16)
 
@@ -1222,6 +1352,22 @@ def main() -> int:
     session_parser.add_argument("current", type=Path)
     session_parser.add_argument("targets", nargs="+", type=parse_address)
 
+    scoreboard_parser = subparsers.add_parser("scoreboard")
+    scoreboard_parser.add_argument("report", type=Path)
+    scoreboard_parser.add_argument("output", type=Path)
+    scoreboard_parser.add_argument(
+        "--functions-map",
+        type=Path,
+        default=ROOT / "tools" / "Resources" / "functions_map.txt",
+    )
+    scoreboard_parser.add_argument(
+        "--function-sizes",
+        type=Path,
+        default=ROOT / "build" / "decomp-function-sizes.json",
+    )
+    scoreboard_parser.add_argument("--source-root", type=Path, default=ROOT / "src")
+    scoreboard_parser.add_argument("--generated-by", default="report")
+
     args = parser.parse_args()
     if args.command == "metadata":
         write_metadata(args.output, args.report, args.data_report)
@@ -1243,6 +1389,16 @@ def main() -> int:
         return 0
     if args.command == "session-summary":
         return session_summary(args.baseline, args.current, args.targets)
+    if args.command == "scoreboard":
+        write_scoreboard(
+            args.report,
+            args.output,
+            args.functions_map,
+            args.function_sizes,
+            args.source_root,
+            args.generated_by,
+        )
+        return 0
     return validate(
         args.baseline,
         args.current,

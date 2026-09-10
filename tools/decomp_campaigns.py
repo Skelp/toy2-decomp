@@ -14,8 +14,10 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from statistics import median
 
 try:
+    from tools.decomp_attempts import attempts_directory, clear_attempts, read_stats
     from tools.decomp_resources import (
         format_resource,
         parse_resource,
@@ -25,6 +27,11 @@ try:
         staged_resource_source_problems,
     )
 except ModuleNotFoundError:  # Direct invocation uses tools/ as sys.path[0].
+    from decomp_attempts import (  # type: ignore[no-redef]
+        attempts_directory,
+        clear_attempts,
+        read_stats,
+    )
     from decomp_resources import (  # type: ignore[no-redef]
         format_resource,
         parse_resource,
@@ -906,6 +913,7 @@ def start_campaign(
         "resource_sources": resource_sources,
         "resource_sources_sha256": _snapshot_hash(resource_sources),
     }
+    clear_attempts(addresses, attempts_directory(worktree_root))
     write_state(path, state)
     return state
 
@@ -1455,6 +1463,18 @@ def _finish_campaign_finalization(
     return item
 
 
+def _attempt_stats(
+    state: dict[str, object], addresses: list[str]
+) -> dict[str, object]:
+    """Sum the logged attempts of the targets; the best attempt is the first target's."""
+    directory = attempts_directory(Path(str(state.get("source_worktree_root", ROOT))))
+    stats = [read_stats(address, directory) for address in addresses]
+    return {
+        "attempts": sum(int(entry["attempts"]) for entry in stats),
+        "best_attempt": stats[0]["best_attempt"] if stats else None,
+    }
+
+
 def record_campaign(
     ledger_path: Path,
     state_path: Path,
@@ -1650,6 +1670,7 @@ def record_campaign(
 
     ended_at = timestamp(ended)
     campaign_id = _campaign_id(state)
+    attempt_stats = _attempt_stats(state, addresses)
     item: dict[str, object] = {
         "schema_version": 2,
         "record_type": "campaign",
@@ -1702,6 +1723,8 @@ def record_campaign(
         "expected_minutes": state.get("expected_minutes"),
         "expected_retained_bytes": state.get("expected_retained_bytes"),
         "deadlines": state.get("deadlines", {}),
+        "attempts": attempt_stats["attempts"],
+        "best_attempt": attempt_stats["best_attempt"],
     }
     state["campaign_id"] = campaign_id
     state["phase"] = "finalizing"
@@ -1874,6 +1897,13 @@ def print_summary(records: list[dict[str, object]], limit: int) -> None:
     ]
     if first_scores:
         print(f"Mean time to first score: {sum(first_scores) / len(first_scores):.1f} minutes")
+    attempts = [
+        int(item.get("attempts", 0) or 0)
+        for item in selected
+        if item.get("result") == "source" and int(item.get("attempts", 0) or 0) > 0
+    ]
+    if attempts:
+        print(f"Median attempts per source result: {median(attempts):g}")
     print("Recent results:")
     for item in selected:
         addresses = ",".join(str(value) for value in item.get("addresses", [])) or "-"

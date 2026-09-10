@@ -157,7 +157,7 @@ def read_mapped_sizes(
                 size = int(row.get("original_size", row.get("size", 0)))
             except (AttributeError, TypeError, ValueError):
                 continue
-            if size > 1:
+            if size >= 1:
                 sizes[address] = size
     for index, (address, _) in enumerate(entries[:-1]):
         sizes.setdefault(address, entries[index + 1][0] - address)

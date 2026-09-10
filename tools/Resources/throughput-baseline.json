@@ -1,0 +1,20 @@
+{
+  "head": "66dc443d63335ffe3e8c797ed0c8f00c5200e5c4",
+  "date": "2026-09-10",
+  "implemented": 1233,
+  "terminal": 749,
+  "terminal_bytes_reported": 116024,
+  "terminal_bytes_corrected": 96329,
+  "unresolved_bytes": 358294,
+  "families": {
+    "SoftwareRenderer": 174303,
+    "Collision": 42463,
+    "Interactions": 33939,
+    "DevDraw": 11353
+  },
+  "sep8_daytime_bytes_per_wall_hour": 185.0,
+  "aug2_3_bytes_per_wall_hour": 103.0,
+  "sep10_bytes_per_wall_hour": 14.6,
+  "cap_window_opens_after": "2026-09-10T17:30:00Z",
+  "notes": "rates are effective bytes per all-in wall hour; recompute after 10 new source rows"
+}

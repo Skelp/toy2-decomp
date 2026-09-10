@@ -1,0 +1,3 @@
+# id	opened_commit	opened_at	hypothesis	baseline_rate	review_after	outcome	note
+T-00	66dc443d63335ffe3e8c797ed0c8f00c5200e5c4	2026-09-10T17:30:00Z	Restore the Sep 8 loop and delete the apparatus	14.6	10	PENDING	baseline is the Sep 10 post-hardening rate
+T-01	66dc443d63335ffe3e8c797ed0c8f00c5200e5c4	2026-09-10T17:30:00Z	Monotone refinement rule (accept a strict score gain below 50%)	14.6	10	PENDING	

@@ -1506,6 +1506,71 @@ class CampaignTests(unittest.TestCase):
             self.assertFalse(state.exists())
             self.assertEqual(campaigns._read_records(ledger), [item])
 
+    def test_record_stores_the_attempt_counts_of_the_targets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = self.make_measured_campaign(
+                root, addresses=["0x00401000", "0x00402000"]
+            )
+            attempts_dir = root / "build" / "decomp-attempts"
+            attempts_dir.mkdir(parents=True)
+            (attempts_dir / "0x00401000.jsonl").write_text(
+                "".join(
+                    json.dumps({"n": index, "raw": raw}) + "\n"
+                    for index, raw in enumerate((40.0, 65.0, 60.0), 1)
+                ),
+                encoding="utf-8",
+            )
+            campaigns.mark_first_score(
+                paths["state"], "0x00401000", paths["started"] + timedelta(minutes=3)
+            )
+            item = campaigns.record_campaign(
+                paths["ledger"],
+                paths["state"],
+                paths["models"],
+                paths["after"],
+                paths["after_data"],
+                "source",
+                now=paths["started"] + timedelta(minutes=10),
+            )
+            self.assertEqual(item["attempts"], 3)
+            self.assertEqual(item["best_attempt"], 2)
+            recorded = campaigns.read_records(paths["ledger"])[-1]
+            self.assertEqual((recorded["attempts"], recorded["best_attempt"]), (3, 2))
+
+    def test_start_clears_the_attempt_files_of_the_campaign_targets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            attempts_dir = root / "build" / "decomp-attempts"
+            attempts_dir.mkdir(parents=True)
+            target = attempts_dir / "0x00401000.jsonl"
+            other = attempts_dir / "0x00402000.jsonl"
+            target.write_text('{"n": 1, "raw": 50.0}\n', encoding="utf-8")
+            other.write_text('{"n": 1, "raw": 50.0}\n', encoding="utf-8")
+            campaigns.start_campaign(
+                root / "state.json", "coverage", ["0x00401000"], "Test",
+                worktree_root=root,
+            )
+            self.assertFalse(target.exists())
+            self.assertTrue(other.exists())
+
+    def test_summary_reports_the_median_attempts_of_source_results(self):
+        records = [
+            {"mode": "coverage", "result": "source", "minutes": 5, "attempts": 3},
+            {"mode": "coverage", "result": "source", "minutes": 5, "attempts": 6},
+            {"mode": "coverage", "result": "no-source", "minutes": 5, "attempts": 9},
+            {"mode": "coverage", "result": "source", "minutes": 5},
+        ]
+        output = StringIO()
+        with redirect_stdout(output):
+            campaigns.print_summary(records, 0)
+        self.assertIn("Median attempts per source result: 4.5", output.getvalue())
+        output = StringIO()
+        with redirect_stdout(output):
+            campaigns.print_summary(records[2:], 0)
+        self.assertNotIn("Median attempts", output.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()
