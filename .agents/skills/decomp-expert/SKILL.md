@@ -49,8 +49,8 @@ and two or three regions are enough to choose the next idea. Batch independent r
   change a header or macro shared by other translation units: in the pilot such edits
   regressed untouched functions and cost 10 to 40 minutes at validate. A type the
   function needs goes file-local; note the header idea under OPEN.
-- Stop the batch after two consecutive attempts that gain under half a point, or at the
-  attempt count the assignment gives. Leave the tree holding the best model.
+- Stop the batch when `bc` prints a `stall:` line (three attempts without a half-point
+  gain) or at the attempt count the assignment gives. Leave the tree holding the best model.
 - Never run validate, record, commit or push unless the assignment says REPAIR.
 
 ## Handoff (end of every batch, under 40 lines, quoted heredoc, no python)
