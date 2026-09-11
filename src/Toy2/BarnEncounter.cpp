@@ -185,8 +185,6 @@ namespace Toy2
 			}
 
 			Actor::Toy2Actor* boss = &Actor::g_creatureActors[0];
-			Actor::Toy2Actor* firstMinion = &Actor::g_creatureActors[g_firstMinionActorIndex];
-			Actor::Toy2Actor* secondMinion = &Actor::g_creatureActors[g_secondMinionActorIndex];
 			{
 				AttachmentPosition orbitPositions[6];
 				int32_t bossWorldX = boss->pos.x;
@@ -286,7 +284,7 @@ namespace Toy2
 				}
 
 				g_phaseTimer -= Renderer::g_frameDelta;
-				if (g_phaseTimer < 1)
+				if (g_phaseTimer <= 0)
 				{
 					g_phaseTimer = 0;
 					boss->creatureRam->defenseMode = 7;
@@ -300,7 +298,7 @@ namespace Toy2
 				}
 				else if (g_encounterState == ENCOUNTER_WAVES)
 				{
-					uint16_t pulse = g_framePulsePhases.thirtyTwoTick;
+					int32_t pulse = g_framePulsePhases.sixtyFourTick;
 					if (pulse > 0x1F)
 						pulse = 0x3F - pulse;
 					boss->useTint = 1;
@@ -358,13 +356,91 @@ namespace Toy2
 					}
 				}
 
-				firstMinion = &Actor::g_creatureActors[g_firstMinionActorIndex];
-				secondMinion = &Actor::g_creatureActors[g_secondMinionActorIndex];
 				if (g_encounterState == ENCOUNTER_WAVES && g_phaseTimer != 0)
 				{
 					if (g_phaseTimer > 0x1E0)
 						g_phaseTimer = 600;
-					if (Camera::g_cutsceneDuration == 0)
+					if (Camera::g_cutsceneDuration != 0)
+					{
+						g_laserCooldown = 200;
+						Camera::g_cutsceneFocusPosition.x = orbitPositions[g_waveActorIndex - 1].position.x;
+						Camera::g_cutsceneFocusPosition.y = orbitPositions[g_waveActorIndex - 1].position.y;
+						Camera::g_cutsceneFocusPosition.z = orbitPositions[g_waveActorIndex - 1].position.z;
+						Camera::g_cutsceneCameraPosition.x =
+							Camera::g_cutsceneFocusPosition.x + Numerics::g_sinCosLUT[(Actor::g_creatureActors[g_waveActorIndex].yawAngle + 0x400) & 0xFFF] * 3;
+						Camera::g_cutsceneCameraPosition.z =
+							Camera::g_cutsceneFocusPosition.z + Numerics::g_sinCosLUT[(Actor::g_creatureActors[g_waveActorIndex].yawAngle - 0x800) & 0xFFF] * 3;
+						Camera::g_cutsceneCameraPosition.y = Camera::g_cutsceneFocusPosition.y;
+
+						if (Camera::g_cutsceneDuration < 300 && Actor::g_creatureActors[g_waveActorIndex].primaryAnimIdx == 0)
+						{
+							Actor::SetAnimation(&Actor::g_creatureActors[g_waveActorIndex], 1, 0x17);
+							Game::InitActor(&Actor::g_creatureActors[g_firstMinionActorIndex], 0);
+							Game::InitActor(&Actor::g_creatureActors[g_secondMinionActorIndex], 0);
+							Actor::g_creatureActors[g_firstMinionActorIndex].visibilityDistance = 0xAF0;
+							Actor::g_creatureActors[g_firstMinionActorIndex].scaleX = 0;
+							Actor::g_creatureActors[g_firstMinionActorIndex].scaleY = 0;
+							Actor::g_creatureActors[g_firstMinionActorIndex].scaleZ = 0;
+							Actor::g_creatureActors[g_firstMinionActorIndex].scalePivotHeight = -0x8000;
+							Actor::g_creatureActors[g_secondMinionActorIndex].visibilityDistance = 0xAF0;
+							Actor::g_creatureActors[g_secondMinionActorIndex].scaleX = 0;
+							Actor::g_creatureActors[g_secondMinionActorIndex].scaleY = 0;
+							Actor::g_creatureActors[g_secondMinionActorIndex].scaleZ = 0;
+							Actor::g_creatureActors[g_secondMinionActorIndex].scalePivotHeight = -0x8000;
+							AudioManager::PlaySoundEffect(0x86, &Actor::g_creatureActors[g_firstMinionActorIndex].pos);
+						}
+
+						if (Camera::g_cutsceneDuration > 0xB9 && Camera::g_cutsceneDuration < 300 && g_framePulseOutputs.twoTickCount != 0)
+						{
+							Vector4I particlePosition;
+							particlePosition.x = 0;
+							particlePosition.y = 400;
+							particlePosition.z = 0x4B0;
+							Actor::ResolveBoneAttachmentPos(&particlePosition, &Actor::g_creatureActors[g_waveActorIndex], 4);
+							if (g_framePulseOutputs.fourTick != 0)
+								Nu3D::Particles::SpawnFromPreset(particlePosition.x, particlePosition.y, particlePosition.z, 0x11, 2);
+							else
+								Nu3D::Particles::SpawnFromPreset(particlePosition.x, particlePosition.y, particlePosition.z, 4, 4);
+						}
+
+						if (Actor::g_creatureActors[g_waveActorIndex].actorPhase == 1)
+						{
+							int32_t waveX = orbitPositions[g_waveActorIndex - 1].position.x;
+							int32_t waveY = orbitPositions[g_waveActorIndex - 1].position.y;
+							int32_t waveZ = orbitPositions[g_waveActorIndex - 1].position.z;
+							Actor::g_creatureActors[g_firstMinionActorIndex].pos.x = waveX;
+							Actor::g_creatureActors[g_firstMinionActorIndex].pos.y = waveY + 0x1000;
+							Actor::g_creatureActors[g_firstMinionActorIndex].pos.z = waveZ;
+							Actor::g_creatureActors[g_firstMinionActorIndex].velX = 0;
+							Actor::g_creatureActors[g_firstMinionActorIndex].gravityVel = 0;
+							Actor::g_creatureActors[g_firstMinionActorIndex].velForward = 0;
+							Actor::g_creatureActors[g_secondMinionActorIndex].pos.x = waveX;
+							Actor::g_creatureActors[g_secondMinionActorIndex].pos.y = waveY + 0x1000;
+							Actor::g_creatureActors[g_secondMinionActorIndex].pos.z = waveZ;
+							Actor::g_creatureActors[g_secondMinionActorIndex].velX = 0;
+							Actor::g_creatureActors[g_secondMinionActorIndex].gravityVel = 0;
+							Actor::g_creatureActors[g_secondMinionActorIndex].velForward = 0;
+							if (Actor::g_creatureActors[g_firstMinionActorIndex].creatureId != 0xE)
+								Actor::g_creatureActors[g_firstMinionActorIndex].previousActorPhase = 0x1CC;
+							if (Actor::g_creatureActors[g_secondMinionActorIndex].creatureId != 0xE)
+								Actor::g_creatureActors[g_secondMinionActorIndex].previousActorPhase = 0x1CC;
+
+							if (Camera::g_cutsceneDuration < 0x3C && Actor::g_creatureActors[g_waveActorIndex].primaryAnimIdx == 1)
+							{
+								Nu3D::Particles::ParticleInstance* particle = 0;
+								for (int32_t i = 0; i < 4; i++)
+								{
+									particle = Nu3D::Particles::SpawnFromPreset(waveX, waveY, waveZ, 0x23, 0xE);
+									particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+								}
+								AudioManager::PlaySoundEffect(0x85, &particle->pos);
+								AudioManager::Preset::PlayOneShotSound(0xD6, &g_buzzActor);
+								Lighting::SpawnLight(waveX, waveY, waveZ, 0xF08000, 0x20, 0x52C840);
+								Actor::Kill(&Actor::g_creatureActors[g_waveActorIndex], Actor::KILL_EFFECTS);
+							}
+						}
+					}
+					else
 					{
 						if (g_waitingForMinions != 0 || g_phaseTimer >= 0x1A4)
 						{
@@ -381,82 +457,6 @@ namespace Toy2
 								g_waitingForMinions = 0;
 								boss->creatureRam->speedTarget = 0x10;
 								g_waveActorIndex++;
-							}
-						}
-					}
-					else
-					{
-						g_laserCooldown = 200;
-						Actor::Toy2Actor* waveActor = &Actor::g_creatureActors[g_waveActorIndex];
-						Camera::g_cutsceneFocusPosition.x = orbitPositions[g_waveActorIndex - 1].position.x;
-						Camera::g_cutsceneFocusPosition.y = orbitPositions[g_waveActorIndex - 1].position.y;
-						Camera::g_cutsceneFocusPosition.z = orbitPositions[g_waveActorIndex - 1].position.z;
-						Camera::g_cutsceneCameraPosition.x =
-							Camera::g_cutsceneFocusPosition.x + Numerics::g_sinCosLUT[(waveActor->yawAngle + 0x400) & 0xFFF] * 3;
-						Camera::g_cutsceneCameraPosition.z =
-							Camera::g_cutsceneFocusPosition.z + Numerics::g_sinCosLUT[(waveActor->yawAngle - 0x800) & 0xFFF] * 3;
-						Camera::g_cutsceneCameraPosition.y = Camera::g_cutsceneFocusPosition.y;
-
-						if (Camera::g_cutsceneDuration < 300 && waveActor->primaryAnimIdx == 0)
-						{
-							Actor::SetAnimation(waveActor, 1, 0x17);
-							Game::InitActor(&Actor::g_creatureActors[g_firstMinionActorIndex], 0);
-							Game::InitActor(&Actor::g_creatureActors[g_secondMinionActorIndex], 0);
-							Actor::g_creatureActors[g_firstMinionActorIndex].visibilityDistance = 0xAF0;
-							Actor::g_creatureActors[g_firstMinionActorIndex].scaleX = 0;
-							Actor::g_creatureActors[g_firstMinionActorIndex].scaleY = 0;
-							Actor::g_creatureActors[g_firstMinionActorIndex].scaleZ = 0;
-							Actor::g_creatureActors[g_firstMinionActorIndex].scalePivotHeight = -0x8000;
-							Actor::g_creatureActors[g_secondMinionActorIndex].visibilityDistance = 0xAF0;
-							Actor::g_creatureActors[g_secondMinionActorIndex].scaleX = 0;
-							Actor::g_creatureActors[g_secondMinionActorIndex].scaleY = 0;
-							Actor::g_creatureActors[g_secondMinionActorIndex].scaleZ = 0;
-							Actor::g_creatureActors[g_secondMinionActorIndex].scalePivotHeight = -0x8000;
-							AudioManager::PlaySoundEffect(0x86, &Actor::g_creatureActors[g_firstMinionActorIndex].pos);
-						}
-
-						if (Camera::g_cutsceneDuration > 0xB9 && Camera::g_cutsceneDuration < 300 && g_framePulseOutputs.fourTick != 0)
-						{
-							Vector4I particlePosition = { 0, 400, 0x4B0, 0 };
-							Actor::ResolveBoneAttachmentPos(&particlePosition, waveActor, 4);
-							if (g_framePulseOutputs.eightTick == 0)
-								Nu3D::Particles::SpawnFromPreset(particlePosition.x, particlePosition.y, particlePosition.z, 4, 4);
-							else
-								Nu3D::Particles::SpawnFromPreset(particlePosition.x, particlePosition.y, particlePosition.z, 0x11, 2);
-						}
-
-						if (waveActor->actorPhase == 1)
-						{
-							Vector3I& wavePosition = orbitPositions[g_waveActorIndex - 1].position;
-							Actor::Toy2Actor* waveFirstMinion = &Actor::g_creatureActors[g_firstMinionActorIndex];
-							Actor::Toy2Actor* waveSecondMinion = &Actor::g_creatureActors[g_secondMinionActorIndex];
-							waveFirstMinion->pos.x = wavePosition.x;
-							waveFirstMinion->pos.y = wavePosition.y + 0x1000;
-							waveFirstMinion->pos.z = wavePosition.z;
-							waveFirstMinion->velX = 0;
-							waveFirstMinion->gravityVel = 0;
-							waveFirstMinion->velForward = 0;
-							waveSecondMinion->pos = waveFirstMinion->pos;
-							waveSecondMinion->velX = 0;
-							waveSecondMinion->gravityVel = 0;
-							waveSecondMinion->velForward = 0;
-							if (waveFirstMinion->creatureId != 0xE)
-								waveFirstMinion->previousActorPhase = 0x1CC;
-							if (waveSecondMinion->creatureId != 0xE)
-								waveSecondMinion->previousActorPhase = 0x1CC;
-
-							if (Camera::g_cutsceneDuration < 0x3C && waveActor->primaryAnimIdx == 1)
-							{
-								Nu3D::Particles::ParticleInstance* particle = 0;
-								for (int32_t i = 0; i < 4; i++)
-								{
-									particle = Nu3D::Particles::SpawnFromPreset(wavePosition.x, wavePosition.y, wavePosition.z, 0x23, 0xE);
-									particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
-								}
-								AudioManager::PlaySoundEffect(0x85, &particle->pos);
-								AudioManager::Preset::PlayOneShotSound(0xD6, &g_buzzActor);
-								Lighting::SpawnLight(wavePosition.x, wavePosition.y, wavePosition.z, 0xF08000, 0x20, 0x52C840);
-								Actor::Kill(waveActor, Actor::KILL_EFFECTS);
 							}
 						}
 					}
@@ -515,16 +515,17 @@ namespace Toy2
 				beamPosition.vector.y = 0;
 				beamPosition.vector.z = -400;
 				Actor::ResolveBoneAttachmentPos(&beamPosition.vector, boss, 0);
+				int32_t bossYaw = boss->yawAngle;
 				int32_t targetAngle = Nu3D::Math::CartesianToFixedAngle(
 					g_buzzActor.posAngles.pos.x - beamPosition.position.x, g_buzzActor.posAngles.pos.z - beamPosition.position.z);
-				int32_t angleOffset = (targetAngle - boss->yawAngle) & 0xFFF;
+				int32_t angleOffset = (targetAngle - bossYaw) & 0xFFF;
 				if (angleOffset > 0x800)
 					angleOffset -= 0xFFF;
-				if (angleOffset < -0x200)
-					angleOffset = -0x200;
-				else if (angleOffset > 0x200)
+				if (angleOffset > 0x200)
 					angleOffset = 0x200;
-				uint32_t beamAngle = (angleOffset + boss->yawAngle) & 0xFFF;
+				else if (angleOffset < -0x200)
+					angleOffset = -0x200;
+				uint32_t beamAngle = (angleOffset + bossYaw) & 0xFFF;
 				AttachmentPosition beamMovement;
 				beamMovement.position.x = Numerics::g_sinCosLUT[beamAngle] << 2;
 				beamMovement.position.y = 96000;
@@ -558,29 +559,27 @@ namespace Toy2
 				}
 			}
 
-			firstMinion = &Actor::g_creatureActors[g_firstMinionActorIndex];
-			secondMinion = &Actor::g_creatureActors[g_secondMinionActorIndex];
-			if (firstMinion->scalePivotHeight == -0x8000)
+			if (Actor::g_creatureActors[g_firstMinionActorIndex].scalePivotHeight == -0x8000)
 			{
-				firstMinion->scaleX += static_cast<int16_t>(Renderer::g_frameDelta) * 0xC;
-				if (firstMinion->scaleX > 0xFFF)
+				Actor::g_creatureActors[g_firstMinionActorIndex].scaleX += static_cast<int16_t>(Renderer::g_frameDelta) * 0xC;
+				if (Actor::g_creatureActors[g_firstMinionActorIndex].scaleX >= 0x1000)
 				{
-					firstMinion->scaleX = 0x1000;
-					firstMinion->scalePivotHeight = 0;
+					Actor::g_creatureActors[g_firstMinionActorIndex].scaleX = 0x1000;
+					Actor::g_creatureActors[g_firstMinionActorIndex].scalePivotHeight = 0;
 				}
-				firstMinion->scaleY = firstMinion->scaleX;
-				firstMinion->scaleZ = firstMinion->scaleX;
+				Actor::g_creatureActors[g_firstMinionActorIndex].scaleY = Actor::g_creatureActors[g_firstMinionActorIndex].scaleX;
+				Actor::g_creatureActors[g_firstMinionActorIndex].scaleZ = Actor::g_creatureActors[g_firstMinionActorIndex].scaleX;
 			}
-			if (firstMinion != secondMinion && secondMinion->scalePivotHeight == -0x8000)
+			if (g_firstMinionActorIndex != g_secondMinionActorIndex && Actor::g_creatureActors[g_secondMinionActorIndex].scalePivotHeight == -0x8000)
 			{
-				secondMinion->scaleX += static_cast<int16_t>(Renderer::g_frameDelta) * 0xC;
-				if (secondMinion->scaleX > 0xFFF)
+				Actor::g_creatureActors[g_secondMinionActorIndex].scaleX += static_cast<int16_t>(Renderer::g_frameDelta) * 0xC;
+				if (Actor::g_creatureActors[g_secondMinionActorIndex].scaleX >= 0x1000)
 				{
-					secondMinion->scaleX = 0x1000;
-					secondMinion->scalePivotHeight = 0;
+					Actor::g_creatureActors[g_secondMinionActorIndex].scaleX = 0x1000;
+					Actor::g_creatureActors[g_secondMinionActorIndex].scalePivotHeight = 0;
 				}
-				secondMinion->scaleY = secondMinion->scaleX;
-				secondMinion->scaleZ = secondMinion->scaleX;
+				Actor::g_creatureActors[g_secondMinionActorIndex].scaleY = Actor::g_creatureActors[g_secondMinionActorIndex].scaleX;
+				Actor::g_creatureActors[g_secondMinionActorIndex].scaleZ = Actor::g_creatureActors[g_secondMinionActorIndex].scaleX;
 			}
 
 			if (g_encounterState > ENCOUNTER_INTRO && g_encounterState < ENCOUNTER_DEFEATED)
@@ -589,23 +588,36 @@ namespace Toy2
 				if (g_cameraTargetUpdateTimer <= 0)
 				{
 					g_cameraTargetUpdateTimer = 0x1E;
-					if (firstMinion->actorPhase > 0 || secondMinion->actorPhase > 0)
+					if (Actor::g_creatureActors[g_firstMinionActorIndex].actorPhase > 0 || Actor::g_creatureActors[g_secondMinionActorIndex].actorPhase > 0)
 					{
-						int32_t firstDistance = 0x7FFFFFFF;
-						if (firstMinion->actorPhase > 0)
+						int32_t firstDistance;
+						int32_t secondX;
+						int32_t secondZ;
+						if (Actor::g_creatureActors[g_firstMinionActorIndex].actorPhase <= 0)
 						{
-							int32_t x = (Camera::g_renderCameraTransform.pos.x - firstMinion->pos.x) >> 8;
-							int32_t z = (Camera::g_renderCameraTransform.pos.z - firstMinion->pos.z) >> 8;
+							firstDistance = 0x7FFFFFFF;
+						}
+						else
+						{
+							int32_t x = (Camera::g_renderCameraTransform.pos.x - Actor::g_creatureActors[g_firstMinionActorIndex].pos.x) >> 8;
+							int32_t z = (Camera::g_renderCameraTransform.pos.z - Actor::g_creatureActors[g_firstMinionActorIndex].pos.z) >> 8;
 							firstDistance = x * x + z * z;
 						}
-						int32_t secondX = 0x40;
-						int32_t secondZ = 0x40;
-						if (secondMinion->actorPhase > 0)
+						if (Actor::g_creatureActors[g_secondMinionActorIndex].actorPhase <= 0)
 						{
-							secondX = (Camera::g_renderCameraTransform.pos.x - secondMinion->pos.x) >> 8;
-							secondZ = (Camera::g_renderCameraTransform.pos.z - secondMinion->pos.z) >> 8;
+							secondX = 0x40;
+							secondZ = 0x40;
+							firstDistance = 0;
 						}
-						g_cameraTargetActorIndex = firstDistance < secondX * secondX + secondZ * secondZ ? g_firstMinionActorIndex : g_secondMinionActorIndex;
+						else
+						{
+							secondX = (Camera::g_renderCameraTransform.pos.x - Actor::g_creatureActors[g_secondMinionActorIndex].pos.x) >> 8;
+							secondZ = (Camera::g_renderCameraTransform.pos.z - Actor::g_creatureActors[g_secondMinionActorIndex].pos.z) >> 8;
+						}
+						if (firstDistance < secondX * secondX + secondZ * secondZ)
+							g_cameraTargetActorIndex = g_firstMinionActorIndex;
+						else
+							g_cameraTargetActorIndex = g_secondMinionActorIndex;
 					}
 					else
 					{
@@ -615,10 +627,9 @@ namespace Toy2
 
 				if (g_cameraTargetActorIndex != 0)
 				{
-					Actor::Toy2Actor* cameraTarget = &Actor::g_creatureActors[g_cameraTargetActorIndex];
-					Camera::g_actorCameraTarget.x = cameraTarget->pos.x;
-					Camera::g_actorCameraTarget.y = cameraTarget->pos.y - 0x2000;
-					Camera::g_actorCameraTarget.z = cameraTarget->pos.z;
+					Camera::g_actorCameraTarget.x = Actor::g_creatureActors[g_cameraTargetActorIndex].pos.x;
+					Camera::g_actorCameraTarget.y = Actor::g_creatureActors[g_cameraTargetActorIndex].pos.y - 0x2000;
+					Camera::g_actorCameraTarget.z = Actor::g_creatureActors[g_cameraTargetActorIndex].pos.z;
 				}
 				else
 				{
@@ -630,8 +641,7 @@ namespace Toy2
 
 			if (g_encounterState == ENCOUNTER_WAVES || g_encounterState == ENCOUNTER_FINAL_PHASE)
 				HUD::g_slideTimers[HUD::SLIDE_BOSS_STATUS] = 0x5A;
-			int32_t hudFrame = (boss->actorPhase - 10) * 0x36;
-			g_hudActorAnimationFrame = (hudFrame + ((hudFrame >> 31) & 0xF)) >> 4;
+			g_hudActorAnimationFrame = (boss->actorPhase - 10) * 0x36 / 16;
 		}
 	}
 }
