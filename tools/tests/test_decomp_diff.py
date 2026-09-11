@@ -466,3 +466,20 @@ class SeenRegionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TargetSourceTests(unittest.TestCase):
+    def test_the_target_source_runs_from_its_annotation_to_the_next_one(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "src"
+            (root / "Toy2").mkdir(parents=True)
+            (root / "Toy2" / "A.cpp").write_text(
+                "int x;\n// FUNCTION: TOY2 0x00401000\nvoid A()\n{\n\tx = 1;\n}\n\n"
+                "// FUNCTION: TOY2 0x00401100\nvoid B() {}\n", encoding="utf-8")
+            text = diff.target_source(root, 0x00401000)
+            self.assertTrue(text.startswith("--- target source "), text)
+            self.assertIn(":2-6 (current tree) ---\n", text)
+            self.assertIn("\tx = 1;", text)
+            self.assertNotIn("void B()", text)
+            self.assertEqual(diff.target_source(root, 0x00401000, limit=10), "")
+            self.assertEqual(diff.target_source(root, 0x00409999), "")

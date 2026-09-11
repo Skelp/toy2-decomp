@@ -334,8 +334,34 @@ def is_seen(region: Region, seen: list[tuple[int, int]]) -> bool:
     return any(region.low <= high and low <= region.high for low, high in seen)
 
 
+TARGET_SOURCE_LIMIT = 30000
+
+
+def target_source(source_root: Path, address: int, limit: int = TARGET_SOURCE_LIMIT) -> str:
+    """Return the target function's whole current source, from its annotation to the next
+    annotation, when it fits the limit. A writer reads it once from the pack instead of
+    paging it with sed between attempts; the pack regions then need no source lines."""
+    marker = re.compile(rf"// (?:FUNCTION|STUB): TOY2 0x{address:08X}\b", re.I)
+    annotation = re.compile(r"// (?:FUNCTION|STUB|GLOBAL|LIBRARY): TOY2 ")
+    for path in sorted(source_root.rglob("*.cpp")):
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        first = next((n for n, line in enumerate(lines, 1) if marker.search(line)), 0)
+        if not first:
+            continue
+        last = next((n - 1 for n in range(first + 1, len(lines) + 1)
+                     if annotation.search(lines[n - 1])), len(lines))
+        while last > first and not lines[last - 1].strip():
+            last -= 1
+        body = "\n".join(lines[first - 1:last])
+        if len(body) > limit:
+            return ""
+        return f"--- target source {path.as_posix()}:{first}-{last} (current tree) ---\n{body}\n"
+    return ""
+
+
 def pack_regions(
-    text: str, source_root: Path, address: int | None, label: str, budget: int
+    text: str, source_root: Path, address: int | None, label: str, budget: int,
+    with_source: bool = True,
 ) -> tuple[str, list[Region]]:
     """Return the pack's largest regions with their source lines, and the regions shown.
 
@@ -346,8 +372,8 @@ def pack_regions(
     found = regions(lines)
     output, shown, skipped = "", [], []
     for region in sorted(found, key=region_size, reverse=True)[:LARGEST_REGIONS]:
-        part = region_text(lines, found, region.number) + source_text(
-            region, source_root, address
+        part = region_text(lines, found, region.number) + (
+            source_text(region, source_root, address) if with_source else ""
         )
         if len(shown) >= PACK_REGIONS or len(output) + len(part) > budget:
             skipped.append(str(region.number))
@@ -621,11 +647,19 @@ def main() -> int:
         help="print the largest regions within BUDGET characters; starts a new --seen set",
     )
     parser.add_argument("--seen", type=Path, help="the regions a writer was shown in this batch")
+    parser.add_argument("--target-source", action="store_true",
+                        help="print the target function's whole source (needs --address)")
+    parser.add_argument("--no-region-source", action="store_true",
+                        help="pack regions without source lines (the pack holds the target source)")
     args = parser.parse_args()
     text = args.path.read_text(encoding="utf-8", errors="replace")
     # The saved diff is named by the address the writer typed, and
     # `bc ADDRESS --hunk N` looks it up by that name.
     label = args.path.stem
+    if args.target_source:
+        if args.address is not None:
+            print(target_source(args.source_root or Path("src"), args.address), end="")
+        return 0
     if args.attempt_view:
         previous = None
         if args.previous is not None and args.previous.is_file():
@@ -639,7 +673,8 @@ def main() -> int:
         return 0
     if args.pack_regions is not None:
         view, shown = pack_regions(
-            text, args.source_root or Path("src"), args.address, label, args.pack_regions
+            text, args.source_root or Path("src"), args.address, label, args.pack_regions,
+            with_source=not args.no_region_source,
         )
         print(view, end="")
         mark_seen(args.seen, shown, fresh=True)  # a new batch starts with the pack

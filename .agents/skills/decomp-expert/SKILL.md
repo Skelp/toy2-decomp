@@ -18,7 +18,7 @@ the handoff TOOL line and stop.
   (`N  0xADDR  -a +b  FILE:LINES`). It is the only command that consumes an attempt.
 - Then `bc` prints up to two regions changed since the last diff and, if room, the largest
   region you have not seen yet, with source lines (tabs kept); `bc ADDR --hunk 3,7` prints
-  any region with source lines, no build. The assignment holds the pack. No `cd`, loops, abs paths.
+  any region with source lines, no build. The pack holds the whole target source. No `cd`, loops, abs paths.
 - A failed build prints the errors and `bc: no attempt logged`; fix it and run the cycle
   again. Never pipe `bc` into `head` or `tail`: a closed pipe aborts the build.
 - A `header side effect:` line means your header edit moved an untouched function; make the

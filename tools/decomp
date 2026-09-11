@@ -420,10 +420,20 @@ bc_pack() {
     text+=$'\n'"--- region index ---"$'\n'"$(saved_diff_line "$address")"
     text+=$'\n'"$(python tools/decomp_diff.py "$diff_path" --hunks)"
     printf '%s\n' "$text"
+    # The target's whole current source, once, replaces the sed reads writers made
+    # between attempts; the regions below then carry asm only.
+    local source region_source=()
+    source=$(python tools/decomp_diff.py "$diff_path" --target-source --address "$address" \
+        --source-root src 2> /dev/null || true)
+    if [[ -n $source ]]; then
+        printf '%s\n' "$source"
+        region_source=(--no-region-source)
+    fi
     # The regions printed here start the batch's seen set, so the attempt
     # view offers the writer the large regions the pack left out.
     python tools/decomp_diff.py "$diff_path" --pack-regions $((budget - ${#text} - 1)) \
-        --address "$address" --source-root src --seen "build/decomp-diffs/$address.seen"
+        --address "$address" --source-root src --seen "build/decomp-diffs/$address.seen" \
+        "${region_source[@]}"
 }
 
 # A dirty header can move functions the writer never touched. Show them at bc
@@ -1081,6 +1091,8 @@ run_cleanup_prompt() {
         "$run_best% at attempt $run_best_at (baseline $baseline%)."
     [[ -z $file ]] || python tools/decomp_attempts.py cleanup-todo "$file" --address "$run_address" \
         2> /dev/null || true
+    echo "Keep line-to-comment or literal-to-name maps in lists of (line, text) tuples: the" \
+        "harness denies a script that holds a {...} literal."
     echo "Follow the Cleanup section of your instructions (two bc runs at most) and end with 1-5" \
         "plain lines under 100 characters saying what changed, with no tool call after them."
 }
