@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -9,6 +10,7 @@ import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
+from unittest import mock
 
 
 TOOLS = Path(__file__).resolve().parents[1]
@@ -188,7 +190,7 @@ class AttemptTests(unittest.TestCase):
             json.loads(text),
             {
                 "attempts": 0, "best_attempt": None, "best_raw": None, "last_raw": None,
-                "stalled": False,
+                "stalled": False, "limit": 12,
             },
         )
         for percent in (55, 58, 57):
@@ -199,18 +201,105 @@ class AttemptTests(unittest.TestCase):
             json.loads(text),
             {
                 "attempts": 3, "best_attempt": 2, "best_raw": 58.0, "last_raw": 57.0,
-                "stalled": False,
+                "stalled": False, "limit": 24,
             },
         )
         code, text = self.run_main("stats", "--address", ADDRESS)
         self.assertEqual(
             text.strip(),
-            "attempts=3 best_attempt=2 best_raw=58.0 last_raw=57.0 stalled=False",
+            "attempts=3 best_attempt=2 best_raw=58.0 last_raw=57.0 stalled=False"
+            " limit=24",
         )
         for percent in (57, 57):
             self.log(similar(percent))
         code, text = self.run_main("stats", "--address", ADDRESS, "--json")
         self.assertEqual(json.loads(text)["stalled"], True)
+
+    def test_budget_doubles_the_exported_base_on_a_one_point_gain(self):
+        small_gains = [50.0, 50.3, 50.6, 50.9, 51.2]
+        self.assertEqual(attempts.budget(small_gains)[0], 12)
+        self.assertEqual(attempts.budget([50.0, 51.0])[0], 24)
+        with mock.patch.dict(os.environ, {"DECOMP_BUDGET": "6"}):
+            self.assertEqual(attempts.budget(small_gains)[0], 6)
+            self.assertEqual(attempts.budget([50.0, 51.0])[0], 12)
+        with mock.patch.dict(os.environ, {"DECOMP_BUDGET": "1"}):
+            self.assertEqual(attempts.budget([50.0])[0], 12)
+
+    def test_pick_skips_map_defects_tried_and_blocked_coverage_rows(self):
+        rows = [
+            {"address": "0x401000", "work_target": False, "map_defect": True},
+            {"address": "0x00402000", "work_target": True, "map_defect": False,
+             "dependency_ready": False, "name": "A::B::Run", "source": ""},
+            {"address": "0x00403000", "work_target": True, "map_defect": False,
+             "dependency_ready": True, "name": "C::Go", "source": "Toy2/Barn.cpp"},
+        ]
+        self.assertEqual(attempts.pick_row(rows)["address"], "0x00402000")
+        self.assertEqual(attempts.pick_row(rows, coverage=True)["address"], "0x00403000")
+        self.assertIsNone(attempts.pick_row(rows, skip=("0x00402000", "0x00403000")))
+        self.assertEqual(attempts.pick_row(rows, address="0x00401000")["address"], "0x401000")
+        self.assertEqual(attempts.subsystem_of(rows[1]), "B")
+        self.assertEqual(attempts.subsystem_of(rows[2]), "Barn")
+
+    def test_pick_describes_a_forced_target_from_the_map_and_source(self):
+        (self.root / "tools" / "Resources").mkdir(parents=True)
+        (self.root / "tools" / "Resources" / "functions_map.txt").write_text(
+            "0x00401000 Toy2::Barn::Update\n", encoding="utf-8")
+        (self.root / "src" / "Toy2").mkdir(parents=True)
+        (self.root / "src" / "Toy2" / "Barn.cpp").write_text(
+            "// STUB: TOY2 0x00401000\nvoid f() {}\n", encoding="utf-8")
+        empty = self.root / "rows.json"
+        empty.write_text("[]", encoding="utf-8")
+        code, text = self.run_main("pick", str(empty), "--address", "0x401000")
+        self.assertEqual(code, 0)
+        self.assertEqual(text.splitlines(), [
+            "0x00401000", "Toy2::Barn::Update", "STUB", "0", "Toy2/Barn.cpp", "Barn"])
+        code, text = self.run_main("pick", str(empty))
+        self.assertEqual((code, text), (1, ""))
+
+    def test_writer_usage_reads_the_cost_and_token_fields(self):
+        text = json.dumps({
+            "total_cost_usd": 0.25, "num_turns": 9, "duration_api_ms": 1200, "result": "a\nb",
+            "permission_denials": [{"tool_name": "Bash"}],
+            "usage": {"input_tokens": 5, "cache_creation_input_tokens": 7,
+                      "cache_read_input_tokens": 11, "output_tokens": 13},
+        })
+        self.assertEqual(attempts.writer_usage(text), {
+            "cost": 0.25, "input": 5, "cache_write": 7, "cache_read": 11, "output": 13,
+            "turns": 9, "api_ms": 1200, "denials": 1, "error": 0, "result": "a\nb",
+        })
+        self.assertEqual(attempts.writer_usage("not json")["cost"], 0.0)
+
+    def test_writer_failure_names_a_run_that_did_no_work(self):
+        ran = attempts.writer_usage(json.dumps({"num_turns": 3, "result": "done"}))
+        self.assertEqual(attempts.writer_failure(ran, 0), "")
+        self.assertEqual(attempts.writer_failure(ran, 124), "the writer timed out")
+        self.assertEqual(attempts.writer_failure(ran, 127), "the writer command was not found")
+        self.assertEqual(attempts.writer_failure(ran, 1), "the writer exited with status 1")
+        failed = attempts.writer_usage(json.dumps(
+            {"is_error": True, "num_turns": 1, "result": "Invalid API key\nrun /login"}))
+        self.assertEqual(attempts.writer_failure(failed, 0),
+                         "the writer reported an error: Invalid API key")
+        self.assertEqual(attempts.writer_failure(attempts.writer_usage(""), 0),
+                         "the writer ran no turn")
+
+    def test_handoff_text_keeps_the_final_message_from_its_title(self):
+        result = "Done.\n```\n# 0x00401000 A::B - batch 1 (refinement)\nBEST: 60%\n```"
+        fields = attempts.writer_usage(json.dumps({"num_turns": 4, "result": result}))
+        self.assertEqual(attempts.handoff_text(fields),
+                         "# 0x00401000 A::B - batch 1 (refinement)\nBEST: 60%")
+        fields["error"] = 1
+        self.assertEqual(attempts.handoff_text(fields), "")
+
+    def test_tried_models_and_failure_lines_parse_the_handoff_and_log(self):
+        handoff = ("BEST: 60%\nTRIED (attempt score idea):\n 1 55.00% baseline\n"
+                   " 2 58.10% signed  index loop\nOPEN:\n 1. regions 3\n")
+        self.assertEqual(attempts.tried_models(handoff), ["2 58.10% signed index loop"])
+        log = ("[1/2] build\nvalidation failed:\n- 0x00401000: source debt\n\n"
+               "src/a.cpp:3: warning: [raw-offset] x\nlint: failed: 1 new warning(s)\n")
+        self.assertEqual(attempts.failure_lines(log), [
+            "- 0x00401000: source debt", "src/a.cpp:3: warning: [raw-offset] x",
+            "lint: failed: 1 new warning(s)",
+        ])
 
     def test_unparsable_or_missing_diff_warns_and_exits_zero(self):
         self.diff.write_text("reccmp: error: nothing here\n", encoding="utf-8")

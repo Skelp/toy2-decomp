@@ -513,6 +513,423 @@ campaign_finish() {
     echo "finished: $(git rev-parse --short HEAD)"
 }
 
+# handoff ADDR: save stdin as the handoff of one target, so that the next
+# batch's pack starts from it. The driver pipes a writer's final message into
+# it; a model that runs a batch itself uses a quoted heredoc.
+handoff() {
+    if [[ $# -ne 1 || ! ${1:-} =~ ^0x[0-9A-Fa-f]{1,8}$ ]]; then
+        echo "Usage: tools/decomp handoff <address> <<'EOF' ... EOF" >&2
+        return 2
+    fi
+    if [[ -t 0 ]]; then
+        echo "error: handoff reads the text from stdin" >&2
+        return 2
+    fi
+    local path
+    path="build/decomp-cache/handoff/$(printf '0x%08X' "$1").md"
+    mkdir -p build/decomp-cache/handoff || return
+    cat > "$path.tmp" || return
+    if [[ ! -s $path.tmp ]]; then
+        rm -f "$path.tmp"
+        echo "error: the handoff text is empty; nothing was written" >&2
+        return 2
+    fi
+    mv -f "$path.tmp" "$path" || return
+    echo "handoff: written ($(wc -l < "$path") lines)"
+}
+
+run_usage() {
+    echo "Usage: tools/decomp campaigns run [--count N] [--mode auto|refinement|coverage]" \
+        "[--address ADDR] [--batch N] [--budget N] [--writer CMD] [--trailer TEXT] [--push]"
+}
+
+# The lean headless writer: the decomp-expert skill is its whole system prompt,
+# the assignment arrives on stdin and the project allow list is its only grant.
+default_writer="claude -p --tools Bash --system-prompt-file .agents/skills/decomp-expert/SKILL.md \
+--strict-mcp-config --setting-sources project --permission-mode dontAsk \
+--no-session-persistence --output-format json --effort xhigh"
+
+# Run the writer on one assignment. It runs in the background under wait, so
+# the INT/TERM trap of campaign_run can stop it: timeout moves the writer into
+# its own process group, which a Ctrl-C or a kill of the driver's group never
+# reaches. The session variables are dropped, so a driver started inside a
+# Claude Code session does not make the writer a child of that session.
+run_writer() {
+    local status=0
+    env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT -u CLAUDE_CODE_CHILD_SESSION \
+        -u CLAUDE_CODE_SESSION_ID -u CLAUDE_CODE_MESSAGING_SOCKET \
+        -u CLAUDE_CODE_MESSAGING_TOKEN -u CLAUDE_PID -u CLAUDE_EFFORT \
+        timeout --kill-after=60 "${DECOMP_WRITER_TIMEOUT:-2400}" bash -c "$writer" \
+        < "$1" > "$2" 2> "${2%.json}.stderr" &
+    writer_pid=$!
+    wait "$writer_pid" || status=$?
+    writer_pid=""
+    return "$status"
+}
+
+# INT or TERM during a run: stop the writer (timeout passes the signal on to
+# its process group), abort a campaign still in its writer phase and exit, so
+# no orphaned writer keeps editing src after the driver is gone.
+run_interrupt() {
+    trap - INT TERM
+    if [[ -n ${writer_pid:-} ]]; then
+        kill -TERM "$writer_pid" 2> /dev/null || true
+        wait "$writer_pid" 2> /dev/null || true
+    fi
+    if [[ -n ${run_active:-} ]]; then
+        "$self" campaigns abort --reason "campaigns run was interrupted." > /dev/null 2>&1 || true
+        echo "run: interrupted; campaign on $run_active aborted; src kept for review" \
+            "(best patch: build/decomp-cache/best/$run_active.patch)" >&2
+    else
+        echo "run: interrupted; check tools/decomp campaigns status" >&2
+    fi
+    exit 130
+}
+
+# Read the attempt log of the current target into run_attempts, run_best,
+# run_best_at, run_last, run_stalled and run_limit (no scored attempt reads 0).
+# run_limit is the budget bc prints, so the driver and the writer agree on it.
+run_read_stats() {
+    local fields
+    fields=$(python tools/decomp_attempts.py stats --address "$run_address" --json | python -c '
+import json, sys
+s = json.load(sys.stdin)
+print(s["attempts"], "%.2f" % (s["best_raw"] or 0), s["best_attempt"] or 0,
+      "%.2f" % (s["last_raw"] or 0), int(s["stalled"]), s["limit"])') || return
+    read -r run_attempts run_best run_best_at run_last run_stalled run_limit <<< "$fields"
+}
+
+run_math() { awk -v a="$2" -v b="${3:-0}" "BEGIN { $1 }"; }
+
+# Append one usage.tsv row and print the batch verdict line.
+run_account() {
+    local label=$1 json=$2 first=$3 seconds=$4 previous_best=$5 fields range
+    range="$first-$run_attempts"
+    ((run_attempts >= first)) || range="none"
+    fields=$(python tools/decomp_attempts.py writer-usage "$json")
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$run_address" "$label" \
+        "$range" "$run_best" "$seconds" "$fields" >> "$runs/usage.tsv"
+    local batch_cost denials
+    batch_cost=$(cut -f1 <<< "$fields")
+    denials=$(cut -f8 <<< "$fields")
+    cost=$(run_math 'printf "%.4f", a + b' "$cost" "$batch_cost")
+    printf '%s: attempts %s, best %s%% (%s), %s min, $%.2f%s%s\n' "$label" "$range" \
+        "$run_best" "$(run_math 'printf "%+.2f", a - b' "$run_best" "$previous_best")" \
+        "$(run_math 'printf "%.1f", a / 60' "$seconds")" "$batch_cost" \
+        "$( ((denials > 0)) && echo ", $denials permission denials")" \
+        "$( ((writer_status != 0)) && echo ", writer exit $writer_status")"
+}
+
+# The batch assignment ends with the orientation pack, so the writer spends no
+# turn on fetching it.
+run_batch_prompt() {
+    local first=$1 last=$2 stub
+    echo "BATCH $batch for target $run_address $run_name ($run_mode)."
+    echo "Source file: ${run_source:+src/}${run_source:-none yet}; retail size $run_size bytes."
+    echo "Attempts logged: $run_attempts; best $run_best% at attempt $run_best_at" \
+        "(baseline $baseline%)."
+    echo "This batch may run attempts $first-$last; stop earlier when bc prints a \"stall:\" line."
+    if [[ $run_mode == coverage ]]; then
+        stub=$(grep -rn -- "// STUB: TOY2 $run_address\b" src | head -n 1 | cut -d: -f1,2 || true)
+        if [[ -n $stub ]]; then
+            echo "Placement: $stub holds \"// STUB: TOY2 $run_address\". Replace the empty" \
+                "definition under it with the complete body and change that line to" \
+                "\"// FUNCTION: TOY2 $run_address\"."
+        else
+            echo "Placement: no annotation exists. Add \"// FUNCTION: TOY2 $run_address\" and the" \
+                "complete body to the translation unit that holds the map neighbours shown by" \
+                "the evidence."
+        fi
+    fi
+    echo "End: your final message is the handoff, with no tool call after it; the driver saves it."
+    echo "The orientation pack (tools/decomp bc $run_address --pack) follows; do not run it again."
+    "$self" bc "$run_address" --pack 2> /dev/null \
+        || echo "(the pack failed; run tools/decomp bc $run_address --pack)"
+}
+
+# Write the commit message of a source result from the current best score.
+run_message() {
+    local subject="Refine $run_name to $1%"
+    [[ $run_mode == coverage ]] && subject="Implement $run_name at $1%"
+    {
+        echo "$subject"
+        echo
+        echo "$baseline% -> $1% in $run_attempts attempts across $writer_runs writer runs" \
+            "(tools/decomp campaigns run)."
+        [[ -z $trailer ]] || printf '\n%s\n' "$trailer"
+    } > "$prefix.msg"
+}
+
+run_finish() {
+    local note="campaigns run: $baseline% -> $1% in $run_attempts attempts"
+    note+=", $writer_runs writer runs; stopped: $stop"
+    finish_log="$prefix-finish$2.log"
+    rm -f build/decomp-diffs/validate.log
+    "$self" campaigns finish --mode "$run_mode" --target "$run_address" --note "$note" \
+        --message "$prefix.msg" > "$finish_log" 2>&1
+}
+
+# One campaign: select, start, writer batches, then a validated commit or a
+# no-source record. Set run_result and run_family for the stop rule. Return 3
+# when no candidate is left, 1 on a fatal error or a writer that did no work.
+run_campaign() {
+    local index=$1 started=$SECONDS cost=0 writer_runs=0 stop="" batch=0 broken=""
+    local run_mode=$mode run_address run_name run_state run_size run_source run_subsystem
+    local run_attempts run_best run_best_at run_last run_stalled run_limit writer_status=0
+    local row fields=() pick=() baseline baseline_attempts prefix final bytes="+0.00" sha="-"
+    local finish_log json
+    if [[ -n $(git status --porcelain -- src tools/Resources/functions_map.txt) ]]; then
+        echo "error: src or the function map has uncommitted changes; commit or restore them" >&2
+        return 1
+    fi
+    if [[ -n $address ]]; then
+        if ! "$self" candidates --refine --json --limit 0 > "$runs/candidates.json" \
+            2> "$runs/candidates.log" || ! "$self" candidates --coverage --json --limit 0 \
+            > "$runs/coverage.json" 2>> "$runs/candidates.log"; then
+            echo "error: candidates failed; see $runs/candidates.log" >&2
+            return 1
+        fi
+        pick=("$runs/candidates.json" "$runs/coverage.json" --address "$address")
+    else
+        if [[ $run_mode == auto ]]; then
+            run_mode=refinement
+            ((index % 3 == 0)) && run_mode=coverage
+        fi
+        local queue=(--refine --yield)
+        [[ $run_mode == coverage ]] && queue=(--coverage)
+        "$self" candidates "${queue[@]}" --json --limit 25 > "$runs/candidates.json" \
+            2> "$runs/candidates.log" || { echo "error: candidates failed; see $runs/candidates.log" >&2; return 1; }
+        pick=("$runs/candidates.json")
+        [[ $run_mode == coverage ]] && pick+=(--coverage)
+        for row in "${tried[@]}"; do pick+=(--skip "$row"); done
+    fi
+    if ! row=$(python tools/decomp_attempts.py pick "${pick[@]}"); then
+        echo "campaign $index: no eligible ${address:-$run_mode} target; run stopped" >&2
+        return 3
+    fi
+    mapfile -t fields <<< "$row"
+    run_address=${fields[0]} run_name=${fields[1]} run_state=${fields[2]}
+    run_size=${fields[3]} run_source=${fields[4]} run_subsystem=${fields[5]}
+    if [[ $run_mode == auto ]]; then
+        run_mode=refinement
+        [[ $run_state == STUB || $run_state == NOT_STARTED ]] && run_mode=coverage
+    fi
+    tried+=("$run_address")
+    run_family=$run_subsystem
+    prefix="$runs/$run_address"
+    rm -f "$prefix"-* "$prefix.msg"
+    # A handoff left by an interrupted run numbers attempts of another baseline.
+    rm -f "build/decomp-cache/handoff/$run_address.md"
+    if ! "$self" campaigns start --mode "$run_mode" --address "$run_address" \
+        --subsystem "$run_subsystem" > "$prefix-start.log" 2>&1; then
+        echo "error: campaigns start failed for $run_address; see $prefix-start.log" >&2
+        return 1
+    fi
+    run_active=$run_address
+    if ! "$self" bc "$run_address" > "$prefix-bc.log" 2>&1; then
+        run_active=""
+        "$self" campaigns abort --reason "The baseline bc failed." > /dev/null 2>&1
+        echo "error: the baseline bc of $run_address failed; see $prefix-bc.log" >&2
+        return 1
+    fi
+    run_read_stats || return 1
+    baseline=$run_best baseline_attempts=$run_attempts
+    echo "campaign $index: $run_address $run_name $run_mode, baseline $baseline%"
+    local first last before_attempts before_best batch_started
+    while true; do
+        if ((run_stalled)); then stop="stalled"; break; fi
+        if ((run_attempts >= run_limit)); then stop="budget"; break; fi
+        batch=$((batch + 1)) writer_runs=$((writer_runs + 1))
+        first=$((run_attempts + 1)) last=$((run_attempts + batch_size))
+        ((last > run_limit)) && last=$run_limit
+        before_attempts=$run_attempts before_best=$run_best batch_started=$SECONDS
+        json="$prefix-batch$batch.json"
+        run_batch_prompt "$first" "$last" > "$prefix-batch$batch.prompt"
+        writer_status=0
+        run_writer "$prefix-batch$batch.prompt" "$json" || writer_status=$?
+        run_read_stats || return 1
+        run_account "batch $batch" "$json" "$first" "$((SECONDS - batch_started))" "$before_best"
+        python tools/decomp_attempts.py writer-usage "$json" --handoff \
+            | handoff "$run_address" > /dev/null 2>&1 || true
+        if ((run_attempts == before_attempts)); then
+            broken=$(python tools/decomp_attempts.py writer-usage "$json" --failure "$writer_status")
+            echo "batch $batch: no new attempt${broken:+ ($broken)}; the writer said:"
+            python tools/decomp_attempts.py writer-usage "$json" --result 3 | sed 's/^/  /'
+            stop="no new attempt"; break
+        fi
+        if run_math 'exit !(a - b < 0.5)' "$run_best" "$before_best"; then
+            stop="batch gain under 0.5"; break
+        fi
+    done
+    # Restore the best compiled tree: the tree the writer left may hold a worse model.
+    git checkout -q -- src tools/Resources/functions_map.txt || return 1
+    if [[ -s build/decomp-cache/best/$run_address.patch ]] &&
+        ! git apply build/decomp-cache/best/"$run_address".patch; then
+        echo "error: the best patch of $run_address does not apply; the tree is at HEAD" >&2
+        return 1
+    fi
+    final=$run_best run_active=""
+    if run_math 'exit !(a > b)' "$final" "$baseline"; then
+        run_message "$final"
+        if ! run_finish "$final" 1; then
+            if [[ -n $broken ]]; then
+                echo "error: finish failed and $broken, so no repair runs;" \
+                    "the tree is left for review (log: $prefix-finish1.log)" >&2
+                return 1
+            fi
+            local problems
+            problems=$(python tools/decomp_attempts.py failures build/decomp-diffs/validate.log)
+            [[ -n $problems ]] || problems=$(grep -E '^error: ' "$prefix-finish1.log" | tail -n 5)
+            echo "finish: failed; one repair run for: $(head -n 1 <<< "$problems")"
+            {
+                echo "REPAIR target $run_address $run_name ($run_mode). campaigns finish failed with:"
+                printf '%s\n' "$problems"
+                echo "Fix only these problems in the target's source, run tools/decomp bc" \
+                    "$run_address once, and return the REPAIR line."
+            } > "$prefix-repair.prompt"
+            before_attempts=$run_attempts before_best=$run_best batch_started=$SECONDS
+            writer_status=0 writer_runs=$((writer_runs + 1))
+            run_writer "$prefix-repair.prompt" "$prefix-repair.json" || writer_status=$?
+            run_read_stats || return 1
+            run_account "repair" "$prefix-repair.json" "$((before_attempts + 1))" \
+                "$((SECONDS - batch_started))" "$before_best"
+            ((run_attempts > before_attempts)) && final=$run_last
+            run_message "$final"
+            if ! run_finish "$final" 2; then
+                echo "error: finish failed twice; the tree is left as is for review" \
+                    "(log: $prefix-finish2.log)" >&2
+                return 1
+            fi
+        fi
+        sha=$(sed -n 's/^finished: //p' "$finish_log")
+        bytes=$(grep -oE 'campaign: [-+][0-9.]+ code' "$finish_log" | grep -oE '[-+][0-9.]+')
+        bytes=${bytes:-+0.00} run_result=source
+        committed=$((committed + 1))
+    elif ((run_attempts == baseline_attempts)) || [[ -n $broken ]]; then
+        # A writer that did no work says nothing about the target. A no-source
+        # row would skip the target later and count toward the stop rule.
+        broken=${broken:-the writer logged no attempt}
+        "$self" campaigns abort --reason "campaigns run: $broken." > "$prefix-abort.log" 2>&1
+        echo "error: campaign $index: $run_address: $broken; campaign aborted, run stopped" \
+            "(logs: $prefix-*)" >&2
+        return 1
+    else
+        # No attempt raised the score: record the tried models so no writer retests them.
+        local models=() model_args=() model
+        mapfile -t models < <(python tools/decomp_attempts.py tried \
+            "build/decomp-cache/handoff/$run_address.md")
+        ((${#models[@]} > 0)) || models=("no writer model scored above the $baseline% baseline")
+        for model in "${models[@]}"; do model_args+=(--model "$model"); done
+        if ! "$self" campaigns record --result no-source --note "no attempt raised the score" \
+            "${model_args[@]}" > "$prefix-record.log" 2>&1; then
+            echo "error: the no-source record failed; see $prefix-record.log" >&2
+            return 1
+        fi
+        {
+            echo "Record no-source campaign on $run_name"
+            [[ -z $trailer ]] || printf '\n%s\n' "$trailer"
+        } > "$prefix.msg"
+        git add tools/Resources/campaign-ledger.jsonl tools/Resources/scoreboard.tsv \
+            .notes/source-models.md && git commit -q -F "$prefix.msg" \
+            || { echo "error: the no-source commit failed" >&2; return 1; }
+        sha=$(git rev-parse --short HEAD) run_result=no-source
+        rm -f "build/decomp-cache/handoff/$run_address.md" "build/decomp-attempts/$run_address.jsonl"
+    fi
+    if ((push)) && ! git push -q origin agent/continuous; then
+        echo "error: git push failed after commit $sha" >&2
+        return 1
+    fi
+    local minutes
+    minutes=$(run_math 'printf "%.1f", a / 60' "$((SECONDS - started))")
+    printf 'campaign %s: %s %s %s %s%% -> %s%% (%s B), %s attempts, %s min, $%.2f, commit %s\n' \
+        "$index" "$run_address" "$run_name" "$run_mode" "$baseline" "$final" "$bytes" \
+        "$run_attempts" "$minutes" "$cost" "$sha"
+    total_cost=$(run_math 'printf "%.4f", a + b' "$total_cost" "$cost")
+    total_bytes=$(run_math 'printf "%+.2f", a + b' "$total_bytes" "$bytes")
+    total_attempts=$((total_attempts + run_attempts)) done_count=$((done_count + 1))
+    if [[ -n $broken ]]; then
+        echo "error: $broken; run stopped after campaign $index" >&2
+        return 1
+    fi
+}
+
+# campaigns run: the whole loop of AGENTS.md without an orchestrating model. The
+# script selects, starts, runs writer batches, restores the best tree and
+# finishes or records no-source; logs go to build/decomp-runs/.
+campaign_run() {
+    local count=1 mode=auto address="" batch_size=4 budget=12 trailer="" push=0
+    local writer="${DECOMP_WRITER:-$default_writer}" self="$ROOT/tools/decomp"
+    local runs=build/decomp-runs tried=() committed=0 total_cost=0 total_bytes=+0.00
+    local total_attempts=0 run_started=$SECONDS index status=0 done_count=0
+    local writer_pid="" run_active="" run_result="" run_family="" families=()
+    # printf and awk must write and read "0.25", whatever the user's locale.
+    export LC_NUMERIC=C
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help) run_usage; return 0 ;;
+            --push) push=1; shift; continue ;;
+        esac
+        [[ $# -ge 2 ]] || { echo "error: run argument $1 needs a value" >&2; return 2; }
+        case "$1" in
+            --count) count="$2" ;;
+            --mode) mode="$2" ;;
+            --address) address="$2" ;;
+            --batch) batch_size="$2" ;;
+            --budget) budget="$2" ;;
+            --writer) writer="$2" ;;
+            --trailer) trailer="$2" ;;
+            *) echo "error: unknown run argument: $1" >&2; run_usage >&2; return 2 ;;
+        esac
+        shift 2
+    done
+    if [[ ! $count =~ ^[1-9][0-9]*$ || ! $batch_size =~ ^[1-9][0-9]*$ ]]; then
+        echo "error: --count and --batch need positive whole numbers" >&2
+        return 2
+    fi
+    # The baseline bc is attempt 1, so a budget below 2 leaves the writer nothing.
+    if [[ ! $budget =~ ^[0-9]+$ ]] || ((budget < 2)); then
+        echo "error: --budget needs a whole number of 2 or more (the baseline bc is attempt 1)" >&2
+        return 2
+    fi
+    if [[ $mode != auto && $mode != refinement && $mode != coverage ]]; then
+        echo "error: --mode must be auto, refinement or coverage" >&2
+        return 2
+    fi
+    if [[ -n $address ]]; then
+        [[ $address =~ ^0x[0-9A-Fa-f]{1,8}$ ]] || { echo "error: --address needs an address such as 0x00401230" >&2; return 2; }
+        address=$(printf '0x%08X' "$address") count=1
+    fi
+    if ((push)) && [[ $(git branch --show-current) != agent/continuous ]]; then
+        echo "error: --push pushes agent/continuous; check out that branch first" >&2
+        return 2
+    fi
+    # bc reads the budget from here, in the driver and inside the writer alike.
+    export DECOMP_BUDGET=$budget
+    mkdir -p "$runs"
+    [[ -s $runs/usage.tsv ]] || printf '%s\n' "time	address	batch	attempts	best	seconds	cost_usd	input	cache_write	cache_read	output	turns	api_ms	denials	error" > "$runs/usage.tsv"
+    trap run_interrupt INT TERM
+    for ((index = 1; index <= count; index++)); do
+        run_result=""
+        run_campaign "$index" || { status=$?; break; }
+        # continue-decomp stop rule: three consecutive no-source results across
+        # two families mean the queue needs a person, not more writer runs.
+        if [[ $run_result == no-source ]]; then families+=("$run_family"); else families=(); fi
+        if ((${#families[@]} >= 3)) &&
+            (($(printf '%s\n' "${families[@]}" | sort -u | wc -l) >= 2)); then
+            echo "run: stop rule: ${#families[@]} consecutive no-source results in" \
+                "$(printf '%s\n' "${families[@]}" | sort -u | wc -l) families; ask the user"
+            break
+        fi
+    done
+    trap - INT TERM
+    printf 'run: %s campaigns, %s with a gain, %s B, %s attempts, %s min, $%.2f\n' \
+        "$done_count" "$committed" "$total_bytes" \
+        "$total_attempts" "$(run_math 'printf "%.1f", a / 60' "$((SECONDS - run_started))")" \
+        "$total_cost"
+    ((status == 3)) && status=0
+    return "$status"
+}
+
 experiment() {
     local action="${1:-}"
     local address="${2:-}"
@@ -629,6 +1046,7 @@ Commands:
   undefer <addr>    Clear all committed blockers for one target
   blockers [addr]   Show committed blockers
   evidence <addr>   Collect bounded evidence for one target in a single call
+  handoff <addr>    Save stdin as a target's writer handoff (bc --pack prints it)
   baseline          Save a fresh parent-state comparison before source edits
   validate [args]   Enforce coverage, refinement, data, or resource success
   experiment [...] Record labeled source-form comparison trials
@@ -660,6 +1078,7 @@ bc (repeat) -> campaigns finish (validate --staged, record, commit) -> push.
   tools/decomp campaigns evidence --address 0x00403640 --kind analogue \
     --note "new evidence that clears a zero-yield penalty"
   tools/decomp campaigns status | summary | abort --reason TEXT | add-target
+  tools/decomp campaigns run --count 3 [--mode auto] [--push]  # no model needed
 
 Output is bounded: `candidates` and `discover` show 10 rows (`--limit 0` or
 `--all` for all), `evidence` 12 rows per category (`--full` for all), `bc`
@@ -694,7 +1113,10 @@ case "$command" in
     campaigns)
         for campaign_argument in "$@"; do
             if [[ $campaign_argument == -h || $campaign_argument == --help ]]; then
-                case " $* " in *" finish "*) finish_usage; exit 0 ;; esac
+                case " $* " in
+                    *" finish "*) finish_usage; exit 0 ;;
+                    *" run "*) run_usage; exit 0 ;;
+                esac
                 exec python tools/decomp_campaigns.py "$@"
             fi
         done
@@ -769,6 +1191,9 @@ case "$command" in
             finish)
                 campaign_finish "${campaign_arguments[@]:$((campaign_index + 1))}"
                 ;;
+            run)
+                campaign_run "${campaign_arguments[@]:$((campaign_index + 1))}"
+                ;;
             *)
                 exec python tools/decomp_campaigns.py "$@"
                 ;;
@@ -800,6 +1225,9 @@ case "$command" in
         ;;
     notes)
         exec python tools/decomp_notes.py "$@"
+        ;;
+    handoff)
+        handoff "$@"
         ;;
     lint)
         exec python tools/decomp_lint.py "$@"
@@ -867,6 +1295,13 @@ case "$command" in
             echo "bc: no attempt logged; fix the error above and run bc again" >&2
             exit 2
         fi
+        # Keep the last diff, so the attempt view can say what this attempt changed.
+        prev_path="build/decomp-diffs/${1}.prev.txt"
+        if [[ -f $diff_path ]]; then
+            cp "$diff_path" "$prev_path"
+        else
+            rm -f "$prev_path"
+        fi
         (cd build && reccmp-reccmp --target TOY2 --no-color --verbose "$1") \
             > "$diff_path" 2> "$diff_path.stderr" || true
         grep -v '^\[INFO\]' "$diff_path.stderr" >&2 || true
@@ -894,6 +1329,10 @@ case "$command" in
             python tools/decomp_diff.py "${diff_args[@]}" --full
         else
             python tools/decomp_diff.py "${diff_args[@]}"
+            # The regions this attempt changed, with their source lines, so the
+            # writer rarely needs a --hunk or sed call before the next edit.
+            python tools/decomp_diff.py "$diff_path" --attempt-view --previous "$prev_path" \
+                --address "$1" --source-root src || true
         fi
         python tools/decomp_campaigns.py first-score --address "$1" --quiet
         ;;

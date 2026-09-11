@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import re
 import sys
@@ -21,6 +22,11 @@ ADDRESS_LINE = re.compile(r"^(0x[0-9a-f]+)\s*:")
 SOURCE_REF = re.compile(r"\(([A-Za-z0-9_./-]+):(\d+)\)")
 HUNK_HEADER = re.compile(r"^@@ ")
 REGION_GAP = 2
+# The attempt view bc prints after each attempt. It stays under this many
+# characters because a writer pays for every line again on each later call.
+VIEW_BUDGET = 8000
+VIEW_CHANGED_REGIONS = 2
+VIEW_SOURCE_CONTEXT = 3
 
 
 @dataclass
@@ -32,6 +38,11 @@ class Region:
     plus: int = 0
     address: str = ""
     refs: dict[str, list[int]] = field(default_factory=dict)
+    # Retail addresses from the line before the region to the line after it.
+    low: int | None = None
+    high: int | None = None
+    # With no reference of its own, the nearest one in the same hunk.
+    nearby: dict[str, list[int]] = field(default_factory=dict)
 
     def source_span(self) -> str:
         if not self.refs:
@@ -83,11 +94,34 @@ def regions(lines: list[str]) -> list[Region]:
     for region in result:
         for line in lines[max(0, region.start - 1):region.end + 1]:
             match = ADDRESS_LINE.match(line)
-            if match and not region.address:
-                region.address = match.group(1)
+            if match:
+                region.address = region.address or match.group(1)
+                value = int(match.group(1), 16)
+                region.low = value if region.low is None else min(region.low, value)
+                region.high = value if region.high is None else max(region.high, value)
             for name, number in SOURCE_REF.findall(line):
                 region.refs.setdefault(name, []).append(int(number))
+        if not region.refs:
+            region.nearby = nearest_refs(lines, region)
     return result
+
+
+def nearest_refs(lines: list[str], region: Region) -> dict[str, list[int]]:
+    """Return the reference nearest a region in its hunk: earlier first, else later.
+
+    reccmp marks only the first instruction of a source line, so the closest
+    earlier reference names the line that holds the region's instructions.
+    """
+    earlier = range(region.start - 1, -1, -1)
+    later = range(region.end, len(lines))
+    for indexes in (earlier, later):
+        for index in indexes:
+            if HUNK_HEADER.match(lines[index]):
+                break
+            found = SOURCE_REF.findall(lines[index])
+            if found:
+                return {name: [int(number)] for name, number in found}
+    return {}
 
 
 def region_index(found: list[Region]) -> list[str]:
@@ -127,6 +161,154 @@ def region_text(lines: list[str], found: list[Region], number: int, context: int
             start, end = max(0, region.start - context), min(len(lines), region.end + context)
             return "\n".join([region_header(region), *lines[start:end]]) + "\n"
     return f"no region {number}; the index has {len(found)} regions\n"
+
+
+def overlaps(one: Region, other: Region) -> bool:
+    if one.low is None or other.low is None:
+        return False
+    return one.low <= other.high and other.low <= one.high
+
+
+def changed_regions(current: list[Region], previous: list[Region]) -> tuple[list[Region], list[str]]:
+    """Compare two diffs by retail address range, because region numbers shift
+    and a region that shrinks or merges with another gets a new start address.
+
+    A region is unchanged when a previous region over the same retail addresses
+    had the same -a/+b counts. A previous region is resolved only when no
+    current region covers any of its retail addresses.
+    """
+    changed = [
+        region for region in current
+        if not any(
+            overlaps(region, old) and (old.minus, old.plus) == (region.minus, region.plus)
+            for old in previous
+        )
+    ]
+    resolved = [
+        old.address for old in previous
+        if old.address and not any(overlaps(old, region) for region in current)
+    ]
+    return changed, resolved
+
+
+@functools.lru_cache(maxsize=None)
+def source_files(root: Path) -> dict[str, tuple[Path, ...]]:
+    """Map each file name under the source root to its paths (one walk per run)."""
+    found: dict[str, list[Path]] = {}
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            found.setdefault(path.name, []).append(path)
+    return {name: tuple(paths) for name, paths in found.items()}
+
+
+def resolve_source(root: Path, name: str, address: int | None) -> Path | None:
+    """Find the file a diff names; two files with one name resolve by the target's annotation."""
+    candidates = [
+        path for path in source_files(root).get(Path(name).name, ())
+        if ("/" + path.relative_to(root).as_posix()).endswith("/" + name)
+    ]
+    if len(candidates) > 1 and address is not None:
+        marker = f"toy2 0x{address:08x}"
+        candidates = [
+            path for path in candidates
+            if marker in path.read_text(encoding="utf-8", errors="replace").lower()
+        ]
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def source_text(region: Region, root: Path, address: int | None) -> str:
+    """Return the raw source lines of a region's span, widened by a few lines.
+
+    The lines keep their tabs and carry no line numbers, so a writer can copy
+    them into an edit anchor without another read.
+    """
+    output: list[str] = []
+    for name, numbers in (region.refs or region.nearby).items():
+        path = resolve_source(root, name, address)
+        if path is None:
+            continue
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        first = max(1, min(numbers) - VIEW_SOURCE_CONTEXT)
+        last = min(len(lines), max(numbers) + VIEW_SOURCE_CONTEXT)
+        if first > last:
+            continue
+        output.append(f"--- source {path.as_posix()}:{first}-{last} ---")
+        output.extend(lines[first - 1:last])
+    return "".join(line + "\n" for line in output)
+
+
+def attempt_view(
+    text: str,
+    previous: str | None,
+    source_root: Path,
+    address: int | None = None,
+    label: str = "ADDRESS",
+    budget: int = VIEW_BUDGET,
+) -> str:
+    """Show what an attempt changed, so a writer needs no separate --hunk or source read.
+
+    The view names the changed and resolved regions and prints the largest
+    changed ones, each as --hunk prints it and followed by its source lines.
+    Unchanged regions are not printed again: the pack or an earlier attempt
+    already showed them. With no previous diff it prints the largest region
+    that fits. A region that does not fit is named in a last line.
+    """
+    if previous is not None and text == previous:
+        return ""  # bc already said "source unchanged"
+    lines = text.splitlines()
+    found = regions(lines)
+    header = ""
+    if previous is None:
+        candidates, slots = found, 1
+    else:
+        candidates, resolved = changed_regions(found, regions(previous.splitlines()))
+        header = f"changed since the last diff: {len(candidates)} region(s)"
+        header += f"; resolved: {', '.join(resolved)}\n" if resolved else "\n"
+        slots = VIEW_CHANGED_REGIONS
+    candidates = sorted(candidates, key=lambda region: region.minus + region.plus, reverse=True)
+
+    def not_shown(numbers: list[int]) -> str:
+        if not numbers:
+            return ""
+        listed = " ".join(str(number) for number in numbers)
+        return f"not shown: regions {listed} (tools/decomp bc {label} --hunk N)\n"
+
+    rendered: dict[int, tuple[str, str]] = {}
+
+    def fill(limit: int) -> tuple[str, list[int]]:
+        output, skipped, printed = header, [], 0
+        for region in candidates:
+            if printed == slots:
+                if previous is None:
+                    break  # the index lists the smaller regions
+                skipped.append(region.number)
+                continue
+            if region.number not in rendered:
+                rendered[region.number] = (
+                    region_text(lines, found, region.number),
+                    source_text(region, source_root, address),
+                )
+            hunk, source = rendered[region.number]
+            if len(output) + len(hunk) + len(source) <= limit:
+                output += hunk + source
+            elif len(output) + len(hunk) <= limit:
+                output += hunk  # the asm is worth more than its source lines
+            else:
+                skipped.append(region.number)
+                continue
+            printed += 1
+        return output, skipped
+
+    # Keep room for the last line so the whole view stays within the budget.
+    # The room grows on each pass and the line has a maximum length, so the
+    # loop ends; a last line that no longer grows means nothing more can go.
+    reserve = 0
+    while True:
+        output, skipped = fill(budget - reserve)
+        tail = not_shown(skipped)
+        if len(output) + len(tail) <= budget or len(tail) <= reserve:
+            return output + tail
+        reserve = len(tail)
 
 
 def read_score_ceiling(
@@ -251,8 +433,23 @@ def main() -> int:
     parser.add_argument("--functions-map", type=Path)
     parser.add_argument("--function-sizes", type=Path)
     parser.add_argument("--source-root", type=Path)
+    parser.add_argument(
+        "--attempt-view", action="store_true", help="print what changed since --previous"
+    )
+    parser.add_argument("--previous", type=Path, help="the diff of the last attempt")
     args = parser.parse_args()
     text = args.path.read_text(encoding="utf-8", errors="replace")
+    if args.attempt_view:
+        previous = None
+        if args.previous is not None and args.previous.is_file():
+            previous = args.previous.read_text(encoding="utf-8", errors="replace")
+        # The saved diff is named by the address the writer typed, and
+        # `bc ADDRESS --hunk N` looks it up by that name.
+        view = attempt_view(
+            text, previous, args.source_root or Path("src"), args.address, args.path.stem
+        )
+        print(view, end="")
+        return 0
     lines = text.splitlines()
     found = regions(lines)
     if args.write_compact is not None:

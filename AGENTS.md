@@ -31,12 +31,12 @@ git push origin agent/continuous
 `campaigns start` saves the baseline that `validate` and `record` compare
 against, so run it before the first edit. `bc` builds, compares one function,
 logs the attempt and prints a region index; read regions with
-`bc ADDRESS --hunk N` (no rebuild), never the raw or compact diff file;
-`bc ADDRESS --pack` prints the orientation pack a fresh batch starts from.
-`campaigns finish` stages `src` and the map, runs `validate` (the only gate:
-rebuild, compare, lint, regression check), records the ledger row from fresh
-reports and commits the source, the ledger and `tools/Resources/scoreboard.tsv`
-together, because a commit is what preserves progress; push after every campaign.
+`bc ADDRESS --hunk N` (no rebuild), never the diff files; `bc ADDRESS --pack`
+prints the orientation pack a batch starts from. `campaigns finish` stages `src`
+and the map, runs `validate` (the only gate), records the ledger row and commits
+source, ledger and scoreboard together, because a commit preserves progress;
+push after every campaign. `tools/decomp campaigns run --count N` runs this loop
+with headless writers, because a script spends no tokens between batches.
 
 ## Select work
 

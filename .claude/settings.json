@@ -6,6 +6,7 @@
       "Bash(tools/decomp evidence:*)",
       "Bash(tools/decomp notes:*)",
       "Bash(tools/decomp lint:*)",
+      "Bash(tools/decomp handoff:*)",
       "Bash(tools/decomp candidates:*)",
       "Bash(tools/decomp progress:*)",
       "Bash(tools/decomp campaigns status:*)",
@@ -16,8 +17,15 @@
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(git show:*)",
+      "Bash(git checkout -- src:*)",
+      "Bash(git checkout HEAD --:*)",
+      "Bash(git apply:*)",
       "Bash(sed -n:*)",
       "Bash(grep:*)",
+      "Bash(awk:*)",
+      "Bash(cat:*)",
+      "Bash(wc:*)",
+      "Bash(ls:*)",
       "Bash(python3 -:*)"
     ]
   }

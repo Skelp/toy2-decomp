@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -28,7 +29,6 @@ ATTEMPTS_DIR = attempts_directory()
 BEST_DIR = ROOT / "build" / "decomp-cache" / "best"
 SOURCE_PATHS = ("src", "tools/Resources/functions_map.txt")
 DEFAULT_BUDGET = 12
-EXTENDED_BUDGET = 24
 STALL_ATTEMPTS = 3
 STALL_MIN_GAIN_POINTS = 0.5
 EXTEND_GAIN_POINTS = 1.0
@@ -69,23 +69,159 @@ def parse_diff(text: str) -> tuple[float, bool, bool] | None:
     return round(similarity * 100.0, 2), similarity >= 1.0 and not effective, effective
 
 
+def base_budget() -> int:
+    """Return the base attempt budget. `campaigns run --budget N` exports
+    DECOMP_BUDGET, so the writer's bc counts against the budget the driver enforces."""
+    value = os.environ.get("DECOMP_BUDGET", "")
+    return int(value) if value.isdigit() and int(value) >= 2 else DEFAULT_BUDGET
+
+
 def budget(raws: list[float]) -> tuple[int, bool]:
     """Return (attempt budget, stalled) from the gains of every attempt after the first."""
     gains = [raw - max(raws[:index]) for index, raw in enumerate(raws) if index]
     extended = any(gain >= EXTEND_GAIN_POINTS for gain in gains[-4:])
     recent = gains[-STALL_ATTEMPTS:]
     stalled = len(recent) >= STALL_ATTEMPTS and all(g < STALL_MIN_GAIN_POINTS for g in recent)
-    return (EXTENDED_BUDGET if extended else DEFAULT_BUDGET), stalled
+    return 2 * base_budget() if extended else base_budget(), stalled
 
 
 def read_stats(address: str, directory: Path = ATTEMPTS_DIR) -> dict[str, object]:
     raws = read_raws(address, directory)
     best = max(raws, default=None)
+    limit, stalled = budget(raws)
     return {
         "attempts": len(raws), "best_attempt": raws.index(best) + 1 if raws else None,
         "best_raw": best, "last_raw": raws[-1] if raws else None,
-        "stalled": budget(raws)[1],
+        "stalled": stalled, "limit": limit,
     }
+
+
+# Helpers of `tools/decomp campaigns run`, the scripted loop: they turn tool JSON
+# and text into the tab-separated fields the bash driver reads.
+def subsystem_of(row: dict[str, object]) -> str:
+    """Name a campaign subsystem: the source file stem, else the class of the name."""
+    source = str(row.get("source") or "")
+    if source:
+        return Path(source).stem
+    parts = str(row.get("name") or "").split("::")
+    return parts[-2] if len(parts) >= 2 else (parts[0] or "Unknown")
+
+
+def pick_row(
+    rows: list[dict[str, object]], address: str | None = None,
+    coverage: bool = False, skip: tuple[str, ...] = (),
+) -> dict[str, object] | None:
+    """Return the forced target's row, else the first workable row not in skip."""
+    for row in rows:
+        here = canonical_address(str(row.get("address")))
+        if address is not None:
+            if here == address:
+                return row
+        elif (row.get("work_target") and not row.get("map_defect") and here not in skip
+              and (row.get("dependency_ready") or not coverage)):
+            return row
+    return None
+
+
+def mapped_row(address: str, root: Path) -> dict[str, object] | None:
+    """Describe a forced target that no queue lists, from the map and the source."""
+    name = None
+    map_path = root / "tools" / "Resources" / "functions_map.txt"
+    for line in map_path.read_text(encoding="utf-8").splitlines():
+        parts = line.split(None, 1)
+        if len(parts) == 2 and parts[0].upper() == address.upper():
+            name = parts[1].strip()
+    if name is None:
+        return None
+    state, source = "NOT_STARTED", ""
+    pattern = re.compile(rf"// (FUNCTION|STUB): TOY2 {address}\b", re.I)
+    for path in sorted((root / "src").rglob("*.cpp")):
+        found = pattern.search(path.read_text(encoding="utf-8", errors="ignore"))
+        if found:
+            state, source = found.group(1).upper(), path.relative_to(root / "src").as_posix()
+            break
+    size = 0
+    try:
+        sizes = json.loads((root / "build" / "decomp-function-sizes.json").read_text())
+        size = next(int(i["size"]) for i in sizes if int(i["address"], 16) == int(address, 16))
+    except (OSError, ValueError, StopIteration, KeyError, TypeError):
+        pass
+    return {"address": address, "name": name, "state": state, "size": size, "source": source}
+
+
+def writer_usage(text: str) -> dict[str, object]:
+    """Read the cost, token and turn fields of a `claude -p --output-format json` run."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        data = {}
+    data = data if isinstance(data, dict) else {}
+    usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
+    return {
+        "cost": float(data.get("total_cost_usd") or 0.0),
+        "input": int(usage.get("input_tokens") or 0),
+        "cache_write": int(usage.get("cache_creation_input_tokens") or 0),
+        "cache_read": int(usage.get("cache_read_input_tokens") or 0),
+        "output": int(usage.get("output_tokens") or 0),
+        "turns": int(data.get("num_turns") or 0),
+        "api_ms": int(data.get("duration_api_ms") or 0),
+        "denials": len(data.get("permission_denials") or []),
+        "error": int(bool(data.get("is_error"))),
+        "result": str(data.get("result") or ""),
+    }
+
+
+def writer_failure(fields: dict[str, object], status: int) -> str:
+    """Say why a writer run did no work, or return "" when it ran and returned."""
+    if status == 124:
+        return "the writer timed out"
+    if status == 127:
+        return "the writer command was not found"
+    if status:
+        return f"the writer exited with status {status}"
+    if fields["error"]:
+        first = (str(fields["result"]).strip().splitlines() or ["no text"])[0]
+        return f"the writer reported an error: {first[:120]}"
+    return "" if fields["turns"] else "the writer ran no turn"
+
+
+def handoff_text(fields: dict[str, object]) -> str:
+    """Return a batch writer's final message as handoff text, from its title line on."""
+    if fields["error"]:
+        return ""
+    lines = [line for line in str(fields["result"]).strip().splitlines()
+             if not line.lstrip().startswith("```")]
+    titles = [index for index, line in enumerate(lines) if line.startswith("# ")]
+    return "\n".join(lines[titles[0] if titles else 0:]).strip()
+
+
+def tried_models(handoff: str) -> list[str]:
+    """Return the TRIED lines of a handoff, without the baseline line."""
+    models: list[str] = []
+    inside = False
+    for line in handoff.splitlines():
+        if line.startswith("TRIED"):
+            inside = True
+        elif inside and line[:1] not in (" ", "\t"):
+            break
+        elif inside and line.strip() and "baseline" not in line.lower():
+            models.append(" ".join(line.split()))
+    return models
+
+
+def failure_lines(log: str) -> list[str]:
+    """Return the validate problems and lint findings of a validate log."""
+    found: list[str] = []
+    inside = False
+    for line in log.splitlines():
+        if line.strip() == "validation failed:":
+            inside = True
+            continue
+        inside = inside and line.startswith("- ")
+        if inside or re.search(r": (error|warning): |^lint: failed", line):
+            if line not in found:
+                found.append(line)
+    return found[:40]
 
 
 def clear_attempts(addresses: list[str], directory: Path = ATTEMPTS_DIR) -> None:
@@ -203,7 +339,50 @@ def main(argv: list[str] | None = None) -> int:
     stats = subparsers.add_parser("stats", help="show the attempt counts of a target")
     stats.add_argument("--address", required=True, type=canonical_address)
     stats.add_argument("--json", action="store_true")
+    pick = subparsers.add_parser("pick", help="print the next target of candidates JSON")
+    pick.add_argument("files", nargs="+", type=Path)
+    pick.add_argument("--address", type=canonical_address)
+    pick.add_argument("--coverage", action="store_true")
+    pick.add_argument("--skip", action="append", default=[], type=canonical_address)
+    usage = subparsers.add_parser("writer-usage", help="print the usage fields of a writer run")
+    usage.add_argument("file", type=Path)
+    usage.add_argument("--result", type=int, metavar="LINES", help="print the result tail")
+    usage.add_argument("--failure", type=int, metavar="STATUS", help="say why it did no work")
+    usage.add_argument("--handoff", action="store_true", help="print the result as a handoff")
+    for name in ("tried", "failures"):
+        subparsers.add_parser(name, help=f"print the {name} lines of a file").add_argument(
+            "file", type=Path)
     args = parser.parse_args(argv)
+    if args.command == "pick":
+        rows = [row for path in args.files for row in json.loads(path.read_text() or "[]")]
+        row = pick_row(rows, args.address, args.coverage, tuple(args.skip))
+        if row is None and args.address is not None:
+            row = mapped_row(args.address, args.root)
+        if row is None:
+            return 1
+        fields = (canonical_address(str(row["address"])), row.get("name"), row.get("state"),
+                  row.get("size") or 0, row.get("source") or "", subsystem_of(row))
+        print("\n".join(str(field) for field in fields))
+        return 0
+    if args.command == "writer-usage":
+        text = args.file.read_text(errors="replace") if args.file.is_file() else ""
+        fields = writer_usage(text)
+        if args.failure is not None:
+            output = writer_failure(fields, args.failure)
+        elif args.handoff:
+            output = handoff_text(fields)
+        elif args.result is not None:
+            output = "\n".join(str(fields["result"]).strip().splitlines()[-args.result:])
+        else:
+            output = "\t".join(f"{value:.4f}" if name == "cost" else str(value)
+                               for name, value in fields.items() if name != "result")
+        print(output) if output else None
+        return 0
+    if args.command in ("tried", "failures"):
+        text = args.file.read_text(errors="replace") if args.file.is_file() else ""
+        lines = tried_models(text) if args.command == "tried" else failure_lines(text)
+        print("\n".join(lines)) if lines else None
+        return 0
     if args.command == "attempt":
         for line in log_attempt(args.address, args.diff, args.root, args.quiet):
             print(line)

@@ -30,13 +30,22 @@ Repeat until the user stops you or the stop rule fires:
    then `tools/decomp bc ADDRESS` once: attempt 1 is the baseline.
 3. Reconstruct under the attempt budget (`decomp-expert`), inline or in
    fresh-context batches of four attempts. A batch opens with
-   `tools/decomp bc ADDRESS --pack` and ends by writing the handoff file; run
-   the next batch while the last one gained half a point and budget remains.
+   `tools/decomp bc ADDRESS --pack` and ends with the handoff as the writer's
+   final message; save it with `tools/decomp handoff ADDRESS`. Run the next
+   batch while the last one gained half a point and budget remains.
 4. `tools/decomp campaigns finish --mode MODE --target ADDRESS --note TEXT
    --message FILE` validates, records and commits; then push. Commit every
    validated gain.
 5. After each result read `tools/decomp campaigns summary`. Do not react to a
    low number with tool work; switch queue or family instead.
+
+Without an orchestrating model: `tools/decomp campaigns run --count N` runs
+steps 1-4 and the stop rule below as a script with headless `decomp-expert`
+writers, prints one line per batch and per campaign, and logs to
+`build/decomp-runs/` (`--push` pushes each commit). A writer that does no work
+stops the run without a `no-source` row. Prefer it for unattended work: a
+script spends no tokens between batches, and a model watching a campaign
+spends the most.
 
 Stop rule: three consecutive `no-source` results across two different
 families. Report the numbers and ask the user before continuing.
