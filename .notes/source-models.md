@@ -115,3 +115,12 @@ include the compiled score or the evidence that rejected the model.
 
 - Mode: refinement.
 - Ruled out: Cache g_controlConfigFirstVisibleRow once before the visible-row loop. Use it with a separate row index and ControlConfigEntry cursor to calculate each Y position. The score increased from 63.41 percent to 64.74 percent. The typed-data oracle rejected relocation and data-section regressions.
+
+<!-- campaign-id: e41fef60-20c9-4ff2-82f0-b731859d79e3 -->
+## 2026-09-11 | Collectables | 0x004A0F80
+
+- Mode: refinement.
+- Ruled out: 2 50.66% signed `for (i = 0; i < recordCount; i++)` with `buzzY = (pos.y >> 5) - 0xE6` moved up, distance sum Z+Y+X. The loop re-reads recordCount each pass, so no down-counter. The buzz load order (y, recordData, x, z) matched retail.
+- Ruled out: 3 51.97% same as 2, but with `int32_t pickupCount = recordCount; for (i = 0; i < pickupCount; ...)`. Gives the retail `test/jle` + `dec/jne`, but buzz loads moved to z, recordData, y, x.
+- Ruled out: 4 36.92% cached `g_respawningGadgetPickup` in a local pointer in cases 6/7/8. Large misalignment; stall line printed.
+- Result note: no attempt raised the score
