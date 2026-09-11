@@ -446,7 +446,7 @@ namespace Toy2
 				{
 					g_toyBoxLiftTimer -= Renderer::g_frameDelta;
 					g_toyBoxLiftVelocity += Renderer::g_frameDelta * 0x10;
-					if (g_toyBoxLiftTimer < 1)
+					if (g_toyBoxLiftTimer <= 0)
 						g_toyBoxLiftTimer = -1;
 					Vector3I position;
 					Nu3D::Link::GetCurrentPosFixed(0x13, &position);
@@ -499,23 +499,31 @@ namespace Toy2
 				Vector3I effectPosition = { 0xB3E1A, 0x26720, -0x814C1 };
 				if (Nu3D::Math::IsWithinDistance(&effectPosition, &g_buzzActor.posAngles.pos, 0x280) != 0)
 				{
-					if (g_framePulseOutputs.sixteenTick != 0)
+					// Spray one particle from the path origin toward a random path point every 64 ticks.
+					if (g_framePulseOutputs.sixtyFourTick != 0)
 					{
+						const int32_t PATH_TO_WORLD_SHIFT = 5;
+						const int32_t PATH_DELTA_SHIFT = 8;
+						const int32_t PARTICLE_VELOCITY_DIVISOR = 0x2000;
+						const int32_t PARTICLE_VERTICAL_DIVISOR = 64;
 						Levels::RecordData* path = Levels::g_recordData[0x16];
 						Vector3I* pathOrigin = path->data;
+						int32_t originX = pathOrigin->x << PATH_TO_WORLD_SHIFT;
+						int32_t originY = pathOrigin->y << PATH_TO_WORLD_SHIFT;
+						int32_t originZ = pathOrigin->z << PATH_TO_WORLD_SHIFT;
 						Vector3I* pathTarget = pathOrigin + g_ambientParticlePathPoint;
-						int32_t deltaX = (pathOrigin->x - pathTarget->x) >> 3;
-						int32_t deltaZ = (pathOrigin->z - pathTarget->z) >> 3;
+						int32_t deltaX = (originX - (pathTarget->x << PATH_TO_WORLD_SHIFT)) >> PATH_DELTA_SHIFT;
+						int32_t deltaZ = (originZ - (pathTarget->z << PATH_TO_WORLD_SHIFT)) >> PATH_DELTA_SHIFT;
 						int32_t angle = (Nu3D::Math::CartesianToFixedAngle(deltaX, deltaZ) - 0x800) & 0xFFF;
 						int32_t distance = (int32_t)sqrt((double)(deltaX * deltaX + deltaZ * deltaZ));
 						int32_t speed = distance * 7 / 2;
 						int32_t verticalSpeed = -((distance << 12) / speed) * 0x80;
-						Nu3D::Particles::SpawnInstance(pathOrigin->x << 5,
-							effectPosition.y,
-							effectPosition.x,
-							Numerics::g_sinCosLUT[angle] * speed >> 13,
-							verticalSpeed >> 6,
-							Numerics::g_sinCosLUT[(angle + 0x400) & 0xFFF] * speed >> 13,
+						Nu3D::Particles::SpawnInstance(originX,
+							originY,
+							originZ,
+							Numerics::g_sinCosLUT[angle] * speed / PARTICLE_VELOCITY_DIVISOR,
+							verticalSpeed / PARTICLE_VERTICAL_DIVISOR,
+							Numerics::g_sinCosLUT[(angle + 0x400) & 0xFFF] * speed / PARTICLE_VELOCITY_DIVISOR,
 							0x80,
 							0,
 							((int32_t)*g_randDatBufferPtr++ - 0x80) >> 2,
@@ -535,10 +543,10 @@ namespace Toy2
 							reinterpret_cast<Vector3I*>(reinterpret_cast<int32_t*>(g_ambientParticlePositions) + g_ambientParticlePositionIndex);
 						Nu3D::Particles::SpawnFromPreset(position->x, position->y - 0x800, position->z, 0x22, 2);
 					}
-					Vector3I* particlePosition =
-						reinterpret_cast<Vector3I*>(reinterpret_cast<int32_t*>(g_ambientParticlePositions) + g_ambientParticlePositionIndex);
 					for (int32_t i = 0; i < g_framePulseOutputs.twoTickCount; i++)
 					{
+						Vector3I* particlePosition =
+							reinterpret_cast<Vector3I*>(reinterpret_cast<int32_t*>(g_ambientParticlePositions) + g_ambientParticlePositionIndex);
 						Nu3D::Particles::ParticleInstance* particle =
 							Nu3D::Particles::SpawnFromPreset(particlePosition->x, particlePosition->y, particlePosition->z, 0x10, 10);
 						particle->lifetime = (*g_randDatBufferPtr++ & 0xF) + 0x20;
@@ -770,25 +778,30 @@ namespace Toy2
 			}
 			if (g_poleRecordOffset == 0x3C)
 			{
+				// Hold the camera inside the floor band that Buzz is in.
+				const int32_t LOWER_CAMERA_Y = -150000;
+				const int32_t LOWER_BAND_TOP_Y = -100000;
+				const int32_t MIDDLE_BAND_TOP_Y = -0x10AC0;
+				const int32_t UPPER_CAMERA_Y = -50000;
 				int32_t buzzY = g_buzzActor.posAngles.pos.y;
-				if (buzzY < -100000 && buzzY >= -150000 && Camera::g_gameplayCamera.position.view.pos.y > -150000)
+				if (buzzY > LOWER_CAMERA_Y && buzzY < LOWER_BAND_TOP_Y && Camera::g_gameplayCamera.position.view.pos.y > LOWER_CAMERA_Y)
 				{
-					Camera::g_gameplayCamera.position.view.pos.y = -150000;
-					Camera::g_gameplayCamera.position.view.lookAt.y = -150000;
+					Camera::g_gameplayCamera.position.view.pos.y = LOWER_CAMERA_Y;
+					Camera::g_gameplayCamera.position.view.lookAt.y = LOWER_CAMERA_Y;
 					int32_t delta = ((int16_t)Camera::g_gameplayCamera.state.fields.orbitPitch - 0x300) * Renderer::g_frameDelta;
 					Camera::g_gameplayCamera.state.fields.orbitPitch -= delta / 8;
 				}
-				if (buzzY < -0x10AC0 && buzzY >= -100001 && Camera::g_gameplayCamera.position.view.pos.y < -50000)
+				if (buzzY >= LOWER_BAND_TOP_Y && buzzY < MIDDLE_BAND_TOP_Y && Camera::g_gameplayCamera.position.view.pos.y < UPPER_CAMERA_Y)
 				{
-					Camera::g_gameplayCamera.position.view.pos.y = -50000;
-					Camera::g_gameplayCamera.position.view.lookAt.y = -50000;
+					Camera::g_gameplayCamera.position.view.pos.y = UPPER_CAMERA_Y;
+					Camera::g_gameplayCamera.position.view.lookAt.y = UPPER_CAMERA_Y;
 					int32_t delta = ((int16_t)Camera::g_gameplayCamera.state.fields.orbitPitch + 0x100) * Renderer::g_frameDelta;
 					Camera::g_gameplayCamera.state.fields.orbitPitch -= delta / 8;
 				}
-				if (buzzY >= -0x10AC0 && Camera::g_gameplayCamera.position.view.pos.y < -50000)
+				if (buzzY >= MIDDLE_BAND_TOP_Y && Camera::g_gameplayCamera.position.view.pos.y < UPPER_CAMERA_Y)
 				{
-					Camera::g_gameplayCamera.position.view.pos.y = -50000;
-					Camera::g_gameplayCamera.position.view.lookAt.y = -50000;
+					Camera::g_gameplayCamera.position.view.pos.y = UPPER_CAMERA_Y;
+					Camera::g_gameplayCamera.position.view.lookAt.y = UPPER_CAMERA_Y;
 				}
 			}
 			g_rotatingPlatformAngle = (g_rotatingPlatformAngle + Renderer::g_frameDelta * 0x20) & 0xFFF;
