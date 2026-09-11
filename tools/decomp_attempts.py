@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -24,9 +26,10 @@ def attempts_directory(root: Path = ROOT) -> Path:
 
 ATTEMPTS_DIR = attempts_directory()
 BEST_DIR = ROOT / "build" / "decomp-cache" / "best"
+SOURCE_PATHS = ("src", "tools/Resources/functions_map.txt")
 DEFAULT_BUDGET = 12
 EXTENDED_BUDGET = 24
-STALL_ATTEMPTS = 5
+STALL_ATTEMPTS = 3
 STALL_MIN_GAIN_POINTS = 0.5
 EXTEND_GAIN_POINTS = 1.0
 
@@ -38,15 +41,23 @@ def canonical_address(value: str) -> str:
         raise argparse.ArgumentTypeError("use an address such as 0x00401000") from error
 
 
-def read_raws(address: str, directory: Path = ATTEMPTS_DIR) -> list[float]:
-    """Return the logged similarity percentages of a target in attempt order."""
+def read_rows(address: str, directory: Path = ATTEMPTS_DIR) -> list[dict[str, object]]:
+    """Return the logged attempt rows of a target in attempt order."""
     path = directory / f"{canonical_address(address)}.jsonl"
     text = path.read_text(encoding="utf-8") if path.exists() else ""
     try:
         rows = [json.loads(line) for line in text.splitlines() if line.strip()]
     except json.JSONDecodeError:
         return []
-    return [float(row["raw"]) for row in rows if isinstance(row.get("raw"), (int, float))]
+    return [
+        row for row in rows
+        if isinstance(row, dict) and isinstance(row.get("raw"), (int, float))
+    ]
+
+
+def read_raws(address: str, directory: Path = ATTEMPTS_DIR) -> list[float]:
+    """Return the logged similarity percentages of a target in attempt order."""
+    return [float(row["raw"]) for row in read_rows(address, directory)]
 
 
 def parse_diff(text: str) -> tuple[float, bool, bool] | None:
@@ -73,6 +84,7 @@ def read_stats(address: str, directory: Path = ATTEMPTS_DIR) -> dict[str, object
     return {
         "attempts": len(raws), "best_attempt": raws.index(best) + 1 if raws else None,
         "best_raw": best, "last_raw": raws[-1] if raws else None,
+        "stalled": budget(raws)[1],
     }
 
 
@@ -81,16 +93,56 @@ def clear_attempts(addresses: list[str], directory: Path = ATTEMPTS_DIR) -> None
         (directory / f"{canonical_address(address)}.jsonl").unlink(missing_ok=True)
 
 
-def save_best_patch(address: str, root: Path) -> Path | None:
-    command = ["git", "diff", "HEAD", "--", "src", "tools/Resources/functions_map.txt"]
+def source_diff(root: Path) -> bytes | None:
+    """Return the diff of the source paths against HEAD, or None when git fails."""
+    command = ["git", "diff", "HEAD", "--", *SOURCE_PATHS]
     try:
-        diff = subprocess.run(command, cwd=root, capture_output=True, text=True, check=True)
+        return subprocess.run(command, cwd=root, capture_output=True, check=True).stdout
     except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def source_tree(diff: bytes | None) -> str:
+    """Return the sha256 of a source diff, or an empty string when git failed."""
+    return "" if diff is None else hashlib.sha256(diff).hexdigest()
+
+
+def save_best_diffs(address: str, diff_path: Path, root: Path) -> list[Path]:
+    """Copy the verbose and compact diffs of a new best next to its patch."""
+    name = canonical_address(address)
+    compact_path = diff_path.with_name(f"{diff_path.stem}.compact.txt")
+    copied: list[Path] = []
+    for source, suffix in ((diff_path, ".txt"), (compact_path, ".compact.txt")):
+        if not source.is_file():
+            continue
+        target = root / "build" / "decomp-cache" / "best" / f"{name}{suffix}"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+        copied.append(target)
+    return copied
+
+
+def save_best_patch(
+    address: str, root: Path, diff_path: Path | None = None, diff: bytes | None = None
+) -> Path | None:
+    """Save the source diff (and the attempt's diffs) as the best of a target."""
+    if diff_path is not None:
+        save_best_diffs(address, diff_path, root)
+    diff = source_diff(root) if diff is None else diff
+    if diff is None:
         return None
     path = root / "build" / "decomp-cache" / "best" / f"{canonical_address(address)}.patch"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(diff.stdout, encoding="utf-8")
+    path.write_bytes(diff)
     return path
+
+
+def unchanged_line(last: dict[str, object], count: int) -> str:
+    """Describe the last attempt that already measured the current source tree."""
+    return (
+        f"source unchanged since attempt {last.get('n', count)} "
+        f"(score {float(last['raw']):.2f}%); not logged"
+    )
 
 
 def log_attempt(
@@ -104,11 +156,19 @@ def log_attempt(
     if parsed is None:
         return [f"warning: no similarity verdict in {diff_path}; attempt not logged"]
     raw, exact, effective = parsed
-    raws = read_raws(address, attempts_directory(root))
+    rows = read_rows(address, attempts_directory(root))
+    diff = source_diff(root)
+    tree = source_tree(diff)
+    if rows and tree and rows[-1].get("tree") == tree:
+        return [unchanged_line(rows[-1], len(rows))]
+    raws = [float(row["raw"]) for row in rows]
     previous_best = max(raws, default=None)
     raws.append(raw)
     at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-    row = {"n": len(raws), "at": at, "raw": raw, "exact": exact, "effective": effective}
+    row = {
+        "n": len(raws), "at": at, "raw": raw, "exact": exact, "effective": effective,
+        "tree": tree,
+    }
     path = attempts_directory(root) / f"{canonical_address(address)}.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
@@ -119,12 +179,12 @@ def log_attempt(
         f"  best {best:.2f}% (attempt {raws.index(best) + 1})"
     ]
     if previous_best is None or raw > previous_best:
-        patch = save_best_patch(address, root)
+        patch = save_best_patch(address, root, diff_path, diff)
         if patch is not None and not quiet:
             lines.append(f"best patch: {patch}")
     if stalled:
         lines.append(f"stall: {STALL_ATTEMPTS} attempts without a {STALL_MIN_GAIN_POINTS:g}-point "
-                     "gain; commit the best model or record no-source")
+                     "gain; stop this batch")
     if count >= limit:
         lines.append(f"budget: {count} attempts used; finish this campaign")
     return lines

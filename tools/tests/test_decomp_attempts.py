@@ -69,6 +69,7 @@ class AttemptTests(unittest.TestCase):
         self.assertEqual(rows[0]["raw"], 60.0)
         self.assertFalse(rows[0]["exact"] or rows[0]["effective"])
         self.assertTrue(rows[0]["at"].endswith("+00:00"))
+        self.assertEqual(rows[0]["tree"], "")  # no git repo: every attempt is logged
 
     def test_a_one_point_gain_extends_the_budget_for_four_attempts(self):
         self.log(similar(60))
@@ -81,15 +82,13 @@ class AttemptTests(unittest.TestCase):
         self.assertTrue(sixth[0].startswith("attempt 6/12"), sixth)
         self.assertIn("best 61.50% (attempt 2)", sixth[0])
 
-    def test_stall_hint_after_five_attempts_without_a_half_point_gain(self):
-        for _ in range(5):
+    def test_stall_hint_after_three_attempts_without_a_half_point_gain(self):
+        for _ in range(3):
             lines = self.log(similar(70))
         self.assertFalse(any(line.startswith("stall") for line in lines), lines)
         lines = self.log(similar(70.4))
         self.assertIn(
-            "stall: 5 attempts without a 0.5-point gain; "
-            "commit the best model or record no-source",
-            lines,
+            "stall: 3 attempts without a 0.5-point gain; stop this batch", lines
         )
         lines = self.log(similar(71))
         self.assertFalse(any(line.startswith("stall") for line in lines), lines)
@@ -101,30 +100,96 @@ class AttemptTests(unittest.TestCase):
         lines = self.log(similar(50))
         self.assertIn("budget: 12 attempts used; finish this campaign", lines)
 
+    def edit_source(self, text: str) -> None:
+        (self.root / "src" / "Target.cpp").write_text(text, encoding="utf-8")
+
     def test_a_new_best_saves_the_source_patch_from_git(self):
         self.make_repo()
-        (self.root / "src" / "Target.cpp").write_text("int a;\nint b;\n", encoding="utf-8")
+        self.edit_source("int a;\nint b;\n")
         lines = self.log(similar(40))
         patch = self.best_dir / f"{ADDRESS}.patch"
         self.assertIn(f"best patch: {patch}", lines)
         self.assertIn("+int b;", patch.read_text(encoding="utf-8"))
         patch.write_text("stale", encoding="utf-8")
+        self.edit_source("int a;\nint b;\nint c;\n")
         self.log(similar(40))
         self.assertEqual(patch.read_text(encoding="utf-8"), "stale")
+        self.edit_source("int a;\nint b;\nint d;\n")
         self.log(similar(41))
-        self.assertIn("+int b;", patch.read_text(encoding="utf-8"))
+        self.assertIn("+int d;", patch.read_text(encoding="utf-8"))
 
     def test_git_failure_skips_the_patch_silently(self):
         lines = self.log(similar(40))
         self.assertEqual(len(lines), 1)
-        self.assertFalse(self.best_dir.exists())
+        self.assertFalse((self.best_dir / f"{ADDRESS}.patch").exists())
+        # the diff of the best attempt is still kept for the writer
+        self.assertEqual(
+            (self.best_dir / f"{ADDRESS}.txt").read_text(encoding="utf-8"), similar(40)
+        )
+
+    def test_an_unchanged_source_tree_is_not_logged_again(self):
+        self.make_repo()
+        self.edit_source("int a;\nint b;\n")
+        self.log(similar(40))
+        lines = self.log(similar(40.5))
+        self.assertEqual(
+            lines, ["source unchanged since attempt 1 (score 40.00%); not logged"]
+        )
+        lines = self.log(similar(40.5), quiet=True)
+        self.assertEqual(
+            lines, ["source unchanged since attempt 1 (score 40.00%); not logged"]
+        )
+        path = self.attempts_dir / f"{ADDRESS}.jsonl"
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(len(rows[0]["tree"]), 64)
+        self.edit_source("int a;\nint b;\nint c;\n")
+        lines = self.log(similar(40.8))
+        self.assertTrue(lines[0].startswith("attempt 2/12  raw 40.80% (+0.80)"), lines)
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        self.assertEqual(len(rows), 2)
+        self.assertNotEqual(rows[0]["tree"], rows[1]["tree"])
+
+    def test_a_row_without_a_tree_never_blocks_the_next_attempt(self):
+        self.make_repo()
+        self.attempts_dir.mkdir(parents=True)
+        (self.attempts_dir / f"{ADDRESS}.jsonl").write_text(
+            json.dumps({"n": 1, "raw": 30.0}) + "\n", encoding="utf-8"
+        )
+        lines = self.log(similar(30.5))
+        self.assertTrue(lines[0].startswith("attempt 2/12  raw 30.50% (+0.50)"), lines)
+
+    def test_a_new_best_keeps_its_verbose_and_compact_diffs(self):
+        diffs = self.root / "build" / "decomp-diffs"
+        diffs.mkdir(parents=True)
+        verbose, compact = diffs / f"{ADDRESS}.txt", diffs / f"{ADDRESS}.compact.txt"
+        verbose.write_text(similar(50) + "0x401000 : -mov eax, edi\n", encoding="utf-8")
+        compact.write_text("-- region 1 --\n", encoding="utf-8")
+        attempts.log_attempt(ADDRESS, verbose, self.root)
+        best_verbose = self.best_dir / f"{ADDRESS}.txt"
+        best_compact = self.best_dir / f"{ADDRESS}.compact.txt"
+        self.assertEqual(best_verbose.read_text(encoding="utf-8"), verbose.read_text())
+        self.assertEqual(best_compact.read_text(encoding="utf-8"), "-- region 1 --\n")
+        verbose.write_text(similar(45) + "0x401000 : -push ebx\n", encoding="utf-8")
+        compact.write_text("-- region 1 -- worse\n", encoding="utf-8")
+        attempts.log_attempt(ADDRESS, verbose, self.root)
+        self.assertIn("-mov eax, edi", best_verbose.read_text(encoding="utf-8"))
+        self.assertEqual(best_compact.read_text(encoding="utf-8"), "-- region 1 --\n")
+        compact.unlink()
+        verbose.write_text(similar(55), encoding="utf-8")
+        attempts.log_attempt(ADDRESS, verbose, self.root)
+        self.assertEqual(best_verbose.read_text(encoding="utf-8"), similar(55))
+        self.assertEqual(best_compact.read_text(encoding="utf-8"), "-- region 1 --\n")
 
     def test_stats_reports_the_best_attempt_as_json(self):
         code, text = self.run_main("stats", "--address", ADDRESS, "--json")
         self.assertEqual(code, 0)
         self.assertEqual(
             json.loads(text),
-            {"attempts": 0, "best_attempt": None, "best_raw": None, "last_raw": None},
+            {
+                "attempts": 0, "best_attempt": None, "best_raw": None, "last_raw": None,
+                "stalled": False,
+            },
         )
         for percent in (55, 58, 57):
             self.log(similar(percent))
@@ -132,12 +197,20 @@ class AttemptTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(
             json.loads(text),
-            {"attempts": 3, "best_attempt": 2, "best_raw": 58.0, "last_raw": 57.0},
+            {
+                "attempts": 3, "best_attempt": 2, "best_raw": 58.0, "last_raw": 57.0,
+                "stalled": False,
+            },
         )
         code, text = self.run_main("stats", "--address", ADDRESS)
         self.assertEqual(
-            text.strip(), "attempts=3 best_attempt=2 best_raw=58.0 last_raw=57.0"
+            text.strip(),
+            "attempts=3 best_attempt=2 best_raw=58.0 last_raw=57.0 stalled=False",
         )
+        for percent in (57, 57):
+            self.log(similar(percent))
+        code, text = self.run_main("stats", "--address", ADDRESS, "--json")
+        self.assertEqual(json.loads(text)["stalled"], True)
 
     def test_unparsable_or_missing_diff_warns_and_exits_zero(self):
         self.diff.write_text("reccmp: error: nothing here\n", encoding="utf-8")
@@ -185,8 +258,7 @@ class AttemptTests(unittest.TestCase):
         self.assertEqual(
             text.splitlines(),
             [
-                "stall: 5 attempts without a 0.5-point gain; commit the best model or "
-                "record no-source",
+                "stall: 3 attempts without a 0.5-point gain; stop this batch",
                 "budget: 12 attempts used; finish this campaign",
             ],
         )

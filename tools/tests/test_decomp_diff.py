@@ -80,8 +80,23 @@ class DiffRegionTests(unittest.TestCase):
         lines = summary.splitlines()
         self.assertTrue(lines[0].startswith("Target is only 40.00%"))
         self.assertIn("Regions: 3; changed lines: 6 of", summary)
+        self.assertIn("(regions: `bc ADDRESS --hunk N`)", summary)
+        self.assertNotIn("read the compact file", summary)
         self.assertIn("compact: c.txt", summary)
         self.assertLessEqual(len(lines), 7)
+
+    def test_region_index_is_never_truncated(self):
+        lines = [f"0x{0x401000 + number:x} : push ebx" for number in range(600)]
+        for number in range(0, 600, 4):  # every fourth line changes: 150 regions
+            lines[number] = f"0x{0x401000 + number:x} : -mov eax, edi"
+        found = diff.regions(lines)
+        self.assertEqual(len(found), 150)
+        index = diff.region_index(found)
+        self.assertEqual(len(index), 150)
+        self.assertTrue(index[-1].startswith("150  0x"), index[-1])
+        self.assertFalse(any("more regions" in row for row in index))
+        summary = diff.summarize("\n".join(lines), Path("diff.txt"))
+        self.assertEqual(len(summary.splitlines()), 150 + 3)
 
     def test_compact_keeps_changed_lines_and_anchors_only(self):
         text = diff.compact(self.lines, self.found)

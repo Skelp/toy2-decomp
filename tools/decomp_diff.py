@@ -20,7 +20,6 @@ CHANGED_LINE = re.compile(r"^(?:0x[0-9a-f]+)?\s*:\s*[-+]")
 ADDRESS_LINE = re.compile(r"^(0x[0-9a-f]+)\s*:")
 SOURCE_REF = re.compile(r"\(([A-Za-z0-9_./-]+):(\d+)\)")
 HUNK_HEADER = re.compile(r"^@@ ")
-MAX_INDEX_ROWS = 60
 REGION_GAP = 2
 
 
@@ -91,15 +90,13 @@ def regions(lines: list[str]) -> list[Region]:
     return result
 
 
-def region_index(found: list[Region], limit: int = MAX_INDEX_ROWS) -> list[str]:
-    rows = [
+def region_index(found: list[Region]) -> list[str]:
+    """Return one row per region; the index is never truncated."""
+    return [
         f"{region.number:3d}  {region.address or '-':<10} -{region.minus:<3d}+{region.plus:<3d} "
         f"{region.source_span()}"
-        for region in found[:limit]
+        for region in found
     ]
-    if len(found) > limit:
-        rows.append(f"... {len(found) - limit} more regions (see the compact file)")
-    return rows
 
 
 def region_header(region: Region) -> str:
@@ -236,7 +233,7 @@ def summarize(
     output.append(saved)
     output.append(
         f"Regions: {len(found)}; changed lines: {changed} of {len(lines)}"
-        "  (read the compact file once; then `bc ADDRESS --hunk N` for one region)"
+        "  (regions: `bc ADDRESS --hunk N`)"
     )
     output.extend(region_index(found))
     return "\n".join(output) + "\n"

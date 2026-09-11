@@ -35,13 +35,29 @@ build() {
     ) || return
 }
 
+# Run one build with its output captured to build/decomp-diffs/build.log so
+# only diagnostics and a one-line verdict reach the writer.
+build_quietly() {
+    local log="build/decomp-diffs/build.log"
+    local started=$SECONDS
+    local status=0
+    mkdir -p build/decomp-diffs
+    "$@" > "$log" 2>&1 || status=$?
+    grep -E ' error |fatal error|build stopped|error LNK' "$log" >&2 || true
+    if [[ $status -ne 0 ]]; then
+        echo "build: FAILED, see $log" >&2
+        return "$status"
+    fi
+    echo "build: OK ($((SECONDS - started)) s)"
+}
+
 # The reccmp "[INFO] Found ..." lines carry no signal for a writer, so only
 # warnings and errors reach the terminal.
 build_game() {
     if [[ ! -f build/build.ninja ]]; then
         configure || return
     fi
-    cmake --build build --target toy2decomp -- "-j${build_jobs}" || return
+    build_quietly cmake --build build --target toy2decomp -- "-j${build_jobs}" || return
     (
         cd build
         reccmp-project detect --what recompiled 2> >(grep -v '^\[INFO\]' >&2)
@@ -262,11 +278,11 @@ validate() {
         return 2
     fi
 
-    build
-    write_comparison_report decomp-current-report.json
+    build || return
+    write_comparison_report decomp-current-report.json || return
     local with_data_reports=0
     if [[ $mode == data || $mode == resource || -f build/decomp-baseline-data-report.json ]]; then
-        write_data_report decomp-current-data-report.json
+        write_data_report decomp-current-data-report.json || return
         with_data_reports=1
     fi
     local verify_args=(
@@ -300,20 +316,150 @@ validate() {
     if [[ -n $accounting_correction ]]; then
         verify_args+=(--accounting-correction "$accounting_correction")
     fi
-    python tools/decomp_verify.py "${verify_args[@]}"
+    python tools/decomp_verify.py "${verify_args[@]}" || return
     python tools/decomp_verify.py scoreboard build/decomp-current-report.json \
-        tools/Resources/scoreboard.tsv --generated-by validate
+        tools/Resources/scoreboard.tsv --generated-by validate || return
     for target in "${targets[@]}"; do
-        python tools/decomp_campaigns.py first-score --address "$target" --quiet
+        python tools/decomp_campaigns.py first-score --address "$target" --quiet || return
     done
     if [[ $mode == resource ]]; then
-        python tools/decomp_campaigns.py resource-score --quiet
+        python tools/decomp_campaigns.py resource-score --quiet || return
     fi
     if [[ $staged -eq 1 ]]; then
-        python tools/decomp_lint.py --staged --warnings-as-errors
+        python tools/decomp_lint.py --staged --warnings-as-errors || return
     fi
-    python tools/ghidra_sync.py check
+    python tools/ghidra_sync.py check || return
     git diff --check
+}
+
+# Say which attempt a saved diff belongs to before a --hunks/--hunk/--compact view.
+saved_diff_line() {
+    local stats
+    stats=$(python tools/decomp_attempts.py stats --address "$1" --json) || return 0
+    python -c '
+import json, sys
+stats = json.loads(sys.argv[1])
+if stats["last_raw"] is None:
+    print("saved diff: no logged attempt for " + sys.argv[2])
+else:
+    print("saved diff: attempt {}, score {:.2f}%".format(stats["attempts"], stats["last_raw"]))
+' "$stats" "$1" || true
+}
+
+# A dirty header can move functions the writer never touched. Show them at bc
+# time instead of at validate. Information only, never a failure.
+header_side_effects() {
+    write_comparison_report decomp-score-report.json || return 0
+    python tools/decomp_verify.py score --changed build/decomp-score-report.json \
+        --baseline build/decomp-baseline-report.json --exclude "$1" || true
+}
+
+# Turn a coverage target's STUB annotation into a FUNCTION annotation.
+promote_stub() {
+    local address="$1"
+    local path
+    while IFS= read -r path; do
+        sed -i "s|// STUB: TOY2 ${address}\b|// FUNCTION: TOY2 ${address} [PROVISIONAL]|" "$path" \
+            || return
+        echo "promoted: $path: STUB ${address} -> FUNCTION [PROVISIONAL]"
+    done < <(grep -rl -- "// STUB: TOY2 ${address}\b" src || true)
+}
+
+finish_usage() {
+    echo "Usage: tools/decomp campaigns finish --mode MODE --target ADDR [--target ADDR ...]" \
+        "--note TEXT --message FILE"
+}
+
+# campaigns finish: promote STUBs, refresh tags, stage, validate --staged,
+# record, commit, then forget the targets' handoff and attempt files. Every
+# step is fatal with one line; a validate failure records nothing.
+campaign_finish() {
+    local mode="" note="" message="" target
+    local targets=() target_args=() canonical=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help) finish_usage; return 0 ;;
+        esac
+        if [[ $# -lt 2 ]]; then
+            echo "error: finish argument $1 needs a value" >&2
+            return 2
+        fi
+        case "$1" in
+            --mode) mode="$2" ;;
+            --note) note="$2" ;;
+            --message) message="$2" ;;
+            --target) targets+=("$2") ;;
+            *) echo "error: unknown finish argument: $1" >&2; finish_usage >&2; return 2 ;;
+        esac
+        shift 2
+    done
+    if [[ $mode != coverage && $mode != refinement && $mode != data ]]; then
+        echo "error: finish needs --mode coverage, refinement, or data" >&2
+        return 2
+    fi
+    if [[ ${#targets[@]} -eq 0 ]]; then
+        echo "error: finish needs at least one --target address" >&2
+        return 2
+    fi
+    if [[ -z $note ]]; then
+        echo "error: finish needs --note TEXT for the campaign record" >&2
+        return 2
+    fi
+    if [[ -z $message || ! -s $message ]]; then
+        echo "error: finish needs --message FILE holding the commit message" >&2
+        return 2
+    fi
+    for target in "${targets[@]}"; do
+        if [[ ! $target =~ ^0x[0-9A-Fa-f]{1,8}$ ]]; then
+            echo "error: finish needs addresses such as 0x00401230, not $target" >&2
+            return 2
+        fi
+        canonical+=("$(printf '0x%08X' "$target")")
+        target_args+=(--target "$target")
+    done
+    if [[ $mode == coverage ]]; then
+        for target in "${canonical[@]}"; do
+            promote_stub "$target" || { echo "error: STUB promotion of $target failed" >&2; return 1; }
+        done
+    fi
+    if [[ $mode != data ]]; then
+        # validate demands the tag fresh verification requires (MATCHED at
+        # 100%, EFFECTIVE, else PROVISIONAL), so set it from a fresh report.
+        build_game || { echo "error: the game build failed; finish stopped" >&2; return 1; }
+        write_comparison_report decomp-current-report.json \
+            || { echo "error: the comparison report failed; finish stopped" >&2; return 1; }
+        python tools/decomp_verify.py annotations build/decomp-current-report.json --write \
+            || { echo "error: the annotation tags could not be refreshed" >&2; return 1; }
+    fi
+    git add src tools/Resources/functions_map.txt \
+        || { echo "error: git add of the source tree failed" >&2; return 1; }
+    local log="build/decomp-diffs/validate.log"
+    mkdir -p build/decomp-diffs
+    if ! validate --mode "$mode" "${target_args[@]}" --staged > "$log" 2>&1; then
+        grep -vE '^\[[0-9]+/[0-9]+\] |: warning [A-Z]+[0-9]+:' "$log" | tail -n 30 || true
+        echo "error: validate failed; nothing was recorded (full log: $log)" >&2
+        return 1
+    fi
+    grep -E '^0x[0-9A-Fa-f]{8}  ' "$log" || true
+    echo "validate: OK (log: $log)"
+    # The record path of `campaigns record`: fresh reports, then the ledger row.
+    if ! campaign_state_is_finalizing "$campaign_state_file"; then
+        build || { echo "error: the record build failed; nothing was recorded" >&2; return 1; }
+        write_comparison_report decomp-current-report.json \
+            || { echo "error: the record comparison report failed" >&2; return 1; }
+        write_data_report decomp-current-data-report.json \
+            || { echo "error: the record data report failed" >&2; return 1; }
+    fi
+    python tools/decomp_campaigns.py "${campaign_global_arguments[@]}" record \
+        --result source --note "$note" \
+        || { echo "error: campaigns record failed; nothing was committed" >&2; return 1; }
+    git add tools/Resources/campaign-ledger.jsonl tools/Resources/scoreboard.tsv \
+        || { echo "error: git add of the campaign records failed" >&2; return 1; }
+    git commit -q -F "$message" || { echo "error: git commit failed" >&2; return 1; }
+    for target in "${canonical[@]}"; do
+        rm -f "build/decomp-cache/handoff/${target}.md" "build/decomp-attempts/${target}.jsonl"
+    done
+    echo "finished: $(git rev-parse --short HEAD)"
 }
 
 experiment() {
@@ -448,7 +594,7 @@ Commands:
   sync [args]       Import matched functions/types/globals into Ghidra via reccmp
 
 The loop (see AGENTS.md): candidates -> campaigns start -> evidence -> edit ->
-bc (repeat) -> validate --staged -> campaigns record -> commit -> push.
+bc (repeat) -> campaigns finish (validate --staged, record, commit) -> push.
   tools/decomp candidates --refine --yield --why      # or --coverage --why
   tools/decomp candidates --for 0x00401230 --why      # explain one target
   tools/decomp campaigns start --mode refinement --address 0x00403640 \
@@ -456,6 +602,8 @@ bc (repeat) -> validate --staged -> campaigns record -> commit -> push.
   tools/decomp evidence 0x00403640 [--disasm | --unmapped | --full]
   tools/decomp bc 0x00403640          # logs the attempt, saves the best patch
   tools/decomp validate --mode refinement --target 0x00403640 --staged
+  tools/decomp campaigns finish --mode refinement --target 0x00403640 \
+    --note "result note" --message commit-message.txt   # or record by hand:
   tools/decomp campaigns record --result source
   tools/decomp campaigns record --result no-source --model "rejected model"
   tools/decomp campaigns evidence --address 0x00403640 --kind analogue \
@@ -495,6 +643,7 @@ case "$command" in
     campaigns)
         for campaign_argument in "$@"; do
             if [[ $campaign_argument == -h || $campaign_argument == --help ]]; then
+                case " $* " in *" finish "*) finish_usage; exit 0 ;; esac
                 exec python tools/decomp_campaigns.py "$@"
             fi
         done
@@ -565,6 +714,9 @@ case "$command" in
                 write_comparison_report decomp-current-report.json
                 write_data_report decomp-current-data-report.json
                 exec python tools/decomp_campaigns.py "$@"
+                ;;
+            finish)
+                campaign_finish "${campaign_arguments[@]:$((campaign_index + 1))}"
                 ;;
             *)
                 exec python tools/decomp_campaigns.py "$@"
@@ -652,13 +804,18 @@ case "$command" in
                 echo "error: no saved diff for $1; run tools/decomp bc $1 first" >&2
                 exit 2
             fi
+            saved_diff_line "$1"
             exec python tools/decomp_diff.py "$diff_path" "${view[@]}"
         fi
-        build_game
+        build_game || exit $?
         (cd build && reccmp-reccmp --target TOY2 --no-color --verbose "$1") \
             > "$diff_path" 2> "$diff_path.stderr" || true
         grep -v '^\[INFO\]' "$diff_path.stderr" >&2 || true
         rm -f "$diff_path.stderr"
+        if git diff --name-only HEAD -- src | grep -q '\.h$'; then
+            header_side_effects "$1"
+        fi
+        python tools/decomp_attempts.py attempt --address "$1" --diff "$diff_path" || true
         diff_args=(
             "$diff_path"
             --address "$1"
@@ -672,7 +829,6 @@ case "$command" in
         else
             python tools/decomp_diff.py "${diff_args[@]}"
         fi
-        python tools/decomp_attempts.py attempt --address "$1" --diff "$diff_path" || true
         python tools/decomp_campaigns.py first-score --address "$1" --quiet
         ;;
     baseline)

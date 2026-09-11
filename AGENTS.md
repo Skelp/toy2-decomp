@@ -24,21 +24,19 @@ tools/decomp candidates --refine --yield --why --limit 15   # or --coverage --wh
 tools/decomp campaigns start --mode MODE --address ADDRESS --subsystem NAME
 tools/decomp evidence ADDRESS
 # edit -> clang-format -i FILE -> tools/decomp bc ADDRESS (repeat)
-git add src tools/Resources/functions_map.txt
-tools/decomp validate --mode MODE --target ADDRESS --staged
-tools/decomp campaigns record --result source
-git commit && git push origin agent/continuous
+tools/decomp campaigns finish --mode MODE --target ADDRESS --note TEXT --message FILE
+git push origin agent/continuous
 ```
 
 `campaigns start` saves the baseline that `validate` and `record` compare
 against, so run it before the first edit. `bc` builds, compares one function,
-logs the attempt and prints a region index; read the compact diff
-`build/decomp-diffs/ADDRESS.compact.txt` once, then `bc ADDRESS --hunk N` per
-region (no rebuild). The raw diff is mostly unchanged context. `validate` is
-the only gate: it rebuilds, compares, checks lint and rejects regressions.
-`record` measures the result from fresh reports and appends the ledger row.
-Commit the source, the ledger and `tools/Resources/scoreboard.tsv` together,
-because a commit is what preserves progress; push after every campaign.
+logs the attempt and prints a region index; read regions with
+`bc ADDRESS --hunk N` (no rebuild), never the raw or compact diff file. The
+orchestrator hands each batch an orientation pack of the same views.
+`campaigns finish` stages `src` and the map, runs `validate` (the only gate:
+rebuild, compare, lint, regression check), records the ledger row from fresh
+reports and commits the source, the ledger and `tools/Resources/scoreboard.tsv`
+together, because a commit is what preserves progress; push after every campaign.
 
 ## Select work
 
@@ -59,7 +57,7 @@ source debt; the estimate columns order the queue and are never a reason to stop
 Budget by attempts, not by the clock, because a timer that the loop itself
 shortens starves the writer. One attempt is one `bc` run. Default 12 attempts;
 24 for a family anchor or while the last four attempts gained a point or more.
-Stop after five attempts without a half-point gain. Two pivots per campaign via
+Stop after three attempts without a half-point gain. Two pivots per campaign via
 `campaigns add-target`. Time is recorded for measurement and never enforced.
 These numbers are provisional until 40 campaigns are logged.
 
@@ -106,7 +104,7 @@ rejects that, because an exact match full of offsets is a transliteration.
 Do not add speculative abstractions, casts that hide a wrong type, dummy locals
 or expression churn only to raise a score. Do not polish a function above about
 90 percent when only symbols, register allocation or scheduling differ.
-Headers are part of the reconstruction; check every user after a layout change.
+A type one function needs goes file-local; a shared-header edit moves other functions.
 
 ## Translation units
 

@@ -1,72 +1,80 @@
 ---
 name: decomp-expert
-description: Complete one Toy Story 2 reconstruction campaign (coverage, refinement or data) under the attempt budget in AGENTS.md. Use for a single assigned target or family anchor.
+description: Run one batch (about four bc attempts) or one validate repair of a Toy Story 2 reconstruction campaign. The orchestrator supplies the target, the phase and an orientation pack; this file is the exact command sequence.
 ---
 
 # Decomp expert
 
-Own one campaign in the canonical tree. Follow `AGENTS.md`; this skill is the
-order of operations.
+AGENTS.md (in your context via CLAUDE.md) holds the rules; this file holds the mechanics.
+Never read AGENTS.md, CLAUDE.md or this file again. Never read tools/*.py or --help; if a
+tool prints something you cannot act on, quote it in the handoff TOOL line and stop.
 
-## Procedure
+## Tool facts
 
-1. Confirm the branch, the assigned mode and addresses, and that
-   `tools/decomp campaigns status` shows the campaign started. The contract is
-   already in your context; do not re-read `AGENTS.md` or this file.
-2. `tools/decomp evidence ADDRESS` (once; `--full` only for a named gap). Read
-   the strings section first, then callers, callees, globals and the
-   decompilation. Search `tools/decomp notes QUERY --source models`.
-3. Establish the ABI, data model, control flow, ownership and supported names
-   before writing the body. Choose the translation unit from evidence.
-4. `tools/decomp bc ADDRESS` for the baseline. It prints the score and a region
-   index (one line per mismatch region with its source lines). Read
-   `build/decomp-diffs/ADDRESS.compact.txt` once, in one call; never page
-   through the raw diff. After each later `bc`, read only the index and
-   `tools/decomp bc ADDRESS --hunk N` for the regions you are working on.
-5. Write the simplest plausible C++; format only the changed lines
-   (`clang-format -i --lines=A:B FILE`). One source-level idea per `bc`. Batch
-   independent reads into one command. Keep the best model; the best-scoring
-   patch is saved under `build/decomp-cache/best/`.
-6. Stop at the budget line, at five attempts without a half-point gain, or when
-   no trial tests a concrete model question. For data work rebuild and run
-   `tools/decomp data ADDRESS` instead of `bc`.
-7. Pivot at most twice inside the subsystem with
-   `tools/decomp campaigns add-target --address NEW`.
+- `tools/decomp bc ADDR` builds, compares, logs one attempt, saves the diff and prints
+  `attempt K/N raw X% (+d) best Y% (attempt k)` plus a region index
+  (`N  0xADDR  -a +b  FILE:LINES`). It is the only command that consumes an attempt.
+- `bc ADDR --hunks` reprints the index and `bc ADDR --hunk N` one region, both from the
+  saved diff, without building. After an edit, plain `bc` first.
+- Never pipe `bc` into `head` or `tail`: a closed pipe aborts the build. Remove noise
+  only with the grep filter in the cycle below.
+- A `header side effect:` line under the index means your header edit moved an untouched
+  function; make the type file-local in the next attempt.
+- The best-scoring tree is saved as `build/decomp-cache/best/ADDR.patch` (with its diff
+  beside it); `git checkout -- src && git apply build/decomp-cache/best/ADDR.patch`
+  restores it.
+- `tools/decomp evidence ADDR --decomp-range A:B` prints decompilation lines A-B.
+- Source files use tabs. An edit that does not apply is the usual lost attempt, so every
+  edit asserts its anchor before the build runs, and edit and bc are `&&`-chained.
 
-## Batches and handoff
+## The attempt cycle (one shell call per attempt)
 
-A long context re-reads every earlier step on every call, so a campaign runs
-as batches of about four attempts, each in a fresh context. At the end of a
-batch write `build/decomp-cache/handoff/ADDRESS.md` (under 40 lines): best
-score and attempt, whether the tree holds the best model, every idea tried
-with its score, the open hypotheses in priority order, and the source lines
-touched. A resumed batch reads that file, the region index and only the
-regions it needs, and continues from the open hypotheses. Finish the
-campaign only when the assignment says so.
+    python3 - <<'EOF' && clang-format -i --lines=A:B FILE && tools/decomp bc ADDR 2>&1 | grep -vE 'warning C4|LNK4'
+    p='FILE'; s=open(p).read()
+    old="""EXACT LINES INCLUDING TABS"""
+    new="""REPLACEMENT"""
+    assert s.count(old)==1, s.count(old)
+    open(p,'w').write(s.replace(old,new))
+    EOF
 
-## Finish
+One source-level idea per cycle. Then `tools/decomp bc ADDR --hunk N` only for regions
+whose `-a +b` counts changed, and `sed -n A,Bp FILE` only for lines you will edit next.
+If the score dropped, restore the best patch in the same call as the next edit. Never
+read the compact or raw diff files or anything under tool-results/: the pack, the index
+and two or three regions are enough to choose the next idea. Batch independent reads.
 
-Source result: convert each completed `STUB` to `FUNCTION`; update the map
-when a name changes; `git add src tools/Resources/functions_map.txt`;
-`tools/decomp validate --mode MODE --target ADDRESS --staged`;
-`tools/decomp campaigns record --result source`; commit source, ledger and
-`tools/Resources/scoreboard.tsv` in one commit; push.
+## Scope rules
 
-No-source result: `git checkout -- src`; `tools/decomp campaigns record
---result no-source --model "..."` once per rejected model; commit the ledger and
-`.notes/source-models.md` entry; push.
+- Edit only the target function's .cpp and a header included by that one .cpp. Never
+  change a header or macro shared by other translation units: in the pilot such edits
+  regressed untouched functions and cost 10 to 40 minutes at validate. A type the
+  function needs goes file-local; note the header idea under OPEN.
+- Stop the batch after two consecutive attempts that gain under half a point, or at the
+  attempt count the assignment gives. Leave the tree holding the best model.
+- Never run validate, record, commit or push unless the assignment says REPAIR.
 
-Return this summary:
+## Handoff (end of every batch, under 40 lines, quoted heredoc, no python)
 
-```text
-MODE: coverage | refinement | data
-RESULT: source | no-source
-COMMIT: <sha or none>
-ADDRESSES: <list>
-MATCH_BEFORE: <address=percent/status>
-MATCH_AFTER: <address=percent/status>
-ATTEMPTS: <count>
-BEST_ATTEMPT: <index>
-MINUTES: <all-in minutes>
-NEXT: <best next target or blocking fact>
-```
+    mkdir -p build/decomp-cache/handoff && cat > build/decomp-cache/handoff/ADDR.md <<'EOF'
+    # ADDR NAME - batch N (MODE)
+    BEST: X% at attempt K (baseline B%). Tree holds best: yes. Patch: build/decomp-cache/best/ADDR.patch
+    ABI: (coverage only) convention, parameters, return, frame size
+    TRIED (attempt score idea, one line each, earlier batches carried forward):
+     1 B% baseline
+    OPEN (priority order; region numbers from the attempt-K index, with retail addresses):
+     1. regions R (0xADDR): hypothesis; the exact source form to build
+    LINES: FILE:A-B
+    TOOL: exact text of any tool error, else none
+    EOF
+
+Return only three lines: `BEST: X% attempt K`, `ATTEMPTS: a-b`, `HANDOFF: written` (or the
+tool error). The orchestrator reads the file itself and runs validate, record and commit.
+
+## Repair (only when the assignment says REPAIR; at most one validate run)
+
+The assignment quotes the `validation failed:` lines. `untouched function score regressed`
+means a shared header or macro changed: `git checkout HEAD -- FILE`, keep the type
+file-local. `annotation is untagged` means add the tag it names. A `source debt` line
+names a lint rule to fix in the target only. Then one call:
+`git add src tools/Resources/functions_map.txt && tools/decomp validate --mode MODE --target ADDR --staged 2>&1 | grep -vE 'warning C4|LNK4' | tail -25`
+Return `VALIDATE: passed` or the `validation failed:` lines verbatim, then stop.

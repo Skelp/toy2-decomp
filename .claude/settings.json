@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tools/decomp bc:*)",
+      "Bash(tools/decomp score:*)",
+      "Bash(tools/decomp evidence:*)",
+      "Bash(tools/decomp notes:*)",
+      "Bash(tools/decomp lint:*)",
+      "Bash(tools/decomp candidates:*)",
+      "Bash(tools/decomp progress:*)",
+      "Bash(tools/decomp campaigns status:*)",
+      "Bash(tools/decomp campaigns summary:*)",
+      "Bash(tools/decomp validate:*)",
+      "Bash(clang-format:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(sed -n:*)",
+      "Bash(grep:*)",
+      "Bash(python3 -:*)"
+    ]
+  }
+}

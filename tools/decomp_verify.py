@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from tools.decomp_status import (  # noqa: E402
+    MatchStatus,
     is_symbol_only_diff,
     read_match_statuses,
     read_tool_artifacts,
@@ -43,6 +44,9 @@ FUNCTION_SIZES = ROOT / "build" / "decomp-function-sizes.json"
 # continues later instead of discarding thousands of retail bytes of work.
 PROVISIONAL_COVERAGE_MIN_SIZE = 2048
 PROVISIONAL_COVERAGE_MIN_SCORE = 0.25
+# A header edit moves a function the writer never touched when its effective
+# score changes by this many percentage points (the display resolution).
+HEADER_SIDE_EFFECT_MIN_POINTS = 0.01
 
 
 def provisional_coverage_ok(
@@ -961,6 +965,97 @@ def score(report: Path, addresses: list[int], source_root: Path = ROOT / "src") 
     return 1 if failed else 0
 
 
+def dirty_headers(root: Path = ROOT) -> list[str]:
+    """Return the headers under src that differ from HEAD, as git names them."""
+    command = ["git", "diff", "--name-only", "HEAD", "--", "src"]
+    try:
+        result = subprocess.run(command, cwd=root, capture_output=True, text=True, check=True)
+    except (OSError, subprocess.CalledProcessError):
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip().endswith(".h")]
+
+
+def parse_ninja_deps(text: str) -> dict[str, list[str]]:
+    """Map each object in ``ninja -t deps`` output to its recorded dependency paths."""
+    deps: dict[str, list[str]] = {}
+    current: list[str] | None = None
+    for line in text.splitlines():
+        if line[:1].isspace():
+            if current is not None and line.strip():
+                current.append(line.strip().replace("\\", "/"))
+        elif "#deps" in line:
+            current = deps.setdefault(line.split(":", 1)[0].strip(), [])
+        else:
+            current = None
+    return deps
+
+
+def ninja_deps(build_root: Path = ROOT / "build") -> dict[str, list[str]] | None:
+    """Return the recorded ninja dependencies, or None when ninja is unavailable."""
+    command = ["ninja", "-C", str(build_root), "-t", "deps"]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return parse_ninja_deps(result.stdout)
+
+
+def translation_units_including(header: str, deps: dict[str, list[str]] | None) -> str:
+    """Count the objects whose recorded dependencies include the header, or '?'."""
+    if deps is None:
+        return "?"
+    suffix = "/" + header
+    return str(
+        sum(
+            1
+            for paths in deps.values()
+            if any(path == header or path.endswith(suffix) for path in paths)
+        )
+    )
+
+
+def header_side_effects(
+    baseline: dict[int, MatchStatus], current: dict[int, MatchStatus], excluded: set[int]
+) -> list[tuple[int, float, float]]:
+    """Functions outside ``excluded`` whose effective score moved between the reports."""
+    moved = []
+    for address in sorted(baseline):
+        after = current.get(address)
+        if after is None or address in excluded:
+            continue
+        before_score, after_score = effective_score(baseline[address]), effective_score(after)
+        if abs(after_score - before_score) * 100 >= HEADER_SIDE_EFFECT_MIN_POINTS - 1e-9:
+            moved.append((address, before_score, after_score))
+    return moved
+
+
+def report_header_side_effects(
+    baseline_path: Path,
+    current_path: Path,
+    excluded: set[int],
+    root: Path = ROOT,
+    build_root: Path = ROOT / "build",
+) -> int:
+    """Print the untouched functions a dirty header moved; information only."""
+    moved = header_side_effects(
+        read_match_statuses(baseline_path), read_match_statuses(current_path), excluded
+    )
+    if not moved:
+        return 0
+    for address, before, after in moved:
+        print(f"header side effect: 0x{address:08X} {before * 100:.2f}% -> {after * 100:.2f}%")
+    deps = ninja_deps(build_root)
+    headers = ", ".join(
+        f"{header} ({translation_units_including(header, deps)} translation units)"
+        for header in dirty_headers(root)
+    )
+    print(
+        f"header side effect: {len(moved)} untouched function(s) moved; "
+        f"dirty headers: {headers or 'none'}"
+    )
+    return 0
+
+
 def validate(
     baseline_path: Path,
     current_path: Path,
@@ -1351,9 +1446,20 @@ def main() -> int:
     classify_parser.add_argument("--source-root", type=Path, default=ROOT / "src")
 
     score_parser = subparsers.add_parser("score")
-    score_parser.add_argument("report", type=Path)
-    score_parser.add_argument("addresses", nargs="+", type=parse_address)
+    score_parser.add_argument("report", type=Path, nargs="?")
+    score_parser.add_argument("addresses", nargs="*", type=parse_address)
     score_parser.add_argument("--source-root", type=Path, default=ROOT / "src")
+    score_parser.add_argument(
+        "--changed", type=Path, help="current report to compare against --baseline"
+    )
+    score_parser.add_argument("--baseline", type=Path, help="report to compare --changed with")
+    score_parser.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        type=parse_address,
+        help="campaign target to leave out of the --changed comparison",
+    )
 
     validate_parser = subparsers.add_parser("validate")
     validate_parser.add_argument("baseline", type=Path)
@@ -1411,6 +1517,12 @@ def main() -> int:
     if args.command == "classify":
         return classify(args.report, args.address, args.source_root)
     if args.command == "score":
+        if args.changed is not None or args.baseline is not None:
+            if args.changed is None or args.baseline is None:
+                score_parser.error("--changed and --baseline go together")
+            return report_header_side_effects(args.baseline, args.changed, set(args.exclude))
+        if args.report is None or not args.addresses:
+            score_parser.error("score needs a report and at least one address")
         return score(args.report, args.addresses, args.source_root)
     if args.command == "annotations":
         if args.write:

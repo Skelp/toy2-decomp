@@ -1164,5 +1164,107 @@ class VerifyRegressionTests(unittest.TestCase):
             self.assertEqual(cli_lines[1:], lines[1:])
 
 
+class HeaderSideEffectTests(unittest.TestCase):
+    """`score --changed CURRENT --baseline BASELINE --exclude TARGET` output."""
+
+    NINJA_DEPS = (
+        "CMakeFiles/toy2decomp.dir/src/A.cpp.obj: #deps 2, deps mtime 1 (VALID)\n"
+        "    ../src/A.cpp\n"
+        "    ../src/Numerics.h\n"
+        "\n"
+        "CMakeFiles/toy2decomp.dir/src/B.cpp.obj: deps not found\n"
+        "\n"
+        "CMakeFiles/patcher.dir/src/C.cpp.obj: #deps 2, deps mtime 1 (VALID)\n"
+        "    Z:\\proj\\src\\C.cpp\n"
+        "    Z:\\proj\\src\\Numerics.h\n"
+    )
+
+    def write_report(self, directory, name, rows):
+        path = Path(directory) / name
+        path.write_text(json.dumps({"data": rows}), encoding="utf-8")
+        return path
+
+    def run_score(self, baseline, current, exclude, headers, deps):
+        argv = [
+            "decomp_verify.py", "score", "--changed", str(current),
+            "--baseline", str(baseline), "--exclude", exclude,
+        ]
+        with mock.patch.object(VERIFY, "dirty_headers", return_value=headers), \
+             mock.patch.object(VERIFY, "ninja_deps", return_value=deps), \
+             mock.patch.object(VERIFY.sys, "argv", argv), \
+             contextlib.redirect_stdout(io.StringIO()) as output:
+            status = VERIFY.main()
+        return status, output.getvalue().splitlines()
+
+    def test_moved_untouched_functions_are_listed_with_the_dirty_headers(self):
+        with tempfile.TemporaryDirectory() as root:
+            baseline = self.write_report(root, "baseline.json", [
+                {"address": "0x41c190", "matching": 0.8916},
+                {"address": "0x41c640", "matching": 0.5},
+                {"address": "0x41c700", "matching": 1.0},
+                {"address": "0x41c800", "matching": 0.7, "effective": True},
+            ])
+            current = self.write_report(root, "current.json", [
+                {"address": "0x41c190", "matching": 0.8075},
+                {"address": "0x41c640", "matching": 0.9},
+                {"address": "0x41c700", "matching": 1.0},
+                {"address": "0x41c800", "matching": 0.7},
+                {"address": "0x41c900", "matching": 0.4},
+            ])
+            deps = VERIFY.parse_ninja_deps(self.NINJA_DEPS)
+            status, lines = self.run_score(
+                baseline, current, "0x41c640", ["src/Numerics.h", "src/Toy2/Levels.h"], deps
+            )
+        self.assertEqual(status, 0)
+        self.assertEqual(lines, [
+            "header side effect: 0x0041C190 89.16% -> 80.75%",
+            "header side effect: 0x0041C800 100.00% -> 70.00%",
+            "header side effect: 2 untouched function(s) moved; dirty headers: "
+            "src/Numerics.h (2 translation units), src/Toy2/Levels.h (0 translation units)",
+        ])
+
+    def test_nothing_is_printed_below_the_display_resolution(self):
+        with tempfile.TemporaryDirectory() as root:
+            baseline = self.write_report(root, "baseline.json", [
+                {"address": "0x41c190", "matching": 0.8916},
+                {"address": "0x41c640", "matching": 0.5},
+            ])
+            current = self.write_report(root, "current.json", [
+                {"address": "0x41c190", "matching": 0.89164},
+                {"address": "0x41c640", "matching": 0.2},
+            ])
+            status, lines = self.run_score(baseline, current, "0x41c640", ["src/X.h"], None)
+        self.assertEqual((status, lines), (0, []))
+
+    def test_translation_unit_counts_fall_back_without_ninja(self):
+        deps = VERIFY.parse_ninja_deps(self.NINJA_DEPS)
+        self.assertEqual(sorted(deps), [
+            "CMakeFiles/patcher.dir/src/C.cpp.obj", "CMakeFiles/toy2decomp.dir/src/A.cpp.obj",
+        ])
+        self.assertEqual(VERIFY.translation_units_including("src/Numerics.h", deps), "2")
+        self.assertEqual(VERIFY.translation_units_including("src/C.cpp", deps), "1")
+        self.assertEqual(VERIFY.translation_units_including("src/Numerics.h", None), "?")
+        with tempfile.TemporaryDirectory() as root:
+            baseline = self.write_report(root, "baseline.json", [
+                {"address": "0x41c190", "matching": 0.5},
+            ])
+            current = self.write_report(root, "current.json", [
+                {"address": "0x41c190", "matching": 0.6},
+            ])
+            status, lines = self.run_score(baseline, current, "0x41c640", ["src/X.h"], None)
+        self.assertEqual(lines, [
+            "header side effect: 0x0041C190 50.00% -> 60.00%",
+            "header side effect: 1 untouched function(s) moved; dirty headers: "
+            "src/X.h (? translation units)",
+        ])
+
+    def test_score_still_needs_a_report_and_addresses_without_changed(self):
+        argv = ["decomp_verify.py", "score", "--baseline", "x.json"]
+        with mock.patch.object(VERIFY.sys, "argv", argv), \
+             contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                VERIFY.main()
+
+
 if __name__ == "__main__":
     unittest.main()
