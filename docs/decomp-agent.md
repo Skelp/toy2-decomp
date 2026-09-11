@@ -16,8 +16,8 @@ Scripted runs (`tools/decomp campaigns run`; `--harness auto` picks the session)
 3. Watch it with `tools/decomp campaigns run --status`, not by reading logs. The
    last line is `run: exit N (REASON); next: COMMAND`.
 4. Stop it with `kill -TERM PID` (a background run ignores Ctrl-C; `kill -9`
-   leaves the writer running). The open campaign is aborted; restore src with
-   `git checkout HEAD -- src tools/Resources/functions_map.txt`. To keep the best
+   leaves the writer running). The open campaign is aborted; restore src with `git checkout
+   --no-overlay HEAD -- src tools/Resources/functions_map.txt CMakeLists.txt && git clean -fd src`. To keep the best
    model, then start a campaign, `git apply build/decomp-cache/best/ADDR.patch`, finish.
 
 A Codex sandbox blocks the network of its commands, so no writer reaches its API:

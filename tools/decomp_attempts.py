@@ -29,7 +29,9 @@ def attempts_directory(root: Path = ROOT) -> Path:
 
 ATTEMPTS_DIR = attempts_directory()
 BEST_DIR = ROOT / "build" / "decomp-cache" / "best"
-SOURCE_PATHS = ("src", "tools/Resources/functions_map.txt")
+SOURCE_PATHS = ("src", "tools/Resources/functions_map.txt", "CMakeLists.txt")
+# The suffixes a campaign may create; anything else under src stays out of the patch.
+NEW_SOURCE_SUFFIXES = (".cpp", ".h", ".inc")
 CAMPAIGN_STATE = Path("build") / "decomp-campaign-state.json"
 DEFAULT_BUDGET = 12
 STALL_ATTEMPTS = 3
@@ -835,10 +837,26 @@ def clear_attempts(addresses: list[str], directory: Path = ATTEMPTS_DIR) -> None
 
 
 def source_diff(root: Path) -> bytes | None:
-    """Return the diff of the source paths against HEAD, or None when git fails."""
+    """Return the diff of the source paths against HEAD, or None when git fails.
+
+    New files under src are not tracked yet; each one is added as a new-file
+    patch, so the tree hash sees it and `git apply` of the best patch makes it again.
+    Only the suffixes a campaign writes are scanned: a stray binary file under src
+    would make a patch that `git apply` refuses, and the patch is the only way back.
+    """
     command = ["git", "diff", "HEAD", "--", *SOURCE_PATHS]
+    untracked = ["git", "ls-files", "-z", "--others", "--exclude-standard", "--",
+                 *(f"src/*{suffix}" for suffix in NEW_SOURCE_SUFFIXES)]
     try:
-        return subprocess.run(command, cwd=root, capture_output=True, check=True).stdout
+        diff = subprocess.run(command, cwd=root, capture_output=True, check=True).stdout
+        names = subprocess.run(untracked, cwd=root, capture_output=True, check=True).stdout
+        for name in sorted(filter(None, names.split(b"\0"))):
+            new = subprocess.run(["git", "diff", "--no-index", "--", "/dev/null", os.fsdecode(name)],
+                                 cwd=root, capture_output=True, check=False)
+            if new.returncode not in (0, 1):
+                return None
+            diff += new.stdout
+        return diff
     except (OSError, subprocess.CalledProcessError):
         return None
 

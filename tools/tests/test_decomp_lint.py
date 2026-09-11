@@ -399,6 +399,20 @@ class CrossFileTests(unittest.TestCase):
         findings = self.repeated_type_findings(sources)
         self.assertNotIn("repeated-private-type", {item.rule for item in findings})
 
+    def test_a_subsystem_internal_header_is_a_local_definition(self):
+        definition = "namespace Toy2 { struct IniState { int line; const char* text; }; }\n"
+        use = '#include "Toy2/Toy2Internal.h"\n'
+        for header in ("Toy2/Toy2Internal.h", "Toy2/Internal/IniTypes.h"):
+            with self.subTest(header=header):
+                shared = self.repeated_type_findings({header: definition, "Toy2.cpp": use, "Ini.cpp": use})
+                self.assertNotIn("repeated-private-type", {item.rule for item in shared})
+                leftover = self.repeated_type_findings({header: definition, "Ini.cpp": definition})
+                repeated = [item for item in leftover if item.rule == "repeated-private-type"]
+                self.assertEqual(len(repeated), 2)
+                self.assertIn("Internal.h", repeated[0].detail)
+        plain = self.repeated_type_findings({"Toy2/Ini.h": definition, "Ini.cpp": definition})
+        self.assertNotIn("repeated-private-type", {item.rule for item in plain})
+
     def test_array_extents_remain_distinct(self):
         sources = {
             f"{index}.cpp": f"struct Table {{ Record records[{index}]; int end; }};\n"
@@ -442,6 +456,17 @@ class CrossFileTests(unittest.TestCase):
             )
             findings = lint.scan_units([header, source])
         self.assertNotIn("signature-concealment", {item.rule for item in findings})
+
+
+class ExplicitTargetTests(unittest.TestCase):
+    def test_a_named_path_that_is_gone_is_skipped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            present = root / "Present.cpp"
+            present.write_text("// FUNCTION: TOY2 0x00401000\nvoid f() {}\n", encoding="utf-8")
+            # `git diff --name-only` still names a file the campaign deleted or moved.
+            units = lint.target_units(False, [str(present), str(root / "Moved.cpp")])
+        self.assertEqual([unit.path for unit in units], [present.resolve()])
 
 
 class StagedSourceTests(unittest.TestCase):

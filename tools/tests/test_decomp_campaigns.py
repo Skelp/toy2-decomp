@@ -622,6 +622,56 @@ class CampaignTests(unittest.TestCase):
                     now=paths["started"] + timedelta(minutes=10),
                 )
 
+    def make_structure_campaign(self, root: Path, after_score: float = 0.25):
+        subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+        paths = {name: root / f"{name}.json" for name in ("state", "before", "after", "before_data", "after_data")}
+        paths.update(ledger=root / "ledger.jsonl", models=root / "models.md", map=root / "functions_map.txt",
+                     sizes=root / "function_sizes.json")
+        paths["map"].write_text("0x00401000 Target\n0x00401064 Next\n", encoding="utf-8")
+        paths["sizes"].write_text(json.dumps([{"address": "00401000", "size": 100}]), encoding="utf-8")
+        self.write_code_report(paths["before"], 0.25)
+        self.write_code_report(paths["after"], after_score)
+        self.write_data_report(paths["before_data"], 40)
+        self.write_data_report(paths["after_data"], 40)
+        started = datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc)
+        with self.assertRaisesRegex(ValueError, "a structure campaign cannot have source targets"):
+            campaigns.start_campaign(paths["state"], "structure", ["0x00401000"], "Toy2.Ini", started,
+                                     worktree_root=root)
+        campaigns.start_campaign(paths["state"], "structure", [], "Toy2.Ini", started, worktree_root=root)
+        campaigns.attach_baseline(paths["state"], paths["before"], paths["before_data"], paths["map"],
+                                  paths["sizes"], started + timedelta(minutes=1), root / "src")
+        return paths, started
+
+    def test_structure_campaign_records_a_structure_row_without_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            paths, started = self.make_structure_campaign(Path(directory))
+            with self.assertRaisesRegex(ValueError, "cannot add a source target"):
+                campaigns.add_target(paths["state"], "0x00401000", started + timedelta(minutes=2))
+            with self.assertRaisesRegex(ValueError, "must use --result structure"):
+                campaigns.record_campaign(paths["ledger"], paths["state"], paths["models"], paths["after"],
+                                          paths["after_data"], "source", now=started + timedelta(minutes=9))
+            item = campaigns.record_campaign(paths["ledger"], paths["state"], paths["models"], paths["after"],
+                                             paths["after_data"], "structure", note="Moved Ini to Ini.cpp.",
+                                             now=started + timedelta(minutes=9))
+            self.assertEqual((item["mode"], item["result"], item["addresses"]), ("structure", "structure", []))
+            self.assertEqual((item["effective_bytes"], item["initialized_bytes"]), (0.0, 0.0))
+            self.assertEqual(json.loads(paths["ledger"].read_text(encoding="utf-8"))["result"], "structure")
+            output = StringIO()
+            with redirect_stdout(output):
+                campaigns.print_summary(campaigns.read_records(paths["ledger"]), 0)
+            self.assertIn("Structure campaigns: 1 of 1 records", output.getvalue())
+            self.assertIn("at most 1 in 10", output.getvalue())
+            self.assertIn("Timed campaigns: 0", output.getvalue())
+
+    def test_structure_result_rejects_a_score_change(self):
+        with tempfile.TemporaryDirectory() as directory:
+            paths, started = self.make_structure_campaign(Path(directory), after_score=0.5)
+            with self.assertRaisesRegex(ValueError, "--result structure disagrees"):
+                campaigns.record_campaign(paths["ledger"], paths["state"], paths["models"], paths["after"],
+                                          paths["after_data"], "structure", now=started + timedelta(minutes=9))
+        with self.assertRaisesRegex(ValueError, "requires an active structure campaign"):
+            campaigns._validate_result_mode("refinement", "structure")
+
     def test_record_rejects_a_changed_baseline_report(self):
         with tempfile.TemporaryDirectory() as directory:
             paths = self.make_measured_campaign(Path(directory))

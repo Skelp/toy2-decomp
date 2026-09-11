@@ -25,7 +25,8 @@ same tree at the same time.
 Repeat until the user stops you or the stop rule fires:
 
 1. Pick the top credible row (AGENTS.md "Select work"); every third campaign
-   take a coverage row.
+   take a coverage row. When `tools/decomp structure` marks a file split, one
+   `--mode structure` campaign moves one block out of it, at most one in ten.
 2. `tools/decomp campaigns start --mode MODE --address ADDRESS --subsystem NAME`,
    then `tools/decomp bc ADDRESS` once: attempt 1 is the baseline.
 3. Reconstruct under the attempt budget (`decomp-expert`), inline or in

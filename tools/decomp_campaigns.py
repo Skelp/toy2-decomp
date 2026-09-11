@@ -828,9 +828,9 @@ def _validate_campaign_targets(state: dict[str, object]) -> None:
         if not isinstance(resource, str):
             raise ValueError("a resource campaign needs exactly one resource")
         parse_resource(resource)
-    elif mode == "meta":
+    elif mode in ("meta", "structure"):
         if addresses or resource is not None:
-            raise ValueError("a meta campaign cannot have source targets")
+            raise ValueError(f"a {mode} campaign cannot have source targets")
     else:
         raise ValueError(f"active campaign has invalid mode: {mode}")
 
@@ -856,9 +856,8 @@ def start_campaign(
         raise ValueError("an active campaign already exists. Record or abort it first")
     if mode in ("coverage", "refinement", "data") and not addresses:
         raise ValueError("a source campaign needs at least one --address")
-    if mode in ("meta", "resource") and addresses:
-        label = "meta" if mode == "meta" else "resource"
-        raise ValueError(f"a {label} campaign cannot have source targets")
+    if mode in ("meta", "resource", "structure") and addresses:
+        raise ValueError(f"a {mode} campaign cannot have source targets")
     if mode == "resource" and len(resources) != 1:
         raise ValueError("a resource campaign needs exactly one --resource")
     if mode != "resource" and resources:
@@ -1097,7 +1096,7 @@ def add_target(
     state = read_state(state_path)
     if state.get("phase") == "finalizing":
         raise ValueError("campaign finalization is pending. Retry campaigns record")
-    if state.get("mode") in ("meta", "resource"):
+    if state.get("mode") in ("meta", "resource", "structure"):
         raise ValueError(f"a {state.get('mode')} campaign cannot add a source target")
     if not state.get("baseline_at"):
         raise ValueError("attach the campaign baseline before adding a target")
@@ -1239,6 +1238,11 @@ def _validate_result_mode(mode: str, result: str) -> None:
         raise ValueError("a meta campaign must use --result meta-fix")
     if mode != "meta" and result == "meta-fix":
         raise ValueError("--result meta-fix requires an active meta campaign")
+    # A structure campaign moves code between files and changes no score.
+    if mode == "structure" and result != "structure":
+        raise ValueError("a structure campaign must use --result structure")
+    if mode != "structure" and result == "structure":
+        raise ValueError("--result structure requires an active structure campaign")
 
 
 def _validate_timeline(
@@ -1655,6 +1659,12 @@ def record_campaign(
         or not math.isclose(resource_delta, 0.0, rel_tol=0.0, abs_tol=0.01)
     ):
         raise ValueError("--result no-source disagrees with the report deltas")
+    if result == "structure":
+        if not math.isclose(effective_delta, 0.0, rel_tol=0.0, abs_tol=0.01) or not math.isclose(
+            initialized_delta, 0.0, rel_tol=0.0, abs_tol=0.01
+        ):
+            raise ValueError("--result structure disagrees with the report deltas")
+        effective_delta = initialized_delta = 0.0
     _assert_close("--effective-bytes", supplied_effective_bytes, effective_delta)
     _assert_close("--initialized-bytes", supplied_initialized_bytes, initialized_delta)
 
@@ -1880,8 +1890,10 @@ def print_summary(records: list[dict[str, object]], limit: int) -> None:
     measured = [
         item
         for item in selected
-        if item.get("mode") != "meta" and float(item.get("minutes", 0.0) or 0.0) > 0
+        if item.get("mode") not in ("meta", "structure")
+        and float(item.get("minutes", 0.0) or 0.0) > 0
     ]
+    structures = sum(item.get("result") == "structure" for item in selected)
     effective = sum(float(item.get("effective_bytes", 0.0) or 0.0) for item in measured)
     initialized = sum(float(item.get("initialized_bytes", 0) or 0) for item in measured)
     resources = sum(
@@ -1894,6 +1906,9 @@ def print_summary(records: list[dict[str, object]], limit: int) -> None:
     print(f"Records: {len(selected)}")
     print(f"Timed campaigns: {len(measured)} ({sources} source, {no_sources} no-source)")
     print(f"Report-derived campaigns: {report_measured}")
+    if structures:
+        print(f"Structure campaigns: {structures} of {len(selected)} records "
+              "(no bytes, outside the rate; at most 1 in 10)")
     print(f"Elapsed: {minutes:.1f} minutes")
     print(f"Effective code: {effective:+.2f} bytes")
     print(f"Initialized data: {initialized:+.2f} bytes")
@@ -2000,7 +2015,7 @@ def make_parser() -> argparse.ArgumentParser:
     start = subparsers.add_parser("start", help="start a measured campaign")
     start.add_argument(
         "--mode", required=True,
-        choices=("coverage", "refinement", "data", "resource", "meta"),
+        choices=("coverage", "refinement", "data", "resource", "meta", "structure"),
     )
     start.add_argument("--address", action="append", default=[], type=parse_address)
     start.add_argument("--resource", action="append", default=[], type=parse_resource)
@@ -2031,10 +2046,12 @@ def make_parser() -> argparse.ArgumentParser:
     add_target_parser.add_argument("--address", required=True, type=parse_address)
 
     record = subparsers.add_parser("record", help="record one completed measured campaign")
-    record.add_argument("--result", required=True, choices=("source", "no-source", "meta-fix"))
+    record.add_argument(
+        "--result", required=True, choices=("source", "no-source", "meta-fix", "structure")
+    )
     record.add_argument(
         "--mode",
-        choices=("coverage", "refinement", "data", "resource", "meta"),
+        choices=("coverage", "refinement", "data", "resource", "meta", "structure"),
         help="optional assertion against the active campaign",
     )
     record.add_argument(

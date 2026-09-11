@@ -109,5 +109,134 @@ class UnmappedStartTests(unittest.TestCase):
         self.assertIn("g_dispatch (Renderer.cpp:10)", output.getvalue())
 
 
+class PlacementTests(unittest.TestCase):
+    ADDRESSES = [0x401000, 0x401100, 0x401200, 0x401300, 0x401400, 0x401500]
+
+    def placement(self, address, owners):
+        functions = {key: ("FUNCTION", source, 1) for key, source in owners.items()}
+        return decomp_evidence.placement_line(address, self.ADDRESSES, functions)
+
+    def test_agreeing_neighbours_name_their_file(self):
+        line = self.placement(0x401200, {0x401000: "Toy2/Ini.cpp", 0x401500: "Toy2/Ini.cpp"})
+        self.assertEqual(line, "placement: src/Toy2/Ini.cpp (both neighbours)")
+
+    def test_the_contiguous_side_wins_when_the_neighbours_disagree(self):
+        line = self.placement(0x401200, {0x401100: "Toy2/Ini.cpp", 0x401500: "Toy2/Toy2.cpp"})
+        self.assertEqual(
+            line, "placement: src/Toy2/Ini.cpp (contiguous; other side in src/Toy2/Toy2.cpp)"
+        )
+        line = self.placement(0x401200, {0x401000: "Toy2/Ini.cpp", 0x401300: "Toy2/Toy2.cpp"})
+        self.assertTrue(line.startswith("placement: src/Toy2/Toy2.cpp (contiguous"), line)
+
+    def test_a_gap_on_both_sides_or_no_gap_on_either_names_a_boundary(self):
+        expected = (
+            "placement: boundary between src/Toy2/Ini.cpp and src/Toy2/Toy2.cpp; a new file "
+            "unless a run of one of them reaches this block "
+            "(tools/decomp structure src/Toy2/Ini.cpp)"
+        )
+        gapped = self.placement(0x401200, {0x401000: "Toy2/Ini.cpp", 0x401500: "Toy2/Toy2.cpp"})
+        adjacent = self.placement(0x401200, {0x401100: "Toy2/Ini.cpp", 0x401300: "Toy2/Toy2.cpp"})
+        self.assertEqual(gapped, expected)
+        self.assertEqual(adjacent, expected)
+
+    def test_annotated_one_sided_unmapped_and_empty_cases(self):
+        self.assertEqual(
+            self.placement(0x401200, {0x401200: "Toy2/Ini.cpp", 0x401000: "Toy2/Toy2.cpp"}),
+            "placement: src/Toy2/Ini.cpp (annotated)",
+        )
+        self.assertEqual(
+            self.placement(0x401500, {0x401000: "Toy2/Ini.cpp"}),
+            "placement: src/Toy2/Ini.cpp (only annotated neighbour)",
+        )
+        # An unmapped start between 0x401100 and 0x401200 touches both entries.
+        self.assertEqual(
+            self.placement(0x401180, {0x401100: "Toy2/Ini.cpp", 0x401300: "Toy2/Toy2.cpp"}),
+            "placement: src/Toy2/Ini.cpp (contiguous; other side in src/Toy2/Toy2.cpp)",
+        )
+        self.assertTrue(self.placement(0x401200, {}).startswith("placement: no annotated"))
+        # Outside the mapped range no neighbour means anything.
+        for address in (0x400000, 0x900000):
+            self.assertEqual(
+                self.placement(address, {0x401000: "Toy2/Ini.cpp"}),
+                "placement: outside the mapped range; choose the file from retail source paths",
+            )
+
+
+class StructureReportTests(unittest.TestCase):
+    def test_runs_prefixes_large_files_and_the_core_count(self):
+        from pathlib import Path
+        import tempfile
+
+        from tools.decomp_annotations import Annotation
+
+        entries = [
+            (0x401000, "Toy2::Ini::Parse"),
+            (0x401100, "Toy2::ReadIniFile"),
+            (0x401200, "Toy2::Level::Start"),
+            (0x401300, "Unmapped::Gap"),
+            (0x401400, "Toy2::Ini::Close"),
+            (0x401500, "Renderer::Draw"),
+        ]
+        owners = {0x401000: "Toy2/Toy2.cpp", 0x401100: "Toy2/Toy2.cpp", 0x401200: "Toy2/Levels.cpp",
+                  0x401400: "Toy2/Toy2.cpp", 0x401500: "Renderer.cpp"}
+        annotations = [Annotation("function", hex(address), source, 1) for address, source in owners.items()]
+        annotations.append(Annotation("global", "0x500000", "Toy2/Levels.cpp", 2))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "Toy2").mkdir()
+            (root / "Toy2" / "Toy2.cpp").write_text("x\n" * 3001, encoding="utf-8")
+            (root / "Toy2" / "Levels.cpp").write_text("x\n", encoding="utf-8")
+            (root / "Renderer.cpp").write_text("x\n", encoding="utf-8")
+            report = decomp_evidence.structure_report(
+                entries, annotations, root, core=(0x401100, 0x401400), core_file="Toy2/Toy2.cpp"
+            )
+        toy2 = report["files"][0]
+        self.assertEqual(toy2["file"], "src/Toy2/Toy2.cpp")
+        self.assertEqual((toy2["lines"], toy2["functions"], toy2["runs"]), (3001, 3, 2))
+        self.assertEqual(toy2["prefixes"], ["Toy2", "Toy2::Ini"])
+        self.assertFalse(toy2["split"])
+        totals = report["totals"]
+        self.assertEqual(totals["files"], 3)
+        self.assertEqual(totals["median_runs"], 1)
+        self.assertEqual(totals["files_over_3000_lines"], ["src/Toy2/Toy2.cpp"])
+        self.assertEqual((totals["core_held"], totals["core_functions"]), (2, 4))
+
+    def test_a_split_candidate_outranks_a_small_file_and_lists_its_runs(self):
+        from pathlib import Path
+        import tempfile
+        from unittest.mock import patch
+
+        from tools.decomp_annotations import Annotation
+
+        entries = [(0x401000, "Toy2::Ini::Parse"), (0x401100, "Toy2::ReadIniFile"),
+                   (0x401200, "Toy2::Level::Start"), (0x401400, "Toy2::Ini::Close"),
+                   (0x401500, "Renderer::Draw"), (0x401600, "Toy2::Level::End")]
+        owners = {0x401000: "Toy2/Toy2.cpp", 0x401100: "Toy2/Toy2.cpp", 0x401200: "Toy2/Levels.cpp",
+                  0x401400: "Toy2/Toy2.cpp", 0x401500: "Renderer.cpp", 0x401600: "Toy2/Levels.cpp"}
+        annotations = [Annotation("function", hex(address), source, 1)
+                       for address, source in owners.items()]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "Toy2").mkdir()
+            (root / "Toy2" / "Toy2.cpp").write_text("x\n" * 3001, encoding="utf-8")
+            (root / "Toy2" / "Levels.cpp").write_text("x\n", encoding="utf-8")
+            (root / "Renderer.cpp").write_text("x\n", encoding="utf-8")
+            # Levels.cpp holds more runs; only the large file is a split candidate.
+            with patch.object(decomp_evidence, "MIXED_FILE_RUNS", 1):
+                report = decomp_evidence.structure_report(
+                    entries, annotations, root, detail="src/Toy2/Toy2.cpp"
+                )
+        self.assertEqual([row["file"] for row in report["files"]][:2],
+                         ["src/Toy2/Toy2.cpp", "src/Toy2/Levels.cpp"])
+        self.assertEqual([row["split"] for row in report["files"]], [True, False, False])
+        self.assertEqual(report["detail"]["file"], "src/Toy2/Toy2.cpp")
+        self.assertEqual(
+            [(run["start"], run["end"], run["functions"], run["before"], run["after"])
+             for run in report["detail"]["runs"]],
+            [(0x401000, 0x401100, 2, None, "src/Toy2/Levels.cpp"),
+             (0x401400, 0x401400, 1, "src/Toy2/Levels.cpp", "src/Renderer.cpp")],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

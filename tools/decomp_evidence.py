@@ -18,6 +18,7 @@ import argparse
 import bisect
 import json
 import re
+import statistics
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -47,6 +48,11 @@ from tools.decomp_dependencies import (  # noqa: E402
 from tools.decomp_discover import scan_annotated_relocation_targets  # noqa: E402
 
 NEIGHBOR_COUNT = 3
+# The proven retail toy2.cpp block (inclusive): 59 map entries.
+CORE_RANGE = (0x0048E730, 0x0049CAA0)
+CORE_FILE = "Toy2/Toy2.cpp"
+LARGE_FILE_LINES = 3000
+MIXED_FILE_RUNS = 10
 ROW_LIMIT = 12
 DECOMP_HEAD = 80
 DECOMP_TAIL = 40
@@ -221,7 +227,177 @@ def resolve_padding_alignment(
     return following
 
 
+def placement_line(
+    address: int, addresses: list[int], functions: dict[int, tuple[str, str, int]]
+) -> str:
+    """Name the file where new code for an address belongs.
+
+    MSVC links each object file as one contiguous address block. The annotated
+    functions on both sides of the address name its file when they agree. When
+    they disagree, the side whose file reaches the address in map order (no
+    unannotated map entry between them) wins; else the address starts a block.
+    """
+    own = functions.get(address)
+    if own is not None and own[1]:
+        return f"placement: src/{own[1]} (annotated)"
+    if not addresses or address < addresses[0] or address > addresses[-1]:
+        return "placement: outside the mapped range; choose the file from retail source paths"
+    index = bisect.bisect_left(addresses, address)
+    after = index + 1 if index < len(addresses) and addresses[index] == address else index
+    below = next((i for i in range(index - 1, -1, -1) if addresses[i] in functions), None)
+    above = next((i for i in range(after, len(addresses)) if addresses[i] in functions), None)
+    sides = []
+    if below is not None:
+        sides.append((functions[addresses[below]][1], index - below - 1))
+    if above is not None:
+        sides.append((functions[addresses[above]][1], above - after))
+    files = sorted({source for source, _ in sides})
+    if not files:
+        return "placement: no annotated neighbour; choose the file from retail source paths"
+    if len(files) == 1:
+        side = "both neighbours" if len(sides) == 2 else "only annotated neighbour"
+        return f"placement: src/{files[0]} ({side})"
+    adjacent = [source for source, gap in sides if gap == 0]
+    if len(adjacent) == 1:
+        other = next(source for source in files if source != adjacent[0])
+        return f"placement: src/{adjacent[0]} (contiguous; other side in src/{other})"
+    # Two files that interleave say only that the address sits on a boundary. The
+    # run list says whether the boundary is a retail one or this repository's doing.
+    return (
+        f"placement: boundary between src/{files[0]} and src/{files[1]}; a new file unless "
+        f"a run of one of them reaches this block (tools/decomp structure src/{files[0]})"
+    )
+
+
+def structure_report(
+    entries: list[tuple[int, str]],
+    annotations: list,
+    source_root: Path,
+    core: tuple[int, int] = CORE_RANGE,
+    core_file: str = CORE_FILE,
+    detail: str | None = None,
+) -> dict[str, object]:
+    """Describe how each source file maps onto the retail address order.
+
+    `detail` names one file: the report then also holds that file's runs, each with
+    its address span and the files before and after it, so a writer sees where a
+    block starts and ends without reading the map by hand."""
+    names = dict(entries)
+    owner = {
+        int(item.address, 16): item.source
+        for item in annotations
+        if item.kind in ("function", "stub") and int(item.address, 16) in names
+    }
+    files: dict[str, dict[str, object]] = {}
+    runs: list[dict[str, object]] = []
+    previous = None
+    for address in sorted(names):
+        source = owner.get(address)
+        if source is None:
+            continue
+        row = files.setdefault(source, {"functions": 0, "runs": 0, "prefixes": set()})
+        row["functions"] += 1
+        prefix = names[address].rpartition("::")[0] or "(global)"
+        row["prefixes"].add(prefix)
+        if source != previous:
+            row["runs"] += 1
+            runs.append({"file": f"src/{source}", "start": address, "end": address,
+                         "functions": 0, "prefixes": [],
+                         "before": f"src/{previous}" if previous else None, "after": None})
+        run = runs[-1]
+        run["end"], run["functions"] = address, run["functions"] + 1
+        if prefix not in run["prefixes"]:
+            run["prefixes"].append(prefix)
+        previous = source
+    for run, following in zip(runs, runs[1:]):
+        run["after"] = following["file"]
+    rows = []
+    for source, row in files.items():
+        path = source_root / source
+        lines = len(path.read_text(encoding="utf-8", errors="ignore").splitlines()) if path.is_file() else 0
+        rows.append({
+            "file": f"src/{source}", "lines": lines, "functions": row["functions"],
+            "runs": row["runs"], "prefixes": sorted(row["prefixes"]),
+        })
+    for row in rows:
+        # The split rule of AGENTS.md: a large file that holds many retail runs.
+        row["split"] = row["lines"] > LARGE_FILE_LINES and row["runs"] > MIXED_FILE_RUNS
+    rows.sort(key=lambda row: (not row["split"], -row["runs"], -row["lines"], row["file"]))
+    core_addresses = [address for address in names if core[0] <= address <= core[1]]
+    large = [row["file"] for row in rows if row["lines"] > LARGE_FILE_LINES]
+    wanted = f"src/{detail.removeprefix('src/')}" if detail else None
+    return {
+        "files": rows,
+        **({"detail": {"file": wanted,
+                       "runs": [run for run in runs if run["file"] == wanted]}}
+           if wanted else {}),
+        "totals": {
+            "files": len(rows),
+            "median_runs": statistics.median(row["runs"] for row in rows) if rows else 0,
+            "files_over_3000_lines": large,
+            "core_functions": len(core_addresses),
+            "core_held": sum(owner.get(address) == core_file for address in core_addresses),
+            "core_file": f"src/{core_file}",
+        },
+    }
+
+
+def structure_main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(
+        prog="tools/decomp structure",
+        description="Report source files against retail address runs (no build).",
+    )
+    parser.add_argument("file", nargs="?", help="one source file: print its runs in map order")
+    parser.add_argument("--json", action="store_true", help="print the whole report as JSON")
+    parser.add_argument("--all", action="store_true", help="list every file, not only the top 15")
+    args = parser.parse_args(argv)
+    report = structure_report(parse_map(), read_source_annotations(SOURCE_ROOT), SOURCE_ROOT,
+                              detail=args.file)
+    if args.json:
+        print(json.dumps(report, indent=2))
+        return 0
+    if args.file:
+        return print_structure_detail(report)
+    rows, totals = report["files"], report["totals"]
+    print(f"{'file':<44} {'lines':>6} {'funcs':>5} {'runs':>4} {'prefixes':>8} {'split':>5}")
+    for row in rows if args.all else rows[:15]:
+        print(f"{row['file']:<44} {row['lines']:>6} {row['functions']:>5} {row['runs']:>4} "
+              f"{len(row['prefixes']):>8} {'yes' if row['split'] else '':>5}")
+    if not args.all and len(rows) > 15:
+        print(f"... {len(rows) - 15} more files (--all)")
+    large = totals["files_over_3000_lines"]
+    print(f"totals: {totals['files']} files, median runs {totals['median_runs']:g}, "
+          f"{len(large)} over {LARGE_FILE_LINES} lines, {totals['core_file']} holds "
+          f"{totals['core_held']} of {totals['core_functions']} retail toy2.cpp core functions")
+    print(f"split: over {LARGE_FILE_LINES} lines and over {MIXED_FILE_RUNS} retail runs; "
+          "tools/decomp structure FILE prints one line per run")
+    return 0
+
+
+def print_structure_detail(report: dict[str, object]) -> int:
+    """Print the runs of one file, so the writer sees where a block starts and ends."""
+    detail = report["detail"]
+    row = next((item for item in report["files"] if item["file"] == detail["file"]), None)
+    if row is None:
+        print(f"{detail['file']}: no annotated function in the map")
+        return 1
+    print(f"{row['file']}: {row['lines']} lines, {row['functions']} functions, "
+          f"{row['runs']} runs, {len(row['prefixes'])} prefixes"
+          f"{', split candidate' if row['split'] else ''}")
+    for run in detail["runs"]:
+        prefixes = ", ".join(run["prefixes"][:3]) + (" ..." if len(run["prefixes"]) > 3 else "")
+        before, after = run["before"], run["after"]
+        between = (f"between {before} and {after}" if before and after
+                   else f"after {before}" if before else f"before {after}" if after
+                   else "the whole map")
+        print(f"  0x{run['start']:08X}-0x{run['end']:08X} {run['functions']:>4} funcs  "
+              f"{prefixes:<34} {between}")
+    return 0
+
+
 def main() -> int:
+    if sys.argv[1:2] == ["structure"]:
+        return structure_main(sys.argv[2:])
     parser = argparse.ArgumentParser(description="Collect bounded evidence for one target.")
     parser.add_argument("address", help="retail address, e.g. 0x00403640")
     parser.add_argument(
@@ -439,7 +615,12 @@ def main() -> int:
             if unmapped and neighbor == address
             else functions.get(neighbor, ("NOT_STARTED", "", 0))[0]
         )
-        print(f"{marker} 0x{neighbor:08X}  {name:<50} {neighbor_state}")
+        owner = functions.get(neighbor, ("", "", 0))[1]
+        where = f"src/{owner}" if owner else ""
+        print(f"{marker} 0x{neighbor:08X}  {name:<50} {neighbor_state:<11} {where}".rstrip())
+    if not functions.get(address, ("", "", 0))[1]:
+        # An annotated target would only repeat the file of the ">" row above.
+        print(placement_line(address, addresses, functions))
 
     section("callers (x-refs to this function)")
     callers = run_ghidra(["x-ref", "to", f"0x{address:08X}"])

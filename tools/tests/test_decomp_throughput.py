@@ -191,13 +191,47 @@ class ThroughputTests(unittest.TestCase):
 
     def test_hours_by_class_and_tooling_share(self):
         data = self.run_json("--commits", "4")
-        self.assertEqual(data["hours"], {"source": 1.5, "tooling": 1.5, "other": 0.5, "total": 3.5})
-        self.assertEqual(data["commits"], {"source": 2, "tooling": 1, "other": 1, "total": 4})
+        self.assertEqual(data["hours"], {"source": 1.5, "structure": 0.0, "tooling": 1.5, "other": 0.5,
+                                         "total": 3.5})
+        self.assertEqual(data["commits"], {"source": 2, "structure": 0, "tooling": 1, "other": 1, "total": 4})
         self.assertAlmostEqual(data["tooling_share"], 1.5 / 3.5)
         code, text = self.run_cli("--commits", "4")
-        self.assertIn("hours: source 1.50  tooling 1.50  other 0.50  (total 3.50)", text)
+        self.assertIn("hours: source 1.50  structure 0.00  tooling 1.50  other 0.50  (total 3.50)", text)
         self.assertIn("tooling share: 0.43", text)
         self.assertIn("bc attempts per source result: n/a", text)
+
+    def test_a_structure_campaign_commit_is_its_own_class(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            build_repo(root)
+            write(root, "src/Ini.cpp", "// FUNCTION: TOY2 0x00401300\nvoid d() {}\n")
+            # An abort record committed with the structure row does not change the class.
+            abort = {"record_type": "abort", "mode": "structure", "result": None, "reason": "restart"}
+            write(root, throughput.LEDGER, json.dumps(abort) + "\n" + json.dumps(ledger_row(
+                "2026-09-08T13:40:00Z", 30.0, 0.0, result="structure", mode="structure")) + "\n")
+            git(root, "add", "-A")
+            git(root, "commit", "-q", "-m", "move Ini", date="2026-09-08T13:40:00Z")
+            with open(root / throughput.LEDGER, "a", encoding="utf-8") as handle:
+                handle.write(json.dumps(ledger_row("2026-09-08T14:00:00Z", 20.0, 5.0)) + "\n")
+            write(root, "src/b.cpp", "// FUNCTION: TOY2 0x00401200\nvoid c() { }\n")
+            git(root, "add", "-A")
+            git(root, "commit", "-q", "-m", "source with a ledger row", date="2026-09-08T14:00:00Z")
+            buffer = StringIO()
+            with redirect_stdout(buffer):
+                self.assertEqual(throughput.main(["--repo", str(root), "--json", "--commits", "5"]), 0)
+            data = json.loads(buffer.getvalue())
+        self.assertEqual([row["class"] for row in data["rows"]][-2:], ["structure", "source"])
+        self.assertAlmostEqual(data["hours"]["structure"], 40 / 60)
+        self.assertEqual(data["commits"]["structure"], 1)
+        # Structure hours count neither as source time nor as tooling time.
+        self.assertAlmostEqual(data["hours"]["source"], 0.5 + 20 / 60)
+        # Structure hours stay out of the share, so a move cannot loosen the cap.
+        self.assertAlmostEqual(
+            data["tooling_share"], 1.5 / (data["hours"]["total"] - data["hours"]["structure"])
+        )
+        self.assertAlmostEqual(
+            data["effective_bytes_per_source_hour"], data["deltas"]["effective_bytes"] / data["hours"]["source"]
+        )
 
     def test_json_shape_and_deltas_from_base(self):
         data = self.run_json("--commits", "3")

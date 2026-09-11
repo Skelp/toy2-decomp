@@ -4,7 +4,9 @@
 Walks the first-parent commits of HEAD inside a window, reads the committed
 scoreboard at each commit (falling back to counting ``// FUNCTION:`` markers),
 and reports function and byte deltas, hours per commit class, and the tooling
-share. ``--experiments`` reviews pending tooling experiments against the
+share. A commit that records a structure campaign (files move, no score
+changes) is its own class, so it neither lowers the source byte rate nor counts
+as tooling. ``--experiments`` reviews pending tooling experiments against the
 campaign ledger; ``--cap-check`` enforces the tooling cap once its window opens.
 Deltas run from the first-parent of the oldest window commit (the base) to the
 newest commit. Commit intervals and ledger idle gaps cap at 90 minutes.
@@ -32,7 +34,7 @@ EXPERIMENTS = "tools/Resources/tooling-experiments.tsv"
 BASELINE = "tools/Resources/throughput-baseline.json"
 EXPERIMENT_COLUMNS = "id opened_commit opened_at hypothesis baseline_rate review_after outcome note".split()
 TOOLING_PREFIXES = ("tools/", "AGENTS.md", "CLAUDE.md", ".agents/", "docs/", "ROADMAP.md", ".github/")
-CLASSES = ("source", "tooling", "other")
+CLASSES = ("source", "structure", "tooling", "other")
 METRICS = ("implemented", "terminal", "terminal_bytes", "effective_bytes")
 CAP_MINUTES = 90.0
 REVIEW_ROWS = 10
@@ -108,6 +110,22 @@ def classify_paths(paths: list[str]) -> str:
     return klass
 
 
+def ledger_results(repo: Path, sha: str) -> set[str]:
+    """Return the results of the campaign rows that one commit adds to the ledger
+    (abort and evidence records carry no result and are left out)."""
+    results = set()
+    for line in git(repo, "show", "--format=", "--first-parent", sha, "--", LEDGER).splitlines():
+        if not line.startswith("+") or line.startswith("+++"):
+            continue
+        try:
+            row = json.loads(line[1:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict) and row.get("record_type", "campaign") == "campaign":
+            results.add(str(row.get("result", "")))
+    return results
+
+
 def list_commits(repo: Path) -> list[dict]:
     rows = []  # first-parent commits of HEAD, newest first
     for line in git(repo, "log", "--first-parent", "--format=%H%x09%ct%x09%P", "HEAD").splitlines():
@@ -126,7 +144,10 @@ def describe_window(repo: Path, rows: list[dict], count: int) -> tuple[list[dict
         gap = (row["time"] - parent["time"]) / 60 if parent else 0.0
         row["interval_hours"] = min(CAP_MINUTES, max(0.0, gap)) / 60
         paths = git(repo, "show", "--format=", "--name-only", "--first-parent", row["sha"])
-        row["class"] = classify_paths([p.strip() for p in paths.splitlines() if p.strip()])
+        changed = [p.strip() for p in paths.splitlines() if p.strip()]
+        row["class"] = classify_paths(changed)
+        if row["class"] == "source" and LEDGER in changed and ledger_results(repo, row["sha"]) == {"structure"}:
+            row["class"] = "structure"
         window.append(row | commit_metrics(repo, row["sha"]))
     window.reverse()
     base = rows[count] | commit_metrics(repo, rows[count]["sha"]) if window and count < len(rows) else None
@@ -152,7 +173,10 @@ def summarise(window: list[dict], base: dict | None, attempts: float | None) -> 
         "deltas": {"functions": deltas["implemented"], **{k: deltas[k] for k in METRICS[1:]}},
         "hours": hours | {"total": total}, "commits": counts | {"total": len(window)},
         "effective_bytes_per_source_hour": per_hour,
-        "tooling_share": hours["tooling"] / total if total > 0 else None,
+        # Structure hours are outside the tooling cap and outside its denominator,
+        # so a move never makes the 15 percent share easier to keep.
+        "tooling_share": (hours["tooling"] / (total - hours["structure"])
+                          if total - hours["structure"] > 0 else None),
         "bc_attempts_per_source_result": attempts,
         "rows": [row | {"time": iso(row["time"])} for row in window],
     }

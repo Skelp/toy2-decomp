@@ -132,7 +132,9 @@ def ninja_blocks(path: Path) -> list[list[str]]:
 
 
 def normalized_build_context(build_root: Path) -> str:
-    """Hash the generated compile and link graph."""
+    """Hash the compile and link settings of the generated build graph: the rules and
+    each distinct set of variables that a rule reads. The source and object lists are
+    left out, so a new translation unit with the usual flags keeps the context."""
 
     build_file = build_root / "build.ninja"
     rules_file = build_root / "CMakeFiles" / "rules.ninja"
@@ -165,17 +167,17 @@ def normalized_build_context(build_root: Path) -> str:
         referenced_variables[name] = variables
         normalized.extend(line.strip() for line in rule_lines)
 
+    settings = set()
     for block in ninja_blocks(build_file):
         match = re.match(r"build\s+.+?:\s+(\S+)", block[0])
         if match is None or match.group(1) not in rule_blocks:
             continue
-        normalized.append(block[0].strip())
         variables = referenced_variables[match.group(1)]
-        for line in block[1:]:
-            statement = line.strip()
-            key = statement.partition("=")[0].strip()
-            if key in variables:
-                normalized.append(statement)
+        lines = [line.strip() for line in block[1:]]
+        settings.add("\n".join([f"build {match.group(1)}", *(
+            line for line in lines if line.partition("=")[0].strip() in variables
+        )]))
+    normalized.extend(sorted(settings))
 
     return sha256(("\n".join(normalized) + "\n").encode("utf-8")).hexdigest()
 
@@ -196,7 +198,43 @@ def source_state(source_root: Path) -> dict[str, object]:
     }
 
 
-def build_inputs(root: Path) -> dict[str, str]:
+def compile_units(build_root: Path) -> list[str]:
+    """Return the sources that the generated build compiles, relative to the checkout."""
+    build_file = build_root / "build.ninja"
+    if not build_file.exists():
+        return []
+    units = set()
+    for block in ninja_blocks(build_file):
+        match = re.match(r"build\s+.+?:\s+(\S*COMPILER\S*)\s+(.*)", block[0])
+        if match is None or "LINKER" in match.group(1):
+            continue
+        for source in match.group(2).split("|", 1)[0].split():
+            path = Path(source)
+            try:
+                path = path.relative_to(build_root.resolve().parent)
+            except ValueError:
+                pass
+            units.add(path.as_posix())
+    return sorted(units)
+
+
+def compile_unit_problems(
+    saved: list[str] | None, current: list[str], *, allow_removed: bool = False
+) -> list[str]:
+    """A campaign may add a translation unit (a split); a baseline unit must stay.
+
+    A structure campaign may also remove one, because a rename and a merge of two
+    mixed files both drop a unit. It compares every function and variable score
+    exactly, so a unit that goes without a score change changed nothing observable.
+    """
+    missing = sorted(set(saved or []) - set(current))
+    if not missing or allow_removed:
+        return []
+    more = f" and {len(missing) - 1} more" if len(missing) > 1 else ""
+    return [f"baseline compile unit {missing[0]}{more} is not in the current build"]
+
+
+def build_inputs(root: Path) -> dict[str, object]:
     """Hash the build rules and output, the compiler and the generated build graph."""
     values = {}
     for name, path in (
@@ -208,6 +246,7 @@ def build_inputs(root: Path) -> dict[str, str]:
         if path.exists():
             values[name] = file_hash(path)
     values["build_context_sha256"] = normalized_build_context(root / "build")
+    values["compile_units"] = compile_units(root / "build")
     return values
 
 
@@ -248,10 +287,39 @@ def metadata(
 def write_metadata(
     path: Path, report: Path | None = None, data_report: Path | None = None
 ) -> None:
-    path.write_text(
-        json.dumps(metadata(report, data_report), indent=2) + "\n",
-        encoding="utf-8",
-    )
+    values = metadata(report, data_report)
+    # Only the baseline keeps these numbers: a structure campaign prints their deltas.
+    values["file_evidence"] = file_evidence(report, data_report)
+    path.write_text(json.dumps(values, indent=2) + "\n", encoding="utf-8")
+
+
+def file_evidence(
+    report: Path | None, data_report: Path | None, root: Path = ROOT
+) -> dict[str, float]:
+    """Return the explained bytes of the whole file and of the PE header, as the
+    HTML report measures them, or {} when the executables or reports are missing.
+
+    A move between files changes the Rich header and the .reloc sites that are
+    measured against the nearest entity, so validate prints these as warnings only.
+    """
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "toy2_generate_decomp_report", root / "tools" / "generate-decomp-report.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        entities = json.loads(report.read_text(encoding="utf-8"))["data"]
+        data = read_data_report(data_report) or None
+        layout = module.read_binary_layout(
+            root / "original" / "toy2.exe", entities, root / "build" / "toy2.exe", data
+        )
+        header = next(item for item in layout["segments"] if item.get("key") == "headers")
+        return {
+            "whole_file_bytes": float(layout["explained_file_bytes"]),
+            "pe_header_bytes": float(header["explained_bytes"]),
+        }
+    except Exception:  # noqa: BLE001 - warnings only; a missing input costs the line
+        return {}
 
 
 # The report stamp. validate fingerprints the tree that its current reports describe,
@@ -444,6 +512,7 @@ def validate_metadata(
     metadata_path: Path,
     baseline_path: Path,
     baseline_data_path: Path | None = None,
+    mode: str | None = None,
 ) -> list[str]:
     if not metadata_path.exists():
         return ["baseline metadata is missing; run tools/decomp baseline"]
@@ -486,6 +555,12 @@ def validate_metadata(
         problems.append(
             "baseline build_rules_sha256 does not match the current build context"
         )
+    if "compile_units" in saved:
+        problems.extend(compile_unit_problems(
+            saved["compile_units"],
+            current.get("compile_units", []),
+            allow_removed=mode == "structure",
+        ))
     for key in (
         "compiler_driver_sha256",
         "compiler_backend_sha256",
@@ -615,6 +690,80 @@ def typed_data_regression_problems(
         ):
             problems.append(f"{group_name}: data evidence regressed")
     return problems
+
+
+def structure_problems(
+    baseline: dict[int, object],
+    current: dict[int, object],
+    baseline_data: dict[str, object],
+    current_data: dict[str, object],
+) -> list[str]:
+    """A structure campaign moves code between files: every function and every
+    variable keeps its exact score, an improvement included."""
+    problems: list[str] = []
+    for address in sorted(set(baseline) | set(current)):
+        before, after = baseline.get(address), current.get(address)
+        if before is None or after is None:
+            change = "appeared" if before is None else "disappeared"
+            problems.append(f"0x{address:08X}: function {change} in a structure campaign")
+        elif (before.matching, before.effective) != (after.matching, after.effective):
+            problems.append(
+                f"0x{address:08X}: score changed in a structure campaign "
+                f"({before.matching * 100:.4f}% -> {after.matching * 100:.4f}%)"
+            )
+    if not baseline_data or not current_data:
+        return problems + ["a typed-data report is missing or invalid"]
+    for rows, label, keys in (
+        (data_variables, "variable", ("size", "matched_bytes", "score", "result")),
+        (unscored_data_variables, "unscored variable", ("size", "reason")),
+    ):
+        before_rows, after_rows = rows(baseline_data), rows(current_data)
+        for address in sorted(set(before_rows) | set(after_rows)):
+            before, after = before_rows.get(address), after_rows.get(address)
+            if before is None or after is None or any(
+                before.get(key) != after.get(key) for key in keys
+            ):
+                problems.append(f"0x{address:08X}: {label} changed in a structure campaign")
+    return problems
+
+
+def structure_warnings(
+    baseline_data: dict[str, object],
+    current_data: dict[str, object],
+    baseline_file: dict[str, float],
+    current_file: dict[str, float],
+) -> list[str]:
+    """Deltas that a move causes without a score change: link order moves the
+    relocation sites and one more object changes the PE header's Rich data."""
+    changes: list[tuple[str, float, float]] = []
+    for group, key in (
+        ("vtables", "explained_bytes"),
+        ("imports", "matched_entries"),
+        ("relocations", "matched_entries"),
+    ):
+        before = baseline_data.get(group, {})
+        after = current_data.get(group, {})
+        if isinstance(before, dict) and isinstance(after, dict):
+            changes.append((f"{group} {key}", before.get(key), after.get(key)))
+    after_sections = data_sections(current_data)
+    for name, before in data_sections(baseline_data).items():
+        after = after_sections.get(name, {})
+        changes.append((f"{name} explained bytes", before.get("explained_bytes"), after.get("explained_bytes")))
+    changes.append(("whole-file evidence", baseline_file.get("whole_file_bytes"), current_file.get("whole_file_bytes")))
+    changes.append(("PE header bytes", baseline_file.get("pe_header_bytes"), current_file.get("pe_header_bytes")))
+    warnings = [
+        f"{label} {float(before):,.2f} -> {float(after):,.2f} ({float(after) - float(before):+,.2f})"
+        for label, before, after in changes
+        if isinstance(before, (int, float)) and isinstance(after, (int, float)) and before != after
+    ]
+    # An unmeasured number must not read as an unchanged one.
+    if not baseline_file or not current_file:
+        side = "baseline" if not baseline_file else "current"
+        warnings.append(
+            f"file evidence unavailable: the {side} numbers are missing, so the "
+            "whole-file and PE-header deltas were not measured"
+        )
+    return warnings
 
 
 def validate_resource_campaign(
@@ -1212,7 +1361,8 @@ def validate(
             validate_metadata(
                 metadata_path,
                 baseline_path,
-                baseline_data_path if mode in ("data", "resource") else None,
+                baseline_data_path if mode in ("data", "resource", "structure") else None,
+                mode,
             )
         )
     debt_findings = read_debt_findings(source_root, staged=staged)
@@ -1256,6 +1406,11 @@ def validate(
             problems.append("a resource campaign cannot have target addresses")
         if resource is None:
             problems.append("a resource campaign needs exactly one --resource")
+    elif mode == "structure":
+        if targets:
+            problems.append("a structure campaign cannot have target addresses")
+        if resource is not None:
+            problems.append("--resource requires --mode resource")
     if lint_change.new_errors:
         problems.append(
             f"staged source has {lint_change.new_errors} new source-debt error(s)"
@@ -1266,7 +1421,21 @@ def validate(
         )
     if check_annotation_tags:
         problems.extend(check_annotations(current_path, source_root))
-    for address, before in baseline.items():
+    baseline_data = read_data_report(baseline_data_path)
+    current_data = read_data_report(current_data_path)
+    if mode == "structure":
+        # The exact comparison below replaces the regression checks of the other modes.
+        problems.extend(structure_problems(baseline, current, baseline_data, current_data))
+        if baseline_state.get("source_dependency_sha256") == tree_hash(source_root):
+            problems.append("structure campaign did not change the source tree")
+        for warning in structure_warnings(
+            baseline_data,
+            current_data,
+            baseline_state.get("file_evidence") or {},
+            file_evidence(current_path, current_data_path),
+        ):
+            print(f"warning: structure: {warning}", file=sys.stderr)
+    for address, before in baseline.items() if mode != "structure" else ():
         after = current.get(address)
         if after is None:
             problems.append(f"0x{address:08X}: matched function disappeared")
@@ -1396,7 +1565,7 @@ def validate(
         ):
             print(f"warning: {warning}", file=sys.stderr)
 
-    if mode in ("data", "resource"):
+    if mode in ("data", "resource", "structure"):
         if has_baseline_state:
             for address in sorted(baseline_implemented - current_implemented):
                 problems.append(
@@ -1600,7 +1769,9 @@ def main() -> int:
     validate_parser.add_argument("targets", nargs="*", type=parse_address)
     validate_parser.add_argument("--allow-target-regression", action="store_true")
     validate_parser.add_argument(
-        "--mode", choices=("coverage", "refinement", "data", "resource"), default="coverage"
+        "--mode",
+        choices=("coverage", "refinement", "data", "resource", "structure"),
+        default="coverage",
     )
     validate_parser.add_argument("--resource", type=parse_resource)
     validate_parser.add_argument("--meta-resolution", action="store_true")

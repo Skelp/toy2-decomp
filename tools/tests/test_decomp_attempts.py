@@ -120,6 +120,42 @@ class AttemptTests(unittest.TestCase):
         self.log(similar(41))
         self.assertIn("+int d;", patch.read_text(encoding="utf-8"))
 
+    def test_the_best_patch_recreates_a_new_file_and_its_cmake_entry(self):
+        self.make_repo()
+        git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
+        (self.root / "CMakeLists.txt").write_text("src/Target.cpp\n", encoding="utf-8")
+        subprocess.run([*git, "add", "CMakeLists.txt"], cwd=self.root, check=True)
+        subprocess.run([*git, "commit", "-q", "-m", "cmake"], cwd=self.root, check=True)
+        new_file = self.root / "src" / "Toy2" / "Ini.cpp"
+        new_file.parent.mkdir()
+        new_file.write_text("int ini;\n", encoding="utf-8")
+        (self.root / "CMakeLists.txt").write_text("src/Target.cpp\nsrc/Toy2/Ini.cpp\n", encoding="utf-8")
+        self.log(similar(40))
+        patch = self.best_dir / f"{ADDRESS}.patch"
+        text = patch.read_text(encoding="utf-8")
+        self.assertIn("+++ b/src/Toy2/Ini.cpp", text)
+        self.assertIn("+src/Toy2/Ini.cpp", text)
+        # The new file is part of the tree hash: another body is a new attempt.
+        new_file.write_text("int ini = 1;\n", encoding="utf-8")
+        self.assertTrue(self.log(similar(39))[0].startswith("attempt 2/"))
+        for command in (["git", "checkout", "-q", "--", "src", "CMakeLists.txt"],
+                        ["git", "clean", "-fdq", "src"], ["git", "apply", str(patch)]):
+            subprocess.run(command, cwd=self.root, check=True)
+        self.assertEqual(new_file.read_text(encoding="utf-8"), "int ini;\n")
+        self.assertIn("src/Toy2/Ini.cpp", (self.root / "CMakeLists.txt").read_text(encoding="utf-8"))
+        self.assertEqual(self.log(similar(40)), ["source matches attempt 1 (score 40.00%); not logged"])
+
+    def test_an_untracked_non_source_file_stays_out_of_the_patch(self):
+        self.make_repo()
+        (self.root / "src" / "capture.bin").write_bytes(b"\x00\x01MZ binary")
+        self.edit_source("int a;\nint b;\n")
+        self.log(similar(40))
+        patch = self.best_dir / f"{ADDRESS}.patch"
+        # A binary stanza has no full index line, so git apply would refuse the patch.
+        self.assertNotIn("capture.bin", patch.read_text(encoding="utf-8"))
+        subprocess.run(["git", "checkout", "-q", "--", "src"], cwd=self.root, check=True)
+        subprocess.run(["git", "apply", "--check", str(patch)], cwd=self.root, check=True)
+
     def test_git_failure_skips_the_patch_silently(self):
         lines = self.log(similar(40))
         self.assertEqual(len(lines), 1)

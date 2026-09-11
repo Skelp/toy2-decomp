@@ -136,6 +136,75 @@ class VerifyRegressionTests(unittest.TestCase):
         finally:
             VERIFY.TOOL_ARTIFACTS = old_artifacts
 
+    def structure_setup(self, directory, *, current_rows=None, current_variables=None, same_tree=False):
+        root = Path(directory)
+        source = root / "src"
+        source.mkdir()
+        (source / "Ini.cpp").write_text(
+            "// FUNCTION: TOY2 0x00401000\nvoid Parse(int* value) { *value = 7; }\n", encoding="utf-8"
+        )
+        rows = [{"address": "0x401000", "matching": 0.5}, {"address": "0x401100", "matching": 1.0}]
+        variables = [{"original_address": 0x500000, "size": 4, "matched_bytes": 4, "score": 1.0}]
+        baseline = self.write_report(root, "baseline.json", rows)
+        current = self.write_report(root, "current.json", current_rows or rows)
+        baseline_data = self.write_data_report(root, "baseline-data.json", variables)
+        current_data = self.write_data_report(root, "current-data.json", current_variables or variables)
+        payload = json.loads(current_data.read_text(encoding="utf-8"))
+        payload["relocations"]["matched_entries"] = -27
+        current_data.write_text(json.dumps(payload), encoding="utf-8")
+        metadata = root / "meta.json"
+        metadata.write_text(json.dumps({
+            "source_dependency_sha256": VERIFY.tree_hash(source) if same_tree else "before the move",
+            "implemented_addresses": [0x401000], "source_debt": {},
+            "file_evidence": {"whole_file_bytes": 1000.0, "pe_header_bytes": 3729.0},
+        }), encoding="utf-8")
+        return dict(baseline=baseline, current=current, targets=[], source_root=source, mode="structure",
+                    metadata=metadata, baseline_data=baseline_data, current_data=current_data)
+
+    def validate_structure(self, arguments):
+        stderr = io.StringIO()
+        evidence = {"whole_file_bytes": 926.53, "pe_header_bytes": 3732.0}
+        with mock.patch.object(VERIFY, "file_evidence", return_value=evidence), \
+                contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(io.StringIO()):
+            code = self.validate(**arguments)
+        return code, stderr.getvalue()
+
+    def test_structure_move_passes_with_file_evidence_deltas_as_warnings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            code, stderr = self.validate_structure(self.structure_setup(directory))
+        self.assertEqual(code, 0, stderr)
+        self.assertIn("warning: structure: relocations matched_entries 0.00 -> -27.00 (-27.00)", stderr)
+        self.assertIn("warning: structure: whole-file evidence 1,000.00 -> 926.53 (-73.47)", stderr)
+        self.assertIn("warning: structure: PE header bytes 3,729.00 -> 3,732.00 (+3.00)", stderr)
+
+    def test_missing_file_evidence_is_named_instead_of_read_as_unchanged(self):
+        measured = {"whole_file_bytes": 926.53, "pe_header_bytes": 3732.0}
+        warnings = VERIFY.structure_warnings({}, {}, {}, measured)
+        self.assertIn("file evidence unavailable: the baseline numbers are missing", warnings[-1])
+        warnings = VERIFY.structure_warnings({}, {}, measured, {})
+        self.assertIn("file evidence unavailable: the current numbers are missing", warnings[-1])
+        self.assertEqual(VERIFY.structure_warnings({}, {}, measured, measured), [])
+
+    def test_structure_rejects_any_score_or_variable_change_and_an_unchanged_tree(self):
+        changed_score = [{"address": "0x401000", "matching": 0.51}, {"address": "0x401100", "matching": 1.0}]
+        changed_variable = [{"original_address": 0x500000, "size": 4, "matched_bytes": 2, "score": 0.5}]
+        cases = (
+            (dict(current_rows=changed_score), "0x00401000: score changed in a structure campaign"),
+            (dict(current_variables=changed_variable), "0x00500000: variable changed in a structure campaign"),
+            (dict(same_tree=True), "structure campaign did not change the source tree"),
+        )
+        for options, problem in cases:
+            with self.subTest(problem=problem), tempfile.TemporaryDirectory() as directory:
+                code, stderr = self.validate_structure(self.structure_setup(directory, **options))
+                self.assertEqual(code, 1)
+                self.assertIn(problem, stderr)
+        with tempfile.TemporaryDirectory() as directory:
+            arguments = self.structure_setup(directory)
+            arguments["targets"] = [0x401000]
+            code, stderr = self.validate_structure(arguments)
+        self.assertEqual(code, 1)
+        self.assertIn("a structure campaign cannot have target addresses", stderr)
+
     def test_rejects_an_untouched_score_regression(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -279,6 +348,20 @@ class VerifyRegressionTests(unittest.TestCase):
             )
             self.assertEqual(before, VERIFY.normalized_build_context(build))
 
+    def test_build_context_allows_a_new_translation_unit_with_the_usual_flags(self):
+        with tempfile.TemporaryDirectory() as directory:
+            build = self.write_build_context(directory)
+            before = VERIFY.normalized_build_context(build)
+            ninja = build / "build.ninja"
+            text = ninja.read_text(encoding="utf-8").replace(
+                "CXX_EXECUTABLE_LINKER__app main.obj\n", "CXX_EXECUTABLE_LINKER__app main.obj ini.obj\n"
+            )
+            unit = "build ini.obj: CXX_COMPILER__app ini.cpp\n  DEFINES = /DWIN32\n  INCLUDES = -Isrc\n"
+            ninja.write_text(unit + "  FLAGS = /O2\n" + text, encoding="utf-8")
+            self.assertEqual(before, VERIFY.normalized_build_context(build))
+            ninja.write_text(unit + "  FLAGS = /Od\n" + text, encoding="utf-8")
+            self.assertNotEqual(before, VERIFY.normalized_build_context(build))
+
     def test_metadata_uses_generated_context_instead_of_cmake_text(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -325,7 +408,6 @@ class VerifyRegressionTests(unittest.TestCase):
 
     def test_build_context_rejects_compile_context_changes(self):
         changes = {
-            "source compile unit": {"source": "other.cpp"},
             "compiler definitions": {"definitions": "/DDEBUG"},
             "compiler include paths": {"includes": "-Iother"},
             "compiler flags": {"flags": "/Od"},
@@ -338,6 +420,24 @@ class VerifyRegressionTests(unittest.TestCase):
                 with self.subTest(name=name):
                     build = self.write_build_context(root, **arguments)
                     self.assertNotEqual(before, VERIFY.normalized_build_context(build))
+
+    def test_a_replaced_compile_unit_is_reported_and_an_added_one_is_not(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            saved = VERIFY.compile_units(self.write_build_context(root))
+            self.assertEqual(saved, ["main.cpp"])
+            replaced = VERIFY.compile_units(self.write_build_context(root, source="other.cpp"))
+            self.assertEqual(
+                VERIFY.compile_unit_problems(saved, replaced),
+                ["baseline compile unit main.cpp is not in the current build"],
+            )
+            self.assertEqual(VERIFY.compile_unit_problems(saved, ["ini.cpp", "main.cpp"]), [])
+            self.assertEqual(VERIFY.compile_unit_problems(None, replaced), [])
+            # A structure campaign renames a unit or merges two: its exact score
+            # comparison already covers a unit that goes.
+            self.assertEqual(
+                VERIFY.compile_unit_problems(saved, replaced, allow_removed=True), []
+            )
 
     def test_build_context_rejects_link_context_changes(self):
         with tempfile.TemporaryDirectory() as directory:

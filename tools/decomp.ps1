@@ -491,8 +491,8 @@ switch ($Command) {
                 throw "Unknown validate argument: $($CommandArgs[$Index])"
             }
         }
-        if ($Mode -ne "resource" -and $Targets.Count -eq 0) { throw "Validate needs at least one --target address." }
-        if ($Mode -and $Mode -notin @("coverage", "refinement", "data", "resource")) {
+        if ($Mode -notin @("resource", "structure") -and $Targets.Count -eq 0) { throw "Validate needs at least one --target address." }
+        if ($Mode -and $Mode -notin @("coverage", "refinement", "data", "resource", "structure")) {
             throw "Unknown validation mode: $Mode"
         }
         if ($Mode -eq "resource" -and $Targets.Count -gt 0) {
@@ -519,7 +519,7 @@ switch ($Command) {
         if ($AccountingCorrection -and $Mode -ne "data") {
             throw "--accounting-correction requires --mode data."
         }
-        if ($Mode -in @("data", "resource") -and -not (Test-Path $BaselineData)) {
+        if ($Mode -in @("data", "resource", "structure") -and -not (Test-Path $BaselineData)) {
             throw "No data baseline exists. Run tools/decomp.ps1 baseline before a data campaign."
         }
         if ($Mode -eq "data" -and $Staged -and -not $AccountingCorrection) {
@@ -533,7 +533,7 @@ switch ($Command) {
         Build-Project
         $Current = Join-Path $Root "build\decomp-current-report.json"
         Write-ComparisonReport $Current
-        if ($Mode -in @("data", "resource")) {
+        if ($Mode -in @("data", "resource", "structure")) {
             Write-DataReport $CurrentData
         }
         $VerifyArgs = @("validate", $Baseline, $Current) + $Targets
@@ -543,7 +543,7 @@ switch ($Command) {
         if ($Staged) { $VerifyArgs += "--staged" }
         if ($Mode) { $VerifyArgs += @("--mode", $Mode) }
         if ($Resource) { $VerifyArgs += @("--resource", $Resource) }
-        if ($Mode -in @("data", "resource")) {
+        if ($Mode -in @("data", "resource", "structure")) {
             $VerifyArgs += @(
                 "--baseline-data"
                 $BaselineData

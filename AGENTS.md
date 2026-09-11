@@ -64,8 +64,8 @@ These numbers are provisional until 40 campaigns are logged.
 
 Always commit the best compiled model that passes `validate`. Record
 `no-source` only when no attempt raised the score; then restore the tree with
-`git checkout -- src` and pass one `--model` per rejected model so the next
-writer does not retest it.
+`git checkout -- src CMakeLists.txt && git clean -fdq src`, because a new file is
+untracked, and pass one `--model` per rejected model so the next writer skips it.
 
 ## Evidence and names
 
@@ -109,14 +109,14 @@ A type one function needs goes file-local; a shared-header edit moves other func
 
 ## Translation units
 
-File placement is evidence. Before adding code to a large or mixed file, check
-nearby map addresses, retail source paths and asserts, OpenCrashWOC units,
-shared globals and helpers, and the file's includes and initialization order.
-Keep a coherent subsystem in one `.cpp` file unless a separate state group or
-private helper set supports a split; then move the complete slice, preserve
-annotations and data order, add the file to CMake, and compare every moved
-function. A move must accompany source progress. Keep a large initializer (a
-160-byte string, or 32 elements and 256 bytes) in a named `.inc` file.
+File placement is evidence: MSVC links objects in order, so a retail unit is one
+contiguous address block. New code goes where the `placement:` line of `tools/decomp
+evidence` names; a new file goes there and into CMakeLists.txt, in the same campaign. A
+split moves one complete retail block with its helpers and file-local data, keeps
+annotations and data order, and puts shared private types in `*Internal.h`. It is a
+`--mode structure` campaign: no target, no score change, layout deltas as warnings, only
+for a file `tools/decomp structure` marks split, at most one in ten. Keep a large
+initializer (a 160-byte string, or 32 elements and 256 bytes) in an `.inc` file.
 
 ## Validate and finish
 

@@ -175,7 +175,8 @@ RULE_HELP = {
     ),
     "repeated-private-type": (
         "Two or more source files define the same named type and field layout. "
-        "Move the type to a shared owning header."
+        "Move the type to a shared owning header, or to the subsystem's *Internal.h "
+        "when only the files of one subsystem use it."
     ),
 }
 
@@ -1212,8 +1213,17 @@ def _namespace_ranges(masked: str) -> list[tuple[int, int, str]]:
     return ranges
 
 
+def _is_internal_header(path: Path) -> bool:
+    """A subsystem-internal header (NameInternal.h, or any header under Internal/)."""
+    return path.suffix in (".h", ".hpp") and (
+        path.stem.endswith("Internal") or "Internal" in path.parent.parts
+    )
+
+
 def _private_type_records(unit: SourceUnit) -> list[tuple[str, str, int, str, str]]:
-    if unit.path.suffix not in (".c", ".cpp"):
+    # A subsystem-internal header is local like a .cpp: the private types that the
+    # files of a split share live there once, outside an anonymous namespace.
+    if unit.path.suffix not in (".c", ".cpp") and not _is_internal_header(unit.path):
         return []
     if any(part.lower() in {"external", "generated", "build"} for part in unit.path.parts):
         return []
@@ -1263,7 +1273,7 @@ def check_repeated_private_types(units: list[SourceUnit]) -> list[Finding]:
                     "repeated-private-type",
                     "error",
                     _line_text(unit.text, line),
-                    f"type {subject!r} repeats the same field layout in {len(paths)} source files. Move it to a shared owning header",
+                    f"type {subject!r} repeats the same field layout in {len(paths)} source files. Move it to a shared owning header or the subsystem's *Internal.h",
                     subject=subject,
                     fingerprint=fingerprint,
                 )
@@ -1275,8 +1285,14 @@ def target_units(
     staged: bool, explicit: list[str], *, revision: str | None = None
 ) -> list[SourceUnit]:
     if explicit:
+        # A move or a delete leaves the old path in `git diff --name-only`; a named
+        # path that is gone is skipped, so one deleted file cannot stop the advice.
         paths = [Path(item).resolve() for item in explicit]
-        return [SourceUnit(path, path.read_text(encoding="utf-8", errors="ignore")) for path in paths]
+        return [
+            SourceUnit(path, path.read_text(encoding="utf-8", errors="ignore"))
+            for path in paths
+            if path.is_file()
+        ]
     if staged or revision is not None:
         result = subprocess.run(
             ["git", "ls-tree", "-r", "--name-only", revision, "--", "src"]

@@ -243,12 +243,17 @@ validate() {
                 ;;
         esac
     done
-    if [[ $mode != resource && ${#targets[@]} -eq 0 ]]; then
+    if [[ $mode != resource && $mode != structure && ${#targets[@]} -eq 0 ]]; then
         echo "error: validate needs at least one --target address" >&2
         return 2
     fi
-    if [[ -n $mode && $mode != coverage && $mode != refinement && $mode != data && $mode != resource ]]; then
+    if [[ -n $mode && $mode != coverage && $mode != refinement && $mode != data && $mode != resource \
+        && $mode != structure ]]; then
         echo "error: unknown validation mode: $mode" >&2
+        return 2
+    fi
+    if [[ $mode == structure && ${#targets[@]} -gt 0 ]]; then
+        echo "error: a structure campaign cannot have target addresses" >&2
         return 2
     fi
     if [[ $mode == resource && ${#targets[@]} -gt 0 ]]; then
@@ -287,13 +292,18 @@ validate() {
         echo "error: run tools/decomp baseline before you edit source" >&2
         return 2
     fi
-    if [[ ( $mode == data || $mode == resource ) && ! -f build/decomp-baseline-data-report.json ]]; then
+    if [[ ( $mode == data || $mode == resource || $mode == structure ) \
+        && ! -f build/decomp-baseline-data-report.json ]]; then
         echo "error: run tools/decomp baseline before a data campaign" >&2
         return 2
     fi
     if [[ $mode == data && $staged -eq 1 && -z $accounting_correction ]] && \
         git diff --cached --quiet -- src; then
         echo "error: a staged data campaign must change the source tree" >&2
+        return 2
+    fi
+    if [[ $mode == structure && $staged -eq 1 ]] && git diff --cached --quiet -- src CMakeLists.txt; then
+        echo "error: a staged structure campaign must move source" >&2
         return 2
     fi
 
@@ -327,7 +337,8 @@ validate_checks() {
     fi
     rm -f "$report_stamp"
     local with_data_reports=0 stamped=(--report build/decomp-current-report.json)
-    if [[ $mode == data || $mode == resource || -f build/decomp-baseline-data-report.json ]]; then
+    if [[ $mode == data || $mode == resource || $mode == structure \
+        || -f build/decomp-baseline-data-report.json ]]; then
         write_data_report decomp-current-data-report.json || return
         with_data_reports=1 stamped=("${both_reports[@]}")
     fi
@@ -444,6 +455,14 @@ header_side_effects() {
         --baseline build/decomp-baseline-report.json --exclude "$1" || true
 }
 
+# Put src, the map and CMakeLists.txt back at HEAD, new files included, so that a best
+# patch that creates a file applies again. Only the suffixes a campaign writes are
+# removed, so a writer's own note or draft survives. Arguments name more paths to reset.
+restore_source_tree() {
+    git checkout -q --no-overlay HEAD -- src tools/Resources/functions_map.txt CMakeLists.txt "$@" \
+        && git clean -fdq -- 'src/*.cpp' 'src/*.h' 'src/*.inc'
+}
+
 # Turn a coverage target's STUB annotation into a FUNCTION annotation.
 promote_stub() {
     local address="$1"
@@ -457,7 +476,7 @@ promote_stub() {
 
 finish_usage() {
     echo "Usage: tools/decomp campaigns finish --mode MODE --target ADDR [--target ADDR ...]" \
-        "--note TEXT --message FILE"
+        "--note TEXT --message FILE (a structure campaign takes no --target)"
 }
 
 # campaigns finish: promote STUBs, refresh tags, stage, validate --staged,
@@ -483,12 +502,16 @@ campaign_finish() {
         esac
         shift 2
     done
-    if [[ $mode != coverage && $mode != refinement && $mode != data ]]; then
-        echo "error: finish needs --mode coverage, refinement, or data" >&2
+    if [[ $mode != coverage && $mode != refinement && $mode != data && $mode != structure ]]; then
+        echo "error: finish needs --mode coverage, refinement, data, or structure" >&2
         return 2
     fi
-    if [[ ${#targets[@]} -eq 0 ]]; then
+    if [[ $mode != structure && ${#targets[@]} -eq 0 ]]; then
         echo "error: finish needs at least one --target address" >&2
+        return 2
+    fi
+    if [[ $mode == structure && ${#targets[@]} -gt 0 ]]; then
+        echo "error: a structure campaign has no --target; its note names the moved block" >&2
         return 2
     fi
     if [[ -z $note ]]; then
@@ -525,8 +548,16 @@ campaign_finish() {
         python tools/decomp_verify.py annotations build/decomp-current-report.json --write \
             || { echo "error: the annotation tags could not be refreshed" >&2; return 1; }
     fi
-    git add src tools/Resources/functions_map.txt \
+    # CMakeLists.txt lists the source files, so a new file is staged with its entry.
+    git add src tools/Resources/functions_map.txt CMakeLists.txt \
         || { echo "error: git add of the source tree failed" >&2; return 1; }
+    # The build context no longer hashes the file list, so name a staged build edit
+    # here: an unintended CMake change would otherwise ride into the commit unseen.
+    if ! git diff --cached --quiet -- CMakeLists.txt; then
+        local added
+        added=$(git diff --cached --name-only --diff-filter=A -- 'src/*.cpp' | tr '\n' ' ')
+        echo "finish: staging CMakeLists.txt${added:+ (new unit: ${added% })}"
+    fi
     # Debt the campaign removed leaves a stale baseline row, which validate rejects.
     # Prune from the committed rows, so a retried finish sees the debt of its own tree.
     git checkout -q HEAD -- .notes/lint-baseline.tsv \
@@ -557,8 +588,10 @@ campaign_finish() {
                 || { echo "error: the record data report failed" >&2; return 1; }
         fi
     fi
+    local result=source
+    [[ $mode != structure ]] || result=structure
     python tools/decomp_campaigns.py "${campaign_global_arguments[@]}" record \
-        --result source --note "$note" \
+        --result "$result" --note "$note" \
         || { echo "error: campaigns record failed; nothing was committed" >&2; return 1; }
     git add tools/Resources/campaign-ledger.jsonl tools/Resources/scoreboard.tsv \
         || { echo "error: git add of the campaign records failed" >&2; return 1; }
@@ -1047,8 +1080,8 @@ run_batch_prompt() {
                 "\"// FUNCTION: TOY2 $run_address\"."
         else
             echo "Placement: no annotation exists. Add \"// FUNCTION: TOY2 $run_address\" and the" \
-                "complete body to the translation unit that holds the map neighbours shown by" \
-                "the evidence."
+                "complete body to the file that the \"placement:\" line of the evidence names;" \
+                "for a new file, create it in that directory and add it to CMakeLists.txt."
         fi
         echo "Write a long body in several edit calls of under 9,000 characters each (the harness" \
             "denies a longer command); they cost no attempt. Then run bc once."
@@ -1112,8 +1145,7 @@ run_cleanup() {
         return 0
     fi
     out="$prefix-cleanup$suffix" cleanup_before=$run_best
-    if ! git checkout -q -- src tools/Resources/functions_map.txt ||
-        { [[ -s $patch ]] && ! git apply "$patch"; }; then
+    if ! restore_source_tree || { [[ -s $patch ]] && ! git apply "$patch"; }; then
         run_error 1 "the best patch of $run_address does not apply before the cleanup" \
             "git apply --check $patch"
         return
@@ -1143,7 +1175,7 @@ run_drop_cleanup() {
     cleanup_kept=""
     run_emit finish "finish: failed with the cleanup edits; finishing the batch model" \
         --field "log=$finish_log"
-    if ! git checkout -q HEAD -- src tools/Resources/functions_map.txt .notes/lint-baseline.tsv ||
+    if ! restore_source_tree .notes/lint-baseline.tsv ||
         { [[ -s $prefix-cleanup-before.patch ]] && ! git apply "$prefix-cleanup-before.patch"; }; then
         run_error 1 "the pre-cleanup patch of $run_address does not apply" \
             "git apply --check $prefix-cleanup-before.patch"
@@ -1346,7 +1378,7 @@ run_campaign() {
         run_cleanup || return
     fi
     # Restore the best compiled tree: the tree the writer left may hold a worse model.
-    git checkout -q -- src tools/Resources/functions_map.txt \
+    restore_source_tree \
         || { run_error 1 "git checkout of src failed" "git status --short -- src"; return; }
     if [[ -s build/decomp-cache/best/$run_address.patch ]] &&
         ! git apply build/decomp-cache/best/"$run_address".patch; then
@@ -1776,9 +1808,10 @@ Commands:
   undefer <addr>    Clear all committed blockers for one target
   blockers [addr]   Show committed blockers
   evidence <addr>   Collect bounded evidence for one target in a single call
+  structure [file]  Rank source files against retail address runs (no build)
   handoff <addr>    Save stdin as a target's writer handoff (bc --pack prints it)
   baseline          Save a fresh parent-state comparison before source edits
-  validate [args]   Enforce coverage, refinement, data, or resource success
+  validate [args]   Enforce coverage, refinement, data, resource or structure success
   experiment [...] Record labeled source-form comparison trials
   lint [files]      Check reconstructed source for decompiler residue
   names             Re-extract .notes/original-names.md from the retail binary
@@ -1808,6 +1841,7 @@ bc (repeat) -> campaigns finish (validate --staged, record, commit) -> push.
   tools/decomp campaigns evidence --address 0x00403640 --kind analogue \
     --note "new evidence that clears a zero-yield penalty"
   tools/decomp campaigns status | summary | abort --reason TEXT | add-target
+  tools/decomp campaigns start --mode structure --subsystem Toy2.Ini  # a move: no score changes
   tools/decomp campaigns run --count 3 [--mode auto] [--push]  # no model needed
   tools/decomp campaigns run --check --live | --dry-run | --status  # --help: exit codes
 
@@ -1954,6 +1988,9 @@ case "$command" in
     evidence)
         exec python tools/decomp_evidence.py "$@"
         ;;
+    structure)
+        exec python tools/decomp_evidence.py structure "$@"
+        ;;
     notes)
         exec python tools/decomp_notes.py "$@"
         ;;
@@ -2054,7 +2091,8 @@ case "$command" in
         # validate --staged rejects new lint errors and warnings; show them now,
         # while the writer still holds the context to fix them. The readability
         # rules print as advice: validate does not reject them.
-        mapfile -t changed_sources < <(git diff --name-only HEAD -- 'src/*.cpp' 'src/*.h')
+        mapfile -t changed_sources < <(git diff --name-only HEAD -- 'src/*.cpp' 'src/*.h';
+            git ls-files --others --exclude-standard -- 'src/*.cpp' 'src/*.h')
         if [[ ${#changed_sources[@]} -gt 0 ]]; then
             python tools/decomp_lint.py --warnings-as-errors "${changed_sources[@]}" \
                 | grep -E ': (error|warning): ' \

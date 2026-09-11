@@ -27,9 +27,9 @@ the handoff TOOL line and stop.
   legacy cast whose shared declaration cannot change stays inline; note the declaration under
   OPEN (the function stays PROVISIONAL). Never move a cast into a local or macro to pass the
   lint. An `advice:` line names a literal to replace with its name; validate ignores it.
-- The best tree is `build/decomp-cache/best/ADDR.patch`; `git checkout -- src && git apply
-  build/decomp-cache/best/ADDR.patch` restores it; bc on a measured tree names its attempt;
-  `tools/decomp evidence ADDR --decomp-range A:B` prints decompilation lines A-B.
+- The best tree is `build/decomp-cache/best/ADDR.patch`; restore it, new files included, with
+  `git checkout -- src CMakeLists.txt && git clean -fdq src && git apply build/decomp-cache/best/ADDR.patch`;
+  bc on a measured tree names its attempt; `tools/decomp evidence ADDR --decomp-range A:B` prints lines A-B.
 - Source files use tabs. Every edit asserts its anchor (a failed assert logs no attempt).
   Build after `EOF`, not with `&&`; no `{...}` literals; each call under 9,000 characters.
 - A sandbox (Codex) lets you write the tree, build/, the git directory and the Wine prefix;
@@ -57,9 +57,9 @@ Never read the diff files or tool-results/. Batch independent reads.
   or `#define` near its use. Naming does not change the generated code.
 - Give each state or sub-block you touch one section comment.
 - A form that exists only to steer codegen gets `// fakematch: REASON` on the line above.
-- Edit only the target's .cpp and a header only that .cpp includes. A shared header or
-  macro edit regresses untouched functions (10 to 40 minutes lost at validate): make the
-  type file-local and note the header idea under OPEN.
+- Edit only the target's .cpp, a header only it includes, and (when the `placement:` line
+  says new file) that new .cpp in its directory plus its CMakeLists.txt line. A shared header or
+  macro edit regresses untouched functions: make the type file-local, note the header idea under OPEN.
 - Stop the batch when `bc` prints a `stall:` line (three attempts without a half-point
   gain) or at the attempt count the assignment gives. Leave the tree holding the best model.
 - Never run validate, record, commit or push: the driver runs `campaigns finish`.
