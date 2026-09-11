@@ -31,13 +31,24 @@ namespace Nu3D
 
 		void DeathEffect(ParticleInstance* particle);
 
+		// Particle pool, 12-bit fixed-point angles and shared particle limits.
+		const int32_t PARTICLE_POOL_SIZE = 64;
+		const int32_t ANGLE_MASK = 0xFFF;
+		const int32_t ANGLE_QUARTER_TURN = 0x400;
+		const int32_t ANGLE_HALF_TURN = 0x800;
+		const int32_t ANGLE_FULL_TURN = 0x1000;
+		const int32_t PARTICLE_HEIGHT_SCALE = 0x20;
+		const int32_t PARTICLE_FADE_TIME = 0x20;
+		const int32_t MAX_PARTICLE_SHADOWS = 47;
+		const int32_t RANDOM_BYTE_CENTRE = 0x80;
+
 		// FUNCTION: TOY2 0x00410F40 [PROVISIONAL]
 		void Update()
 		{
 			ParticleInstance* particle = g_particleInstances;
 			int32_t colourMode = 0;
-			int32_t particleIndex = 0;
-			do
+			// Age, move and animate each live particle.
+			for (int32_t particleIndex = 0; particleIndex < PARTICLE_POOL_SIZE; particleIndex++, particle++)
 			{
 				if (particle->lifetime > 0)
 				{
@@ -92,7 +103,7 @@ namespace Nu3D
 								targetX >>= 5;
 								targetY >>= 5;
 								targetZ >>= 5;
-								if (particle->lifetime < 0x20)
+								if (particle->lifetime < PARTICLE_FADE_TIME)
 								{
 									turnDivisor = (particle->lifetime & 0xF) + 2;
 								}
@@ -104,23 +115,23 @@ namespace Nu3D
 							}
 
 							int32_t targetYaw = Math::CartesianToFixedAngle(targetX, targetZ);
-							int32_t yawDelta = (targetYaw - particle->yawAngle) & 0xFFF;
-							if (yawDelta >= 0x800)
+							int32_t yawDelta = (targetYaw - particle->yawAngle) & ANGLE_MASK;
+							if (yawDelta >= ANGLE_HALF_TURN)
 							{
-								yawDelta -= 0x1000;
+								yawDelta -= ANGLE_FULL_TURN;
 							}
-							particle->yawAngle = (particle->yawAngle + Renderer::g_frameDelta * yawDelta / turnDivisor) & 0xFFF;
+							particle->yawAngle = (particle->yawAngle + Renderer::g_frameDelta * yawDelta / turnDivisor) & ANGLE_MASK;
 
 							if (particle->discPitchAngle != -1)
 							{
 								int32_t horizontalDistance = (int32_t)sqrt((double)(targetX * targetX + targetZ * targetZ));
 								int32_t targetPitch = Math::CartesianToFixedAngle(horizontalDistance, targetY);
-								int32_t pitchDelta = (targetPitch + (-0x400 - particle->discPitchAngle)) & 0xFFF;
-								if (pitchDelta >= 0x800)
+								int32_t pitchDelta = (targetPitch + (-ANGLE_QUARTER_TURN - particle->discPitchAngle)) & ANGLE_MASK;
+								if (pitchDelta >= ANGLE_HALF_TURN)
 								{
-									pitchDelta -= 0x1000;
+									pitchDelta -= ANGLE_FULL_TURN;
 								}
-								particle->discPitchAngle = (particle->discPitchAngle + Renderer::g_frameDelta * pitchDelta / 20) & 0xFFF;
+								particle->discPitchAngle = (particle->discPitchAngle + Renderer::g_frameDelta * pitchDelta / 20) & ANGLE_MASK;
 							}
 						}
 
@@ -128,8 +139,8 @@ namespace Nu3D
 						int32_t pitchCosine;
 						if (particle->discPitchAngle != -1)
 						{
-							pitchSine = Numerics::g_sinCosLUT[particle->discPitchAngle & 0xFFF];
-							pitchCosine = Numerics::g_sinCosLUT[(particle->discPitchAngle + 0x400) & 0xFFF];
+							pitchSine = Numerics::g_sinCosLUT[particle->discPitchAngle & ANGLE_MASK];
+							pitchCosine = Numerics::g_sinCosLUT[(particle->discPitchAngle + ANGLE_QUARTER_TURN) & ANGLE_MASK];
 						}
 						else
 						{
@@ -139,7 +150,7 @@ namespace Nu3D
 						verticalVelocity = -pitchSine / velocityDivisor;
 						int32_t yaw = particle->yawAngle + 0x400;
 						particle->velX = (Numerics::g_sinCosLUT[particle->yawAngle] * pitchCosine >> 14) / velocityDivisor;
-						particle->velZ = (Numerics::g_sinCosLUT[yaw & 0xFFF] * pitchCosine >> 14) / velocityDivisor;
+						particle->velZ = (Numerics::g_sinCosLUT[yaw & ANGLE_MASK] * pitchCosine >> 14) / velocityDivisor;
 						verticalAcceleration = 0;
 					}
 					else
@@ -169,10 +180,9 @@ namespace Nu3D
 
 					if (particle->rotSpeed != 0)
 					{
-						particle->groundAlignRot = (particle->groundAlignRot + particle->rotSpeed * (int16_t)Renderer::g_frameDelta) & 0xFFF;
+						particle->groundAlignRot = (particle->groundAlignRot + particle->rotSpeed * (int16_t)Renderer::g_frameDelta) & ANGLE_MASK;
 					}
 
-					int16_t shadowCount = Renderer::Shadows::g_shadowCount;
 					if ((particle->renderFlags & PARTICLE_COLLIDES_WITH_GROUND) != 0 && particle->lifetime > 0)
 					{
 						if (particle->velX != 0 || particle->velZ != 0 || particle->groundHeightY == INT_MIN)
@@ -181,30 +191,28 @@ namespace Nu3D
 						}
 						if (particle->groundHeightY != INT_MIN)
 						{
-							if (particle->groundHeightY < particle->pos.y + particle->height * 0x20)
+							if (particle->groundHeightY < particle->pos.y + particle->height * PARTICLE_HEIGHT_SCALE)
 							{
 								particle->lifetime = 0;
 								if (particle->pos.y + particle->yawAngle - particle->velY < particle->groundHeightY)
 								{
-									particle->pos.y = particle->groundHeightY - particle->height * 0x20;
-									if (shadowCount < 47)
+									particle->pos.y = particle->groundHeightY - particle->height * PARTICLE_HEIGHT_SCALE;
+									if (Renderer::Shadows::g_shadowCount < MAX_PARTICLE_SHADOWS)
 									{
-										Renderer::Shadows::ShadowInstance* shadow = &Renderer::Shadows::g_shadowInstances[shadowCount];
-										shadow->pos.x = particle->pos.x;
-										shadow->pos.y = particle->groundHeightY;
-										shadow->pos.z = particle->pos.z;
-										shadow->size = particle->width;
+										Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.x = particle->pos.x;
+										Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.y = particle->groundHeightY;
+										Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.z = particle->pos.z;
+										Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].size = particle->width;
 										Renderer::Shadows::g_shadowCount++;
 									}
 								}
 							}
-							else if (shadowCount < 47)
+							else if (Renderer::Shadows::g_shadowCount < MAX_PARTICLE_SHADOWS)
 							{
-								Renderer::Shadows::ShadowInstance* shadow = &Renderer::Shadows::g_shadowInstances[shadowCount];
-								shadow->pos.x = particle->pos.x;
-								shadow->pos.y = particle->groundHeightY;
-								shadow->pos.z = particle->pos.z;
-								shadow->size = particle->width;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.x = particle->pos.x;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.y = particle->groundHeightY;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.z = particle->pos.z;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].size = particle->width;
 								Renderer::Shadows::g_shadowCount++;
 							}
 						}
@@ -226,13 +234,13 @@ namespace Nu3D
 					switch (particle->updateMode)
 					{
 						case 1:
-							if (shadowCount < 47)
+							if (Renderer::Shadows::g_shadowCount < MAX_PARTICLE_SHADOWS)
 							{
-								Renderer::Shadows::ShadowInstance* shadow = &Renderer::Shadows::g_shadowInstances[shadowCount];
-								shadow->pos.x = particle->pos.x;
-								shadow->pos.y = particle->pos.y + particle->height * 0x20;
-								shadow->pos.z = particle->pos.z;
-								shadow->size = particle->width;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.x = particle->pos.x;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.y =
+									particle->pos.y + particle->height * PARTICLE_HEIGHT_SCALE;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.z = particle->pos.z;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].size = particle->width;
 								Renderer::Shadows::g_shadowCount++;
 							}
 							break;
@@ -261,11 +269,11 @@ namespace Nu3D
 						case 8: {
 							uint32_t angle = ((uint8_t)particle->lifetime & 0x1F) * 0x80;
 							particle->width = (Numerics::g_sinCosLUT[angle] >> 10) + 0x78;
-							particle->height = (Numerics::g_sinCosLUT[(angle + 0x400) & 0xFFF] >> 10) + 0x78;
+							particle->height = (Numerics::g_sinCosLUT[(angle + ANGLE_QUARTER_TURN) & ANGLE_MASK] >> 10) + 0x78;
 							if (Toy2::g_framePulseOutputs.sevenTick != 0 && particle->lifetime > 5)
 							{
 								ParticleInstance* spawned = SpawnFromPreset(particle->pos.x, particle->pos.y, particle->pos.z, 0xF, 2);
-								spawned->rotSpeed = ((int32_t)*g_randDatBufferPtr++ - 0x80) >> 3;
+								spawned->rotSpeed = ((int32_t)*g_randDatBufferPtr++ - RANDOM_BYTE_CENTRE) >> 3;
 							}
 							break;
 						}
@@ -304,7 +312,7 @@ namespace Nu3D
 							break;
 						case 14:
 							particle->groundAlignRot = (uint16_t)(*g_randDatBufferPtr++ << 4);
-							colourMode = particle->lifetime < 0x20 ? 1 : 6;
+							colourMode = particle->lifetime < PARTICLE_FADE_TIME ? 1 : 6;
 							Renderer::LensFlare::RegisterLight(
 								particle->pos.x, particle->pos.y, particle->pos.z, particle->colourR, particle->colourG, particle->colourB, 0x30);
 							break;
@@ -319,7 +327,7 @@ namespace Nu3D
 								SpawnFromPreset(particle->pos.x, particle->pos.y, particle->pos.z, 0x24, 0xF);
 							break;
 						case 17:
-							if (particle->lifetime > 4)
+							if (particle->lifetime > 4 && Toy2::g_framePulseOutputs.threeTick != 0)
 							{
 								for (int32_t i = 0; i < Toy2::g_framePulseOutputs.threeTick; i++)
 									SpawnFromPreset(particle->pos.x, particle->pos.y, particle->pos.z, 0x27, 2);
@@ -332,18 +340,18 @@ namespace Nu3D
 								g_randDatBufferPtr += 3;
 								ParticleInstance* spawned =
 									SpawnFromPreset(particle->pos.x + offset, particle->pos.y + offset, particle->pos.z + offset, 0x2C, 2);
-								spawned->rotSpeed = ((int32_t)*g_randDatBufferPtr++ - 0x80) >> 1;
+								spawned->rotSpeed = ((int32_t)*g_randDatBufferPtr++ - RANDOM_BYTE_CENTRE) >> 1;
 							}
 							break;
 						case 19: {
 							if ((*g_randDatBufferPtr++ & 7) == 0)
 							{
-								particle->velX = *g_randDatBufferPtr++ - 0x80;
-								particle->velZ = *g_randDatBufferPtr++ - 0x80;
+								particle->velX = *g_randDatBufferPtr++ - RANDOM_BYTE_CENTRE;
+								particle->velZ = *g_randDatBufferPtr++ - RANDOM_BYTE_CENTRE;
 							}
 							uint32_t angle = ((uint8_t)particle->lifetime & 0x1F) * 0x80;
 							particle->width = (Numerics::g_sinCosLUT[angle] >> 11) + 0x28;
-							particle->height = (Numerics::g_sinCosLUT[(angle + 0x400) & 0xFFF] >> 11) + 0x28;
+							particle->height = (Numerics::g_sinCosLUT[(angle + ANGLE_QUARTER_TURN) & ANGLE_MASK] >> 11) + 0x28;
 							if (particle->pos.y < Toy2::g_environmentSurfaceY)
 								particle->lifetime = 0;
 							break;
@@ -360,15 +368,15 @@ namespace Nu3D
 							int32_t angle;
 							if (particle->updateParam == 0x65)
 							{
-								particle->pos.x += Numerics::g_sinCosLUT[(buzzYaw + 0x680) & 0xFFF] >> 2;
+								particle->pos.x += Numerics::g_sinCosLUT[(buzzYaw + 0x680) & ANGLE_MASK] >> 2;
 								angle = buzzYaw - 0x580;
 							}
 							else
 							{
-								particle->pos.x += Numerics::g_sinCosLUT[(buzzYaw - 0x680) & 0xFFF] >> 2;
+								particle->pos.x += Numerics::g_sinCosLUT[(buzzYaw - 0x680) & ANGLE_MASK] >> 2;
 								angle = buzzYaw - 0x280;
 							}
-							particle->pos.z += Numerics::g_sinCosLUT[angle & 0xFFF] >> 2;
+							particle->pos.z += Numerics::g_sinCosLUT[angle & ANGLE_MASK] >> 2;
 							particle->pos.y = Toy2::g_buzzActor.posAngles.pos.y - 0x400;
 							colourMode = 1;
 							if (particle->lifetime > 4)
@@ -400,19 +408,18 @@ namespace Nu3D
 							particle->height = particle->width;
 							break;
 						case 23:
-							if (shadowCount < 47)
+							if (Renderer::Shadows::g_shadowCount < MAX_PARTICLE_SHADOWS)
 							{
-								Renderer::Shadows::ShadowInstance* shadow = &Renderer::Shadows::g_shadowInstances[shadowCount];
-								shadow->pos.x = particle->pos.x;
-								shadow->pos.y = particle->groundHeightY;
-								shadow->pos.z = particle->pos.z;
-								shadow->size = particle->width;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.x = particle->pos.x;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.y = particle->groundHeightY;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.z = particle->pos.z;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].size = particle->width;
 								Renderer::Shadows::g_shadowCount++;
 							}
-							if (particle->groundHeightY < particle->pos.y + particle->height * 0x20)
+							if (particle->groundHeightY < particle->pos.y + particle->height * PARTICLE_HEIGHT_SCALE)
 							{
 								particle->lifetime = 0;
-								particle->pos.y = particle->groundHeightY - particle->height * 0x20;
+								particle->pos.y = particle->groundHeightY - particle->height * PARTICLE_HEIGHT_SCALE;
 							}
 							break;
 						case 24:
@@ -422,18 +429,17 @@ namespace Nu3D
 								particle->width = 1;
 							break;
 						case 25:
-							if (shadowCount < 47)
+							if (Renderer::Shadows::g_shadowCount < MAX_PARTICLE_SHADOWS)
 							{
-								Renderer::Shadows::ShadowInstance* shadow = &Renderer::Shadows::g_shadowInstances[shadowCount];
-								shadow->pos.x = particle->pos.x;
-								shadow->pos.y = particle->groundHeightY;
-								shadow->pos.z = particle->pos.z;
-								shadow->size = particle->width;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.x = particle->pos.x;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.y = particle->groundHeightY;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.z = particle->pos.z;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].size = particle->width;
 								Renderer::Shadows::g_shadowCount++;
 							}
-							if (particle->groundHeightY < particle->pos.y + particle->height * 0x20)
+							if (particle->groundHeightY < particle->pos.y + particle->height * PARTICLE_HEIGHT_SCALE)
 							{
-								particle->pos.y = particle->groundHeightY - particle->height * 0x20;
+								particle->pos.y = particle->groundHeightY - particle->height * PARTICLE_HEIGHT_SCALE;
 								if (particle->velY > 0)
 									particle->velY = particle->velY * -6 / 8;
 								if (abs(particle->velY) < 0x100)
@@ -467,9 +473,9 @@ namespace Nu3D
 							if (particle->updateParam != 0xC6)
 							{
 								particle->groundHeightY = Collision::GetGroundHeight(&particle->groundProbe, 100);
-								if (particle->groundHeightY != INT_MIN && particle->groundHeightY < particle->pos.y + particle->height * 0x20)
+								if (particle->groundHeightY != INT_MIN && particle->groundHeightY < particle->pos.y + particle->height * PARTICLE_HEIGHT_SCALE)
 								{
-									particle->pos.y = particle->groundHeightY - particle->height * 0x20;
+									particle->pos.y = particle->groundHeightY - particle->height * PARTICLE_HEIGHT_SCALE;
 									if (particle->velY > 0)
 										particle->velY = particle->velY * -3 / 4;
 									if (abs(particle->velY) < 0x400)
@@ -480,7 +486,7 @@ namespace Nu3D
 							if (Toy2::g_framePulseOutputs.sevenTick != 0 && particle->lifetime > 5 && (particle->renderFlags & PARTICLE_SPAWNS_TRAIL) != 0)
 							{
 								ParticleInstance* spawned = SpawnFromPreset(particle->pos.x, particle->pos.y, particle->pos.z, 0xF, 2);
-								spawned->rotSpeed = ((int32_t)*g_randDatBufferPtr++ - 0x80) >> 3;
+								spawned->rotSpeed = ((int32_t)*g_randDatBufferPtr++ - RANDOM_BYTE_CENTRE) >> 3;
 							}
 							break;
 						case 29: {
@@ -493,23 +499,23 @@ namespace Nu3D
 							int32_t dz = (target->pos.z + volume->offset.z - particle->pos.z) >> 5;
 							if (dx * dx + dy * dy + dz * dz < 0x4000)
 							{
-								if (target->creatureRam->defenseMode == 4)
+								if (target->creatureRam->defenseMode != 4)
+								{
+									Toy2::Actor::HandleDamage(target, Math::CartesianToFixedAngle(dx, dz) & ANGLE_MASK, 4);
+									particle->lifetime = 0;
+									particle->collisionFlags = 8;
+								}
+								else
 								{
 									int32_t angle = Math::CartesianToFixedAngle(target->pos.x - particle->pos.x, target->pos.z - particle->pos.z);
 									particle->renderFlags &= ~(PARTICLE_INTERACTS_WITH_BUZZ | PARTICLE_TRACKS_TARGET);
 									particle->velY = -0x400;
 									particle->yawAngle = 0x30;
 									particle->lifetime = 0x32;
-									particle->velX = Numerics::g_sinCosLUT[(angle + 0x800) & 0xFFF] / 16;
+									particle->velX = Numerics::g_sinCosLUT[(angle + 0x800) & ANGLE_MASK] / 16;
 									particle->updateMode = 30;
-									particle->velZ = Numerics::g_sinCosLUT[(angle + 0xC00) & 0xFFF] / 16;
+									particle->velZ = Numerics::g_sinCosLUT[(angle + 0xC00) & ANGLE_MASK] / 16;
 									AudioManager::PlaySoundEffect(7, &particle->pos);
-								}
-								else
-								{
-									Toy2::Actor::HandleDamage(target, Math::CartesianToFixedAngle(dx, dz) & 0xFFF, 4);
-									particle->lifetime = 0;
-									particle->collisionFlags = 8;
 								}
 							}
 						}
@@ -531,14 +537,14 @@ namespace Nu3D
 							}
 							break;
 						case 31:
-							particle->width -= (int16_t)Renderer::g_frameDelta * 4;
 							colourMode = 1;
+							particle->width -= (int16_t)Renderer::g_frameDelta * 4;
 							if (particle->width < 0x10)
 								particle->width = 0x10;
 							particle->height = particle->width;
 							break;
 						case 32: {
-							uint16_t pulse = Toy2::g_framePulsePhases.thirtyTwoTick;
+							int32_t pulse = Toy2::g_framePulsePhases.sixteenTick;
 							if (pulse > 7)
 								pulse = 15 - pulse;
 							particle->width = pulse * 8 + 100;
@@ -546,7 +552,7 @@ namespace Nu3D
 							if (particle->lifetime > 4 && Toy2::g_framePulseOutputs.twoTickCount != 0 && (particle->renderFlags & PARTICLE_SPAWNS_TRAIL) != 0)
 							{
 								ParticleInstance* spawned = SpawnFromPreset(particle->pos.x, particle->pos.y, particle->pos.z, 0x4D, 2);
-								spawned->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+								spawned->rotSpeed = *g_randDatBufferPtr++ - RANDOM_BYTE_CENTRE;
 							}
 							break;
 						}
@@ -575,28 +581,28 @@ namespace Nu3D
 								particle->width = 0xFA - wobble;
 								particle->height = wobble + 0xFA;
 							}
-							if (particle->groundHeightY < particle->pos.y + particle->height * 0x20)
+							if (particle->groundHeightY < particle->pos.y + particle->height * PARTICLE_HEIGHT_SCALE)
 							{
-								particle->pos.y = particle->groundHeightY - particle->height * 0x20;
+								particle->pos.y = particle->groundHeightY - particle->height * PARTICLE_HEIGHT_SCALE;
 								if (particle->velY > 0)
 									particle->velY = particle->velY * -3 / 4;
 								AudioManager::PlaySoundEffect(0x71, &particle->pos);
 							}
-							if (Renderer::Shadows::g_shadowCount < 47)
+							if (Renderer::Shadows::g_shadowCount < MAX_PARTICLE_SHADOWS)
 							{
-								Renderer::Shadows::ShadowInstance* shadow = &Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount++];
-								shadow->pos.x = particle->pos.x;
-								shadow->pos.y = particle->groundHeightY;
-								shadow->pos.z = particle->pos.z;
-								shadow->size = particle->width;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.x = particle->pos.x;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.y = particle->groundHeightY;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.z = particle->pos.z;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].size = particle->width;
+								Renderer::Shadows::g_shadowCount++;
 							}
 							break;
 						}
 						case 36: {
 							colourMode = 1;
 							int32_t yaw = (int16_t)Toy2::g_buzzActor.posAngles.angles.yaw;
-							int32_t xOffset = Numerics::g_sinCosLUT[(yaw + 0x400) & 0xFFF] / 10;
-							int32_t zOffset = Numerics::g_sinCosLUT[(yaw - 0x800) & 0xFFF] / 10;
+							int32_t xOffset = Numerics::g_sinCosLUT[(yaw + ANGLE_QUARTER_TURN) & ANGLE_MASK] / 10;
+							int32_t zOffset = Numerics::g_sinCosLUT[(yaw - 0x800) & ANGLE_MASK] / 10;
 							if (particle->rotSpeed < 0)
 							{
 								xOffset = -xOffset;
@@ -642,20 +648,20 @@ namespace Nu3D
 							else
 								particle->groundHeightY = 1;
 
-							if (particle->groundHeightY < particle->pos.y + particle->height * 0x20)
+							if (particle->groundHeightY < particle->pos.y + particle->height * PARTICLE_HEIGHT_SCALE)
 							{
-								particle->pos.y = particle->groundHeightY - particle->height * 0x20;
+								particle->pos.y = particle->groundHeightY - particle->height * PARTICLE_HEIGHT_SCALE;
 								if (particle->velY > 0)
 									particle->velY = -particle->velY / 2;
 								AudioManager::PlaySoundEffect(0x71, &particle->pos);
 							}
-							if (Renderer::Shadows::g_shadowCount < 47)
+							if (Renderer::Shadows::g_shadowCount < MAX_PARTICLE_SHADOWS)
 							{
-								Renderer::Shadows::ShadowInstance* shadow = &Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount++];
-								shadow->pos.x = particle->pos.x;
-								shadow->pos.y = particle->groundHeightY;
-								shadow->pos.z = particle->pos.z;
-								shadow->size = particle->width;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.x = particle->pos.x;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.y = particle->groundHeightY;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.z = particle->pos.z;
+								Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].size = particle->width;
+								Renderer::Shadows::g_shadowCount++;
 							}
 							break;
 						}
@@ -666,7 +672,7 @@ namespace Nu3D
 							if (particle->lifetime > 4 && Toy2::g_framePulseOutputs.fourTick != 0 && (particle->renderFlags & PARTICLE_SPAWNS_TRAIL) != 0)
 							{
 								ParticleInstance* spawned = SpawnFromPreset(particle->pos.x, particle->pos.y, particle->pos.z, 0x5A, 2);
-								spawned->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+								spawned->rotSpeed = *g_randDatBufferPtr++ - RANDOM_BYTE_CENTRE;
 							}
 							colourMode = 3;
 							break;
@@ -692,7 +698,7 @@ namespace Nu3D
 							break;
 						}
 						case 43:
-							particle->groundAlignRot = (0x7FF - (int16_t)particle->yawAngle) & 0xFFF;
+							particle->groundAlignRot = (0x7FF - (int16_t)particle->yawAngle) & ANGLE_MASK;
 							particle->groundHeightY = Collision::GetGroundHeight(&particle->groundProbe, 0);
 							if (particle->groundHeightY != INT_MIN)
 								particle->pos.y = particle->groundHeightY - 0x800;
@@ -700,7 +706,7 @@ namespace Nu3D
 								&& Toy2::g_framePulseOutputs.fourTick != 0)
 							{
 								ParticleInstance* spawned = SpawnFromPreset(particle->pos.x, particle->pos.y, particle->pos.z, 0x6B, 2);
-								spawned->groundAlignRot = (0x7FF - (int16_t)particle->yawAngle) & 0xFFF;
+								spawned->groundAlignRot = (0x7FF - (int16_t)particle->yawAngle) & ANGLE_MASK;
 							}
 							break;
 						case 44: {
@@ -724,9 +730,9 @@ namespace Nu3D
 								{
 									ParticleInstance* spawned = SpawnFromPreset(particle->pos.x, particle->pos.y, particle->pos.z, 0x6A, 2);
 									if (Toy2::g_framePulseOutputs.sixteenTick == 0)
-										spawned->groundAlignRot = (particle->groundAlignRot + *g_randDatBufferPtr++ - 0x280) & 0xFFF;
+										spawned->groundAlignRot = (particle->groundAlignRot + *g_randDatBufferPtr++ - 0x280) & ANGLE_MASK;
 									else
-										spawned->groundAlignRot = (particle->groundAlignRot + *g_randDatBufferPtr++ + 0x180) & 0xFFF;
+										spawned->groundAlignRot = (particle->groundAlignRot + *g_randDatBufferPtr++ + 0x180) & ANGLE_MASK;
 								}
 							}
 							break;
@@ -752,10 +758,10 @@ namespace Nu3D
 						case 49:
 							AudioManager::PlaySoundEffect(0x40, &particle->pos);
 							Link::SetPositionRawAndCommit(0x19, particle->pos.x >> 5, particle->pos.y >> 5, particle->pos.z >> 5);
-							Link::SetRotationRelative8bit(0x19, 0, (particle->yawAngle + 0x400) & 0xFFF, particle->discPitchAngle);
+							Link::SetRotationRelative8bit(0x19, 0, (particle->yawAngle + ANGLE_QUARTER_TURN) & ANGLE_MASK, particle->discPitchAngle);
 							if (particle->lifetime > 4 && Toy2::g_framePulseOutputs.twoTickCount != 0)
 							{
-								int32_t rotation = *g_randDatBufferPtr++ - 0x80;
+								int32_t rotation = *g_randDatBufferPtr++ - RANDOM_BYTE_CENTRE;
 								SpawnInstance(
 									particle->pos.x, particle->pos.y, particle->pos.z, particle->velX / 2, 0, particle->velZ / 2, 0, 0, rotation, 0x2E);
 							}
@@ -777,7 +783,7 @@ namespace Nu3D
 							if (particle->lifetime > 4 && Toy2::g_framePulseOutputs.fourTick != 0)
 							{
 								ParticleInstance* spawned = SpawnFromPreset(particle->pos.x, particle->pos.y, particle->pos.z, particle->updateParam >> 1, 2);
-								spawned->rotSpeed = *g_randDatBufferPtr++ - 0x80;
+								spawned->rotSpeed = *g_randDatBufferPtr++ - RANDOM_BYTE_CENTRE;
 							}
 							break;
 						case 52:
@@ -799,7 +805,7 @@ namespace Nu3D
 					switch (colourMode)
 					{
 						case 1:
-							if (particle->lifetime < 0x20)
+							if (particle->lifetime < PARTICLE_FADE_TIME)
 							{
 								particle->colourR = g_particleTypes[particle->typeId - 1].colourR * particle->lifetime / 2 >> 4;
 								particle->colourG = g_particleTypes[particle->typeId - 1].colourG * particle->lifetime / 2 >> 4;
@@ -815,7 +821,7 @@ namespace Nu3D
 							}
 							break;
 						case 3:
-							if (particle->lifetime < 0x20)
+							if (particle->lifetime < PARTICLE_FADE_TIME)
 							{
 								particle->colourR = g_particleTypes[particle->typeId - 1].colourR * particle->lifetime / 2 >> 4;
 								if (particle->lifetime > 0x10)
@@ -836,7 +842,7 @@ namespace Nu3D
 							}
 							break;
 						case 5:
-							if (particle->lifetime < 0x20)
+							if (particle->lifetime < PARTICLE_FADE_TIME)
 							{
 								if (particle->lifetime < 0x10)
 									particle->colourR = g_particleTypes[particle->typeId - 1].colourR * particle->lifetime / 2 >> 4;
@@ -862,7 +868,7 @@ namespace Nu3D
 							break;
 						}
 						case 7:
-							if (particle->lifetime < 0x20)
+							if (particle->lifetime < PARTICLE_FADE_TIME)
 							{
 								particle->colourR = g_particleTypes[particle->typeId - 1].colourR * particle->lifetime / 2 >> 4;
 								particle->colourG = g_particleTypes[particle->typeId - 1].colourG * particle->lifetime / 2 >> 4;
@@ -884,12 +890,11 @@ namespace Nu3D
 						particle->lifetime = -1;
 					}
 				}
-				particle++;
-				particleIndex++;
-			} while (particleIndex < 64);
+			}
 
 			particle = g_particleInstances;
-			int32_t cleanupCount = 64;
+			// Free the particles that expired this frame.
+			int32_t cleanupCount = PARTICLE_POOL_SIZE;
 			do
 			{
 				if (particle->lifetime == -1)
