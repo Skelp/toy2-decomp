@@ -133,3 +133,12 @@ include the compiled score or the evidence that rejected the model.
 - Ruled out: 3 56.01% rotated rows written as m2x*relZ + m1x*relY + m0x*relX. No change: the compiler puts the terms in a fixed order either way.
 - Ruled out: 4 56.01% drop the `z` local in the moving-mesh loop and read `position->z` directly, plus a named `DISTANCE_SHIFT`. No change: the compiler already reloads z.
 - Result note: no attempt raised the score
+
+<!-- campaign-id: 08b99b1a-0011-4bdf-809f-430b9981d669 -->
+## 2026-09-11 | Toy2 | 0x00433700
+
+- Mode: refinement.
+- Ruled out: 2 56.08% dropped the `riderIndex` local and used `g_objects[g_forcedFacingActive - 1]` and `g_forcedFacingActive - 1` directly. The object address is now computed like retail (`lea eax,[ecx+ecx*4]`, base g_objects-40), but the first loop's registers changed (buzz moved from ebx to ecx), so the score fell.
+- Ruled out: 3 59.13% ambient check on `data[riderIndex].y` instead of `.x`, plus `targetY` written inline. Same score. The retail displacement `[eax+ecx*4-4]` with ecx=active*3 decodes to data[active-1].y, so `.y` is the correct field. The inline `targetY` gave the same code as the local.
+- Ruled out: 4 58.08% rebuilt the path-bounds logic as `if (progress==0 && cur>target) {dec; ps=0} else { if (==segLen) {cur<count-2 ? adv : ps=moving} else if (>segLen) {cur<count-2 ? adv : clamp} if (<0) {...} }`. The compiler did not share the step-back block or the advance block, so the score fell.
+- Result note: no attempt raised the score
