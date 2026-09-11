@@ -310,30 +310,41 @@ namespace Toy2
 			MainMenu::g_menuClearColor.b = g_skyColorBlue;
 		}
 
+		// Constants for Interactions.
+		const static int SFX_BARN_LAUNCH = 0x1C;
+		const static int BARN_LAUNCH_SPEED_HIGH = 0xC00;
+		const static int HAY_BALE_LAUNCH_YAW = 0xB90;
+		const static int SLAM_PLATFORM_LAUNCH_YAW = 0x81E;
+		const static int HAY_BALE_LINK = 33;
+		const static int EGG_LIFT_PLATFORM = 18;
+		const static int HAY_BALE_TIP_ANGLE = 0x708;
+
 		// FUNCTION: TOY2 0x00421340 [PROVISIONAL]
 		void Interactions()
 		{
 			Vector3I position;
 			Vector3I origin;
 
+			// Hay bale ride: end the ride early when Buzz leaves the bale area.
 			if (g_hayBaleRideTimer > 1 && g_buzzActor.posAngles.pos.z > -0x11203)
 			{
 				g_hayBaleRideTimer = 1;
 			}
 
+			// Hay bale ride: run the timer, or start the ride on a ground slam.
 			if (g_hayBaleRideTimer > 0)
 			{
 				HUD::g_challengeState = 2;
 				AndysHouse::g_raceCheckpointPassCount = g_hayBaleRideTimer / 60 + 100;
-				g_hayBaleRideSpeed += Renderer::g_frameDelta;
 				g_hayBaleRideTimer -= Renderer::g_frameDelta;
+				g_hayBaleRideSpeed += Renderer::g_frameDelta;
 				if (g_hayBaleRideSpeed > 0x200)
 					g_hayBaleRideSpeed = 0x200;
 				if (g_hayBaleRideTimer <= 0)
 				{
 					g_hayBaleRideTimer = 0;
 					Platform::SetRotationAngles(15, 0, 0, 0);
-					Nu3D::Link::SetRotationRelative8bit(33, 0, 0, 0);
+					Nu3D::Link::SetRotationRelative8bit(HAY_BALE_LINK, 0, 0, 0);
 					HUD::g_challengeState = 0;
 					AndysHouse::g_raceCheckpointPassCount = 100;
 				}
@@ -349,33 +360,34 @@ namespace Toy2
 				if (g_groundSlamTimer != 0 && Platform::HadBuzzContactThisFrame(15) != 0 && HUD::g_challengeState == 0)
 				{
 					Platform::SetRotationAngles(15, 0, 0, -0x180);
-					Nu3D::Link::SetRotationRelative8bit(33, 0, 0, -0x180);
+					Nu3D::Link::SetRotationRelative8bit(HAY_BALE_LINK, 0, 0, -0x180);
 					g_hayBaleRideTimer = 0xA8C;
 					Levels::DeactivateAmbientEmitter(0, 1);
 				}
 			}
 
+			// Hay bale ride: engine sound and swing angle.
 			if (g_hayBaleRideSpeed != 0)
 			{
 				AudioManager::g_dynamicSoundFrequencies[0] = static_cast<int16_t>(g_hayBaleRideSpeed) * 8 + 0x400;
-				Nu3D::Link::GetCurrentPosFixed(33, &position);
+				Nu3D::Link::GetCurrentPosFixed(HAY_BALE_LINK, &position);
 				AudioManager::PlaySoundEffect(0x75, &position);
 			}
 			g_hayBaleRideAngle += g_hayBaleRideSpeed * Renderer::g_frameDelta / 16;
 
-			if (g_hayBaleRideTimer > 0 &&
-				(Platform::GetFlags(0) & Platform::PLATFORM_FLAG_BUZZ_CONTACT) == Platform::PLATFORM_FLAG_BUZZ_CONTACT)
+			// Hay bale ride: launch Buzz when he touches the bale.
+			if (g_hayBaleRideTimer > 0 && (Platform::GetFlags(0) & Platform::PLATFORM_FLAG_BUZZ_CONTACT) == Platform::PLATFORM_FLAG_BUZZ_CONTACT)
 			{
 				g_hayBaleRideState = 1;
 				g_groundSlamTimer = 0;
-				Buzz::Launch(-0xC00, 2);
-				AudioManager::PlaySoundEffect(0x1C, &g_buzzActor.posAngles.pos);
-				g_buzzActor.velocity.lateral = Numerics::g_sinCosLUT[0xB90] / 7;
+				Buzz::Launch(-BARN_LAUNCH_SPEED_HIGH, 2);
+				AudioManager::PlaySoundEffect(SFX_BARN_LAUNCH, &g_buzzActor.posAngles.pos);
+				g_buzzActor.velocity.lateral = Numerics::g_sinCosLUT[HAY_BALE_LAUNCH_YAW] / 7;
 				Camera::g_cameraSmoothingDivisor = 0x40;
 				g_buzzActor.velocity.forward = Numerics::g_sinCosLUT[0xF90] / 7;
 				g_buzzActor.actorFlags |= Buzz::ACTOR_FLAG_LOCK_FACING | Buzz::ACTOR_FLAG_UNCONTROLLED_MOMENTUM;
-				g_buzzActor.posAngles.angles.yaw = 0xB90;
-				g_buzzActor.facingAngle = 0xB90;
+				g_buzzActor.posAngles.angles.yaw = HAY_BALE_LAUNCH_YAW;
+				g_buzzActor.facingAngle = HAY_BALE_LAUNCH_YAW;
 			}
 
 			Nu3D::Link::GetTargetPosFixed(0, &position);
@@ -383,27 +395,22 @@ namespace Toy2
 			position.y += Numerics::g_sinCosLUT[(g_hayBaleRideAngle * 7 / 6) & 0xFFF] / 2 - origin.y;
 			Platform::SetVelocity(0, 0, position.y, 0);
 			Platform::GetRotation(0, &position);
+			// Hay bale ride: turn the bale to the target tilt for each state.
 			if (g_hayBaleRideState == HAY_BALE_RIDE_TIPPING)
 			{
-				Platform::SetAngularVelocity(0, 0, 0, static_cast<int16_t>((-0x708 - position.z) >> 2));
-				if (abs((-0x708 - position.z) >> 2) < 8)
+				Platform::SetAngularVelocity(0, 0, 0, static_cast<int16_t>((-HAY_BALE_TIP_ANGLE - position.z) >> 2));
+				if (abs((-HAY_BALE_TIP_ANGLE - position.z) >> 2) < 8)
 					g_hayBaleRideState = HAY_BALE_RIDE_RECOVERING;
 			}
 			else if (g_hayBaleRideState == HAY_BALE_RIDE_RECOVERING)
 			{
-				Platform::SetAngularVelocity(0,
-					0,
-					0,
-					static_cast<int16_t>((Numerics::g_sinCosLUT[g_hayBaleRideAngle & 0xFFF] / 32 - position.z) >> 3));
+				Platform::SetAngularVelocity(0, 0, 0, static_cast<int16_t>((Numerics::g_sinCosLUT[g_hayBaleRideAngle & 0xFFF] / 32 - position.z) >> 3));
 				if (abs((Numerics::g_sinCosLUT[g_hayBaleRideAngle & 0xFFF] / 32 - position.z) >> 3) < 8)
 					g_hayBaleRideState = HAY_BALE_RIDE_STABLE;
 			}
 			else
 			{
-				Platform::SetAngularVelocity(0,
-					0,
-					0,
-					static_cast<int16_t>((Numerics::g_sinCosLUT[g_hayBaleRideAngle & 0xFFF] / 32 - position.z) >> 2));
+				Platform::SetAngularVelocity(0, 0, 0, static_cast<int16_t>((Numerics::g_sinCosLUT[g_hayBaleRideAngle & 0xFFF] / 32 - position.z) >> 2));
 			}
 			Platform::CommitRotationToLink(0, 0);
 			Nu3D::Link::SetPositionRawAndCommit(0, origin.x >> 5, origin.y >> 5, origin.z >> 5);
@@ -411,22 +418,24 @@ namespace Toy2
 			Nu3D::Link::GetRotation8Bit(0, &position);
 			Nu3D::Link::SetRotationRelative8bit(1, position.x, position.y, position.z);
 
+			// Egg lift: move the offset to the target.
 			if (g_eggLiftOffset < g_targetEggLiftOffset)
 			{
 				g_eggLiftOffset += Renderer::g_frameDelta * 0x200;
-				if (g_eggLiftOffset > g_targetEggLiftOffset)
+				if (g_eggLiftOffset >= g_targetEggLiftOffset)
 					g_eggLiftOffset = g_targetEggLiftOffset;
 			}
 			else if (g_eggLiftOffset > g_targetEggLiftOffset)
 			{
 				g_eggLiftOffset -= Renderer::g_frameDelta * 0x200;
-				if (g_eggLiftOffset < g_targetEggLiftOffset)
+				if (g_eggLiftOffset <= g_targetEggLiftOffset)
 					g_eggLiftOffset = g_targetEggLiftOffset;
 			}
+			// Egg lift: collision is on only at rest.
 			if (g_eggLiftOffset == 0)
-				Collision::MarkPlatformAsMoving(18);
+				Collision::MarkPlatformAsMoving(EGG_LIFT_PLATFORM);
 			else
-				Platform::DisableCollision(18);
+				Platform::DisableCollision(EGG_LIFT_PLATFORM);
 			Nu3D::Link::GetTargetPosFixed(31, &position);
 			Nu3D::Link::SetPositionRawAndCommit(31, position.x >> 5, (position.y - g_eggLiftOffset) >> 5, position.z >> 5);
 
@@ -441,11 +450,13 @@ namespace Toy2
 			Nu3D::Link::SetScaleFromFixedOffsets(30, 0x1000, abs(g_groundSlamPlatformTimer) * 0x80, 0x1000);
 			Nu3D::Link::SetRotationRelative8bit(2, 0, 0, abs(g_groundSlamPlatformTimer) * 0x20);
 
+			// Ground slam platform: start on a slam.
 			if (g_buzzActor.collisionFlags != 0 && g_footingType == 8 && g_groundSlamPlatformTimer == 0 && g_groundSlamTimer != 0)
 			{
 				Levels::DeactivateAmbientEmitter(1, 1);
 				g_groundSlamPlatformTimer = 2;
 			}
+			// Ground slam platform: bounce up, launch Buzz, then settle.
 			if (g_groundSlamPlatformTimer != 0)
 			{
 				if (g_groundSlamPlatformTimer > 0)
@@ -458,13 +469,13 @@ namespace Toy2
 					else if (g_groundSlamPlatformTimer > 6 && g_groundSlamPlatformTimer - Renderer::g_frameDelta <= 6)
 					{
 						g_groundSlamTimer = 0;
-						Buzz::Launch(-0xC00, 2);
-						AudioManager::PlaySoundEffect(0x1C, &g_buzzActor.posAngles.pos);
-						g_buzzActor.velocity.lateral = Numerics::g_sinCosLUT[0x81E] >> 3;
+						Buzz::Launch(-BARN_LAUNCH_SPEED_HIGH, 2);
+						AudioManager::PlaySoundEffect(SFX_BARN_LAUNCH, &g_buzzActor.posAngles.pos);
+						g_buzzActor.velocity.lateral = Numerics::g_sinCosLUT[SLAM_PLATFORM_LAUNCH_YAW] >> 3;
 						g_buzzActor.velocity.forward = Numerics::g_sinCosLUT[0xC1E] >> 3;
 						g_buzzActor.actorFlags |= Buzz::ACTOR_FLAG_LOCK_FACING | Buzz::ACTOR_FLAG_UNCONTROLLED_MOMENTUM;
-						g_buzzActor.posAngles.angles.yaw = 0x81E;
-						g_buzzActor.facingAngle = 0x81E;
+						g_buzzActor.posAngles.angles.yaw = SLAM_PLATFORM_LAUNCH_YAW;
+						g_buzzActor.facingAngle = SLAM_PLATFORM_LAUNCH_YAW;
 						Camera::g_cameraSmoothingDivisor = 0x80;
 					}
 				}
@@ -476,6 +487,7 @@ namespace Toy2
 				}
 			}
 
+			// Launch pad: bounce Buzz.
 			if (g_buzzActor.collisionFlags != 0 && g_footingType == 9)
 			{
 				g_buzzActor.actorFlags &= ~(Buzz::ACTOR_FLAG_LOCK_FACING | Buzz::ACTOR_FLAG_UNCONTROLLED_MOMENTUM);
@@ -483,13 +495,13 @@ namespace Toy2
 				if (g_groundSlamTimer != 0)
 				{
 					g_groundSlamTimer = 0;
-					Buzz::Launch(-0xC00, 2);
+					Buzz::Launch(-BARN_LAUNCH_SPEED_HIGH, 2);
 				}
 				else
 				{
 					Buzz::Launch(-0x980, 2);
 				}
-				AudioManager::PlaySoundEffect(0x1C, &g_buzzActor.posAngles.pos);
+				AudioManager::PlaySoundEffect(SFX_BARN_LAUNCH, &g_buzzActor.posAngles.pos);
 			}
 			if (g_launchPadBounceTimer != 0)
 			{
@@ -552,12 +564,12 @@ namespace Toy2
 					if ((Platform::GetFlags(10) & 3) == Platform::PLATFORM_FLAG_BUZZ_CONTACT)
 					{
 						Buzz::Launch(-0xA00, 2);
-						AudioManager::PlaySoundEffect(0x1C, &g_buzzActor.posAngles.pos);
-						g_buzzActor.velocity.lateral = Numerics::g_sinCosLUT[0x81E] >> 5;
+						AudioManager::PlaySoundEffect(SFX_BARN_LAUNCH, &g_buzzActor.posAngles.pos);
+						g_buzzActor.velocity.lateral = Numerics::g_sinCosLUT[SLAM_PLATFORM_LAUNCH_YAW] >> 5;
 						g_buzzActor.velocity.forward = Numerics::g_sinCosLUT[0xC1E] >> 5;
 						g_buzzActor.actorFlags |= Buzz::ACTOR_FLAG_LOCK_FACING | Buzz::ACTOR_FLAG_UNCONTROLLED_MOMENTUM;
-						g_buzzActor.posAngles.angles.yaw = 0x81E;
-						g_buzzActor.facingAngle = 0x81E;
+						g_buzzActor.posAngles.angles.yaw = SLAM_PLATFORM_LAUNCH_YAW;
+						g_buzzActor.facingAngle = SLAM_PLATFORM_LAUNCH_YAW;
 					}
 				}
 			}
@@ -588,12 +600,12 @@ namespace Toy2
 					if ((Platform::GetFlags(14) & 3) == Platform::PLATFORM_FLAG_BUZZ_CONTACT)
 					{
 						Buzz::Launch(-0xA00, 2);
-						AudioManager::PlaySoundEffect(0x1C, &g_buzzActor.posAngles.pos);
-						g_buzzActor.velocity.lateral = Numerics::g_sinCosLUT[0x81E] >> 4;
+						AudioManager::PlaySoundEffect(SFX_BARN_LAUNCH, &g_buzzActor.posAngles.pos);
+						g_buzzActor.velocity.lateral = Numerics::g_sinCosLUT[SLAM_PLATFORM_LAUNCH_YAW] >> 4;
 						g_buzzActor.velocity.forward = Numerics::g_sinCosLUT[0xC1E] >> 4;
 						g_buzzActor.actorFlags |= Buzz::ACTOR_FLAG_LOCK_FACING | Buzz::ACTOR_FLAG_UNCONTROLLED_MOMENTUM;
-						g_buzzActor.posAngles.angles.yaw = 0x81E;
-						g_buzzActor.facingAngle = 0x81E;
+						g_buzzActor.posAngles.angles.yaw = SLAM_PLATFORM_LAUNCH_YAW;
+						g_buzzActor.facingAngle = SLAM_PLATFORM_LAUNCH_YAW;
 					}
 				}
 			}
@@ -604,16 +616,21 @@ namespace Toy2
 				position.y >>= 5;
 				position.z >>= 5;
 				Nu3D::Link::SetPositionRawAndCommit(24, position.x, position.y, position.z);
-				if (position.z < 0x3A27 || (g_platform14MotionSpeed += Renderer::g_frameDelta * 0x20) < 0)
+				if (position.z >= 0x3A27)
 				{
-					Platform::SetVelocity(14, 0, 0, -g_platform14MotionSpeed);
+					// Past the stop line: brake, then halt the platform.
+					g_platform14MotionSpeed += Renderer::g_frameDelta * 0x20;
+					if (g_platform14MotionSpeed >= 0)
+					{
+						Platform::SetVelocity(14, 0, 0, 0);
+						g_platform14MotionSpeed = 0;
+						Platform::SetVelocity(14, 0, 0, 0);
+					}
+					else
+						Platform::SetVelocity(14, 0, 0, -g_platform14MotionSpeed);
 				}
 				else
-				{
-					Platform::SetVelocity(14, 0, 0, 0);
-					g_platform14MotionSpeed = 0;
-					Platform::SetVelocity(14, 0, 0, 0);
-				}
+					Platform::SetVelocity(14, 0, 0, -g_platform14MotionSpeed);
 			}
 
 			Platform::StepMotionScript(7, 15, &g_platform7MotionCursor, &g_platform7MotionTimer, &g_platform7MotionSpeed);
@@ -626,10 +643,19 @@ namespace Toy2
 			Nu3D::Link::GetCurrentPosFixed(17, &position);
 			Nu3D::Link::SetPositionRawAndCommit(20, position.x >> 7, position.y >> 7, position.z >> 7);
 
-			int8_t launcherDefenseMode = g_discLauncherShotSlotsAvailable == 6 ? 4 : 5;
-			Actor::g_creatureActors[7].creatureRam->defenseMode = launcherDefenseMode;
-			Actor::g_creatureActors[8].creatureRam->defenseMode = launcherDefenseMode;
-			Actor::g_creatureActors[9].creatureRam->defenseMode = launcherDefenseMode;
+			// Launcher defense: all three launchers share one mode.
+			if (g_discLauncherShotSlotsAvailable != 6)
+			{
+				Actor::g_creatureActors[7].creatureRam->defenseMode = 5;
+				Actor::g_creatureActors[8].creatureRam->defenseMode = 5;
+				Actor::g_creatureActors[9].creatureRam->defenseMode = 5;
+			}
+			else
+			{
+				Actor::g_creatureActors[7].creatureRam->defenseMode = 4;
+				Actor::g_creatureActors[8].creatureRam->defenseMode = 4;
+				Actor::g_creatureActors[9].creatureRam->defenseMode = 4;
+			}
 			if (Actor::g_creatureActors[7].actorPhase == 0)
 				Platform::StepMotionScript(13, 12, &g_platform13MotionCursor, &g_platform13MotionTimer, &g_platform13MotionSpeed);
 			if (Actor::g_creatureActors[8].actorPhase == 0)
@@ -651,9 +677,12 @@ namespace Toy2
 					particle->groundHeightY = 0;
 					AudioManager::PlaySoundEffect(0x74, &particle->pos);
 				}
+			}
+			if (g_framePulseOutputs.sixtyFourTick != 0)
+			{
 				if (Actor::IsInsideBounds(&g_buzzActor.posAngles.pos, -0x3BB3A, -0x1B73A, -0xA7DD, 0x48FA3) != 0)
 				{
-					uint32_t positionIndex = *g_randDatBufferPtr++ & 7;
+					int32_t positionIndex = *g_randDatBufferPtr++ & 7;
 					if (positionIndex > 5)
 						positionIndex -= 6;
 					Vector3I& particlePosition = Levels::g_recordData[7]->data[positionIndex];
@@ -704,18 +733,18 @@ namespace Toy2
 			if (chick10.actorPhase > 0 && g_chick10WasActive != 0 && (chick10.pos.z > 0x47000 || (chick10.actorFlags & Actor::ACTOR_FLAG_TARGETABLE) == 0))
 			{
 				g_chick10WasActive = 0;
-				if ((chick10.actorFlags & Actor::ACTOR_FLAG_ACTIVE) == 0)
-					chick10.actorPhase = 0;
-				else
+				if ((chick10.actorFlags & Actor::ACTOR_FLAG_ACTIVE) != 0)
 					Actor::Kill(&chick10, Actor::KILL_REMOVE_ACTOR);
+				else
+					chick10.actorPhase = 0;
 			}
 			if (chick11.actorPhase > 0 && g_chick11WasActive != 0 && (chick11.pos.z > 0x47000 || (chick11.actorFlags & Actor::ACTOR_FLAG_TARGETABLE) == 0))
 			{
 				g_chick11WasActive = 0;
-				if ((chick11.actorFlags & Actor::ACTOR_FLAG_ACTIVE) == 0)
-					chick11.actorPhase = 0;
-				else
+				if ((chick11.actorFlags & Actor::ACTOR_FLAG_ACTIVE) != 0)
 					Actor::Kill(&chick11, Actor::KILL_REMOVE_ACTOR);
+				else
+					chick11.actorPhase = 0;
 			}
 
 			Actor::Toy2Actor& chickQuestActor = Actor::g_creatureActors[12];
