@@ -646,7 +646,7 @@ class AttemptTests(unittest.TestCase):
         self.assertEqual((stats["attempts"], stats["cleanup_attempts"], stats["best_attempt"]), (5, 2, 4))
         self.assertFalse(stats["stalled"])
 
-    def test_cleanup_todo_lists_literals_openers_and_fixable_findings(self):
+    def test_cleanup_todo_lists_literals_and_fixable_findings(self):
         path = self.root / "Level.cpp"
         path.write_text(
             "enum { SOUND_JUMP = 0x3D };\n// FUNCTION: TOY2 0x00401000\nvoid f(Boss* boss)\n{\n"
@@ -655,12 +655,13 @@ class AttemptTests(unittest.TestCase):
             "\t\tPlay(SOUND_JUMP, 0);\n\t\tbreak;\n\t}\n\towner = (void*)1;\n}\n"
             "// FUNCTION: TOY2 0x00402000\nvoid g() { Play(0x3D, 0); }\n", encoding="utf-8")
         lines = attempts.cleanup_todo(path, ADDRESS)
-        self.assertEqual(lines[:3], [
+        self.assertEqual(lines[:2], [
             f"Target source: {path}:2-19.",
             "Bare literals (uses, first line): 0xFFF x2 L8, 0x400 x1 L5, 0x3D x1 L7",
-            "Block openers without a comment: L5 if (boss->timer > 0x400), L13 case 1:",
         ])
-        self.assertEqual(lines[3], "Lint findings:")
+        # The list asks for no comment per block: a quota buys comments that guess.
+        self.assertFalse([line for line in lines if "opener" in line.lower()])
+        self.assertEqual(lines[2], "Lint findings:")
         self.assertTrue(any("L7 [unnamed-constant]" in line and "SOUND_JUMP" in line for line in lines))
         self.assertFalse([line for line in lines if "magic-pointer" in line])
         self.assertEqual(attempts.cleanup_todo(path, "0x00403000"), [])

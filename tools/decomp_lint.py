@@ -22,6 +22,7 @@ import os
 import re
 import subprocess
 import sys
+from collections import Counter
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
@@ -71,10 +72,17 @@ SUPPRESSIBLE_RULES = {"anonymous-buffer-view", "typed-byte-roundtrip"}
 # Readability advice: bc prints a new occurrence, but it never fails validate and
 # is not source debt, so naming a value in one function never blocks a campaign on
 # the literals of another, and un-naming a value never counts as removed debt.
-ADVISORY_RULES = {"unnamed-constant", "repeated-macro-body"}
+ADVISORY_RULES = {"unnamed-constant"}
 # Values too common to need a name; the unnamed-constant rule skips them.
 PLAIN_VALUES = {0, 1, -1, 2}
 MACRO_REPEAT_LINES = 8
+DUPLICATE_RULE = "duplicated-block"
+# Twelve normalized lines are longer than any idiom a file repeats by itself (a
+# clamp, a swap, a loop header), so a run this long is copied source.
+DUPLICATE_BLOCK_LINES = 12
+# Retail does repeat some code, a per-edge walk for example. This comment above the
+# block or the macro states that, and accepts both duplication rules for it.
+RETAIL_DUPLICATE_RE = re.compile(r"//\s*retail-duplicate:\s*(.{8,})\s*$", re.IGNORECASE)
 # Longer operators first, so "==" is not read as "=".
 OPERATORS = ("==", "!=", "<=", ">=", "<<", ">>", "&&", "||", "+=", "-=", "*=", "/=", "&=",
              "|=", "^=", "=", "<", ">", "+", "-", "*", "/", "%", "&", "|", "^")
@@ -120,8 +128,18 @@ RULE_HELP = {
         "naming does not change the generated code."
     ),
     "repeated-macro-body": (
-        "Two macros in one file have the same body of 8 or more lines. Keep one macro and "
-        "give it a parameter; the preprocessed code stays identical."
+        "Two macros in one file have the same body of 8 or more lines, or one holds a run "
+        "of 8 or more code lines (a blank line, a brace and a comment do not count) that "
+        "the other states too. Keep one macro and give it a parameter; the preprocessed "
+        "code stays identical. Write '// retail-duplicate: REASON' above the later #define "
+        "when retail really repeats the code."
+    ),
+    "duplicated-block": (
+        "A run of 12 or more code lines (a blank line, a brace and a comment do not count) "
+        "repeats a run the same file already states. Call a file-local helper or a macro "
+        "with a parameter. Write '// retail-duplicate: REASON' directly above the block "
+        "when retail really repeats it, a per-edge walk for example; one comment accepts "
+        "one block. A data table is exempt: keep a large initializer in a named .inc file."
     ),
     "unfinished-function": (
         "A FUNCTION annotation has an empty or default-return body. Mark unfinished work "
@@ -278,10 +296,19 @@ def _macro_definition_lines(text: str) -> set[int]:
 def _mask_source(text: str) -> str:
     """Replace comments, strings, and inactive #if 0 text while preserving positions."""
 
+    return _mask(text)[0]
+
+
+def _mask(text: str) -> tuple[str, list[tuple[int, int]]]:
+    """Return the masked text and the span of each string literal it blanked, so a
+    caller that must tell two calls apart can read their arguments back."""
+
     chars = list(text)
+    strings: list[tuple[int, int]] = []
     index = 0
     state = "code"
     quote = ""
+    opened = 0
     line_start = True
     active = True
     preprocessor_stack: list[tuple[bool, bool]] = []
@@ -318,6 +345,7 @@ def _mask_source(text: str) -> str:
                 index += 2
             elif char == quote:
                 chars[index] = " "
+                strings.append((opened, index + 1))
                 index += 1
                 state = "code"
             else:
@@ -373,6 +401,7 @@ def _mask_source(text: str) -> str:
             continue
         if char in ('"', "'"):
             quote = char
+            opened = index
             chars[index] = " "
             index += 1
             state = "string"
@@ -380,7 +409,120 @@ def _mask_source(text: str) -> str:
         if char == "\n":
             line_start = True
         index += 1
-    return "".join(chars)
+    return "".join(chars), strings
+
+
+def _code_lines(text: str, masked: str, strings: list[tuple[int, int]]) -> list[str]:
+    """Return the lines without comments, directives and inactive text but with their
+    string literals, so two calls that log different text stay different lines."""
+
+    chars = list(masked)
+    for start, end in strings:
+        chars[start:end] = text[start:end]
+    return "".join(chars).splitlines()
+
+
+def _significant_lines(code_lines: list[str]) -> list[tuple[int, str]]:
+    """Return the (line number, normalized text) of the lines that carry content.
+    Whitespace, a macro continuation, a brace and a lone break carry none."""
+
+    lines: list[tuple[int, str]] = []
+    for number, raw in enumerate(code_lines, 1):
+        normalized = _normalized(raw.rstrip().removesuffix("\\"))
+        if not normalized or normalized == "break;" or re.fullmatch(r"[{};]+", normalized):
+            continue
+        lines.append((number, normalized))
+    return lines
+
+
+def _shared_lines(body: list[str], other: list[str], width: int) -> int:
+    """Return how many lines of ``body`` sit in a run of ``width`` lines that ``other``
+    states too, so scattered declarations and idioms never read as a copy."""
+
+    keys = {tuple(other[index : index + width]) for index in range(len(other) - width + 1)}
+    covered: set[int] = set()
+    for index in range(len(body) - width + 1):
+        if tuple(body[index : index + width]) in keys:
+            covered.update(range(index, index + width))
+    return len(covered)
+
+
+def _macro_spans(text: str, code_lines: list[str]) -> list[tuple[str, int, int]]:
+    """Return the (name, first line, last line) of every #define, continuations
+    included, so the macro rule and the block rule read the file the same way."""
+
+    header = re.compile(r"\s*#\s*define\s+(?P<name>[A-Za-z_]\w*)(?:\([^)]*\))?")
+    raw = text.splitlines()
+    spans: list[tuple[str, int, int]] = []
+    index = 0
+    while index < len(raw):
+        start = index
+        found = header.match(code_lines[index]) if index < len(code_lines) else None
+        while raw[index].rstrip().endswith("\\") and index + 1 < len(raw):
+            index += 1
+        index += 1
+        if found:
+            spans.append((found.group("name"), start + 1, index))
+    return spans
+
+
+def _retail_duplicate_spans(
+    text: str, masked: str, macro_spans: list[tuple[str, int, int]]
+) -> list[tuple[int, int]]:
+    """Return the line ranges a ``// retail-duplicate: REASON`` comment accepts: the
+    macro, the brace block or the paragraph that starts under the comment."""
+
+    raw = text.splitlines()
+    masked_lines = masked.splitlines()
+    macros = {start: end for _, start, end in macro_spans}
+    starts = [0] + [found.end() for found in re.finditer("\n", masked)]
+    spans: list[tuple[int, int]] = []
+    for number, line in enumerate(raw, 1):
+        if not RETAIL_DUPLICATE_RE.search(line):
+            continue
+        first = number + 1
+        # An annotation or another comment may stand between the directive and its block.
+        while first <= len(raw) and not masked_lines[first - 1].strip() and raw[first - 1].strip():
+            first += 1
+        if first > len(raw):
+            continue
+        if first in macros:
+            spans.append((first, macros[first]))
+            continue
+        opening = -1
+        depth = 0
+        for position in range(starts[first - 1], len(masked)):
+            char = masked[position]
+            if char in "([":
+                depth += 1
+            elif char in ")]":
+                depth -= 1
+            elif depth == 0 and char == ";":
+                break
+            elif depth == 0 and char == "{":
+                opening = position
+                break
+        body = _balanced_body(masked, opening) if opening >= 0 else None
+        if body:
+            spans.append((first, _line_column(masked, body[1])[0]))
+            continue
+        last = first
+        while last < len(raw) and raw[last].strip():
+            last += 1
+        spans.append((first, last))
+    return spans
+
+
+def _accepted(retail: list[tuple[int, int]], used: set[int], first: int, last: int) -> bool:
+    """Accept one block for each ``// retail-duplicate:`` comment: the innermost unused
+    comment whose span holds the whole run, so a second or a later copy still reports."""
+
+    inside = [index for index, (low, high) in enumerate(retail)
+              if low <= first and last <= high and index not in used]
+    if not inside:
+        return False
+    used.add(max(inside, key=lambda index: retail[index][0]))
+    return True
 
 
 def _line_column(text: str, offset: int) -> tuple[int, int]:
@@ -469,7 +611,10 @@ def _balanced_body(masked: str, opening: int) -> tuple[int, int] | None:
 
 def check_text(path: Path, text: str) -> list[Finding]:
     findings: list[Finding] = []
-    masked = _mask_source(text)
+    masked, strings = _mask(text)
+    code_lines = _code_lines(text, masked, strings)
+    macro_spans = _macro_spans(text, code_lines)
+    retail = _retail_duplicate_spans(text, masked, macro_spans)
     owners = _owners_by_line(text)
     allowed = _allowed_rules(text)
 
@@ -830,7 +975,13 @@ def check_text(path: Path, text: str) -> list[Finding]:
         )
 
     findings.extend(check_unnamed_constants(path, text, masked, owners, allowed))
-    findings.extend(check_repeated_macros(path, text, masked))
+    accepted: set[int] = set()
+    repeated = check_repeated_macros(path, text, code_lines, macro_spans, retail, accepted)
+    findings.extend(repeated)
+    findings.extend(check_duplicated_blocks(
+        path, text, code_lines, owners, macro_spans, retail, accepted,
+        stated={finding.subject for finding in repeated},
+    ))
 
     # Remove exact duplicates caused by overlapping lexical patterns.
     unique: dict[tuple[str, str, str], Finding] = {}
@@ -1004,34 +1155,140 @@ def check_unnamed_constants(
     return findings
 
 
-def check_repeated_macros(path: Path, text: str, masked: str) -> list[Finding]:
-    """Report each #define whose body repeats an earlier one of 8 or more lines."""
-    lines, masked_lines = text.splitlines(), masked.splitlines()
-    header = re.compile(r"\s*#\s*define\s+(?P<name>[A-Za-z_]\w*)(?:\([^)]*\))?")
-    first: dict[str, tuple[str, int]] = {}
+def check_repeated_macros(
+    path: Path,
+    text: str,
+    code_lines: list[str],
+    macro_spans: list[tuple[str, int, int]],
+    retail: list[tuple[int, int]],
+    used: set[int],
+) -> list[Finding]:
+    """Report each macro of 8 or more lines whose body repeats an earlier macro, or
+    holds a run of its lines, because the shared part belongs in one macro. Only a
+    run counts: two edge walks state the same declarations and idioms without either
+    being a copy of the other."""
+
+    header = re.compile(r"\s*#\s*define\s+[A-Za-z_]\w*(?:\([^)]*\))?")
+    bodies: list[tuple[str, int, list[str]]] = []
     findings: list[Finding] = []
-    index = 0
-    while index < len(masked_lines):
-        found = header.match(masked_lines[index])
-        start = index
-        while lines[index].rstrip().endswith("\\") and index + 1 < len(lines):
-            index += 1
-        index += 1
-        if not found or index - start < MACRO_REPEAT_LINES:
+    for name, start, end in macro_spans:
+        if end - start + 1 < MACRO_REPEAT_LINES:
             continue
-        code = "\n".join([masked_lines[start][found.end() :], *masked_lines[start + 1 : index]])
-        strings = re.findall(r'"(?:\\.|[^"\\\n])*"', "\n".join(lines[start:index]))
-        key = _normalized(code.replace("\\", " ")) + "\0" + "\0".join(strings)
-        name = found.group("name")
-        if key not in first:
-            first[key] = (name, start + 1)
+        found = header.match(code_lines[start - 1])
+        lines = [code_lines[start - 1][found.end() :] if found else "", *code_lines[start:end]]
+        body = [line for _, line in _significant_lines(lines)]
+        if not body:
             continue
-        original, line = first[key]
+        best: tuple[int, str, int, bool] | None = None
+        for other_name, other_line, other_body in bodies:
+            if other_body == body:
+                best = (len(body), other_name, other_line, True)
+                break
+            shared = _shared_lines(body, other_body, MACRO_REPEAT_LINES)
+            if shared and (best is None or shared > best[0]):
+                best = (shared, other_name, other_line, False)
+        bodies.append((name, start, body))
+        if best is None:
+            continue
+        shared, original, line, identical = best
+        detail = (
+            f"macro {name!r} repeats the {len(body)}-line body of {original!r} (line {line}); "
+            "keep one macro with a parameter"
+            if identical
+            else f"macro {name!r} holds {shared} of its {len(body)} lines as a run that "
+            f"{original!r} (line {line}) states too; keep one macro with a parameter for "
+            "the difference"
+        )
         findings.append(Finding(
-            path, start + 1, "repeated-macro-body", "warning", lines[start],
-            f"macro {name!r} repeats the {index - start}-line body of {original!r} (line {line}); "
-            "keep one macro with a parameter",
+            path, start, "repeated-macro-body", "warning", _line_text(text, start), detail,
             subject=name, fingerprint=_fingerprint(f"{original}={name}"),
+            suppressed=_accepted(retail, used, start, end),
+        ))
+    return findings
+
+
+def check_duplicated_blocks(
+    path: Path,
+    text: str,
+    code_lines: list[str],
+    owners: list[Owner],
+    macro_spans: list[tuple[str, int, int]],
+    retail: list[tuple[int, int]],
+    used: set[int],
+    stated: set[str] = frozenset(),
+) -> list[Finding]:
+    """Report each later copy of a run of 12 or more lines the file states elsewhere.
+
+    Every window of that many normalized lines is hashed once, so a long file costs
+    one pass. A copy belongs to the function or the macro that holds it, and its
+    fingerprint is its own text, so an edit elsewhere never restates it as new.
+    ``stated`` names the macros the macro rule already reports."""
+
+    significant = _significant_lines(code_lines)
+    width = DUPLICATE_BLOCK_LINES
+    if len(significant) < 2 * width:
+        return []
+    macro_of_line: dict[int, str] = {}
+    for name, start, end in macro_spans:
+        macro_of_line.update({number: name for number in range(start, end + 1)})
+
+    # A window must stay inside one function or one macro, so a copy has one owner.
+    identifiers: dict[str, int] = {}
+    sequence: list[int] = []
+    holders: list[tuple[str, str]] = []
+    for number, normalized in significant:
+        sequence.append(identifiers.setdefault(normalized, len(identifiers)))
+        holders.append((macro_of_line.get(number, ""), _owner_at(owners, number).key))
+    segments = [0]
+    for index in range(1, len(holders)):
+        segments.append(segments[-1] + (holders[index] != holders[index - 1]))
+
+    earliest: dict[tuple[int, ...], int] = {}
+    copies: dict[int, int] = {}
+    for position in range(len(sequence) - width + 1):
+        if segments[position] != segments[position + width - 1]:
+            continue
+        key = tuple(sequence[position : position + width])
+        first = earliest.setdefault(key, position)
+        if first + width <= position:
+            copies[position] = first
+
+    runs: list[list[int]] = []
+    for position in sorted(copies):
+        if runs and position == runs[-1][1] + 1 and segments[position] == segments[runs[-1][0]]:
+            runs[-1][1] = position
+        else:
+            runs.append([position, position])
+
+    findings: list[Finding] = []
+    counted: Counter = Counter()
+    for first, last in runs:
+        lines = significant[first : last + width]
+        owner = _owner_at(owners, lines[0][0])
+        macro = macro_of_line.get(lines[0][0], "")
+        # A macro body belongs to the macro's users, not to the function whose
+        # annotation precedes the #define, so a copy there is the file's debt.
+        holder = Owner() if macro else owner
+        # A repeated data table is data, not copied source: two sprite sheets of one
+        # grid state the same rows, and AGENTS keeps a large initializer in an .inc
+        # file, which no macro or helper can state for it.
+        if holder.kind in ("library", "global") or macro in stated:
+            continue
+        subject = f"{macro}: {len(lines)} lines" if macro else f"{len(lines)} lines"
+        counted[holder.address, subject] += 1
+        repeat = counted[holder.address, subject]
+        source_line = significant[copies[first]][0]
+        source_owner = macro_of_line.get(source_line) or _owner_at(owners, source_line).address
+        findings.append(Finding(
+            path, lines[0][0], DUPLICATE_RULE, "warning", _line_text(text, lines[0][0]),
+            f"{len(lines)} lines repeat the block at line {source_line}"
+            + (f" ({source_owner})" if source_owner else "")
+            + "; share them through a macro or a helper, or write "
+            "'// retail-duplicate: REASON' above the block",
+            owner_kind=holder.kind, owner_address=holder.address,
+            subject=subject if repeat == 1 else f"{subject} #{repeat}",
+            fingerprint=_fingerprint("\n".join(line for _, line in lines)),
+            suppressed=_accepted(retail, used, lines[0][0], lines[-1][0]),
         ))
     return findings
 
@@ -1402,9 +1659,25 @@ def apply_baseline(
 ) -> tuple[list[Finding], list[BaselineEntry]]:
     baseline = {entry.key: entry for entry in entries}
     seen: set[tuple[str, str, str, str]] = set()
+    # A duplicated-block row stands for one copy of its owner, not for one text: the
+    # writer edits the copy, or the block it repeats grows, and it is the same debt.
+    # So a copy with no row of its own takes a spare row of its owner and stays
+    # legacy. An added copy, or a copy in an owner with no spare row, is new debt,
+    # and a copy the writer shares away leaves its row stale, which --prune-baseline
+    # removes and validate counts as removed debt.
+    matched = {finding.baseline_key for finding in findings
+               if not finding.suppressed and finding.baseline_key in baseline}
+    spare: dict[str, list[BaselineEntry]] = {}
+    for entry in entries:
+        if entry.rule == DUPLICATE_RULE and entry.key not in matched:
+            spare.setdefault(entry.owner, []).append(entry)
     classified: list[Finding] = []
     for finding in findings:
         legacy = finding.baseline_key in baseline
+        rows = spare.get(finding.baseline_key[0], [])
+        if not legacy and not finding.suppressed and finding.rule == DUPLICATE_RULE and rows:
+            seen.add(rows.pop().key)
+            legacy = True
         # An accepted (suppressed) finding is not debt, so its baseline row is stale.
         if legacy and not finding.suppressed:
             seen.add(finding.baseline_key)

@@ -78,13 +78,30 @@ of a real file or API format.
   call, or as a case of the same switch. Values 0, 1, -1 and 2 are exempt. A
   value alone is not enough, because an enum covers most small numbers.
 - `repeated-macro-body`: Two `#define` bodies of 8 or more lines in one file are
-  identical after whitespace normalization.
+  identical after whitespace normalization, or one holds a run of 8 or more of the
+  other's lines. Only a run counts, because two edge walks state the same
+  declarations and idioms without either being a copy. A macro with a parameter
+  states the difference once.
+- `duplicated-block`: A run of 12 or more normalized lines repeats a run the same
+  file states elsewhere. Comments, blank lines, braces and a lone `break;` do not
+  count; string literals do. Each later copy is one finding, owned by the function
+  or the macro that holds it. A `GLOBAL` data table is exempt: retail writes its
+  rows out, and AGENTS keeps a large initializer in a named `.inc` file. A baseline
+  row stands for one copy of its owner, not for one text: a copy the writer edits,
+  and a copy the block it repeats lengthens, take a spare row of that owner and stay
+  legacy. An added copy, and a copy in an owner with no spare row, are new debt; a
+  copy the writer shares away leaves its row stale, which `--prune-baseline` removes
+  and `validate` counts as removed debt.
+  Duplication is read inside one file, so moving a copy to another `.cpp` hides it;
+  read a file move as a move, not as a clean result.
 
-`unnamed-constant` and `repeated-macro-body` are advisory: `bc` prints a new
-occurrence as an `advice:` line, but it never fails validate and it is not source
-debt. So naming a value in one function never blocks a campaign on the literals of
-another, and removing an advisory finding is not counted as removed debt, because
-un-naming a value would remove the findings that depend on its name.
+`unnamed-constant` is advisory: `bc` prints a new occurrence as an `advice:` line,
+but it never fails validate and it is not source debt. So naming a value in one
+function never blocks a campaign on the literals of another, and removing an
+advisory finding is not counted as removed debt, because un-naming a value would
+remove the findings that depend on its name. The two duplication rules are not
+advisory: a new occurrence fails `validate`, and removing a baselined one is
+progress.
 
 The linter does not reject integer lookup tables, fixed-point arithmetic, manual
 shifts, IEEE 754 bit operations, or other established Nu3D idioms.
@@ -103,6 +120,20 @@ before the expression:
 
 The reason must identify the external format or API constraint. A directive
 applies to one expression. File-wide exceptions are not available.
+
+The duplication rules have their own comment, because retail does repeat some
+code and a macro or a helper is the normal way to share source. Put it directly
+above the block or the `#define`, before the annotation of a whole function:
+
+```cpp
+// retail-duplicate: retail walks each of the four edges in the function body
+```
+
+It accepts `duplicated-block` and `repeated-macro-body` for the macro, the brace
+block or the paragraph under it, and it must hold the whole run. One comment
+accepts one block: a second copy, and a copy added later, each need their own
+comment. Use it when the repetition is retail's own form, not to keep a copy that
+a macro with a parameter would state once.
 
 Use `tools/decomp lint --explain RULE` for a short explanation. Use
 `tools/decomp lint --format json` when a tool needs structured findings.

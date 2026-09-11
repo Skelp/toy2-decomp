@@ -769,9 +769,10 @@ def rationale_lines(handoff: str, cleanup: str = "", limit: int = 12, width: int
 
 def cleanup_todo(path: Path, address: str, limit: int = 15) -> list[str]:
     """Return the work list of a CLEANUP assignment: the target's line span, its bare
-    literals of 0x10 or more (most used first), the block openers that have no
-    comment above them and the lint findings a .cpp edit can fix, so the writer
-    edits from the assignment instead of reading the whole function."""
+    literals of 0x10 or more (most used first) and the lint findings a .cpp edit can
+    fix, so the writer edits from the assignment instead of reading the whole
+    function. The list names no block to comment: a comment quota buys wrong
+    comments, and the writer comments where the names do not state the purpose."""
     from tools import decomp_lint
 
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -783,35 +784,25 @@ def cleanup_todo(path: Path, address: str, limit: int = 15) -> list[str]:
     last = next((number - 1 for number in range(first + 1, len(lines) + 1)
                  if annotation.search(lines[number - 1])), len(lines))
     uses: dict[str, list[int]] = {}
-    openers: list[str] = []
-    depth = None
     for number in range(first + 1, last + 1):
-        line = lines[number - 1]
-        code = re.sub(r'"(?:\\.|[^"\\])*"|//.*', "", line)
+        code = re.sub(r'"(?:\\.|[^"\\])*"|//.*', "", lines[number - 1])
         for literal in re.findall(r"(?<![\w.])(?:0[xX][0-9A-Fa-f]+|[0-9]+)[uUlL]*(?![\w.])", code):
             digits = literal.rstrip("uUlL")
             if int(digits, 16 if digits[:2].lower() == "0x" else 10) >= 0x10:
                 uses.setdefault(literal, []).append(number)
-        stripped = line.strip()
-        indent = len(line) - len(line.lstrip())
-        if depth is None:
-            depth = indent + 1 if stripped == "{" else None
-        elif (indent == depth and re.match(r"(?:\}\s*)?(?:if|else|switch|for|while|do)\b", stripped)
-              or indent <= depth + 1 and re.match(r"(?:case\b|default\s*:)", stripped)):
-            if not lines[number - 2].strip().startswith("//"):
-                openers.append(f"L{number} {stripped[:50]}")
     ranked = sorted(uses.items(), key=lambda item: (-len(item[1]), item[1][0]))[:limit]
     findings = [
         f" L{item.line} [{item.rule}] {item.detail}"
         for item in decomp_lint.check_file(path)
         if item.owner_address == address.lower() and not item.suppressed
-        and item.rule not in ("magic-pointer", "signature-concealment")  # a shared declaration
+        # A shared declaration, or a macro the whole file shares: not a cleanup edit.
+        and item.rule not in ("magic-pointer", "signature-concealment",
+                              decomp_lint.DUPLICATE_RULE, "repeated-macro-body")
     ][:8]
     return [
         f"Target source: {path}:{first}-{last}.",
         "Bare literals (uses, first line): "
         + (", ".join(f"{value} x{len(at)} L{at[0]}" for value, at in ranked) or "none"),
-        "Block openers without a comment: " + (", ".join(openers[:limit]) or "none"),
         *(["Lint findings:", *findings] if findings else []),
     ]
 

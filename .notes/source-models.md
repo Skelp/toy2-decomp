@@ -151,3 +151,10 @@ include the compiled score or the evidence that rejected the model.
 - Ruled out: 3 66.04% subtractive loops: destinationPixel and sourcePixel as uint16_t. The offset-free loop now loads `mov dx,[ecx]` with no xor, as retail does, but the registers moved
 - Ruled out: 4 67.45% `uint16_t useSubtractive = flags & SOFTWARE_RENDER_SUBTRACTIVE; if (useSubtractive != 0)`: the compiler folded it back to `test dh,0x10`, so the code did not change. Stall.
 - Result note: no attempt raised the score
+
+<!-- campaign-id: 964bc444-ca5f-4e28-9de3-77817090b5d1 -->
+## 2026-09-11 | Collision | 0x00486520
+
+- Mode: coverage.
+- Ruled out: per-face ground/ceiling resolve loop over the workspace slot, 306 lines, 6.38%
+- Result note: coverage stalled at 6.38% of a 4,979-byte body (needs 25% of the ceiling); the ground/ceiling resolve loop was not modelled

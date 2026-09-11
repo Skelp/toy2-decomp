@@ -24,9 +24,10 @@ the handoff TOOL line and stop.
 - A `header side effect:` line means your header edit moved an untouched function; make the
   type file-local in the next attempt.
 - A `lint:` line is a new finding validate will reject: fix the declared type or field. A
-  legacy cast whose shared declaration cannot change stays inline; note the declaration under
-  OPEN (the function stays PROVISIONAL). Never move a cast into a local or macro to pass the
-  lint. An `advice:` line names a literal to replace with its name; validate ignores it.
+  legacy cast whose shared declaration cannot change stays inline; note it under OPEN (it
+  stays PROVISIONAL). Never move a cast into a local or macro to pass the lint. A
+  `duplicated-block` line names copied source: share it in a file-local macro or static
+  helper, or write `// retail-duplicate: REASON` above the one block retail repeats.
 - The best tree is `build/decomp-cache/best/ADDR.patch`; restore it, new files included, with
   `git checkout -- src CMakeLists.txt && git clean -fdq src && git apply build/decomp-cache/best/ADDR.patch`;
   bc on a measured tree names its attempt; `tools/decomp evidence ADDR --decomp-range A:B` prints lines A-B.
@@ -55,7 +56,7 @@ Never read the diff files or tool-results/. Batch independent reads.
 
 - Name each constant you add or touch: the name the file already has, else a `const`, enum
   or `#define` near its use. Naming does not change the generated code.
-- Give each state or sub-block you touch one section comment.
+- Comment a state or sub-block only where its names do not state the purpose; never guess.
 - A form that exists only to steer codegen gets `// fakematch: REASON` on the line above.
 - Edit only the target's .cpp, a header only it includes, and (when the `placement:` line
   says new file) that new .cpp in its directory plus its CMakeLists.txt line. A shared header or
@@ -83,11 +84,10 @@ the next pack with it and puts TRIED and OPEN in the commit message (else save i
 ## Cleanup (only when the assignment says CLEANUP)
 
 The tree holds the best model; the assignment lists the work. In one edit, name the listed
-literals (scope rules above), give each listed block opener one section comment and tag
-codegen-only forms `// fakematch: REASON`; change no code, field, type or header. Run the bc
-line once. If the score dropped, restore the best patch, redo half of the edits and run bc
-once more; stop at the `budget:` line. Return 1-5 plain lines under 100 characters saying
-what changed and any field, type or helper idea for a later batch, then stop.
+literals (scope rules above), comment only a block whose names do not state its purpose (never
+guess one) and tag codegen-only forms `// fakematch: REASON`; change no code, field, type or
+header. Run the bc line once. If the score dropped, restore the best patch, redo half of the edits
+and run bc once more. Return 1-5 plain lines saying what changed and any helper idea.
 
 ## Repair (only when the assignment says REPAIR)
 

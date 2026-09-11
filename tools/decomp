@@ -1115,8 +1115,8 @@ run_message() {
     } > "$prefix.msg"
 }
 
-# The CLEANUP assignment ends with its work list (literals, block openers, lint
-# findings a .cpp edit can fix), so the writer spends no turn on finding it.
+# The CLEANUP assignment ends with its work list (literals, lint findings a .cpp
+# edit can fix), so the writer spends no turn on finding it.
 run_cleanup_prompt() {
     local file
     file=$(grep -rlE -- "// (FUNCTION|STUB): TOY2 $run_address\b" src | head -n 1 || true)
@@ -2089,14 +2089,14 @@ case "$command" in
         fi
         python tools/decomp_attempts.py attempt --address "$1" --diff "$diff_path" || true
         # validate --staged rejects new lint errors and warnings; show them now,
-        # while the writer still holds the context to fix them. The readability
-        # rules print as advice: validate does not reject them.
+        # while the writer still holds the context to fix them. Only the
+        # readability rule prints as advice: validate does not reject it.
         mapfile -t changed_sources < <(git diff --name-only HEAD -- 'src/*.cpp' 'src/*.h';
             git ls-files --others --exclude-standard -- 'src/*.cpp' 'src/*.h')
         if [[ ${#changed_sources[@]} -gt 0 ]]; then
             python tools/decomp_lint.py --warnings-as-errors "${changed_sources[@]}" \
                 | grep -E ': (error|warning): ' \
-                | sed -E '/\[(unnamed-constant|repeated-macro-body)\]/{s/^/advice: /;b};s/^/lint: /' || true
+                | sed -E '/\[unnamed-constant\]/{s/^/advice: /;b};s/^/lint: /' || true
         fi
         diff_args=(
             "$diff_path"

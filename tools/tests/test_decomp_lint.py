@@ -592,18 +592,47 @@ class QualityRuleTests(unittest.TestCase):
         source = macro("BLEND25", 8) + macro("BLEND50", 8) + macro("BLEND75", 8)
         found = [item for item in findings_for(source) if item.rule == "repeated-macro-body"]
         self.assertEqual([item.subject for item in found], ["BLEND50", "BLEND75"])
-        self.assertTrue(all(item.severity == "warning" and item.advisory for item in found))
+        self.assertTrue(all(item.severity == "warning" and not item.advisory for item in found))
         self.assertIn("'BLEND25' (line 1)", found[0].detail)
 
-    def test_short_different_or_inactive_macros_do_not_warn(self):
+    def test_a_macro_that_holds_a_run_of_another_macro_warns(self):
+        for source in (macro("A", 12) + macro("B", 12, "done(a + 1)"),
+                       macro("A", 12, 'log("a")') + macro("B", 12, 'log("b")')):
+            with self.subTest(source=source[-20:]):
+                found = [item for item in findings_for(source) if item.rule == "repeated-macro-body"]
+                self.assertEqual([item.subject for item in found], ["B"])
+                self.assertIn("holds 10 of its 11 lines as a run that 'A' (line 1)", found[0].detail)
+                self.assertFalse(found[0].advisory or found[0].suppressed)
+
+    def test_scattered_shared_lines_are_not_a_macro_copy(self):
+        """Two edge walks state the same declarations and idioms without a copy."""
+        steps = [f"\tstep{index}(a); \\\n" for index in range(12)]
+        source = ("#define A(a) \\\n" + "".join(steps) + "\tdone(a)\n"
+                  + "#define B(a) \\\n"
+                  + "".join(step if index % 2 else f"\tblend{index}(a); \\\n"
+                           for index, step in enumerate(steps))
+                  + "\tdone(a)\n")
+        self.assertNotIn("repeated-macro-body", rules(source))
+
+    def test_short_unrelated_or_inactive_macros_do_not_warn(self):
         for source in (
             macro("A", 7) + macro("B", 7),
-            macro("A", 8) + macro("B", 8, "done(a + 1)"),
-            macro("A", 8, 'log("a")') + macro("B", 8, 'log("b")'),
+            macro("A", 8) + "#define B(a) \\\n" + "".join(
+                f"\tother{i}(a); \\\n" for i in range(6)) + "\tdone(a)\n",
             "#if 0\n" + macro("A", 8) + "#endif\n" + macro("B", 8),
         ):
             with self.subTest(source=source[:30]):
                 self.assertNotIn("repeated-macro-body", rules(source))
+
+    def test_a_retail_duplicate_comment_accepts_a_repeated_macro(self):
+        source = (macro("BLEND25", 8)
+                  + "// retail-duplicate: retail writes one edge walk for each blend\n"
+                  + macro("BLEND50", 8))
+        found = [item for item in findings_for(source) if item.rule == "repeated-macro-body"]
+        self.assertEqual([item.suppressed for item in found], [True])
+
+    def test_a_reported_macro_is_not_reported_again_as_a_copied_block(self):
+        self.assertEqual(rules(macro("A", 14) + macro("B", 14)), {"repeated-macro-body"})
 
     def test_a_literal_where_the_file_writes_a_name_warns(self):
         source = (
@@ -659,6 +688,130 @@ class QualityRuleTests(unittest.TestCase):
             stale = [lint.BaselineEntry("0x2", "r", "s", "f", "b.cpp")]
             self.assertEqual(lint.prune_baseline(path, stale), 1)
             self.assertEqual(path.read_text(encoding="utf-8"), header + "0x1\tr\ts\tf\ta.cpp\n")
+
+
+def walk(count: int, prefix: str = "edge") -> str:
+    """Return `count` distinct statement lines, one per line."""
+    return "".join(f"\t{prefix}.x{i} = {prefix}.y{i} * scale{i};\n" for i in range(count))
+
+
+def function(address: str, name: str, body: str) -> str:
+    return f"// FUNCTION: TOY2 {address}\nvoid {name}(Edge& edge)\n{{\n{body}}}\n"
+
+
+class DuplicatedBlockTests(unittest.TestCase):
+    def test_each_later_copy_of_a_long_run_is_one_finding(self):
+        body = walk(14)
+        source = (function("0x00401000", "drawFirst", body)
+                  + function("0x00402000", "drawSecond", body)
+                  + function("0x00403000", "drawThird", body))
+        found = [item for item in findings_for(source) if item.rule == "duplicated-block"]
+        self.assertEqual([item.owner_address for item in found], ["0x00402000", "0x00403000"])
+        self.assertEqual([item.subject for item in found], ["14 lines", "14 lines"])
+        self.assertEqual({item.severity for item in found}, {"warning"})
+        self.assertFalse(any(item.advisory or item.suppressed for item in found))
+        self.assertIn("14 lines repeat the block at line 4 (0x00401000)", found[0].detail)
+
+    def test_comments_blank_lines_and_braces_do_not_separate_two_copies(self):
+        body = walk(12)
+        spaced = body.replace("\tedge.x3", "\n\t// The far edge.\n\t{\n\tedge.x3").replace(
+            "\tedge.x7", "\t}\n\tedge.x7")
+        source = (function("0x00401000", "drawFirst", body)
+                  + function("0x00402000", "drawSecond", spaced))
+        found = [item for item in findings_for(source) if item.rule == "duplicated-block"]
+        self.assertEqual([(item.owner_address, item.subject) for item in found],
+                         [("0x00402000", "12 lines")])
+
+    def test_a_short_run_and_an_unrelated_body_are_accepted(self):
+        for second in (walk(11), walk(14, "span")):
+            with self.subTest(second=second[:20]):
+                source = (function("0x00401000", "drawFirst", walk(11) + walk(3, "span"))
+                          + function("0x00402000", "drawSecond", second))
+                self.assertNotIn("duplicated-block", rules(source))
+
+    def test_a_retail_duplicate_comment_accepts_a_copy(self):
+        body = walk(14)
+        source = (function("0x00401000", "drawFirst", body)
+                  + "// retail-duplicate: retail walks each edge in the body\n"
+                  + function("0x00402000", "drawSecond", body))
+        found = [item for item in findings_for(source) if item.rule == "duplicated-block"]
+        self.assertEqual([item.suppressed for item in found], [True])
+
+    def test_one_comment_accepts_one_copy(self):
+        body = walk(14)
+        source = (function("0x00401000", "drawFirst", body)
+                  + "// retail-duplicate: retail walks each edge in the body\n"
+                  + function("0x00402000", "drawSecond", body + "\tmid(edge);\n" + body))
+        found = [item for item in findings_for(source) if item.rule == "duplicated-block"]
+        self.assertEqual([item.suppressed for item in found], [True, False])
+
+    def test_a_comment_over_one_block_does_not_accept_a_copy_outside_it(self):
+        guard = ("\t// retail-duplicate: retail states this guard in each mode\n"
+                 "\t{\n\t\tedge.ready = 1;\n\t}\n")
+        source = (function("0x00401000", "drawFirst", walk(14))
+                  + function("0x00402000", "drawSecond", guard + walk(14)))
+        found = [item for item in findings_for(source) if item.rule == "duplicated-block"]
+        self.assertEqual([item.suppressed for item in found], [False])
+
+    def test_a_repeated_data_table_is_not_copied_source(self):
+        """A sprite sheet states its grid; AGENTS keeps a large initializer in an .inc file."""
+        table = "".join(f"\t{{ {index}, 0 }},\n" for index in range(14))
+        source = ("// GLOBAL: TOY2 0x00500000\nSheet g_first = {\n" + table + "};\n"
+                  + "// GLOBAL: TOY2 0x00500100\nSheet g_second = {\n" + table + "};\n")
+        self.assertNotIn("duplicated-block", rules(source))
+
+    def test_an_edit_elsewhere_in_the_owner_keeps_the_same_finding(self):
+        body = walk(14)
+        first = function("0x00401000", "drawFirst", body)
+        second = function("0x00402000", "drawSecond", body + "\tedge.done = 1;\n")
+        before = [item for item in findings_for(first + second) if item.rule == "duplicated-block"]
+        edited = second.replace("edge.done = 1;", "edge.done = edge.count;")
+        after = [item for item in findings_for("// A leading comment.\n" + first + edited)
+                 if item.rule == "duplicated-block"]
+        self.assertEqual([item.baseline_key for item in before],
+                         [item.baseline_key for item in after])
+        self.assertEqual(after[0].line - before[0].line, 1)
+
+    def test_a_baseline_row_stands_for_one_copy_of_its_owner(self):
+        entry = lint.BaselineEntry("0x1", "duplicated-block", "20 lines", "aaaa", "a.cpp")
+        finding = lint.Finding(Path("a.cpp"), 9, "duplicated-block", "warning", "x", "detail",
+                               owner_address="0x1", subject="14 lines", fingerprint="bbbb")
+        # A copy the writer shortened, and one the block it repeats lengthened, are the
+        # same debt. A second copy, and a copy in an owner with no row, are new debt.
+        for subject in ("14 lines", "24 lines"):
+            classified, stale = lint.apply_baseline([replace(finding, subject=subject)], [entry])
+            self.assertEqual(([item.legacy for item in classified], stale), ([True], []))
+        added = replace(finding, subject="14 lines #2", fingerprint="cccc")
+        self.assertEqual(
+            [item.legacy for item in lint.apply_baseline([finding, added], [entry])[0]], [True, False])
+        elsewhere = replace(finding, owner_address="0x2")
+        self.assertFalse(lint.apply_baseline([elsewhere], [entry])[0][0].legacy)
+        self.assertEqual(lint.apply_baseline([], [entry])[1], [entry])
+
+    def test_sharing_one_copy_away_makes_its_row_stale(self):
+        rows = [lint.BaselineEntry("0x1", "duplicated-block", f"{count} lines", f"f{count}", "a.cpp")
+                for count in (20, 14)]
+        kept = lint.Finding(Path("a.cpp"), 9, "duplicated-block", "warning", "x", "detail",
+                            owner_address="0x1", subject="20 lines", fingerprint="f20")
+        classified, stale = lint.apply_baseline([kept], rows)
+        self.assertEqual([item.legacy for item in classified], [True])
+        self.assertEqual([entry.subject for entry in stale], ["14 lines"])
+
+    def test_a_new_copy_fails_warnings_as_errors_until_it_is_accepted(self):
+        body = walk(14)
+        source = function("0x00401000", "drawFirst", body) + function("0x00402000", "drawSecond", body)
+        accepted = source.replace("// FUNCTION: TOY2 0x00402000",
+                                  "// retail-duplicate: retail walks each edge\n// FUNCTION: TOY2 0x00402000")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "probe.cpp"
+            for text, expected in ((source, 1), (accepted, 0)):
+                path.write_text(text, encoding="utf-8")
+                output = StringIO()
+                with patch.object(sys, "argv", ["lint", "--warnings-as-errors", str(path)]), \
+                        redirect_stdout(output):
+                    code = lint.main()
+                self.assertEqual(code, expected, output.getvalue())
+            self.assertIn("[duplicated-block]", output.getvalue())
 
 
 if __name__ == "__main__":

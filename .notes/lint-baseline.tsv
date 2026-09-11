@@ -1,49 +1,192 @@
 # owner	rule	subject	fingerprint	path
 0x0047e5b0	magic-pointer	integer-pointer	3f95d3272f3c	src/AudioManager/AudioManager.cpp
+0x0047e850	duplicated-block	14 lines	d7c75818ca37	src/AudioManager/AudioManager.cpp
+0x0047ec20	duplicated-block	23 lines	6460388a8c28	src/AudioManager/AudioManager.cpp
+0x00412ff0	duplicated-block	12 lines	8da46c5f9c5e	src/AudioManager/AudioManager.cpp
+0x0047de50	duplicated-block	13 lines	76c79f788794	src/AudioManager/AudioManager.cpp
 0x0047de50	magic-pointer	integer-pointer	3f95d3272f3c	src/AudioManager/AudioManager.cpp
+0x0043d6b0	duplicated-block	14 lines	78b62744341a	src/CharacterLoader.cpp
+0x0040d2d0	duplicated-block	13 lines	94d3c269031e	src/D3DApp/d3dapp.cpp
+0x0040d2d0	duplicated-block	20 lines	c963b9255833	src/D3DApp/d3dapp.cpp
+0x00415ae0	duplicated-block	25 lines	80325f1c1fb4	src/InputManager.cpp
 0x004f572c	magic-pointer	integer-pointer	8644029423fd	src/ModeSelect.cpp
+0x004b46b0	duplicated-block	14 lines	37d5dad85c02	src/Nu3D/Font.cpp
+0x004b53d0	duplicated-block	17 lines	befc6a1eb07b	src/Nu3D/Font.cpp
+0x004c2be0	duplicated-block	20 lines	1894c1d52db5	src/Nu3D/Light.cpp
 0x004cbc90	unstructured-control-flow	goto-count	4c11133ca3eb	src/Nu3D/ObjLoad.cpp
+0x004cc480	duplicated-block	13 lines	e359fd84c299	src/Nu3D/Primitive.cpp
 0x0047b170	unstructured-control-flow	goto-count	af283beb99ab	src/RawLoader.cpp
+0x00495060	duplicated-block	21 lines	e7e1f805f125	src/Renderer/DevDraw.cpp
+0x004b7d60	duplicated-block	28 lines	6767e8bae662	src/Renderer/Sprite.cpp
+0x004b8160	duplicated-block	15 lines	d6807cc69776	src/Renderer/Sprite.cpp
+0x004b8e60	duplicated-block	18 lines	59c6794341e7	src/Renderer/Sprite.cpp
+0x004b8f40	duplicated-block	18 lines	59c6794341e7	src/Renderer/Sprite.cpp
+0x00494820	duplicated-block	19 lines	ac35fcd5ea62	src/Renderer/Sprite.cpp
+0x004949b0	duplicated-block	19 lines	ac35fcd5ea62	src/Renderer/Sprite.cpp
+0x00493c30	duplicated-block	19 lines	5399ae298fdc	src/Renderer/Sprite.cpp
+0x0049d7a0	duplicated-block	13 lines	7f1e5e9e3eb5	src/Renderer/Sprite.cpp
+0x004942d0	duplicated-block	13 lines	57f98d58eaaa	src/Renderer/Sprite.cpp
+0x004942d0	duplicated-block	16 lines	c66e4a159359	src/Renderer/Sprite.cpp
 0x0045db80	unnamed-constant	255	3028f51407d8	src/SoftwareRenderer.cpp
 0x0045db80	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
+0x0045db80	duplicated-block	15 lines	b4ef275913f5	src/SoftwareRenderer.cpp
+0x0045db80	duplicated-block	14 lines	a2168a2c9f97	src/SoftwareRenderer.cpp
+0x0045db80	duplicated-block	15 lines #2	b4ef275913f5	src/SoftwareRenderer.cpp
+0x0045db80	duplicated-block	15 lines #3	b4ef275913f5	src/SoftwareRenderer.cpp
+src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_LIT_OVERLAY_EDGE	fa3c5f4e877c	src/SoftwareRenderer.cpp
+src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_OVERLAY_EDGE	0a51ce8d280c	src/SoftwareRenderer.cpp
+0x0045e390	duplicated-block	26 lines	1b6ab6db13dc	src/SoftwareRenderer.cpp
+0x00461d20	duplicated-block	33 lines	c654dd92c457	src/SoftwareRenderer.cpp
 0x00461d20	unnamed-constant	255	3028f51407d8	src/SoftwareRenderer.cpp
 0x00461d20	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
+0x00461d20	duplicated-block	14 lines	a944b99bfbe1	src/SoftwareRenderer.cpp
+0x00461d20	duplicated-block	12 lines	0c74b1b121f6	src/SoftwareRenderer.cpp
+0x00461d20	duplicated-block	21 lines	2a28b49ae353	src/SoftwareRenderer.cpp
+0x00461d20	duplicated-block	19 lines	c06cb32fcccf	src/SoftwareRenderer.cpp
+0x00461d20	duplicated-block	15 lines	c4a7d7f43d87	src/SoftwareRenderer.cpp
+0x00461d20	duplicated-block	16 lines	67aa1752059d	src/SoftwareRenderer.cpp
+0x0046d7b0	duplicated-block	30 lines	338b8ec54c96	src/SoftwareRenderer.cpp
+0x0046d7b0	duplicated-block	42 lines	8bf541f96668	src/SoftwareRenderer.cpp
+0x0046d7b0	duplicated-block	38 lines	117253339bfa	src/SoftwareRenderer.cpp
+0x0046d7b0	duplicated-block	35 lines	fab4324b3db5	src/SoftwareRenderer.cpp
+0x0046d7b0	duplicated-block	13 lines	e6a80ea44d87	src/SoftwareRenderer.cpp
+0x0046d7b0	duplicated-block	37 lines	ba624524e81b	src/SoftwareRenderer.cpp
+0x0046d7b0	duplicated-block	14 lines	9d51d3161ed7	src/SoftwareRenderer.cpp
+0x00471520	duplicated-block	21 lines	831c4878cbfb	src/SoftwareRenderer.cpp
 0x00471520	unnamed-constant	255	3028f51407d8	src/SoftwareRenderer.cpp
+0x00471520	duplicated-block	13 lines	7fb6ecd4ae3d	src/SoftwareRenderer.cpp
+0x00471520	duplicated-block	15 lines	b829e933fbe3	src/SoftwareRenderer.cpp
+0x00471520	duplicated-block	15 lines #2	75292b28033d	src/SoftwareRenderer.cpp
+0x00471520	duplicated-block	15 lines #3	e449cb9d7161	src/SoftwareRenderer.cpp
+0x00471520	duplicated-block	15 lines #4	75292b28033d	src/SoftwareRenderer.cpp
+0x004776c0	duplicated-block	21 lines	56cc8658dd78	src/SoftwareRenderer.cpp
+0x004776c0	duplicated-block	14 lines	0c11997af2cf	src/SoftwareRenderer.cpp
+src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_BLEND25_555_EDGE	6e272c97febb	src/SoftwareRenderer.cpp
+0x00459ab0	duplicated-block	22 lines	19c06cc05c55	src/SoftwareRenderer.cpp
+0x00459ab0	duplicated-block	13 lines	47eb47da77eb	src/SoftwareRenderer.cpp
+0x00459ab0	duplicated-block	14 lines	d694d99a1084	src/SoftwareRenderer.cpp
+0x00459ab0	duplicated-block	14 lines #2	ce44818c4253	src/SoftwareRenderer.cpp
 src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_BLEND50_555_EDGE	7863025be09d	src/SoftwareRenderer.cpp
+0x0045a5c0	duplicated-block	22 lines	19c06cc05c55	src/SoftwareRenderer.cpp
+0x0045a5c0	duplicated-block	14 lines	342849e28ddf	src/SoftwareRenderer.cpp
+0x0045a5c0	duplicated-block	14 lines #2	ea35be3ca62b	src/SoftwareRenderer.cpp
+0x0045a5c0	duplicated-block	14 lines #3	751477bd27ea	src/SoftwareRenderer.cpp
 src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_BLEND75_555_EDGE	d7d32fe640b1	src/SoftwareRenderer.cpp
+0x0045b0b0	duplicated-block	22 lines	19c06cc05c55	src/SoftwareRenderer.cpp
+0x0045b0b0	duplicated-block	14 lines	1badcc3939cd	src/SoftwareRenderer.cpp
+0x0045b0b0	duplicated-block	15 lines	9c96f5ef309e	src/SoftwareRenderer.cpp
+0x0045b0b0	duplicated-block	39 lines	dff6d200372c	src/SoftwareRenderer.cpp
+src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_TEXTURED_EDGE_WITH_END	119b31aa7012	src/SoftwareRenderer.cpp
+0x0045bbc0	duplicated-block	20 lines	159b725655b9	src/SoftwareRenderer.cpp
+0x0045d110	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
 0x0045d110	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
+0x0045d110	duplicated-block	24 lines	c4365fc1e498	src/SoftwareRenderer.cpp
+0x0045c6b0	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
 0x0045c6b0	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
+0x0045c6b0	duplicated-block	25 lines	95a0e330df84	src/SoftwareRenderer.cpp
+0x00463090	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
+0x00463090	duplicated-block	24 lines	65293c6857a8	src/SoftwareRenderer.cpp
+0x00463090	duplicated-block	51 lines	b8dc63146998	src/SoftwareRenderer.cpp
+0x00463b80	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
+0x00463b80	duplicated-block	34 lines	cc04564a2adc	src/SoftwareRenderer.cpp
+0x00463b80	duplicated-block	39 lines	dff6d200372c	src/SoftwareRenderer.cpp
+0x00464690	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
+0x00464690	duplicated-block	35 lines	71ac9af81324	src/SoftwareRenderer.cpp
+0x00464690	duplicated-block	22 lines #2	99e2e5020361	src/SoftwareRenderer.cpp
+0x00464690	duplicated-block	15 lines	ad5670b08a31	src/SoftwareRenderer.cpp
+0x00468430	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
+0x00468430	duplicated-block	30 lines	46f41b5acde8	src/SoftwareRenderer.cpp
 0x00468430	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
+0x00468430	duplicated-block	15 lines	b06d1fef5d27	src/SoftwareRenderer.cpp
+0x00468e90	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
+0x00468e90	duplicated-block	28 lines	01d2ab7f19ed	src/SoftwareRenderer.cpp
 0x00468e90	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
+0x00468e90	duplicated-block	13 lines	924e9588b5ad	src/SoftwareRenderer.cpp
+0x00476d00	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
+0x00476d00	duplicated-block	14 lines	c4d94301b6df	src/SoftwareRenderer.cpp
+0x00476340	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
+0x00476340	duplicated-block	24 lines	267e30a5057f	src/SoftwareRenderer.cpp
+0x00474190	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
+0x00474190	duplicated-block	24 lines	267e30a5057f	src/SoftwareRenderer.cpp
+0x00474190	duplicated-block	17 lines	c52efe8b3700	src/SoftwareRenderer.cpp
+0x00474190	duplicated-block	17 lines #2	f16078c607c3	src/SoftwareRenderer.cpp
+0x0047c8b0	duplicated-block	15 lines	e4a9bc798517	src/SoftwareRenderer.cpp
+0x004c17b0	duplicated-block	13 lines	72701525afaa	src/SoftwareRenderer.cpp
 0x004bc900	unnamed-constant	255	3028f51407d8	src/SoftwareRenderer.cpp
+0x004bc980	duplicated-block	16 lines	c40fd71b483c	src/SoftwareRenderer.cpp
 0x004c4640	unnamed-constant	8	fe5dbbcea5ce	src/SoftwareRenderer.cpp
 0x004c4640	unnamed-constant	255	3028f51407d8	src/SoftwareRenderer.cpp
 0x004c4640	unnamed-constant	65280	52df1422f88f	src/SoftwareRenderer.cpp
 0x004c4640	unnamed-constant	65536	1260ebb2e483	src/SoftwareRenderer.cpp
+0x004c4370	duplicated-block	74 lines	0418ec692b4a	src/SoftwareRenderer.cpp
 0x004c4370	unnamed-constant	8	fe5dbbcea5ce	src/SoftwareRenderer.cpp
 0x004c4370	unnamed-constant	255	3028f51407d8	src/SoftwareRenderer.cpp
 0x004c4370	unnamed-constant	65280	52df1422f88f	src/SoftwareRenderer.cpp
 0x004c4370	unnamed-constant	65536	1260ebb2e483	src/SoftwareRenderer.cpp
+0x004c4370	duplicated-block	13 lines	0933048a0e3c	src/SoftwareRenderer.cpp
+0x004c48e0	duplicated-block	42 lines	923df35201e7	src/SoftwareRenderer.cpp
+0x004c4a60	duplicated-block	43 lines	460d8475d55e	src/SoftwareRenderer.cpp
+0x004c4be0	duplicated-block	31 lines	b9a243226dad	src/SoftwareRenderer.cpp
+0x004c4be0	duplicated-block	22 lines	7e845a82fbb9	src/SoftwareRenderer.cpp
+0x004c4e00	duplicated-block	22 lines	97942471daae	src/SoftwareRenderer.cpp
 0x004c4e00	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
+0x004c4f30	duplicated-block	39 lines	8a94ed0adb8b	src/SoftwareRenderer.cpp
 0x004c4f30	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
+0x004c5060	duplicated-block	67 lines	2fc8df4506f6	src/SoftwareRenderer.cpp
+0x004c5280	duplicated-block	62 lines	67bec9a3a518	src/SoftwareRenderer.cpp
+0x004c5490	duplicated-block	34 lines	45fd7a1f8112	src/SoftwareRenderer.cpp
 0x004c5490	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
+0x004c55b0	duplicated-block	39 lines	23cb76ef879d	src/SoftwareRenderer.cpp
 0x004c55b0	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
+0x004c56d0	duplicated-block	67 lines	714ace7e1a25	src/SoftwareRenderer.cpp
+0x004c58e0	duplicated-block	62 lines	67bec9a3a518	src/SoftwareRenderer.cpp
+0x004c5ac0	duplicated-block	13 lines	24207f9f922f	src/SoftwareRenderer.cpp
 0x004c5ac0	unnamed-constant	255	3028f51407d8	src/SoftwareRenderer.cpp
 0x004c5ac0	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
+0x004c5d80	duplicated-block	29 lines	7518ca96bfbe	src/SoftwareRenderer.cpp
 0x004c5d80	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
+0x004c5f00	duplicated-block	39 lines	18cc5540e602	src/SoftwareRenderer.cpp
 0x004c5f00	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
+0x004c6080	duplicated-block	59 lines	c686d2e41ab2	src/SoftwareRenderer.cpp
 0x004c6080	unnamed-constant	255	3028f51407d8	src/SoftwareRenderer.cpp
 0x004c6080	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
+0x004c8930	duplicated-block	130 lines	c8cc8283f572	src/SoftwareRenderer.cpp
+0x004c8930	duplicated-block	67 lines	a1612bcd240d	src/SoftwareRenderer.cpp
+0x004c6340	duplicated-block	34 lines	07296aaac57f	src/SoftwareRenderer.cpp
+0x004c6340	duplicated-block	44 lines	17073e805b1c	src/SoftwareRenderer.cpp
+0x004c6b80	duplicated-block	108 lines	d87a542deec2	src/SoftwareRenderer.cpp
+0x004c6b80	duplicated-block	16 lines	01553768825b	src/SoftwareRenderer.cpp
+0x004c6b80	duplicated-block	76 lines	61049ad7d2fc	src/SoftwareRenderer.cpp
+0x004c7630	duplicated-block	172 lines	a4ba0de67e59	src/SoftwareRenderer.cpp
+0x004c7630	duplicated-block	90 lines	f358a73685d5	src/SoftwareRenderer.cpp
+0x004c9190	duplicated-block	185 lines	f0ddc666dd81	src/SoftwareRenderer.cpp
+0x004c9a50	duplicated-block	31 lines	e925de06b732	src/SoftwareRenderer.cpp
+0x004c9a50	duplicated-block	29 lines	3c8c53b46c36	src/SoftwareRenderer.cpp
+0x004c9a50	duplicated-block	12 lines	266e067aadf5	src/SoftwareRenderer.cpp
 0x0042a130	magic-pointer	integer-pointer	ad670f1d57ee	src/Toy2/AlsPenthouse.cpp
 0x00424490	magic-pointer	integer-pointer	e5674b7c679a	src/Toy2/BarnEncounter.cpp
 0x0041aa10	magic-pointer	integer-pointer	e5674b7c679a	src/Toy2/BombsAway.cpp
 0x004011d0	unnamed-constant	26	887309d048be	src/Toy2/Buzz.cpp
+0x00402290	duplicated-block	19 lines	7fb33df4e8d1	src/Toy2/Camera.cpp
+0x004a0f80	duplicated-block	19 lines	b9bcb67bfa3d	src/Toy2/Collectables.cpp
+0x00485940	duplicated-block	24 lines	4b99874a5430	src/Toy2/Collision.cpp
+0x00488e10	duplicated-block	17 lines	d991d1420d79	src/Toy2/Collision.cpp
+0x0048acc0	duplicated-block	39 lines	650bfb496a90	src/Toy2/Collision.cpp
+0x0048c030	duplicated-block	13 lines	824364002168	src/Toy2/Collision.cpp
 0x00408d30	magic-pointer	integer-pointer	3e12a14bd1f6	src/Toy2/Direct6.cpp
 0x0042b3a0	magic-pointer	integer-pointer	e5674b7c679a	src/Toy2/EvilEmperorZurg.cpp
 0x004f6be4	magic-pointer	integer-pointer	f086aefc1ed3	src/Toy2/LevelSelect.cpp
+0x00494130	duplicated-block	15 lines	c5c557aab4ca	src/Toy2/LevelSelect.cpp
 0x00438a50	opaque-state-slot	startRecord->data[1]	29bb2dac2fd9	src/Toy2/LevelSelect.cpp
 0x00438a50	opaque-state-slot	soundRecord->data[1]	58dbde0cf034	src/Toy2/LevelSelect.cpp
 0x00438a50	opaque-state-slot	targetRecord->data[0]	277f94d56b17	src/Toy2/LevelSelect.cpp
 0x00438a50	unstructured-control-flow	goto-count	8564fcf859bd	src/Toy2/LevelSelect.cpp
+0x0043e430	duplicated-block	12 lines	ec776ed69821	src/Toy2/Levels.cpp
+0x00452fc0	duplicated-block	12 lines	5d6f82a85557	src/Toy2/Levels.cpp
+0x0044f880	duplicated-block	13 lines	2b45305e0e52	src/Toy2/TextureConversion.cpp
 0x00433700	unnamed-constant	58	667be543b022	src/Toy2/Toy2.cpp
+0x0049b9e0	duplicated-block	13 lines	8ebd08a0b17f	src/Toy2/Toy2.cpp
+0x0047f250	duplicated-block	12 lines	a91efeb30b38	src/Toy2/Toy2.cpp
 0x0049d910	unstructured-control-flow	goto-count	77dd5e8ddf01	src/Toy2/Toy2.cpp
+0x004909e0	duplicated-block	14 lines	c70c3c420627	src/Toy2/Toy2.cpp
+0x00498550	duplicated-block	17 lines	3f4ddd75a27d	src/Toy2/Toy2.cpp
