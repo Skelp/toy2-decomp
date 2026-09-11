@@ -476,18 +476,17 @@ namespace Toy2
 						{
 							g_bridgeSwingSpeed = 0x20;
 						}
-						g_bridgeSwingAngle -= g_bridgeSwingSpeed * Renderer::g_frameDelta / 8;
 					}
 					else
 					{
 						g_bridgeSwingSpeed -= Renderer::g_frameDelta;
 						if (g_bridgeSwingSpeed < 0)
 						{
-							g_bridgeStateFlags &= ~BRIDGE_STATE_SWING_REVERSED;
 							g_bridgeSwingSpeed = 0;
+							g_bridgeStateFlags &= ~BRIDGE_STATE_SWING_REVERSED;
 						}
-						g_bridgeSwingAngle -= g_bridgeSwingSpeed * Renderer::g_frameDelta / 8;
 					}
+					g_bridgeSwingAngle -= g_bridgeSwingSpeed * Renderer::g_frameDelta / 8;
 				}
 				else
 				{
@@ -498,18 +497,17 @@ namespace Toy2
 						{
 							g_bridgeSwingSpeed = 0x20;
 						}
-						g_bridgeSwingAngle += g_bridgeSwingSpeed * Renderer::g_frameDelta / 8;
 					}
 					else
 					{
 						g_bridgeSwingSpeed -= Renderer::g_frameDelta;
 						if (g_bridgeSwingSpeed < 0)
 						{
-							g_bridgeStateFlags |= BRIDGE_STATE_SWING_REVERSED;
 							g_bridgeSwingSpeed = 0;
+							g_bridgeStateFlags |= BRIDGE_STATE_SWING_REVERSED;
 						}
-						g_bridgeSwingAngle += g_bridgeSwingSpeed * Renderer::g_frameDelta / 8;
 					}
+					g_bridgeSwingAngle += g_bridgeSwingSpeed * Renderer::g_frameDelta / 8;
 				}
 
 				Nu3D::Link::SetRotationRelative8bit(10, 0, -g_bridgeSwingAngle, 0);
@@ -753,12 +751,15 @@ namespace Toy2
 				{
 					g_ambientParticlePathPoint = 0;
 				}
-				Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnInstance(ambientPath->data[g_ambientParticlePathPoint].x,
-					ambientPath->data[g_ambientParticlePathPoint].y,
-					ambientPath->data[g_ambientParticlePathPoint].z,
-					(ambientPath->data[g_ambientParticlePathPoint + 1].x - ambientPath->data[g_ambientParticlePathPoint].x) >> 6,
-					(ambientPath->data[g_ambientParticlePathPoint + 1].y - ambientPath->data[g_ambientParticlePathPoint].y) >> 6,
-					(ambientPath->data[g_ambientParticlePathPoint + 1].z - ambientPath->data[g_ambientParticlePathPoint].z) >> 6,
+				int32_t pointX = ambientPath->data[g_ambientParticlePathPoint].x;
+				int32_t pointY = ambientPath->data[g_ambientParticlePathPoint].y;
+				int32_t pointZ = ambientPath->data[g_ambientParticlePathPoint].z;
+				Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnInstance(pointX,
+					pointY,
+					pointZ,
+					(ambientPath->data[g_ambientParticlePathPoint + 1].x - pointX) >> 6,
+					(ambientPath->data[g_ambientParticlePathPoint + 1].y - pointY) >> 6,
+					(ambientPath->data[g_ambientParticlePathPoint + 1].z - pointZ) >> 6,
 					0,
 					0,
 					0,
@@ -979,27 +980,23 @@ namespace Toy2
 
 			Weather::StepPrecipitation(0x100, 0x1000, 0x34);
 
-			Levels::RecordData* flareRecords = Levels::g_recordData[17];
 			int32_t nearestDistanceSquared = INT_MAX;
 			int32_t nearestFlareIndex;
-			for (int32_t flareIndex = 0; flareIndex < flareRecords->recordCount; flareIndex++)
+			for (int32_t flareIndex = 0; flareIndex < Levels::g_recordData[17]->recordCount; flareIndex++)
 			{
-				int32_t cameraOffsetZ = (Camera::g_renderCameraTransform.pos.z - flareRecords->data[flareIndex].z * 0x20) >> 8;
-				int32_t cameraOffsetY = (Camera::g_renderCameraTransform.pos.y - flareRecords->data[flareIndex].y * 0x20) >> 8;
-				int32_t cameraOffsetX = (Camera::g_renderCameraTransform.pos.x - flareRecords->data[flareIndex].x * 0x20) >> 8;
+				int32_t flareX = Levels::g_recordData[17]->data[flareIndex].x * 0x20;
+				int32_t flareY = Levels::g_recordData[17]->data[flareIndex].y * 0x20;
+				int32_t flareZ = Levels::g_recordData[17]->data[flareIndex].z * 0x20;
+				int32_t cameraOffsetZ = (Camera::g_renderCameraTransform.pos.z - flareZ) >> 8;
+				int32_t cameraOffsetY = (Camera::g_renderCameraTransform.pos.y - flareY) >> 8;
+				int32_t cameraOffsetX = (Camera::g_renderCameraTransform.pos.x - flareX) >> 8;
 				if (cameraOffsetZ * cameraOffsetZ + cameraOffsetY * cameraOffsetY + cameraOffsetX * cameraOffsetX < 1000000)
 				{
-					Renderer::LensFlare::RegisterLight(flareRecords->data[flareIndex].x * 0x20,
-						flareRecords->data[flareIndex].y * 0x20,
-						flareRecords->data[flareIndex].z * 0x20,
-						0x40,
-						0x30,
-						0x20,
-						0x80);
-					int32_t buzzOffsetZ = (g_buzzActor.posAngles.pos.z - flareRecords->data[flareIndex].z * 0x20) >> 8;
-					int32_t buzzOffsetY = (g_buzzActor.posAngles.pos.y - flareRecords->data[flareIndex].y * 0x20 - 0x2000) >> 8;
-					int32_t buzzOffsetX = (g_buzzActor.posAngles.pos.x - flareRecords->data[flareIndex].x * 0x20) >> 8;
-					int32_t distanceSquared = buzzOffsetX * buzzOffsetX + buzzOffsetZ * buzzOffsetZ + buzzOffsetY * buzzOffsetY;
+					Renderer::LensFlare::RegisterLight(flareX, flareY, flareZ, 0x40, 0x30, 0x20, 0x80);
+					int32_t buzzOffsetZ = (g_buzzActor.posAngles.pos.z - flareZ) >> 8;
+					int32_t buzzOffsetY = (g_buzzActor.posAngles.pos.y - flareY - 0x2000) >> 8;
+					int32_t buzzOffsetX = (g_buzzActor.posAngles.pos.x - flareX) >> 8;
+					int32_t distanceSquared = buzzOffsetZ * buzzOffsetZ + buzzOffsetY * buzzOffsetY + buzzOffsetX * buzzOffsetX;
 					if (distanceSquared < nearestDistanceSquared)
 					{
 						nearestDistanceSquared = distanceSquared;
@@ -1010,16 +1007,15 @@ namespace Toy2
 
 			if (nearestDistanceSquared < 0x10000)
 			{
-				Vector3I* nearestFlare = &flareRecords->data[nearestFlareIndex];
 				Lighting::DynamicLight* light = &Lighting::g_lightingState.dynamicLights[1];
-				light->position.x = nearestFlare->x << 5;
-				light->position.y = nearestFlare->y << 5;
+				light->position.x = Levels::g_recordData[17]->data[nearestFlareIndex].x << 5;
+				light->position.y = Levels::g_recordData[17]->data[nearestFlareIndex].y << 5;
 				light->colour.r = 0x80;
-				light->position.z = nearestFlare->z << 5;
+				light->position.z = Levels::g_recordData[17]->data[nearestFlareIndex].z << 5;
 				light->colour.g = 0x60;
 				light->colour.b = 0x40;
 				light->lifetime = 1;
-				light->sourceId = reinterpret_cast<int32_t>(nearestFlare);
+				light->sourceId = reinterpret_cast<int32_t>(&Levels::g_recordData[17]->data[nearestFlareIndex]);
 			}
 			else
 			{
