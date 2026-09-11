@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import importlib.util
 import json
 import os
@@ -8,8 +9,10 @@ import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
+from datetime import datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
+from unittest import mock
 
 
 TOOLS = Path(__file__).resolve().parents[1]
@@ -305,6 +308,178 @@ class ThroughputTests(unittest.TestCase):
         write_ledger(self.root, ledger_series(10, 2.0))
         code, text = self.run_cli("--cap-check", "--now", "2026-09-20T00:00:00Z")
         self.assertEqual((code, text.strip()), (0, "cap check passed (tooling share n/a, tooling hours today 0.00)"))
+
+
+START = datetime(2026, 9, 11, 10, 0, tzinfo=timezone.utc)
+USAGE_HEADER = ("time\tharness\taddress\tbatch\tattempts\tbest\tseconds\tcost_usd\tinput\tcache_write"
+                "\tcache_read\toutput\treasoning\tturns\tapi_ms\tdenials\terror\n")
+
+
+def at(seconds: float) -> str:
+    return (START + timedelta(seconds=seconds)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def event(offset: float, name: str, text: str = "", **fields) -> dict:
+    return {"ts": at(offset), "event": name, "text": text, "fields": fields}
+
+
+def bash(identifier: str, seconds: float, command: str) -> dict:
+    return {"type": "assistant", "timestamp": at(seconds), "message": {"id": f"m{identifier}", "content": [
+        {"type": "tool_use", "id": identifier, "name": "Bash", "input": {"command": command}}]}}
+
+
+def done(identifier: str, seconds: float, content: object = "") -> dict:
+    return {"type": "user", "timestamp": at(seconds),
+            "message": {"content": [{"type": "tool_result", "tool_use_id": identifier, "content": content}]}}
+
+
+class RunReportTests(unittest.TestCase):
+    """--runs on fixture events, usage rows and transcripts of both harnesses."""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.runs = Path(directory.name)
+
+    def write(self, name: str, lines: list, seconds: float | None = None) -> None:
+        path = self.runs / name
+        text = "".join((line if isinstance(line, str) else json.dumps(line)) + "\n" for line in lines)
+        path.write_bytes(gzip.compress(text.encode()) if name.endswith(".gz") else text.encode())
+        if seconds is not None:
+            stamp = (START + timedelta(seconds=seconds)).timestamp()
+            os.utime(path, (stamp, stamp))
+
+    def write_two_campaigns(self) -> None:
+        a, b = "0x00401000", "0x00402000"
+        self.write("events.jsonl", [
+            event(0, "harness", harness="claude"), event(0, "phase", phase="select", campaign=1),
+            event(10, "phase", phase="start"), event(40, "phase", phase="baseline"),
+            event(60, "campaign", "campaign 1", campaign=1, address=a, mode="refinement", baseline=50.0),
+            event(60, "phase", phase="batch"),
+            event(360, "batch", "batch 1", label="batch 1", attempts="2-4", seconds=300),
+            event(362, "phase", phase="finish"), event(380, "phase", phase="verify"),
+            event(420, "phase", phase="record"),
+            event(430, "campaign", "campaign 1 done", campaign=1, address=a, result="source",
+                  final=60.0, bytes=120.0, commit="abc1234", attempts=4),
+            event(430, "phase", phase="select", campaign=2), event(440, "phase", phase="start"),
+            event(460, "phase", phase="baseline"),
+            event(470, "campaign", "campaign 2: 0x00402000 B refinement, baseline 30.00%",
+                  campaign=2, address=b, mode="refinement"),
+            event(470, "phase", phase="batch"),
+            event(570, "batch", "batch 1", label="batch 1", attempts="2-3", seconds=100),
+            event(572, "phase", phase="record"), event(580, "phase", phase="commit"),
+            event(590, "campaign", "campaign 2: 0x00402000 B refinement 30.00% -> 30.00% (+0.00 B),"
+                  " 3 attempts, 2.7 min, 9k tokens, commit def5678", campaign=2, address=b,
+                  result="no-source", final=30.0, bytes=0.0, commit="def5678"),
+            event(590, "final", "run: exit 0")])
+        self.write("usage.tsv", [USAGE_HEADER.rstrip("\n"),
+                                 f"{at(0)}\tclaude\t-\tcheck\tnone\t-\t7\t0.02\t4\t260\t16172\t241\t128\t2\t\t0\t0",
+                                 f"{at(361)}\tclaude\t{a}\tbatch 1\t2-4\t60.0\t300\t1.5000\t20\t10000"
+                                 "\t200000\t5000\t3000\t12\t250000\t0\t0",
+                                 f"{at(571)}\tcodex\t{b}\tbatch 1\t2-3\t30.0\t100\t\t9000\t0\t50000\t1000"
+                                 "\t400\t3\t\t0\t0"])
+        edit = "python3 - <<'EOF'\np = Path('src/a.cpp')\np.write_text(p.read_text())\nEOF"
+        self.write(f"{a}-batch1.jsonl", [
+            {"type": "system", "subtype": "init"},
+            bash("u1", 70, f"tools/decomp bc {a} 2>&1 | tail -n 30"), done("u1", 110, "x" * 2048),
+            {"type": "assistant", "timestamp": at(115), "message": {"content": [
+                {"type": "tool_use", "id": "u2", "name": "Bash", "input": {"command": "sed -n 1,9p src/a.cpp"}},
+                {"type": "tool_use", "id": "u3", "name": "Bash", "input": {"command": f"tools/decomp bc {a} --hunk 2"}}]}},
+            done("u2", 116), done("u3", 118, [{"type": "text", "text": "y" * 512}]),
+            bash("u4", 120, edit), done("u4", 121),
+            {"type": "result", "duration_ms": 300000, "num_turns": 12,
+             "usage": {"output_tokens": 5000, "output_tokens_details": {"thinking_tokens": 3000}}}], 360)
+        self.write(f"{b}-batch1.jsonl.gz", [
+            {"type": "thread.started"}, {"type": "turn.started"},
+            *({"type": "item.completed", "item": {"type": "command_execution", "command": command,
+                                                  "aggregated_output": "z" * 100}}
+              for command in (f"bash -lc 'tools/decomp bc {b}'", "bash -lc 'git checkout -- src'",
+                              'bash -lc "grep -n Foo src/b.cpp"')),
+            {"type": "item.completed", "item": {"type": "file_change"}},
+            {"type": "turn.completed", "usage": {"input_tokens": 59000, "cached_input_tokens": 50000}}], 570)
+
+    def test_the_report_splits_campaigns_into_phases_writer_runs_and_calls(self):
+        self.write_two_campaigns()
+        report = throughput.run_report(self.runs)
+        first, second = report["campaigns"]
+        self.assertEqual(first["phases"], {"select": 10.0, "start": 30.0, "baseline": 20.0,
+                                           "writer": 302.0, "finish": 18.0, "verify": 40.0, "record": 10.0})
+        run = first["writer_runs"][0]
+        self.assertEqual(run["calls"], {"build": 1, "source read": 1, "hunk": 1, "edit": 1})
+        self.assertEqual((run["output_bytes"]["build"], run["output_bytes"]["hunk"]), (2048, 512))
+        self.assertEqual((run["tool_seconds"], run["model_seconds"]), (44.0, 256.0))
+        self.assertEqual((run["input_equivalent"], run["tokens"]["thinking"], run["cost"]),
+                         (55020.0, 3000.0, 1.5))
+        self.assertEqual((second["baseline"], second["attempts"], second["result"]), (30.0, 3, "no-source"))
+        self.assertEqual(second["phases"], {"select": 10.0, "start": 20.0, "baseline": 10.0,
+                                            "writer": 102.0, "record": 8.0, "commit": 10.0})
+        self.assertEqual(list(second["phases"])[-2:], ["record", "commit"])  # an unknown phase comes last
+        run = second["writer_runs"][0]
+        self.assertEqual(run["calls"], {"build": 1, "restore": 1, "source read": 1, "edit": 1})
+        self.assertEqual((run["transcript"], run["output_bytes"]["restore"]), ("0x00402000-batch1.jsonl.gz", 100))
+        self.assertEqual((run["harness"], run["model_seconds"], run["cost"]), ("codex", None, None))
+        totals = report["totals"]
+        self.assertEqual((totals["bytes"], totals["calls"], totals["attempts"]), (120.0, 8, 5))
+        self.assertAlmostEqual(totals["bytes_per_minute"], 120.0 / (590 / 60))
+        self.assertAlmostEqual(totals["bytes_per_million_ie"], 120.0 / 74020 * 1e6)
+        self.assertEqual((totals["calls_per_attempt"], totals["call_share"]["build"]), (1.6, 0.25))
+        self.assertEqual(totals["call_output_bytes"]["build"], 2148)
+        self.assertEqual(report["unassigned_runs"], [])
+        with mock.patch.object(throughput, "writer_run", wraps=throughput.writer_run) as reader:
+            self.assertEqual([c["address"] for c in throughput.run_report(self.runs, 1)["campaigns"]],
+                             ["0x00402000"])
+        self.assertEqual(reader.call_count, 1)  # --last reads only the kept campaigns' transcripts
+        with redirect_stdout(StringIO()) as out:
+            self.assertEqual(throughput.main(["--runs", "--dir", str(self.runs)]), 0)
+        lines = out.getvalue().splitlines()
+        self.assertTrue(lines[0].endswith(throughput.WEIGHTS))
+        self.assertEqual(lines[1], "campaign 1: 0x00401000 refinement 50.00 -> 60.00%, +120.00 B,"
+                                   " 4 attempts, source, commit abc1234")
+        self.assertEqual(lines[2], "  all-in 430 s: select 10, start 30, baseline 20, writer 302,"
+                                   " finish 18, verify 40, record 10")
+        self.assertIn("build 1: 2.0 KB", lines[3])
+        self.assertIn("model 256 s, tool 44 s", lines[3])
+        self.assertIn("calls: 8 in 5 logged attempts, 1.6 per attempt; build 25% 2.1 KB, hunk 12% 0.5 KB,"
+                      " source read 25% 0.1 KB, edit 25% 0.0 KB, restore 12% 0.1 KB", lines)
+        with redirect_stdout(StringIO()) as out:
+            throughput.main(["--runs", "--dir", str(self.runs), "--json", "--last", "1"])
+        self.assertEqual(json.loads(out.getvalue())["totals"]["campaigns"], 1)
+
+    def test_an_older_log_without_phase_events_still_splits_setup_writer_and_finish(self):
+        self.write("events.jsonl", [
+            event(20, "campaign", "campaign 1: 0x00401000 A refinement, baseline 50.00%",
+                  campaign=1, address="0x00401000", mode="refinement"),
+            event(320, "batch", "batch 1", label="batch 1", attempts="2-5", seconds=290),
+            event(400, "campaign", "campaign 1: 0x00401000 A refinement 50.00% -> 55.00% (+9.50 B),"
+                  " 5 attempts, 6.5 min, $1.00, commit abc", campaign=1, address="0x00401000",
+                  result="source", final=55.0, bytes=9.5, commit="abc")])
+        self.write("usage.tsv", [USAGE_HEADER.rstrip("\n"),
+                                 f"{at(319)}\tclaude\t0x00401000\tbatch 1\t2-5\t55\t290\t1.0\t1\t2\t3\t4\t\t5\t\t0\t0",
+                                 f"{at(900)}\tclaude\t0x00409000\tbatch 1\t2-2\t1\t9\t0.1\t1\t2\t3\t4\t\t1\t\t0\t0"])
+        self.write("0x00401000-batch1.json", [{"type": "result", "num_turns": 5}], 318)
+        report = throughput.run_report(self.runs)
+        campaign = report["campaigns"][0]
+        self.assertEqual(campaign["phases"], {"writer": 290.0, "finish": 80.0, "setup": 10.0, "other": 10.0})
+        self.assertEqual((campaign["writer_runs"][0]["calls"], campaign["writer_runs"][0]["transcript_kind"]),
+                         (None, "claude-json"))
+        self.assertEqual([run["address"] for run in report["unassigned_runs"]], ["0x00409000"])
+        lines = throughput.render_runs(report)
+        self.assertEqual(lines[1], "calls: not counted for 2 writer runs (no stream-json or codex transcript)")
+        self.assertFalse([line for line in lines[2:] if line.startswith("calls:")])
+
+    def test_shell_calls_fall_into_one_category_each(self):
+        cases = {
+            "tools/decomp bc 0x1": "build", "clang-format -i src/a.cpp && tools/decomp bc 0x1": "build",
+            "tools/decomp bc 0x1 --hunks": "hunk", "tools/decomp bc 0x1 --pack": "pack",
+            "sed -i 's/a/b/' src/a.cpp": "edit", "sed -n 1,5p src/a.cpp | nl": "source read",
+            "grep -rn Foo src": "source read", "bash -lc 'cat src/a.cpp'": "source read",
+            "tools/decomp evidence 0x1 --full": "evidence/notes",
+            "tools/decomp notes vtable --source models": "evidence/notes",
+            "tools/decomp handoff 0x1 <<'EOF'\n# x\nEOF": "handoff",
+            "git checkout -- src && git apply best.patch": "restore", "git diff --stat": "other",
+            "git show abc1234:src/a.cpp > src/a.cpp": "restore",
+        }
+        self.assertEqual({command: throughput.classify(command) for command in cases}, cases)
 
 
 if __name__ == "__main__":

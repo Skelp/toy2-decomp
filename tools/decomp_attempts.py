@@ -159,7 +159,7 @@ CODEX_MARKERS = ("CODEX_THREAD_ID", "CODEX_SESSION_ID")
 SKILL_PATH = ".agents/skills/decomp-expert/SKILL.md"
 DEFAULT_EFFORT = {"claude": "xhigh", "codex": "high"}
 HARNESS_FORMAT = {"claude": "claude-json", "codex": "codex-jsonl"}
-FORMAT_SUFFIX = {"claude-json": ".json", "codex-jsonl": ".jsonl", "text": ".txt"}
+FORMAT_SUFFIX = {"claude-json": ".jsonl", "codex-jsonl": ".jsonl", "text": ".txt"}
 LOGIN = {"claude": "claude auth login", "codex": "codex login"}
 NETWORK_SETTING = "sandbox_workspace_write.network_access = true"
 EXIT_CODES = {"done": 0, "review": 1, "usage": 2, "check": 2, "writer": 3, "interrupted": 130}
@@ -243,9 +243,10 @@ def writer_command(harness: str, root: Path, effort: str = "", model: str = "") 
     effort = shlex.quote(effort or DEFAULT_EFFORT[harness])
     if harness == "claude":
         # The skill is the whole system prompt; the project allow list is the only grant.
+        # stream-json keeps every message as the transcript; its last event is the result.
         words = ["claude -p --tools Bash --system-prompt-file", SKILL_PATH,
                  "--strict-mcp-config --setting-sources project --permission-mode dontAsk",
-                 "--no-session-persistence --output-format json --effort", effort]
+                 "--no-session-persistence --output-format stream-json --verbose --effort", effort]
         return " ".join(words + (["--model", shlex.quote(model)] if model else []))
     # Codex has no system-prompt flag; developer_instructions adds the skill and keeps
     # the base instructions. A value that is not TOML (the skill starts with ---) is
@@ -303,13 +304,28 @@ def first_line(text: str) -> str:
     return (str(text).strip().splitlines() or [""])[0].strip()
 
 
-def claude_usage(text: str) -> dict[str, object]:
-    """Read a `claude -p --output-format json` result. input excludes the cache."""
+def claude_result(text: str) -> dict[str, object]:
+    """Return the result object of `claude -p`: the whole output of --output-format json,
+    else the last "type": "result" event of a stream-json transcript, else {}."""
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        data = {}
-    data = data if isinstance(data, dict) else {}
+        data = None
+    if isinstance(data, dict):
+        return data
+    for line in reversed(text.splitlines()):
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(event, dict) and event.get("type") == "result":
+            return event
+    return {}
+
+
+def claude_usage(text: str) -> dict[str, object]:
+    """Read a `claude -p` result (json or stream-json). input excludes the cache."""
+    data = claude_result(text)
     usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
     details = usage.get("output_tokens_details")
     details = details if isinstance(details, dict) else {}
@@ -836,7 +852,7 @@ def run_subcommands(subparsers) -> None:
     event.add_argument("text", nargs="?")
     event.add_argument("--field", action="append", default=[])
     event.add_argument("--set", action="append", default=[])
-    for flag in ("--state", "--reset", "--json", "--stderr"):
+    for flag in ("--state", "--reset", "--json", "--stderr", "--quiet"):
         event.add_argument(flag, action="store_true")
     final = subparsers.add_parser("final", help="print the final line; exit with its code")
     final.add_argument("--kind", required=True, choices=tuple(EXIT_CODES))
@@ -880,11 +896,12 @@ def run_command(args) -> int:
     if args.command == "event":
         state = parse_pairs(args.set)
         if args.text is not None:
-            state["last_event"] = args.text.strip()
             record = append_event(runs / "events.jsonl" if args.state else None, args.name,
                                   args.text, parse_pairs(args.field))
-            line = json.dumps(record) if args.json else args.text
-            print(line, file=sys.stderr if args.stderr and not args.json else sys.stdout)
+            if not args.quiet:  # a quiet event (a phase change) is logged, not shown
+                state["last_event"] = args.text.strip()
+                line = json.dumps(record) if args.json else args.text
+                print(line, file=sys.stderr if args.stderr and not args.json else sys.stdout)
         if args.state:
             update_state(runs / "state.json", state, args.reset)
         return 0

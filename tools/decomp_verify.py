@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
 import statistics
@@ -194,22 +195,28 @@ def source_state(source_root: Path) -> dict[str, object]:
     }
 
 
+def build_inputs(root: Path) -> dict[str, str]:
+    """Hash the build rules and output, the compiler and the generated build graph."""
+    values = {}
+    for name, path in (
+        ("build_rules_sha256", root / "build" / "build.ninja"),
+        ("recompiled_sha256", root / "build" / "toy2.exe"),
+        ("compiler_driver_sha256", root / ".tooling" / "msvc600-8168" / "VC98" / "Bin" / "CL.EXE"),
+        ("compiler_backend_sha256", root / ".tooling" / "msvc600-8168" / "VC98" / "Bin" / "C1XX.DLL"),
+    ):
+        if path.exists():
+            values[name] = file_hash(path)
+    values["build_context_sha256"] = normalized_build_context(root / "build")
+    return values
+
+
 def metadata(
     report: Path | None = None, data_report: Path | None = None
 ) -> dict[str, object]:
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, capture_output=True, check=True
     ).stdout.strip()
-    values = {"git_head": head}
-    for name, path in (
-        ("build_rules_sha256", ROOT / "build" / "build.ninja"),
-        ("recompiled_sha256", ROOT / "build" / "toy2.exe"),
-        ("compiler_driver_sha256", ROOT / ".tooling" / "msvc600-8168" / "VC98" / "Bin" / "CL.EXE"),
-        ("compiler_backend_sha256", ROOT / ".tooling" / "msvc600-8168" / "VC98" / "Bin" / "C1XX.DLL"),
-    ):
-        if path.exists():
-            values[name] = file_hash(path)
-    values["build_context_sha256"] = normalized_build_context(ROOT / "build")
+    values = {"git_head": head, **build_inputs(ROOT)}
     if report is not None and report.exists():
         values["baseline_report_sha256"] = file_hash(report)
     if data_report is not None and data_report.exists():
@@ -244,6 +251,108 @@ def write_metadata(
         json.dumps(metadata(report, data_report), indent=2) + "\n",
         encoding="utf-8",
     )
+
+
+# The report stamp. validate fingerprints the tree that its current reports describe,
+# so that campaigns finish (the record path) and the next baseline can reuse them in
+# place of a new comparison. Any changed input or report disables the reuse.
+STAMP_ADVANCE_EXEMPT = ("git_head", "index_tree")
+
+
+def _git_output(root: Path, *args: str) -> str | None:
+    result = subprocess.run(["git", *args], cwd=root, text=True, capture_output=True, check=False)
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def report_fingerprint(root: Path = ROOT) -> dict[str, object]:
+    """Return what the comparison and data reports depend on: HEAD, the index, src, the
+    function map, the build outputs, the toolchain, the reccmp configuration and the code
+    that writes the reports."""
+    values: dict[str, object] = {"git_head": _git_output(root, "rev-parse", "HEAD"),
+                                 "index_tree": _git_output(root, "write-tree")}
+    values.update(build_inputs(root))
+    for name, path in (("pdb_sha256", root / "build" / "toy2.pdb"),
+                       ("original_sha256", root / "original" / "toy2.exe"),
+                       ("functions_map_sha256", root / "tools" / "Resources" / "functions_map.txt"),
+                       ("data_report_tool_sha256", root / "tools" / "generate-decomp-data-report.py"),
+                       ("reccmp_project_sha256", root / "reccmp-project.yml"),
+                       ("reccmp_user_sha256", root / "reccmp-user.yml"),
+                       ("reccmp_build_sha256", root / "reccmp-build.yml"),
+                       ("reccmp_detected_sha256", root / "build" / "reccmp-build.yml")):
+        values[name] = file_hash(path) if path.exists() else "missing"
+    values["sdk_headers_sha256"] = tree_hash(root / "external" / "include")
+    values["vc6_headers_sha256"] = tree_hash(root / ".tooling" / "msvc600-8168" / "VC98" / "Include")
+    values["source_dependency_sha256"] = tree_hash(root / "src")
+    # The venv can load reccmp from another checkout, and a git head misses uncommitted edits.
+    values["reccmp_source_sha256"] = package_hash("reccmp")
+    return values
+
+
+def package_hash(name: str) -> str:
+    """Hash the Python files of an importable package, wherever the venv loads it from."""
+    try:
+        spec = importlib.util.find_spec(name)
+    except (ImportError, ValueError):
+        spec = None
+    locations = list(spec.submodule_search_locations or []) if spec else []
+    if not locations:
+        return "missing"
+    digest, package = sha256(), Path(locations[0])
+    for path in sorted(package.rglob("*.py")):
+        digest.update(path.relative_to(package).as_posix().encode("utf-8"))
+        digest.update(bytes.fromhex(file_hash(path)))
+    return digest.hexdigest()
+
+
+def write_report_stamp(path: Path, reports: list[Path], root: Path = ROOT) -> None:
+    stamp = {"fingerprint": report_fingerprint(root),
+             "reports": {str(report): file_hash(root / report) for report in reports}}
+    (root / path).write_text(json.dumps(stamp, indent=1) + "\n", encoding="utf-8")
+
+
+def report_stamp_problem(path: Path, root: Path = ROOT, exempt: tuple[str, ...] = (),
+                         required: tuple[Path, ...] = ()) -> str:
+    """Return why the stamped reports may not describe the current tree, or "" when every
+    input and every report is unchanged and each required report is stamped."""
+    try:
+        stamp = json.loads((root / path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        stamp = None
+    saved = stamp.get("fingerprint") if isinstance(stamp, dict) else None
+    reports = stamp.get("reports") if isinstance(stamp, dict) else None
+    if not isinstance(saved, dict) or not isinstance(reports, dict) or not reports:
+        return "no valid report stamp"
+    missing = [str(report) for report in required if str(report) not in reports]
+    if missing:
+        return ", ".join(missing) + " not stamped"
+    current = report_fingerprint(root)
+    if not current["git_head"] or not current["index_tree"]:
+        return "git cannot read HEAD or the index"
+    changed = sorted(key for key in set(saved) | set(current)
+                     if key not in exempt and saved.get(key) != current.get(key))
+    if changed:
+        return ", ".join(changed) + " changed"
+    for name, digest in reports.items():
+        report = root / name
+        if not report.is_file() or file_hash(report) != digest:
+            return f"{name} changed"
+    return ""
+
+
+def advance_report_stamp(path: Path, root: Path = ROOT) -> str:
+    """After a commit of the stamped tree, move the stamp to the new HEAD and index when
+    nothing else changed and src and the map equal HEAD; else remove the stamp."""
+    problem = report_stamp_problem(path, root, STAMP_ADVANCE_EXEMPT)
+    status = _git_output(root, "status", "--porcelain", "--", "src", "tools/Resources/functions_map.txt")
+    if not problem and status != "":
+        problem = "src or the function map differs from HEAD"
+    if problem:
+        (root / path).unlink(missing_ok=True)
+        return problem
+    stamp = json.loads((root / path).read_text(encoding="utf-8"))
+    stamp["fingerprint"] = report_fingerprint(root)
+    (root / path).write_text(json.dumps(stamp, indent=1) + "\n", encoding="utf-8")
+    return ""
 
 
 def read_source_debt(source_root: Path, *, staged: bool = False) -> dict[int, list[str]]:
@@ -1510,9 +1619,31 @@ def main() -> int:
     scoreboard_parser.add_argument("--source-root", type=Path, default=ROOT / "src")
     scoreboard_parser.add_argument("--generated-by", default="report")
 
+    stamp_parser = subparsers.add_parser("stamp", help="write or check the report stamp")
+    stamp_parser.add_argument("path", type=Path)
+    stamp_parser.add_argument("--report", type=Path, action="append", default=[])
+    stamp_action = stamp_parser.add_mutually_exclusive_group()
+    stamp_action.add_argument("--check", action="store_true",
+                              help="exit 1 and say why when the stamped reports (each --report) may be stale")
+    stamp_action.add_argument("--advance", action="store_true",
+                              help="move the stamp to a new commit of the same tree")
+    stamp_parser.add_argument("--ignore-index", action="store_true",
+                              help="with --check: a changed index does not change the reports")
+
     args = parser.parse_args()
     if args.command == "metadata":
         write_metadata(args.output, args.report, args.data_report)
+        return 0
+    if args.command == "stamp":
+        if args.check or args.advance:
+            problem = advance_report_stamp(args.path) if args.advance else report_stamp_problem(
+                args.path, exempt=("index_tree",) if args.ignore_index else (), required=tuple(args.report))
+            if problem:
+                print(f"stamp: {problem}")
+            return 1 if problem else 0
+        if not args.report:
+            stamp_parser.error("stamp needs --report FILE, --check or --advance")
+        write_report_stamp(args.path, args.report)
         return 0
     if args.command == "classify":
         return classify(args.report, args.address, args.source_root)

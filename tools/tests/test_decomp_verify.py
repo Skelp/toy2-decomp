@@ -2,6 +2,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -1264,6 +1265,79 @@ class HeaderSideEffectTests(unittest.TestCase):
              contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit):
                 VERIFY.main()
+
+
+def git(root, *args):
+    subprocess.run(["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t", *args],
+                   check=True, capture_output=True)
+
+
+class ReportStampTests(unittest.TestCase):
+    """finish and baseline reuse the validate reports only while nothing they describe changed."""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        for name, text in (("src/a.cpp", "int a;\n"), ("tools/Resources/functions_map.txt", "0x1 A\n"),
+                           ("build/toy2.exe", "exe"), ("build/toy2.pdb", "pdb"), ("build/patcher.dll", "dll"),
+                           ("reccmp-project.yml", "targets: {}\n"), ("build/r.json", "{}"), ("build/d.json", "[]")):
+            (self.root / name).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / name).write_text(text, encoding="utf-8")
+        git(self.root, "init", "-q")
+        git(self.root, "add", "src", "tools")
+        git(self.root, "commit", "-q", "-m", "base")
+        self.stamp = Path("build/stamp.json")
+        self.write_stamp()
+
+    def write_stamp(self):
+        VERIFY.write_report_stamp(self.stamp, [Path("build/r.json"), Path("build/d.json")], self.root)
+
+    def problem(self):
+        return VERIFY.report_stamp_problem(self.stamp, self.root)
+
+    def commit_notes(self, text):
+        (self.root / "notes.txt").write_text(text, encoding="utf-8")
+        git(self.root, "add", "notes.txt")
+        git(self.root, "commit", "-q", "-m", text)
+
+    def test_a_changed_tree_index_output_or_report_disables_reuse(self):
+        self.assertEqual(self.problem(), "")
+        for name, key in (("src/a.cpp", "source_dependency_sha256"), ("build/toy2.exe", "recompiled_sha256"),
+                          ("build/toy2.pdb", "pdb_sha256"), ("build/d.json", "build/d.json"),
+                          ("tools/Resources/functions_map.txt", "functions_map_sha256"),
+                          ("reccmp-project.yml", "reccmp_project_sha256")):
+            with self.subTest(name=name):
+                path = self.root / name
+                old = path.read_text(encoding="utf-8")
+                path.write_text(old + "x", encoding="utf-8")
+                self.assertIn(key, self.problem())
+                path.write_text(old, encoding="utf-8")
+                self.assertEqual(self.problem(), "")
+        (self.root / "build" / "patcher.dll").write_text("new", encoding="utf-8")
+        self.assertEqual(self.problem(), "")  # no report reads patcher.dll
+        self.assertEqual(VERIFY.report_stamp_problem(self.stamp, self.root, required=(
+            Path("build/r.json"), Path("build/x.json"))), "build/x.json not stamped")
+        (self.root / "notes.txt").write_text("n", encoding="utf-8")
+        git(self.root, "add", "notes.txt")
+        self.assertEqual(self.problem(), "index_tree changed")
+        self.assertEqual(VERIFY.report_stamp_problem(self.stamp, self.root, exempt=("index_tree",)), "")
+        git(self.root, "reset", "-q", "notes.txt")
+        self.assertEqual(self.problem(), "")
+        (self.root / self.stamp).write_text("[]", encoding="utf-8")
+        self.assertEqual(self.problem(), "no valid report stamp")
+
+    def test_a_new_head_disables_reuse_until_a_clean_commit_advances_the_stamp(self):
+        self.commit_notes("one")
+        self.assertEqual(self.problem(), "git_head, index_tree changed")
+        self.assertEqual(VERIFY.advance_report_stamp(self.stamp, self.root), "")
+        self.assertEqual(self.problem(), "")
+        (self.root / "src" / "a.cpp").write_text("int b;\n", encoding="utf-8")
+        self.write_stamp()
+        self.commit_notes("two")
+        self.assertEqual(VERIFY.advance_report_stamp(self.stamp, self.root),
+                         "src or the function map differs from HEAD")
+        self.assertFalse((self.root / self.stamp).exists())
 
 
 if __name__ == "__main__":

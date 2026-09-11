@@ -337,6 +337,17 @@ class AttemptTests(unittest.TestCase):
                          "the writer exited with status 1: 400: The 'x' model is not supported.")
         self.assertEqual(attempts.handoff_text(fields), "")
 
+    def test_claude_usage_reads_the_result_event_of_a_stream_transcript(self):
+        stream = [{"type": "system", "subtype": "init"},
+                  {"type": "assistant", "message": {"content": [{"type": "text", "text": "x"}]}},
+                  {"type": "result", "num_turns": 3, "total_cost_usd": 0.5, "result": "# T",
+                   "usage": {"input_tokens": 2, "cache_read_input_tokens": 10, "output_tokens": 7,
+                             "output_tokens_details": {"thinking_tokens": 4}}}]
+        fields = attempts.writer_usage("\n".join(map(json.dumps, stream)) + "\n")
+        self.assertEqual((fields["turns"], fields["cost"], fields["cache_read"], fields["reasoning"],
+                          fields["result"]), (3, 0.5, 10, 4, "# T"))
+        self.assertEqual(attempts.writer_usage(json.dumps(stream[0]) + "\n")["turns"], 0)
+
     def test_live_verdict_reports_context_denials_and_the_skill(self):
         fields = attempts.writer_usage(json.dumps({
             "num_turns": 2, "total_cost_usd": 0.088, "result": "579f56e x\n# Decomp expert",
@@ -370,7 +381,7 @@ class AttemptTests(unittest.TestCase):
         self.assertEqual(claude, "claude -p --tools Bash --system-prompt-file "
                          ".agents/skills/decomp-expert/SKILL.md --strict-mcp-config "
                          "--setting-sources project --permission-mode dontAsk "
-                         "--no-session-persistence --output-format json --effort xhigh")
+                         "--no-session-persistence --output-format stream-json --verbose --effort xhigh")
         codex = attempts.writer_command("codex", self.root, "medium", "gpt-x")
         for part in ("codex exec --ephemeral --ignore-user-config --disable apps --disable plugins",
                      "-s workspace-write -C", f"--add-dir {self.root}",

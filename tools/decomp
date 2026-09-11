@@ -10,6 +10,17 @@ if [[ -f .decomp-local ]]; then
 fi
 
 build_jobs="${TOY2_BUILD_JOBS:-${TOY2_LOCAL_BUILD_JOBS:-4}}"
+# validate fingerprints the tree its current reports describe; finish and baseline
+# reuse those reports only while the fingerprint still matches.
+report_stamp="build/decomp-report-stamp.json"
+both_reports=(--report build/decomp-current-report.json --report build/decomp-current-data-report.json)
+
+# A driver run (DECOMP_RUN_EVENTS) logs each step of finish and validate as a quiet
+# phase event, so that throughput --runs can time the steps.
+run_step() {
+    [[ -z ${DECOMP_RUN_EVENTS:-} ]] || python tools/decomp_attempts.py event phase "phase $1" \
+        --field "phase=$1" --set "phase=$1" --state --quiet || true
+}
 
 configure() {
     cmake -S . -B build -G Ninja \
@@ -148,8 +159,16 @@ baseline() {
         return 2
     fi
     build || return
-    write_comparison_report decomp-baseline-report.json || return
-    write_data_report decomp-baseline-data-report.json || return
+    # The reports of the last validate describe this tree while their stamp matches
+    # (HEAD, index, src, build outputs, toolchain): copy them instead of a new run.
+    if python tools/decomp_verify.py stamp "$report_stamp" --check "${both_reports[@]}" > /dev/null 2>&1; then
+        cp -f build/decomp-current-report.json build/decomp-baseline-report.json || return
+        cp -f build/decomp-current-data-report.json build/decomp-baseline-data-report.json || return
+        echo "baseline: reused the reports of the last validate (stamp matches)"
+    else
+        write_comparison_report decomp-baseline-report.json || return
+        write_data_report decomp-baseline-data-report.json || return
+    fi
     refresh_function_sizes || return
     python tools/decomp_verify.py metadata build/decomp-baseline-meta.json \
         --report build/decomp-baseline-report.json \
@@ -278,13 +297,43 @@ validate() {
         return 2
     fi
 
-    build || return
-    write_comparison_report decomp-current-report.json || return
-    local with_data_reports=0
+    run_step build
+    build_game || return
+    # patcher.dll builds the same sources with APPLY_FIXES and no report reads it, so it
+    # builds beside the reports and checks. validate waits for it on every path.
+    local patcher_log=build/decomp-diffs/patcher-build.log patcher_pid status=0
+    cmake --build build --target patcher -- "-j${build_jobs}" > "$patcher_log" 2>&1 &
+    patcher_pid=$!
+    validate_checks || status=$?
+    run_step patcher
+    if ! wait "$patcher_pid"; then
+        grep -E ' error |fatal error|error LNK' "$patcher_log" >&2 || true
+        echo "error: patcher.dll does not build (log: $patcher_log)" >&2
+        ((status)) || status=1
+    fi
+    return "$status"
+}
+
+# The reports and checks of validate. It reads the options of validate, its caller.
+validate_checks() {
+    run_step reports
+    # finish stamps the comparison report that it writes for the annotation tags. While
+    # the build, src and the report inputs match the stamp, that report is still exact.
+    if python tools/decomp_verify.py stamp "$report_stamp" --check --ignore-index \
+        --report build/decomp-current-report.json > /dev/null 2>&1; then
+        echo "validate: reused the comparison report of finish (stamp matches)"
+    else
+        write_comparison_report decomp-current-report.json || return
+    fi
+    rm -f "$report_stamp"
+    local with_data_reports=0 stamped=(--report build/decomp-current-report.json)
     if [[ $mode == data || $mode == resource || -f build/decomp-baseline-data-report.json ]]; then
         write_data_report decomp-current-data-report.json || return
-        with_data_reports=1
+        with_data_reports=1 stamped=("${both_reports[@]}")
     fi
+    # Fingerprint the tree these reports describe, so that the record step and the next
+    # baseline can reuse them. A failed stamp costs only the reuse.
+    python tools/decomp_verify.py stamp "$report_stamp" "${stamped[@]}" || rm -f "$report_stamp"
     local verify_args=(
         validate
         build/decomp-baseline-report.json
@@ -316,7 +365,9 @@ validate() {
     if [[ -n $accounting_correction ]]; then
         verify_args+=(--accounting-correction "$accounting_correction")
     fi
+    run_step verify
     python tools/decomp_verify.py "${verify_args[@]}" || return
+    run_step scoreboard
     python tools/decomp_verify.py scoreboard build/decomp-current-report.json \
         tools/Resources/scoreboard.tsv --generated-by validate || return
     for target in "${targets[@]}"; do
@@ -325,6 +376,7 @@ validate() {
     if [[ $mode == resource ]]; then
         python tools/decomp_campaigns.py resource-score --quiet || return
     fi
+    run_step lint
     if [[ $staged -eq 1 ]]; then
         python tools/decomp_lint.py --staged --warnings-as-errors || return
     fi
@@ -422,7 +474,7 @@ finish_usage() {
 # record, commit, then forget the targets' handoff and attempt files. Every
 # step is fatal with one line; a validate failure records nothing.
 campaign_finish() {
-    local mode="" note="" message="" target
+    local mode="" note="" message="" target reason=""
     local targets=() target_args=() canonical=()
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -471,11 +523,15 @@ campaign_finish() {
         done
     fi
     if [[ $mode != data ]]; then
+        run_step annotate
         # validate demands the tag fresh verification requires (MATCHED at
         # 100%, EFFECTIVE, else PROVISIONAL), so set it from a fresh report.
         build_game || { echo "error: the game build failed; finish stopped" >&2; return 1; }
         write_comparison_report decomp-current-report.json \
             || { echo "error: the comparison report failed; finish stopped" >&2; return 1; }
+        # validate reuses this report when the tags, the build and src stay as they are.
+        python tools/decomp_verify.py stamp "$report_stamp" --report build/decomp-current-report.json \
+            || rm -f "$report_stamp"
         python tools/decomp_verify.py annotations build/decomp-current-report.json --write \
             || { echo "error: the annotation tags could not be refreshed" >&2; return 1; }
     fi
@@ -490,13 +546,21 @@ campaign_finish() {
     fi
     grep -E '^0x[0-9A-Fa-f]{8}  ' "$log" || true
     echo "validate: OK (log: $log)"
+    run_step record
     # The record path of `campaigns record`: fresh reports, then the ledger row.
+    # validate wrote the reports moments ago; its stamp proves whether HEAD, the
+    # index, src, the build outputs and the reports are still the same.
     if ! campaign_state_is_finalizing "$campaign_state_file"; then
         build || { echo "error: the record build failed; nothing was recorded" >&2; return 1; }
-        write_comparison_report decomp-current-report.json \
-            || { echo "error: the record comparison report failed" >&2; return 1; }
-        write_data_report decomp-current-data-report.json \
-            || { echo "error: the record data report failed" >&2; return 1; }
+        if reason=$(python tools/decomp_verify.py stamp "$report_stamp" --check "${both_reports[@]}"); then
+            echo "record: reused the validate reports (stamp matches)"
+        else
+            echo "record: new reports (${reason#stamp: })"
+            write_comparison_report decomp-current-report.json \
+                || { echo "error: the record comparison report failed" >&2; return 1; }
+            write_data_report decomp-current-data-report.json \
+                || { echo "error: the record data report failed" >&2; return 1; }
+        fi
     fi
     python tools/decomp_campaigns.py "${campaign_global_arguments[@]}" record \
         --result source --note "$note" \
@@ -504,6 +568,8 @@ campaign_finish() {
     git add tools/Resources/campaign-ledger.jsonl tools/Resources/scoreboard.tsv \
         || { echo "error: git add of the campaign records failed" >&2; return 1; }
     git commit -q -F "$message" || { echo "error: git commit failed" >&2; return 1; }
+    # Move the stamp to the new commit, so that the next baseline can reuse the reports.
+    python tools/decomp_verify.py stamp "$report_stamp" --advance > /dev/null || true
     # candidates ranks from the session report; give it the committed scores so
     # the next selection does not repeat the target it just finished.
     cp -f build/decomp-current-report.json build/decomp-report-data.json
@@ -571,7 +637,8 @@ run_emit() {
         || printf '%s\n' "$2"
 }
 
-# Record a phase change and other run fields in state.json; prints nothing.
+# Record a phase change as an event (throughput --runs times the phases from it)
+# and other run fields in state.json; prints nothing.
 run_phase() {
     local pairs=() pair
     run_phase_name=$1
@@ -579,7 +646,8 @@ run_phase() {
     pairs=(--set "phase=$1")
     shift
     for pair in "$@"; do pairs+=(--set "$pair"); done
-    python tools/decomp_attempts.py event state "${pairs[@]}" --state || true
+    python tools/decomp_attempts.py event phase "phase $run_phase_name" \
+        --field "phase=$run_phase_name" "${pairs[@]}" --state --quiet || true
 }
 
 # Print the error line of a stopped run (it names the log and one next step) and
@@ -622,8 +690,7 @@ run_resolve() {
     harness=${lines[0]:-} harness_reason=${lines[1]:-} writer_format=${lines[2]:-text}
     writer_binary=${lines[3]:-} writer=${lines[4]:-}
     case $writer_format in
-        claude-json) suffix=.json ;;
-        codex-jsonl) suffix=.jsonl ;;
+        claude-json|codex-jsonl) suffix=.jsonl ;;
         *) suffix=.txt ;;
     esac
 }
@@ -1005,7 +1072,7 @@ run_finish() {
     finish_log="$prefix-finish$2.log"
     rm -f build/decomp-diffs/validate.log
     run_phase finish "log=$finish_log"
-    "$self" campaigns finish --mode "$run_mode" --target "$run_address" --note "$note" \
+    DECOMP_RUN_EVENTS=1 "$self" campaigns finish --mode "$run_mode" --target "$run_address" --note "$note" \
         --message "$prefix.msg" > "$finish_log" 2>&1
 }
 
@@ -1017,13 +1084,19 @@ run_select() {
     local index=$1 reuse=${2:-} row fields=() pick=() list queue=()
     run_mode=$mode select_error=""
     if [[ -n $address ]]; then
-        if ! "$self" candidates --refine --json --limit 0 > "${select_files}candidates.json" \
-            2> "${select_files}candidates.log" || ! "$self" candidates --coverage --json --limit 0 \
-            > "${select_files}coverage.json" 2>> "${select_files}candidates.log"; then
+        # The source state of the target names its one queue: a FUNCTION is refinement,
+        # a STUB or an unstarted function coverage. pick falls back to the map.
+        queue=(--refine) list="${select_files}candidates.json"
+        if [[ $mode == coverage ]] || { [[ $mode != refinement ]] && ! grep -rqiE --include='*.cpp' \
+            "// FUNCTION: TOY2 $(printf '0x%08X' "$address" 2> /dev/null)\b" src; }; then
+            queue=(--coverage) list="${select_files}coverage.json"
+        fi
+        if ! "$self" candidates "${queue[@]}" --json --limit 0 > "$list" \
+            2> "${select_files}candidates.log"; then
             select_error="candidates failed (log: ${select_files}candidates.log)"
             return 1
         fi
-        pick=("${select_files}candidates.json" "${select_files}coverage.json" --address "$address")
+        pick=("$list" --address "$address")
     else
         if [[ $run_mode == auto ]]; then
             run_mode=refinement
@@ -1116,7 +1189,7 @@ run_campaign() {
     rm -f "$prefix"-* "$prefix.msg"
     # A handoff left by an interrupted run numbers attempts of another baseline.
     rm -f "build/decomp-cache/handoff/$run_address.md"
-    run_phase baseline "target=$run_address" "name=$run_name" "mode=$run_mode" \
+    run_phase start "target=$run_address" "name=$run_name" "mode=$run_mode" \
         "subsystem=$run_subsystem" "log=$prefix-start.log"
     # Set before the start, so a signal held back until the start returns aborts it.
     run_active=$run_address
@@ -1140,7 +1213,8 @@ run_campaign() {
     baseline=$run_best baseline_attempts=$run_attempts
     run_emit campaign "campaign $index: $run_address $run_name $run_mode, baseline $baseline%" \
         --field "campaign=$index" --field "address=$run_address" --field "mode=$run_mode" \
-        --set "baseline=$baseline" --set "best=$run_best" --set "attempts=$run_attempts"
+        --field "baseline=$baseline" --set "baseline=$baseline" --set "best=$run_best" \
+        --set "attempts=$run_attempts"
     local first last before_attempts before_best batch_started
     while true; do
         if ((run_stalled)); then stop="stalled"; break; fi
@@ -1150,8 +1224,8 @@ run_campaign() {
         ((last > run_limit)) && last=$run_limit
         before_attempts=$run_attempts before_best=$run_best batch_started=$SECONDS
         json="$prefix-batch$batch$suffix"
-        run_batch_prompt "$first" "$last" > "$prefix-batch$batch.prompt"
         run_phase batch "batch=$batch" "log=$json"
+        run_batch_prompt "$first" "$last" > "$prefix-batch$batch.prompt"
         writer_status=0
         run_writer "$prefix-batch$batch.prompt" "$json" watch || writer_status=$?
         run_read_stats || { run_error 1 "the attempt log of $run_address is unreadable" \
@@ -1248,6 +1322,7 @@ run_campaign() {
         sha=$(git rev-parse --short HEAD) run_result=no-source run_active=""
         rm -f "build/decomp-cache/handoff/$run_address.md" "build/decomp-attempts/$run_address.jsonl"
     fi
+    ((push == 0)) || run_phase push
     if ((push)) && ! git push -q origin agent/continuous; then
         run_error 1 "git push failed after commit $sha" "git push origin agent/continuous"
         return
@@ -1256,7 +1331,9 @@ run_campaign() {
     minutes=$(run_math 'printf "%.1f", a / 60' "$((SECONDS - started))")
     run_emit campaign "campaign $index: $run_address $run_name $run_mode $baseline% -> $final% ($bytes B), $run_attempts attempts, $minutes min, $(run_spend "$cost" "$tokens"), commit $sha" \
         --field "campaign=$index" --field "address=$run_address" --field "result=$run_result" \
-        --field "final=$final" --field "bytes=$bytes" --field "commit=$sha" --set "best=$final"
+        --field "final=$final" --field "bytes=$bytes" --field "commit=$sha" \
+        --field "baseline=$baseline" --field "attempts=$run_attempts" --field "minutes=$minutes" \
+        --set "best=$final"
     total_cost=$(run_math 'printf "%.4f", a + b' "$total_cost" "$cost")
     total_tokens=$((total_tokens + tokens))
     total_bytes=$(run_math 'printf "%+.2f", a + b' "$total_bytes" "$bytes")
@@ -1266,6 +1343,8 @@ run_campaign() {
             "${broken_next:-tools/decomp campaigns run --check --live --harness $harness}"
         return
     fi
+    # A transcript keeps every tool result; throughput --runs reads the compressed ones.
+    [[ $suffix != .jsonl ]] || gzip -fq -- "$prefix"-batch*.jsonl "$prefix"-repair.jsonl 2> /dev/null || true
 }
 
 # --dry-run: the next campaigns as a run would select them; nothing starts.
@@ -1584,7 +1663,7 @@ Commands:
   report [file]     Generate the self-contained HTML decompilation dashboard
   session-summary   Summarize selected targets against the saved baseline
   progress [--json] [scope]  Show annotation progress
-  throughput [args] Git-derived throughput meter (--experiments, --cap-check)
+  throughput [args] Git-derived throughput meter (--experiments, --cap-check, --runs)
   check             Verify functions_map.txt is sorted, deduplicated, named, in-range
   run [args]        Run the recompiled toy2.exe through Wine
   shell             Start a shell with the decompilation environment active

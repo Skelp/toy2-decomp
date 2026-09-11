@@ -17,6 +17,7 @@ import argparse
 import csv
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -28,6 +29,12 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = ROOT / "src"
 BASELINE_PATH = ROOT / ".notes" / "lint-baseline.tsv"
+# A whole-tree scan takes seconds, and one finish and the next start scan the same src
+# in up to ten processes (the working tree, the index and the next HEAD hold the same
+# text). Such scans are saved under build/, keyed on the text of each unit and on the
+# source of this module, so a changed unit or rule scans again.
+CACHE_DIR = ROOT / "build" / "decomp-cache" / "lint"
+CACHE_KEEP = 16
 
 SOURCE_SUFFIXES = (".c", ".cpp", ".h", ".hpp")
 ANNOTATION_RE = re.compile(
@@ -1064,13 +1071,51 @@ def target_units(
     ]
 
 
+def _scan_cache(units: list[SourceUnit]) -> Path | None:
+    """Return the cache file of a whole-tree scan of src, or None for any other scan."""
+    if not units or not CACHE_DIR.parent.parent.is_dir():
+        return None
+    digest = hashlib.sha256(Path(__file__).read_bytes())
+    for unit in units:
+        if not unit.path.is_relative_to(SOURCE_ROOT):
+            return None
+        digest.update(unit.path.relative_to(SOURCE_ROOT).as_posix().encode("utf-8") + b"\0")
+        digest.update(hashlib.sha256(unit.text.encode("utf-8")).digest())
+    return CACHE_DIR / f"{digest.hexdigest()}.json"
+
+
+def _save_scan(cache: Path, findings: list[Finding]) -> None:
+    """Save a scan atomically and keep the newest CACHE_KEEP files; a failure costs only the reuse."""
+    try:
+        rows = [asdict(item) | {"path": item.path.relative_to(SOURCE_ROOT).as_posix()} for item in findings]
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        temporary = cache.with_name(f"{cache.stem}.{os.getpid()}.tmp")
+        temporary.write_text(json.dumps(rows), encoding="utf-8")
+        os.replace(temporary, cache)
+        for old in sorted(cache.parent.glob("*.json"), key=lambda path: path.stat().st_mtime)[:-CACHE_KEEP]:
+            old.unlink(missing_ok=True)
+    except (OSError, ValueError):
+        pass
+
+
 def scan_units(units: list[SourceUnit], *, cross_file: bool = True) -> list[Finding]:
+    cache = _scan_cache(units) if cross_file else None
+    try:
+        if cache is not None and cache.is_file():
+            rows = json.loads(cache.read_text(encoding="utf-8"))
+            os.utime(cache)
+            return [Finding(**(row | {"path": SOURCE_ROOT / row["path"]})) for row in rows]
+    except (OSError, ValueError, TypeError, KeyError):
+        pass
     findings = [finding for unit in units for finding in check_text(unit.path, unit.text)]
     if cross_file:
         findings.extend(check_signature_drift(units))
         findings.extend(check_signature_concealment(units))
         findings.extend(check_repeated_private_types(units))
-    return sorted(findings, key=lambda item: (item.relative_path, item.line, item.column, item.rule))
+    findings = sorted(findings, key=lambda item: (item.relative_path, item.line, item.column, item.rule))
+    if cache is not None:
+        _save_scan(cache, findings)
+    return findings
 
 
 def read_baseline(

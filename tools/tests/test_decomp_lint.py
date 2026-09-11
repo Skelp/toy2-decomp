@@ -303,6 +303,33 @@ class LayoutAssertionTests(unittest.TestCase):
         self.assertIn("unpinned-layout", rules(source))
 
 
+class ScanCacheTests(unittest.TestCase):
+    """A whole-tree scan of src is saved by content, so a later process reads it back."""
+
+    def test_the_same_text_is_read_back_and_a_changed_or_outside_unit_scans_again(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "build").mkdir()
+            source, cache = root / "src", root / "build" / "decomp-cache" / "lint"
+            units = [lint.SourceUnit(source / "a.cpp", "int a;\n"), lint.SourceUnit(source / "b.cpp", "int b;\n")]
+
+            def check(path, text):
+                return [lint.Finding(path, 1, "rule", "error", text, "detail", owner_address="0x00401000")]
+
+            with patch.object(lint, "SOURCE_ROOT", source), patch.object(lint, "CACHE_DIR", cache), \
+                    patch.object(lint, "check_text", side_effect=check) as scan:
+                first = lint.scan_units(units)
+                self.assertEqual(lint.scan_units(list(units)), first)
+                self.assertEqual(scan.call_count, 2)
+                lint.scan_units([units[0], lint.SourceUnit(source / "b.cpp", "int c;\n")])
+                self.assertEqual(scan.call_count, 4)
+                outside = [lint.SourceUnit(root / "other.cpp", "int a;\n")]
+                lint.scan_units(outside)
+                lint.scan_units(outside)
+                self.assertEqual(scan.call_count, 6)
+            self.assertEqual(len(list(cache.glob("*.json"))), 2)
+
+
 class BaselineTests(unittest.TestCase):
     def test_baseline_classification_and_stale_rows(self):
         source = "// FUNCTION: TOY2 0x00401000\nvoid f() { int iVar2 = 0; use(iVar2); }\n"
