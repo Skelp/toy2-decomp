@@ -14,8 +14,10 @@ tool prints something you cannot act on, quote it in the handoff TOOL line and s
 - `tools/decomp bc ADDR` builds, compares, logs one attempt, saves the diff and prints
   `attempt K/N raw X% (+d) best Y% (attempt k)` plus a region index
   (`N  0xADDR  -a +b  FILE:LINES`). It is the only command that consumes an attempt.
-- `bc ADDR --hunks` reprints the index and `bc ADDR --hunk N` one region, both from the
-  saved diff, without building. After an edit, plain `bc` first.
+- `bc ADDR --hunks` reprints the index, `bc ADDR --hunk N` one region and `bc ADDR --pack`
+  the orientation pack, all from the saved diff, without building. After an edit, plain `bc`.
+- A failed build prints the compiler errors and `bc: no attempt logged`; fix the error and
+  run the same cycle again. The attempt count does not change.
 - Never pipe `bc` into `head` or `tail`: a closed pipe aborts the build. Remove noise
   only with the grep filter in the cycle below.
 - A `header side effect:` line under the index means your header edit moved an untouched

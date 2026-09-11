@@ -31,8 +31,8 @@ git push origin agent/continuous
 `campaigns start` saves the baseline that `validate` and `record` compare
 against, so run it before the first edit. `bc` builds, compares one function,
 logs the attempt and prints a region index; read regions with
-`bc ADDRESS --hunk N` (no rebuild), never the raw or compact diff file. The
-orchestrator hands each batch an orientation pack of the same views.
+`bc ADDRESS --hunk N` (no rebuild), never the raw or compact diff file;
+`bc ADDRESS --pack` prints the orientation pack a fresh batch starts from.
 `campaigns finish` stages `src` and the map, runs `validate` (the only gate:
 rebuild, compare, lint, regression check), records the ledger row from fresh
 reports and commits the source, the ledger and `tools/Resources/scoreboard.tsv`
