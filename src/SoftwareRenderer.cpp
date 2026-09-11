@@ -2744,6 +2744,14 @@ namespace SoftwareRenderer
 			height--;
 		} while (height != 0);
 	}
+	// Edge X values carry 10 fraction bits; the half unit centres a span on its pixel.
+	enum
+	{
+		SOLID_EDGE_X_FRACTION_BITS = 10,
+		SOLID_EDGE_X_ONE = 1 << SOLID_EDGE_X_FRACTION_BITS,
+		SOLID_EDGE_X_HALF = SOLID_EDGE_X_ONE / 2
+	};
+
 	// FUNCTION: TOY2 0x004776C0 [PROVISIONAL]
 	void RasterizeSolidQuad8(const PointI* point0, const PointI* point1, const PointI* point2, const PointI* point3, uint32_t colourPair)
 	{
@@ -2804,8 +2812,8 @@ namespace SoftwareRenderer
 
 			if (rasterizeFinalEdge)
 			{
-				int32_t edgeXStep = (edgeEndX - edgeStartX) * 0x400 / (edgeEndY - edgeY);
-				int32_t edgeXFixed = edgeStartX * 0x400 + 0x200;
+				int32_t edgeXStep = (edgeEndX - edgeStartX) * SOLID_EDGE_X_ONE / (edgeEndY - edgeY);
+				int32_t edgeXFixed = edgeStartX * SOLID_EDGE_X_ONE + SOLID_EDGE_X_HALF;
 				if (edgeY < Toy2::g_screenClipTop)
 				{
 					edgeXFixed += (Toy2::g_screenClipTop - edgeY) * edgeXStep;
@@ -2841,12 +2849,14 @@ namespace SoftwareRenderer
 		}
 
 		uint8_t* rowStart = (uint8_t*)g_lockedBackBuffer + g_backBufferPitchPixels * topY + Toy2::g_screenClipLeft;
+		ScanlineScratch* span = scanline;
+		int32_t rowsRemaining = scanlineCount;
 		do
 		{
-			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
+			if (span->populated != 0 && span->leftXFixed <= Toy2::g_screenClipRightFixed && span->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = span->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = span->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX != rightX)
 				{
 					if (leftX < Toy2::g_screenClipLeft)
@@ -2854,7 +2864,7 @@ namespace SoftwareRenderer
 					if (rightX > Toy2::g_screenClipRight)
 						rightX = Toy2::g_screenClipRight;
 
-					uint8_t* pixel = rowStart + leftX - Toy2::g_screenClipLeft;
+					uint8_t* pixel = rowStart - Toy2::g_screenClipLeft + leftX;
 					int32_t pixelCount = rightX - leftX + 1;
 					if (((uint32_t)pixel & 3) != 0)
 					{
@@ -2865,18 +2875,18 @@ namespace SoftwareRenderer
 					{
 						Nu3D::MemSet32Util(pixel, pixelCount / 4, colourPair);
 						int32_t filledPixels = pixelCount & ~3;
-						pixelCount -= filledPixels;
 						pixel += filledPixels;
+						pixelCount -= filledPixels;
 					}
 					if (pixelCount != 0)
 						*pixel = (uint8_t)colourPair;
 				}
 			}
 
-			scanline++;
-			scanlineCount--;
 			rowStart += g_backBufferPitchPixels;
-		} while (scanlineCount != 0);
+			span++;
+			rowsRemaining--;
+		} while (rowsRemaining != 0);
 	}
 
 #undef RASTERIZE_SOLID_EDGE
