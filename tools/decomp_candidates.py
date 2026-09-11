@@ -125,6 +125,7 @@ class Candidate:
     prior_zero_yield_attempts: int = 0
     penalty_attempts: int | None = None
     prior_minutes: float = 0.0
+    prior_last_bytes_per_attempt: float | None = None
     prior_effective_bytes: float = 0.0
     prior_initialized_bytes: int = 0
     expected_retained_bytes: float = 0.0
@@ -510,6 +511,7 @@ def build_candidates() -> list[Candidate]:
                 prior_minutes=history.minutes if history else 0.0,
                 prior_effective_bytes=history.effective_bytes if history else 0.0,
                 prior_initialized_bytes=history.initialized_bytes if history else 0,
+                prior_last_bytes_per_attempt=history.last_bytes_per_attempt if history else None,
             )
         )
     return candidates
@@ -691,6 +693,19 @@ def print_frontier_diagnostics(candidates: list[Candidate]) -> None:
             print(f"    {kind:<24} {count}")
 
 
+REVISIT_YIELD_REFERENCE = 60.0
+REVISIT_MIN_FACTOR = 0.3
+
+
+def revisit_factor(candidate: Candidate) -> float:
+    """Scale for a target whose last campaign retained few bytes per attempt: a revisit
+    pays less than a first pass (measured 23-48 against 45-180 bytes per attempt)."""
+    last_yield = candidate.prior_last_bytes_per_attempt
+    if last_yield is None or last_yield >= REVISIT_YIELD_REFERENCE:
+        return 1.0
+    return max(last_yield / REVISIT_YIELD_REFERENCE, REVISIT_MIN_FACTOR)
+
+
 def score(candidate: Candidate) -> None:
     """Assign a rank and the evidence that supports it.
 
@@ -703,10 +718,20 @@ def score(candidate: Candidate) -> None:
     rank = 0.0
     reasons: list[str] = []
 
+    opportunity_rank = 0.0
     if candidate.size:
         opportunity = candidate.unresolved_bytes
-        rank += min(opportunity / 16.0, 160.0)
+        opportunity_rank = min(opportunity / 16.0, 160.0)
+        rank += opportunity_rank
         reasons.append(f"{opportunity:.0f} unresolved retail byte(s)")
+    # A low last yield scales the opportunity term down. Ranking only: the target stays queued.
+    factor = revisit_factor(candidate)
+    if opportunity_rank and factor < 1.0:
+        rank -= opportunity_rank * (1.0 - factor)
+        reasons.append(
+            f"last campaign {candidate.prior_last_bytes_per_attempt:.0f} B per attempt "
+            f"(opportunity x{factor:.2f})"
+        )
 
     if candidate.state == "STUB":
         if candidate.match == 1.0 or candidate.effective:
@@ -891,6 +916,8 @@ def estimate_yield(candidate: Candidate, queue: str | None) -> None:
         ZERO_YIELD_PENALTY_FLOOR,
     )
     confidence *= retry_penalty
+    # The yield queue is what the scripted driver takes, so the revisit scale applies here too.
+    confidence *= revisit_factor(candidate)
 
     if candidate.map_defect:
         confidence = 0.0
@@ -1389,6 +1416,7 @@ def main() -> int:
                     "unresolved_bytes": item.unresolved_bytes,
                     "prior_attempts": item.prior_attempts,
                     "prior_zero_yield_attempts": item.prior_zero_yield_attempts,
+                    "prior_last_bytes_per_attempt": item.prior_last_bytes_per_attempt,
                     "penalty_attempts": item.active_penalty_attempts,
                     "prior_minutes": item.prior_minutes,
                     "expected_retained_bytes": item.expected_retained_bytes,

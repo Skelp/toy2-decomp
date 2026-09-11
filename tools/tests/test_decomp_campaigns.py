@@ -316,6 +316,18 @@ class CampaignTests(unittest.TestCase):
             "started": started,
         }
 
+    def test_address_stats_keep_the_yield_per_attempt_of_the_latest_campaign(self):
+        records = [
+            {"record_type": "campaign", "addresses": ["0x00401000"], "effective_bytes": 600.0,
+             "attempts": 10, "ended_at": "2026-09-10T10:00:00+00:00", "timestamp": "2026-09-10T10:00:00+00:00"},
+            {"record_type": "campaign", "addresses": ["0x00401000"], "effective_bytes": 90.0,
+             "attempts": 6, "ended_at": "2026-09-11T10:00:00+00:00", "timestamp": "2026-09-11T10:00:00+00:00"},
+            {"record_type": "campaign", "addresses": ["0x00402000"], "effective_bytes": 50.0},
+        ]
+        stats = campaigns.address_stats(records)
+        self.assertAlmostEqual(stats[0x00401000].last_bytes_per_attempt, 15.0)
+        self.assertIsNone(stats[0x00402000].last_bytes_per_attempt)
+
     def test_read_records_and_address_stats_split_bundle_yield(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "campaigns.jsonl"

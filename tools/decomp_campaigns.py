@@ -110,6 +110,9 @@ class AddressStats:
     minutes: float = 0.0
     effective_bytes: float = 0.0
     initialized_bytes: float = 0.0
+    # Retained bytes per bc attempt of the latest campaign that logged attempts. A second
+    # pass on the same function yields less; the candidate rank uses this to prefer fresh work.
+    last_bytes_per_attempt: float | None = None
 
 
 def utc_now() -> datetime:
@@ -229,6 +232,7 @@ def address_stats(records: list[dict[str, object]]) -> dict[int, AddressStats]:
             "minutes": 0.0,
             "effective_bytes": 0.0,
             "initialized_bytes": 0.0,
+            "last_bytes_per_attempt": None,
         }
     )
     for record in _chronological_records(records):
@@ -269,6 +273,12 @@ def address_stats(records: list[dict[str, object]]) -> dict[int, AddressStats]:
             item["minutes"] += minutes / share
             item["effective_bytes"] += address_effective
             item["initialized_bytes"] += address_initialized
+            try:
+                logged = int(record.get("attempts") or 0)
+            except (TypeError, ValueError):
+                logged = 0
+            if logged > 0:
+                item["last_bytes_per_attempt"] = (address_effective + address_initialized) / logged
     return {
         address: AddressStats(
             attempts=int(values["attempts"]),
@@ -278,6 +288,7 @@ def address_stats(records: list[dict[str, object]]) -> dict[int, AddressStats]:
             minutes=values["minutes"],
             effective_bytes=values["effective_bytes"],
             initialized_bytes=values["initialized_bytes"],
+            last_bytes_per_attempt=values["last_bytes_per_attempt"],
         )
         for address, values in totals.items()
     }

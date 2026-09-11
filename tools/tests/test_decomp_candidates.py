@@ -88,6 +88,22 @@ class CandidateTests(unittest.TestCase):
         self.assertEqual(reset.rank, fresh.rank)
         self.assertIn("new evidence reset", "; ".join(reset.reasons))
 
+    def test_a_low_yield_last_campaign_scales_down_the_opportunity_rank(self):
+        fresh = make(0x401000, "N::Fresh", size=1000, state="FUNCTION", match=0.5)
+        poor = make(0x402000, "N::Poor", size=1000, state="FUNCTION", match=0.5,
+                    prior_attempts=1, prior_effective_bytes=120.0, prior_last_bytes_per_attempt=15.0)
+        rich = make(0x403000, "N::Rich", size=1000, state="FUNCTION", match=0.5,
+                    prior_attempts=1, prior_effective_bytes=900.0, prior_last_bytes_per_attempt=90.0)
+        for item in (fresh, poor, rich):
+            candidates.score(item)
+        self.assertLess(poor.rank, fresh.rank)
+        self.assertEqual(rich.rank, fresh.rank)
+        self.assertIn("last campaign 15 B per attempt (opportunity x0.30)", "; ".join(poor.reasons))
+        for item in (fresh, poor, rich):
+            candidates.estimate_yield(item, "refinement")
+        self.assertAlmostEqual(poor.expected_bytes_per_minute, fresh.expected_bytes_per_minute * 0.3)
+        self.assertEqual(rich.expected_bytes_per_minute, fresh.expected_bytes_per_minute)
+
     def test_zero_yield_history_reduces_expected_rate_and_rank(self):
         fresh = make(
             0x401000, "N::Fresh", size=1000, state="FUNCTION", match=0.5
