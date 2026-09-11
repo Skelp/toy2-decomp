@@ -487,7 +487,7 @@ namespace Toy2
 			InitCutsceneCamera(&g_cutsceneFocusPosition, &g_cutsceneCameraPosition);
 		}
 
-		// FUNCTION: TOY2 0x00402290 [EFFECTIVE]
+		// FUNCTION: TOY2 0x00402290 [PROVISIONAL]
 		void BeginScriptedCutsceneOnBuzz(int32_t duration)
 		{
 			if (g_scriptedCameraState != 0)

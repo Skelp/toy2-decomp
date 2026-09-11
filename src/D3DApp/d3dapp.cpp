@@ -654,7 +654,7 @@ int32_t D3DAppWindowProc(WPARAM* stopProcessing, LPARAM* result, HWND hWnd, UINT
 	return TRUE;
 }
 
-// FUNCTION: TOY2 0x0040D2D0 [EFFECTIVE]
+// FUNCTION: TOY2 0x0040D2D0 [PROVISIONAL]
 BOOL D3DAppDestroy()
 {
 	d3dappi.bRenderingIsOK = FALSE;

@@ -10073,7 +10073,7 @@ namespace SoftwareRenderer
 		ResetRenderCommands();
 	}
 
-	// FUNCTION: TOY2 0x004C9A50 [MATCHED]
+	// FUNCTION: TOY2 0x004C9A50 [PROVISIONAL]
 	void RasterizeSortedRenderCommand(RenderCommand* command, int32_t vertexCount, int32_t renderState, uint32_t* texData, int32_t useAlternateSpans)
 	{
 		int32_t pixelFormatMode = g_pixelFormatMode;

@@ -489,7 +489,7 @@ namespace AudioManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x0047E850 [MATCHED]
+	// FUNCTION: TOY2 0x0047E850 [PROVISIONAL]
 	void ReleaseBuffers()
 	{
 		if (g_audioInitialized != 0)

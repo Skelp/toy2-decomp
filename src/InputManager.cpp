@@ -495,7 +495,7 @@ namespace InputManager
 		DrawKeyboardGlyphText(message->x, message->y, message->text);
 	}
 
-	// FUNCTION: TOY2 0x00415AE0 [MATCHED]
+	// FUNCTION: TOY2 0x00415AE0 [PROVISIONAL]
 	void DrawColouredKeyboardGlyphText(int32_t x, int32_t y, const char* text, int32_t blue, int32_t green, int32_t red)
 	{
 		DevDraw::TexturedQuad quad;

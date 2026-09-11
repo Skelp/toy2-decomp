@@ -653,7 +653,7 @@ namespace Nu3D
 		return (clipDY2 & clipDY1 & clipDX2 & clipDX1) & 0x80000000;
 	}
 
-	// FUNCTION: TOY2 0x004B46B0 [MATCHED]
+	// FUNCTION: TOY2 0x004B46B0 [PROVISIONAL]
 	int32_t Font::DrawScaledGlyph(char c)
 	{
 		LPDIRECT3DDEVICE3 device = DrawingDevice::GetD3DDevice();

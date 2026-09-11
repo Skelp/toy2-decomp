@@ -335,7 +335,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B8160 [MATCHED]
+		// FUNCTION: TOY2 0x004B8160 [PROVISIONAL]
 		void RenderQuadSpriteFromVerts(Nu3D::Sprite* sprite)
 		{
 			LPDIRECT3DVERTEXBUFFER destBuffer = g_FVF_14C_Buffer_1.vertexBuffer;
@@ -580,7 +580,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B8E60 [MATCHED]
+		// FUNCTION: TOY2 0x004B8E60 [PROVISIONAL]
 		void QueueQuadSprite(Vector3F* position,
 			int32_t trigIndex,
 			float width,
@@ -620,7 +620,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B8F40 [MATCHED]
+		// FUNCTION: TOY2 0x004B8F40 [PROVISIONAL]
 		void QueueBillboardSprite(Vector3F* position,
 			int32_t trigIndex,
 			float width,
@@ -733,7 +733,7 @@ namespace Renderer
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x00494820 [EFFECTIVE]
+		// FUNCTION: TOY2 0x00494820 [PROVISIONAL]
 		int16_t DrawTile(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex)
 		{
 			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
@@ -959,7 +959,7 @@ namespace Renderer
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x00493C30 [MATCHED]
+		// FUNCTION: TOY2 0x00493C30 [PROVISIONAL]
 		int16_t DrawColoured(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue)
 		{
 			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
