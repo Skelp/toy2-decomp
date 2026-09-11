@@ -295,8 +295,7 @@ namespace Toy2
 			uint32_t contactFlags;
 			PackedCollisionFace* face;
 			CollisionNormal hitNormal;
-			Vector3I movementDirection;
-			int32_t movementLength;
+			MathScratchVector movement; // unit direction (value) and length (scalar) of the sweep
 		};
 
 		const int16_t COLLISION_MESH_STATIC_A = 6;
@@ -318,8 +317,7 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(CollisionSweep) == 0x4C);
 		STATIC_ASSERT(offsetof(CollisionSweep, nearestFraction) == 0x20);
 		STATIC_ASSERT(offsetof(CollisionSweep, hitNormal) == 0x34);
-		STATIC_ASSERT(offsetof(CollisionSweep, movementDirection) == 0x3C);
-		STATIC_ASSERT(offsetof(CollisionSweep, movementLength) == 0x48);
+		STATIC_ASSERT(offsetof(CollisionSweep, movement) == 0x3C);
 
 		// GLOBAL: TOY2 0x00729178
 		CollisionQueryResult g_collisionQueryResults[2];
@@ -1178,8 +1176,7 @@ namespace Toy2
 			Vector3I& crossOffset = g_mathScratch[7].value;
 			Vector3I& hitNormal = g_mathScratch[8].value;
 
-			movementDirection = sweep->movementDirection;
-			g_mathScratch[1].scalar = sweep->movementLength;
+			g_mathScratch[1] = sweep->movement;
 			edgeDirection.x = edgeX;
 			edgeDirection.y = edgeY;
 			edgeDirection.z = edgeZ;
@@ -1233,15 +1230,15 @@ namespace Toy2
 				if (alongEdge < 0 || (alongEdge >> 5) > edgeLengthSquared)
 					return 0;
 
-				scaledEdgeLengthSquared = edgeLengthSquared;
+				int32_t contactLengthSquared = edgeLengthSquared;
 				while (alongEdge > 0x40000)
 				{
 					alongEdge >>= 1;
-					scaledEdgeLengthSquared >>= 1;
+					contactLengthSquared >>= 1;
 				}
-				contactPoint.x -= alongEdge * edgeX / scaledEdgeLengthSquared;
-				contactPoint.y -= alongEdge * edgeY / scaledEdgeLengthSquared;
-				contactPoint.z -= alongEdge * edgeZ / scaledEdgeLengthSquared;
+				contactPoint.x -= alongEdge * edgeX / contactLengthSquared;
+				contactPoint.y -= alongEdge * edgeY / contactLengthSquared;
+				contactPoint.z -= alongEdge * edgeZ / contactLengthSquared;
 				Nu3D::Math::NormalizeToFixedPoint(&contactPoint, &contactPoint);
 				contactPoint.x *= 4;
 				contactPoint.y *= 4;
@@ -1320,19 +1317,22 @@ namespace Toy2
 			int32_t radiusOffset = (int32_t)sqrt((double)abs(radius * radius * 16 - planeDistance * planeDistance));
 			radiusOffset = abs(radiusOffset * 0x4000 / approachRate);
 			hitDistance -= radiusOffset;
-			if (hitDistance < 0 || hitDistance >= sweep->movementLength)
+			int32_t movementLength = sweep->movement.scalar;
+			if (hitDistance < 0 || hitDistance >= movementLength)
 				return 0;
 
-			int32_t fraction = hitDistance * 0x4000 / sweep->movementLength;
+			int32_t fraction = hitDistance * 0x4000 / movementLength;
 			if (fraction >= sweep->nearestFraction)
 				return 0;
 
-			crossOffset.x = start->x + (end->x - start->x) * hitDistance / sweep->movementLength;
-			crossOffset.y = start->y + (end->y - start->y) * hitDistance / sweep->movementLength;
-			crossOffset.z = start->z + (end->z - start->z) * hitDistance / sweep->movementLength;
+			crossOffset.x = start->x + (end->x - start->x) * hitDistance / movementLength;
+			crossOffset.y = start->y + (end->y - start->y) * hitDistance / movementLength;
+			crossOffset.z = start->z + (end->z - start->z) * hitDistance / movementLength;
 			int32_t alongEdge = crossOffset.x * edgeX + crossOffset.y * edgeY + crossOffset.z * edgeZ;
+			if (alongEdge < 0)
+				return 0;
 			int32_t edgeLengthSquared = edgeX * edgeX + edgeY * edgeY + edgeZ * edgeZ;
-			if (alongEdge < 0 || (alongEdge >> 5) > edgeLengthSquared)
+			if ((alongEdge >> 5) > edgeLengthSquared)
 				return 0;
 
 			int32_t scaledEdgeLengthSquared = edgeLengthSquared;
@@ -1360,7 +1360,7 @@ namespace Toy2
 				|| accepted)
 			{
 				sweep->startDistance = hitDistance;
-				sweep->endDistance = hitDistance - sweep->movementLength;
+				sweep->endDistance = hitDistance - movementLength;
 				sweep->nearestFraction = fraction;
 				sweep->hitNormal.direction.x = (int16_t)hitNormal.x;
 				sweep->hitNormal.direction.y = (int16_t)hitNormal.y;
@@ -1865,21 +1865,20 @@ namespace Toy2
 						sweep.end.z = sweep.start.z + totalMovement.z;
 					}
 
-					sweep.movementDirection.x = sweep.end.x - sweep.start.x;
-					sweep.movementDirection.y = sweep.end.y - sweep.start.y;
-					sweep.movementDirection.z = sweep.end.z - sweep.start.z;
-					while (abs(sweep.movementDirection.x) > 0x4000 || abs(sweep.movementDirection.y) > 0x4000
-						|| abs(sweep.movementDirection.z) > 0x4000)
+					sweep.movement.value.x = sweep.end.x - sweep.start.x;
+					sweep.movement.value.y = sweep.end.y - sweep.start.y;
+					sweep.movement.value.z = sweep.end.z - sweep.start.z;
+					while (abs(sweep.movement.value.x) > 0x4000 || abs(sweep.movement.value.y) > 0x4000 || abs(sweep.movement.value.z) > 0x4000)
 					{
-						sweep.movementDirection.x >>= 1;
-						sweep.movementDirection.y >>= 1;
-						sweep.movementDirection.z >>= 1;
+						sweep.movement.value.x >>= 1;
+						sweep.movement.value.y >>= 1;
+						sweep.movement.value.z >>= 1;
 					}
-					Nu3D::Math::NormalizeToFixedPoint(&sweep.movementDirection, &sweep.movementDirection);
-					sweep.movementLength = (((sweep.end.x - sweep.start.x) * sweep.movementDirection.x
-						+ (sweep.end.y - sweep.start.y) * sweep.movementDirection.y
-						+ (sweep.end.z - sweep.start.z) * sweep.movementDirection.z)
-						>> 12)
+					Nu3D::Math::NormalizeToFixedPoint(&sweep.movement.value, &sweep.movement.value);
+					sweep.movement.scalar =
+						(((sweep.end.x - sweep.start.x) * sweep.movement.value.x + (sweep.end.y - sweep.start.y) * sweep.movement.value.y
+							 + (sweep.end.z - sweep.start.z) * sweep.movement.value.z)
+							>> 12)
 						+ 0x100;
 					preparedMeshIndex = meshIndex;
 				}
