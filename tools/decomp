@@ -775,7 +775,14 @@ run_writer() {
     local status=0 last="${2%.*}.last.txt" refs
     rm -f "$2" "$last"
     refs=$(run_refs)
-    DECOMP_WRITER_LAST="$ROOT/$last" env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT \
+    # Writers never push: every push URL is rewritten to a scheme git cannot
+    # reach. The codex sandbox needs network for the Wine server socket and
+    # AGENTS.md says to push, so the skill text alone does not stop a push.
+    DECOMP_WRITER_LAST="$ROOT/$last" GIT_CONFIG_COUNT=3 \
+        GIT_CONFIG_KEY_0="url.writer-push-disabled://.pushInsteadOf" GIT_CONFIG_VALUE_0="https://" \
+        GIT_CONFIG_KEY_1="url.writer-push-disabled://.pushInsteadOf" GIT_CONFIG_VALUE_1="ssh://" \
+        GIT_CONFIG_KEY_2="url.writer-push-disabled://.pushInsteadOf" GIT_CONFIG_VALUE_2="git@" \
+        env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT \
         -u CLAUDE_CODE_CHILD_SESSION -u CLAUDE_CODE_SESSION_ID -u CLAUDE_CODE_MESSAGING_SOCKET \
         -u CLAUDE_CODE_MESSAGING_TOKEN -u CLAUDE_PID -u CLAUDE_EFFORT -u CODEX_THREAD_ID \
         -u CODEX_SESSION_ID -u CODEX_CI \
