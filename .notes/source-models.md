@@ -124,3 +124,12 @@ include the compiled score or the evidence that rejected the model.
 - Ruled out: 3 51.97% same as 2, but with `int32_t pickupCount = recordCount; for (i = 0; i < pickupCount; ...)`. Gives the retail `test/jle` + `dec/jne`, but buzz loads moved to z, recordData, y, x.
 - Ruled out: 4 36.92% cached `g_respawningGadgetPickup` in a local pointer in cases 6/7/8. Large misalignment; stall line printed.
 - Result note: no attempt raised the score
+
+<!-- campaign-id: 0b624c1f-8cdb-4d3f-a153-3729ee998f8c -->
+## 2026-09-11 | Collision | 0x0048D530
+
+- Mode: refinement.
+- Ruled out: 2 56.01% cached branch gets its own zero-initialized `cacheLocalX/Y/Z`; the uncached branch declares block-local `localX/Y/Z`. No change: the allocator already treats the two branches separately.
+- Ruled out: 3 56.01% rotated rows written as m2x*relZ + m1x*relY + m0x*relX. No change: the compiler puts the terms in a fixed order either way.
+- Ruled out: 4 56.01% drop the `z` local in the moving-mesh loop and read `position->z` directly, plus a named `DISTANCE_SHIFT`. No change: the compiler already reloads z.
+- Result note: no attempt raised the score
