@@ -1194,9 +1194,9 @@ namespace Toy2
 				planeNormal.x = (start->x + end->x) >> 1;
 				planeNormal.y = (start->y + end->y) >> 1;
 				planeNormal.z = (start->z + end->z) >> 1;
+				int32_t edgeProjection = planeNormal.x * edgeX + planeNormal.y * edgeY + planeNormal.z * edgeZ;
 				int32_t edgeLengthSquared = edgeX * edgeX + edgeY * edgeY + edgeZ * edgeZ;
 				int32_t scaledEdgeLengthSquared = edgeLengthSquared;
-				int32_t edgeProjection = planeNormal.x * edgeX + planeNormal.y * edgeY + planeNormal.z * edgeZ;
 				while (edgeProjection > 0x40000)
 				{
 					edgeProjection >>= 1;
@@ -1247,23 +1247,25 @@ namespace Toy2
 				contactPoint.y *= 4;
 				contactPoint.z *= 4;
 
-				bool accepted = adjacentNormals[0].y != 0x7FFF
-					&& adjacentNormals[0].x * hitNormal.x + adjacentNormals[0].y * hitNormal.y + adjacentNormals[0].z * hitNormal.z > -0x80000;
-				if (! accepted)
+				int32_t accepted = false;
+				if (adjacentNormals[0].y != 0x7FFF
+					&& adjacentNormals[0].x * hitNormal.x + adjacentNormals[0].y * hitNormal.y + adjacentNormals[0].z * hitNormal.z > -0x80000)
 				{
-					accepted = adjacentNormals[1].y != 0x7FFF
-						&& adjacentNormals[1].x * hitNormal.x + adjacentNormals[1].y * hitNormal.y + adjacentNormals[1].z * hitNormal.z > -0x80000;
+					accepted = true;
 				}
-				if (! accepted)
-					return 0;
-
-				sweep->startDistance = startDistance;
-				sweep->endDistance = endDistance;
-				sweep->nearestFraction = fraction;
-				sweep->hitNormal.direction.x = (int16_t)hitNormal.x;
-				sweep->hitNormal.direction.y = (int16_t)hitNormal.y;
-				sweep->hitNormal.direction.z = (int16_t)hitNormal.z;
-				return 1;
+				if ((adjacentNormals[1].y != 0x7FFF
+						&& adjacentNormals[1].x * hitNormal.x + adjacentNormals[1].y * hitNormal.y + adjacentNormals[1].z * hitNormal.z > -0x80000)
+					|| accepted)
+				{
+					sweep->startDistance = startDistance;
+					sweep->endDistance = endDistance;
+					sweep->nearestFraction = fraction;
+					sweep->hitNormal.direction.x = (int16_t)hitNormal.x;
+					sweep->hitNormal.direction.y = (int16_t)hitNormal.y;
+					sweep->hitNormal.direction.z = (int16_t)hitNormal.z;
+					return 1;
+				}
+				return 0;
 			}
 
 			edgeCross.x >>= 10;
@@ -1325,10 +1327,10 @@ namespace Toy2
 			if (fraction >= sweep->nearestFraction)
 				return 0;
 
-			contactPoint.x = start->x + (end->x - start->x) * hitDistance / sweep->movementLength;
-			contactPoint.y = start->y + (end->y - start->y) * hitDistance / sweep->movementLength;
-			contactPoint.z = start->z + (end->z - start->z) * hitDistance / sweep->movementLength;
-			int32_t alongEdge = contactPoint.x * edgeX + contactPoint.y * edgeY + contactPoint.z * edgeZ;
+			crossOffset.x = start->x + (end->x - start->x) * hitDistance / sweep->movementLength;
+			crossOffset.y = start->y + (end->y - start->y) * hitDistance / sweep->movementLength;
+			crossOffset.z = start->z + (end->z - start->z) * hitDistance / sweep->movementLength;
+			int32_t alongEdge = crossOffset.x * edgeX + crossOffset.y * edgeY + crossOffset.z * edgeZ;
 			int32_t edgeLengthSquared = edgeX * edgeX + edgeY * edgeY + edgeZ * edgeZ;
 			if (alongEdge < 0 || (alongEdge >> 5) > edgeLengthSquared)
 				return 0;
@@ -1339,31 +1341,33 @@ namespace Toy2
 				alongEdge >>= 1;
 				scaledEdgeLengthSquared >>= 1;
 			}
-			hitNormal.x = contactPoint.x - alongEdge * edgeX / scaledEdgeLengthSquared;
-			hitNormal.y = contactPoint.y - alongEdge * edgeY / scaledEdgeLengthSquared;
-			hitNormal.z = contactPoint.z - alongEdge * edgeZ / scaledEdgeLengthSquared;
+			hitNormal.x = crossOffset.x - alongEdge * edgeX / scaledEdgeLengthSquared;
+			hitNormal.y = crossOffset.y - alongEdge * edgeY / scaledEdgeLengthSquared;
+			hitNormal.z = crossOffset.z - alongEdge * edgeZ / scaledEdgeLengthSquared;
 			Nu3D::Math::NormalizeToFixedPoint(&hitNormal, &hitNormal);
 			hitNormal.x *= 4;
 			hitNormal.y *= 4;
 			hitNormal.z *= 4;
 
-			bool accepted = adjacentNormals[0].y != 0x7FFF
-				&& adjacentNormals[0].x * hitNormal.x + adjacentNormals[0].y * hitNormal.y + adjacentNormals[0].z * hitNormal.z > -0x80000;
-			if (! accepted)
+			int32_t accepted = false;
+			if (adjacentNormals[0].y != 0x7FFF
+				&& adjacentNormals[0].x * hitNormal.x + adjacentNormals[0].y * hitNormal.y + adjacentNormals[0].z * hitNormal.z > -0x80000)
 			{
-				accepted = adjacentNormals[1].y != 0x7FFF
-					&& adjacentNormals[1].x * hitNormal.x + adjacentNormals[1].y * hitNormal.y + adjacentNormals[1].z * hitNormal.z > -0x80000;
+				accepted = true;
 			}
-			if (! accepted)
-				return 0;
-
-			sweep->startDistance = hitDistance;
-			sweep->endDistance = hitDistance - sweep->movementLength;
-			sweep->nearestFraction = fraction;
-			sweep->hitNormal.direction.x = (int16_t)hitNormal.x;
-			sweep->hitNormal.direction.y = (int16_t)hitNormal.y;
-			sweep->hitNormal.direction.z = (int16_t)hitNormal.z;
-			return 1;
+			if ((adjacentNormals[1].y != 0x7FFF
+					&& adjacentNormals[1].x * hitNormal.x + adjacentNormals[1].y * hitNormal.y + adjacentNormals[1].z * hitNormal.z > -0x80000)
+				|| accepted)
+			{
+				sweep->startDistance = hitDistance;
+				sweep->endDistance = hitDistance - sweep->movementLength;
+				sweep->nearestFraction = fraction;
+				sweep->hitNormal.direction.x = (int16_t)hitNormal.x;
+				sweep->hitNormal.direction.y = (int16_t)hitNormal.y;
+				sweep->hitNormal.direction.z = (int16_t)hitNormal.z;
+				return 1;
+			}
+			return 0;
 		}
 
 		// FUNCTION: TOY2 0x00481D00 [PROVISIONAL]
