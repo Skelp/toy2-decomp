@@ -4396,12 +4396,33 @@ namespace Toy2
 		}
 	}
 
+	// RenderGame constants.
+	enum
+	{
+		COLOR_CHANNEL_MAX = 0xFF,
+		TEXTURE_SIZE_UNKNOWN = 0xFF,
+		NEARBY_EFFECT_LIST_END = 0xFF,
+		RECORD_TYPE_EFFECTS = 59,
+		RECORD_TYPE_PICKUPS = 63,
+		SPRITE_FLAGS_BLENDED = 0xC40,
+		PICKUP_DISTANCE_BIAS = 100,
+		BEAM_QUEUE_SIZE = 100,
+		LEVEL2_SECTOR3_UNDERGROUND_Y = 0x19640,
+		LEVEL2_UNDERGROUND_Y = 74000,
+		LEVEL4_DETAIL_CENTER_X = 0x51B97,
+		LEVEL4_DETAIL_CENTER_Y = -0x104FD,
+		LEVEL4_DETAIL_CENTER_Z = 0x5E58E,
+		LEVEL4_DETAIL_RADIUS = 0xFA
+	};
+
 	// FUNCTION: TOY2 0x00440F70 [PROVISIONAL]
 	void RenderGame(int32_t fullRender)
 	{
+		// Skip the frame while rendering is off.
 		if (g_renderDisabled != 0)
 			return;
 
+		// Show the pending black frames once.
 		if (g_showBlackFrames != 0)
 		{
 			g_showBlackFrames = 0;
@@ -4410,14 +4431,13 @@ namespace Toy2
 
 		Renderer::Sprite::g_parallaxDepthZPos = 0.9999f;
 		RGBA clearColor;
-		clearColor.a = 0xFF;
+		clearColor.a = COLOR_CHANNEL_MAX;
 		clearColor.r = MainMenu::g_menuClearColor.r >> 1;
 		clearColor.g = MainMenu::g_menuClearColor.g >> 1;
 		clearColor.b = MainMenu::g_menuClearColor.b >> 1;
 
 		Renderer::Glue::ReleaseBackdrop();
-		int32_t renderSector = Level::GetSectorAtPosition(
-			reinterpret_cast<const Vector3I*>(&Nu3D::Camera::g_fixedViewPosition));
+		int32_t renderSector = Level::GetSectorAtPosition(reinterpret_cast<const Vector3I*>(&Nu3D::Camera::g_fixedViewPosition));
 		g_renderSectorIndex = renderSector;
 		Sector::g_activeSectorIndex = renderSector;
 		Sector::g_currentSectorIndex = renderSector;
@@ -4425,70 +4445,82 @@ namespace Toy2
 		Renderer::SetViewportPreset();
 
 		int32_t worldRenderFlags = 0;
+		// Level-specific sector and viewport overrides.
 		switch (g_levelFileIndex)
 		{
-		case 2:
-			if ((Sector::g_activeSectorIndex == 3 && Nu3D::Camera::g_fixedViewPosition.y < -0x19640)
-				|| (Sector::g_activeSectorIndex != 3 && Nu3D::Camera::g_fixedViewPosition.y < -74000))
-			{
-				worldRenderFlags = 1;
-				renderSector = -1;
-			}
-			break;
-		case 3:
-		case 9:
-			Renderer::SetViewportPresetByDetail(INT_MAX);
-			worldRenderFlags = 3;
-			break;
-		case 4:
-			if (Sector::g_currentSectorIndex == 2 && Nu3D::Camera::g_cameraPosition.y < -7900.0f)
-			{
-				Sector::g_activeSectorIndex = 1;
-				g_renderSectorIndex = 1;
-				Sector::g_currentSectorIndex = 1;
-				renderSector = 1;
-			}
-			{
-				Vector3I detailCenter = { 0x51B97, -0x104FD, 0x5E58E };
-				if (Sector::g_currentSectorIndex == 2
-					|| Nu3D::Math::IsWithinDistance(&detailCenter, &g_buzzActor.posAngles.pos, 0xFA) != 0)
-					Renderer::SetViewportPresetByDetail(INT_MAX);
-			}
-			break;
-		case 10:
-			if (g_renderSectorIndex == 4 && Nu3D::Camera::g_cameraPosition.y < -40800.0f
-				&& Nu3D::Camera::g_cameraPosition.x > -5500.0f && Nu3D::Camera::g_cameraPosition.x < 800.0f
-				&& Nu3D::Camera::g_cameraPosition.z > -800.0f && Nu3D::Camera::g_cameraPosition.z < -3900.0f)
-			{
-				renderSector = 5;
-				Sector::g_activeSectorIndex = 5;
-				g_renderSectorIndex = 5;
-			}
-			break;
-		case 11:
-			if (g_renderSectorIndex == 5 || g_renderSectorIndex == 7)
+			// Hide the sector geometry below the floor.
+			case 2:
+				if ((Sector::g_activeSectorIndex == 3 && Nu3D::Camera::g_fixedViewPosition.y < -LEVEL2_SECTOR3_UNDERGROUND_Y)
+					|| (Sector::g_activeSectorIndex != 3 && Nu3D::Camera::g_fixedViewPosition.y < -LEVEL2_UNDERGROUND_Y))
+				{
+					worldRenderFlags = 1;
+					renderSector = -1;
+				}
+				break;
+			// Force sector 1 below the floor and full detail near the center.
+			case 4:
+				if (Sector::g_currentSectorIndex == 2 && Nu3D::Camera::g_cameraPosition.y < -7900.0f)
+				{
+					Sector::g_activeSectorIndex = 1;
+					g_renderSectorIndex = 1;
+					Sector::g_currentSectorIndex = 1;
+					renderSector = 1;
+				}
+				{
+					Vector3I detailCenter = { LEVEL4_DETAIL_CENTER_X, LEVEL4_DETAIL_CENTER_Y, LEVEL4_DETAIL_CENTER_Z };
+					if (Sector::g_currentSectorIndex == 2 || Nu3D::Math::IsWithinDistance(&detailCenter, &g_buzzActor.posAngles.pos, LEVEL4_DETAIL_RADIUS) != 0)
+						Renderer::SetViewportPresetByDetail(INT_MAX);
+				}
+				break;
+			// Full detail for all of the level.
+			case 3:
+			// fall through
+			case 9:
 				Renderer::SetViewportPresetByDetail(INT_MAX);
-			break;
-		case 14:
-			Renderer::ConfigureFog(24000.0f, 46000.0f, clearColor);
-			break;
+				worldRenderFlags = 3;
+				break;
+			// Use sector 5 inside the lower area of sector 4.
+			case 10:
+				if (g_renderSectorIndex == 4 && Nu3D::Camera::g_cameraPosition.y < -40800.0f && Nu3D::Camera::g_cameraPosition.x > -5500.0f
+					&& Nu3D::Camera::g_cameraPosition.x < 800.0f && Nu3D::Camera::g_cameraPosition.z > -800.0f && Nu3D::Camera::g_cameraPosition.z < -3900.0f)
+				{
+					renderSector = 5;
+					Sector::g_activeSectorIndex = 5;
+					g_renderSectorIndex = 5;
+				}
+				break;
+			// Full detail in sectors 5 and 7.
+			case 11:
+				if (g_renderSectorIndex == 5 || g_renderSectorIndex == 7)
+					Renderer::SetViewportPresetByDetail(INT_MAX);
+				break;
+			// Near fog.
+			case 14:
+				Renderer::ConfigureFog(24000.0f, 46000.0f, clearColor);
+				break;
 		}
 
 		Animation::AnimateActors(Actor::g_renderActors);
 		ProcessMiscEventsEx();
+		// Clear the screen; with no backdrop, use far fog.
 		if (g_hasBackdrop == 0 && g_hasStaticBackdrop == 0)
 		{
 			Renderer::ClearScreen(clearColor, 3);
 			Renderer::ConfigureFog(24000.0f, 48000.0f, clearColor);
 		}
-		else
+		else // backdrop present
 		{
 			Renderer::ClearScreen(clearColor, 2);
 		}
 
-		Nu3D::Light::SetDirectionalLight(-g_buzzActor.lightDirection.x, -g_buzzActor.lightDirection.y,
-			-g_buzzActor.lightDirection.z, g_buzzActor.color.r, g_buzzActor.color.g, g_buzzActor.color.b);
+		Nu3D::Light::SetDirectionalLight(-g_buzzActor.lightDirection.x,
+			-g_buzzActor.lightDirection.y,
+			-g_buzzActor.lightDirection.z,
+			g_buzzActor.color.r,
+			g_buzzActor.color.g,
+			g_buzzActor.color.b);
 
+		// Draw the scene.
 		if (Renderer::BeginScene() != 0)
 		{
 			Renderer::UpdateBackgroundScroll((int16_t)Nu3D::Camera::g_cameraPitch, -Nu3D::Camera::g_cameraYaw);
@@ -4503,17 +4535,30 @@ namespace Toy2
 			if (fullRender != 0)
 			{
 				Renderer::Shadows::DrawAll();
+
+				// Pickups: sheet pickups draw a billboard and a shadow, link pickups spin.
+				enum
+				{
+					PICKUP_FIRST_LINK_INDEX = 48,
+					PICKUP_TILE_STEP = 2,
+					PICKUP_TILE_COUNT = 10,
+					PICKUP_FLAG_DRAWN = 0x80,
+					PICKUP_SPRITE_FRAME_COUNT = 20
+				};
+				uint32_t textureWidth = TEXTURE_SIZE_UNKNOWN;
+				uint32_t textureHeight = TEXTURE_SIZE_UNKNOWN;
 				if (g_isPaused == 0)
 				{
 					g_pickupSpriteFrame += (int16_t)Renderer::g_frameDelta;
-					if (g_pickupSpriteFrame > 19)
-						g_pickupSpriteFrame -= 20;
+					if (g_pickupSpriteFrame > PICKUP_SPRITE_FRAME_COUNT - 1)
+						g_pickupSpriteFrame -= PICKUP_SPRITE_FRAME_COUNT;
 				}
+				int32_t tileIndex = g_pickupSpriteFrame >> 1;
 
 				Vector3F cameraPosition;
 				Nu3D::Math::GetPositionVector(&Nu3D::Camera::g_activeCamera.transform, &cameraPosition);
 				int32_t cullRadius = Levels::g_type63CullDistance / 4;
-				uint32_t cullRadiusSquared = cullRadius * cullRadius;
+				int32_t cullRadiusSquared = cullRadius * cullRadius;
 
 				struct PickupRenderRecord
 				{
@@ -4524,130 +4569,139 @@ namespace Toy2
 				};
 				STATIC_ASSERT(sizeof(PickupRenderRecord) == 0x10);
 
-				Levels::RecordData* pickupRecordData = Levels::g_recordData[63];
-				if (pickupRecordData != 0)
+				if (Levels::g_recordData[RECORD_TYPE_PICKUPS] != 0)
 				{
-					PickupRenderRecord* pickup = reinterpret_cast<PickupRenderRecord*>(pickupRecordData + 1);
-					for (uint32_t pickupIndex = 0; pickupIndex < pickupRecordData->recordCount; ++pickupIndex, ++pickup)
+					PickupRenderRecord* pickup = reinterpret_cast<PickupRenderRecord*>(Levels::g_recordData[RECORD_TYPE_PICKUPS] + 1);
+					for (int32_t pickupIndex = 0; pickupIndex < Levels::g_recordData[RECORD_TYPE_PICKUPS]->recordCount; ++pickupIndex, ++pickup)
 					{
-						pickup->flags &= 0x7F;
-						if (pickup->position.y == INT_MIN)
-							continue;
+						// Offset the animation phase of each pickup.
+						tileIndex += PICKUP_TILE_STEP;
+						if (tileIndex > PICKUP_TILE_COUNT - 1)
+							tileIndex -= PICKUP_TILE_COUNT;
 
-						int32_t deltaZ = ((int32_t)cameraPosition.z - pickup->position.z) >> 4;
-						int32_t deltaX = ((int32_t)cameraPosition.x - pickup->position.x) >> 4;
-						int32_t distanceSquared = deltaX * deltaX + deltaZ * deltaZ - 100;
-						if (distanceSquared >= (int32_t)cullRadiusSquared)
-							continue;
-
-						uint32_t alphaDistance = cullRadiusSquared - distanceSquared;
-						int32_t alpha = (alphaDistance & 0xFFFFFFC0) < 0x3FC1 ? alphaDistance >> 6 : 0xFF;
-						if (pickup->spriteSheetIndex < 48)
+						pickup->flags &= ~PICKUP_FLAG_DRAWN;
+						if (pickup->position.y != INT_MIN)
 						{
-							Renderer::SpriteSheet* sheet = Renderer::g_spriteSheets[pickup->spriteSheetIndex];
-							uint32_t textureWidth = 0xFF;
-							uint32_t textureHeight = 0xFF;
-							int32_t textureIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
-							if (textureIndex != 0)
-								NGNLoader::RetrieveTextureData(textureIndex, &textureWidth, &textureHeight, 0, 0, 0);
+							int32_t deltaZ = ((int32_t)cameraPosition.z - pickup->position.z) >> 4;
+							int32_t deltaX = ((int32_t)cameraPosition.x - pickup->position.x) >> 4;
+							int32_t distanceSquared = deltaX * deltaX + deltaZ * deltaZ - PICKUP_DISTANCE_BIAS;
+							if (distanceSquared < cullRadiusSquared)
+							{
+								int32_t alphaDistance = cullRadiusSquared - distanceSquared;
+								int32_t alpha = (alphaDistance & ~0x3F) > 0x3FC0 ? COLOR_CHANNEL_MAX : alphaDistance >> 6;
+								if (pickup->spriteSheetIndex >= PICKUP_FIRST_LINK_INDEX)
+								{
+									if (g_isPaused == 0)
+									{
+										Vector3I rotation;
+										Nu3D::Link::GetRotation8Bit(pickup->spriteSheetIndex, &rotation);
+										Nu3D::Link::SetRotationAbsolute8bit(pickup->spriteSheetIndex,
+											rotation.x + Renderer::g_frameDelta * 10,
+											rotation.y + ((pickupIndex >> 2 & 3) * 3 + 7) * Renderer::g_frameDelta * 2,
+											rotation.z + ((pickupIndex & 7) + 4) * Renderer::g_frameDelta * 2);
+									}
+									pickup->flags |= PICKUP_FLAG_DRAWN;
+								}
+								else
+								{
+									Vector3F position = { (float)pickup->position.x, (float)pickup->position.y, (float)pickup->position.z };
+									Renderer::SpriteSheet* sheet = Renderer::g_spriteSheets[pickup->spriteSheetIndex];
+									int32_t textureIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
+									if (textureIndex != 0)
+										NGNLoader::RetrieveTextureData(textureIndex, &textureWidth, &textureHeight, 0, 0, 0);
 
-							int32_t tileIndex = g_pickupSpriteFrame >> 1;
-							Vector2F uvTopLeft;
-							uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (float)textureWidth;
-							uvTopLeft.y = (float)sheet->tiles[tileIndex].y / (float)textureHeight;
-							Vector2F uvBottomRight;
-							uvBottomRight.x = ((float)sheet->tileWidth + sheet->tiles[tileIndex].x) / (float)textureWidth;
-							uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (float)textureHeight;
-							Vector3F position = { (float)pickup->position.x, (float)pickup->position.y, (float)pickup->position.z };
-							pickup->flags |= 0x80;
-							RGBA spriteColor;
-							spriteColor.value = alpha * 0x1000000 + 0xFFFFFF;
-							Renderer::Sprite::QueueQuadSprite(&position, 0, 100.0f, 100.0f, &uvTopLeft,
-								&uvBottomRight, textureIndex, spriteColor, 0xC40);
+									Vector2F uvTopLeft;
+									uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)textureWidth;
+									uvTopLeft.y = (float)sheet->tiles[tileIndex].y / (int32_t)textureHeight;
+									Vector2F uvBottomRight;
+									uvBottomRight.x = ((float)sheet->tileWidth + sheet->tiles[tileIndex].x) / (int32_t)textureWidth;
+									uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)textureHeight;
+									pickup->flags |= PICKUP_FLAG_DRAWN;
+									RGBA spriteColor;
+									spriteColor.value = alpha * 0x1000000 + 0xFFFFFF;
+									Renderer::Sprite::QueueQuadSprite(
+										&position, 0, 100.0f, 100.0f, &uvTopLeft, &uvBottomRight, textureIndex, spriteColor, SPRITE_FLAGS_BLENDED);
 
-							position.y = (float)pickup->groundY - 10.0f;
-							textureIndex = NGNLoader::GetTextureDataIndex(31);
-							if (textureIndex != 0)
-								NGNLoader::RetrieveTextureData(textureIndex, &textureWidth, &textureHeight, 0, 0, 0);
-							uvTopLeft.x = 96.0f / (float)textureWidth;
-							uvTopLeft.y = 96.0f / (float)textureHeight;
-							uvBottomRight.x = 127.0f / (float)textureWidth;
-							uvBottomRight.y = 127.0f / (float)textureHeight;
-							int32_t shadowFlags;
-							if ((Renderer::g_deviceBlendShadeCapsCpy & 4) == 0)
-							{
-								spriteColor.value = 0x88000000;
-								shadowFlags = 0xC40;
+									Vector3F shadowPosition = { (float)pickup->position.x, (float)pickup->groundY - 10.0f, (float)pickup->position.z };
+									textureIndex = NGNLoader::GetTextureDataIndex(31);
+									if (textureIndex != 0)
+										NGNLoader::RetrieveTextureData(textureIndex, &textureWidth, &textureHeight, 0, 0, 0);
+									uvTopLeft.x = 96.0f / (int32_t)textureWidth;
+									uvTopLeft.y = 96.0f / (int32_t)textureHeight;
+									uvBottomRight.x = 127.0f / (int32_t)textureWidth;
+									uvBottomRight.y = 127.0f / (int32_t)textureHeight;
+									int32_t shadowFlags;
+									if ((Renderer::g_deviceBlendShadeCapsCpy & 4) != 0)
+									{
+										spriteColor.value = 0xFFAAAAAA;
+										shadowFlags = 0x20840;
+									}
+									else
+									{
+										spriteColor.value = 0x88000000;
+										shadowFlags = SPRITE_FLAGS_BLENDED;
+									}
+									Renderer::Sprite::QueueGroundAlignedSprite(
+										&shadowPosition, 0, 80.0f, 80.0f, &uvTopLeft, &uvBottomRight, textureIndex, spriteColor, shadowFlags);
+								}
 							}
-							else
-							{
-								spriteColor.value = 0xFFAAAAAA;
-								shadowFlags = 0x20840;
-							}
-							Renderer::Sprite::QueueGroundAlignedSprite(&position, 0, 80.0f, 80.0f,
-								&uvTopLeft, &uvBottomRight, textureIndex, spriteColor, shadowFlags);
-						}
-						else
-						{
-							if (g_isPaused == 0)
-							{
-								Vector3I rotation;
-								Nu3D::Link::GetRotation8Bit(pickup->spriteSheetIndex, &rotation);
-								Nu3D::Link::SetRotationAbsolute8bit(pickup->spriteSheetIndex,
-									rotation.x + Renderer::g_frameDelta * 10,
-									rotation.y + ((pickupIndex >> 2 & 3) * 3 + 7) * Renderer::g_frameDelta * 2,
-									rotation.z + ((pickupIndex & 7) + 4) * Renderer::g_frameDelta * 2);
-							}
-							pickup->flags |= 0x80;
 						}
 					}
 				}
 
+				// Effects: queue a sprite for each effect in range and list the ones near the camera.
 				uint32_t nearbyCount = 0;
-				Levels::RecordData* effectRecordData = Levels::g_recordData[59];
+				uint32_t effectTextureWidth = TEXTURE_SIZE_UNKNOWN;
+				uint32_t effectTextureHeight = TEXTURE_SIZE_UNKNOWN;
+				cullRadius = Levels::g_type63CullDistance / 4;
+				float effectCullRadiusSquared = (float)(cullRadius * cullRadius);
 				Nu3D::Math::GetPositionVector(&Nu3D::Camera::g_activeCamera.transform, &cameraPosition);
-				if (effectRecordData != 0)
+				if (Levels::g_recordData[RECORD_TYPE_EFFECTS] != 0)
 				{
-					for (uint32_t effectIndex = 0; effectIndex < effectRecordData->recordCount; ++effectIndex)
+					Vector3I* effect = Levels::g_recordData[RECORD_TYPE_EFFECTS]->data;
+					for (int32_t effectIndex = 0; effectIndex < Levels::g_recordData[RECORD_TYPE_EFFECTS]->recordCount; ++effectIndex, ++effect)
 					{
-						Vector3F position = { (float)effectRecordData->data[effectIndex].x,
-							(float)(effectRecordData->data[effectIndex].y - 250),
-							(float)effectRecordData->data[effectIndex].z };
+						Vector3F position = { (float)effect->x, (float)(effect->y - 250), (float)effect->z };
 						Vector3F delta;
 						Nu3D::Math::VertexSubtract(&delta, &position, &cameraPosition);
 						float distanceSquared = (delta.x * delta.x + delta.y * delta.y + delta.z * delta.z) / 1024.0f;
-						if (distanceSquared < (float)(cullRadius * cullRadius)
-							&& effectRecordData->data[effectIndex].y != INT_MIN)
+						if (distanceSquared < effectCullRadiusSquared && effect->y != INT_MIN)
 						{
-							if (distanceSquared < 65536.0f
-								&& (Nu3D::Frustum::TestSphereAllPlanes(&position, 250.0f) & 0x55555575) == 0)
+							if (distanceSquared < 65536.0f && (Nu3D::Frustum::TestSphereAllPlanes(&position, 250.0f) & 0x55555575) == 0)
 								g_nearbyEffectRecordIndices[nearbyCount++] = (uint8_t)effectIndex;
 
 							Renderer::SpriteSheet* sheet = Renderer::g_spriteSheets[30];
-							uint32_t textureWidth = 0xFF;
-							uint32_t textureHeight = 0xFF;
+							RGBA color;
+							color.a = COLOR_CHANNEL_MAX;
+							color.r = COLOR_CHANNEL_MAX;
+							color.g = COLOR_CHANNEL_MAX;
+							color.b = COLOR_CHANNEL_MAX;
 							int32_t textureIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
 							if (textureIndex != 0)
-								NGNLoader::RetrieveTextureData(textureIndex, &textureWidth, &textureHeight, 0, 0, 0);
-							Vector2F uvTopLeft = { (float)sheet->tiles[0].x / (float)textureWidth,
-								(float)sheet->tiles[0].y / (float)textureHeight };
-							Vector2F uvBottomRight = { ((float)sheet->tileWidth + sheet->tiles[0].x) / (float)textureWidth,
-								((float)sheet->tileHeight + sheet->tiles[0].y) / (float)textureHeight };
-							RGBA color;
-							color.value = 0xFFFFFFFF;
-							Renderer::Sprite::QueueQuadSprite(&position, 0, 150.0f, 250.0f,
-								&uvTopLeft, &uvBottomRight, textureIndex, color, 0xC40);
+								NGNLoader::RetrieveTextureData(textureIndex, &effectTextureWidth, &effectTextureHeight, 0, 0, 0);
+							Vector2F uvTopLeft = { (float)sheet->tiles[0].x / (int32_t)effectTextureWidth,
+								(float)sheet->tiles[0].y / (int32_t)effectTextureHeight };
+							Vector2F uvBottomRight = { ((float)sheet->tileWidth + sheet->tiles[0].x) / (int32_t)effectTextureWidth,
+								((float)sheet->tileHeight + sheet->tiles[0].y) / (int32_t)effectTextureHeight };
+							Renderer::Sprite::QueueQuadSprite(
+								&position, 0, 150.0f, 250.0f, &uvTopLeft, &uvBottomRight, textureIndex, color, SPRITE_FLAGS_BLENDED);
 						}
 					}
 				}
-				g_nearbyEffectRecordIndices[nearbyCount] = 0xFF;
+				g_nearbyEffectRecordIndices[nearbyCount] = NEARBY_EFFECT_LIST_END;
 
 				Renderer::Particles::DrawParticles();
-				while (Renderer::Beam::g_queueHead < 100)
+				while (Renderer::Beam::g_queueHead < BEAM_QUEUE_SIZE)
 				{
-					Renderer::Beam::Command& beam = Renderer::Beam::g_commands[Renderer::Beam::g_queueHead];
-					Renderer::Beam::DrawSegmentedBeam(beam.spriteSheetIndex, beam.width, beam.segmentLength,
-						&beam.position, &beam.direction, beam.color.r, beam.color.g, beam.color.b);
+					int32_t head = Renderer::Beam::g_queueHead;
+					Renderer::Beam::DrawSegmentedBeam(Renderer::Beam::g_commands[head].spriteSheetIndex,
+						Renderer::Beam::g_commands[head].width,
+						Renderer::Beam::g_commands[head].segmentLength,
+						&Renderer::Beam::g_commands[head].position,
+						&Renderer::Beam::g_commands[head].direction,
+						Renderer::Beam::g_commands[head].color.r,
+						Renderer::Beam::g_commands[head].color.g,
+						Renderer::Beam::g_commands[head].color.b);
 					++Renderer::Beam::g_queueHead;
 				}
 				Renderer::DrawFallingParticles();
