@@ -189,7 +189,7 @@ class AttemptTests(unittest.TestCase):
         self.assertEqual(
             json.loads(text),
             {
-                "attempts": 0, "best_attempt": None, "best_raw": None, "last_raw": None,
+                "attempts": 0, "cleanup_attempts": 0, "best_attempt": None, "best_raw": None, "last_raw": None,
                 "stalled": False, "limit": 12,
             },
         )
@@ -200,14 +200,14 @@ class AttemptTests(unittest.TestCase):
         self.assertEqual(
             json.loads(text),
             {
-                "attempts": 3, "best_attempt": 2, "best_raw": 58.0, "last_raw": 57.0,
+                "attempts": 3, "cleanup_attempts": 0, "best_attempt": 2, "best_raw": 58.0, "last_raw": 57.0,
                 "stalled": False, "limit": 24,
             },
         )
         code, text = self.run_main("stats", "--address", ADDRESS)
         self.assertEqual(
             text.strip(),
-            "attempts=3 best_attempt=2 best_raw=58.0 last_raw=57.0 stalled=False"
+            "attempts=3 cleanup_attempts=0 best_attempt=2 best_raw=58.0 last_raw=57.0 stalled=False"
             " limit=24",
         )
         for percent in (57, 57):
@@ -574,6 +574,63 @@ class AttemptTests(unittest.TestCase):
                 "budget: 12 attempts used; finish this campaign",
             ],
         )
+
+    def test_only_a_cleanup_tie_replaces_the_best_and_cleanups_spend_no_budget(self):
+        self.make_repo()
+        best = self.best_dir / f"{ADDRESS}.patch"
+        for line in ("int b;", "int c;", "int e;"):
+            self.edit_source(f"int a;\n{line}\n")
+            lines = self.log(similar(40))
+        self.assertTrue(lines[0].endswith("best 40.00% (attempt 1)"), lines)
+        self.assertIn("+int b;", best.read_text(encoding="utf-8"))
+        with mock.patch.dict(os.environ, {"DECOMP_PHASE": "cleanup"}):
+            self.edit_source("int a;\nint b; // named\n")
+            lines = self.log(similar(40))
+            self.assertEqual(lines[0], "attempt 4 (cleanup 1/2)  raw 40.00% (+0.00)  best 40.00% (attempt 4)")
+            self.assertFalse([line for line in lines if line.startswith(("stall", "budget"))], lines)
+            self.assertIn("+int b; // named", best.read_text(encoding="utf-8"))
+            self.edit_source("int a;\nint d;\n")
+            lines = self.log(similar(39.5))
+        self.assertIn("budget: 2 cleanup attempts used; stop and return your lines", lines)
+        self.assertIn("+int b; // named", best.read_text(encoding="utf-8"))
+        _, text = self.run_main("stats", "--address", ADDRESS, "--json")
+        stats = json.loads(text)
+        self.assertEqual((stats["attempts"], stats["cleanup_attempts"], stats["best_attempt"]), (5, 2, 4))
+        self.assertFalse(stats["stalled"])
+
+    def test_cleanup_todo_lists_literals_openers_and_fixable_findings(self):
+        path = self.root / "Level.cpp"
+        path.write_text(
+            "enum { SOUND_JUMP = 0x3D };\n// FUNCTION: TOY2 0x00401000\nvoid f(Boss* boss)\n{\n"
+            "\tif (boss->timer > 0x400)\n\t{\n\t\tPlay(0x3D, 0);\n\t\tboss->angle &= 0xFFF;\n\t}\n"
+            "\t// Wave state.\n\tswitch (boss->state)\n\t{\n\tcase 1:\n\t\tboss->angle &= 0xFFF;\n"
+            "\t\tPlay(SOUND_JUMP, 0);\n\t\tbreak;\n\t}\n\towner = (void*)1;\n}\n"
+            "// FUNCTION: TOY2 0x00402000\nvoid g() { Play(0x3D, 0); }\n", encoding="utf-8")
+        lines = attempts.cleanup_todo(path, ADDRESS)
+        self.assertEqual(lines[:3], [
+            f"Target source: {path}:2-19.",
+            "Bare literals (uses, first line): 0xFFF x2 L8, 0x400 x1 L5, 0x3D x1 L7",
+            "Block openers without a comment: L5 if (boss->timer > 0x400), L13 case 1:",
+        ])
+        self.assertEqual(lines[3], "Lint findings:")
+        self.assertTrue(any("L7 [unnamed-constant]" in line and "SOUND_JUMP" in line for line in lines))
+        self.assertFalse([line for line in lines if "magic-pointer" in line])
+        self.assertEqual(attempts.cleanup_todo(path, "0x00403000"), [])
+
+    def test_rationale_keeps_tried_and_open_lines_under_the_limit(self):
+        handoff = ("# 0x1 f - batch 2\nBEST: 5%\nTRIED (attempt score idea):\n 1 1% baseline\n"
+                   + "".join(f" {n} 2%   idea {n}\n" for n in range(2, 20)) + "OPEN (priority):\n"
+                   + "".join(f" {n}. region {n}\n" for n in range(1, 7)) + "LINES: a.cpp:1-2\n")
+        lines = attempts.rationale_lines(handoff, "Named 3 constants.\n\n" + "x" * 150 + "\n")
+        body = lines[: lines.index("Cleanup:")]
+        self.assertEqual(len(body), 12)
+        self.assertEqual(body[:2], ["Tried:", " 14 2% idea 14"])
+        self.assertEqual(body[-5:], ["Open:", " 1. region 1", " 2. region 2", " 3. region 3",
+                                     " 4. region 4"])
+        self.assertEqual(lines[-2:], [" Named 3 constants.", " " + "x" * 97 + "..."])
+        self.assertEqual(attempts.rationale_lines(""), [])
+        self.assertEqual(attempts.clip("**Lint fix:** the magic-pointer finding at line 340", 30),
+                         "Lint fix: the magic-pointer...")
 
 
 if __name__ == "__main__":

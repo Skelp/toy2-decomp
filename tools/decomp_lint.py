@@ -14,6 +14,7 @@ from the report without being removed from the baseline too.
 from __future__ import annotations
 
 import argparse
+import bisect
 import csv
 import hashlib
 import json
@@ -63,7 +64,22 @@ ARITHMETIC_NAME_RE = re.compile(
     r"Minus[0-9]+|Plus[0-9]+|Tmp|Temp)\b"
 )
 
+# A directive may accept only these rules. A cast that hides a wrong declared type
+# (magic-pointer, signature-concealment) stays debt until the declaration is fixed,
+# so a comment can never make its function terminal.
 SUPPRESSIBLE_RULES = {"anonymous-buffer-view", "typed-byte-roundtrip"}
+# Readability advice: bc prints a new occurrence, but it never fails validate and
+# is not source debt, so naming a value in one function never blocks a campaign on
+# the literals of another, and un-naming a value never counts as removed debt.
+ADVISORY_RULES = {"unnamed-constant", "repeated-macro-body"}
+# Values too common to need a name; the unnamed-constant rule skips them.
+PLAIN_VALUES = {0, 1, -1, 2}
+MACRO_REPEAT_LINES = 8
+# Longer operators first, so "==" is not read as "=".
+OPERATORS = ("==", "!=", "<=", ">=", "<<", ">>", "&&", "||", "+=", "-=", "*=", "/=", "&=",
+             "|=", "^=", "=", "<", ">", "+", "-", "*", "/", "%", "&", "|", "^")
+NONZERO_INTEGER = r"(?:0[xX]0*[1-9A-Fa-f][0-9A-Fa-f]*|[1-9][0-9]*)[uUlL]*\b"
+INTEGER_VALUE = r"-?[ \t]*(?:0[xX][0-9A-Fa-f]+|[0-9]+)"
 
 RULE_HELP = {
     "raw-layout-access": (
@@ -94,7 +110,19 @@ RULE_HELP = {
         "A recovered layout still has an unresolved member. Keep it visible as debt until "
         "enough uses establish the member's role."
     ),
-    "magic-pointer": "A nonzero integer is cast to a pointer. Correct the type or name the handle.",
+    "magic-pointer": (
+        "A nonzero integer is cast to a pointer. Correct the declared type; until then the "
+        "finding stays as debt of the function."
+    ),
+    "unnamed-constant": (
+        "A bare literal stands where this file writes a constant, enum or #define of the same "
+        "value (same operand and operator, array, call argument or switch). Use the name; "
+        "naming does not change the generated code."
+    ),
+    "repeated-macro-body": (
+        "Two macros in one file have the same body of 8 or more lines. Keep one macro and "
+        "give it a parameter; the preprocessed code stays identical."
+    ),
     "unfinished-function": (
         "A FUNCTION annotation has an empty or default-return body. Mark unfinished work "
         "as STUB unless comparison proves that retail has the same null body."
@@ -178,6 +206,10 @@ class Finding:
     fingerprint: str = ""
     legacy: bool = False
     suppressed: bool = False
+
+    @property
+    def advisory(self) -> bool:
+        return self.rule in ADVISORY_RULES
 
     @property
     def baseline_key(self) -> tuple[str, str, str, str]:
@@ -594,8 +626,8 @@ def check_text(path: Path, text: str) -> list[Finding]:
         )
 
     magic_pointer_patterns = (
-        re.compile(rf"\(\s*{TYPE_WORD}\s*\*+\s*\)\s*0x[0-9A-Fa-f]{{2,}}"),
-        re.compile(rf"reinterpret_cast\s*<\s*{TYPE_WORD}\s*\*+\s*>\s*\(\s*0x[0-9A-Fa-f]{{2,}}\s*\)"),
+        re.compile(rf"\(\s*(?:const\s+)?{TYPE_WORD}\s*\*+\s*\)\s*(?:\(\s*{NONZERO_INTEGER}\s*\)|{NONZERO_INTEGER})"),
+        re.compile(rf"reinterpret_cast\s*<\s*(?:const\s+)?{TYPE_WORD}\s*\*+\s*>\s*\(\s*{NONZERO_INTEGER}\s*\)"),
     )
     for pattern in magic_pointer_patterns:
         for match in pattern.finditer(masked):
@@ -796,12 +828,211 @@ def check_text(path: Path, text: str) -> list[Finding]:
             subject=name, excerpt=name,
         )
 
+    findings.extend(check_unnamed_constants(path, text, masked, owners, allowed))
+    findings.extend(check_repeated_macros(path, text, masked))
+
     # Remove exact duplicates caused by overlapping lexical patterns.
     unique: dict[tuple[str, str, str], Finding] = {}
     for finding in findings:
         owner = finding.owner_address or finding.relative_path
-        unique.setdefault((owner, finding.rule, finding.subject), finding)
+        _keep_first_open(unique, (owner, finding.rule, finding.subject), finding)
     return sorted(unique.values(), key=lambda item: (item.line, item.column, item.rule))
+
+
+def _keep_first_open(unique: dict, key: tuple, finding: Finding) -> None:
+    """Keep the first finding of a key, but an unsuppressed one over a suppressed
+    one, so one directive never hides a later finding of the same rule."""
+    if key not in unique or (unique[key].suppressed and not finding.suppressed):
+        unique[key] = finding
+
+
+def _integer_value(text: str) -> int:
+    digits = re.sub(r"[\s()uUlL]", "", text)
+    sign = -1 if digits.startswith("-") else 1
+    digits = digits.lstrip("-")
+    if digits[:2].lower() == "0x":
+        return sign * int(digits, 16)
+    if len(digits) > 1 and digits.startswith("0") and set(digits) <= set("01234567"):
+        return sign * int(digits, 8)
+    return sign * int(digits, 10)
+
+
+def _function_bodies(text: str, masked: str) -> list[tuple[int, int]]:
+    """Return the (start, end) offsets of every annotated FUNCTION and STUB body."""
+    bodies: list[tuple[int, int]] = []
+    for annotation in ANNOTATION_RE.finditer(text):
+        if annotation.group(1) not in ("FUNCTION", "STUB"):
+            continue
+        opening = masked.find("{", annotation.end())
+        following = ANNOTATION_RE.search(text, annotation.end())
+        if opening < 0 or (following and opening > following.start()):
+            continue
+        body = _balanced_body(masked, opening)
+        if body:
+            bodies.append(body)
+    return bodies
+
+
+def _named_constants(masked: str) -> list[tuple[str, int, int, int]]:
+    """Return (name, value, start, end) of each integer const, enum member and
+    object-like #define with a literal value; start and end locate the value."""
+    found: list[tuple[str, int, int, int]] = []
+    patterns = [
+        re.compile(rf"(?m)^[ \t]*#[ \t]*define[ \t]+(?P<name>[A-Za-z_]\w*)[ \t]+\(?[ \t]*"
+                   rf"(?P<value>{INTEGER_VALUE})[uUlL]*[ \t]*\)?[ \t]*$"),
+        re.compile(rf"\bconst(?:expr)?\s+[\w:\s]*?\b(?P<name>[A-Za-z_]\w*)\s*=\s*\(?\s*"
+                   rf"(?P<value>{INTEGER_VALUE})[uUlL]*\s*\)?\s*;"),
+    ]
+    for pattern in patterns:
+        found.extend((match.group("name"), _integer_value(match.group("value")),
+                      match.start("value"), match.end("value"))
+                     for match in pattern.finditer(masked))
+    member = re.compile(rf"(?P<name>[A-Za-z_]\w*)\s*=\s*\(?\s*(?P<value>{INTEGER_VALUE})"
+                        rf"[uUlL]*\s*\)?\s*(?=[,}}]|$)")
+    for enum in re.finditer(r"\benum\b[^{};()]*\{", masked):
+        body = _balanced_body(masked, enum.end() - 1)
+        if body:
+            found.extend((match.group("name"), _integer_value(match.group("value")),
+                          body[0] + match.start("value"), body[0] + match.end("value"))
+                         for match in member.finditer(masked[body[0] : body[1]]))
+    return found
+
+
+def _signed_literal(masked: str, start: int, value: int) -> int:
+    """Negate a literal that follows a unary minus."""
+    before = masked[:start].rstrip()
+    if not before.endswith("-"):
+        return value
+    prior = before[:-1].rstrip()
+    unary = not prior or prior[-1] in "=([,?:{;<>!&|+-*/%^~" or re.search(r"\b(?:return|case)$", prior)
+    return -value if unary else value
+
+
+def _slot(masked: str, start: int, floor: int) -> tuple[str, ...] | None:
+    """Name the place a value stands in: the operand and operator before it, the
+    array it indexes, the call argument it fills, or the switch of its case label."""
+    before = masked[max(floor, start - 400) : start].rstrip()
+    if re.search(r"\bcase$", before):
+        switches = re.findall(r"\bswitch\s*\(([^;{}]*)\)\s*\{", masked[floor:start])
+        return ("case", *re.findall(r"\w+", switches[-1])[-1:]) if switches else None
+    for operator in OPERATORS:
+        if before.endswith(operator):
+            left = before[: -len(operator)].rstrip()
+            operand = re.search(r"(\w+)\s*(?:\[[^\[\]]*\])?\s*\)?$", left)
+            return (operand.group(1), operator) if operand else None
+    if before.endswith("["):
+        array = re.search(r"(\w+)\s*\[$", before)
+        return (array.group(1), "[]") if array else None
+    if not before.endswith(("(", ",")):
+        return None
+    depth, index, position = 0, 0, len(before) - 1
+    while position >= 0:
+        char = before[position]
+        if char in ")]":
+            depth += 1
+        elif char in "([" and depth:
+            depth -= 1
+        elif char in "([":
+            break
+        elif char == "," and not depth:
+            index += 1
+        position -= 1
+    callee = re.search(r"(\w+)\s*$", before[:position]) if position >= 0 and before[position] == "(" else None
+    return (callee.group(1), f"arg{index}") if callee else None
+
+
+def check_unnamed_constants(
+    path: Path, text: str, masked: str, owners: list[Owner], allowed: dict[int, set[str]]
+) -> list[Finding]:
+    """Report a bare literal that stands where this file writes a constant's name.
+
+    A value matches a name only in the same place: after the same operand and
+    operator, as an index of the same array, as the same argument of the same
+    call, or as a case of the same switch. A bare value alone would match every
+    small number an enum happens to cover. A constant defined in a function body
+    names the value only in that function, so a name added near its use never
+    reports literals in untouched functions."""
+    bodies = _function_bodies(text, masked)
+    names: dict[tuple[int, int] | None, dict[str, int]] = {}
+    definitions: set[int] = set()
+    for name, value, start, end in _named_constants(masked):
+        scope = next((body for body in bodies if body[0] <= start < body[1]), None)
+        names.setdefault(scope, {})[name] = value
+        definitions.update(range(start, end))
+    if not names:
+        return []
+    # Where each value is written by name: the file-wide names in every body,
+    # a body's own names only in that body.
+    places: dict[tuple[int, int] | None, dict[tuple[int, tuple[str, ...]], str]] = {}
+    spelled = re.compile(r"\b(?:" + "|".join(sorted({n for group in names.values() for n in group})) + r")\b")
+    for body in bodies:
+        for match in spelled.finditer(masked, body[0], body[1]):
+            scope = body if match.group(0) in names.get(body, {}) else None
+            value = names.get(scope, {}).get(match.group(0))
+            slot = None if value is None else _slot(masked, match.start(), body[0])
+            if slot:
+                places.setdefault(scope, {}).setdefault((value, slot), match.group(0))
+    named_values = {value for group in places.values() for value, _ in group}
+    macro_lines = _macro_definition_lines(text)
+    line_starts = [0] + [match.end() for match in re.finditer("\n", masked)]
+    literal = re.compile(r"(?<![\w.])(?:0[xX][0-9A-Fa-f]+|[0-9]+)[uUlL]*(?![\w.])")
+    findings: list[Finding] = []
+    for body in bodies:
+        uses: dict[int, list[tuple[re.Match[str], str]]] = {}
+        for match in literal.finditer(masked, body[0], body[1]):
+            if match.start() in definitions:
+                continue
+            value = _signed_literal(masked, match.start(), _integer_value(match.group(0)))
+            if value in PLAIN_VALUES or value not in named_values:
+                continue
+            if bisect.bisect_right(line_starts, match.start()) in macro_lines:
+                continue
+            start = masked.rindex("-", body[0], match.start()) if value < 0 else match.start()
+            slot = _slot(masked, start, body[0])
+            name = places.get(body, {}).get((value, slot)) or places.get(None, {}).get((value, slot))
+            if slot and name:
+                uses.setdefault(value, []).append((match, name))
+        for value, matches in uses.items():
+            first, name = matches[0]
+            _add_finding(
+                findings, path, text, owners, allowed, offset=first.start(),
+                rule="unnamed-constant", severity="warning",
+                detail=f"literal {first.group(0)} ({len(matches)} use(s)) stands where this file writes {name}",
+                subject=str(value), excerpt=str(value),
+            )
+    return findings
+
+
+def check_repeated_macros(path: Path, text: str, masked: str) -> list[Finding]:
+    """Report each #define whose body repeats an earlier one of 8 or more lines."""
+    lines, masked_lines = text.splitlines(), masked.splitlines()
+    header = re.compile(r"\s*#\s*define\s+(?P<name>[A-Za-z_]\w*)(?:\([^)]*\))?")
+    first: dict[str, tuple[str, int]] = {}
+    findings: list[Finding] = []
+    index = 0
+    while index < len(masked_lines):
+        found = header.match(masked_lines[index])
+        start = index
+        while lines[index].rstrip().endswith("\\") and index + 1 < len(lines):
+            index += 1
+        index += 1
+        if not found or index - start < MACRO_REPEAT_LINES:
+            continue
+        code = "\n".join([masked_lines[start][found.end() :], *masked_lines[start + 1 : index]])
+        strings = re.findall(r'"(?:\\.|[^"\\\n])*"', "\n".join(lines[start:index]))
+        key = _normalized(code.replace("\\", " ")) + "\0" + "\0".join(strings)
+        name = found.group("name")
+        if key not in first:
+            first[key] = (name, start + 1)
+            continue
+        original, line = first[key]
+        findings.append(Finding(
+            path, start + 1, "repeated-macro-body", "warning", lines[start],
+            f"macro {name!r} repeats the {index - start}-line body of {original!r} (line {line}); "
+            "keep one macro with a parameter",
+            subject=name, fingerprint=_fingerprint(f"{original}={name}"),
+        ))
+    return findings
 
 
 def check_file(path: Path) -> list[Finding]:
@@ -936,7 +1167,7 @@ def check_signature_concealment(units: list[SourceUnit]) -> list[Finding]:
                 )
     unique: dict[tuple[str, str], Finding] = {}
     for finding in findings:
-        unique.setdefault((finding.owner_address, finding.subject), finding)
+        _keep_first_open(unique, (finding.owner_address, finding.subject), finding)
     return list(unique.values())
 
 
@@ -1158,11 +1389,23 @@ def apply_baseline(
     classified: list[Finding] = []
     for finding in findings:
         legacy = finding.baseline_key in baseline
-        if legacy:
+        # An accepted (suppressed) finding is not debt, so its baseline row is stale.
+        if legacy and not finding.suppressed:
             seen.add(finding.baseline_key)
         classified.append(replace(finding, legacy=legacy))
     stale = [entry for entry in entries if entry.key not in seen]
     return classified, stale
+
+
+def prune_baseline(path: Path, stale: list[BaselineEntry]) -> int:
+    """Remove the stale rows from the baseline file; never add a row."""
+    keys = {entry.key for entry in stale}
+    kept = [
+        line for line in path.read_text(encoding="utf-8").splitlines()
+        if line.startswith("#") or tuple(line.split("\t")[:4]) not in keys
+    ]
+    path.write_text("\n".join(kept) + "\n", encoding="utf-8")
+    return len(keys)
 
 
 def print_baseline(findings: list[Finding]) -> None:
@@ -1195,6 +1438,10 @@ def main() -> int:
         "--print-baseline", action="store_true",
         help="print reviewed-baseline rows; this never edits the repository",
     )
+    parser.add_argument(
+        "--prune-baseline", action="store_true",
+        help="remove baseline rows whose debt no longer exists (campaigns finish runs it)",
+    )
     parser.add_argument("--baseline", type=Path, default=BASELINE_PATH, help=argparse.SUPPRESS)
     args = parser.parse_args()
 
@@ -1214,12 +1461,19 @@ def main() -> int:
     if args.print_baseline:
         print_baseline(findings)
         return 0
+    if args.prune_baseline:
+        if args.files or args.staged:
+            print("lint: --prune-baseline scans the whole working tree", file=sys.stderr)
+            return 2
+        print(f"lint: pruned {prune_baseline(args.baseline, stale) if stale else 0} stale baseline row(s)")
+        return 0
 
     visible = [item for item in findings if _show_finding(item, args.show)]
     new_errors = [item for item in findings if item.severity == "error" and not item.legacy and not item.suppressed]
     legacy_errors = [item for item in findings if item.severity == "error" and item.legacy and not item.suppressed]
     warnings = [item for item in findings if item.severity == "warning" and not item.suppressed]
     new_warnings = [item for item in warnings if not item.legacy]
+    new_blocking_warnings = [item for item in new_warnings if not item.advisory]
     suppressed = [item for item in findings if item.suppressed]
     visible_new_errors = [item for item in visible if item.severity == "error" and not item.legacy and not item.suppressed]
     visible_legacy_errors = [item for item in visible if item.severity == "error" and item.legacy and not item.suppressed]
@@ -1271,11 +1525,11 @@ def main() -> int:
                 "\nA machine-code match with a new error is a matched transliteration, "
                 "not a reconstruction. Fix the source model or keep the function a STUB."
             )
-        if args.warnings_as_errors and new_warnings:
-            print(f"lint: failed: {len(new_warnings)} new warning(s) count as errors here")
+        if args.warnings_as_errors and new_blocking_warnings:
+            print(f"lint: failed: {len(new_blocking_warnings)} new warning(s) count as errors here")
 
     return 1 if (
-        new_errors or (stale_is_gate and stale) or (args.warnings_as_errors and new_warnings)
+        new_errors or (stale_is_gate and stale) or (args.warnings_as_errors and new_blocking_warnings)
     ) else 0
 
 

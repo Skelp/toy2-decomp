@@ -416,7 +416,7 @@ def read_lint_findings() -> dict[int, tuple[int, int]]:
     findings, _ = decomp_lint.apply_baseline(findings, decomp_lint.read_baseline())
     counts: dict[int, tuple[int, int]] = {}
     for finding in findings:
-        if not finding.owner_address or finding.suppressed:
+        if not finding.owner_address or finding.suppressed or finding.advisory:
             continue
         address = int(finding.owner_address, 16)
         errors, warnings = counts.get(address, (0, 0))

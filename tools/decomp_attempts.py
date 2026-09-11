@@ -35,6 +35,10 @@ DEFAULT_BUDGET = 12
 STALL_ATTEMPTS = 3
 STALL_MIN_GAIN_POINTS = 0.5
 EXTEND_GAIN_POINTS = 1.0
+# The driver's cleanup run exports DECOMP_PHASE=cleanup. Its attempts only name and
+# explain, so they spend no budget, never stall, and a tie keeps their edits.
+CLEANUP_PHASE = "cleanup"
+CLEANUP_ATTEMPTS = 2
 
 
 def canonical_address(value: str) -> str:
@@ -88,13 +92,34 @@ def budget(raws: list[float]) -> tuple[int, bool]:
     return 2 * base_budget() if extended else base_budget(), stalled
 
 
+def is_cleanup(row: dict[str, object]) -> bool:
+    return row.get("phase") == CLEANUP_PHASE
+
+
+def batch_budget(rows: list[dict[str, object]]) -> tuple[int, bool]:
+    """Return budget() of the batch attempts; cleanup attempts do not count."""
+    return budget([float(row["raw"]) for row in rows if not is_cleanup(row)])
+
+
+def best_attempt(rows: list[dict[str, object]]) -> int:
+    """Return the 1-based number of the best attempt: the first to reach the best
+    score, or a later cleanup attempt that ties it (its best patch holds the names)."""
+    best, number = None, 0
+    for index, row in enumerate(rows, 1):
+        raw = float(row["raw"])
+        if best is None or raw > best or (raw == best and is_cleanup(row)):
+            best, number = raw, index
+    return number
+
+
 def read_stats(address: str, directory: Path = ATTEMPTS_DIR) -> dict[str, object]:
-    raws = read_raws(address, directory)
-    best = max(raws, default=None)
-    limit, stalled = budget(raws)
+    rows = read_rows(address, directory)
+    raws = [float(row["raw"]) for row in rows]
+    limit, stalled = batch_budget(rows)
     return {
-        "attempts": len(raws), "best_attempt": raws.index(best) + 1 if raws else None,
-        "best_raw": best, "last_raw": raws[-1] if raws else None,
+        "attempts": len(raws), "cleanup_attempts": sum(map(is_cleanup, rows)),
+        "best_attempt": best_attempt(rows) if rows else None,
+        "best_raw": max(raws, default=None), "last_raw": raws[-1] if raws else None,
         "stalled": stalled, "limit": limit,
     }
 
@@ -621,7 +646,7 @@ def run_status(root: Path = ROOT, now: datetime | None = None) -> dict[str, obje
                      f" attempts {get('attempts')}")
     if get("last_event") and not finished:
         lines.append(f"last: {str(get('last_event')).strip()}")
-    if get("target") and get("phase") in ("batch", "repair"):
+    if get("target") and get("phase") in ("batch", "repair", "cleanup"):
         rows = read_rows(str(get("target")), attempts_directory(root))[-4:]
         report["attempts"] = rows
         if rows:
@@ -700,18 +725,93 @@ def busy_run(report: dict[str, object], caller: int) -> tuple[str, str]:
     return "", ""
 
 
-def tried_models(handoff: str) -> list[str]:
-    """Return the TRIED lines of a handoff, without the baseline line."""
-    models: list[str] = []
+def handoff_section(handoff: str, name: str) -> list[str]:
+    """Return the indented lines under the NAME heading of a handoff, whitespace folded."""
+    lines: list[str] = []
     inside = False
     for line in handoff.splitlines():
-        if line.startswith("TRIED"):
+        if line.startswith(name):
             inside = True
         elif inside and line[:1] not in (" ", "\t"):
             break
-        elif inside and line.strip() and "baseline" not in line.lower():
-            models.append(" ".join(line.split()))
-    return models
+        elif inside and line.strip():
+            lines.append(" ".join(line.split()))
+    return lines
+
+
+def tried_models(handoff: str) -> list[str]:
+    """Return the TRIED lines of a handoff, without the baseline line."""
+    return [line for line in handoff_section(handoff, "TRIED") if "baseline" not in line.lower()]
+
+
+def clip(line: str, width: int) -> str:
+    """Fold whitespace, drop markdown emphasis and cut at a word boundary."""
+    line = " ".join(line.replace("**", "").split())
+    if len(line) <= width:
+        return line
+    cut = line.rfind(" ", 0, width - 2)
+    return line[: cut if cut > 0 else width - 3] + "..."
+
+
+def rationale_lines(handoff: str, cleanup: str = "", limit: int = 12, width: int = 100) -> list[str]:
+    """Return the rationale of a driver commit message: at most `limit` lines of the
+    handoff's TRIED and OPEN sections (the newest TRIED lines and the first four OPEN
+    lines), then at most five lines of the cleanup summary."""
+    opened = [f" {clip(line, width)}" for line in handoff_section(handoff, "OPEN")[:4]]
+    room = limit - 1 - (len(opened) + 1 if opened else 0)
+    tried = [f" {clip(line, width)}" for line in tried_models(handoff)][-room:] if room > 0 else []
+    summary = [f" {clip(line, width)}" for line in cleanup.splitlines() if line.strip()]
+    return ((["Tried:", *tried] if tried else []) + (["Open:", *opened] if opened else [])
+            + (["Cleanup:", *summary[:5]] if summary else []))
+
+
+def cleanup_todo(path: Path, address: str, limit: int = 15) -> list[str]:
+    """Return the work list of a CLEANUP assignment: the target's line span, its bare
+    literals of 0x10 or more (most used first), the block openers that have no
+    comment above them and the lint findings a .cpp edit can fix, so the writer
+    edits from the assignment instead of reading the whole function."""
+    from tools import decomp_lint
+
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    marker = re.compile(rf"// (?:FUNCTION|STUB): TOY2 {re.escape(address)}\b", re.I)
+    first = next((number for number, line in enumerate(lines, 1) if marker.search(line)), 0)
+    if not first:
+        return []
+    annotation = re.compile(r"// (?:FUNCTION|STUB|GLOBAL|LIBRARY): TOY2 ")
+    last = next((number - 1 for number in range(first + 1, len(lines) + 1)
+                 if annotation.search(lines[number - 1])), len(lines))
+    uses: dict[str, list[int]] = {}
+    openers: list[str] = []
+    depth = None
+    for number in range(first + 1, last + 1):
+        line = lines[number - 1]
+        code = re.sub(r'"(?:\\.|[^"\\])*"|//.*', "", line)
+        for literal in re.findall(r"(?<![\w.])(?:0[xX][0-9A-Fa-f]+|[0-9]+)[uUlL]*(?![\w.])", code):
+            digits = literal.rstrip("uUlL")
+            if int(digits, 16 if digits[:2].lower() == "0x" else 10) >= 0x10:
+                uses.setdefault(literal, []).append(number)
+        stripped = line.strip()
+        indent = len(line) - len(line.lstrip())
+        if depth is None:
+            depth = indent + 1 if stripped == "{" else None
+        elif (indent == depth and re.match(r"(?:\}\s*)?(?:if|else|switch|for|while|do)\b", stripped)
+              or indent <= depth + 1 and re.match(r"(?:case\b|default\s*:)", stripped)):
+            if not lines[number - 2].strip().startswith("//"):
+                openers.append(f"L{number} {stripped[:50]}")
+    ranked = sorted(uses.items(), key=lambda item: (-len(item[1]), item[1][0]))[:limit]
+    findings = [
+        f" L{item.line} [{item.rule}] {item.detail}"
+        for item in decomp_lint.check_file(path)
+        if item.owner_address == address.lower() and not item.suppressed
+        and item.rule not in ("magic-pointer", "signature-concealment")  # a shared declaration
+    ][:8]
+    return [
+        f"Target source: {path}:{first}-{last}.",
+        "Bare literals (uses, first line): "
+        + (", ".join(f"{value} x{len(at)} L{at[0]}" for value, at in ranked) or "none"),
+        "Block openers without a comment: " + (", ".join(openers[:limit]) or "none"),
+        *(["Lint findings:", *findings] if findings else []),
+    ]
 
 
 def failure_lines(log: str) -> list[str]:
@@ -810,23 +910,33 @@ def log_attempt(
         "n": len(raws), "at": at, "raw": raw, "exact": exact, "effective": effective,
         "tree": tree,
     }
+    if os.environ.get("DECOMP_PHASE"):
+        row["phase"] = os.environ["DECOMP_PHASE"]
     path = attempts_directory(root) / f"{canonical_address(address)}.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(row) + "\n")
-    count, best, (limit, stalled) = len(raws), max(raws), budget(raws)
+    rows.append(row)
+    cleanup = sum(map(is_cleanup, rows)) if is_cleanup(row) else 0
+    count, best, (limit, stalled) = len(raws), max(raws), batch_budget(rows)
+    counter = f"{count} (cleanup {cleanup}/{CLEANUP_ATTEMPTS})" if cleanup else f"{count}/{limit}"
     lines = [] if quiet else [
-        f"attempt {count}/{limit}  raw {raw:.2f}% ({raw - (previous_best or 0.0):+.2f})"
-        f"  best {best:.2f}% (attempt {raws.index(best) + 1})"
+        f"attempt {counter}  raw {raw:.2f}% ({raw - (previous_best or 0.0):+.2f})"
+        f"  best {best:.2f}% (attempt {best_attempt(rows)})"
     ]
-    if previous_best is None or raw > previous_best:
+    # A batch tie keeps the earlier model; a cleanup tie keeps its names and comments.
+    if previous_best is None or raw > previous_best or (cleanup and raw == previous_best):
         patch = save_best_patch(address, root, diff_path, diff)
         if patch is not None and not quiet:
             lines.append(f"best patch: {patch}")
+    if cleanup:
+        if cleanup >= CLEANUP_ATTEMPTS:
+            lines.append(f"budget: {cleanup} cleanup attempts used; stop and return your lines")
+        return lines
     if stalled:
         lines.append(f"stall: {STALL_ATTEMPTS} attempts without a {STALL_MIN_GAIN_POINTS:g}-point "
                      "gain; stop this batch")
-    if count >= limit:
+    if count - sum(map(is_cleanup, rows)) >= limit:
         lines.append(f"budget: {count} attempts used; finish this campaign")
     return lines
 
@@ -948,6 +1058,12 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("tried", "failures"):
         subparsers.add_parser(name, help=f"print the {name} lines of a file").add_argument(
             "file", type=Path)
+    todo = subparsers.add_parser("cleanup-todo", help="print the work list of a cleanup")
+    todo.add_argument("file", type=Path)
+    todo.add_argument("--address", type=canonical_address, required=True)
+    rationale = subparsers.add_parser("rationale", help="print a commit message rationale")
+    rationale.add_argument("handoff", type=Path)
+    rationale.add_argument("--cleanup", type=Path, help="the cleanup summary file")
     args = parser.parse_args(argv)
     if args.command in ("writer", "writer-usage", "event", "final", "run-status"):
         return run_command(args)
@@ -961,6 +1077,14 @@ def main(argv: list[str] | None = None) -> int:
         fields = (canonical_address(str(row["address"])), row.get("name"), row.get("state"),
                   row.get("size") or 0, row.get("source") or "", subsystem_of(row))
         print("\n".join(str(field) for field in fields))
+        return 0
+    if args.command == "cleanup-todo":
+        print("\n".join(cleanup_todo(args.file, args.address)))
+        return 0
+    if args.command == "rationale":
+        read = lambda file: file.read_text(errors="replace") if file and file.is_file() else ""  # noqa: E731
+        lines = rationale_lines(read(args.handoff), read(args.cleanup))
+        print("\n".join(lines)) if lines else None
         return 0
     if args.command in ("tried", "failures"):
         text = args.file.read_text(errors="replace") if args.file.is_file() else ""

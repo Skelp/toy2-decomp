@@ -65,6 +65,7 @@ class WrapperTests(unittest.TestCase):
         self.assertIn("campaigns run [--count N]", result.stdout)
         self.assertIn("130 interrupted", result.stdout)
         self.assertIn("Stop it with kill -TERM PID", result.stdout)
+        self.assertIn("--no-cleanup skips it.", result.stdout)
         for args in (("--count", "0"), ("--mode", "data"), ("--address", "x"), ("--bogus", "1"),
                      ("--budget", "1"), ("--budget", "x"), ("--harness", "pi"),
                      ("--writer-format", "xml")):

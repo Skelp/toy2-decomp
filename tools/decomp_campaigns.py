@@ -1466,11 +1466,12 @@ def _finish_campaign_finalization(
 def _attempt_stats(
     state: dict[str, object], addresses: list[str]
 ) -> dict[str, object]:
-    """Sum the logged attempts of the targets; the best attempt is the first target's."""
+    """Sum the logged batch attempts of the targets (a driver cleanup is not a
+    matching attempt); the best attempt is the first target's."""
     directory = attempts_directory(Path(str(state.get("source_worktree_root", ROOT))))
     stats = [read_stats(address, directory) for address in addresses]
     return {
-        "attempts": sum(int(entry["attempts"]) for entry in stats),
+        "attempts": sum(int(entry["attempts"]) - int(entry["cleanup_attempts"]) for entry in stats),
         "best_attempt": stats[0]["best_attempt"] if stats else None,
     }
 

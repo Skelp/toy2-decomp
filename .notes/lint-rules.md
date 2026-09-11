@@ -16,8 +16,11 @@ Nu3D code before you rename an unknown item.
 
 The committed baseline contains reviewed old findings. A baseline finding stays
 in the output as legacy debt, but it does not stop unrelated work. Do not add a
-new finding to the baseline. When a change fixes old debt, remove the stale
-baseline row in the same commit.
+new finding to the baseline, except when a new rule starts: its findings on
+existing code go into the baseline, so only new occurrences fail. When a change
+fixes old debt, remove the stale baseline row in the same commit; `campaigns
+finish` does this with `tools/decomp lint --prune-baseline`. A baseline finding
+keeps its function provisional, but it never fails validate for its own target.
 
 ## Data-model errors
 
@@ -29,7 +32,8 @@ baseline row in the same commit.
 - `implicit-record-layout`: Several offsets treat a scalar buffer as an
   undeclared record.
 - `placeholder-field-use`: Completed code reads or writes an unresolved member.
-- `magic-pointer`: Code converts a nonzero integer literal to a pointer.
+- `magic-pointer`: Code converts a nonzero integer literal (hex or decimal) to a
+  pointer, as in `reinterpret_cast<const Vector3I*>(1)`.
 - `signature-concealment`: A cast at a project-function call hides an incorrect
   caller type.
 - `repeated-private-type`: Two or more source files define the same named,
@@ -68,6 +72,19 @@ of a real file or API format.
 - `unexplained-helper`: A helper name does not identify its operation.
 - `original-name-vocabulary`: Source uses an alias where retail text supplies
   the original engine name.
+- `unnamed-constant`: A bare literal stands where the same file writes a named
+  constant (const, enum or `#define`) of the same value: after the same operand
+  and operator, as an index of the same array, as the same argument of the same
+  call, or as a case of the same switch. Values 0, 1, -1 and 2 are exempt. A
+  value alone is not enough, because an enum covers most small numbers.
+- `repeated-macro-body`: Two `#define` bodies of 8 or more lines in one file are
+  identical after whitespace normalization.
+
+`unnamed-constant` and `repeated-macro-body` are advisory: `bc` prints a new
+occurrence as an `advice:` line, but it never fails validate and it is not source
+debt. So naming a value in one function never blocks a campaign on the literals of
+another, and removing an advisory finding is not counted as removed debt, because
+un-naming a value would remove the findings that depend on its name.
 
 The linter does not reject integer lookup tables, fixed-point arithmetic, manual
 shifts, IEEE 754 bit operations, or other established Nu3D idioms.
@@ -75,7 +92,10 @@ shifts, IEEE 754 bit operations, or other established Nu3D idioms.
 ## Narrow exceptions
 
 Only `anonymous-buffer-view` and `typed-byte-roundtrip` can have a local
-exception. Put this directive on the line before the expression:
+exception. A cast that hides a wrong declared type (`magic-pointer`,
+`signature-concealment`) has none: it stays debt, and its function stays
+provisional, until the declaration is fixed. Put this directive on the line
+before the expression:
 
 ```cpp
 // decomp-lint: allow[typed-byte-roundtrip] reason: SDK pitch is measured in bytes

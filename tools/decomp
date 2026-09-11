@@ -537,6 +537,11 @@ campaign_finish() {
     fi
     git add src tools/Resources/functions_map.txt \
         || { echo "error: git add of the source tree failed" >&2; return 1; }
+    # Debt the campaign removed leaves a stale baseline row, which validate rejects.
+    # Prune from the committed rows, so a retried finish sees the debt of its own tree.
+    git checkout -q HEAD -- .notes/lint-baseline.tsv \
+        && python tools/decomp_lint.py --prune-baseline && git add .notes/lint-baseline.tsv \
+        || { echo "error: the lint baseline could not be pruned" >&2; return 1; }
     local log="build/decomp-diffs/validate.log"
     mkdir -p build/decomp-diffs
     if ! validate --mode "$mode" "${target_args[@]}" --staged > "$log" 2>&1; then
@@ -609,8 +614,12 @@ run_usage() {
 Usage: tools/decomp campaigns run [--count N] [--mode auto|refinement|coverage]
          [--address ADDR] [--batch N] [--budget N] [--harness auto|claude|codex]
          [--effort LEVEL] [--model M] [--writer CMD] [--writer-format FORMAT]
-         [--trailer TEXT] [--push] [--json]
+         [--trailer TEXT] [--no-cleanup] [--push] [--json]
        tools/decomp campaigns run --check [--live] | --dry-run [--count N] | --status [--json]
+After the last batch of a campaign that raised the score, one CLEANUP writer run (two bc
+runs, effort medium unless --effort) names constants and adds comments on the best tree;
+a tie keeps its edits, and a finish that fails with them finishes the batch model instead.
+--no-cleanup skips it.
 --check prints one line per check; --live adds one minimal writer call. --dry-run
 prints the next N campaigns and starts nothing. --status reads
 build/decomp-runs/state.json from any shell. --json prints the JSON events of
@@ -978,16 +987,17 @@ run_settle() {
 }
 
 # Read the attempt log of the current target into run_attempts, run_best,
-# run_best_at, run_last, run_stalled and run_limit (no scored attempt reads 0).
-# run_limit is the budget bc prints, so the driver and the writer agree on it.
+# run_best_at, run_last, run_stalled, run_limit and run_cleanups (no scored
+# attempt reads 0). run_limit is the budget bc prints, so the driver and the
+# writer agree on it; run_cleanups counts the cleanup attempts in run_attempts.
 run_read_stats() {
     local fields
     fields=$(python tools/decomp_attempts.py stats --address "$run_address" --json | python -c '
 import json, sys
 s = json.load(sys.stdin)
 print(s["attempts"], "%.2f" % (s["best_raw"] or 0), s["best_attempt"] or 0,
-      "%.2f" % (s["last_raw"] or 0), int(s["stalled"]), s["limit"])') || return
-    read -r run_attempts run_best run_best_at run_last run_stalled run_limit <<< "$fields"
+      "%.2f" % (s["last_raw"] or 0), int(s["stalled"]), s["limit"], s["cleanup_attempts"])') || return
+    read -r run_attempts run_best run_best_at run_last run_stalled run_limit run_cleanups <<< "$fields"
 }
 
 run_math() { awk -v a="$2" -v b="${3:-0}" "BEGIN { $1 }"; }
@@ -1053,21 +1063,104 @@ run_batch_prompt() {
         || echo "(the pack failed; run tools/decomp bc $run_address --pack)"
 }
 
-# Write the commit message of a source result from the current best score.
+# "N attempts", with the cleanup attempts apart: they name and explain, never match.
+run_attempt_count() {
+    printf '%s attempts' "$((run_attempts - run_cleanups))"
+    ((run_cleanups == 0)) || printf ' (cleanup %s)' "$run_cleanups"
+}
+
+# Write the commit message of a source result from the current best score, with
+# the handoff's TRIED and OPEN lines and the cleanup summary as its rationale.
 run_message() {
-    local subject="Refine $run_name to $1%"
+    local subject="Refine $run_name to $1%" rationale
     [[ $run_mode == coverage ]] && subject="Implement $run_name at $1%"
+    rationale=$(python tools/decomp_attempts.py rationale \
+        "build/decomp-cache/handoff/$run_address.md" --cleanup "$prefix-cleanup.summary" || true)
     {
         echo "$subject"
         echo
-        echo "$baseline% -> $1% in $run_attempts attempts across $writer_runs writer runs" \
+        echo "$baseline% -> $1% in $(run_attempt_count) across $writer_runs writer runs" \
             "(tools/decomp campaigns run, $harness writer)."
+        [[ -z $rationale ]] || printf '\n%s\n' "$rationale"
         [[ -z $trailer ]] || printf '\n%s\n' "$trailer"
     } > "$prefix.msg"
 }
 
+# The CLEANUP assignment ends with its work list (literals, block openers, lint
+# findings a .cpp edit can fix), so the writer spends no turn on finding it.
+run_cleanup_prompt() {
+    local file
+    file=$(grep -rlE -- "// (FUNCTION|STUB): TOY2 $run_address\b" src | head -n 1 || true)
+    echo "CLEANUP for target $run_address $run_name ($run_mode). The tree holds the best model:" \
+        "$run_best% at attempt $run_best_at (baseline $baseline%)."
+    [[ -z $file ]] || python tools/decomp_attempts.py cleanup-todo "$file" --address "$run_address" \
+        2> /dev/null || true
+    echo "Follow the Cleanup section of your instructions (two bc runs at most) and end with 1-5" \
+        "plain lines under 100 characters saying what changed, with no tool call after them."
+}
+
+# One CLEANUP writer run on the best tree, at effort medium unless --effort names
+# one: names and comments need no search. Its attempts carry DECOMP_PHASE=cleanup,
+# so they spend no budget and a tie becomes the best, which the restore before
+# finish keeps; a drop leaves the earlier best.
+run_cleanup() {
+    local out before_attempts=$run_attempts before_best=$run_best started=$SECONDS
+    local patch="build/decomp-cache/best/$run_address.patch" kept="no change kept"
+    local writer=$writer harness=$harness harness_choice=$harness writer_format=$writer_format
+    local harness_reason="" writer_binary="" suffix=$suffix effort=${effort:-medium}
+    [[ -n $writer_override ]] || run_resolve
+    if [[ -z $writer ]]; then
+        run_emit cleanup "cleanup: skipped ($harness_reason)"
+        return 0
+    fi
+    out="$prefix-cleanup$suffix" cleanup_before=$run_best
+    if ! git checkout -q -- src tools/Resources/functions_map.txt ||
+        { [[ -s $patch ]] && ! git apply "$patch"; }; then
+        run_error 1 "the best patch of $run_address does not apply before the cleanup" \
+            "git apply --check $patch"
+        return
+    fi
+    cp -f "$patch" "$prefix-cleanup-before.patch" 2> /dev/null || : > "$prefix-cleanup-before.patch"
+    run_cleanup_prompt > "$prefix-cleanup.prompt"
+    writer_status=0 writer_runs=$((writer_runs + 1))
+    run_phase cleanup "log=$out"
+    DECOMP_PHASE=cleanup run_writer "$prefix-cleanup.prompt" "$out" watch || writer_status=$?
+    run_read_stats || { run_error 1 "the attempt log of $run_address is unreadable" \
+        "python tools/decomp_attempts.py stats --address $run_address"; return; }
+    run_account cleanup "$out" "$((before_attempts + 1))" "$((SECONDS - started))" "$before_best"
+    run_guard_refs "$out" || return
+    if ! cmp -s "$patch" "$prefix-cleanup-before.patch"; then
+        cleanup_kept=1
+        kept="kept at $run_best% ($(git diff --no-index --numstat "$prefix-cleanup-before.patch" \
+            "$patch" 2> /dev/null | awk '{ print $1 + $2 }') patch lines changed)"
+        python tools/decomp_attempts.py writer-usage "$out" --format "$writer_format" --result 5 \
+            > "$prefix-cleanup.summary" || true
+    fi
+    run_emit cleanup "cleanup: $kept" --field "kept=$([[ $kept == kept* ]] && echo 1 || echo 0)"
+}
+
+# Put back the model the batches left after a finish failed with the cleanup's
+# edits, so the cleanup can cost only its own edits; the caller finishes again.
+run_drop_cleanup() {
+    cleanup_kept=""
+    run_emit finish "finish: failed with the cleanup edits; finishing the batch model" \
+        --field "log=$finish_log"
+    if ! git checkout -q HEAD -- src tools/Resources/functions_map.txt .notes/lint-baseline.tsv ||
+        { [[ -s $prefix-cleanup-before.patch ]] && ! git apply "$prefix-cleanup-before.patch"; }; then
+        run_error 1 "the pre-cleanup patch of $run_address does not apply" \
+            "git apply --check $prefix-cleanup-before.patch"
+        return
+    fi
+    cp -f "$prefix-cleanup-before.patch" "build/decomp-cache/best/$run_address.patch"
+    # The ledger's best attempt must name the committed model, not a dropped cleanup tie.
+    sed -i '/"phase": "cleanup"/d' "build/decomp-attempts/$run_address.jsonl" || true
+    rm -f "$prefix-cleanup.summary"
+    final=$cleanup_before
+    run_message "$final"
+}
+
 run_finish() {
-    local note="campaigns run: $baseline% -> $1% in $run_attempts attempts"
+    local note="campaigns run: $baseline% -> $1% in $(run_attempt_count)"
     note+=", $writer_runs $harness writer runs; stopped: $stop"
     finish_log="$prefix-finish$2.log"
     rm -f build/decomp-diffs/validate.log
@@ -1165,7 +1258,8 @@ run_campaign() {
     local index=$1 started=$SECONDS cost=0 tokens=0 writer_runs=0 stop="" batch=0 broken=""
     local broken_fix="" broken_next="" failure=() said line code
     local run_mode=$mode run_address run_name run_state run_size run_source run_subsystem
-    local run_attempts run_best run_best_at run_last run_stalled run_limit writer_status=0
+    local run_attempts run_best run_best_at run_last run_stalled run_limit run_cleanups writer_status=0
+    local cleanup_kept="" cleanup_before=0
     local baseline baseline_attempts prefix final bytes="+0.00" sha="-" finish_log json
     if [[ -n $(git status --porcelain -- src tools/Resources/functions_map.txt) ]]; then
         run_error 1 "src or the function map has uncommitted changes before campaign $index" \
@@ -1250,6 +1344,9 @@ run_campaign() {
             stop="batch gain under 0.5"; break
         fi
     done
+    if ((cleanup)) && [[ -z $broken ]] && run_math 'exit !(a > b)' "$run_best" "$baseline"; then
+        run_cleanup || return
+    fi
     # Restore the best compiled tree: the tree the writer left may hold a worse model.
     git checkout -q -- src tools/Resources/functions_map.txt \
         || { run_error 1 "git checkout of src failed" "git status --short -- src"; return; }
@@ -1262,17 +1359,23 @@ run_campaign() {
     final=$run_best
     if run_math 'exit !(a > b)' "$final" "$baseline"; then
         run_message "$final"
-        if ! run_finish "$final" 1; then
+        local finished=0
+        run_finish "$final" 1 && finished=1
+        if ((!finished)) && [[ -n $cleanup_kept ]]; then
+            run_drop_cleanup || return
+            run_finish "$final" 1b && finished=1
+        fi
+        if ((!finished)); then
             if [[ -n $broken ]]; then
-                run_error 3 "finish failed and $broken, so no repair runs; the tree is left for review (log: $prefix-finish1.log)" \
-                    "tail -n 30 $prefix-finish1.log"
+                run_error 3 "finish failed and $broken, so no repair runs; the tree is left for review (log: $finish_log)" \
+                    "tail -n 30 $finish_log"
                 return
             fi
             local problems
             problems=$(python tools/decomp_attempts.py failures build/decomp-diffs/validate.log)
-            [[ -n $problems ]] || problems=$(grep -E '^error: ' "$prefix-finish1.log" | tail -n 5)
+            [[ -n $problems ]] || problems=$(grep -E '^error: ' "$finish_log" | tail -n 5)
             run_emit finish "finish: failed; one repair run for: $(head -n 1 <<< "$problems")" \
-                --field "log=$prefix-finish1.log"
+                --field "log=$finish_log"
             {
                 echo "REPAIR target $run_address $run_name ($run_mode). campaigns finish failed with:"
                 printf '%s\n' "$problems"
@@ -1329,7 +1432,7 @@ run_campaign() {
     fi
     local minutes
     minutes=$(run_math 'printf "%.1f", a / 60' "$((SECONDS - started))")
-    run_emit campaign "campaign $index: $run_address $run_name $run_mode $baseline% -> $final% ($bytes B), $run_attempts attempts, $minutes min, $(run_spend "$cost" "$tokens"), commit $sha" \
+    run_emit campaign "campaign $index: $run_address $run_name $run_mode $baseline% -> $final% ($bytes B), $(run_attempt_count), $minutes min, $(run_spend "$cost" "$tokens"), commit $sha" \
         --field "campaign=$index" --field "address=$run_address" --field "result=$run_result" \
         --field "final=$final" --field "bytes=$bytes" --field "commit=$sha" \
         --field "baseline=$baseline" --field "attempts=$run_attempts" --field "minutes=$minutes" \
@@ -1337,7 +1440,7 @@ run_campaign() {
     total_cost=$(run_math 'printf "%.4f", a + b' "$total_cost" "$cost")
     total_tokens=$((total_tokens + tokens))
     total_bytes=$(run_math 'printf "%+.2f", a + b' "$total_bytes" "$bytes")
-    total_attempts=$((total_attempts + run_attempts)) done_count=$((done_count + 1))
+    total_attempts=$((total_attempts + run_attempts - run_cleanups)) done_count=$((done_count + 1))
     if [[ -n $broken ]]; then
         run_error 3 "$broken${broken_fix:+; $broken_fix}; run stopped after campaign $index (log: $json)" \
             "${broken_next:-tools/decomp campaigns run --check --live --harness $harness}"
@@ -1379,7 +1482,7 @@ run_dry_run() {
 # script selects, starts, runs writer batches, restores the best tree and
 # finishes or records no-source; logs go to build/decomp-runs/.
 campaign_run() {
-    local count=1 mode=auto address="" batch_size=4 budget=12 trailer="" push=0
+    local count=1 mode=auto address="" batch_size=4 budget=12 trailer="" push=0 cleanup=1
     local self="$ROOT/tools/decomp" runs=build/decomp-runs tried=() committed=0 total_cost=0
     local total_tokens=0 total_bytes=+0.00 total_attempts=0 run_started=$SECONDS index status=0
     local done_count=0 writer_pid="" watch_pid="" run_active="" run_result="" run_family=""
@@ -1398,6 +1501,7 @@ campaign_run() {
         case "$1" in
             -h|--help) run_usage; return 0 ;;
             --push) push=1; shift; continue ;;
+            --no-cleanup) cleanup=0; shift; continue ;;
             --check|--dry-run|--status) action=${1#--}; shift; continue ;;
             --live) live=1; shift; continue ;;
             --json) run_json=1; shift; continue ;;
@@ -1919,11 +2023,13 @@ case "$command" in
         fi
         python tools/decomp_attempts.py attempt --address "$1" --diff "$diff_path" || true
         # validate --staged rejects new lint errors and warnings; show them now,
-        # while the writer still holds the context to fix them.
+        # while the writer still holds the context to fix them. The readability
+        # rules print as advice: validate does not reject them.
         mapfile -t changed_sources < <(git diff --name-only HEAD -- 'src/*.cpp' 'src/*.h')
         if [[ ${#changed_sources[@]} -gt 0 ]]; then
             python tools/decomp_lint.py --warnings-as-errors "${changed_sources[@]}" \
-                | grep -E ': (error|warning): ' | sed 's/^/lint: /' || true
+                | grep -E ': (error|warning): ' \
+                | sed -E '/\[(unnamed-constant|repeated-macro-body)\]/{s/^/advice: /;b};s/^/lint: /' || true
         fi
         diff_args=(
             "$diff_path"

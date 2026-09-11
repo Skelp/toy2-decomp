@@ -1339,6 +1339,42 @@ class ReportStampTests(unittest.TestCase):
                          "src or the function map differs from HEAD")
         self.assertFalse((self.root / self.stamp).exists())
 
+class LintDebtTests(unittest.TestCase):
+    @staticmethod
+    def finding(rule: str, severity: str, legacy: bool, address: str = "0x00401000"):
+        return VERIFY.decomp_lint.Finding(
+            Path("src/a.cpp"), 1, rule, severity, "x", "detail", owner_kind="function",
+            owner_address=address, subject=rule, fingerprint="f", legacy=legacy,
+        )
+
+    def test_a_removed_baselined_warning_is_removed_debt_unless_it_is_advice(self):
+        finding = self.finding("unexplained-helper", "warning", False)
+        entry = VERIFY.decomp_lint.BaselineEntry(*finding.baseline_key, "src/a.cpp")
+        change = VERIFY.classify_lint_debt_change([finding], [entry], [], [])
+        self.assertEqual(change, VERIFY.LintDebtChange(removed_warnings=1))
+        advice = self.finding("unnamed-constant", "warning", False)
+        entry = VERIFY.decomp_lint.BaselineEntry(*advice.baseline_key, "src/a.cpp")
+        self.assertEqual(VERIFY.classify_lint_debt_change([advice], [entry], [], []), VERIFY.LintDebtChange())
+
+    def test_legacy_debt_can_be_left_out(self):
+        legacy = self.finding("magic-pointer", "error", True)
+        new = self.finding("decompiler-identifier", "error", False, "0x00402000")
+        self.assertEqual(VERIFY.debt_by_address([legacy, new]),
+                         {0x401000: ["magic-pointer"], 0x402000: ["decompiler-identifier"]})
+        self.assertEqual(VERIFY.debt_by_address([legacy, new], legacy=False),
+                         {0x402000: ["decompiler-identifier"]})
+
+    def test_advisory_findings_are_not_source_debt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "a.cpp"
+            path.write_text(
+                "enum { PHASE_DONE = 3 };\n// FUNCTION: TOY2 0x00ABCDE0\nvoid f(Boss* b)\n{\n"
+                "\tif (b->phase == PHASE_DONE) b->phase = 0;\n\tif (b->phase == 3) use(iVar2);\n}\n",
+                encoding="utf-8",
+            )
+            rules = [item.rule for item in VERIFY.read_debt_findings(path)]
+        self.assertEqual(rules, ["decompiler-identifier"])
+
 
 if __name__ == "__main__":
     unittest.main()

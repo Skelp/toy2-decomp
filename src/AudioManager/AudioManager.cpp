@@ -409,7 +409,7 @@ namespace AudioManager
 		}
 	}
 
-	// FUNCTION: TOY2 0x0047E5B0 [EFFECTIVE]
+	// FUNCTION: TOY2 0x0047E5B0 [PROVISIONAL]
 	void LoadSoundEffect(char* name, int32_t index, int32_t flag)
 	{
 		char path[1024];

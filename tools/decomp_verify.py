@@ -72,6 +72,7 @@ class LintDebtChange(NamedTuple):
     removed_errors: int = 0
     new_errors: int = 0
     stale_rows: int = 0
+    removed_warnings: int = 0
 
 
 def file_hash(path: Path) -> str:
@@ -355,7 +356,9 @@ def advance_report_stamp(path: Path, root: Path = ROOT) -> str:
     return ""
 
 
-def read_source_debt(source_root: Path, *, staged: bool = False) -> dict[int, list[str]]:
+def read_debt_findings(source_root: Path, *, staged: bool = False) -> list[decomp_lint.Finding]:
+    """Return the lint findings that are source debt of a function: owned by an
+    address, not accepted by a directive and not an advisory readability rule."""
     if staged:
         units = decomp_lint.target_units(True, [])
     elif source_root.is_file():
@@ -372,11 +375,24 @@ def read_source_debt(source_root: Path, *, staged: bool = False) -> dict[int, li
     findings, _ = decomp_lint.apply_baseline(
         findings, decomp_lint.read_baseline(staged=staged)
     )
+    return [
+        finding for finding in findings
+        if finding.owner_address and not finding.suppressed and not finding.advisory
+    ]
+
+
+def debt_by_address(
+    findings: list[decomp_lint.Finding], *, legacy: bool = True
+) -> dict[int, list[str]]:
     debt: dict[int, list[str]] = {}
     for finding in findings:
-        if finding.owner_address and not finding.suppressed:
+        if legacy or not finding.legacy:
             debt.setdefault(int(finding.owner_address, 16), []).append(finding.rule)
     return debt
+
+
+def read_source_debt(source_root: Path, *, staged: bool = False) -> dict[int, list[str]]:
+    return debt_by_address(read_debt_findings(source_root, staged=staged))
 
 
 def classify_lint_debt_change(
@@ -391,11 +407,12 @@ def classify_lint_debt_change(
     staged_finding_keys = {finding.baseline_key for finding in staged_findings}
     staged_entry_keys = {entry.key for entry in staged_entries}
     removed = {
-        finding.baseline_key
+        finding.baseline_key: finding.severity
         for finding in head_findings
-        if finding.severity == "error"
-        and finding.legacy
+        if finding.legacy
         and not finding.suppressed
+        # Advice is not debt: un-naming a value would remove its findings.
+        and not finding.advisory
         and finding.baseline_key not in staged_finding_keys
         and finding.baseline_key not in staged_entry_keys
     }
@@ -406,7 +423,10 @@ def classify_lint_debt_change(
         and not finding.legacy
         and not finding.suppressed
     }
-    return LintDebtChange(len(removed), len(new_errors), len(stale))
+    removed_errors = sum(severity == "error" for severity in removed.values())
+    return LintDebtChange(
+        removed_errors, len(new_errors), len(stale), len(removed) - removed_errors
+    )
 
 
 def read_lint_debt_change() -> LintDebtChange:
@@ -1195,7 +1215,11 @@ def validate(
                 baseline_data_path if mode in ("data", "resource") else None,
             )
         )
-    source_debt = read_source_debt(source_root, staged=staged)
+    debt_findings = read_debt_findings(source_root, staged=staged)
+    source_debt = debt_by_address(debt_findings)
+    # Baselined debt keeps a function provisional, but only new debt stops a
+    # campaign on its own target: a new lint rule never blocks legacy code.
+    new_debt = debt_by_address(debt_findings, legacy=False)
     lint_change = (
         read_lint_debt_change()
         if staged and mode == "refinement"
@@ -1309,10 +1333,10 @@ def validate(
             problems.append(
                 f"0x{address:08X}: target finishes below 50% similarity"
             )
-        if debt:
+        if new_debt.get(address):
             problems.append(
                 f"0x{address:08X}: target has source debt: "
-                f"{', '.join(sorted(set(debt)))}"
+                f"{', '.join(sorted(set(new_debt[address])))}"
             )
 
         before_rules = baseline_debt.get(address, [])
@@ -1349,7 +1373,7 @@ def validate(
                     f"0x{address:08X}: refinement target was not implemented at baseline"
                 )
             lint_debt_removed = bool(
-                lint_change.removed_errors
+                (lint_change.removed_errors or lint_change.removed_warnings)
                 and not lint_change.new_errors
                 and not lint_change.stale_rows
             )

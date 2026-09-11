@@ -4,6 +4,9 @@ import importlib.util
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from dataclasses import replace
+from io import StringIO
 from unittest.mock import patch
 from pathlib import Path
 
@@ -499,6 +502,138 @@ def subprocess_result(*, stdout):
             self.stdout = value
 
     return Result(stdout)
+
+
+
+def macro(name: str, lines: int, last: str = "done(a)") -> str:
+    """Return an object of `lines` physical lines: the #define line, steps, then `last`."""
+    return f"#define {name}(a) \\\n" + "".join(f"\tstep{i}(a); \\\n" for i in range(lines - 2)) + f"\t{last}\n"
+
+
+class QualityRuleTests(unittest.TestCase):
+    def test_decimal_and_const_pointer_literals_are_magic(self):
+        for body in ("Play(1, reinterpret_cast<const Vector3I*>(1));", "owner = (void*)1;",
+                     "ok = guid != (GUID*)2;"):
+            with self.subTest(body=body):
+                source = f"// FUNCTION: TOY2 0x00401000\nvoid f() {{ {body} }}\n"
+                self.assertEqual(severities(source).get("magic-pointer"), "error")
+
+    def test_null_pointers_and_integer_casts_are_not_magic(self):
+        source = "void f() { p = (void*)0x0; q = reinterpret_cast<Foo*>(0); n = sizeof(Foo*) * 2; }\n"
+        self.assertNotIn("magic-pointer", rules(source))
+
+    def test_a_cast_of_an_expression_is_not_magic(self):
+        for body in ("b = (int*)(8 * n);", "c = (char*)(1 + base);"):
+            with self.subTest(body=body):
+                self.assertNotIn("magic-pointer", rules(f"void f() {{ {body} }}\n"))
+        self.assertIn("magic-pointer", rules("void f() { p = (Foo*)(0x1234); }\n"))
+
+    def test_a_directive_cannot_accept_a_cast_that_hides_a_type(self):
+        source = (
+            "// FUNCTION: TOY2 0x00401000\nvoid f()\n{\n"
+            "// decomp-lint: allow[magic-pointer] reason: PlaySound reads mode 1, not a Vector3I\n"
+            "Play(1, reinterpret_cast<const Vector3I*>(1));\n}\n"
+        )
+        item = next(item for item in findings_for(source) if item.rule == "magic-pointer")
+        self.assertFalse(item.suppressed)
+        header = lint.SourceUnit(Path("Draw.h"), "void Draw(Vector3I* position);\n")
+        caller = lint.SourceUnit(Path("Level.cpp"), "// FUNCTION: TOY2 0x00401000\nvoid f(Vector4I* record)\n{\n"
+                                 "// decomp-lint: allow[signature-concealment] reason: Draw reads a Vector4I\n"
+                                 "Draw((Vector3I*)record);\n}\n")
+        self.assertEqual([item.suppressed for item in lint.check_signature_concealment([header, caller])],
+                         [False])
+
+    def test_a_suppressed_finding_never_hides_a_later_open_one(self):
+        first = lint.Finding(Path("a.cpp"), 1, "typed-byte-roundtrip", "error", "x", "d",
+                             owner_address="0x1", subject="s", suppressed=True)
+        unique: dict = {}
+        for finding in (first, replace(first, line=2, suppressed=False), replace(first, line=3)):
+            lint._keep_first_open(unique, ("0x1", "s"), finding)
+        self.assertEqual((unique["0x1", "s"].line, unique["0x1", "s"].suppressed), (2, False))
+
+    def test_advisory_warnings_never_fail_warnings_as_errors(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "probe.cpp"
+            path.write_text("enum { PHASE_DONE = 3 };\n// FUNCTION: TOY2 0x00401000\nvoid f(Boss* b)\n{\n"
+                            "\tif (b->phase == PHASE_DONE) b->phase = 0;\n\tif (b->phase == 3) b->phase = 0;\n}\n",
+                            encoding="utf-8")
+            output = StringIO()
+            with patch.object(sys, "argv", ["lint", "--warnings-as-errors", str(path)]), redirect_stdout(output):
+                code = lint.main()
+        self.assertEqual(code, 0, output.getvalue())
+        self.assertIn("[unnamed-constant]", output.getvalue())
+
+    def test_identical_long_macro_bodies_warn_once_per_copy(self):
+        source = macro("BLEND25", 8) + macro("BLEND50", 8) + macro("BLEND75", 8)
+        found = [item for item in findings_for(source) if item.rule == "repeated-macro-body"]
+        self.assertEqual([item.subject for item in found], ["BLEND50", "BLEND75"])
+        self.assertTrue(all(item.severity == "warning" and item.advisory for item in found))
+        self.assertIn("'BLEND25' (line 1)", found[0].detail)
+
+    def test_short_different_or_inactive_macros_do_not_warn(self):
+        for source in (
+            macro("A", 7) + macro("B", 7),
+            macro("A", 8) + macro("B", 8, "done(a + 1)"),
+            macro("A", 8, 'log("a")') + macro("B", 8, 'log("b")'),
+            "#if 0\n" + macro("A", 8) + "#endif\n" + macro("B", 8),
+        ):
+            with self.subTest(source=source[:30]):
+                self.assertNotIn("repeated-macro-body", rules(source))
+
+    def test_a_literal_where_the_file_writes_a_name_warns(self):
+        source = (
+            "enum Phase { PHASE_DEFEATED = 3, STATE_RUN = 5 };\n#define SOUND_JUMP 0x3D\n"
+            "// FUNCTION: TOY2 0x00401000\nvoid f(Boss* boss)\n{\n"
+            "\tif (boss->phase == PHASE_DEFEATED) Play(SOUND_JUMP, 0);\n"
+            "\tg_records[PHASE_DEFEATED] = 0;\n\tswitch (state) { case STATE_RUN: break; }\n}\n"
+            "// FUNCTION: TOY2 0x00402000\nvoid g(Boss* boss)\n{\n"
+            "\tif (boss->phase == 3) Play(0x3D, 0);\n\tg_records[3] = 0;\n"
+            "\tswitch (state) { case 5: break; }\n\tswitch (other) { case 5: break; }\n}\n"
+        )
+        found = {(item.owner_address, item.subject): item for item in findings_for(source)
+                 if item.rule == "unnamed-constant"}
+        self.assertEqual(sorted(found), [("0x00402000", "3"), ("0x00402000", "5"), ("0x00402000", "61")])
+        self.assertIn("(2 use(s)) stands where this file writes PHASE_DEFEATED",
+                      found["0x00402000", "3"].detail)
+        self.assertIn("(1 use(s))", found["0x00402000", "5"].detail)
+        self.assertTrue(found["0x00402000", "61"].advisory)
+
+    def test_a_value_in_another_place_or_a_plain_value_does_not_warn(self):
+        source = (
+            "enum Phase { PHASE_DEFEATED = 3, PHASE_TWO = 2 };\n"
+            "// FUNCTION: TOY2 0x00401000\nvoid f(Boss* boss)\n{\n"
+            "\tif (boss->phase == PHASE_DEFEATED || boss->phase == PHASE_TWO) boss->phase = 0;\n}\n"
+            "// FUNCTION: TOY2 0x00402000\nvoid g(Boss* boss)\n{\n"
+            "\tint sound = random & 3;\n\tif (boss->phase == 2) boss->timer = 3;\n}\n"
+        )
+        self.assertNotIn("unnamed-constant", rules(source))
+
+    def test_a_name_inside_one_function_names_the_value_only_there(self):
+        source = (
+            "// FUNCTION: TOY2 0x00401000\nint f(int radius)\n{\n\tconst int32_t radiusScale = 0x1644;\n"
+            "\treturn radius * radiusScale + radius * 0x1644;\n}\n"
+            "// FUNCTION: TOY2 0x00402000\nint g(int radius)\n{\n\treturn radius * 0x1644;\n}\n"
+        )
+        found = [(item.owner_address, item.subject) for item in findings_for(source)
+                 if item.rule == "unnamed-constant"]
+        self.assertEqual(found, [("0x00401000", str(0x1644))])
+
+    def test_an_accepted_finding_needs_no_baseline_row(self):
+        finding = lint.Finding(Path("a.cpp"), 1, "magic-pointer", "error", "x", "detail",
+                               owner_address="0x1", subject="integer-pointer", fingerprint="f",
+                               suppressed=True)
+        entry = lint.BaselineEntry(*finding.baseline_key, "a.cpp")
+        self.assertEqual(lint.apply_baseline([finding], [entry])[1], [entry])
+        self.assertEqual(lint.apply_baseline([replace(finding, suppressed=False)], [entry])[1], [])
+
+    def test_prune_removes_only_stale_baseline_rows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "baseline.tsv"
+            header = "# owner\trule\tsubject\tfingerprint\tpath\n"
+            path.write_text(header + "0x1\tr\ts\tf\ta.cpp\n0x2\tr\ts\tf\tb.cpp\n", encoding="utf-8")
+            stale = [lint.BaselineEntry("0x2", "r", "s", "f", "b.cpp")]
+            self.assertEqual(lint.prune_baseline(path, stale), 1)
+            self.assertEqual(path.read_text(encoding="utf-8"), header + "0x1\tr\ts\tf\ta.cpp\n")
 
 
 if __name__ == "__main__":
