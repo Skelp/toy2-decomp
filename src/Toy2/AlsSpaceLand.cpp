@@ -33,24 +33,50 @@ namespace Toy2
 
 	namespace AlsSpaceLand
 	{
-			enum BuggyEncounterState
-			{
-				BUGGY_ENCOUNTER_ACTIVE = 2,
-				BUGGY_ENCOUNTER_DEFEATED = 3,
-				BUGGY_ENCOUNTER_REWARD_GIVEN = 200,
-			};
+		enum BuggyEncounterState
+		{
+			BUGGY_ENCOUNTER_ACTIVE = 2,
+			BUGGY_ENCOUNTER_DEFEATED = 3,
+			BUGGY_ENCOUNTER_REWARD_GIVEN = 200,
+		};
 
-			enum ZiplineChallengeState
-			{
-				ZIPLINE_CHALLENGE_FAILED = 4,
-			};
+		enum ZiplineChallengeState
+		{
+			ZIPLINE_CHALLENGE_FAILED = 4,
+		};
 
-			enum SpaceshipTokenMotionState
-			{
-				SPACESHIP_TOKEN_ATTACHED = 1,
-				SPACESHIP_TOKEN_FALLING = 2,
-				SPACESHIP_TOKEN_SETTLED = 3,
-			};
+		enum SpaceshipTokenMotionState
+		{
+			SPACESHIP_TOKEN_ATTACHED = 1,
+			SPACESHIP_TOKEN_FALLING = 2,
+			SPACESHIP_TOKEN_SETTLED = 3,
+		};
+
+		// Fixed-point and tuning constants of the level interactions.
+		const int32_t ANGLE_MASK = 0xFFF;
+		const int32_t LINK_SCALE_ONE = 0x1000;
+		const int32_t PATH_PROGRESS_SHIFT = 16;
+		const int32_t PATH_FRACTION_MASK = 0xFFFF;
+		const int32_t CHALLENGE_PATH_ACCELERATION = 0x10;
+		const int32_t CHALLENGER_BOB_SPEED = 0x20;
+		const int32_t RAND_BYTE_CENTRE = 0x80;
+		const int32_t TOKEN_SCATTER_SCALE = 0x60;
+		const int32_t STOMP_SWITCH_DURATION = 60;
+		const int32_t SPACESHIP_CLAW_SWAP_TIME = 60;
+		const int32_t SPACESHIP_MOVE_SPEED = 0x80;
+		const int32_t ORBIT_PHASE_MAX = 0xFFFF;
+		const int32_t ORBIT_PHASE_RANGE = 0x10000;
+		const int32_t ORBIT_PHASE_HALF = 0x8000;
+		const int32_t SPACESHIP_MOTOR_FREQUENCY_LIFT = 0x2C00;
+		const int32_t SPACESHIP_TOKEN_HANG_OFFSET = 0x1000;
+		const int32_t SPACESHIP_SHADOW_SIZE = 0x100;
+		const int32_t TOKEN_FALL_GRAVITY = 0x20;
+		const int32_t TOKEN_ROLL_SPEED = 0x100;
+		const int32_t TOKEN_BOUNCE_MIN_SPEED = 0x100;
+		const int32_t SPLASH_SPEED_MIN = 0x20;
+		const int32_t SOUND_ALIEN_CHATTER_FIRST = 0x7B;
+		const int32_t SOUND_SPACESHIP_SWITCH = 0x81;
+		const int32_t SOUND_SPACESHIP_MOTOR = 0x82;
 
 		struct RotatingLinkState
 		{
@@ -68,13 +94,11 @@ namespace Toy2
 		char g_buggyIntroSubtitle[] =
 			"hey space ranger! return to your ship immediately!... defeat the ^buzz lightyear buggy^ boss to get a pizza planet ^token^!";
 		// GLOBAL: TOY2 0x004F2AE4
-		char g_missingAliensSubtitle[] =
-			"hi buzz! if you find my ^five^ missing ^aliens^ and come back and find me, i will give you a pizza planet ^token^.";
+		char g_missingAliensSubtitle[] = "hi buzz! if you find my ^five^ missing ^aliens^ and come back and find me, i will give you a pizza planet ^token^.";
 		// GLOBAL: TOY2 0x004F2B58
 		char g_foundAliensSubtitle[] = "thanks for finding my ^aliens^ buzz! here is a pizza planet ^token^!";
 		// GLOBAL: TOY2 0x004F2BA0
-		char g_ziplineChallengeSubtitle[] =
-			"hi buzz! if you can beat me to the end of the ^zipline^ course i will give you a pizza planet ^token^!";
+		char g_ziplineChallengeSubtitle[] = "hi buzz! if you can beat me to the end of the ^zipline^ course i will give you a pizza planet ^token^!";
 		// GLOBAL: TOY2 0x004F2C08
 		char g_hammHintSubtitle[] = "i saw ^hamm^ at the end of the ^laser battle zone^.";
 		// GLOBAL: TOY2 0x004F2C3C
@@ -352,22 +376,24 @@ namespace Toy2
 			RotatingLinkState* rotatingLink = g_rotatingLinkStates;
 			int32_t linkId = 2;
 			int32_t linkIndex;
+			// Spin the eight rotating links; each spins at its own speed.
 			do
 			{
 				int32_t frameDelta = Renderer::g_frameDelta;
-				rotatingLink->speedAngle = (rotatingLink->speedAngle + linkId * frameDelta) & 0xFFF;
-				rotatingLink->rotationAngle =
-					(rotatingLink->rotationAngle + (Numerics::g_sinCosLUT[rotatingLink->speedAngle] >> 10) * frameDelta) & 0xFFF;
+				rotatingLink->speedAngle = (rotatingLink->speedAngle + linkId * frameDelta) & ANGLE_MASK;
+				rotatingLink->rotationAngle = (rotatingLink->rotationAngle + (Numerics::g_sinCosLUT[rotatingLink->speedAngle] >> 10) * frameDelta) & ANGLE_MASK;
 				Nu3D::Link::SetRotationRelative8bit(linkId, 0, rotatingLink->rotationAngle, 0);
 				rotatingLink++;
 				linkIndex = linkId - 1;
 				linkId++;
+				// Stop after the last rotating link.
 			} while (linkIndex < 8);
 
 			Actor::CollectQuestReward(0, 10, -1, 0, 0);
 			Actor::RotatingHint(41, 5, g_rotatingHintSubtitles);
 
 			Actor::Toy2Actor* alien = &Actor::g_creatureActors[2];
+			// Alien dialogue: report how many aliens Buzz has found.
 			if ((alien->actorFlags & Actor::ACTOR_FLAG_INTERACTION_REQUESTED) != 0)
 			{
 				alien->actorFlags &= ~Actor::ACTOR_FLAG_INTERACTION_REQUESTED;
@@ -386,6 +412,7 @@ namespace Toy2
 			}
 
 			Actor::Toy2Actor* challenger = &Actor::g_creatureActors[1];
+			// Zipline challenger: start the challenge on interaction.
 			if ((challenger->actorFlags & Actor::ACTOR_FLAG_INTERACTION_REQUESTED) != 0)
 			{
 				challenger->actorFlags &= ~Actor::ACTOR_FLAG_INTERACTION_REQUESTED;
@@ -400,36 +427,37 @@ namespace Toy2
 				}
 			}
 
+			// Start the race when the intro camera is done.
 			if (HUD::g_challengeState == HUD::CHALLENGE_STATE_WAITING_FOR_CAMERA && Nu3D::Camera::g_viewHistoryInitialized == 0)
 			{
 				HUD::g_challengeState = HUD::CHALLENGE_STATE_ACTIVE;
 				g_challengePathProgress = 1;
 			}
 
-			if (HUD::g_challengeState == HUD::CHALLENGE_STATE_ACTIVE && g_buzzActor.collisionFlags != 0)
+			// Check the zipline race result.
+			if (HUD::g_challengeState == HUD::CHALLENGE_STATE_ACTIVE && g_buzzActor.specialAirState != 0)
 			{
-				if (g_buzzActor.posAngles.pos.y < -0x1419A)
+				// Buzz fails when he is above the zipline height or out of the zipline course.
+				if (g_buzzActor.posAngles.pos.y >= -0x1419A)
 				{
-					if (Actor::IsInsideBounds(&g_buzzActor.posAngles.pos, -0x7265C, -0x600DC, 0x129C8, 0x19148) != 0)
-					{
-						HUD::g_challengeState = HUD::CHALLENGE_STATE_COMPLETE;
-						AndysHouse::g_raceCheckpointPassCount = 3;
-						Collectables::Activate(2, 0);
-					}
-					else if (Actor::IsInsideBounds(&g_buzzActor.posAngles.pos, -0x924C, -0x204C, -0x5FD94, -0x3DB94) == 0)
-					{
-						HUD::g_challengeState = ZIPLINE_CHALLENGE_FAILED;
-					}
+					HUD::g_challengeState = ZIPLINE_CHALLENGE_FAILED;
 				}
-				else
+				else if (Actor::IsInsideBounds(&g_buzzActor.posAngles.pos, -0x7265C, -0x600DC, 0x129C8, 0x19148) != 0)
+				{
+					HUD::g_challengeState = HUD::CHALLENGE_STATE_COMPLETE;
+					AndysHouse::g_raceCheckpointPassCount = 3;
+					Collectables::Activate(2, 0);
+				}
+				else if (Actor::IsInsideBounds(&g_buzzActor.posAngles.pos, -0x924C, -0x204C, -0x5FD94, -0x3DB94) == 0)
 				{
 					HUD::g_challengeState = ZIPLINE_CHALLENGE_FAILED;
 				}
 			}
 
+			// Move the challenger along the zipline path.
 			if (g_challengePathProgress != 0)
 			{
-				g_challengePathSpeed += Renderer::g_frameDelta * 0x10;
+				g_challengePathSpeed += Renderer::g_frameDelta * CHALLENGE_PATH_ACCELERATION;
 				if (g_challengePathSpeed > 3000)
 					g_challengePathSpeed = 3000;
 
@@ -440,7 +468,7 @@ namespace Toy2
 				}
 
 				g_challengePathProgress += g_challengePathSpeed * Renderer::g_frameDelta;
-				if ((g_challengePathProgress >> 16) > static_cast<int32_t>(Levels::g_recordData[13]->recordCount) - 2)
+				if ((g_challengePathProgress >> PATH_PROGRESS_SHIFT) > static_cast<int32_t>(Levels::g_recordData[13]->recordCount) - 2)
 				{
 					challenger->actorFlags |= Actor::ACTOR_FLAG_COLLIDABLE;
 					g_challengePathProgress = Levels::g_recordData[13]->recordCount * 0x10000 - 0x10001;
@@ -450,8 +478,8 @@ namespace Toy2
 			}
 
 			Levels::RecordData* challengePath = Levels::g_recordData[13];
-			int32_t challengePathPoint = g_challengePathProgress >> 16;
-			uint32_t challengePathFraction = g_challengePathProgress & 0xFFFF;
+			int32_t challengePathPoint = g_challengePathProgress >> PATH_PROGRESS_SHIFT;
+			int32_t challengePathFraction = g_challengePathProgress & PATH_FRACTION_MASK;
 			challenger->pos.x = (challengePath->data[challengePathPoint].x << 5)
 				+ ((challengePath->data[challengePathPoint + 1].x - challengePath->data[challengePathPoint].x) * challengePathFraction >> 11);
 			challenger->pos.y = (challengePath->data[challengePathPoint].y << 5)
@@ -459,8 +487,9 @@ namespace Toy2
 				+ (Numerics::g_sinCosLUT[g_challengeBobAngle] >> 2);
 			challenger->pos.z = (challengePath->data[challengePathPoint].z << 5)
 				+ ((challengePath->data[challengePathPoint + 1].z - challengePath->data[challengePathPoint].z) * challengePathFraction >> 11);
-			g_challengeBobAngle = (g_challengeBobAngle + Renderer::g_frameDelta * 0x20) & 0xFFF;
+			g_challengeBobAngle = (g_challengeBobAngle + Renderer::g_frameDelta * CHALLENGER_BOB_SPEED) & ANGLE_MASK;
 
+			// Reset the challenge after a failure.
 			if (HUD::g_challengeState == ZIPLINE_CHALLENGE_FAILED && (challenger->actorFlags & Actor::ACTOR_FLAG_ACTIVE) == 0)
 			{
 				challenger->actorPhase = 0;
@@ -471,31 +500,32 @@ namespace Toy2
 			challenger->boundary = challenger->pos;
 			challenger->motionTargetPos = challenger->pos;
 
+			// Laser trap zone.
 			if (Actor::IsInsideBounds(&g_buzzActor.posAngles.pos, 0x29EA3, 0x9AB23, -0x6F3F3, -0x6273) != 0)
 			{
 				FireLaser(0);
 				FireLaser(1);
 			}
 
+			// Sector 4: stomp switch, spaceship claw and floating links.
 			if (Sector::g_currentSectorIndex == 4)
 			{
 				if (g_spaceshipTokenDetached == 0 && Nu3D::Math::IsWithinDistanceXZ(&g_spaceshipTokenPosition, &g_buzzActor.posAngles.pos, 1000) != 0)
 				{
-					g_spaceshipTokenPosition.x += (0x80 - *g_randDatBufferPtr) * 0x60;
-					g_spaceshipTokenPosition.z += (0x80 - g_randDatBufferPtr[1]) * 0x60;
-					g_spaceshipOrbitZ = g_randDatBufferPtr[2] << 8;
+					g_spaceshipTokenPosition.x += (RAND_BYTE_CENTRE - *g_randDatBufferPtr++) * TOKEN_SCATTER_SCALE;
+					g_spaceshipTokenPosition.z += (RAND_BYTE_CENTRE - *g_randDatBufferPtr++) * TOKEN_SCATTER_SCALE;
+					g_spaceshipOrbitZ = *g_randDatBufferPtr++ << 8;
 					g_spaceshipTokenDetached = 1;
-					g_spaceshipOrbitX = g_randDatBufferPtr[3] << 8;
-					g_randDatBufferPtr += 4;
+					g_spaceshipOrbitX = *g_randDatBufferPtr++ << 8;
 				}
 
 				if (g_buzzActor.collisionFlags != 0 && g_groundSlamTimer != 0 && g_footingType == 8 && g_stompSwitchTimer == 0)
 				{
-					g_stompSwitchTimer = 60;
+					g_stompSwitchTimer = STOMP_SWITCH_DURATION;
 					if (g_spaceshipSequenceState < 3)
 						g_spaceshipSequenceState++;
 					Nu3D::Link::SetScaleFromFixedOffsets(13, 0, 0, 0);
-					Nu3D::Link::SetScaleFromFixedOffsets(14, 0x1000, 0x1000, 0x1000);
+					Nu3D::Link::SetScaleFromFixedOffsets(14, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 					Levels::DeactivateAmbientEmitter(0, 1);
 				}
 				if (g_stompSwitchTimer != 0)
@@ -504,7 +534,7 @@ namespace Toy2
 					if (g_stompSwitchTimer < 1)
 					{
 						g_stompSwitchTimer = 0;
-						Nu3D::Link::SetScaleFromFixedOffsets(13, 0x1000, 0x1000, 0x1000);
+						Nu3D::Link::SetScaleFromFixedOffsets(13, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 						Nu3D::Link::SetScaleFromFixedOffsets(14, 0, 0, 0);
 					}
 				}
@@ -512,104 +542,104 @@ namespace Toy2
 				int32_t motorFrequency = 0;
 				switch (g_spaceshipSequenceState)
 				{
-				case 1:
-					g_spaceshipOrbitX += Renderer::g_frameDelta * 0x80;
-					if (g_spaceshipOrbitX > 0xFFFF)
-						g_spaceshipOrbitX -= 0x10000;
-					motorFrequency = 0x3000;
-					break;
-				case 2:
-					g_spaceshipOrbitZ += Renderer::g_frameDelta * 0x80;
-					if (g_spaceshipOrbitZ > 0xFFFF)
-						g_spaceshipOrbitZ -= 0x10000;
-					motorFrequency = 0x3400;
-					break;
-				case 3:
-					g_spaceshipLiftOffset += Renderer::g_frameDelta * 0x80;
-					if (g_spaceshipLiftOffset > 0x4FFF)
-					{
-						g_spaceshipSequenceState = 4;
-						g_spaceshipSequenceTimer = 0;
-						g_spaceshipLiftOffset = 0x5000;
-					}
-					motorFrequency = 0x2C00;
-					break;
-				case 4:
-				{
-					g_spaceshipSequenceTimer += Renderer::g_frameDelta;
-					if (g_spaceshipSequenceTimer > 59 && g_spaceshipSequenceTimer - Renderer::g_frameDelta < 60)
-					{
-						Nu3D::Link::SetScaleFromFixedOffsets(11, 0x1000, 0x1000, 0x1000);
-						Nu3D::Link::SetScaleFromFixedOffsets(10, 0, 0, 0);
-						AudioManager::PlaySoundEffect(0x81, &g_spaceshipBasePosition);
-					}
-					if (g_spaceshipSequenceTimer > 119)
-					{
-						g_spaceshipSequenceState = 5;
-						Vector3I linkPosition;
-						Nu3D::Link::GetCurrentPosFixed(10, &linkPosition);
-						g_spaceshipTokenMotionState = Nu3D::Math::IsWithinDistanceXZ(&linkPosition, &g_spaceshipTokenPosition, 15) != 0;
-					}
-					break;
-				}
-				case 5:
-					g_spaceshipLiftOffset -= Renderer::g_frameDelta * 0x80;
-					if (g_spaceshipLiftOffset < 0)
-					{
-						g_spaceshipLiftOffset = 0;
-						if (g_spaceshipTokenMotionState == SPACESHIP_TOKEN_ATTACHED)
+					case 1:
+						g_spaceshipOrbitX += Renderer::g_frameDelta * SPACESHIP_MOVE_SPEED;
+						if (g_spaceshipOrbitX > ORBIT_PHASE_MAX)
+							g_spaceshipOrbitX -= ORBIT_PHASE_RANGE;
+						motorFrequency = 0x3000;
+						break;
+					case 2:
+						g_spaceshipOrbitZ += Renderer::g_frameDelta * SPACESHIP_MOVE_SPEED;
+						if (g_spaceshipOrbitZ > ORBIT_PHASE_MAX)
+							g_spaceshipOrbitZ -= ORBIT_PHASE_RANGE;
+						motorFrequency = 0x3400;
+						break;
+					case 3:
+						g_spaceshipLiftOffset += Renderer::g_frameDelta * SPACESHIP_MOVE_SPEED;
+						if (g_spaceshipLiftOffset >= 0x5000)
 						{
-							g_spaceshipSequenceState = 6;
-							if (g_spaceshipOrbitX > 0x7FFF)
-								g_spaceshipOrbitX = 0x10000 - g_spaceshipOrbitX;
-							if (g_spaceshipOrbitZ > 0x7FFF)
-								g_spaceshipOrbitZ = 0x10000 - g_spaceshipOrbitZ;
+							g_spaceshipSequenceState = 4;
+							g_spaceshipSequenceTimer = 0;
+							g_spaceshipLiftOffset = 0x5000;
+						}
+						motorFrequency = SPACESHIP_MOTOR_FREQUENCY_LIFT;
+						break;
+					case 4: {
+						g_spaceshipSequenceTimer += Renderer::g_frameDelta;
+						if (g_spaceshipSequenceTimer >= SPACESHIP_CLAW_SWAP_TIME
+							&& g_spaceshipSequenceTimer - Renderer::g_frameDelta < SPACESHIP_CLAW_SWAP_TIME)
+						{
+							Nu3D::Link::SetScaleFromFixedOffsets(11, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
+							Nu3D::Link::SetScaleFromFixedOffsets(10, 0, 0, 0);
+							AudioManager::PlaySoundEffect(SOUND_SPACESHIP_SWITCH, &g_spaceshipBasePosition);
+						}
+						if (g_spaceshipSequenceTimer > 119)
+						{
+							g_spaceshipSequenceState = 5;
+							Vector3I linkPosition;
+							Nu3D::Link::GetCurrentPosFixed(10, &linkPosition);
+							g_spaceshipTokenMotionState = Nu3D::Math::IsWithinDistanceXZ(&linkPosition, &g_spaceshipTokenPosition, 15) != 0;
+						}
+						break;
+					}
+					case 5:
+						g_spaceshipLiftOffset -= Renderer::g_frameDelta * SPACESHIP_MOVE_SPEED;
+						if (g_spaceshipLiftOffset < 0)
+						{
+							g_spaceshipLiftOffset = 0;
+							if (g_spaceshipTokenMotionState == SPACESHIP_TOKEN_ATTACHED)
+							{
+								g_spaceshipSequenceState = 6;
+								if (g_spaceshipOrbitX >= ORBIT_PHASE_HALF)
+									g_spaceshipOrbitX = ORBIT_PHASE_RANGE - g_spaceshipOrbitX;
+								if (g_spaceshipOrbitZ >= ORBIT_PHASE_HALF)
+									g_spaceshipOrbitZ = ORBIT_PHASE_RANGE - g_spaceshipOrbitZ;
+							}
+							else
+							{
+								g_spaceshipSequenceState = 0;
+								Nu3D::Link::SetScaleFromFixedOffsets(10, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
+								Nu3D::Link::SetScaleFromFixedOffsets(11, 0, 0, 0);
+								AudioManager::PlaySoundEffect(SOUND_SPACESHIP_SWITCH, &g_spaceshipBasePosition);
+							}
+						}
+						motorFrequency = SPACESHIP_MOTOR_FREQUENCY_LIFT;
+						break;
+					case 6:
+						g_spaceshipOrbitX -= Renderer::g_frameDelta * SPACESHIP_MOVE_SPEED;
+						if (g_spaceshipOrbitX < 0)
+							g_spaceshipOrbitX = 0;
+						g_spaceshipOrbitZ += Renderer::g_frameDelta * SPACESHIP_MOVE_SPEED;
+						if (g_spaceshipOrbitZ > ORBIT_PHASE_HALF)
+							g_spaceshipOrbitZ = ORBIT_PHASE_HALF;
+						if (g_spaceshipOrbitX == 0 && g_spaceshipOrbitZ == ORBIT_PHASE_HALF)
+						{
+							Nu3D::Link::SetScaleFromFixedOffsets(10, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
+							Nu3D::Link::SetScaleFromFixedOffsets(11, 0, 0, 0);
+							g_spaceshipSequenceState = 7;
+							g_spaceshipTokenMotionState = SPACESHIP_TOKEN_FALLING;
+							g_spaceshipTokenVerticalVelocity = 0;
+							AudioManager::PlaySoundEffect(SOUND_SPACESHIP_SWITCH, &g_spaceshipBasePosition);
 						}
 						else
 						{
-							g_spaceshipSequenceState = 0;
-							Nu3D::Link::SetScaleFromFixedOffsets(10, 0x1000, 0x1000, 0x1000);
-							Nu3D::Link::SetScaleFromFixedOffsets(11, 0, 0, 0);
-							AudioManager::PlaySoundEffect(0x81, &g_spaceshipBasePosition);
+							motorFrequency = SPACESHIP_MOTOR_FREQUENCY_LIFT;
 						}
-					}
-					motorFrequency = 0x2C00;
-					break;
-				case 6:
-					g_spaceshipOrbitX -= Renderer::g_frameDelta * 0x80;
-					if (g_spaceshipOrbitX < 0)
-						g_spaceshipOrbitX = 0;
-					g_spaceshipOrbitZ += Renderer::g_frameDelta * 0x80;
-					if (g_spaceshipOrbitZ > 0x8000)
-						g_spaceshipOrbitZ = 0x8000;
-					if (g_spaceshipOrbitX == 0 && g_spaceshipOrbitZ == 0x8000)
-					{
-						Nu3D::Link::SetScaleFromFixedOffsets(10, 0x1000, 0x1000, 0x1000);
-						Nu3D::Link::SetScaleFromFixedOffsets(11, 0, 0, 0);
-						g_spaceshipSequenceState = 7;
-						g_spaceshipTokenMotionState = SPACESHIP_TOKEN_FALLING;
-						g_spaceshipTokenVerticalVelocity = 0;
-						AudioManager::PlaySoundEffect(0x81, &g_spaceshipBasePosition);
-					}
-					else
-					{
-						motorFrequency = 0x2C00;
-					}
-					break;
+						break;
 				}
 
 				if (motorFrequency != 0)
 				{
 					AudioManager::g_dynamicSoundFrequencies[0] = motorFrequency;
-					AudioManager::PlaySoundEffect(0x82, &g_spaceshipBasePosition);
+					AudioManager::PlaySoundEffect(SOUND_SPACESHIP_MOTOR, &g_spaceshipBasePosition);
 				}
 
 				int32_t orbitX = g_spaceshipOrbitX;
-				if (orbitX > 0x7FFF)
-					orbitX = 0x10000 - orbitX;
+				if (orbitX >= ORBIT_PHASE_HALF)
+					orbitX = ORBIT_PHASE_RANGE - orbitX;
 				int32_t orbitZ = g_spaceshipOrbitZ;
-				if (orbitZ > 0x7FFF)
-					orbitZ = 0x10000 - orbitZ;
+				if (orbitZ >= ORBIT_PHASE_HALF)
+					orbitZ = ORBIT_PHASE_RANGE - orbitZ;
 				int32_t spaceshipX = g_spaceshipBasePosition.x + orbitX;
 				int32_t spaceshipY = g_spaceshipBasePosition.y + g_spaceshipLiftOffset;
 				int32_t spaceshipZ = g_spaceshipBasePosition.z + orbitZ;
@@ -620,51 +650,48 @@ namespace Toy2
 
 				if (Renderer::Shadows::g_shadowCount < 47)
 				{
-					Renderer::Shadows::ShadowInstance* shadow = &Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount++];
-					shadow->pos.x = spaceshipX;
-					shadow->pos.y = -64000;
-					shadow->pos.z = spaceshipZ;
-					shadow->size = 0x100;
+					Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.x = spaceshipX;
+					Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.y = -64000;
+					Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].pos.z = spaceshipZ;
+					Renderer::Shadows::g_shadowInstances[Renderer::Shadows::g_shadowCount].size = SPACESHIP_SHADOW_SIZE;
+					Renderer::Shadows::g_shadowCount++;
 				}
 
 				if (g_spaceshipTokenMotionState == SPACESHIP_TOKEN_ATTACHED)
 				{
 					g_spaceshipTokenPosition.x = spaceshipX;
-					g_spaceshipTokenPosition.y = spaceshipY + 0x1000;
+					g_spaceshipTokenPosition.y = spaceshipY + SPACESHIP_TOKEN_HANG_OFFSET;
 					g_spaceshipTokenPosition.z = spaceshipZ;
 				}
 				else if (g_spaceshipTokenMotionState == SPACESHIP_TOKEN_FALLING)
 				{
-					g_spaceshipTokenVerticalVelocity += Renderer::g_frameDelta * 0x20;
+					g_spaceshipTokenVerticalVelocity += Renderer::g_frameDelta * TOKEN_FALL_GRAVITY;
 					g_spaceshipTokenPosition.y += g_spaceshipTokenVerticalVelocity * Renderer::g_frameDelta;
 					if (g_spaceshipTokenPosition.y > -0x6D41)
 					{
 						g_spaceshipTokenPickup->facingAngle |= 0x28;
-						g_spaceshipTokenPosition.x -= Renderer::g_frameDelta * 0x100;
-						g_spaceshipTokenPosition.z += Renderer::g_frameDelta * 0x100;
+						g_spaceshipTokenPosition.x -= Renderer::g_frameDelta * TOKEN_ROLL_SPEED;
+						g_spaceshipTokenPosition.z += Renderer::g_frameDelta * TOKEN_ROLL_SPEED;
 					}
 					if (g_spaceshipTokenPosition.y > -0x1800)
 					{
 						g_spaceshipTokenPosition.y = -0x1800;
 						g_spaceshipTokenVerticalVelocity = -(g_spaceshipTokenVerticalVelocity / 2);
-						if (abs(g_spaceshipTokenVerticalVelocity) < 0x100)
+						if (abs(g_spaceshipTokenVerticalVelocity) < TOKEN_BOUNCE_MIN_SPEED)
 							g_spaceshipTokenMotionState = SPACESHIP_TOKEN_SETTLED;
 					}
 				}
 
 				RotatingLinkState* spaceshipRotation = &g_rotatingLinkStates[8];
-				spaceshipRotation->speedAngle = (spaceshipRotation->speedAngle + Renderer::g_frameDelta * 8) & 0xFFF;
+				spaceshipRotation->speedAngle = (spaceshipRotation->speedAngle + Renderer::g_frameDelta * 8) & ANGLE_MASK;
 				spaceshipRotation->rotationAngle =
-					(spaceshipRotation->rotationAngle + (Numerics::g_sinCosLUT[spaceshipRotation->speedAngle] >> 11) * Renderer::g_frameDelta) & 0xFFF;
+					(spaceshipRotation->rotationAngle + (Numerics::g_sinCosLUT[spaceshipRotation->speedAngle] >> 11) * Renderer::g_frameDelta) & ANGLE_MASK;
 				Nu3D::Link::SetRotationRelative8bit(10, 0, spaceshipRotation->rotationAngle, 0);
 				Nu3D::Link::SetRotationRelative8bit(11, 0, spaceshipRotation->rotationAngle, 0);
 
 				if (g_spaceshipTokenPickup->position.y != INT_MIN)
 				{
-					Nu3D::Link::SetPositionRawAndCommit(53,
-						g_spaceshipTokenPosition.x >> 5,
-						g_spaceshipTokenPosition.y >> 5,
-						g_spaceshipTokenPosition.z >> 5);
+					Nu3D::Link::SetPositionRawAndCommit(53, g_spaceshipTokenPosition.x >> 5, g_spaceshipTokenPosition.y >> 5, g_spaceshipTokenPosition.z >> 5);
 					g_spaceshipTokenPickup->position.x = g_spaceshipTokenPosition.x >> 5;
 					g_spaceshipTokenPickup->position.y = g_spaceshipTokenPosition.y >> 5;
 					g_spaceshipTokenPickup->position.z = g_spaceshipTokenPosition.z >> 5;
@@ -674,10 +701,10 @@ namespace Toy2
 				Renderer::BlitTextureByIndexOffset(5, 0, 0, 0x40, 0x40, 0, g_textureAnimationFrame / 2, 0, 0x40);
 				g_textureAnimationFrame = (g_textureAnimationFrame + Renderer::g_frameDelta) & 0x7F;
 
-				g_link21BobAngle = (g_link21BobAngle + Renderer::g_frameDelta * 7) & 0xFFF;
-				g_link20BobAngle = (g_link20BobAngle + Renderer::g_frameDelta * 8) & 0xFFF;
-				g_link22BobAngle = (g_link22BobAngle + Renderer::g_frameDelta * 6) & 0xFFF;
-				g_link23BobAngle = (g_link23BobAngle + Renderer::g_frameDelta * 11) & 0xFFF;
+				g_link21BobAngle = (g_link21BobAngle + Renderer::g_frameDelta * 7) & ANGLE_MASK;
+				g_link20BobAngle = (g_link20BobAngle + Renderer::g_frameDelta * 8) & ANGLE_MASK;
+				g_link22BobAngle = (g_link22BobAngle + Renderer::g_frameDelta * 6) & ANGLE_MASK;
+				g_link23BobAngle = (g_link23BobAngle + Renderer::g_frameDelta * 11) & ANGLE_MASK;
 				Nu3D::Link::SetPositionRawAndCommit(
 					20, g_link20Origin.x >> 5, (g_link20Origin.y >> 5) + (Numerics::g_sinCosLUT[g_link20BobAngle] >> 6), g_link20Origin.z >> 5);
 				Nu3D::Link::SetPositionRawAndCommit(
@@ -690,29 +717,25 @@ namespace Toy2
 				g_ambientSoundTimer -= Renderer::g_frameDelta;
 				if (g_ambientSoundTimer < 1)
 				{
-					g_ambientSoundTimer = (*g_randDatBufferPtr & 0x7F) + 10;
-					int32_t soundId = g_randDatBufferPtr[1] & 3;
+					g_ambientSoundTimer = (*g_randDatBufferPtr++ & 0x7F) + 10;
+					int32_t soundId = *g_randDatBufferPtr++ & 3;
 					if (soundId == 3)
 						soundId = 0;
-					int32_t sourceIndex = g_randDatBufferPtr[2] & 3;
-					g_randDatBufferPtr += 3;
-					Vector3I* soundPosition;
-					switch (sourceIndex)
+					switch (*g_randDatBufferPtr++ & 3)
 					{
-					case 0:
-						soundPosition = &g_link20Origin;
-						break;
-					case 1:
-						soundPosition = &g_link21Origin;
-						break;
-					case 2:
-						soundPosition = &g_link22Origin;
-						break;
-					default:
-						soundPosition = &g_link23Origin;
-						break;
+						case 0:
+							AudioManager::PlaySoundEffect(soundId + SOUND_ALIEN_CHATTER_FIRST, &g_link20Origin);
+							break;
+						case 1:
+							AudioManager::PlaySoundEffect(soundId + SOUND_ALIEN_CHATTER_FIRST, &g_link21Origin);
+							break;
+						case 2:
+							AudioManager::PlaySoundEffect(soundId + SOUND_ALIEN_CHATTER_FIRST, &g_link22Origin);
+							break;
+						case 3:
+							AudioManager::PlaySoundEffect(soundId + SOUND_ALIEN_CHATTER_FIRST, &g_link23Origin);
+							break;
 					}
-					AudioManager::PlaySoundEffect(soundId + 0x7B, soundPosition);
 				}
 
 				if (g_swingPlatformTriggered == 0)
@@ -729,12 +752,14 @@ namespace Toy2
 			}
 
 			int32_t surfaceY;
+			// Buzz is in the pool: set the water surface effect.
 			if (Actor::IsInsideBounds(&g_buzzActor.posAngles.pos, 0x3320E, 0x5960E, 0x269CA, 0x49D8A) != 0)
 			{
 				surfaceY = -0x8200;
 				g_environmentEffectType = 3;
 				g_environmentSurfaceY = surfaceY;
 			}
+			// Buzz is out of the pool: clear the water surface effect.
 			else
 			{
 				surfaceY = 0;
@@ -742,8 +767,9 @@ namespace Toy2
 				g_environmentSurfaceY = 0;
 			}
 
+			// Spawn splash particles when Buzz moves in the water.
 			if ((g_buzzActor.actorFlags & Buzz::ACTOR_FLAG_BLOCK_EDGE_IDLE) != 0 && g_framePulseOutputs.fourTick != 0
-				&& (g_buzzActor.forwardSpeed > 0x20 || abs(g_buzzActor.velocity.vertical) > 0x20))
+				&& (g_buzzActor.forwardSpeed > SPLASH_SPEED_MIN || abs(g_buzzActor.velocity.vertical) > SPLASH_SPEED_MIN))
 			{
 				Nu3D::Particles::ParticleInstance* particle =
 					Nu3D::Particles::SpawnFromPreset(g_buzzActor.posAngles.pos.x, surfaceY, g_buzzActor.posAngles.pos.z, 0x5F, 4);
@@ -753,6 +779,7 @@ namespace Toy2
 				particle->colourB = static_cast<uint8_t>(colour->b);
 			}
 
+			// Sector 2: fire projectiles along the path at Buzz.
 			if (Sector::g_currentSectorIndex == 2 && g_buzzActor.posAngles.pos.x < 0x1B467)
 			{
 				g_projectileScanTimer += Renderer::g_frameDelta;
@@ -775,23 +802,15 @@ namespace Toy2
 						int32_t deltaX = (projectilePosition.x - g_buzzActor.posAngles.pos.x) >> 5;
 						int32_t deltaY = projectilePosition.y - g_buzzActor.posAngles.pos.y;
 						int32_t deltaZ = (projectilePosition.z - g_buzzActor.posAngles.pos.z) >> 5;
-						int32_t yaw = Nu3D::Math::CartesianToFixedAngle(deltaX, deltaZ) & 0xFFF;
+						int32_t yaw = Nu3D::Math::CartesianToFixedAngle(deltaX, deltaZ) & ANGLE_MASK;
 						int32_t distance = static_cast<int32_t>(sqrt(static_cast<float>(deltaX * deltaX + deltaZ * deltaZ)));
 						int32_t horizontalSpeed = distance * 2 / 3;
 						int32_t travelTime = (distance << 12) / horizontalSpeed;
-						int32_t velocityX = Numerics::g_sinCosLUT[(yaw - 0x800) & 0xFFF] * horizontalSpeed / 0x4000;
+						int32_t velocityX = Numerics::g_sinCosLUT[(yaw - 0x800) & ANGLE_MASK] * horizontalSpeed / 0x4000;
 						int32_t velocityY = (-travelTime * 0x80) / 0x100 - (deltaY * 0x80) / travelTime;
-						int32_t velocityZ = Numerics::g_sinCosLUT[(yaw - 0x400) & 0xFFF] * horizontalSpeed / 0x4000;
-						Nu3D::Particles::SpawnInstance(projectilePosition.x,
-							projectilePosition.y,
-							projectilePosition.z,
-							velocityX,
-							velocityY,
-							velocityZ,
-							0x80,
-							0,
-							0,
-							0x60);
+						int32_t velocityZ = Numerics::g_sinCosLUT[(yaw - 0x400) & ANGLE_MASK] * horizontalSpeed / 0x4000;
+						Nu3D::Particles::SpawnInstance(
+							projectilePosition.x, projectilePosition.y, projectilePosition.z, velocityX, velocityY, velocityZ, 0x80, 0, 0, 0x60);
 						AudioManager::PlaySoundEffect(13, &projectilePosition);
 					}
 				}
@@ -802,6 +821,7 @@ namespace Toy2
 			Nu3D::Link::SetPositionRawAndCommit(17, linkPosition.x >> 7, linkPosition.y >> 7, linkPosition.z >> 7);
 			Nu3D::Link::GetCurrentPosFixed(15, &linkPosition);
 			Nu3D::Link::SetPositionRawAndCommit(18, linkPosition.x >> 7, linkPosition.y >> 7, linkPosition.z >> 7);
+			// Animate the alien texture while the alien is targetable.
 			if ((Actor::g_creatureActors[2].actorFlags & Actor::ACTOR_FLAG_TARGETABLE) != 0)
 			{
 				Renderer::BlitTextureByIndexOffset(18, 0x40, 0, 0x14, 0x40, 0, g_framePulsePhases.sixtyFourTick, 0x14, 0);
@@ -817,11 +837,10 @@ namespace Toy2
 					break;
 				}
 			}
-			if (!projectileActive)
+			if (! projectileActive)
 				Nu3D::Link::SetPositionRawAndCommit(25, -0x2A6D, -0x4962, 0x25E1);
 
-			if (g_hammDialogueState == 0 && g_buzzActor.collisionFlags != 0 && Sector::g_currentSectorIndex == 5
-				&& g_buzzActor.posAngles.pos.y >= -0x27A7F)
+			if (g_hammDialogueState == 0 && g_buzzActor.collisionFlags != 0 && Sector::g_currentSectorIndex == 5 && g_buzzActor.posAngles.pos.y >= -0x27A7F)
 			{
 				g_hammDialogueState = 1;
 				Dialogue::Begin(40, 17, g_buggyIntroSubtitle, -1, 0, -1);
