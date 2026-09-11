@@ -796,33 +796,32 @@ namespace Nu3D
 						}
 					}
 
-					const ParticleType* type = &g_particleTypes[particle->typeId - 1];
 					switch (colourMode)
 					{
 						case 1:
 							if (particle->lifetime < 0x20)
 							{
-								particle->colourR = type->colourR * particle->lifetime / 2 >> 4;
-								particle->colourG = type->colourG * particle->lifetime / 2 >> 4;
-								particle->colourB = type->colourB * particle->lifetime / 2 >> 4;
+								particle->colourR = g_particleTypes[particle->typeId - 1].colourR * particle->lifetime / 2 >> 4;
+								particle->colourG = g_particleTypes[particle->typeId - 1].colourG * particle->lifetime / 2 >> 4;
+								particle->colourB = g_particleTypes[particle->typeId - 1].colourB * particle->lifetime / 2 >> 4;
 							}
 							break;
 						case 2:
 							if (particle->lifetime < 0x40)
 							{
-								particle->colourR = type->colourR * particle->lifetime / 2 >> 5;
-								particle->colourG = type->colourG * particle->lifetime / 2 >> 5;
-								particle->colourB = type->colourB * particle->lifetime / 2 >> 5;
+								particle->colourR = g_particleTypes[particle->typeId - 1].colourR * particle->lifetime / 2 >> 5;
+								particle->colourG = g_particleTypes[particle->typeId - 1].colourG * particle->lifetime / 2 >> 5;
+								particle->colourB = g_particleTypes[particle->typeId - 1].colourB * particle->lifetime / 2 >> 5;
 							}
 							break;
 						case 3:
 							if (particle->lifetime < 0x20)
 							{
-								particle->colourR = type->colourR * particle->lifetime / 2 >> 4;
+								particle->colourR = g_particleTypes[particle->typeId - 1].colourR * particle->lifetime / 2 >> 4;
 								if (particle->lifetime > 0x10)
 								{
-									particle->colourG = type->colourG * (particle->lifetime - 0x10) / 2 >> 3;
-									particle->colourB = type->colourB * (particle->lifetime - 0x10) / 2 >> 3;
+									particle->colourG = g_particleTypes[particle->typeId - 1].colourG * (particle->lifetime - 0x10) / 2 >> 3;
+									particle->colourB = g_particleTypes[particle->typeId - 1].colourB * (particle->lifetime - 0x10) / 2 >> 3;
 								}
 								else
 									particle->colourG = particle->colourB = 0;
@@ -831,41 +830,50 @@ namespace Nu3D
 						case 4:
 							if (particle->lifetime < 0x100)
 							{
-								particle->colourR = type->colourR * particle->lifetime / 2 >> 7;
-								particle->colourG = type->colourG * particle->lifetime / 2 >> 7;
-								particle->colourB = type->colourB * particle->lifetime / 2 >> 7;
+								particle->colourR = g_particleTypes[particle->typeId - 1].colourR * particle->lifetime / 2 >> 7;
+								particle->colourG = g_particleTypes[particle->typeId - 1].colourG * particle->lifetime / 2 >> 7;
+								particle->colourB = g_particleTypes[particle->typeId - 1].colourB * particle->lifetime / 2 >> 7;
 							}
 							break;
 						case 5:
 							if (particle->lifetime < 0x20)
 							{
-								particle->colourR = particle->lifetime < 0x10 ? type->colourR * particle->lifetime / 2 >> 4 : 0;
-								particle->colourB = particle->lifetime > 0xC ? type->colourB * (particle->lifetime - 0xC) / 2 >> 4 : 0;
-								particle->colourG = particle->lifetime > 0x18 ? type->colourG * (particle->lifetime - 0x18) / 2 >> 3 : 0;
+								if (particle->lifetime < 0x10)
+									particle->colourR = g_particleTypes[particle->typeId - 1].colourR * particle->lifetime / 2 >> 4;
+								else
+									particle->colourR = 0;
+								if (particle->lifetime > 0xC)
+									particle->colourB = g_particleTypes[particle->typeId - 1].colourB * (particle->lifetime - 0xC) / 2 >> 4;
+								else
+									particle->colourB = 0;
+								if (particle->lifetime > 0x18)
+									particle->colourG = g_particleTypes[particle->typeId - 1].colourG * (particle->lifetime - 0x18) / 2 >> 3;
+								else
+									particle->colourG = 0;
 							}
 							else
 								particle->colourR = 0;
 							break;
 						case 6: {
 							int32_t scale = (*g_randDatBufferPtr++ & 0x7F) + 0x80;
-							particle->colourR = type->colourR * scale >> 8;
-							particle->colourG = type->colourG * scale >> 8;
-							particle->colourB = type->colourB * scale >> 8;
+							particle->colourR = g_particleTypes[particle->typeId - 1].colourR * scale >> 8;
+							particle->colourG = g_particleTypes[particle->typeId - 1].colourG * scale >> 8;
+							particle->colourB = g_particleTypes[particle->typeId - 1].colourB * scale >> 8;
 							break;
 						}
 						case 7:
 							if (particle->lifetime < 0x20)
 							{
-								particle->colourR = type->colourR * particle->lifetime / 2 >> 4;
-								particle->colourG = type->colourG * particle->lifetime / 2 >> 4;
-								particle->colourB = type->colourB * particle->lifetime / 2 >> 4;
+								particle->colourR = g_particleTypes[particle->typeId - 1].colourR * particle->lifetime / 2 >> 4;
+								particle->colourG = g_particleTypes[particle->typeId - 1].colourG * particle->lifetime / 2 >> 4;
+								particle->colourB = g_particleTypes[particle->typeId - 1].colourB * particle->lifetime / 2 >> 4;
 							}
 							else
 							{
 								int32_t scale = 0x2A - particle->lifetime;
-								particle->colourR = type->colourR * scale / 2 >> 2;
-								particle->colourG = type->colourG * scale / 2 >> 2;
-								particle->colourB = type->colourB * scale / 2 >> 2;
+								particle->colourR = g_particleTypes[particle->typeId - 1].colourR * scale / 2 >> 2;
+								particle->colourG = g_particleTypes[particle->typeId - 1].colourG * scale / 2 >> 2;
+								particle->colourB = g_particleTypes[particle->typeId - 1].colourB * scale / 2 >> 2;
 							}
 							break;
 					}
