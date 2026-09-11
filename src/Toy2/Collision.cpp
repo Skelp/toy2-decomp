@@ -3958,6 +3958,216 @@ namespace Nu3D
 			return foundHit;
 		}
 
+		// FUNCTION: TOY2 0x0048C030 [PROVISIONAL]
+		int32_t RaycastAgainstCandidates(const Vector4I* movement, Vector4I* position, int32_t radius)
+		{
+			// A face whose second plane normal has this Y value has no second triangle.
+			const int16_t SINGLE_TRIANGLE_FACE = 0x7FFF;
+			const int32_t NO_HIT_FRACTION = 0x7FFFFFFF;
+			// Fixed-point scale of the 4.12 rotation matrix entries.
+			const int32_t ROTATION_ONE = 0x1000;
+
+			int16_t hitCount = 0;
+			int32_t nearestFraction = NO_HIT_FRACTION;
+			int32_t startDistance;
+			int32_t endDistance;
+			union
+			{
+				Vector3I16 xyz;
+				Vector4I16 xyzw;
+			} hitNormal;
+			uint16_t reversed;
+			int32_t crossingReversed;
+			int16_t preparedMeshIndex = -1;
+			Vector3I localStart;
+			Vector3I localEnd;
+			Vector3I hitPoint;
+
+			// Test the ray against each candidate triangle.
+			for (int32_t triangleIndex = 0; triangleIndex < Toy2::Collision::g_collisionTriangleCount; triangleIndex++)
+			{
+				int16_t meshIndex = Toy2::Collision::g_collisionTriangleMeshIndices[triangleIndex];
+				Toy2::Collision::PackedCollisionFace* face = Toy2::Collision::g_collisionTriangles[triangleIndex];
+
+				// Put the ray into the local space of the mesh that owns the face.
+				if (meshIndex != preparedMeshIndex)
+				{
+					Vector4I start = *position;
+					Vector4I delta = *movement;
+					preparedMeshIndex = meshIndex;
+					// Retail holds two copies of the translate-only block (the compiler merged their tails).
+					if (Toy2::Collision::g_collisionMeshInstances[meshIndex].typeFlags != Toy2::Collision::COLLISION_MESH_MOVING)
+					{
+						localStart.x = start.x - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.x;
+						localStart.y = start.y - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.y;
+						localStart.z = start.z - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.z;
+						localEnd.x = delta.x - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.x + start.x;
+						localEnd.y = delta.y - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.y + start.y;
+						localEnd.z = delta.z - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.z + start.z;
+					}
+					else if ((Toy2::Platform::g_platformStates[Toy2::Collision::g_collisionMeshInstances[meshIndex].platformIdx].flags
+								 & Toy2::Platform::PLATFORM_FLAG_ROTATED)
+						!= 0)
+					{
+						Toy2::Platform::PlatformState& platform =
+							Toy2::Platform::g_platformStates[Toy2::Collision::g_collisionMeshInstances[meshIndex].platformIdx];
+						Vector3I16 angles;
+						angles.x = platform.rotationAnglesFixed.x >> 2;
+						angles.y = platform.rotationAnglesFixed.y >> 2;
+						angles.z = platform.rotationAnglesFixed.z >> 2;
+						const Matrix3x3I16& rotation = Toy2::Animation::g_keyframeRotation.matrix;
+						Math::SetRotationXYZ(&angles, &Toy2::Animation::g_keyframeRotation.matrix);
+						int32_t relativeX = start.x - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.x;
+						int32_t relativeY = start.y - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.y;
+						int32_t relativeZ = start.z - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.z;
+						localStart.x = (rotation.m00 * relativeX + rotation.m10 * relativeY + rotation.m20 * relativeZ) / ROTATION_ONE;
+						localStart.y = (rotation.m01 * relativeX + rotation.m11 * relativeY + rotation.m21 * relativeZ) / ROTATION_ONE;
+						localStart.z = (rotation.m02 * relativeX + rotation.m12 * relativeY + rotation.m22 * relativeZ) / ROTATION_ONE;
+						relativeX = delta.x - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.x + start.x;
+						relativeY = delta.y - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.y + start.y;
+						relativeZ = delta.z - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.z + start.z;
+						localEnd.x = (rotation.m00 * relativeX + rotation.m10 * relativeY + rotation.m20 * relativeZ) / ROTATION_ONE;
+						localEnd.y = (rotation.m01 * relativeX + rotation.m11 * relativeY + rotation.m21 * relativeZ) / ROTATION_ONE;
+						localEnd.z = (rotation.m02 * relativeX + rotation.m12 * relativeY + rotation.m22 * relativeZ) / ROTATION_ONE;
+					}
+					else
+					{
+						localStart.x = start.x - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.x;
+						localStart.y = start.y - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.y;
+						localStart.z = start.z - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.z;
+						localEnd.x = delta.x - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.x + start.x;
+						localEnd.y = delta.y - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.y + start.y;
+						localEnd.z = delta.z - Toy2::Collision::g_collisionMeshInstances[meshIndex].origin.z + start.z;
+					}
+				}
+
+				// First triangle: vertex0 with the vertex1 and vertex2 offsets.
+				crossingReversed = 0;
+				int32_t endDistanceFromPlane =
+					(((localEnd.x >> 5) - face->vertex0.x - face->vertex1Offset.x) * face->firstPlaneNormal.x
+						+ ((localEnd.y >> 5) - face->vertex0.y - face->vertex1Offset.y) * face->firstPlaneNormal.y
+						+ ((localEnd.z >> 5) - face->vertex0.z - face->vertex1Offset.z) * face->firstPlaneNormal.z)
+					>> 14;
+				int32_t startDistanceFromPlane =
+					(((localStart.x >> 5) - face->vertex0.x - face->vertex1Offset.x) * face->firstPlaneNormal.x
+						+ ((localStart.y >> 5) - face->vertex0.y - face->vertex1Offset.y) * face->firstPlaneNormal.y
+						+ ((localStart.z >> 5) - face->vertex0.z - face->vertex1Offset.z) * face->firstPlaneNormal.z)
+					>> 14;
+				if (startDistanceFromPlane < endDistanceFromPlane)
+				{
+					startDistanceFromPlane = -startDistanceFromPlane;
+					endDistanceFromPlane = -endDistanceFromPlane;
+					crossingReversed = 1;
+				}
+				if (endDistanceFromPlane < 0 && startDistanceFromPlane >= 0)
+				{
+					int32_t distanceRange = startDistanceFromPlane - endDistanceFromPlane;
+					hitPoint.x = localStart.x + (localEnd.x - localStart.x) * startDistanceFromPlane / distanceRange;
+					hitPoint.y = localStart.y + (localEnd.y - localStart.y) * startDistanceFromPlane / distanceRange;
+					hitPoint.z = localStart.z + (localEnd.z - localStart.z) * startDistanceFromPlane / distanceRange;
+					if (IsPointInTriangle((hitPoint.x >> 5) - face->vertex0.x,
+							(hitPoint.y >> 5) - face->vertex0.y,
+							(hitPoint.z >> 5) - face->vertex0.z,
+							face->vertex1Offset.x,
+							face->vertex1Offset.y,
+							face->vertex1Offset.z,
+							face->vertex2Offset.x,
+							face->vertex2Offset.y,
+							face->vertex2Offset.z,
+							&face->firstPlaneNormal)
+						!= 0)
+					{
+						int32_t fraction = (startDistanceFromPlane << 14) / distanceRange;
+						if (fraction < nearestFraction)
+						{
+							startDistance = startDistanceFromPlane;
+							endDistance = endDistanceFromPlane;
+							nearestFraction = fraction;
+							hitNormal.xyzw = *reinterpret_cast<const Vector4I16*>(&face->firstPlaneNormal);
+							reversed = (uint16_t)crossingReversed;
+							hitCount++;
+						}
+					}
+				}
+
+				// Second triangle of a quad face: vertex0 plus the vertex3 offset, at full precision.
+				if (face->secondPlaneNormal.y != SINGLE_TRIANGLE_FACE)
+				{
+					crossingReversed = 0;
+					int32_t endDistanceFromSecond =
+						((localEnd.x - (face->vertex0.x << 5) - (face->vertex3Offset.x << 5)) * face->secondPlaneNormal.x
+							+ (localEnd.y - (face->vertex0.y << 5) - (face->vertex3Offset.y << 5)) * face->secondPlaneNormal.y
+							+ (localEnd.z - (face->vertex0.z << 5) - (face->vertex3Offset.z << 5)) * face->secondPlaneNormal.z)
+						>> 14;
+					int32_t startDistanceFromSecond =
+						((localStart.x - (face->vertex0.x << 5) - (face->vertex3Offset.x << 5)) * face->secondPlaneNormal.x
+							+ (localStart.y - (face->vertex0.y << 5) - (face->vertex3Offset.y << 5)) * face->secondPlaneNormal.y
+							+ (localStart.z - (face->vertex0.z << 5) - (face->vertex3Offset.z << 5)) * face->secondPlaneNormal.z)
+						>> 14;
+					if (startDistanceFromSecond < endDistanceFromSecond)
+					{
+						startDistanceFromSecond = -startDistanceFromSecond;
+						endDistanceFromSecond = -endDistanceFromSecond;
+						crossingReversed = 1;
+					}
+					if (endDistanceFromSecond < 0 && startDistanceFromSecond >= 0)
+					{
+						int32_t distanceRange = startDistanceFromSecond - endDistanceFromSecond;
+						hitPoint.x = localStart.x + (localEnd.x - localStart.x) * startDistanceFromSecond / distanceRange;
+						hitPoint.y = localStart.y + (localEnd.y - localStart.y) * startDistanceFromSecond / distanceRange;
+						hitPoint.z = localStart.z + (localEnd.z - localStart.z) * startDistanceFromSecond / distanceRange;
+						if (IsPointInTriangle(((hitPoint.x >> 5) - face->vertex3Offset.x) - face->vertex0.x,
+								((hitPoint.y >> 5) - face->vertex3Offset.y) - face->vertex0.y,
+								((hitPoint.z >> 5) - face->vertex3Offset.z) - face->vertex0.z,
+								face->vertex2Offset.x - face->vertex3Offset.x,
+								face->vertex2Offset.y - face->vertex3Offset.y,
+								face->vertex2Offset.z - face->vertex3Offset.z,
+								face->vertex1Offset.x - face->vertex3Offset.x,
+								face->vertex1Offset.y - face->vertex3Offset.y,
+								face->vertex1Offset.z - face->vertex3Offset.z,
+								&face->secondPlaneNormal)
+							!= 0)
+						{
+							int32_t fraction = (startDistanceFromSecond << 14) / distanceRange;
+							if (fraction < nearestFraction)
+							{
+								startDistance = startDistanceFromSecond;
+								endDistance = endDistanceFromSecond;
+								nearestFraction = fraction;
+								hitNormal.xyzw = *reinterpret_cast<const Vector4I16*>(&face->secondPlaneNormal);
+								reversed = (uint16_t)crossingReversed;
+								hitCount++;
+							}
+						}
+					}
+				}
+			}
+
+			// Test the ray against the candidate edges and keep a nearer hit.
+			if (RaycastAgainstEdges(&nearestFraction,
+					&startDistance,
+					&endDistance,
+					&hitNormal.xyz,
+					&reversed,
+					reinterpret_cast<const Vector3I*>(position),
+					reinterpret_cast<const Vector3I*>(movement))
+				== 1)
+			{
+				hitCount++;
+			}
+
+			// Move the position to the nearest hit that the ray met from behind.
+			if (hitCount > 0 && reversed == 1)
+			{
+				int32_t distanceRange = startDistance - endDistance;
+				position->x += movement->x * startDistance / distanceRange;
+				position->y += movement->y * startDistance / distanceRange;
+				position->z += movement->z * startDistance / distanceRange;
+				return 1;
+			}
+			return 0;
+		}
+
 		// FUNCTION: TOY2 0x00486280 [MATCHED]
 		int32_t GetGroundHeight(const PosAndAngles* position, int32_t shadowSize)
 		{
