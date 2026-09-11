@@ -1040,6 +1040,8 @@ run_batch_prompt() {
                 "complete body to the translation unit that holds the map neighbours shown by" \
                 "the evidence."
         fi
+        echo "Write a long body in several edit calls of under 9,000 characters each (the harness" \
+            "denies a longer command); they cost no attempt. Then run bc once."
     fi
     echo "End: your final message is the handoff, with no tool call after it; the driver saves it."
     echo "The orientation pack (tools/decomp bc $run_address --pack) follows; do not run it again."

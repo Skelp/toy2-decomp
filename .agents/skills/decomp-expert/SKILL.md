@@ -18,7 +18,7 @@ the handoff TOOL line and stop.
   (`N  0xADDR  -a +b  FILE:LINES`). It is the only command that consumes an attempt.
 - Then `bc` prints up to two regions changed since the last diff and, if room, the largest
   region you have not seen yet, with source lines (tabs kept); `bc ADDR --hunk 3,7` prints
-  any region with its source lines, no build. The assignment holds the pack. No `cd` or loops.
+  any region with source lines, no build. The assignment holds the pack. No `cd`, loops, abs paths.
 - A failed build prints the errors and `bc: no attempt logged`; fix it and run the cycle
   again. Never pipe `bc` into `head` or `tail`: a closed pipe aborts the build.
 - A `header side effect:` line means your header edit moved an untouched function; make the
@@ -28,10 +28,10 @@ the handoff TOOL line and stop.
   OPEN (the function stays PROVISIONAL). Never move a cast into a local or macro to pass the
   lint. An `advice:` line names a literal to replace with its name; validate ignores it.
 - The best tree is `build/decomp-cache/best/ADDR.patch`; `git checkout -- src && git apply
-  build/decomp-cache/best/ADDR.patch` restores it; bc on a measured tree names its attempt.
+  build/decomp-cache/best/ADDR.patch` restores it; bc on a measured tree names its attempt;
   `tools/decomp evidence ADDR --decomp-range A:B` prints decompilation lines A-B.
 - Source files use tabs. Every edit asserts its anchor (a failed assert logs no attempt).
-  Build on the line after `EOF`, not with `&&`; no `{...}` literals (lists or `dict()`).
+  Build after `EOF`, not with `&&`; no `{...}` literals; each call under 9,000 characters.
 - A sandbox (Codex) lets you write the tree, build/, the git directory and the Wine prefix;
   quote any other write error in the TOOL line and never work around it.
 
