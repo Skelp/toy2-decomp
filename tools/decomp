@@ -884,11 +884,14 @@ run_writer() {
 
 # HEAD and a checksum of every branch, remote and tag ref: a commit, reset, branch
 # switch or push changes them.
+# Only what a writer's commit, reset or checkout would move: this checkout's HEAD, the
+# branch it is on and that branch's commit. Other worktrees share the ref store and create
+# or move their own branches at any time, which is not the writer's doing.
 run_refs() {
-    printf '%s %s\n' "$(git rev-parse --short HEAD 2> /dev/null || true)" "$({
-        git symbolic-ref -q HEAD
-        git for-each-ref --format='%(objectname) %(refname)' refs/heads refs/remotes refs/tags
-    } 2> /dev/null | cksum)"
+    local branch
+    branch=$(git symbolic-ref -q HEAD 2> /dev/null || true)
+    printf '%s %s %s\n' "$(git rev-parse --short HEAD 2> /dev/null || true)" "${branch:-detached}" \
+        "$( [[ -n $branch ]] && git rev-parse -q --verify "$branch" 2> /dev/null || true)"
 }
 
 # Stop a campaign whose writer moved git refs, because the driver owns commits and
