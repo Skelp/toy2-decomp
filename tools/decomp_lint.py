@@ -1226,6 +1226,8 @@ def main() -> int:
                 "\nA machine-code match with a new error is a matched transliteration, "
                 "not a reconstruction. Fix the source model or keep the function a STUB."
             )
+        if args.warnings_as_errors and new_warnings:
+            print(f"lint: failed: {len(new_warnings)} new warning(s) count as errors here")
 
     return 1 if (
         new_errors or (stale_is_gate and stale) or (args.warnings_as_errors and new_warnings)

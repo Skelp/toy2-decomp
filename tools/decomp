@@ -504,6 +504,9 @@ campaign_finish() {
     git add tools/Resources/campaign-ledger.jsonl tools/Resources/scoreboard.tsv \
         || { echo "error: git add of the campaign records failed" >&2; return 1; }
     git commit -q -F "$message" || { echo "error: git commit failed" >&2; return 1; }
+    # candidates ranks from the session report; give it the committed scores so
+    # the next selection does not repeat the target it just finished.
+    cp -f build/decomp-current-report.json build/decomp-report-data.json
     for target in "${canonical[@]}"; do
         rm -f "build/decomp-cache/handoff/${target}.md" "build/decomp-attempts/${target}.jsonl"
     done
@@ -872,6 +875,13 @@ case "$command" in
             header_side_effects "$1"
         fi
         python tools/decomp_attempts.py attempt --address "$1" --diff "$diff_path" || true
+        # validate --staged rejects new lint errors and warnings; show them now,
+        # while the writer still holds the context to fix them.
+        mapfile -t changed_sources < <(git diff --name-only HEAD -- 'src/*.cpp' 'src/*.h')
+        if [[ ${#changed_sources[@]} -gt 0 ]]; then
+            python tools/decomp_lint.py --warnings-as-errors "${changed_sources[@]}" \
+                | grep -E ': (error|warning): ' | sed 's/^/lint: /' || true
+        fi
         diff_args=(
             "$diff_path"
             --address "$1"

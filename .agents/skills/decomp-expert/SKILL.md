@@ -22,6 +22,9 @@ tool prints something you cannot act on, quote it in the handoff TOOL line and s
   only with the grep filter in the cycle below.
 - A `header side effect:` line under the index means your header edit moved an untouched
   function; make the type file-local in the next attempt.
+- A `lint:` line after the attempt line is a finding validate will reject; fix it in the
+  next attempt (a cast goes into a role-named typed local; a file-local struct with a
+  reserved field gets `STATIC_ASSERT(sizeof(T) == N)`).
 - The best-scoring tree is saved as `build/decomp-cache/best/ADDR.patch` (with its diff
   beside it); `git checkout -- src && git apply build/decomp-cache/best/ADDR.patch`
   restores it.
