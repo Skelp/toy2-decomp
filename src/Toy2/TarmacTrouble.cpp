@@ -580,6 +580,40 @@ namespace Toy2
 			Weather::Init();
 		}
 
+		// Flare records below this index are red; the rest are blue.
+		const int32_t RED_FLARE_COUNT = 16;
+
+		// Tarmac Trouble interaction constants.
+		const int32_t ANGLE_MASK = 0xFFF;
+		const int32_t ANGLE_QUARTER = 0x400;
+		const int32_t LINK_SCALE_ONE = 0x1000;
+		const int32_t PUZZLE_FOCUS_LINK = 0x74;
+		const int32_t PUZZLE_CUTSCENE_DURATION = 300;
+		const int32_t SMITH_TRIGGER_DISTANCE = 300;
+		const int32_t LIGHTNING_FLASH_DURATION = 0x20;
+		const int32_t LIGHTNING_ARC_HALF = 0x80;
+		const int32_t FLARE_COORD_SCALE = 0x20;
+		const int32_t FLARE_BRIGHTNESS_MAX = 0x80;
+		const int32_t FLARE_RECORD_SET = 0x28;
+		const int32_t FOOTING_PUZZLE_BUTTON_0 = 0x20;
+		const int32_t FOOTING_PUZZLE_BUTTON_3 = 0x23;
+		const int32_t BUTTON_LINK_FIRST = 0x36;
+		const int32_t CUTSCENE_CAMERA_RAISE = 0x8000;
+		const int32_t RAIN_SPAWN_HEIGHT = 0x8000;
+		const int32_t RAIN_SCATTER = 0x100;
+		const int32_t RAND_BYTE_CENTRE = 0x80;
+		const int32_t PLATFORM_LIFT_SPEED = 0x80;
+		const int32_t TINT_NEUTRAL = 0x80;
+		const int32_t COLOUR_FULL = 0xFF;
+		const int32_t LUGGAGE_OWNER_ACTOR = 0x28;
+		const int32_t CHALLENGE_ACTOR = 0x26;
+		const int32_t BLINK_HALF_PERIOD = 20;
+		const int32_t WOBBLE_RATE_A = 7;
+		const int32_t WOBBLE_RATE_B = 11;
+		const int32_t WOBBLE_RATE_C = 17;
+		const int32_t WOBBLE_PITCH_DIVISOR = 0x200000;
+		const int32_t WOBBLE_ROLL_DIVISOR = 0x400000;
+
 		// FUNCTION: TOY2 0x0042E790 [PROVISIONAL]
 		void Interactions()
 		{
@@ -590,6 +624,7 @@ namespace Toy2
 			position.pos.x = -0xD2AC0;
 			position.pos.y = -0xF9F7;
 			position.pos.z = -0x98D72;
+			// Light puzzle near the button pad.
 			if (Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &position.pos, 500) != 0)
 			{
 				if (g_lightPuzzleInitialized == 0)
@@ -600,36 +635,36 @@ namespace Toy2
 				if ((g_lightPuzzleState & LIGHT_PUZZLE_TOP_ROW) == (g_lightPuzzleState & LIGHT_PUZZLE_BOTTOM_ROW) * 0x10 && g_remainingButtonPresses >= 0)
 				{
 					g_remainingButtonPresses = (g_remainingButtonPresses + Renderer::g_frameDelta) & 0x3F;
-					if (g_remainingButtonPresses > 20 && previousPuzzleState == 0)
+					if (g_remainingButtonPresses > BLINK_HALF_PERIOD && previousPuzzleState == 0)
 					{
-						g_lightPuzzleState = 0xFF;
+						g_lightPuzzleState = LIGHT_PUZZLE_TOP_ROW | LIGHT_PUZZLE_BOTTOM_ROW;
 						UpdateBottomPuzzleLights();
 						UpdateTopPuzzleLights();
 						previousPuzzleState = g_lightPuzzleState;
 					}
-					if (g_remainingButtonPresses < 20 && previousPuzzleState != 0)
+					if (g_remainingButtonPresses < BLINK_HALF_PERIOD && previousPuzzleState != 0)
 					{
 						g_lightPuzzleState = 0;
 						UpdateBottomPuzzleLights();
 						UpdateTopPuzzleLights();
 					}
 					if (g_platformLiftOffset < 48000)
-						g_platformLiftOffset += Renderer::g_frameDelta * 0x80;
+						g_platformLiftOffset += Renderer::g_frameDelta * PLATFORM_LIFT_SPEED;
 
 					if (g_puzzleCutsceneTimer >= 0)
 					{
 						if (g_puzzleCutsceneTimer == 0)
 						{
-							Nu3D::Link::GetCurrentPosFixed(0x74, &position.pos);
-							Camera::BeginScriptedCutsceneAtPoint(&position.pos, 300, 0x20);
-							Camera::g_cutsceneCameraPosition.y += 0x8000;
+							Nu3D::Link::GetCurrentPosFixed(PUZZLE_FOCUS_LINK, &position.pos);
+							Camera::BeginScriptedCutsceneAtPoint(&position.pos, PUZZLE_CUTSCENE_DURATION, 0x20);
+							Camera::g_cutsceneCameraPosition.y += CUTSCENE_CAMERA_RAISE;
 							AudioManager::StartSoundSequenceOnActor(-5, &g_buzzActor.posAngles.pos);
 						}
-						Nu3D::Link::GetCurrentPosFixed(0x74, &position.pos);
+						Nu3D::Link::GetCurrentPosFixed(PUZZLE_FOCUS_LINK, &position.pos);
 						Camera::g_cutsceneFocusPosition = position.pos;
 						g_puzzleCutsceneTimer += Renderer::g_frameDelta;
-						Nu3D::Link::GetCurrentPosFixed(0x74, &position.pos);
-						if (g_puzzleCutsceneTimer >= 300)
+						Nu3D::Link::GetCurrentPosFixed(PUZZLE_FOCUS_LINK, &position.pos);
+						if (g_puzzleCutsceneTimer >= PUZZLE_CUTSCENE_DURATION)
 							g_puzzleCutsceneTimer = -1;
 					}
 				}
@@ -649,13 +684,13 @@ namespace Toy2
 							AudioManager::StartSoundSequenceOnActor(-6, &g_buzzActor.posAngles.pos);
 					}
 				}
-				else if (g_groundSlamTimer == -40 && g_footingType >= 0x20 && g_footingType <= 0x23)
+				else if (g_groundSlamTimer == -40 && g_footingType >= FOOTING_PUZZLE_BUTTON_0 && g_footingType <= FOOTING_PUZZLE_BUTTON_3)
 				{
 					g_remainingButtonPresses--;
-					for (int32_t linkId = 0x36; linkId < 0x3A; linkId++)
+					for (int32_t linkId = BUTTON_LINK_FIRST; linkId < BUTTON_LINK_FIRST + 4; linkId++)
 					{
-						if (linkId == g_remainingButtonPresses + 0x36)
-							Nu3D::Link::SetScaleFromFixedOffsets(linkId, 0x1000, 0x1000, 0x1000);
+						if (linkId == g_remainingButtonPresses + BUTTON_LINK_FIRST)
+							Nu3D::Link::SetScaleFromFixedOffsets(linkId, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 						else
 							Nu3D::Link::SetScaleFromFixedOffsets(linkId, 0, 0, 0);
 					}
@@ -665,34 +700,40 @@ namespace Toy2
 					Levels::DeactivateAmbientEmitter(3, 1);
 					if (g_remainingButtonPresses >= 0)
 					{
-						PressLightPuzzleButton(g_footingType - 0x20);
+						PressLightPuzzleButton(g_footingType - FOOTING_PUZZLE_BUTTON_0);
 						UpdateBottomPuzzleLights();
 					}
 				}
 			}
 
+			// Pressed button pops back up.
 			if (g_buttonResetTimer > 0)
 			{
 				g_buttonResetTimer -= Renderer::g_frameDelta;
 				if (g_buttonResetTimer <= 0)
 				{
-					Nu3D::Link::SetScaleFromFixedOffsets(g_pressedButtonLink, 0x1000, 0x1000, 0x1000);
+					Nu3D::Link::SetScaleFromFixedOffsets(g_pressedButtonLink, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 					Nu3D::Link::SetScaleFromFixedOffsets(g_pressedButtonLink + 4, 0, 0, 0);
 				}
 			}
 
 			UpdatePlatforms();
 			g_indicatorWobbleAngle += Renderer::g_frameDelta;
-			int32_t wobbleX = Numerics::g_sinCosLUT[g_indicatorWobbleAngle * 7 & 0xFFF] * Numerics::g_sinCosLUT[g_indicatorWobbleAngle * 11 & 0xFFF];
-			int32_t wobbleY = Numerics::g_sinCosLUT[g_indicatorWobbleAngle * 17 & 0xFFF] * Numerics::g_sinCosLUT[g_indicatorWobbleAngle * 11 & 0xFFF];
-			Nu3D::Link::SetRotationRelative8bit(0x45, 0, wobbleY / 0x200000, wobbleX / 0x400000);
-			wobbleX = Numerics::g_sinCosLUT[g_indicatorWobbleAngle * 7 & 0xFFF] * Numerics::g_sinCosLUT[g_indicatorWobbleAngle * 11 & 0xFFF];
-			wobbleY = Numerics::g_sinCosLUT[g_indicatorWobbleAngle * 17 & 0xFFF] * Numerics::g_sinCosLUT[g_indicatorWobbleAngle * 11 & 0xFFF];
-			Nu3D::Link::SetRotationRelative8bit(0x46, 0, wobbleY / 0x200000, wobbleX / 0x400000);
+			int32_t wobbleX = Numerics::g_sinCosLUT[g_indicatorWobbleAngle * WOBBLE_RATE_A & ANGLE_MASK]
+				* Numerics::g_sinCosLUT[g_indicatorWobbleAngle * WOBBLE_RATE_B & ANGLE_MASK];
+			int32_t wobbleY = Numerics::g_sinCosLUT[g_indicatorWobbleAngle * WOBBLE_RATE_C & ANGLE_MASK]
+				* Numerics::g_sinCosLUT[g_indicatorWobbleAngle * WOBBLE_RATE_B & ANGLE_MASK];
+			Nu3D::Link::SetRotationRelative8bit(0x45, 0, wobbleY / WOBBLE_PITCH_DIVISOR, wobbleX / WOBBLE_ROLL_DIVISOR);
+			wobbleX = Numerics::g_sinCosLUT[g_indicatorWobbleAngle * WOBBLE_RATE_A & ANGLE_MASK]
+				* Numerics::g_sinCosLUT[g_indicatorWobbleAngle * WOBBLE_RATE_B & ANGLE_MASK];
+			wobbleY = Numerics::g_sinCosLUT[g_indicatorWobbleAngle * WOBBLE_RATE_C & ANGLE_MASK]
+				* Numerics::g_sinCosLUT[g_indicatorWobbleAngle * WOBBLE_RATE_B & ANGLE_MASK];
+			Nu3D::Link::SetRotationRelative8bit(0x46, 0, wobbleY / WOBBLE_PITCH_DIVISOR, wobbleX / WOBBLE_ROLL_DIVISOR);
 
 			Actor::CollectQuestReward(0x27, 2, -1, 0, 0);
 			Actor::RotatingHint(0x2F, 10, g_rotatingHintSubtitles);
-			Actor::Toy2Actor* luggageOwner = &Actor::g_creatureActors[0x28];
+			Actor::Toy2Actor* luggageOwner = &Actor::g_creatureActors[LUGGAGE_OWNER_ACTOR];
+			// Luggage owner dialogue.
 			if ((luggageOwner->actorFlags & Actor::ACTOR_FLAG_INTERACTION_REQUESTED) != 0)
 			{
 				luggageOwner->actorFlags &= ~Actor::ACTOR_FLAG_INTERACTION_REQUESTED;
@@ -700,12 +741,12 @@ namespace Toy2
 				{
 					if (g_levelObjectiveProgress == 5)
 					{
-						Dialogue::Begin(0x28, 3, "thanks for finding my ^luggage^ buzz! here is a pizza planet ^token^!", -1, 0, 1);
+						Dialogue::Begin(LUGGAGE_OWNER_ACTOR, 3, "thanks for finding my ^luggage^ buzz! here is a pizza planet ^token^!", -1, 0, 1);
 						g_levelObjectiveProgress = -1;
 					}
 					else
 					{
-						Dialogue::Begin(0x28,
+						Dialogue::Begin(LUGGAGE_OWNER_ACTOR,
 							3,
 							"hi buzz! i have lost ^five^ pieces of ^luggage^. if you can find them for me, i will give you a pizza planet ^token^.",
 							-1,
@@ -715,8 +756,9 @@ namespace Toy2
 				}
 			}
 
-			Actor::PlayPeriodicHintSound(0x26, 0xB5);
-			Actor::Toy2Actor* challengeActor = &Actor::g_creatureActors[0x26];
+			Actor::PlayPeriodicHintSound(CHALLENGE_ACTOR, 0xB5);
+			Actor::Toy2Actor* challengeActor = &Actor::g_creatureActors[CHALLENGE_ACTOR];
+			// No-jump challenge dialogue.
 			if ((challengeActor->actorFlags & Actor::ACTOR_FLAG_INTERACTION_REQUESTED) != 0)
 			{
 				challengeActor->actorFlags &= ~Actor::ACTOR_FLAG_INTERACTION_REQUESTED;
@@ -725,7 +767,7 @@ namespace Toy2
 					if (HUD::g_challengeState == HUD::CHALLENGE_STATE_INACTIVE)
 					{
 						AudioManager::Preset::PlayOneShotSound2(0xB6, challengeActor);
-						Dialogue::Begin(0x26,
+						Dialogue::Begin(CHALLENGE_ACTOR,
 							4,
 							"hi buzz! if you can reach the end of this path without ^jumping^ or touching the ^green^ slime, i will give you a pizza planet "
 							"^token^.",
@@ -736,15 +778,17 @@ namespace Toy2
 					}
 					else
 					{
-						Dialogue::Begin(0x26, 4, "quick! you can still reach the token!", -1, 0, -1);
+						Dialogue::Begin(CHALLENGE_ACTOR, 4, "quick! you can still reach the token!", -1, 0, -1);
 					}
 				}
 			}
+			// Challenge starts after the camera settles.
 			if (HUD::g_challengeState == HUD::CHALLENGE_STATE_WAITING_FOR_CAMERA && Nu3D::Camera::g_viewHistoryInitialized == 0)
 			{
 				HUD::g_challengeState = HUD::CHALLENGE_STATE_ACTIVE;
 				AndysHouse::g_raceCheckpointPassCount = 170;
 			}
+			// Challenge countdown and failure.
 			if (HUD::g_challengeState == HUD::CHALLENGE_STATE_ACTIVE)
 			{
 				if (Collectables::g_tokenStates[2].active == 2)
@@ -775,11 +819,13 @@ namespace Toy2
 			turntableActor->pos.z = position.pos.z;
 
 			Actor::Toy2Actor* smith = &Actor::g_creatureActors[0x2E];
-			if (g_smithEncounterState == 0 && Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &smith->pos, 300) != 0)
+			// Smith encounter trigger.
+			if (g_smithEncounterState == 0 && Nu3D::Math::IsWithinDistance(&g_buzzActor.posAngles.pos, &smith->pos, SMITH_TRIGGER_DISTANCE) != 0)
 			{
 				g_smithEncounterState = 1;
 				Dialogue::Begin(0x2E, 1, "ha ha ha ha ... defeat the ^blacksmith^ boss to get a pizza planet ^token^!", -1, 0, -1);
 			}
+			// Smith fight starts after the camera settles.
 			if (g_smithEncounterState == 1 && Nu3D::Camera::g_viewHistoryInitialized == 0)
 			{
 				smith->movementData = CreatureBehaviour::g_smithMovementData + 14;
@@ -788,7 +834,8 @@ namespace Toy2
 				smith->movementCommandTimer = 0;
 				smith->creatureRam->initialFacingAngle = 0;
 			}
-			if (g_smithEncounterState > SMITH_ENCOUNTER_ACTIVE)
+			// Smith defeated: delay, then award the token.
+			if (g_smithEncounterState >= SMITH_ENCOUNTER_DEFEATED)
 			{
 				if (g_smithEncounterState < SMITH_ENCOUNTER_TOKEN_DELAY_END)
 					g_smithEncounterState += Renderer::g_frameDelta;
@@ -811,99 +858,115 @@ namespace Toy2
 			AudioManager::PlaySoundEffect(0x9B, &g_platformSoundPosition);
 
 			Weather::StepPrecipitation(0x100, 0x1000, 0x33);
+			// Rain splashes near the camera.
 			if (g_framePulseOutputs.eightTick != 0)
 			{
-				position.pos.x = (*g_randDatBufferPtr - 0x80) * 0x100 + Numerics::g_sinCosLUT[Camera::g_renderCameraTransform.rotation.euler.angles.yaw] * 3
-					+ Camera::g_renderCameraTransform.pos.x;
-				position.pos.y = Camera::g_renderCameraTransform.pos.y - 0x8000;
-				position.pos.z = (g_randDatBufferPtr[1] - 0x80) * 0x100
-					+ Numerics::g_sinCosLUT[(Camera::g_renderCameraTransform.rotation.euler.angles.yaw + 0x400) & 0xFFF] * 3
+				position.pos.x = (*g_randDatBufferPtr++ - RAND_BYTE_CENTRE) * RAIN_SCATTER
+					+ Numerics::g_sinCosLUT[Camera::g_renderCameraTransform.rotation.euler.angles.yaw] * 3 + Camera::g_renderCameraTransform.pos.x;
+				position.pos.y = Camera::g_renderCameraTransform.pos.y - RAIN_SPAWN_HEIGHT;
+				position.pos.z = (*g_randDatBufferPtr++ - RAND_BYTE_CENTRE) * RAIN_SCATTER
+					+ Numerics::g_sinCosLUT[(Camera::g_renderCameraTransform.rotation.euler.angles.yaw + ANGLE_QUARTER) & ANGLE_MASK] * 3
 					+ Camera::g_renderCameraTransform.pos.z;
-				g_randDatBufferPtr += 2;
 				int32_t groundHeight = Nu3D::Collision::GetGroundHeight(&position, 0);
 				if (groundHeight != INT_MIN && Camera::g_renderCameraTransform.pos.y < groundHeight)
 					Nu3D::Particles::SpawnFromPreset(position.pos.x, groundHeight, position.pos.z, 0x1B, 2);
 			}
 
-			int32_t flashTimer = g_lightningFlashTimer - Renderer::g_frameDelta;
-			if (flashTimer < 0x20)
+			// Lightning flash, tint and thunder.
+			int32_t previousFlashTimer = g_lightningFlashTimer;
+			g_lightningFlashTimer -= Renderer::g_frameDelta;
+			// Flash window: pick a strike point and tint.
+			if (g_lightningFlashTimer < LIGHTNING_FLASH_DURATION)
 			{
-				if (g_lightningFlashTimer > 0x1F)
+				if (previousFlashTimer >= LIGHTNING_FLASH_DURATION)
 				{
-					g_thunderTimer = *g_randDatBufferPtr;
-					uint32_t lightningAngle = (Camera::g_renderCameraTransform.rotation.euler.angles.yaw - 0x80 + g_randDatBufferPtr[1]) & 0xFFF;
-					g_randDatBufferPtr += 2;
+					g_thunderTimer = *g_randDatBufferPtr++;
+					uint32_t lightningAngle =
+						(Camera::g_renderCameraTransform.rotation.euler.angles.yaw - LIGHTNING_ARC_HALF + *g_randDatBufferPtr++) & ANGLE_MASK;
 					g_lightningSoundPosition.x = (Numerics::g_sinCosLUT[lightningAngle] * g_thunderTimer >> 5) + Camera::g_renderCameraTransform.pos.x;
 					g_lightningSoundPosition.y = Camera::g_renderCameraTransform.pos.y;
 					g_lightningSoundPosition.z =
-						(Numerics::g_sinCosLUT[(lightningAngle + 0x400) & 0xFFF] * g_thunderTimer >> 5) + Camera::g_renderCameraTransform.pos.z;
+						(Numerics::g_sinCosLUT[(lightningAngle + ANGLE_QUARTER) & ANGLE_MASK] * g_thunderTimer >> 5) + Camera::g_renderCameraTransform.pos.z;
 				}
-				if (Nu3D::Camera::g_targetTintFadeSpeed == 0)
+				if (Nu3D::Camera::g_targetTintFadeSpeed != 0)
 				{
-					if (flashTimer < 0)
-						flashTimer = *g_randDatBufferPtr++ * 2 + 0x20;
-					else if (Nu3D::Camera::g_cameraTintBlue > 0x40)
-					{
-						Nu3D::Camera::g_cameraTintBlue = (int16_t)flashTimer * 3 + 0x80;
-						Nu3D::Camera::g_cameraTintRed = Nu3D::Camera::g_cameraTintBlue;
-						Nu3D::Camera::g_cameraTintGreen = Nu3D::Camera::g_cameraTintBlue;
-					}
-				}
-				else
-				{
-					Nu3D::Camera::g_cameraTintRed = 0x80;
-					Nu3D::Camera::g_cameraTintGreen = 0x80;
-					Nu3D::Camera::g_cameraTintBlue = 0x80;
+					Nu3D::Camera::g_cameraTintRed = TINT_NEUTRAL;
+					Nu3D::Camera::g_cameraTintGreen = TINT_NEUTRAL;
+					Nu3D::Camera::g_cameraTintBlue = TINT_NEUTRAL;
 					g_lightningFlashTimer = 10000;
-					flashTimer = g_lightningFlashTimer;
+				}
+				else if (g_lightningFlashTimer < 0)
+				{
+					g_lightningFlashTimer = *g_randDatBufferPtr++ * 2 + LIGHTNING_FLASH_DURATION;
+				}
+				else if (Nu3D::Camera::g_cameraTintBlue > 0x40)
+				{
+					Nu3D::Camera::g_cameraTintRed = g_lightningFlashTimer * 3 + TINT_NEUTRAL;
+					Nu3D::Camera::g_cameraTintGreen = Nu3D::Camera::g_cameraTintRed;
+					Nu3D::Camera::g_cameraTintBlue = Nu3D::Camera::g_cameraTintRed;
 				}
 			}
-			g_lightningFlashTimer = flashTimer;
 			g_thunderTimer -= Renderer::g_frameDelta;
-			if (g_thunderTimer < 1)
+			// Thunder sound after the strike.
+			if (g_thunderTimer <= 0)
 			{
 				g_thunderTimer = 20000;
 				AudioManager::PlaySoundEffect(0x70, &g_lightningSoundPosition);
 			}
 
-			Levels::RecordData* flareRecords = Levels::g_recordData[0x28];
 			int32_t nearestDistanceSquared = INT_MAX;
 			int32_t nearestFlareIndex = 0;
 			int32_t flareIndex;
 			int32_t flareCount;
 			int32_t buzzRadiusSquared = (g_buzzActor.posAngles.pos.z >> 8) * (g_buzzActor.posAngles.pos.z >> 8)
 				+ (g_buzzActor.posAngles.pos.x >> 8) * (g_buzzActor.posAngles.pos.x >> 8);
+			// Buzz inside the red flare ring.
 			if (buzzRadiusSquared < 0x8E5144)
 			{
 				flareIndex = 0;
-				flareCount = 16;
+				flareCount = RED_FLARE_COUNT;
 			}
+			// Buzz outside: blue flares.
 			else
 			{
-				flareIndex = 16;
-				flareCount = flareRecords->recordCount;
+				flareIndex = RED_FLARE_COUNT;
+				flareCount = Levels::g_recordData[FLARE_RECORD_SET]->recordCount;
 			}
 
+			// Lens flares near the camera, and the nearest flare to Buzz.
 			for (; flareIndex < flareCount; flareIndex++)
 			{
-				Vector3I* flare = &flareRecords->data[flareIndex];
-				int32_t cameraOffsetY = (Camera::g_renderCameraTransform.pos.y - flare->y * 0x20) >> 8;
-				int32_t cameraOffsetZ = (Camera::g_renderCameraTransform.pos.z - flare->z * 0x20) >> 8;
-				int32_t cameraOffsetX = (Camera::g_renderCameraTransform.pos.x - flare->x * 0x20) >> 8;
-				int32_t cameraDistanceSquared = cameraOffsetX * cameraOffsetX + cameraOffsetY * cameraOffsetY + cameraOffsetZ * cameraOffsetZ;
+				Vector3I* flare = &Levels::g_recordData[FLARE_RECORD_SET]->data[flareIndex];
+				int32_t flareX = flare->x * FLARE_COORD_SCALE;
+				int32_t flareY = flare->y * FLARE_COORD_SCALE;
+				int32_t flareZ = flare->z * FLARE_COORD_SCALE;
+				int32_t cameraOffsetY = (Camera::g_renderCameraTransform.pos.y - flareY) >> 8;
+				int32_t cameraOffsetZ = (Camera::g_renderCameraTransform.pos.z - flareZ) >> 8;
+				int32_t cameraOffsetX = (Camera::g_renderCameraTransform.pos.x - flareX) >> 8;
+				int32_t cameraDistanceSquared = cameraOffsetY * cameraOffsetY + cameraOffsetZ * cameraOffsetZ + cameraOffsetX * cameraOffsetX;
 				if (cameraDistanceSquared < 0x40000)
 				{
-					int32_t brightness = 0x80 - (int32_t)sqrt((double)cameraDistanceSquared) / 4;
+					int32_t brightness = FLARE_BRIGHTNESS_MAX - ((int32_t)sqrt((double)cameraDistanceSquared) >> 2);
 					if (brightness > 0)
 					{
-						int32_t red = flareIndex < 16 ? brightness : 0;
-						int32_t blue = flareIndex < 16 ? 0 : brightness;
-						Renderer::LensFlare::RegisterLight(flare->x * 0x20, flare->y * 0x20, flare->z * 0x20, red, brightness, blue, 0x80);
+						int32_t red;
+						int32_t blue;
+						if (flareIndex >= RED_FLARE_COUNT)
+						{
+							red = 0;
+							blue = brightness;
+						}
+						else
+						{
+							red = brightness;
+							blue = 0;
+						}
+						Renderer::LensFlare::RegisterLight(flareX, flareY, flareZ, red, brightness, blue, 0x80);
 					}
-					int32_t buzzOffsetY = (g_buzzActor.posAngles.pos.y - flare->y * 0x20 - 0x2000) >> 8;
-					int32_t buzzOffsetZ = (g_buzzActor.posAngles.pos.z - flare->z * 0x20) >> 8;
-					int32_t buzzOffsetX = (g_buzzActor.posAngles.pos.x - flare->x * 0x20) >> 8;
-					int32_t distanceSquared = buzzOffsetX * buzzOffsetX + buzzOffsetZ * buzzOffsetZ + buzzOffsetY * buzzOffsetY;
+					int32_t buzzOffsetY = (g_buzzActor.posAngles.pos.y - flareY - 0x2000) >> 8;
+					int32_t buzzOffsetZ = (g_buzzActor.posAngles.pos.z - flareZ) >> 8;
+					int32_t buzzOffsetX = (g_buzzActor.posAngles.pos.x - flareX) >> 8;
+					int32_t distanceSquared = buzzOffsetY * buzzOffsetY + buzzOffsetZ * buzzOffsetZ + buzzOffsetX * buzzOffsetX;
 					if (distanceSquared < nearestDistanceSquared)
 					{
 						nearestDistanceSquared = distanceSquared;
@@ -912,26 +975,28 @@ namespace Toy2
 				}
 			}
 
+			// Dynamic light at the nearest flare.
 			if (nearestDistanceSquared < 0x10000)
 			{
-				Vector3I* nearestFlare = &flareRecords->data[nearestFlareIndex];
+				Vector3I* nearestFlare = &Levels::g_recordData[FLARE_RECORD_SET]->data[nearestFlareIndex];
 				Lighting::DynamicLight* light = &Lighting::g_lightingState.dynamicLights[1];
-				light->sourceId = reinterpret_cast<int32_t>(nearestFlare);
 				light->position.x = nearestFlare->x << 5;
 				light->position.y = nearestFlare->y << 5;
 				light->position.z = nearestFlare->z << 5;
-				if (nearestFlareIndex < 16)
+				if (nearestFlareIndex >= RED_FLARE_COUNT)
 				{
-					light->colour.r = 0xFF;
-					light->colour.b = 0;
+					light->colour.r = 0;
+					light->colour.g = COLOUR_FULL;
+					light->colour.b = COLOUR_FULL;
 				}
 				else
 				{
-					light->colour.r = 0;
-					light->colour.b = 0xFF;
+					light->colour.r = COLOUR_FULL;
+					light->colour.g = COLOUR_FULL;
+					light->colour.b = 0;
 				}
-				light->colour.g = 0xFF;
 				light->lifetime = 1;
+				light->sourceId = reinterpret_cast<int32_t>(nearestFlare);
 			}
 			else
 			{
