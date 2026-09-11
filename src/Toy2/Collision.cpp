@@ -4168,6 +4168,346 @@ namespace Nu3D
 			return 0;
 		}
 
+		// FUNCTION: TOY2 0x0048D530 [PROVISIONAL]
+		int32_t SweepQuery(Vector4I* position, Vector4I* movement, int32_t useQueryCache, int32_t raycastMode)
+		{
+			const int32_t MAX_TRIANGLES = 240;
+			const int32_t MAX_EDGE_VERTICES = 32;
+			const int32_t EDGE_BLOCK_SIZE = 16;
+			const int32_t NO_EDGE_BOUNDS = (int32_t)0x80000000;
+			// Half size and full size of the query box around the start position.
+			const int32_t QUERY_HALF_SIZE = 0x800;
+			const int32_t QUERY_SIZE = 0x1000;
+			const uint32_t EXCLUDE_FROM_CACHED_QUERY = 0x200;
+			const int32_t MOVING_MESH_CELL = 256;
+			// World units per collision grid unit, per face block unit and per motion step.
+			const int32_t GRID_UNIT = 32;
+			const int32_t FACE_BLOCK_UNIT = 64;
+			const int32_t MOTION_STEP = 16;
+			// Fixed-point one of the rotation matrix.
+			const int32_t FIXED_ONE = 0x1000;
+			int32_t localX = 0;
+			int32_t localY = 0;
+
+			Toy2::Collision::g_collisionEdgeVertexCount = 0;
+			Toy2::Collision::g_collisionTriangleCount = 0;
+			Toy2::Collision::g_collisionPassFlags = 0;
+			Vector4I delta;
+			delta.x = movement->x;
+			delta.y = movement->y;
+			delta.z = movement->z;
+			int32_t localZ = 0;
+			int32_t meshInRange = 0;
+
+			// Query box: the maximum corner and the extent that covers the movement.
+			int32_t queryMaxX;
+			uint32_t queryExtentX;
+			// X extent: a negative move widens the box below the start.
+			if (delta.x < 0)
+			{
+				queryMaxX = position->x + QUERY_HALF_SIZE;
+				queryExtentX = QUERY_SIZE - delta.x;
+			}
+			else
+			// Positive move: widen the box above the start.
+			{
+				queryMaxX = position->x + QUERY_HALF_SIZE + delta.x;
+				queryExtentX = delta.x + QUERY_SIZE;
+			}
+
+			int32_t queryMaxY;
+			uint32_t queryExtentY;
+			// Y extent: a negative move widens the box below the start.
+			if (delta.y < 0)
+			{
+				queryMaxY = position->y + QUERY_HALF_SIZE;
+				queryExtentY = QUERY_SIZE - delta.y;
+			}
+			else
+			// Positive move: widen the box above the start.
+			{
+				queryMaxY = position->y + QUERY_HALF_SIZE + delta.y;
+				queryExtentY = delta.y + QUERY_SIZE;
+			}
+
+			int32_t queryMaxZ;
+			uint32_t queryExtentZ;
+			// Z extent: a negative move widens the box below the start.
+			if (delta.z < 0)
+			{
+				queryMaxZ = position->z + QUERY_HALF_SIZE;
+				queryExtentZ = QUERY_SIZE - delta.z;
+			}
+			else
+			// Positive move: widen the box above the start.
+			{
+				queryMaxZ = position->z + QUERY_HALF_SIZE + delta.z;
+				queryExtentZ = delta.z + QUERY_SIZE;
+			}
+
+			uint32_t toleranceX = (queryExtentX + GRID_UNIT - 1) / GRID_UNIT;
+			uint32_t toleranceY = (queryExtentY + GRID_UNIT - 1) / GRID_UNIT;
+			uint32_t toleranceZ = (queryExtentZ + GRID_UNIT - 1) / GRID_UNIT;
+			int32_t lastMeshIndex = -1;
+			uint32_t excludeMask = useQueryCache != 0 ? EXCLUDE_FROM_CACHED_QUERY : Toy2::Collision::COLLISION_MESH_EXCLUDE_FROM_QUERY;
+
+			// Use the query cache only when the box is inside the cached bounds.
+			if (useQueryCache == 0 || queryMaxX >= Toy2::Terrain::g_collisionWorkspace->slots[8].queryBounds.maximum.x
+				|| queryMaxY >= Toy2::Terrain::g_collisionWorkspace->slots[8].queryBounds.maximum.y
+				|| queryMaxZ >= Toy2::Terrain::g_collisionWorkspace->slots[8].queryBounds.maximum.z
+				|| queryMaxX - queryExtentX <= (uint32_t)Toy2::Terrain::g_collisionWorkspace->slots[8].queryBounds.minimum.x
+				|| queryMaxY - queryExtentY <= (uint32_t)Toy2::Terrain::g_collisionWorkspace->slots[8].queryBounds.minimum.y
+				|| queryMaxZ - queryExtentZ <= (uint32_t)Toy2::Terrain::g_collisionWorkspace->slots[8].queryBounds.minimum.z)
+			{
+				// Uncached query: collect the meshes of the grid cells and the moving meshes, then their faces.
+				int16_t* candidateMeshes = reinterpret_cast<int16_t*>(Toy2::Collision::g_mathScratch);
+				int32_t candidateCount = 0;
+				int16_t* candidate = candidateMeshes;
+				int32_t cellCount = Toy2::Collision::g_activeCollisionGridCellCount;
+				for (int32_t cellIndex = 0; cellIndex < cellCount; cellIndex++)
+				{
+					Toy2::Collision::CollisionGridCell& cell = Toy2::Collision::g_collisionGrid[cellIndex];
+					if ((uint32_t)(queryMaxX - cell.boundsMinX) < cell.boundsExtentX + queryExtentX
+						&& (uint32_t)(queryMaxZ - cell.boundsMinZ) < cell.boundsExtentZ + queryExtentZ)
+					{
+						int16_t* meshList = &Toy2::Collision::g_collisionGridMeshIndices[cell.meshListStart];
+						int32_t meshCount = cell.meshCount;
+						for (int32_t index = 0; index < meshCount; index++)
+							*candidate++ = meshList[index];
+						candidateCount += meshCount;
+					}
+				}
+
+				Toy2::Collision::CollisionGridCell& movingCell = Toy2::Collision::g_collisionGrid[MOVING_MESH_CELL];
+				int16_t* movingList = &Toy2::Collision::g_collisionGridMeshIndices[movingCell.meshListStart];
+				int32_t movingListCount = movingCell.meshCount;
+				for (int32_t index = 0; index < movingListCount; index++)
+					*candidate++ = movingList[index];
+				candidateCount += movingListCount;
+
+				for (int32_t candidateIndex = 0; candidateIndex < candidateCount; candidateIndex++)
+				{
+					int16_t meshIndex = candidateMeshes[candidateIndex];
+					Toy2::Collision::CollisionMeshInstance& mesh = Toy2::Collision::g_collisionMeshInstances[meshIndex];
+					if ((uint32_t)(queryMaxX - mesh.boundsMin.x) < mesh.boundsExt.x + queryExtentX
+						&& (uint32_t)(queryMaxY - mesh.boundsMin.y) < mesh.boundsExt.y + queryExtentY
+						&& (uint32_t)(queryMaxZ - mesh.boundsMin.z) < mesh.boundsExt.z + queryExtentZ && mesh.typeFlags != 0 && (excludeMask & mesh.unk) == 0)
+					{
+						localX = (queryMaxX - mesh.origin.x) / GRID_UNIT;
+						localY = (queryMaxY - mesh.origin.y) / GRID_UNIT;
+						localZ = (queryMaxZ - mesh.origin.z) / GRID_UNIT;
+						Toy2::Collision::CollisionTreeGroup* group = reinterpret_cast<Toy2::Collision::CollisionTreeGroup*>(mesh.collisionTree);
+						while (group->marker >= 0)
+						{
+							int32_t faceCount = group->faceCount;
+							Toy2::Collision::PackedCollisionFace* face = reinterpret_cast<Toy2::Collision::PackedCollisionFace*>(group + 1);
+							if ((uint32_t)(localX - group->boundsMinX) < group->boundsExtentX + toleranceX
+								&& (uint32_t)(localZ - group->boundsMinZ) < group->boundsExtentZ + toleranceZ)
+							{
+								for (int32_t faceIndex = 0; faceIndex < faceCount; faceIndex++, face++)
+								{
+									if ((uint32_t)(localX - face->boundsMinX) < face->boundsExtentX + toleranceX
+										&& (uint32_t)(localZ - face->boundsMinZBlock * FACE_BLOCK_UNIT - face->vertex0.z)
+											< face->boundsExtentZBlock * FACE_BLOCK_UNIT + toleranceZ
+										&& (uint32_t)(localY - face->boundsMinYBlock * FACE_BLOCK_UNIT - face->vertex0.y)
+											< face->boundsExtentYBlock * FACE_BLOCK_UNIT + toleranceY
+										&& Toy2::Collision::g_collisionTriangleCount < MAX_TRIANGLES)
+									{
+										Toy2::Collision::g_collisionTriangles[Toy2::Collision::g_collisionTriangleCount] = face;
+										Toy2::Collision::g_collisionTriangleMeshIndices[Toy2::Collision::g_collisionTriangleCount] = meshIndex;
+										Toy2::Collision::g_collisionTriangleCount++;
+									}
+								}
+							}
+							else
+								face += faceCount;
+							group = reinterpret_cast<Toy2::Collision::CollisionTreeGroup*>(face);
+						}
+					}
+				}
+			}
+			// Cached query
+			else
+			{
+				// Cached query: filter the faces that the query cache already holds.
+				Toy2::Terrain::CollisionWorkspaceSlot& cache = Toy2::Terrain::g_collisionWorkspace->slots[8];
+				for (int32_t entry = cache.entryCount - 1; entry >= 0; entry--)
+				{
+					int32_t meshIndex = cache.meshIndices[entry];
+					if (meshIndex != lastMeshIndex)
+					{
+						meshInRange = 0;
+						lastMeshIndex = meshIndex;
+						Toy2::Collision::CollisionMeshInstance& mesh = Toy2::Collision::g_collisionMeshInstances[meshIndex];
+						if ((uint32_t)(queryMaxX - mesh.boundsMin.x) < mesh.boundsExt.x + queryExtentX
+							&& (uint32_t)(queryMaxY - mesh.boundsMin.y) < mesh.boundsExt.y + queryExtentY
+							&& (uint32_t)(queryMaxZ - mesh.boundsMin.z) < mesh.boundsExt.z + queryExtentZ && mesh.typeFlags != 0
+							&& (excludeMask & mesh.unk) == 0)
+						{
+							meshInRange = 1;
+							localX = (queryMaxX - mesh.origin.x) / GRID_UNIT;
+							localY = (queryMaxY - mesh.origin.y) / GRID_UNIT;
+							localZ = (queryMaxZ - mesh.origin.z) / GRID_UNIT;
+						}
+					}
+
+					if (meshInRange != 0)
+					{
+						Toy2::Collision::PackedCollisionFace* face = cache.faces[entry];
+						if ((uint32_t)(localX - face->boundsMinX) < face->boundsExtentX + toleranceX
+							&& (uint32_t)(localZ - face->boundsMinZBlock * FACE_BLOCK_UNIT - face->vertex0.z)
+								< face->boundsExtentZBlock * FACE_BLOCK_UNIT + toleranceZ
+							&& (uint32_t)(localY - face->boundsMinYBlock * FACE_BLOCK_UNIT - face->vertex0.y)
+								< face->boundsExtentYBlock * FACE_BLOCK_UNIT + toleranceY
+							&& Toy2::Collision::g_collisionTriangleCount < MAX_TRIANGLES)
+						{
+							Toy2::Collision::g_collisionTriangles[Toy2::Collision::g_collisionTriangleCount] = face;
+							Toy2::Collision::g_collisionTriangleMeshIndices[Toy2::Collision::g_collisionTriangleCount] = (int16_t)lastMeshIndex;
+							Toy2::Collision::g_collisionTriangleCount++;
+						}
+					}
+				}
+			}
+
+			// Moving meshes: widen the query by the platform velocity and test it in platform space.
+			int16_t* movingMeshes = &Toy2::Collision::g_collisionGridMeshIndices[Toy2::Collision::g_collisionGrid[MOVING_MESH_CELL].meshListStart];
+			int32_t moveX = delta.x / MOTION_STEP;
+			int32_t moveY = delta.y / MOTION_STEP;
+			int32_t moveZ = delta.z / MOTION_STEP;
+			int32_t moveLengthSq = moveX * moveX + moveY * moveY + moveZ * moveZ;
+			int32_t movingCount = Toy2::Collision::g_collisionGrid[MOVING_MESH_CELL].meshCount;
+			// Test each moving mesh near the start position.
+			for (int32_t movingIndex = 0; movingIndex < movingCount; movingIndex++)
+			{
+				Toy2::Collision::CollisionMeshInstance& mesh = Toy2::Collision::g_collisionMeshInstances[movingMeshes[movingIndex]];
+				int32_t x = position->x;
+				int32_t y = position->y;
+				int32_t z = position->z;
+				int32_t offsetX = (mesh.origin.x - x) >> 6;
+				int32_t offsetY = (mesh.origin.y - y) >> 6;
+				int32_t offsetZ = (mesh.origin.z - z) >> 6;
+				if (offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ > (mesh.boundingSqRadius >> 1) + moveLengthSq)
+					continue;
+
+				Toy2::Platform::PlatformState& platform = Toy2::Platform::g_platformStates[mesh.platformIdx];
+				int32_t platformRadius = abs(platform.velocity.x) + abs(platform.velocity.y) + abs(platform.velocity.z)
+					+ (int32_t)sqrt((double)((delta.x / MOTION_STEP) * (delta.x / MOTION_STEP) + (delta.y / MOTION_STEP) * (delta.y / MOTION_STEP)
+						  + (delta.z / MOTION_STEP) * (delta.z / MOTION_STEP)))
+						* MOTION_STEP;
+				int32_t platformDiameter = platformRadius * 2;
+				int32_t tolerance = (platformRadius + MOTION_STEP - 1) / MOTION_STEP;
+				int32_t queryX;
+				int32_t queryY;
+				int32_t queryZ;
+				if ((platform.flags & Toy2::Platform::PLATFORM_FLAG_ROTATED) != 0)
+				{
+					Vector3I16 angles;
+					angles.x = platform.rotationAnglesFixed.x >> 2;
+					angles.y = platform.rotationAnglesFixed.y >> 2;
+					angles.z = platform.rotationAnglesFixed.z >> 2;
+					Math::SetRotationXYZ(&angles, &Toy2::Animation::g_keyframeRotation.matrix);
+					const Matrix3x3I16& rotation = Toy2::Animation::g_keyframeRotation.matrix;
+					int32_t relativeX = position->x - mesh.origin.x;
+					int32_t relativeY = position->y - mesh.origin.y;
+					int32_t relativeZ = position->z - mesh.origin.z;
+					queryX = (rotation.m00 * relativeX + rotation.m10 * relativeY + rotation.m20 * relativeZ) / FIXED_ONE + mesh.origin.x + platformRadius;
+					queryY = (rotation.m01 * relativeX + rotation.m11 * relativeY + rotation.m21 * relativeZ) / FIXED_ONE + mesh.origin.y + platformRadius;
+					queryZ = (rotation.m02 * relativeX + rotation.m12 * relativeY + rotation.m22 * relativeZ) / FIXED_ONE + mesh.origin.z + platformRadius;
+				}
+				else
+				{
+					queryX = x + platformRadius;
+					queryY = y + platformRadius;
+					queryZ = z + platformRadius;
+				}
+
+				if (queryX - mesh.boundsMin.x < mesh.boundsExt.x + platformDiameter && queryZ - mesh.boundsMin.z < mesh.boundsExt.z + platformDiameter
+					&& mesh.typeFlags != 0 && (excludeMask & mesh.unk) == 0)
+				{
+					int32_t platformLocalX = (queryX - mesh.origin.x) / GRID_UNIT;
+					int32_t platformLocalY = (queryY - mesh.origin.y) / GRID_UNIT;
+					int32_t platformLocalZ = (queryZ - mesh.origin.z) / GRID_UNIT;
+					Toy2::Collision::CollisionTreeGroup* group = reinterpret_cast<Toy2::Collision::CollisionTreeGroup*>(mesh.collisionTree);
+					while (group->marker >= 0)
+					{
+						int32_t faceCount = group->faceCount;
+						Toy2::Collision::PackedCollisionFace* face = reinterpret_cast<Toy2::Collision::PackedCollisionFace*>(group + 1);
+						if ((uint32_t)(platformLocalX - group->boundsMinX) < (uint32_t)(group->boundsExtentX + tolerance)
+							&& (uint32_t)(platformLocalZ - group->boundsMinZ) < (uint32_t)(group->boundsExtentZ + tolerance))
+						{
+							for (int32_t faceIndex = 0; faceIndex < faceCount; faceIndex++, face++)
+							{
+								if ((uint32_t)(platformLocalX - face->boundsMinX) < (uint32_t)(face->boundsExtentX + tolerance)
+									&& (uint32_t)(platformLocalZ - face->boundsMinZBlock * FACE_BLOCK_UNIT - face->vertex0.z)
+										< (uint32_t)(face->boundsExtentZBlock * FACE_BLOCK_UNIT + tolerance)
+									&& (uint32_t)(platformLocalY - face->boundsMinYBlock * FACE_BLOCK_UNIT - face->vertex0.y)
+										< (uint32_t)(face->boundsExtentYBlock * FACE_BLOCK_UNIT + tolerance)
+									&& Toy2::Collision::g_collisionTriangleCount < MAX_TRIANGLES)
+								{
+									Toy2::Collision::g_collisionTriangles[Toy2::Collision::g_collisionTriangleCount] = face;
+									Toy2::Collision::g_collisionTriangleMeshIndices[Toy2::Collision::g_collisionTriangleCount] = movingMeshes[movingIndex];
+									Toy2::Collision::g_collisionTriangleCount++;
+								}
+							}
+						}
+						else
+							face += faceCount;
+						group = reinterpret_cast<Toy2::Collision::CollisionTreeGroup*>(face);
+					}
+				}
+			}
+
+			// Wall edges: collect the edge pairs whose X and Z ranges meet the query box.
+			int32_t minimumX = (int32_t)(queryMaxX - queryExtentX) / GRID_UNIT;
+			int32_t minimumZ = (int32_t)(queryMaxZ - queryExtentZ) / GRID_UNIT;
+			int32_t maximumX = queryMaxX / GRID_UNIT;
+			int32_t maximumZ = queryMaxZ / GRID_UNIT;
+			// Walk each relocated edge list.
+			for (uint8_t* head = Toy2::Terrain::g_terrainRelocationHeads[1]; head != 0;
+				head = reinterpret_cast<Toy2::Terrain::TerrainRelocationLink*>(head - sizeof(Toy2::Terrain::TerrainRelocationLink))->next)
+			{
+				Toy2::Terrain::TerrainEdgeList* edges = reinterpret_cast<Toy2::Terrain::TerrainEdgeList*>(head);
+				for (int32_t edgeIndex = 0; edgeIndex < edges->edgeCount; edgeIndex += EDGE_BLOCK_SIZE)
+				{
+					Vector3I* block = &edges->vertices[edgeIndex];
+					int32_t blockEnd;
+					if (block[0].y != NO_EDGE_BOUNDS)
+					{
+						if ((uint32_t)(maximumX - block[0].y) < block[1].y + toleranceX && (uint32_t)(maximumZ - block[2].y) < block[3].y + toleranceZ)
+							blockEnd = edgeIndex + EDGE_BLOCK_SIZE;
+						else
+							blockEnd = 0;
+					}
+					else
+						blockEnd = edges->edgeCount;
+
+					for (int32_t index = edgeIndex; index < blockEnd; index++)
+					{
+						Vector3I& start = edges->vertices[index];
+						Vector3I& end = edges->vertices[index + 1];
+						if (((start.x >= minimumX && end.x <= maximumX) || (end.x >= minimumX && start.x <= maximumX))
+							&& ((start.z >= minimumZ && end.z <= maximumZ) || (end.z >= minimumZ && start.z <= maximumZ))
+							&& Toy2::Collision::g_collisionEdgeVertexCount < MAX_EDGE_VERTICES)
+						{
+							Toy2::Collision::g_collisionEdgeVertices[Toy2::Collision::g_collisionEdgeVertexCount++] = start;
+							Toy2::Collision::g_collisionEdgeVertices[Toy2::Collision::g_collisionEdgeVertexCount++] = end;
+						}
+					}
+				}
+			}
+
+			// Raycast the movement against the collected faces and edges.
+			if (Toy2::Collision::g_collisionTriangleCount <= 0 && Toy2::Collision::g_collisionEdgeVertexCount <= 0)
+				return 0;
+
+			Vector4I start = *position;
+			int32_t hit = RaycastAgainstCandidates(&delta, &start, raycastMode);
+			movement->x = start.x - position->x;
+			movement->y = start.y - position->y;
+			movement->z = start.z - position->z;
+			return hit;
+		}
+
 		// FUNCTION: TOY2 0x00486280 [MATCHED]
 		int32_t GetGroundHeight(const PosAndAngles* position, int32_t shadowSize)
 		{
