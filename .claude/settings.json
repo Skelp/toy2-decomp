@@ -27,7 +27,14 @@
       "Bash(wc:*)",
       "Bash(ls:*)",
       "Bash(python3 -:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(sed:*)",
+      "Bash(cut:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(sort:*)",
+      "Bash(uniq:*)",
+      "Bash(tr:*)"
     ]
   }
 }
