@@ -404,8 +404,8 @@ else:
 # while the text stays under 24,000 characters, because a longer tool output is
 # spilled to a file the writer must page through.
 bc_pack() {
-    local address=$1 diff_path=$2 budget=24000 text part skipped="" count=0
-    local handoff="build/decomp-cache/handoff/$1.md" canonical file range first last path
+    local address=$1 diff_path=$2 budget=24000 text
+    local handoff="build/decomp-cache/handoff/$1.md" canonical
     canonical=$(printf '0x%08X' "$((address))")
     if [[ -f $handoff ]]; then
         text="--- handoff $handoff ---"$'\n'"$(cat "$handoff")"
@@ -419,31 +419,11 @@ bc_pack() {
     fi
     text+=$'\n'"--- region index ---"$'\n'"$(saved_diff_line "$address")"
     text+=$'\n'"$(python tools/decomp_diff.py "$diff_path" --hunks)"
-    while read -r _ number span; do
-        part=$'\n'"$(python tools/decomp_diff.py "$diff_path" --hunk "$number")"
-        file=${span%%:*}
-        range=${span#*:}
-        path=$(git ls-files -- "src/*$file" | grep -m1 "/$file$" || true)
-        if [[ $span == *:* && -n $path ]]; then
-            first=${range%%-*}
-            last=${range##*-}
-            first=$((first > 3 ? first - 3 : 1))
-            part+=$'\n'"--- source $path:$first-$((last + 3)) ---"
-            part+=$'\n'"$(sed -n "${first},$((last + 3))p" "$path")"
-        fi
-        if (( count >= 4 || ${#text} + ${#part} > budget )); then
-            skipped+=" $number"
-            continue
-        fi
-        text+=$part
-        count=$((count + 1))
-    done < <(python tools/decomp_diff.py "$diff_path" --hunks \
-        | awk '/^ *[0-9]+ +0x/ {a=$3; b=$4; gsub(/[-+]/, "", a); gsub(/[-+]/, "", b); print a + b, $1, $5}' \
-        | sort -rn | head -n 8)
     printf '%s\n' "$text"
-    if [[ -n $skipped ]]; then
-        echo "--- not included (tools/decomp bc $address --hunk N): regions$skipped ---"
-    fi
+    # The regions printed here start the batch's seen set, so the attempt
+    # view offers the writer the large regions the pack left out.
+    python tools/decomp_diff.py "$diff_path" --pack-regions $((budget - ${#text} - 1)) \
+        --address "$address" --source-root src --seen "build/decomp-diffs/$address.seen"
 }
 
 # A dirty header can move functions the writer never touched. Show them at bc
@@ -1965,7 +1945,7 @@ case "$command" in
         ;;
     bc)
         # bc ADDRESS            build, compare, log the attempt, print the region index
-        # bc ADDRESS --hunk N   print one mismatch region (or N,N,... several) from the saved diff (no build)
+        # bc ADDRESS --hunk N   print one mismatch region (or N,N,... several) with source lines (no build)
         # bc ADDRESS --hunks    print the region index from the saved diff (no build)
         # bc ADDRESS --compact  print the compact diff (changed lines only, no build)
         # bc ADDRESS --pack     print the orientation pack for a fresh batch (no build)
@@ -1992,6 +1972,10 @@ case "$command" in
             exit 2
         fi
         mkdir -p build/decomp-diffs
+        # A seen set older than the campaign baseline belongs to an earlier campaign.
+        if [[ build/decomp-diffs/$1.seen -ot build/decomp-baseline-report.json ]]; then
+            rm -f "build/decomp-diffs/$1.seen"
+        fi
         diff_path="build/decomp-diffs/${1}.txt"
         compact_path="build/decomp-diffs/${1}.compact.txt"
         if [[ ${#view[@]} -gt 0 ]]; then
@@ -2004,14 +1988,11 @@ case "$command" in
                 exit
             fi
             saved_diff_line "$1"
-            # --hunk 3,7,9 prints several regions in one call; writers otherwise loop in
-            # the shell, which the harness permission check denies.
-            if [[ ${view[0]} == --hunk && ${view[1]} == *,* ]]; then
-                IFS=, read -ra hunk_numbers <<< "${view[1]}"
-                for hunk_number in "${hunk_numbers[@]}"; do
-                    python tools/decomp_diff.py "$diff_path" --hunk "$hunk_number" || exit $?
-                done
-                exit 0
+            # --hunk 3,7,9 prints several regions in one call (writers otherwise loop in
+            # the shell, which the harness permission check denies), each with its
+            # source lines, and adds them to the seen set the attempt view reads.
+            if [[ ${view[0]} == --hunk ]]; then
+                view+=(--address "$1" --source-root src --seen "build/decomp-diffs/$1.seen")
             fi
             exec python tools/decomp_diff.py "$diff_path" "${view[@]}"
         fi
@@ -2055,10 +2036,11 @@ case "$command" in
             python tools/decomp_diff.py "${diff_args[@]}" --full
         else
             python tools/decomp_diff.py "${diff_args[@]}"
-            # The regions this attempt changed, with their source lines, so the
-            # writer rarely needs a --hunk or sed call before the next edit.
+            # The regions this attempt changed and the largest one not seen in
+            # this batch, with their source lines, so the writer rarely needs a
+            # --hunk or sed call before the next edit.
             python tools/decomp_diff.py "$diff_path" --attempt-view --previous "$prev_path" \
-                --address "$1" --source-root src || true
+                --address "$1" --source-root src --seen "build/decomp-diffs/$1.seen" || true
         fi
         python tools/decomp_campaigns.py first-score --address "$1" --quiet
         ;;

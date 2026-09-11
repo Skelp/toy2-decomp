@@ -16,9 +16,9 @@ the handoff TOOL line and stop.
 - `tools/decomp bc ADDR` builds, compares, logs one attempt, saves the diff and prints
   `attempt K/N raw X% (+d) best Y% (attempt k)` plus a region index
   (`N  0xADDR  -a +b  FILE:LINES`). It is the only command that consumes an attempt.
-- Then `bc` prints up to two regions changed since the last diff with their source lines
-  (tabs kept); `bc ADDR --hunk 3,7` prints the regions a `not shown:` line names, no build.
-  The assignment holds the pack. You start at the repo root: no `cd`, no shell loops.
+- Then `bc` prints up to two regions changed since the last diff and, if room, the largest
+  region you have not seen yet, with source lines (tabs kept); `bc ADDR --hunk 3,7` prints
+  any region with its source lines, no build. The assignment holds the pack. No `cd` or loops.
 - A failed build prints the errors and `bc: no attempt logged`; fix it and run the cycle
   again. Never pipe `bc` into `head` or `tail`: a closed pipe aborts the build.
 - A `header side effect:` line means your header edit moved an untouched function; make the
@@ -27,11 +27,11 @@ the handoff TOOL line and stop.
   legacy cast whose shared declaration cannot change stays inline; note the declaration under
   OPEN (the function stays PROVISIONAL). Never move a cast into a local or macro to pass the
   lint. An `advice:` line names a literal to replace with its name; validate ignores it.
-- The best tree (a cleanup tie replaces it) is `build/decomp-cache/best/ADDR.patch`;
-  `git checkout -- src && git apply build/decomp-cache/best/ADDR.patch` restores it.
+- The best tree is `build/decomp-cache/best/ADDR.patch`; `git checkout -- src && git apply
+  build/decomp-cache/best/ADDR.patch` restores it; bc on a measured tree names its attempt.
   `tools/decomp evidence ADDR --decomp-range A:B` prints decompilation lines A-B.
 - Source files use tabs. Every edit asserts its anchor (a failed assert logs no attempt).
-  Keep the build on the line after `EOF`, never joined with `&&`: a permission rule denies it.
+  Build on the line after `EOF`, not with `&&`; no `{...}` literals (lists or `dict()`).
 - A sandbox (Codex) lets you write the tree, build/, the git directory and the Wine prefix;
   quote any other write error in the TOOL line and never work around it.
 
@@ -46,7 +46,7 @@ the handoff TOOL line and stop.
     EOF
     clang-format -i --lines=A:B FILE && tools/decomp bc ADDR 2>&1 | grep -vE 'warning C4|LNK4'
 
-One source-level idea per cycle, written from the changed regions and the pack; `sed -n
+One source-level idea per cycle, written from the printed regions and the pack; `sed -n
 A,Bp FILE` only for lines outside the printed spans. If the score dropped, put the restore
 command of the best patch on its own line above `python3 - <<'EOF'` in the next cycle.
 Never read the diff files or tool-results/. Batch independent reads.

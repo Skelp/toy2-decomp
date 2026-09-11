@@ -27,6 +27,19 @@ REGION_GAP = 2
 VIEW_BUDGET = 8000
 VIEW_CHANGED_REGIONS = 2
 VIEW_SOURCE_CONTEXT = 3
+# While changed regions print, a second one must leave up to this many
+# characters for the largest region the writer has not seen.
+VIEW_UNSEEN_RESERVE = 3000
+# References more than this many lines apart print as separate windows, because
+# one stray reference (an inlined helper, say) would otherwise stretch a window
+# over hundreds of lines. Most gaps inside a region are 7 lines or fewer.
+SOURCE_GAP = 12
+# --hunk has no budget, so it prints at most this many source lines per region.
+HUNK_SOURCE_LINES = 60
+# The pack prints at most PACK_REGIONS of the largest regions. The pack and the
+# pick of an unseen region try only this many; the index names the others.
+PACK_REGIONS = 4
+LARGEST_REGIONS = 8
 
 
 @dataclass
@@ -163,6 +176,10 @@ def region_text(lines: list[str], found: list[Region], number: int, context: int
     return f"no region {number}; the index has {len(found)} regions\n"
 
 
+def region_size(region: Region) -> int:
+    return region.minus + region.plus
+
+
 def overlaps(one: Region, other: Region) -> bool:
     if one.low is None or other.low is None:
         return False
@@ -216,25 +233,132 @@ def resolve_source(root: Path, name: str, address: int | None) -> Path | None:
     return candidates[0] if len(candidates) == 1 else None
 
 
-def source_text(region: Region, root: Path, address: int | None) -> str:
-    """Return the raw source lines of a region's span, widened by a few lines.
-
-    The lines keep their tabs and carry no line numbers, so a writer can copy
-    them into an edit anchor without another read.
-    """
-    output: list[str] = []
+def source_windows(
+    region: Region, root: Path, address: int | None
+) -> list[tuple[Path, list[str], int, int, int]]:
+    """Return (path, file lines, first, last, references) for each window of a region."""
+    windows = []
     for name, numbers in (region.refs or region.nearby).items():
         path = resolve_source(root, name, address)
         if path is None:
             continue
         lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-        first = max(1, min(numbers) - VIEW_SOURCE_CONTEXT)
-        last = min(len(lines), max(numbers) + VIEW_SOURCE_CONTEXT)
-        if first > last:
-            continue
-        output.append(f"--- source {path.as_posix()}:{first}-{last} ---")
-        output.extend(lines[first - 1:last])
+        clusters: list[list[int]] = []
+        for number in sorted(numbers):
+            if clusters and number - clusters[-1][-1] <= SOURCE_GAP:
+                clusters[-1].append(number)
+            else:
+                clusters.append([number])
+        for cluster in clusters:
+            first = max(1, cluster[0] - VIEW_SOURCE_CONTEXT)
+            last = min(len(lines), cluster[-1] + VIEW_SOURCE_CONTEXT)
+            if first <= last:
+                windows.append((path, lines, first, last, len(cluster)))
+    return windows
+
+
+def source_text(
+    region: Region,
+    root: Path,
+    address: int | None,
+    cap: int | None = None,
+    printed: dict[Path, set[int]] | None = None,
+) -> str:
+    """Return the raw source lines around a region's references, a few lines wider.
+
+    The lines keep their tabs and carry no line numbers, so a writer can copy
+    them into an edit anchor without another read. With a cap, the windows
+    with the most references get their lines first and one line names each
+    part that did not print. printed holds the lines of each file that this
+    call already printed; they do not print again.
+    """
+    parts = []
+    for path, lines, first, last, weight in source_windows(region, root, address):
+        done = set() if printed is None else printed.setdefault(path, set())
+        start = None
+        for number in range(first, last + 2):
+            if number <= last and number not in done:
+                start = number if start is None else start
+            elif start is not None:
+                parts.append((path, lines, start, number - 1, weight))
+                start = None
+    counts = [last - first + 1 for _, _, first, last, _ in parts]
+    if cap is not None:
+        room = cap
+        for index in sorted(range(len(parts)), key=lambda index: -parts[index][4]):
+            counts[index] = min(counts[index], room)
+            room -= counts[index]
+    output: list[str] = []
+    for (path, lines, first, last, _), count in zip(parts, counts):
+        end = first + count - 1
+        if count:
+            output.append(f"--- source {path.as_posix()}:{first}-{end} ---")
+            output.extend(lines[first - 1:end])
+            if printed is not None:
+                printed[path].update(range(first, end + 1))
+        if end < last:
+            output.append(
+                f"--- {last - end} more lines: sed -n {end + 1},{last}p {path.as_posix()} ---"
+            )
     return "".join(line + "\n" for line in output)
+
+
+def read_seen(path: Path | None) -> list[tuple[int, int]]:
+    """Return the retail ranges of the regions a writer was shown in this batch."""
+    if path is None or not path.is_file():
+        return []
+    seen = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            low, high = (int(value, 16) for value in line.split())
+        except ValueError:
+            continue
+        seen.append((low, high))
+    return seen
+
+
+def mark_seen(path: Path | None, shown: list[Region], fresh: bool = False) -> None:
+    """Add the ranges of the shown regions to the seen set; fresh starts a new set."""
+    if path is None:
+        return
+    rows = "".join(f"0x{r.low:x} 0x{r.high:x}\n" for r in shown if r.low is not None)
+    with path.open("w" if fresh else "a", encoding="utf-8") as handle:
+        handle.write(rows)
+
+
+def is_seen(region: Region, seen: list[tuple[int, int]]) -> bool:
+    """Region numbers change between diffs, so a region is seen when its retail
+    range overlaps the range of a region shown earlier."""
+    if region.low is None or region.high is None:
+        return False
+    return any(region.low <= high and low <= region.high for low, high in seen)
+
+
+def pack_regions(
+    text: str, source_root: Path, address: int | None, label: str, budget: int
+) -> tuple[str, list[Region]]:
+    """Return the pack's largest regions with their source lines, and the regions shown.
+
+    The regions go in, largest first, while the text stays within the budget.
+    The other large regions are named in a last line.
+    """
+    lines = text.splitlines()
+    found = regions(lines)
+    output, shown, skipped = "", [], []
+    for region in sorted(found, key=region_size, reverse=True)[:LARGEST_REGIONS]:
+        part = region_text(lines, found, region.number) + source_text(
+            region, source_root, address
+        )
+        if len(shown) >= PACK_REGIONS or len(output) + len(part) > budget:
+            skipped.append(str(region.number))
+            continue
+        output += part
+        shown.append(region)
+    if skipped:
+        output += (
+            f"--- not included (tools/decomp bc {label} --hunk N): regions {' '.join(skipped)} ---\n"
+        )
+    return output, shown
 
 
 def attempt_view(
@@ -244,70 +368,119 @@ def attempt_view(
     address: int | None = None,
     label: str = "ADDRESS",
     budget: int = VIEW_BUDGET,
-) -> str:
+    seen: list[tuple[int, int]] = (),
+) -> tuple[str, list[Region]]:
     """Show what an attempt changed, so a writer needs no separate --hunk or source read.
 
     The view names the changed and resolved regions and prints the largest
     changed ones, each as --hunk prints it and followed by its source lines.
-    Unchanged regions are not printed again: the pack or an earlier attempt
-    already showed them. With no previous diff it prints the largest region
-    that fits. A region that does not fit is named in a last line.
+    Then, if room, it prints the largest region the writer has not seen in
+    this batch (seen holds the retail ranges whose source the pack, a view or
+    --hunk printed), because a writer otherwise fetches the next large region
+    from the index. With no previous diff only that region is printed. To keep
+    room for it, a second changed region must leave VIEW_UNSEEN_RESERVE
+    characters, and the source of a changed region the writer saw before goes
+    in last: the writer has just edited those lines. A last line names the
+    regions that do not fit. Returns the view and the regions whose source it
+    printed.
     """
     if previous is not None and text == previous:
-        return ""  # bc already said "source unchanged"
+        return "", []  # bc already said "source unchanged"
     lines = text.splitlines()
     found = regions(lines)
-    header = ""
-    if previous is None:
-        candidates, slots = found, 1
-    else:
-        candidates, resolved = changed_regions(found, regions(previous.splitlines()))
-        header = f"changed since the last diff: {len(candidates)} region(s)"
+    header, label_line, changed = "", "", []
+    if previous is not None:
+        changed, resolved = changed_regions(found, regions(previous.splitlines()))
+        header = f"changed since the last diff: {len(changed)} region(s)"
         header += f"; resolved: {', '.join(resolved)}\n" if resolved else "\n"
-        slots = VIEW_CHANGED_REGIONS
-    candidates = sorted(candidates, key=lambda region: region.minus + region.plus, reverse=True)
+        label_line = "not seen yet:\n"
+    changed = sorted(changed, key=region_size, reverse=True)
+    numbers = {region.number for region in changed}
+    unseen = [
+        region for region in sorted(found, key=region_size, reverse=True)
+        if region.number not in numbers and not is_seen(region, seen)
+    ][:LARGEST_REGIONS]
+    hunks: dict[int, str] = {}
+    sources: dict[int, str] = {}
 
-    def not_shown(numbers: list[int]) -> str:
-        if not numbers:
+    def hunk(region: Region) -> str:
+        if region.number not in hunks:
+            hunks[region.number] = region_text(lines, found, region.number)
+        return hunks[region.number]
+
+    def source(region: Region) -> str:
+        if region.number not in sources:
+            sources[region.number] = source_text(region, source_root, address)
+        return sources[region.number]
+
+    def not_shown(skipped: list[int], missed: list[int]) -> str:
+        parts = [
+            f"{name} {' '.join(str(number) for number in group)}"
+            for name, group in (("changed", skipped), ("not seen", missed)) if group
+        ]
+        if not parts:
             return ""
-        listed = " ".join(str(number) for number in numbers)
-        return f"not shown: regions {listed} (tools/decomp bc {label} --hunk N)\n"
+        return f"not shown: {'; '.join(parts)} (tools/decomp bc {label} --hunk N)\n"
 
-    rendered: dict[int, tuple[str, str]] = {}
+    def fill(limit: int) -> tuple[str, list[int], list[int], list[Region]]:
+        cost, slots, skipped, sourced = len(header), [], [], set()
+        reserve = 0
+        if unseen:
+            first = unseen[0]
+            reserve = min(VIEW_UNSEEN_RESERVE, len(label_line + hunk(first) + source(first)))
 
-    def fill(limit: int) -> tuple[str, list[int]]:
-        output, skipped, printed = header, [], 0
-        for region in candidates:
-            if printed == slots:
-                if previous is None:
-                    break  # the index lists the smaller regions
-                skipped.append(region.number)
-                continue
-            if region.number not in rendered:
-                rendered[region.number] = (
-                    region_text(lines, found, region.number),
-                    source_text(region, source_root, address),
-                )
-            hunk, source = rendered[region.number]
-            if len(output) + len(hunk) + len(source) <= limit:
-                output += hunk + source
-            elif len(output) + len(hunk) <= limit:
-                output += hunk  # the asm is worth more than its source lines
+        def add_source(region: Region, room: int) -> None:
+            nonlocal cost
+            if region.number not in sourced and cost + len(source(region)) <= room:
+                sourced.add(region.number)
+                cost += len(source(region))
+
+        for region in changed:
+            room = limit - reserve if slots else limit
+            if len(slots) < VIEW_CHANGED_REGIONS and cost + len(hunk(region)) <= room:
+                slots.append(region)
+                cost += len(hunk(region))
             else:
                 skipped.append(region.number)
-                continue
-            printed += 1
-        return output, skipped
+        for region in slots:
+            if not is_seen(region, seen):
+                add_source(region, limit - reserve)
+        # The unseen region prints with its source; its asm alone only when
+        # no candidate fits with its source.
+        extra = None
+        for with_source in (True, False):
+            for region in unseen:
+                size = len(label_line + hunk(region))
+                size += len(source(region)) if with_source else 0
+                if cost + size <= limit:
+                    extra, cost = region, cost + size
+                    if with_source:
+                        sourced.add(region.number)
+                    break
+            if extra is not None:
+                break
+        for region in slots:
+            add_source(region, limit)
+        printed = slots + ([extra] if extra is not None else [])
+        output = header + "".join(
+            (label_line if region is extra else "")
+            + hunk(region)
+            + (source(region) if region.number in sourced else "")
+            for region in printed
+        )
+        missed = unseen[:unseen.index(extra)] if extra is not None else unseen
+        shown = [region for region in printed if region.number in sourced or not source(region)]
+        return output, skipped, [region.number for region in missed], shown
 
     # Keep room for the last line so the whole view stays within the budget.
     # The room grows on each pass and the line has a maximum length, so the
     # loop ends; a last line that no longer grows means nothing more can go.
     reserve = 0
     while True:
-        output, skipped = fill(budget - reserve)
-        tail = not_shown(skipped)
+        output, skipped, missed, shown = fill(budget - reserve)
+        tail = not_shown(skipped, missed)
         if len(output) + len(tail) <= budget or len(tail) <= reserve:
-            return output + tail
+            return output + tail, shown
         reserve = len(tail)
 
 
@@ -421,13 +594,19 @@ def summarize(
     return "\n".join(output) + "\n"
 
 
+def region_numbers(value: str) -> list[int]:
+    return [int(number) for number in value.split(",")]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("path", type=Path)
     parser.add_argument("--full", action="store_true", help="print the raw diff")
     parser.add_argument("--compact", action="store_true", help="print changed lines only")
     parser.add_argument("--hunks", action="store_true", help="print the region index only")
-    parser.add_argument("--hunk", type=int, help="print one region with context")
+    parser.add_argument(
+        "--hunk", type=region_numbers, help="print regions N[,N...] with context and source"
+    )
     parser.add_argument("--write-compact", type=Path, help="also write the compact diff here")
     parser.add_argument("--address", type=lambda value: int(value, 16))
     parser.add_argument("--functions-map", type=Path)
@@ -437,25 +616,54 @@ def main() -> int:
         "--attempt-view", action="store_true", help="print what changed since --previous"
     )
     parser.add_argument("--previous", type=Path, help="the diff of the last attempt")
+    parser.add_argument(
+        "--pack-regions", type=int, metavar="BUDGET",
+        help="print the largest regions within BUDGET characters; starts a new --seen set",
+    )
+    parser.add_argument("--seen", type=Path, help="the regions a writer was shown in this batch")
     args = parser.parse_args()
     text = args.path.read_text(encoding="utf-8", errors="replace")
+    # The saved diff is named by the address the writer typed, and
+    # `bc ADDRESS --hunk N` looks it up by that name.
+    label = args.path.stem
     if args.attempt_view:
         previous = None
         if args.previous is not None and args.previous.is_file():
             previous = args.previous.read_text(encoding="utf-8", errors="replace")
-        # The saved diff is named by the address the writer typed, and
-        # `bc ADDRESS --hunk N` looks it up by that name.
-        view = attempt_view(
-            text, previous, args.source_root or Path("src"), args.address, args.path.stem
+        view, shown = attempt_view(
+            text, previous, args.source_root or Path("src"), args.address, label,
+            seen=read_seen(args.seen),
         )
         print(view, end="")
+        mark_seen(args.seen, shown)
+        return 0
+    if args.pack_regions is not None:
+        view, shown = pack_regions(
+            text, args.source_root or Path("src"), args.address, label, args.pack_regions
+        )
+        print(view, end="")
+        mark_seen(args.seen, shown, fresh=True)  # a new batch starts with the pack
         return 0
     lines = text.splitlines()
     found = regions(lines)
     if args.write_compact is not None:
         args.write_compact.write_text(compact(lines, found), encoding="utf-8")
     if args.hunk is not None:
-        print(region_text(lines, found, args.hunk), end="")
+        # A source line prints once per call, so neighbouring regions do not
+        # repeat the lines they share.
+        shown, printed = [], {}
+        for number in args.hunk:
+            print(region_text(lines, found, number), end="")
+            region = next((region for region in found if region.number == number), None)
+            if region is None:
+                continue
+            shown.append(region)
+            if args.source_root is not None:
+                print(
+                    source_text(region, args.source_root, args.address, HUNK_SOURCE_LINES, printed),
+                    end="",
+                )
+        mark_seen(args.seen, shown)
         return 0
     if args.hunks:
         print("\n".join([verdict_line(lines), *region_index(found)]))
