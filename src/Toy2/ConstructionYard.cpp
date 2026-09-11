@@ -777,79 +777,158 @@ namespace Toy2
 			}
 
 			g_paintPuzzleStation = 0;
-			if (g_paintMixerPulseTimer > 0)
+			if (g_paintMixerPulseTimer <= 0)
+			{
+				if (g_buzzActor.collisionFlags != 0 && g_groundSlamTimer != 0 && g_footingType >= 0x20 && g_footingType <= 0x23 && g_paintPuzzleTimer <= 0)
+				{
+					g_paintPuzzleTarget = g_footingType - 0x1F;
+					g_paintPuzzleTimer = 0x3C;
+					Levels::DeactivateAmbientEmitter(0, 1);
+					Levels::DeactivateAmbientEmitter(1, 1);
+					Levels::DeactivateAmbientEmitter(2, 1);
+				}
+
+				Levels::RecordData* paintStations = Levels::g_recordData[3];
+				for (int32_t station = 0; station <= paintStations->recordCount; ++station)
+				{
+					if (abs((position.x >> 5) - paintStations->data[station].x) < 200)
+						g_paintPuzzleStation = station + 1;
+				}
+				if (g_paintPuzzleTimer == 0x3C && g_paintPuzzleStation > 4 && g_paintPuzzleStation - 3 == g_paintPuzzleTarget)
+				{
+					if (g_firstPaintColor == 0)
+						g_firstPaintColor = g_paintPuzzleStation - 4;
+					else if (g_secondPaintColor == 0)
+					{
+						g_secondPaintColor = g_paintPuzzleStation - 4;
+						g_paintPuzzleInvalidSequence = 0;
+					}
+					else
+						g_paintPuzzleInvalidSequence = 1;
+				}
+			}
+			else
 			{
 				g_paintPuzzleInvalidSequence = 0;
 				paintMixer->scaleY = static_cast<int16_t>(g_paintMixerScale * g_paintMixerPulseTimer / 32);
 				g_paintMixerPulseTimer -= Renderer::g_frameDelta;
 			}
-			else if (g_buzzActor.airborneMode != 0 && g_groundSlamTimer != 0 && g_footingType > 0x1F && g_footingType < 0x24 && g_paintPuzzleTimer < 1)
-			{
-				g_paintPuzzleTarget = g_footingType - 0x1F;
-				g_paintPuzzleTimer = 0x3C;
-				Levels::DeactivateAmbientEmitter(0, 1);
-				Levels::DeactivateAmbientEmitter(1, 1);
-				Levels::DeactivateAmbientEmitter(2, 1);
-			}
-
-			Levels::RecordData* paintStations = Levels::g_recordData[3];
-			for (int32_t station = 0; station <= paintStations->recordCount; ++station)
-			{
-				if (abs((position.x >> 5) - paintStations->data[station].x) < 200)
-					g_paintPuzzleStation = station + 1;
-			}
-			if (g_paintPuzzleTimer == 0x3C && g_paintPuzzleStation > 4 && g_paintPuzzleStation - 3 == g_paintPuzzleTarget)
-			{
-				if (g_firstPaintColor == 0)
-					g_firstPaintColor = g_paintPuzzleStation - 4;
-				else if (g_secondPaintColor == 0)
-				{
-					g_secondPaintColor = g_paintPuzzleStation - 4;
-					g_paintPuzzleInvalidSequence = 0;
-				}
-				else
-					g_paintPuzzleInvalidSequence = 1;
-			}
-			if (g_paintPuzzleTarget > 1 && g_paintPuzzleTimer > 0)
-			{
-				int32_t buttonScale = g_paintPuzzleTimer > 0x34 ? (0x3C - g_paintPuzzleTimer) * 0x200 : (g_paintPuzzleTimer > 0xB ? 0x1000 : 0);
-				Nu3D::Link::SetScaleFromFixedOffsets(g_paintPuzzleTarget + 0x1F, 0x1000, buttonScale, 0x1000);
-			}
-
-			if (g_paintPuzzleInvalidSequence == 0 && g_paintPuzzleStation >= 5 && g_paintPuzzleStation <= 7
-				&& g_paintPuzzleStation - 3 == g_paintPuzzleTarget)
-			{
-				int16_t timer = static_cast<int16_t>(g_paintPuzzleTimer);
-				switch (g_secondPaintColor * 3 + g_firstPaintColor - 1)
-				{
-					case 0: paintMixer->actorTint.r = 0x680; paintMixer->actorTint.g = 0; paintMixer->actorTint.b = 0; g_paintMixerScale = (0x3C - g_paintPuzzleTimer) * 0x20; break;
-					case 1: paintMixer->actorTint.r = 0; paintMixer->actorTint.g = 0; paintMixer->actorTint.b = 0x600; g_paintMixerScale = (0x3C - g_paintPuzzleTimer) * 0x20; break;
-					case 2: paintMixer->actorTint.r = 0x600; paintMixer->actorTint.g = 0x580; paintMixer->actorTint.b = 0; g_paintMixerScale = (0x3C - g_paintPuzzleTimer) * 0x20; break;
-					case 4: paintMixer->actorTint.r = (0x3C - timer) * 14; paintMixer->actorTint.g = 0; paintMixer->actorTint.b = timer * 8 + 0x420; g_paintMixerScale = (0x7C - g_paintPuzzleTimer) * 0x20; break;
-					case 5: paintMixer->actorTint.r = 0x600; paintMixer->actorTint.g = timer * 10 + 0x328; paintMixer->actorTint.b = 0; g_paintMixerScale = (0x7C - g_paintPuzzleTimer) * 0x20; break;
-					case 6: paintMixer->actorTint.r = timer * 12 + 0x3B0; paintMixer->actorTint.g = 0; paintMixer->actorTint.b = (0x3C - timer) * 18; g_paintMixerScale = (0x7C - g_paintPuzzleTimer) * 0x20; break;
-					case 8: paintMixer->actorTint.r = (timer * 3 + 12) * 8; paintMixer->actorTint.g = timer * 6 + 0x418; paintMixer->actorTint.b = 0; g_paintMixerScale = (0x7C - g_paintPuzzleTimer) * 0x20; break;
-					case 9: paintMixer->actorTint.r = timer * 2 + 0x608; paintMixer->actorTint.g = (0x3C - timer) * 12; paintMixer->actorTint.b = 0; g_paintMixerScale = (0x7C - g_paintPuzzleTimer) * 0x20; break;
-					case 10: paintMixer->actorTint.r = 0; paintMixer->actorTint.g = (0x3C - timer) * 16; paintMixer->actorTint.b = (timer * 3 + 12) * 8; g_paintMixerScale = (0x7C - g_paintPuzzleTimer) * 0x20; break;
-				}
-				paintMixer->scaleY = static_cast<int16_t>(g_paintMixerScale);
-			}
 			if (g_paintPuzzleTimer > 0)
+			{
+				if (g_paintPuzzleTimer > 0x34)
+				{
+					if (g_paintPuzzleTarget > 1)
+						Nu3D::Link::SetScaleFromFixedOffsets(g_paintPuzzleTarget + 0x1F, 0x1000, (0x3C - g_paintPuzzleTimer) * 0x200, 0x1000);
+				}
+				else if (g_paintPuzzleTimer < 0xC)
+				{
+					if (g_paintPuzzleTarget > 1)
+						Nu3D::Link::SetScaleFromFixedOffsets(g_paintPuzzleTarget + 0x1F, 0, 0, 0);
+				}
+				else if (g_paintPuzzleTarget > 1)
+					Nu3D::Link::SetScaleFromFixedOffsets(g_paintPuzzleTarget + 0x1F, 0x1000, 0x1000, 0x1000);
+
+				if (g_paintPuzzleInvalidSequence == 0 && g_paintPuzzleStation - 3 == g_paintPuzzleTarget && g_paintPuzzleStation >= 5
+					&& g_paintPuzzleStation <= 7)
+				{
+					int16_t timer = static_cast<int16_t>(g_paintPuzzleTimer);
+					switch (g_secondPaintColor * 3 + g_firstPaintColor - 1)
+					{
+						case 0:
+							paintMixer->actorTint.r = 0x680;
+							paintMixer->actorTint.g = 0;
+							paintMixer->actorTint.b = 0;
+							g_paintMixerScale = (0x3C - g_paintPuzzleTimer) * 0x20;
+							break;
+						case 1:
+							paintMixer->actorTint.r = 0;
+							paintMixer->actorTint.g = 0;
+							paintMixer->actorTint.b = 0x600;
+							g_paintMixerScale = (0x3C - g_paintPuzzleTimer) * 0x20;
+							break;
+						case 2:
+							paintMixer->actorTint.r = 0x600;
+							paintMixer->actorTint.g = 0x580;
+							paintMixer->actorTint.b = 0;
+							g_paintMixerScale = (0x3C - g_paintPuzzleTimer) * 0x20;
+							break;
+						case 4:
+							paintMixer->actorTint.r = (0x3C - timer) * 14;
+							paintMixer->actorTint.g = 0;
+							paintMixer->actorTint.b = timer * 8 + 0x420;
+							g_paintMixerScale = (0x7C - g_paintPuzzleTimer) * 0x20;
+							break;
+						case 5:
+							paintMixer->actorTint.r = 0x600;
+							paintMixer->actorTint.g = timer * 10 + 0x328;
+							paintMixer->actorTint.b = 0;
+							g_paintMixerScale = (0x7C - g_paintPuzzleTimer) * 0x20;
+							break;
+						case 6:
+							paintMixer->actorTint.r = timer * 12 + 0x3B0;
+							paintMixer->actorTint.g = 0;
+							paintMixer->actorTint.b = (0x3C - timer) * 18;
+							g_paintMixerScale = (0x7C - g_paintPuzzleTimer) * 0x20;
+							break;
+						case 8:
+							paintMixer->actorTint.r = (timer * 3 + 12) * 8;
+							paintMixer->actorTint.g = timer * 6 + 0x418;
+							paintMixer->actorTint.b = 0;
+							g_paintMixerScale = (0x7C - g_paintPuzzleTimer) * 0x20;
+							break;
+						case 9:
+							paintMixer->actorTint.r = timer * 2 + 0x608;
+							paintMixer->actorTint.g = (0x3C - timer) * 12;
+							paintMixer->actorTint.b = 0;
+							g_paintMixerScale = (0x7C - g_paintPuzzleTimer) * 0x20;
+							break;
+						case 10:
+							paintMixer->actorTint.r = 0;
+							paintMixer->actorTint.g = (0x3C - timer) * 16;
+							paintMixer->actorTint.b = (timer * 3 + 12) * 8;
+							g_paintMixerScale = (0x7C - g_paintPuzzleTimer) * 0x20;
+							break;
+					}
+					paintMixer->scaleY = static_cast<int16_t>(g_paintMixerScale);
+				}
 				g_paintPuzzleTimer -= Renderer::g_frameDelta;
+			}
 
 			mixedColor = g_secondPaintColor * 3 + g_firstPaintColor - 1;
 			if (g_paintPuzzleStation > 0 && g_paintPuzzleStation < 4)
 			{
-				bool correctMix = (g_paintPuzzleStation == 1 && (mixedColor == 4 || mixedColor == 6))
-					|| (g_paintPuzzleStation == 2 && (mixedColor == 5 || mixedColor == 9))
-					|| (g_paintPuzzleStation == 3 && (mixedColor == 8 || mixedColor == 10));
-				if (correctMix)
+				switch (g_paintPuzzleStation)
 				{
-					g_completedPaintMask |= 1 << (g_paintPuzzleStation - 1);
-					g_paintMixerPulseTimer = 0x20;
-					g_firstPaintColor = 0;
-					g_secondPaintColor = 0;
-					AudioManager::StartSoundSequenceOnActor(-5, &g_buzzActor.posAngles.pos);
+					case 1:
+						if (mixedColor == 4 || mixedColor == 6)
+						{
+							g_completedPaintMask |= 1;
+							g_paintMixerPulseTimer = 0x20;
+							g_firstPaintColor = 0;
+							g_secondPaintColor = 0;
+							AudioManager::StartSoundSequenceOnActor(-5, &g_buzzActor.posAngles.pos);
+						}
+						break;
+					case 2:
+						if (mixedColor == 5 || mixedColor == 9)
+						{
+							g_completedPaintMask |= 2;
+							g_paintMixerPulseTimer = 0x20;
+							g_firstPaintColor = 0;
+							g_secondPaintColor = 0;
+							AudioManager::StartSoundSequenceOnActor(-5, &g_buzzActor.posAngles.pos);
+						}
+						break;
+					case 3:
+						if (mixedColor == 8 || mixedColor == 10)
+						{
+							g_completedPaintMask |= 4;
+							g_paintMixerPulseTimer = 0x20;
+							g_firstPaintColor = 0;
+							g_secondPaintColor = 0;
+							AudioManager::StartSoundSequenceOnActor(-5, &g_buzzActor.posAngles.pos);
+						}
+						break;
 				}
 			}
 			if (paintMixer->scaleY < 0x180)
@@ -857,20 +936,18 @@ namespace Toy2
 			if (g_framePulseOutputs.eightTick != 0)
 			{
 				int32_t indicatorIndex = g_framePulsePhases.sixtyFourTick >> 3;
-				PaintIndicatorEntry* indicator = &g_paintIndicatorEntries[indicatorIndex];
-				if ((indicator->completedMask & g_completedPaintMask) != 0)
+				if ((g_paintIndicatorEntries[indicatorIndex].completedMask & g_completedPaintMask) != 0)
 				{
-					int32_t linkId = indicator->linkId;
-					if (linkId < 0)
+					PaintIndicatorEntry* indicator = &g_paintIndicatorEntries[indicatorIndex];
+					if (indicator->linkId < 0)
 					{
-						linkId = -linkId;
-						Nu3D::Link::SetScaleFromFixedOffsets(linkId, 0, 0, 0);
-						Nu3D::Link::SetScaleFromFixedOffsets(linkId + 3, 0x1000, 0x1000, 0x1000);
+						Nu3D::Link::SetScaleFromFixedOffsets(-indicator->linkId, 0, 0, 0);
+						Nu3D::Link::SetScaleFromFixedOffsets(3 - indicator->linkId, 0x1000, 0x1000, 0x1000);
 					}
 					else
 					{
-						Nu3D::Link::SetScaleFromFixedOffsets(linkId, 0x1000, 0x1000, 0x1000);
-						Nu3D::Link::SetScaleFromFixedOffsets(linkId + 3, 0, 0, 0);
+						Nu3D::Link::SetScaleFromFixedOffsets(indicator->linkId, 0x1000, 0x1000, 0x1000);
+						Nu3D::Link::SetScaleFromFixedOffsets(indicator->linkId + 3, 0, 0, 0);
 					}
 				}
 			}
@@ -1015,80 +1092,137 @@ namespace Toy2
 			}
 			if (g_workLightIntensity != 0)
 			{
-				int32_t red = g_workLightIntensity < 0x41 ? g_workLightIntensity * 2 : 0x80;
-				int32_t blue = g_workLightIntensity < 0x41 ? 0 : g_workLightIntensity * 2 - 0x80;
-				Levels::RecordData* lights = Levels::g_recordData[6];
-				int32_t nearestDistance = INT_MAX;
-				int32_t nearestIndex = 0;
-				for (int32_t i = 0; i < lights->recordCount; ++i)
+				int32_t red;
+				int32_t blue;
+				if (g_workLightIntensity > 0x40)
 				{
-					Vector3I* lightPosition = &lights->data[i];
-					int32_t cameraX = (Camera::g_renderCameraTransform.pos.x - lightPosition->x * 0x20) >> 8;
-					int32_t cameraY = (Camera::g_renderCameraTransform.pos.y - lightPosition->y * 0x20) >> 8;
-					int32_t cameraZ = (Camera::g_renderCameraTransform.pos.z - lightPosition->z * 0x20) >> 8;
+					red = 0x80;
+					blue = g_workLightIntensity * 2 - 0x80;
+				}
+				else
+				{
+					red = g_workLightIntensity * 2;
+					blue = 0;
+				}
+				int32_t nearestDistance = INT_MAX;
+				int32_t nearestIndex;
+				for (int32_t i = 0; i < Levels::g_recordData[6]->recordCount; ++i)
+				{
+					Vector3I* lightPosition = &Levels::g_recordData[6]->data[i];
+					int32_t lightX = lightPosition->x * 0x20;
+					int32_t lightY = lightPosition->y * 0x20;
+					int32_t lightZ = lightPosition->z * 0x20;
+					int32_t cameraX = (Camera::g_renderCameraTransform.pos.x - lightX) >> 8;
+					int32_t cameraY = (Camera::g_renderCameraTransform.pos.y - lightY) >> 8;
+					int32_t cameraZ = (Camera::g_renderCameraTransform.pos.z - lightZ) >> 8;
 					if (cameraX * cameraX + cameraY * cameraY + cameraZ * cameraZ < 1000000)
 					{
-						Renderer::LensFlare::RegisterLight(lightPosition->x * 0x20, lightPosition->y * 0x20, lightPosition->z * 0x20, red, red, blue, 0x40);
-						int32_t buzzX = (g_buzzActor.posAngles.pos.x - lightPosition->x * 0x20) >> 8;
-						int32_t buzzY = (g_buzzActor.posAngles.pos.y - lightPosition->y * 0x20 - 0x2000) >> 8;
-						int32_t buzzZ = (g_buzzActor.posAngles.pos.z - lightPosition->z * 0x20) >> 8;
+						Renderer::LensFlare::RegisterLight(lightX, lightY, lightZ, red, red, blue, 0x40);
+						int32_t buzzX = (g_buzzActor.posAngles.pos.x - lightX) >> 8;
+						int32_t buzzY = (g_buzzActor.posAngles.pos.y - lightY - 0x2000) >> 8;
+						int32_t buzzZ = (g_buzzActor.posAngles.pos.z - lightZ) >> 8;
 						int32_t distance = buzzX * buzzX + buzzY * buzzY + buzzZ * buzzZ;
-						if (distance < nearestDistance) { nearestDistance = distance; nearestIndex = i; }
+						if (distance < nearestDistance)
+						{
+							nearestDistance = distance;
+							nearestIndex = i;
+						}
 					}
 				}
 				if (nearestDistance < 0x10000)
 				{
-					Vector3I* nearest = &lights->data[nearestIndex];
+					Vector3I* nearest = &Levels::g_recordData[6]->data[nearestIndex];
 					Lighting::DynamicLight* light = &Lighting::g_lightingState.dynamicLights[1];
-					light->sourceId = reinterpret_cast<int32_t>(nearest);
-					light->position.x = nearest->x << 5; light->position.y = nearest->y << 5; light->position.z = nearest->z << 5;
-					light->colour.r = static_cast<uint8_t>(red); light->colour.g = static_cast<uint8_t>(red); light->colour.b = static_cast<uint8_t>(blue);
+					light->position.x = nearest->x << 5;
+					light->position.y = nearest->y << 5;
+					light->position.z = nearest->z << 5;
+					light->colour.r = static_cast<uint8_t>(red);
+					light->colour.g = static_cast<uint8_t>(red);
+					light->colour.b = static_cast<uint8_t>(blue);
 					light->lifetime = 1;
+					light->sourceId = reinterpret_cast<int32_t>(nearest);
 				}
 				else
 					Lighting::g_lightingState.dynamicLights[1].lifetime = 0;
 			}
-			else
-				Lighting::g_lightingState.dynamicLights[1].lifetime = 0;
 
-			if (g_groundSlamTimer != 0)
+			if (g_groundSlamTimer != 0 && (g_slammedPlatformFlags & SLAMMED_PLATFORM_FIRST) == 0 && Platform::HadBuzzContactThisFrame(0x16) != 0)
 			{
-				for (int32_t i = 0; i < 3; ++i)
-				{
-					if ((g_slammedPlatformFlags & (1 << i)) == 0 && Platform::HadBuzzContactThisFrame(i + 0x16) != 0)
-					{
-						Platform::SetRotationAngles(i + 0x16, -0x180, 0, 0);
-						Nu3D::Link::SetRotationRelative8bit(i + 0x41, -0x180, 0, 0);
-						g_slammedPlatformFlags |= 1 << i;
-						Levels::DeactivateAmbientEmitter(i + 4, 1);
-					}
-				}
+				Platform::SetRotationAngles(0x16, -0x180, 0, 0);
+				Nu3D::Link::SetRotationRelative8bit(0x41, -0x180, 0, 0);
+				g_slammedPlatformFlags |= SLAMMED_PLATFORM_FIRST;
+				Levels::DeactivateAmbientEmitter(4, 1);
 			}
-			int32_t targetOffset = (g_slammedPlatformFlags & SLAMMED_PLATFORM_THIRD) != 0 ? -0x63380
-				: (g_slammedPlatformFlags & SLAMMED_PLATFORM_SECOND) != 0 ? -0x3B600
-				: (g_slammedPlatformFlags & SLAMMED_PLATFORM_FIRST) != 0 ? -0x15E00 : 0;
+			if (g_groundSlamTimer != 0 && (g_slammedPlatformFlags & SLAMMED_PLATFORM_SECOND) == 0 && Platform::HadBuzzContactThisFrame(0x17) != 0)
+			{
+				Platform::SetRotationAngles(0x17, -0x180, 0, 0);
+				Nu3D::Link::SetRotationRelative8bit(0x42, -0x180, 0, 0);
+				g_slammedPlatformFlags |= SLAMMED_PLATFORM_SECOND;
+				Levels::DeactivateAmbientEmitter(5, 1);
+			}
+			if (g_groundSlamTimer != 0 && (g_slammedPlatformFlags & SLAMMED_PLATFORM_THIRD) == 0 && Platform::HadBuzzContactThisFrame(0x18) != 0)
+			{
+				Platform::SetRotationAngles(0x18, -0x180, 0, 0);
+				Nu3D::Link::SetRotationRelative8bit(0x43, -0x180, 0, 0);
+				g_slammedPlatformFlags |= SLAMMED_PLATFORM_THIRD;
+				Levels::DeactivateAmbientEmitter(6, 1);
+			}
+			int32_t targetOffset = 0;
+			if ((g_slammedPlatformFlags & SLAMMED_PLATFORM_FIRST) != 0)
+				targetOffset = -0x15E00;
+			if ((g_slammedPlatformFlags & SLAMMED_PLATFORM_SECOND) != 0)
+				targetOffset = -0x3B600;
+			if ((g_slammedPlatformFlags & SLAMMED_PLATFORM_THIRD) != 0)
+				targetOffset = -0x63380;
 			if (targetOffset != 0)
 			{
 				Vector3I targetPosition;
 				Vector3I platformOrigin;
-				Nu3D::Link::GetTargetPosFixed(0x44, &targetPosition);
-				Platform::GetOrigin(0x15, &platformOrigin);
-				Nu3D::Link::SetPositionRawAndCommit(0x44, platformOrigin.x >> 5, platformOrigin.y >> 5, platformOrigin.z >> 5);
 				int32_t velocity;
-				if ((g_slammedPlatformFlags & SLAMMED_PLATFORM_LIFT_RETURNING) == 0)
+				if ((g_slammedPlatformFlags & SLAMMED_PLATFORM_LIFT_RETURNING) != 0)
 				{
-					targetPosition.y += targetOffset;
-					g_platform21VerticalSpeed += targetPosition.y < platformOrigin.y ? Renderer::g_frameDelta * 8 : Renderer::g_frameDelta * -8;
-					if (g_platform21VerticalSpeed > 0x400) g_platform21VerticalSpeed = 0x400;
-					if (g_platform21VerticalSpeed < 0) { g_platform21VerticalSpeed = 0; g_slammedPlatformFlags |= SLAMMED_PLATFORM_LIFT_RETURNING; }
-					velocity = -g_platform21VerticalSpeed * Renderer::g_frameDelta;
+					Nu3D::Link::GetTargetPosFixed(0x44, &targetPosition);
+					Platform::GetOrigin(0x15, &platformOrigin);
+					Nu3D::Link::SetPositionRawAndCommit(0x44, platformOrigin.x >> 5, platformOrigin.y >> 5, platformOrigin.z >> 5);
+					if (platformOrigin.y + 0xE100 < targetPosition.y)
+					{
+						g_platform21VerticalSpeed += Renderer::g_frameDelta * 8;
+						if (g_platform21VerticalSpeed > 0x400)
+							g_platform21VerticalSpeed = 0x400;
+					}
+					else
+					{
+						g_platform21VerticalSpeed -= Renderer::g_frameDelta * 8;
+						if (g_platform21VerticalSpeed < 0)
+						{
+							g_platform21VerticalSpeed = 0;
+							g_slammedPlatformFlags &= ~SLAMMED_PLATFORM_LIFT_RETURNING;
+						}
+					}
+					velocity = g_platform21VerticalSpeed * Renderer::g_frameDelta;
 				}
 				else
 				{
-					g_platform21VerticalSpeed += platformOrigin.y + 0xE100 < targetPosition.y ? Renderer::g_frameDelta * 8 : Renderer::g_frameDelta * -8;
-					if (g_platform21VerticalSpeed > 0x400) g_platform21VerticalSpeed = 0x400;
-					if (g_platform21VerticalSpeed < 0) { g_platform21VerticalSpeed = 0; g_slammedPlatformFlags &= ~SLAMMED_PLATFORM_LIFT_RETURNING; }
-					velocity = g_platform21VerticalSpeed * Renderer::g_frameDelta;
+					Nu3D::Link::GetTargetPosFixed(0x44, &targetPosition);
+					Platform::GetOrigin(0x15, &platformOrigin);
+					Nu3D::Link::SetPositionRawAndCommit(0x44, platformOrigin.x >> 5, platformOrigin.y >> 5, platformOrigin.z >> 5);
+					targetPosition.y += targetOffset;
+					if (platformOrigin.y > targetPosition.y)
+					{
+						g_platform21VerticalSpeed += Renderer::g_frameDelta * 8;
+						if (g_platform21VerticalSpeed > 0x400)
+							g_platform21VerticalSpeed = 0x400;
+					}
+					else
+					{
+						g_platform21VerticalSpeed -= Renderer::g_frameDelta * 8;
+						if (g_platform21VerticalSpeed < 0)
+						{
+							g_platform21VerticalSpeed = 0;
+							g_slammedPlatformFlags |= SLAMMED_PLATFORM_LIFT_RETURNING;
+						}
+					}
+					velocity = -g_platform21VerticalSpeed * Renderer::g_frameDelta;
 				}
 				Platform::SetVelocity(0x15, 0, velocity, 0);
 			}
