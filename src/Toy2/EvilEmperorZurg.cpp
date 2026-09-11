@@ -100,22 +100,24 @@ namespace Toy2
 			AudioManager::PlaySoundEffect(0x67, 0);
 
 			int32_t attackFrame = 0;
-			Levels::RecordData* flareRecords = Levels::g_recordData[0];
 			int32_t nearestDistanceSquared = INT_MAX;
 			int32_t nearestFlareIndex;
-			for (int32_t flareIndex = 0; flareIndex < flareRecords->recordCount; flareIndex++)
+			for (int32_t flareIndex = 0; flareIndex < Levels::g_recordData[0]->recordCount; flareIndex++)
 			{
-				Vector3I* flare = &flareRecords->data[flareIndex];
-				int32_t cameraOffsetY = (Camera::g_renderCameraTransform.pos.y - flare->y * 0x20) >> 8;
-				int32_t cameraOffsetZ = (Camera::g_renderCameraTransform.pos.z - flare->z * 0x20) >> 8;
-				int32_t cameraOffsetX = (Camera::g_renderCameraTransform.pos.x - flare->x * 0x20) >> 8;
-				if (cameraOffsetZ * cameraOffsetZ + cameraOffsetY * cameraOffsetY + cameraOffsetX * cameraOffsetX < 1000000)
+				Vector3I* flare = &Levels::g_recordData[0]->data[flareIndex];
+				int32_t flareX = flare->x * 0x20;
+				int32_t flareY = flare->y * 0x20;
+				int32_t flareZ = flare->z * 0x20;
+				int32_t cameraOffsetX = (Camera::g_renderCameraTransform.pos.x - flareX) >> 8;
+				int32_t cameraOffsetY = (Camera::g_renderCameraTransform.pos.y - flareY) >> 8;
+				int32_t cameraOffsetZ = (Camera::g_renderCameraTransform.pos.z - flareZ) >> 8;
+				if (cameraOffsetX * cameraOffsetX + cameraOffsetY * cameraOffsetY + cameraOffsetZ * cameraOffsetZ < 1000000)
 				{
-					Renderer::LensFlare::RegisterLight(flare->x * 0x20, flare->y * 0x20, flare->z * 0x20, 0x80, 0x80, 0x80, 0x40);
-					int32_t buzzOffsetZ = (g_buzzActor.posAngles.pos.z - flare->z * 0x20) >> 8;
-					int32_t buzzOffsetY = (g_buzzActor.posAngles.pos.y - flare->y * 0x20 - 0x2000) >> 8;
-					int32_t buzzOffsetX = (g_buzzActor.posAngles.pos.x - flare->x * 0x20) >> 8;
-					int32_t distanceSquared = buzzOffsetX * buzzOffsetX + buzzOffsetZ * buzzOffsetZ + buzzOffsetY * buzzOffsetY;
+					Renderer::LensFlare::RegisterLight(flareX, flareY, flareZ, 0x80, 0x80, 0x80, 0x40);
+					int32_t buzzOffsetX = (g_buzzActor.posAngles.pos.x - flareX) >> 8;
+					int32_t buzzOffsetY = (g_buzzActor.posAngles.pos.y - flareY - 0x2000) >> 8;
+					int32_t buzzOffsetZ = (g_buzzActor.posAngles.pos.z - flareZ) >> 8;
+					int32_t distanceSquared = buzzOffsetX * buzzOffsetX + buzzOffsetY * buzzOffsetY + buzzOffsetZ * buzzOffsetZ;
 					if (distanceSquared < nearestDistanceSquared)
 					{
 						nearestDistanceSquared = distanceSquared;
@@ -126,16 +128,15 @@ namespace Toy2
 
 			if (nearestDistanceSquared < 0x10000)
 			{
-				Vector3I* nearestFlare = &flareRecords->data[nearestFlareIndex];
 				Lighting::DynamicLight* light = &Lighting::g_lightingState.dynamicLights[1];
-				light->position.x = nearestFlare->x << 5;
-				light->position.y = nearestFlare->y << 5;
-				light->position.z = nearestFlare->z << 5;
+				light->position.x = Levels::g_recordData[0]->data[nearestFlareIndex].x << 5;
+				light->position.y = Levels::g_recordData[0]->data[nearestFlareIndex].y << 5;
+				light->position.z = Levels::g_recordData[0]->data[nearestFlareIndex].z << 5;
 				light->colour.r = 0xFF;
 				light->colour.g = 0xFF;
 				light->colour.b = 0xFF;
 				light->lifetime = 1;
-				light->sourceId = reinterpret_cast<int32_t>(nearestFlare);
+				light->sourceId = reinterpret_cast<int32_t>(&Levels::g_recordData[0]->data[nearestFlareIndex]);
 			}
 			else
 			{
@@ -143,7 +144,7 @@ namespace Toy2
 			}
 
 			g_damageFlashToggle = (g_damageFlashToggle - 1) & 1;
-			if (g_encounterState > ENCOUNTER_INTRO)
+			if (g_encounterState >= ENCOUNTER_ACTIVE)
 			{
 				g_damageFlashTimer -= Renderer::g_frameDelta;
 				if (g_damageFlashTimer < 0)
@@ -152,16 +153,16 @@ namespace Toy2
 					zurg->creatureRam->defenseMode = 6;
 					zurg->useTint = 0;
 				}
-				else if (g_damageFlashToggle == 0)
-				{
-					zurg->useTint = 0;
-				}
-				else
+				else if (g_damageFlashToggle != 0)
 				{
 					zurg->useTint = 1;
 					zurg->actorTint.r = 0x2000;
 					zurg->actorTint.g = 0x2000;
 					zurg->actorTint.b = 0x2000;
+				}
+				else
+				{
+					zurg->useTint = 0;
 				}
 			}
 
@@ -191,22 +192,22 @@ namespace Toy2
 					g_buzzActor.posAngles.pos.y = -0x12BD0;
 					g_buzzActor.posAngles.pos.z = 0xF699;
 				}
-				if (Camera::g_cutsceneDuration == 0)
-				{
-					zurg->actorFlags |= Actor::ACTOR_FLAG_TRACKS_TARGET | Actor::ACTOR_FLAG_TARGETS_BUZZ;
-					g_encounterState = ENCOUNTER_ACTIVE;
-					zurg->creatureRam->rotSpeed = 10;
-					zurg->creatureRam->defenseMode = 6;
-				}
-				else
+				if (Camera::g_cutsceneDuration != 0)
 				{
 					zurg->pos.y += Renderer::g_frameDelta * 0x200;
 					Camera::g_cutsceneCameraPosition.y += Renderer::g_frameDelta * 0x220;
 					Camera::g_cutsceneCameraPosition.x -= Renderer::g_frameDelta * 0x20;
 					if (Camera::g_cutsceneDuration < 0xB4)
 						Camera::g_cutsceneCameraPosition.x -= Renderer::g_frameDelta * 0x150;
-					Camera::g_cutsceneFocusPosition.y = zurg->pos.y - 0x4000;
 					zurg->motionTargetPos.y = zurg->pos.y;
+					Camera::g_cutsceneFocusPosition.y = zurg->pos.y - 0x4000;
+				}
+				else
+				{
+					zurg->actorFlags |= Actor::ACTOR_FLAG_TRACKS_TARGET | Actor::ACTOR_FLAG_TARGETS_BUZZ;
+					g_encounterState = ENCOUNTER_ACTIVE;
+					zurg->creatureRam->rotSpeed = 10;
+					zurg->creatureRam->defenseMode = 6;
 				}
 			}
 
@@ -215,10 +216,8 @@ namespace Toy2
 				g_voiceTimer -= Renderer::g_frameDelta;
 				if (g_voiceTimer < 0)
 				{
-					uint8_t* soundChoice = g_randDatBufferPtr + 1;
-					g_voiceTimer = *g_randDatBufferPtr * 2 + 400;
-					g_randDatBufferPtr += 2;
-					AudioManager::Preset::PlayOneShotSound((*soundChoice & 3) + 0xBA, zurg);
+					g_voiceTimer = *g_randDatBufferPtr++ * 2 + 400;
+					AudioManager::Preset::PlayOneShotSound((*g_randDatBufferPtr++ & 3) + 0xBA, zurg);
 				}
 				Camera::g_actorCameraTarget = zurg->pos;
 				HUD::g_slideTimers[HUD::SLIDE_BOSS_STATUS] = 90;
@@ -229,14 +228,14 @@ namespace Toy2
 					g_previousPhase = zurg->actorPhase;
 					g_damageFlashTimer = 0x3C;
 					zurg->creatureRam->defenseMode = 4;
-					if (zurg->actorPhase < 10)
+					if (zurg->actorPhase < 10 && g_encounterState == ENCOUNTER_ACTIVE)
 					{
 						g_encounterState = ENCOUNTER_DEFEATED;
 						Camera::BeginScriptedCutsceneAtPoint(&zurg->pos, 300, 0x10);
 						Camera::g_cutsceneFocusPosition.y = zurg->pos.y - 0x4000;
-						Camera::g_cutsceneCameraPosition.x = Numerics::g_sinCosLUT[(uint16_t)zurg->yawAngle] + zurg->pos.x;
-						Camera::g_cutsceneCameraPosition.z = Numerics::g_sinCosLUT[(zurg->yawAngle + 0x400) & 0xFFF] + zurg->pos.z;
 						Camera::g_cutsceneCameraPosition.y = Camera::g_cutsceneFocusPosition.y;
+						Camera::g_cutsceneCameraPosition.x = Numerics::g_sinCosLUT[zurg->yawAngle] + zurg->pos.x;
+						Camera::g_cutsceneCameraPosition.z = Numerics::g_sinCosLUT[(zurg->yawAngle + 0x400) & 0xFFF] + zurg->pos.z;
 						Actor::SetAnimation(zurg, 2, 0x19);
 						zurg->actorFlags &= ~(Actor::ACTOR_FLAG_TRACKS_TARGET | Actor::ACTOR_FLAG_TARGETS_BUZZ);
 						g_attackTimer = 0x1E;
@@ -259,31 +258,29 @@ namespace Toy2
 				}
 
 				int32_t previousAttackTimer = g_attackTimer;
-				int32_t nextAttackTimer = g_attackTimer - Renderer::g_frameDelta;
-				if (nextAttackTimer < 0)
+				g_attackTimer -= Renderer::g_frameDelta;
+				if (g_attackTimer < 0)
 				{
 					g_attackTimer = 0x12E;
 					int32_t movementAngle = zurg->yawAngle + 0x200;
 					if (*g_randDatBufferPtr++ < 0x80)
-						movementAngle = zurg->yawAngle - 0x200;
+						movementAngle -= 0x400;
 					zurg->velX = Numerics::g_sinCosLUT[movementAngle] >> 3;
 					zurg->velForward = Numerics::g_sinCosLUT[(movementAngle + 0x400) & 0xFFF] >> 3;
 				}
 				else
 				{
-					bool passedAnimationFrame = g_attackTimer > 200;
-					g_attackTimer = nextAttackTimer;
-					if (passedAnimationFrame && nextAttackTimer < 201)
+					if (previousAttackTimer > 200 && g_attackTimer <= 200)
 					{
 						Actor::SetAnimation(zurg, 0, 0x18);
 						zurg->reservedArea[1] = 0xC0;
 						zurg->reservedArea[2] = 0xC0;
 					}
-					if (previousAttackTimer > 0x92 && g_attackTimer < 0x93)
+					if (previousAttackTimer > 0x92 && g_attackTimer <= 0x92)
 						attackFrame = 1;
-					if (previousAttackTimer > 0x8A && g_attackTimer < 0x8B)
+					if (previousAttackTimer > 0x8A && g_attackTimer <= 0x8A)
 						attackFrame = 2;
-					if (previousAttackTimer >= 0x7F && g_attackTimer < 0x7F)
+					if (previousAttackTimer > 0x7E && g_attackTimer <= 0x7E)
 						attackFrame = 1;
 					if (attackFrame != 0)
 					{
@@ -292,32 +289,27 @@ namespace Toy2
 						particlePosition.y = -0xFA;
 						particlePosition.z = 0;
 						Actor::ResolveBoneAttachmentPos(&particlePosition, zurg, 1);
-						int32_t particleType;
-						int32_t particleYaw;
-						int32_t velocityX;
-						int32_t velocityY;
-						int32_t velocityZ;
 						if (g_attackVariant == 0 && (zurg->actorPhase >= 20 || attackFrame != 2))
 						{
-							particleType = 0x6C;
-							particleYaw = 0x100;
-							velocityZ = Numerics::g_sinCosLUT[zurg->yawAngle + 0x380] >> 2;
-							velocityY = 0x400;
-							velocityX = Numerics::g_sinCosLUT[(zurg->yawAngle - 0x80) & 0xFFF] >> 2;
+							Nu3D::Particles::SpawnInstance(particlePosition.x,
+								particlePosition.y,
+								particlePosition.z,
+								Numerics::g_sinCosLUT[(zurg->yawAngle - 0x80) & 0xFFF] >> 2,
+								0x400,
+								Numerics::g_sinCosLUT[zurg->yawAngle + 0x380] >> 2,
+								0x100,
+								0,
+								0,
+								0x6C);
 						}
 						else
 						{
-							particleType = 0x6D;
-							particleYaw = zurg->yawAngle << 2;
-							velocityZ = 0;
-							velocityY = -2;
-							velocityX = 0;
+							Nu3D::Particles::SpawnInstance(
+								particlePosition.x, particlePosition.y, particlePosition.z, 0, -2, 0, zurg->yawAngle << 2, 0, 0, 0x6D);
 						}
-						Nu3D::Particles::SpawnInstance(
-							particlePosition.x, particlePosition.y, particlePosition.z, velocityX, velocityY, velocityZ, particleYaw, 0, 0, particleType);
 						AudioManager::PlaySoundEffect(0x9D, &zurg->pos);
 					}
-					if (previousAttackTimer > 0x68 && g_attackTimer < 0x69)
+					if (previousAttackTimer > 0x68 && g_attackTimer <= 0x68)
 					{
 						g_attackVariant = 0;
 						Actor::SetAnimation(zurg, 1, 2);
@@ -351,10 +343,9 @@ namespace Toy2
 					if (zurg->pos.y > 70000)
 					{
 						AudioManager::PlaySoundEffect(0x9E, reinterpret_cast<const Vector3I*>(1));
-						if (zurg->pos.y > 70000 && g_framePulseOutputs.sixteenTick != 0 && Camera::g_cutsceneDuration > 0x32)
+						if (zurg->pos.y > 70000 && g_framePulseOutputs.fourTick != 0 && Camera::g_cutsceneDuration > 0x32)
 						{
-							uint8_t randomAngle = *g_randDatBufferPtr++;
-							Nu3D::Particles::SpawnInstance(zurg->pos.x, 80000, zurg->pos.z, 0, -0x2400, 0, 0, randomAngle << 4, 0x80, 0x70);
+							Nu3D::Particles::SpawnInstance(zurg->pos.x, 80000, zurg->pos.z, 0, -0x2400, 0, 0, *g_randDatBufferPtr++ << 4, 0x80, 0x70);
 						}
 					}
 				}
