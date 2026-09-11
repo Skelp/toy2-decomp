@@ -4061,24 +4061,33 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00555368
 		Vector3I g_portalIntersectionPoint;
 
+		// Record index that ends a sector portal list.
+		const uint8_t kPortalListEnd = 0xFF;
+		// Half size of the box around a portal that Buzz must be in (world >> 7 units).
+		const int32_t kPortalNearRange = 0x4000;
+		// Edge tolerance for the portal polygon test.
+		const int32_t kPortalEdgeTolerance = 400;
+
 		// FUNCTION: TOY2 0x0043FEF0 [PROVISIONAL]
 		void UpdateActiveSector()
 		{
 			Levels::PortalRecord** portalRecords = reinterpret_cast<Levels::PortalRecord**>(Levels::g_recordData);
 			Levels::PortalEntry* entry = Levels::g_portalZones[Sector::g_currentSectorIndex].entries;
-			if (entry->recordIdx == 0xFF)
+			// Stop when the sector has no portal entries.
+			if (entry->recordIdx == kPortalListEnd)
 				return;
 
+			// Test each portal of the sector for a crossing by Buzz.
 			do
 			{
 				if (entry->categoryIdx != 15 || g_hasBackdrop == 0)
 				{
-					if ((abs((g_buzzActor.posAngles.pos.x >> 7) - portalRecords[entry->recordIdx]->origin.x) < 0x4000
-							&& abs((g_buzzActor.posAngles.pos.y >> 7) - portalRecords[entry->recordIdx]->origin.y) < 0x4000
-							&& abs((g_buzzActor.posAngles.pos.z >> 7) - portalRecords[entry->recordIdx]->origin.z) < 0x4000)
-						|| (abs((g_buzzActor.posAngles.pos.x >> 7) - portalRecords[entry->recordIdx]->vertices[1].position.x) < 0x4000
-							&& abs((g_buzzActor.posAngles.pos.y >> 7) - portalRecords[entry->recordIdx]->vertices[1].position.y) < 0x4000
-							&& abs((g_buzzActor.posAngles.pos.z >> 7) - portalRecords[entry->recordIdx]->vertices[1].position.z) < 0x4000))
+					if ((abs((g_buzzActor.posAngles.pos.x >> 7) - portalRecords[entry->recordIdx]->origin.x) < kPortalNearRange
+							&& abs((g_buzzActor.posAngles.pos.y >> 7) - portalRecords[entry->recordIdx]->origin.y) < kPortalNearRange
+							&& abs((g_buzzActor.posAngles.pos.z >> 7) - portalRecords[entry->recordIdx]->origin.z) < kPortalNearRange)
+						|| (abs((g_buzzActor.posAngles.pos.x >> 7) - portalRecords[entry->recordIdx]->vertices[1].position.x) < kPortalNearRange
+							&& abs((g_buzzActor.posAngles.pos.y >> 7) - portalRecords[entry->recordIdx]->vertices[1].position.y) < kPortalNearRange
+							&& abs((g_buzzActor.posAngles.pos.z >> 7) - portalRecords[entry->recordIdx]->vertices[1].position.z) < kPortalNearRange))
 					{
 						g_portalPlaneNormal.x = portalRecords[entry->recordIdx]->normal.x;
 						g_portalPlaneNormal.y = portalRecords[entry->recordIdx]->normal.y;
@@ -4100,19 +4109,18 @@ namespace Toy2
 								g_portalNormal.y = (int16_t)g_portalPlaneNormal.y;
 								g_portalNormal.z = (int16_t)g_portalPlaneNormal.z;
 
-								int32_t distanceDelta = previousDistance - currentDistance;
 								g_portalIntersectionPoint.x =
-									(((g_buzzActor.posAngles.pos.x - g_previousSectorPosition.x) * previousDistance / distanceDelta
+									(((g_buzzActor.posAngles.pos.x - g_previousSectorPosition.x) * previousDistance / (previousDistance - currentDistance)
 										 + g_previousSectorPosition.x)
 										>> 7)
 									- portalRecords[entry->recordIdx]->origin.x;
 								g_portalIntersectionPoint.y =
-									(((g_buzzActor.posAngles.pos.y - g_previousSectorPosition.y) * previousDistance / distanceDelta
+									(((g_buzzActor.posAngles.pos.y - g_previousSectorPosition.y) * previousDistance / (previousDistance - currentDistance)
 										 + g_previousSectorPosition.y)
 										>> 7)
 									- portalRecords[entry->recordIdx]->origin.y;
 								g_portalIntersectionPoint.z =
-									(((g_buzzActor.posAngles.pos.z - g_previousSectorPosition.z) * previousDistance / distanceDelta
+									(((g_buzzActor.posAngles.pos.z - g_previousSectorPosition.z) * previousDistance / (previousDistance - currentDistance)
 										 + g_previousSectorPosition.z)
 										>> 7)
 									- portalRecords[entry->recordIdx]->origin.z;
@@ -4127,7 +4135,7 @@ namespace Toy2
 										portalRecords[entry->recordIdx]->vertices[1].position.y - portalRecords[entry->recordIdx]->origin.y,
 										portalRecords[entry->recordIdx]->vertices[1].position.z - portalRecords[entry->recordIdx]->origin.z,
 										&g_portalNormal,
-										400)
+										kPortalEdgeTolerance)
 									|| Nu3D::Math::InsidePolLines(g_portalIntersectionPoint.x,
 										g_portalIntersectionPoint.y,
 										g_portalIntersectionPoint.z,
@@ -4138,7 +4146,7 @@ namespace Toy2
 										portalRecords[entry->recordIdx]->vertices[2].position.y - portalRecords[entry->recordIdx]->origin.y,
 										portalRecords[entry->recordIdx]->vertices[2].position.z - portalRecords[entry->recordIdx]->origin.z,
 										&g_portalNormal,
-										400))
+										kPortalEdgeTolerance))
 								{
 									Sector::g_currentSectorIndex = entry->categoryIdx;
 								}
@@ -4147,8 +4155,9 @@ namespace Toy2
 					}
 				}
 
+				// Go to the next portal entry until the list end.
 				++entry;
-			} while (entry->recordIdx != 0xFF);
+			} while (entry->recordIdx != kPortalListEnd);
 		}
 
 		// FUNCTION: TOY2 0x00440260 [MATCHED]
