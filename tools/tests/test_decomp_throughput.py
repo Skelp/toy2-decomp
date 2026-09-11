@@ -152,6 +152,26 @@ class ThroughputTests(unittest.TestCase):
         self.assertIn("effective bytes delta: unknown (fallback)", text)
         self.assertIn("(no base: root commit)", text)
 
+    def test_mixed_windows_compare_functions_on_the_annotation_count(self):
+        # A scoreboard row without a src annotation must not inflate the
+        # functions delta when the window base predates the scoreboard.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            build_repo(root)
+            write(root, "tools/Resources/scoreboard.tsv", scoreboard(
+                [(0x401000, 100, 1.0, 1, 0, 0), (0x401100, 50, 1.0, 0, 1, 1),
+                 (0x401200, 30, 0.4, 0, 0, 0), (0x401300, 40, 0.5, 0, 0, 0)]))
+            git(root, "add", "-A")
+            git(root, "commit", "-q", "-m", "extra row", date="2026-09-08T14:00:00Z")
+            buffer = StringIO()
+            with redirect_stdout(buffer):
+                code = throughput.main(["--repo", str(root), "--json", "--commits", "6"])
+            self.assertEqual(code, 0)
+            data = json.loads(buffer.getvalue())
+            self.assertEqual(data["rows"][-1]["implemented"], 4)
+            self.assertEqual(data["rows"][-1]["annotations"], 3)
+            self.assertEqual(data["deltas"]["functions"], 2)
+
     def test_intervals_are_capped_at_ninety_minutes(self):
         rows = self.run_json("--commits", "5")["rows"]
         self.assertEqual([row["interval_hours"] for row in rows], [0.0, 1.0, 1.5, 0.5, 0.5])
@@ -190,7 +210,8 @@ class ThroughputTests(unittest.TestCase):
         self.assertAlmostEqual(data["effective_bytes_per_source_hour"], 74.0)
         self.assertIsNone(data["experiments"])
         self.assertEqual(set(data["rows"][0]), {"sha", "time", "interval_hours", "class", "implemented",
-                                                "terminal", "terminal_bytes", "effective_bytes", "fallback"})
+                                                "annotations", "terminal", "terminal_bytes",
+                                                "effective_bytes", "fallback"})
 
     def test_since_and_window_days_select_commits(self):
         self.assertEqual(self.run_json("--since", "2026-09-08T12:00:00Z")["commits"]["total"], 3)

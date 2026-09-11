@@ -75,13 +75,21 @@ def parse_scoreboard(text: str) -> dict:
     return counts | {"fallback": False}
 
 
+def annotation_count(repo: Path, sha: str) -> int:
+    markers = git(repo, "grep", "-c", "// FUNCTION:", sha, "--", "src").splitlines()
+    return sum(int(c) for c in (line.rpartition(":")[2] for line in markers) if c.isdigit())
+
+
 def commit_metrics(repo: Path, sha: str) -> dict:
+    # The annotation count is always recorded so that a window whose base
+    # predates the scoreboard still compares functions on one definition.
+    annotations = annotation_count(repo, sha)
     text = git(repo, "show", f"{sha}:{SCOREBOARD}")
     if text.strip():
-        return parse_scoreboard(text)
-    markers = git(repo, "grep", "-c", "// FUNCTION:", sha, "--", "src").splitlines()
-    counted = sum(int(c) for c in (line.rpartition(":")[2] for line in markers) if c.isdigit())
-    return dict.fromkeys(METRICS) | {"implemented": counted, "fallback": True}
+        return parse_scoreboard(text) | {"annotations": annotations}
+    return dict.fromkeys(METRICS) | {
+        "implemented": annotations, "annotations": annotations, "fallback": True
+    }
 
 
 def classify_paths(paths: list[str]) -> str:
@@ -126,6 +134,9 @@ def summarise(window: list[dict], base: dict | None, attempts: float | None) -> 
         counts[row["class"]] += 1
     total, last, start = sum(hours.values()), window[-1], base or window[0]
     deltas = {k: None if last[k] is None or start[k] is None else last[k] - start[k] for k in METRICS}
+    if last["fallback"] or start["fallback"]:
+        # Mixed definitions would compare reccmp rows against annotations.
+        deltas["implemented"] = last["annotations"] - start["annotations"]
     per_hour = deltas["effective_bytes"] / hours["source"] if (
         deltas["effective_bytes"] is not None and hours["source"] > 0) else None
     briefs = {k: r and {"sha": r["sha"], "time": iso(r["time"]), "fallback": r["fallback"]}
