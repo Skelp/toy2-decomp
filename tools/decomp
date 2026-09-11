@@ -594,12 +594,13 @@ run_usage() {
 Usage: tools/decomp campaigns run [--count N] [--mode auto|refinement|coverage]
          [--address ADDR] [--batch N] [--budget N] [--harness auto|claude|codex]
          [--effort LEVEL] [--model M] [--writer CMD] [--writer-format FORMAT]
-         [--trailer TEXT] [--no-cleanup] [--push] [--json]
+         [--trailer TEXT] [--no-cleanup] [--no-report] [--push] [--json]
        tools/decomp campaigns run --check [--live] | --dry-run [--count N] | --status [--json]
 After the last batch of a campaign that raised the score, one CLEANUP writer run (two bc
 runs, effort medium unless --effort) names constants and adds comments on the best tree;
 a tie keeps its edits, and a finish that fails with them finishes the batch model instead.
---no-cleanup skips it.
+--no-cleanup skips it. A run with a committed gain ends by refreshing
+build/decomp-report.html (--no-report skips that).
 --check prints one line per check; --live adds one minimal writer call. --dry-run
 prints the next N campaigns and starts nothing. --status reads
 build/decomp-runs/state.json from any shell. --json prints the JSON events of
@@ -1464,8 +1465,25 @@ run_dry_run() {
 # campaigns run: the whole loop of AGENTS.md without an orchestrating model. The
 # script selects, starts, runs writer batches, restores the best tree and
 # finishes or records no-source; logs go to build/decomp-runs/.
+# The HTML report (build/decomp-report.html) is how the user follows progress, so a
+# run that committed a gain refreshes it. The report also rewrites the scoreboard; when
+# only its generator header differs from the committed file, that change is dropped.
+run_report_html() {
+    local log="build/decomp-runs/report.log" changed
+    if ! "$self" report > "$log" 2>&1; then
+        run_emit report "report: failed (log: $log); the run result is unaffected"
+        return 0
+    fi
+    changed=$(git diff -U0 -- tools/Resources/scoreboard.tsv | grep -E '^[-+][^-+]' | grep -vc '^[-+]# reccmp_head=' || true)
+    if [[ $changed == 0 ]]; then
+        git checkout -q -- tools/Resources/scoreboard.tsv 2> /dev/null || true
+    fi
+    run_emit report "report: build/decomp-report.html refreshed, $(grep -m1 -E '^Implemented:' "$log" | tr -s ' ')" \
+        --field "log=$log"
+}
+
 campaign_run() {
-    local count=1 mode=auto address="" batch_size=4 budget=12 trailer="" push=0 cleanup=1
+    local count=1 mode=auto address="" batch_size=4 budget=12 trailer="" push=0 cleanup=1 report_after=1
     local self="$ROOT/tools/decomp" runs=build/decomp-runs tried=() committed=0 total_cost=0
     local total_tokens=0 total_bytes=+0.00 total_attempts=0 run_started=$SECONDS index status=0
     local done_count=0 writer_pid="" watch_pid="" run_active="" run_result="" run_family=""
@@ -1485,6 +1503,7 @@ campaign_run() {
             -h|--help) run_usage; return 0 ;;
             --push) push=1; shift; continue ;;
             --no-cleanup) cleanup=0; shift; continue ;;
+            --no-report) report_after=0; shift; continue ;;
             --check|--dry-run|--status) action=${1#--}; shift; continue ;;
             --live) live=1; shift; continue ;;
             --json) run_json=1; shift; continue ;;
@@ -1604,6 +1623,9 @@ campaign_run() {
         fi
     done
     trap - INT TERM HUP QUIT
+    if ((report_after && committed > 0)); then
+        run_report_html
+    fi
     run_emit summary "$(printf 'run: %s campaigns, %s with a gain, %s B, %s attempts, %s min, %s' \
         "$done_count" "$committed" "$total_bytes" "$total_attempts" \
         "$(run_math 'printf "%.1f", a / 60' "$((SECONDS - run_started))")" \
