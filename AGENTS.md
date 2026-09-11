@@ -137,7 +137,8 @@ a tagged experiment: a `[T-nn]` commit, a row in
 `tools/Resources/tooling-experiments.tsv`, and a keep-or-revert decision from
 `tools/decomp throughput --experiments` after ten source campaigns. Tooling time
 stays under 15 percent of the trailing week and under one hour per day
-(`tools/decomp throughput --cap-check`). A tool defect met mid-campaign is
+(`tools/decomp throughput --cap-check`); tooling the user asks for is tagged
+`[T-nn][user]` and skips the cap, not the tests. A tool defect met mid-campaign is
 worked around, then fixed in a separate commit of at most 30 minutes. A failing
 number is never answered with a new gate, review step or estimator: the
 permitted responses are revert the last tooling commit, switch family, or ask

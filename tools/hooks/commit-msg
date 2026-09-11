@@ -25,9 +25,13 @@ fail() {
 if ! grep -vE '^#' "$message_file" | grep -Eq '\[T-[0-9]{2,}\]'; then
     fail "a tooling-only commit must cite its task id, e.g. [T-12], in the message"
 fi
-if grep -Eq '^[[:space:]]*throughput\)' tools/decomp; then
+# Tooling the user asked for is tagged [T-nn][user]: it skips the tooling cap,
+# which exists to stop self-directed process work, but never the tests below.
+user_requested=0
+grep -vE '^#' "$message_file" | grep -Eq '\[T-[0-9]{2,}\]\[user\]' && user_requested=1
+if [[ $user_requested -eq 0 ]] && grep -Eq '^[[:space:]]*throughput\)' tools/decomp; then
     tools/decomp throughput --cap-check \
-        || fail "tools/decomp throughput --cap-check failed; the tooling budget is exceeded"
+        || fail "tools/decomp throughput --cap-check failed; the tooling budget is exceeded (tooling the user requested is tagged [T-nn][user])"
 fi
 "$python" -m unittest tools.tests.test_normative_inputs -q \
     || fail "tools/tests/test_normative_inputs.py failed; fix the contract or tooling first"
