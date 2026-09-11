@@ -1198,6 +1198,18 @@ namespace Toy2
 			strcat(output, ".bin");
 		}
 
+		// Level load configuration flags (g_levelLoadConfig)
+		const int32_t kLoadSkipCreatures = 16;
+		const int32_t kLoadTextureSet1 = 64;
+		const int32_t kLoadTextureSetMask = 192;
+		const int32_t kLoadBonusVariant = 256;
+
+		const int32_t kBackdropScrollUnset = -32768;
+		const int32_t kMaxParticleInstances = 64;
+		const int32_t kLevelFileNameSize = 128;
+		const int32_t kMaxCreatureIds = 128;
+		const int32_t kTextureSuffixLevelId = 16;
+
 		// FUNCTION: TOY2 0x00452FC0 [PROVISIONAL]
 		void InitLevelPlay(int32_t levelId)
 		{
@@ -1206,8 +1218,6 @@ namespace Toy2
 			InitLevelDefaults();
 
 			FileUtils::LoadFile("rand.dat", g_randDatBuffer);
-
-			int32_t levelIdCpy = levelId;
 
 			AudioManager::g_curTrackIndex = -1;
 			g_isElevatorHopLevel = levelId != 10;
@@ -1221,8 +1231,8 @@ namespace Toy2
 			memset(Collision::g_collisionMeshInstances, 0, sizeof(Collision::g_collisionMeshInstances));
 			memset(Collision::g_mathScratch, 0, sizeof(Collision::g_mathScratch));
 
-			SoftwareRenderer::g_backdropScrollOverride.x = -32768;
-			SoftwareRenderer::g_backdropScrollOverride.y = -32768;
+			SoftwareRenderer::g_backdropScrollOverride.x = kBackdropScrollUnset;
+			SoftwareRenderer::g_backdropScrollOverride.y = kBackdropScrollUnset;
 
 			g_hasBackdrop = 0;
 
@@ -1235,7 +1245,8 @@ namespace Toy2
 			Renderer::Shadows::g_shadowCount = 0;
 			Renderer::Shadows::g_unusedShadowVar = 0;
 
-			for (int32_t particleIdx = 0; particleIdx < 64; particleIdx++)
+			// Stop all particle instances
+			for (int32_t particleIdx = 0; particleIdx < kMaxParticleInstances; particleIdx++)
 				Nu3D::Particles::g_particleInstances[particleIdx].lifetime = 0;
 
 			Nu3D::Camera::InitViewMatrixGlobals();
@@ -1245,14 +1256,17 @@ namespace Toy2
 
 			g_cachedAllBuffer = 0;
 
+			int32_t requestedLevelId = levelId;
+
+			// Map a bonus level to its base level
 			if (levelId > 10)
 			{
-				g_levelLoadConfig |= 256;
+				g_levelLoadConfig |= kLoadBonusVariant;
 
-				if ((g_levelLoadConfig & 192) == 0)
-					g_levelLoadConfig |= 64;
+				if ((g_levelLoadConfig & kLoadTextureSetMask) == 0)
+					g_levelLoadConfig |= kLoadTextureSet1;
 
-				levelIdCpy = levelId - 10;
+				levelId -= 10;
 			}
 
 			int32_t loadConfigCpy = g_levelLoadConfig;
@@ -1263,92 +1277,88 @@ namespace Toy2
 			g_levelDataHeapBasePtr = g_levelDataHeapBase;
 			g_levelLoadArena = g_levelDataHeapBase;
 
-			char fileNameBuffer[128];
+			char fileNameBuffer[kLevelFileNameSize];
 			fileNameBuffer[0] = '\0';
 
+			// Load the level packet file
 			if ((loadConfigCpy & 1) == 0)
 			{
-				int32_t rawVariant = ((loadConfigCpy >> 6) & 3) - 1;
-				const char* rawFileName;
-
-				if (rawVariant)
+				// Select the packet file of the requested raw variant
+				switch ((loadConfigCpy >> 6) & 3)
 				{
-					int32_t rawVariantStep = rawVariant - 1;
-
-					if (rawVariantStep)
-					{
-						if (rawVariantStep == 1)
-						{
-							if (levelIdCpy >= 10)
-							{
-								strcpy(fileNameBuffer, "level");
-								fileNameBuffer[5] = levelIdCpy / 10 + 48;
-								fileNameBuffer[6] = levelIdCpy % 10 + 48;
-							}
-							else
-							{
-								strcpy(fileNameBuffer, "level0");
-								fileNameBuffer[6] = levelIdCpy + 48;
-							}
-
-							strcpy(&fileNameBuffer[7], "\\");
-							rawFileName = "level3.raw";
-						}
-						else
-						{
-							if (levelIdCpy >= 10)
-							{
-								strcpy(fileNameBuffer, "level");
-								fileNameBuffer[5] = levelIdCpy / 10 + 48;
-								fileNameBuffer[6] = levelIdCpy % 10 + 48;
-							}
-							else
-							{
-								strcpy(fileNameBuffer, "level0");
-								fileNameBuffer[6] = levelIdCpy + 48;
-							}
-
-							strcpy(&fileNameBuffer[7], "\\");
-							rawFileName = "level.raw";
-						}
-					}
-					else
-					{
-						if (levelIdCpy >= 10)
-						{
-							strcpy(fileNameBuffer, "level");
-							fileNameBuffer[5] = levelIdCpy / 10 + 48;
-							fileNameBuffer[6] = levelIdCpy % 10 + 48;
-						}
-						else
+					case 1:
+						if (levelId < 10)
 						{
 							strcpy(fileNameBuffer, "level0");
-							fileNameBuffer[6] = levelIdCpy + 48;
+							fileNameBuffer[6] = levelId + '0';
+						}
+						else
+						{
+							strcpy(fileNameBuffer, "level");
+							fileNameBuffer[5] = levelId / 10 + '0';
+							fileNameBuffer[6] = levelId % 10 + '0';
 						}
 
-						strcpy(&fileNameBuffer[7], "\\");
-						rawFileName = "level2.raw";
-					}
-				}
-				else
-				{
-					if (levelIdCpy >= 10)
-					{
-						strcpy(fileNameBuffer, "level");
-						fileNameBuffer[5] = levelIdCpy / 10 + 48;
-						fileNameBuffer[6] = levelIdCpy % 10 + 48;
-					}
-					else
-					{
-						strcpy(fileNameBuffer, "level0");
-						fileNameBuffer[6] = levelIdCpy + 48;
-					}
+						fileNameBuffer[7] = '\\';
+						fileNameBuffer[8] = '\0';
+						strcat(fileNameBuffer, "level1.raw");
+						break;
 
-					strcpy(&fileNameBuffer[7], "\\");
-					rawFileName = "level1.raw";
+					case 2:
+						if (levelId < 10)
+						{
+							strcpy(fileNameBuffer, "level0");
+							fileNameBuffer[6] = levelId + '0';
+						}
+						else
+						{
+							strcpy(fileNameBuffer, "level");
+							fileNameBuffer[5] = levelId / 10 + '0';
+							fileNameBuffer[6] = levelId % 10 + '0';
+						}
+
+						fileNameBuffer[7] = '\\';
+						fileNameBuffer[8] = '\0';
+						strcat(fileNameBuffer, "level2.raw");
+						break;
+
+					case 3:
+						if (levelId < 10)
+						{
+							strcpy(fileNameBuffer, "level0");
+							fileNameBuffer[6] = levelId + '0';
+						}
+						else
+						{
+							strcpy(fileNameBuffer, "level");
+							fileNameBuffer[5] = levelId / 10 + '0';
+							fileNameBuffer[6] = levelId % 10 + '0';
+						}
+
+						fileNameBuffer[7] = '\\';
+						fileNameBuffer[8] = '\0';
+						strcat(fileNameBuffer, "level3.raw");
+						break;
+
+					default:
+						if (levelId < 10)
+						{
+							strcpy(fileNameBuffer, "level0");
+							fileNameBuffer[6] = levelId + '0';
+						}
+						else
+						{
+							strcpy(fileNameBuffer, "level");
+							fileNameBuffer[5] = levelId / 10 + '0';
+							fileNameBuffer[6] = levelId % 10 + '0';
+						}
+
+						fileNameBuffer[7] = '\\';
+						fileNameBuffer[8] = '\0';
+						strcat(fileNameBuffer, "level.raw");
+						break;
 				}
 
-				strcat(fileNameBuffer, rawFileName);
 				RawLoader::LoadPacketData(fileNameBuffer);
 				loadConfigCpy = g_levelLoadConfig;
 			}
@@ -1356,86 +1366,85 @@ namespace Toy2
 			dataBuffer = g_levelLoadArena;
 
 			char levelDigits[4];
+			int32_t binLevelId;
 
+			// Load the level binary
 			if ((loadConfigCpy & 2) == 0)
 			{
-				int32_t binVariant = ((loadConfigCpy >> 8) & 3) - 1;
-
-				if (binVariant)
+				// Build the path of the level binary
+				switch ((loadConfigCpy >> 8) & 3)
 				{
-					int32_t binVariantStep = binVariant - 1;
-
-					if (binVariantStep)
-					{
-						if (binVariantStep == 1)
-						{
-							strcpy(fileNameBuffer, "..\\level");
-
-							if (levelIdCpy + 10 >= 10)
-							{
-								levelDigits[2] = 0;
-								levelDigits[0] = (levelIdCpy + 10) / 10 + 48;
-								levelDigits[1] = (levelIdCpy + 10) % 10 + 48;
-							}
-							else
-							{
-								levelDigits[0] = '0';
-								levelDigits[1] = levelIdCpy + 58;
-								levelDigits[2] = 0;
-							}
-						}
-						else
-						{
-							strcpy(fileNameBuffer, "..\\level");
-
-							if (levelIdCpy >= 10)
-							{
-								levelDigits[2] = 0;
-								levelDigits[0] = levelIdCpy / 10 + 48;
-								levelDigits[1] = levelIdCpy % 10 + 48;
-							}
-							else
-							{
-								levelDigits[0] = '0';
-								levelDigits[2] = 0;
-								levelDigits[1] = levelIdCpy + 48;
-							}
-						}
-					}
-					else
-					{
+					case 1:
 						strcpy(fileNameBuffer, "..\\level");
+						binLevelId = levelId + 10;
 
-						if (levelIdCpy + 10 >= 10)
-						{
-							levelDigits[2] = 0;
-							levelDigits[0] = (levelIdCpy + 10) / 10 + 48;
-							levelDigits[1] = (levelIdCpy + 10) % 10 + 48;
-						}
-						else
+						if (binLevelId < 10)
 						{
 							levelDigits[0] = '0';
-							levelDigits[1] = levelIdCpy + 58;
-							levelDigits[2] = 0;
+							levelDigits[1] = binLevelId + '0';
 						}
-					}
-				}
-				else
-				{
-					strcpy(fileNameBuffer, "..\\level");
+						else
+						{
+							levelDigits[0] = binLevelId / 10 + '0';
+							levelDigits[1] = binLevelId % 10 + '0';
+						}
 
-					if (levelIdCpy + 10 >= 10)
-					{
-						levelDigits[0] = (levelIdCpy + 10) / 10 + 48;
-						levelDigits[1] = (levelIdCpy + 10) % 10 + 48;
-					}
-					else
-					{
-						levelDigits[0] = 48;
-						levelDigits[1] = levelIdCpy + 58;
-					}
+						levelDigits[2] = '\0';
+						break;
 
-					levelDigits[2] = 0;
+					case 2:
+						strcpy(fileNameBuffer, "..\\level");
+
+						binLevelId = levelId + 10;
+
+						if (binLevelId < 10)
+						{
+							levelDigits[0] = '0';
+							levelDigits[1] = binLevelId + '0';
+							levelDigits[2] = '\0';
+						}
+						else
+						{
+							levelDigits[0] = binLevelId / 10 + '0';
+							levelDigits[1] = binLevelId % 10 + '0';
+							levelDigits[2] = '\0';
+						}
+						break;
+
+					case 3:
+						strcpy(fileNameBuffer, "..\\level");
+						binLevelId = levelId + 10;
+
+						if (binLevelId < 10)
+						{
+							levelDigits[0] = '0';
+							levelDigits[1] = binLevelId + '0';
+							levelDigits[2] = '\0';
+						}
+						else
+						{
+							levelDigits[2] = '\0';
+							levelDigits[0] = binLevelId / 10 + '0';
+							levelDigits[1] = binLevelId % 10 + '0';
+						}
+						break;
+
+					default:
+						strcpy(fileNameBuffer, "..\\level");
+
+						if (levelId < 10)
+						{
+							levelDigits[0] = '0';
+							levelDigits[2] = '\0';
+							levelDigits[1] = levelId + '0';
+						}
+						else
+						{
+							levelDigits[2] = '\0';
+							levelDigits[0] = levelId / 10 + '0';
+							levelDigits[1] = levelId % 10 + '0';
+						}
+						break;
 				}
 
 				strcat(fileNameBuffer, levelDigits);
@@ -1444,12 +1453,12 @@ namespace Toy2
 
 			Renderer::InitSpriteSheets();
 
-			const char* datFileName;
 			void* bufferPtr;
 			int32_t loadedCharacterBoneCount = 0;
 
 			memset(fileNameBuffer, 0, sizeof(fileNameBuffer));
 
+			// Load the level image
 			if ((g_levelLoadConfig & 4) == 0)
 			{
 				bufferPtr = dataBuffer;
@@ -1458,203 +1467,177 @@ namespace Toy2
 				switch ((g_levelLoadConfig >> 8) & 3)
 				{
 					case 1:
-						if (levelIdCpy >= 10)
+						if (levelId < 10)
 						{
-							strcpy(fileNameBuffer, "level");
-							fileNameBuffer[5] = levelIdCpy / 10 + 48;
-							fileNameBuffer[6] = levelIdCpy % 10 + 48;
+							strcpy(fileNameBuffer, "level0");
+							fileNameBuffer[6] = levelId + '0';
 						}
 						else
 						{
-							strcpy(fileNameBuffer, "level0");
-							fileNameBuffer[6] = levelIdCpy + 48;
+							strcpy(fileNameBuffer, "level");
+							fileNameBuffer[5] = levelId / 10 + '0';
+							fileNameBuffer[6] = levelId % 10 + '0';
 						}
 
-						strcpy(&fileNameBuffer[7], "\\");
-						datFileName = "level1.dat";
+						fileNameBuffer[7] = '\\';
+						fileNameBuffer[8] = '\0';
+						strcat(fileNameBuffer, "level1.dat");
 						break;
 
 					case 2:
-						if (levelIdCpy >= 10)
+						if (levelId < 10)
 						{
-							strcpy(fileNameBuffer, "level");
-							fileNameBuffer[5] = levelIdCpy / 10 + 48;
-							fileNameBuffer[6] = levelIdCpy % 10 + 48;
+							strcpy(fileNameBuffer, "level0");
+							fileNameBuffer[6] = levelId + '0';
 						}
 						else
 						{
-							strcpy(fileNameBuffer, "level0");
-							fileNameBuffer[6] = levelIdCpy + 48;
+							strcpy(fileNameBuffer, "level");
+							fileNameBuffer[5] = levelId / 10 + '0';
+							fileNameBuffer[6] = levelId % 10 + '0';
 						}
 
-						strcpy(&fileNameBuffer[7], "\\");
-						datFileName = "level2.dat";
+						fileNameBuffer[7] = '\\';
+						fileNameBuffer[8] = '\0';
+						strcat(fileNameBuffer, "level2.dat");
 						break;
 
 					case 3:
-						if (levelIdCpy >= 10)
+						if (levelId < 10)
 						{
-							strcpy(fileNameBuffer, "level");
-							fileNameBuffer[5] = levelIdCpy / 10 + 48;
-							fileNameBuffer[6] = levelIdCpy % 10 + 48;
+							strcpy(fileNameBuffer, "level0");
+							fileNameBuffer[6] = levelId + '0';
 						}
 						else
 						{
-							strcpy(fileNameBuffer, "level0");
-							fileNameBuffer[6] = levelIdCpy + 48;
+							strcpy(fileNameBuffer, "level");
+							fileNameBuffer[5] = levelId / 10 + '0';
+							fileNameBuffer[6] = levelId % 10 + '0';
 						}
 
-						strcpy(&fileNameBuffer[7], "\\");
-						datFileName = "level3.dat";
+						fileNameBuffer[7] = '\\';
+						fileNameBuffer[8] = '\0';
+						strcat(fileNameBuffer, "level3.dat");
 						break;
 
 					default:
-						if (levelIdCpy >= 10)
+						if (levelId < 10)
 						{
-							strcpy(fileNameBuffer, "level");
-							fileNameBuffer[5] = levelIdCpy / 10 + 48;
-							fileNameBuffer[6] = levelIdCpy % 10 + 48;
+							strcpy(fileNameBuffer, "level0");
+							fileNameBuffer[6] = levelId + '0';
 						}
 						else
 						{
-							strcpy(fileNameBuffer, "level0");
-							fileNameBuffer[6] = levelIdCpy + 48;
+							strcpy(fileNameBuffer, "level");
+							fileNameBuffer[5] = levelId / 10 + '0';
+							fileNameBuffer[6] = levelId % 10 + '0';
 						}
 
-						strcpy(&fileNameBuffer[7], "\\");
-						datFileName = "level.dat";
+						fileNameBuffer[7] = '\\';
+						fileNameBuffer[8] = '\0';
+						strcat(fileNameBuffer, "level.dat");
 						break;
 				}
-
-				strcat(fileNameBuffer, datFileName);
 
 				int32_t fileSize = FileUtils::LoadFile(fileNameBuffer, bufferPtr);
 				dataBuffer = dataBuffer + fileSize;
 
-				int32_t offset = LoadDAT(levelIdCpy, fileSize);
+				int32_t offset = LoadDAT(levelId, fileSize);
 				dataBuffer = dataBuffer + offset;
 			}
 
 			fileNameBuffer[0] = 0;
 			FileUtils::AppendRegPathToBuffer();
 
-			int32_t variant;
-			int32_t variantStep;
-			const char* ngnBaseName;
-			int32_t loadConfigCpy2 = g_levelLoadConfig;
-
-			Logger::Log("Level load config -> %d\n", g_levelLoadConfig);
-
+			// Load the level geometry image unless the level data is cached
 			if ((g_levelLoadConfig & 4) == 0 || (g_levelLoadConfig & 1) == 0)
 			{
 				g_levelDataBase = dataBuffer;
 
-				if (((g_levelLoadConfig >> 8) & 3) == 1)
+				switch ((g_levelLoadConfig >> 8) & 3)
 				{
-					if (levelIdCpy >= 10)
-					{
-						strcpy(fileNameBuffer, "level");
-						fileNameBuffer[5] = levelIdCpy / 10 + 48;
-						fileNameBuffer[6] = levelIdCpy % 10 + 48;
-						loadConfigCpy2 = g_levelLoadConfig;
-					}
-					else
-					{
-						strcpy(fileNameBuffer, "level0");
-						fileNameBuffer[6] = levelIdCpy + 48;
-					}
-
-					strcpy(&fileNameBuffer[7], "\\");
-					ngnBaseName = "level1";
-				}
-				else
-				{
-					if (((g_levelLoadConfig >> 8) & 3) != 2)
-					{
-						if (((g_levelLoadConfig >> 8) & 3) == 3)
-							BuildLevelPath(levelIdCpy, fileNameBuffer, "level3");
-						else
-							BuildLevelPath(levelIdCpy, fileNameBuffer, "level");
-
-						loadConfigCpy2 = g_levelLoadConfig;
-						ngnBaseName = 0;
-					}
-					else
-					{
-						if (levelIdCpy >= 10)
-						{
-							strcpy(fileNameBuffer, "level");
-							fileNameBuffer[5] = levelIdCpy / 10 + 48;
-							fileNameBuffer[6] = levelIdCpy % 10 + 48;
-							loadConfigCpy2 = g_levelLoadConfig;
-						}
-						else
+					case 1:
+						if (levelId < 10)
 						{
 							strcpy(fileNameBuffer, "level0");
-							fileNameBuffer[6] = levelIdCpy + 48;
-						}
-
-						strcpy(&fileNameBuffer[7], "\\");
-						ngnBaseName = "level2";
-					}
-				}
-
-				if (ngnBaseName)
-					strcat(fileNameBuffer, ngnBaseName);
-
-				if ((loadConfigCpy2 & 4) != 0 || levelIdCpy == 0 || levelId == 16)
-				{
-					const char* textureSuffix = 0;
-					variant = ((loadConfigCpy2 >> 6) & 3) - 1;
-
-					if (variant)
-					{
-						variantStep = variant - 1;
-						if (variantStep)
-						{
-							if (variantStep == 1)
-								textureSuffix = "t3";
+							fileNameBuffer[6] = levelId + '0';
 						}
 						else
 						{
-							textureSuffix = "t2";
+							strcpy(fileNameBuffer, "level");
+							fileNameBuffer[5] = levelId / 10 + '0';
+							fileNameBuffer[6] = levelId % 10 + '0';
 						}
-					}
-					else
-					{
-						textureSuffix = "t1";
-					}
 
-					if (textureSuffix)
-						strcat(fileNameBuffer, textureSuffix);
+						fileNameBuffer[7] = '\\';
+						fileNameBuffer[8] = '\0';
+						strcat(fileNameBuffer, "level1");
+						break;
+
+					case 2:
+						if (levelId < 10)
+						{
+							strcpy(fileNameBuffer, "level0");
+							fileNameBuffer[6] = levelId + '0';
+						}
+						else
+						{
+							strcpy(fileNameBuffer, "level");
+							fileNameBuffer[5] = levelId / 10 + '0';
+							fileNameBuffer[6] = levelId % 10 + '0';
+						}
+
+						fileNameBuffer[7] = '\\';
+						fileNameBuffer[8] = '\0';
+						strcat(fileNameBuffer, "level2");
+						break;
+
+					case 3:
+						BuildLevelPath(levelId, fileNameBuffer, "level3");
+						break;
+
+					default:
+						BuildLevelPath(levelId, fileNameBuffer, "level");
+						break;
+				}
+
+				if ((g_levelLoadConfig & 4) != 0 || levelId == 0 || requestedLevelId == kTextureSuffixLevelId)
+				{
+					// Add the texture set suffix
+					switch ((g_levelLoadConfig >> 6) & 3)
+					{
+						case 1:
+							strcat(fileNameBuffer, "t1");
+							break;
+						case 2:
+							strcat(fileNameBuffer, "t2");
+							break;
+						case 3:
+							strcat(fileNameBuffer, "t3");
+							break;
+					}
 				}
 
 				strcat(fileNameBuffer, ".ngn");
 				strcat(FileUtils::g_fileNameBuffer, fileNameBuffer);
 				NGNLoader::SetNewImage(FileUtils::g_fileNameBuffer);
 				NGNLoader::DetectBackdropTextures();
-
-				loadConfigCpy2 = g_levelLoadConfig;
 			}
 
-			if ((loadConfigCpy2 & 8) == 0)
+			// Build the collision world and the pickup table
+			if ((g_levelLoadConfig & 8) == 0)
 			{
 				if (! g_cachedAllBuffer)
-				{
-					Collision::BuildCollisionWorld(levelIdCpy, &dataBuffer, (loadConfigCpy2 >> 8) & 3);
-					loadConfigCpy2 = (loadConfigCpy2 & ~0xFF) | (g_levelLoadConfig & 0xFF);
-				}
+					Collision::BuildCollisionWorld(levelId, &dataBuffer, (g_levelLoadConfig >> 8) & 3);
 
-				if ((loadConfigCpy2 & 8) == 0)
-				{
+				if ((g_levelLoadConfig & 8) == 0)
 					Collectables::BuildPickupTable();
-					loadConfigCpy2 = (loadConfigCpy2 & ~0xFF) | (g_levelLoadConfig & 0xFF);
-				}
 			}
 
-			if ((loadConfigCpy2 & 16) == 0)
+			// Load the creatures of the level
+			if ((g_levelLoadConfig & kLoadSkipCreatures) == 0)
 			{
-				uint8_t creatureIdList[128];
+				uint8_t creatureIdList[kMaxCreatureIds];
 				Actor::GetCreatureList(creatureIdList);
 				CharacterLoader::Start(&loadedCharacterBoneCount, &dataBuffer, creatureIdList);
 			}
