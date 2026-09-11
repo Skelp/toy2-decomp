@@ -1297,8 +1297,804 @@ namespace SoftwareRenderer
 	void UnkRenderAPI20(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x00465180
 	void UnkRenderAPI24(SoftwareRenderItem* item) {}
-	// STUB: TOY2 0x0046D7B0
-	void UnkRenderAPI25(SoftwareRenderItem* item) {}
+	// UnkRenderAPI25 combines a polygon with the shared overlay texture in one of these modes.
+	enum SoftwareOverlayMode
+	{
+		OVERLAY_MODE_NONE = -1, // add the lit texture to the back buffer
+		OVERLAY_MODE_LIT = 0, // write the lit texture plus the overlay texel
+		OVERLAY_MODE_BLEND_50 = 1, // average the overlay texel with the back buffer
+		OVERLAY_MODE_ADDITIVE = 2, // add the overlay texel to the back buffer
+	};
+
+	// Render flag that selects OVERLAY_MODE_NONE.
+	const uint16_t SOFTWARE_RENDER_NO_OVERLAY = 0x2000;
+	// g_softwareTextureData slot of the shared overlay texture.
+	const int32_t OVERLAY_TEXTURE_INDEX = 14;
+	// Level 9 texel that selects OVERLAY_MODE_ADDITIVE (pure green in RGB565).
+	const uint16_t OVERLAY_MARKER_TEXEL = 0x7C0;
+
+	const int32_t RGB565_RED_MASK = 0xF800;
+	const int32_t RGB565_GREEN_MASK = 0x7E0;
+	const int32_t RGB565_BLUE_MASK = 0x1F;
+	// Channel mask of a pixel shifted right by one, for a 50 percent blend.
+	const int32_t RGB565_HALF_MASK = 0x7BEF;
+
+	// rightInterpolants slots that hold the overlay UV at both ends of a span.
+	enum OverlayScanlineSlot
+	{
+		OVERLAY_LEFT_U = 7,
+		OVERLAY_LEFT_V = 8,
+		OVERLAY_RIGHT_U = 9,
+		OVERLAY_RIGHT_V = 10,
+	};
+
+	// UnkRenderAPI25 reads the reserved bytes after SoftwareRenderItem::textureIndex as one overlay
+	// texture UV byte pair per vertex. A rename of the shared field moves 0x0042E600, so this
+	// layout stays file-local.
+	struct SoftwareOverlayItem
+	{
+		SoftwareRasterVertex vertices[4];
+		SoftwareRenderItem* next;
+		uint16_t renderFlags;
+		uint8_t textureIndex;
+		uint8_t reserved77;
+		uint8_t overlayUV[4][2];
+	};
+	STATIC_ASSERT(sizeof(SoftwareOverlayItem) == sizeof(SoftwareRenderItem));
+	STATIC_ASSERT(offsetof(SoftwareOverlayItem, overlayUV) == 0x78);
+
+// Adds two RGB565 pixels and clamps each channel at its maximum.
+#define ADD_SATURATED_565(first, second, result)                                           \
+	do                                                                                     \
+	{                                                                                      \
+		int32_t redSum = ((first) & RGB565_RED_MASK) + ((second) & RGB565_RED_MASK);       \
+		if (redSum > RGB565_RED_MASK)                                                      \
+			redSum = RGB565_RED_MASK;                                                      \
+		int32_t greenSum = ((first) & RGB565_GREEN_MASK) + ((second) & RGB565_GREEN_MASK); \
+		if (greenSum > RGB565_GREEN_MASK)                                                  \
+			greenSum = RGB565_GREEN_MASK;                                                  \
+		int32_t blueSum = ((first) & RGB565_BLUE_MASK) + ((second) & RGB565_BLUE_MASK);    \
+		if (blueSum > RGB565_BLUE_MASK)                                                    \
+			blueSum = RGB565_BLUE_MASK;                                                    \
+		(result) = (uint16_t)(blueSum | greenSum | redSum);                                \
+	} while (0)
+
+// Walks one edge with the texture UV and the three colour interpolants.
+#define RASTERIZE_LIT_EDGE(vertexA, vertexB, doneLabel)                                                                          \
+	do                                                                                                                           \
+	{                                                                                                                            \
+		int32_t edgeY;                                                                                                           \
+		int32_t edgeEndY;                                                                                                        \
+		int32_t edgeX;                                                                                                           \
+		int32_t edgeHeight;                                                                                                      \
+		int32_t edgeXStep;                                                                                                       \
+		int32_t edgeU;                                                                                                           \
+		int32_t edgeV;                                                                                                           \
+		int32_t edgeBlue;                                                                                                        \
+		int32_t edgeGreen;                                                                                                       \
+		int32_t edgeRed;                                                                                                         \
+		int32_t edgeUStep;                                                                                                       \
+		int32_t edgeVStep;                                                                                                       \
+		int32_t edgeBlueStep;                                                                                                    \
+		int32_t edgeGreenStep;                                                                                                   \
+		int32_t edgeRedStep;                                                                                                     \
+		int32_t edgeXFixed;                                                                                                      \
+		int32_t clippedRows;                                                                                                     \
+		ScanlineScratch* edgeScanline;                                                                                           \
+		if ((vertexA)->y < (vertexB)->y)                                                                                         \
+		{                                                                                                                        \
+			if ((vertexA)->y > Toy2::g_screenClipBottom || (vertexB)->y < Toy2::g_screenClipTop)                                 \
+				goto doneLabel;                                                                                                  \
+			edgeY = (vertexA)->y;                                                                                                \
+			edgeEndY = (vertexB)->y;                                                                                             \
+			edgeX = (vertexA)->x;                                                                                                \
+			edgeHeight = edgeEndY - edgeY;                                                                                       \
+			edgeXStep = ((vertexB)->x - edgeX) * 0x400 / edgeHeight;                                                             \
+			edgeU = (vertexA)->u;                                                                                                \
+			edgeV = (vertexA)->v;                                                                                                \
+			edgeBlue = (vertexA)->blue;                                                                                          \
+			edgeGreen = (vertexA)->green;                                                                                        \
+			edgeRed = (vertexA)->red;                                                                                            \
+			edgeUStep = ((vertexB)->u - edgeU) / edgeHeight;                                                                     \
+			edgeVStep = ((vertexB)->v - edgeV) / edgeHeight;                                                                     \
+			edgeBlueStep = ((vertexB)->blue - edgeBlue) / edgeHeight;                                                            \
+			edgeGreenStep = ((vertexB)->green - edgeGreen) / edgeHeight;                                                         \
+			edgeRedStep = ((vertexB)->red - edgeRed) / edgeHeight;                                                               \
+		}                                                                                                                        \
+		else                                                                                                                     \
+		{                                                                                                                        \
+			if ((vertexB)->y >= (vertexA)->y || (vertexB)->y > Toy2::g_screenClipBottom || (vertexA)->y < Toy2::g_screenClipTop) \
+				goto doneLabel;                                                                                                  \
+			edgeY = (vertexB)->y;                                                                                                \
+			edgeEndY = (vertexA)->y;                                                                                             \
+			edgeX = (vertexB)->x;                                                                                                \
+			edgeHeight = edgeEndY - edgeY;                                                                                       \
+			edgeXStep = ((vertexA)->x - edgeX) * 0x400 / edgeHeight;                                                             \
+			edgeU = (vertexB)->u;                                                                                                \
+			edgeV = (vertexB)->v;                                                                                                \
+			edgeBlue = (vertexB)->blue;                                                                                          \
+			edgeGreen = (vertexB)->green;                                                                                        \
+			edgeRed = (vertexB)->red;                                                                                            \
+			edgeUStep = ((vertexA)->u - edgeU) / edgeHeight;                                                                     \
+			edgeVStep = ((vertexA)->v - edgeV) / edgeHeight;                                                                     \
+			edgeBlueStep = ((vertexA)->blue - edgeBlue) / edgeHeight;                                                            \
+			edgeGreenStep = ((vertexA)->green - edgeGreen) / edgeHeight;                                                         \
+			edgeRedStep = ((vertexA)->red - edgeRed) / edgeHeight;                                                               \
+		}                                                                                                                        \
+		edgeXFixed = edgeX * 0x400 + 0x200;                                                                                      \
+		if (edgeY < Toy2::g_screenClipTop)                                                                                       \
+		{                                                                                                                        \
+			clippedRows = Toy2::g_screenClipTop - edgeY;                                                                         \
+			edgeXFixed += edgeXStep * clippedRows;                                                                               \
+			edgeU += edgeUStep * clippedRows;                                                                                    \
+			edgeV += edgeVStep * clippedRows;                                                                                    \
+			edgeBlue += edgeBlueStep * clippedRows;                                                                              \
+			edgeGreen += edgeGreenStep * clippedRows;                                                                            \
+			edgeRed += edgeRedStep * clippedRows;                                                                                \
+			edgeY = Toy2::g_screenClipTop;                                                                                       \
+		}                                                                                                                        \
+		edgeScanline = &g_scanlineScratch[edgeY];                                                                                \
+		do                                                                                                                       \
+		{                                                                                                                        \
+			if (g_skipOddScanlines == 0 || (edgeY & 1) == 0)                                                                     \
+			{                                                                                                                    \
+				if (edgeScanline->populated == 0)                                                                                \
+				{                                                                                                                \
+					edgeScanline->rightXFixed = edgeXFixed;                                                                      \
+					edgeScanline->leftXFixed = edgeXFixed;                                                                       \
+					edgeScanline->rightInterpolants[0] = edgeU;                                                                  \
+					edgeScanline->leftInterpolants[0] = edgeU;                                                                   \
+					edgeScanline->rightInterpolants[1] = edgeV;                                                                  \
+					edgeScanline->leftInterpolants[1] = edgeV;                                                                   \
+					edgeScanline->rightInterpolants[2] = edgeBlue;                                                               \
+					edgeScanline->leftInterpolants[2] = edgeBlue;                                                                \
+					edgeScanline->rightInterpolants[3] = edgeGreen;                                                              \
+					edgeScanline->leftInterpolants[3] = edgeGreen;                                                               \
+					edgeScanline->rightInterpolants[4] = edgeRed;                                                                \
+					edgeScanline->leftInterpolants[4] = edgeRed;                                                                 \
+					edgeScanline->populated = 1;                                                                                 \
+				}                                                                                                                \
+				else if (edgeXFixed < edgeScanline->leftXFixed)                                                                  \
+				{                                                                                                                \
+					edgeScanline->leftXFixed = edgeXFixed;                                                                       \
+					edgeScanline->leftInterpolants[0] = edgeU;                                                                   \
+					edgeScanline->leftInterpolants[1] = edgeV;                                                                   \
+					edgeScanline->leftInterpolants[2] = edgeBlue;                                                                \
+					edgeScanline->leftInterpolants[3] = edgeGreen;                                                               \
+					edgeScanline->leftInterpolants[4] = edgeRed;                                                                 \
+				}                                                                                                                \
+				else if (edgeXFixed > edgeScanline->rightXFixed)                                                                 \
+				{                                                                                                                \
+					edgeScanline->rightXFixed = edgeXFixed;                                                                      \
+					edgeScanline->rightInterpolants[0] = edgeU;                                                                  \
+					edgeScanline->rightInterpolants[1] = edgeV;                                                                  \
+					edgeScanline->rightInterpolants[2] = edgeBlue;                                                               \
+					edgeScanline->rightInterpolants[3] = edgeGreen;                                                              \
+					edgeScanline->rightInterpolants[4] = edgeRed;                                                                \
+				}                                                                                                                \
+			}                                                                                                                    \
+			edgeScanline++;                                                                                                      \
+			edgeXFixed += edgeXStep;                                                                                             \
+			edgeU += edgeUStep;                                                                                                  \
+			edgeV += edgeVStep;                                                                                                  \
+			edgeBlue += edgeBlueStep;                                                                                            \
+			edgeGreen += edgeGreenStep;                                                                                          \
+			edgeRed += edgeRedStep;                                                                                              \
+			edgeY++;                                                                                                             \
+		} while (edgeY < edgeEndY && edgeY <= Toy2::g_screenClipBottom);                                                         \
+	doneLabel:;                                                                                                                  \
+	} while (0)
+
+// Walks one edge with the lit texture interpolants plus the overlay UV; the end row is inclusive.
+#define RASTERIZE_LIT_OVERLAY_EDGE(vertexA, vertexB, overlayA, overlayB, doneLabel)                                              \
+	do                                                                                                                           \
+	{                                                                                                                            \
+		int32_t edgeY;                                                                                                           \
+		int32_t edgeEndY;                                                                                                        \
+		int32_t edgeX;                                                                                                           \
+		int32_t edgeHeight;                                                                                                      \
+		int32_t edgeXStep;                                                                                                       \
+		int32_t edgeU;                                                                                                           \
+		int32_t edgeV;                                                                                                           \
+		int32_t edgeBlue;                                                                                                        \
+		int32_t edgeGreen;                                                                                                       \
+		int32_t edgeRed;                                                                                                         \
+		int32_t edgeOverlayU;                                                                                                    \
+		int32_t edgeOverlayV;                                                                                                    \
+		int32_t edgeUStep;                                                                                                       \
+		int32_t edgeVStep;                                                                                                       \
+		int32_t edgeBlueStep;                                                                                                    \
+		int32_t edgeGreenStep;                                                                                                   \
+		int32_t edgeRedStep;                                                                                                     \
+		int32_t edgeOverlayUStep;                                                                                                \
+		int32_t edgeOverlayVStep;                                                                                                \
+		int32_t edgeXFixed;                                                                                                      \
+		int32_t clippedRows;                                                                                                     \
+		ScanlineScratch* edgeScanline;                                                                                           \
+		if ((vertexA)->y < (vertexB)->y)                                                                                         \
+		{                                                                                                                        \
+			if ((vertexA)->y > Toy2::g_screenClipBottom || (vertexB)->y < Toy2::g_screenClipTop)                                 \
+				goto doneLabel;                                                                                                  \
+			edgeY = (vertexA)->y;                                                                                                \
+			edgeEndY = (vertexB)->y;                                                                                             \
+			edgeX = (vertexA)->x;                                                                                                \
+			edgeHeight = edgeEndY - edgeY;                                                                                       \
+			edgeXStep = ((vertexB)->x - edgeX) * 0x400 / edgeHeight;                                                             \
+			edgeU = (vertexA)->u;                                                                                                \
+			edgeV = (vertexA)->v;                                                                                                \
+			edgeBlue = (vertexA)->blue;                                                                                          \
+			edgeGreen = (vertexA)->green;                                                                                        \
+			edgeRed = (vertexA)->red;                                                                                            \
+			edgeUStep = ((vertexB)->u - edgeU) / edgeHeight;                                                                     \
+			edgeVStep = ((vertexB)->v - edgeV) / edgeHeight;                                                                     \
+			edgeBlueStep = ((vertexB)->blue - edgeBlue) / edgeHeight;                                                            \
+			edgeGreenStep = ((vertexB)->green - edgeGreen) / edgeHeight;                                                         \
+			edgeRedStep = ((vertexB)->red - edgeRed) / edgeHeight;                                                               \
+			edgeOverlayU = (overlayA)[0];                                                                                        \
+			edgeOverlayUStep = ((overlayB)[0] - edgeOverlayU) * 0x10000 / edgeHeight;                                            \
+			edgeOverlayV = (overlayA)[1];                                                                                        \
+			edgeOverlayVStep = ((overlayB)[1] - edgeOverlayV) * 0x10000 / edgeHeight;                                            \
+		}                                                                                                                        \
+		else                                                                                                                     \
+		{                                                                                                                        \
+			if ((vertexB)->y >= (vertexA)->y || (vertexB)->y > Toy2::g_screenClipBottom || (vertexA)->y < Toy2::g_screenClipTop) \
+				goto doneLabel;                                                                                                  \
+			edgeY = (vertexB)->y;                                                                                                \
+			edgeEndY = (vertexA)->y;                                                                                             \
+			edgeX = (vertexB)->x;                                                                                                \
+			edgeHeight = edgeEndY - edgeY;                                                                                       \
+			edgeXStep = ((vertexA)->x - edgeX) * 0x400 / edgeHeight;                                                             \
+			edgeU = (vertexB)->u;                                                                                                \
+			edgeV = (vertexB)->v;                                                                                                \
+			edgeBlue = (vertexB)->blue;                                                                                          \
+			edgeGreen = (vertexB)->green;                                                                                        \
+			edgeRed = (vertexB)->red;                                                                                            \
+			edgeUStep = ((vertexA)->u - edgeU) / edgeHeight;                                                                     \
+			edgeVStep = ((vertexA)->v - edgeV) / edgeHeight;                                                                     \
+			edgeBlueStep = ((vertexA)->blue - edgeBlue) / edgeHeight;                                                            \
+			edgeGreenStep = ((vertexA)->green - edgeGreen) / edgeHeight;                                                         \
+			edgeRedStep = ((vertexA)->red - edgeRed) / edgeHeight;                                                               \
+			edgeOverlayU = (overlayB)[0];                                                                                        \
+			edgeOverlayUStep = ((overlayA)[0] - edgeOverlayU) * 0x10000 / edgeHeight;                                            \
+			edgeOverlayV = (overlayB)[1];                                                                                        \
+			edgeOverlayVStep = ((overlayA)[1] - edgeOverlayV) * 0x10000 / edgeHeight;                                            \
+		}                                                                                                                        \
+		edgeOverlayU = edgeOverlayU * 0x10000 + 0x8000;                                                                          \
+		edgeOverlayV = edgeOverlayV * 0x10000 + 0x8000;                                                                          \
+		edgeXFixed = edgeX * 0x400 + 0x200;                                                                                      \
+		if (edgeY < Toy2::g_screenClipTop)                                                                                       \
+		{                                                                                                                        \
+			clippedRows = Toy2::g_screenClipTop - edgeY;                                                                         \
+			edgeXFixed += edgeXStep * clippedRows;                                                                               \
+			edgeU += edgeUStep * clippedRows;                                                                                    \
+			edgeV += edgeVStep * clippedRows;                                                                                    \
+			edgeBlue += edgeBlueStep * clippedRows;                                                                              \
+			edgeGreen += edgeGreenStep * clippedRows;                                                                            \
+			edgeRed += edgeRedStep * clippedRows;                                                                                \
+			edgeOverlayU += edgeOverlayUStep * clippedRows;                                                                      \
+			edgeOverlayV += edgeOverlayVStep * clippedRows;                                                                      \
+			edgeY = Toy2::g_screenClipTop;                                                                                       \
+		}                                                                                                                        \
+		edgeScanline = &g_scanlineScratch[edgeY];                                                                                \
+		do                                                                                                                       \
+		{                                                                                                                        \
+			if (g_skipOddScanlines == 0 || (edgeY & 1) == 0)                                                                     \
+			{                                                                                                                    \
+				if (edgeScanline->populated == 0)                                                                                \
+				{                                                                                                                \
+					edgeScanline->rightXFixed = edgeXFixed;                                                                      \
+					edgeScanline->leftXFixed = edgeXFixed;                                                                       \
+					edgeScanline->rightInterpolants[0] = edgeU;                                                                  \
+					edgeScanline->leftInterpolants[0] = edgeU;                                                                   \
+					edgeScanline->rightInterpolants[1] = edgeV;                                                                  \
+					edgeScanline->leftInterpolants[1] = edgeV;                                                                   \
+					edgeScanline->rightInterpolants[2] = edgeBlue;                                                               \
+					edgeScanline->leftInterpolants[2] = edgeBlue;                                                                \
+					edgeScanline->rightInterpolants[3] = edgeGreen;                                                              \
+					edgeScanline->leftInterpolants[3] = edgeGreen;                                                               \
+					edgeScanline->rightInterpolants[4] = edgeRed;                                                                \
+					edgeScanline->leftInterpolants[4] = edgeRed;                                                                 \
+					edgeScanline->rightInterpolants[OVERLAY_RIGHT_U] = edgeOverlayU;                                             \
+					edgeScanline->rightInterpolants[OVERLAY_LEFT_U] = edgeOverlayU;                                              \
+					edgeScanline->rightInterpolants[OVERLAY_RIGHT_V] = edgeOverlayV;                                             \
+					edgeScanline->rightInterpolants[OVERLAY_LEFT_V] = edgeOverlayV;                                              \
+					edgeScanline->populated = 1;                                                                                 \
+				}                                                                                                                \
+				else if (edgeXFixed < edgeScanline->leftXFixed)                                                                  \
+				{                                                                                                                \
+					edgeScanline->leftXFixed = edgeXFixed;                                                                       \
+					edgeScanline->leftInterpolants[0] = edgeU;                                                                   \
+					edgeScanline->leftInterpolants[1] = edgeV;                                                                   \
+					edgeScanline->leftInterpolants[2] = edgeBlue;                                                                \
+					edgeScanline->leftInterpolants[3] = edgeGreen;                                                               \
+					edgeScanline->leftInterpolants[4] = edgeRed;                                                                 \
+					edgeScanline->rightInterpolants[OVERLAY_LEFT_U] = edgeOverlayU;                                              \
+					edgeScanline->rightInterpolants[OVERLAY_LEFT_V] = edgeOverlayV;                                              \
+				}                                                                                                                \
+				else if (edgeXFixed > edgeScanline->rightXFixed)                                                                 \
+				{                                                                                                                \
+					edgeScanline->rightXFixed = edgeXFixed;                                                                      \
+					edgeScanline->rightInterpolants[0] = edgeU;                                                                  \
+					edgeScanline->rightInterpolants[1] = edgeV;                                                                  \
+					edgeScanline->rightInterpolants[2] = edgeBlue;                                                               \
+					edgeScanline->rightInterpolants[3] = edgeGreen;                                                              \
+					edgeScanline->rightInterpolants[4] = edgeRed;                                                                \
+					edgeScanline->rightInterpolants[OVERLAY_RIGHT_U] = edgeOverlayU;                                             \
+					edgeScanline->rightInterpolants[OVERLAY_RIGHT_V] = edgeOverlayV;                                             \
+				}                                                                                                                \
+			}                                                                                                                    \
+			edgeScanline++;                                                                                                      \
+			edgeXFixed += edgeXStep;                                                                                             \
+			edgeU += edgeUStep;                                                                                                  \
+			edgeV += edgeVStep;                                                                                                  \
+			edgeBlue += edgeBlueStep;                                                                                            \
+			edgeGreen += edgeGreenStep;                                                                                          \
+			edgeRed += edgeRedStep;                                                                                              \
+			edgeOverlayU += edgeOverlayUStep;                                                                                    \
+			edgeOverlayV += edgeOverlayVStep;                                                                                    \
+			edgeY++;                                                                                                             \
+		} while (edgeY <= edgeEndY && edgeY <= Toy2::g_screenClipBottom);                                                        \
+	doneLabel:;                                                                                                                  \
+	} while (0)
+
+// Walks one edge with only the overlay UV.
+#define RASTERIZE_OVERLAY_EDGE(vertexA, vertexB, overlayA, overlayB, doneLabel)                                                  \
+	do                                                                                                                           \
+	{                                                                                                                            \
+		int32_t edgeY;                                                                                                           \
+		int32_t edgeEndY;                                                                                                        \
+		int32_t edgeX;                                                                                                           \
+		int32_t edgeHeight;                                                                                                      \
+		int32_t edgeXStep;                                                                                                       \
+		int32_t edgeOverlayU;                                                                                                    \
+		int32_t edgeOverlayV;                                                                                                    \
+		int32_t edgeOverlayUStep;                                                                                                \
+		int32_t edgeOverlayVStep;                                                                                                \
+		int32_t edgeXFixed;                                                                                                      \
+		int32_t clippedRows;                                                                                                     \
+		ScanlineScratch* edgeScanline;                                                                                           \
+		if ((vertexA)->y < (vertexB)->y)                                                                                         \
+		{                                                                                                                        \
+			if ((vertexA)->y > Toy2::g_screenClipBottom || (vertexB)->y < Toy2::g_screenClipTop)                                 \
+				goto doneLabel;                                                                                                  \
+			edgeY = (vertexA)->y;                                                                                                \
+			edgeEndY = (vertexB)->y;                                                                                             \
+			edgeX = (vertexA)->x;                                                                                                \
+			edgeHeight = edgeEndY - edgeY;                                                                                       \
+			edgeXStep = ((vertexB)->x - edgeX) * 0x400 / edgeHeight;                                                             \
+			edgeOverlayU = (overlayA)[0];                                                                                        \
+			edgeOverlayUStep = ((overlayB)[0] - edgeOverlayU) * 0x10000 / edgeHeight;                                            \
+			edgeOverlayV = (overlayA)[1];                                                                                        \
+			edgeOverlayVStep = ((overlayB)[1] - edgeOverlayV) * 0x10000 / edgeHeight;                                            \
+		}                                                                                                                        \
+		else                                                                                                                     \
+		{                                                                                                                        \
+			if ((vertexB)->y >= (vertexA)->y || (vertexB)->y > Toy2::g_screenClipBottom || (vertexA)->y < Toy2::g_screenClipTop) \
+				goto doneLabel;                                                                                                  \
+			edgeY = (vertexB)->y;                                                                                                \
+			edgeEndY = (vertexA)->y;                                                                                             \
+			edgeX = (vertexB)->x;                                                                                                \
+			edgeHeight = edgeEndY - edgeY;                                                                                       \
+			edgeXStep = ((vertexA)->x - edgeX) * 0x400 / edgeHeight;                                                             \
+			edgeOverlayU = (overlayB)[0];                                                                                        \
+			edgeOverlayUStep = ((overlayA)[0] - edgeOverlayU) * 0x10000 / edgeHeight;                                            \
+			edgeOverlayV = (overlayB)[1];                                                                                        \
+			edgeOverlayVStep = ((overlayA)[1] - edgeOverlayV) * 0x10000 / edgeHeight;                                            \
+		}                                                                                                                        \
+		edgeOverlayU = edgeOverlayU * 0x10000 + 0x8000;                                                                          \
+		edgeXFixed = edgeX * 0x400 + 0x200;                                                                                      \
+		edgeOverlayV = edgeOverlayV * 0x10000 + 0x8000;                                                                          \
+		if (edgeY < Toy2::g_screenClipTop)                                                                                       \
+		{                                                                                                                        \
+			clippedRows = Toy2::g_screenClipTop - edgeY;                                                                         \
+			edgeXFixed += edgeXStep * clippedRows;                                                                               \
+			edgeOverlayU += edgeOverlayUStep * clippedRows;                                                                      \
+			edgeOverlayV += edgeOverlayVStep * clippedRows;                                                                      \
+			edgeY = Toy2::g_screenClipTop;                                                                                       \
+		}                                                                                                                        \
+		edgeScanline = &g_scanlineScratch[edgeY];                                                                                \
+		do                                                                                                                       \
+		{                                                                                                                        \
+			if (g_skipOddScanlines == 0 || (edgeY & 1) == 0)                                                                     \
+			{                                                                                                                    \
+				if (edgeScanline->populated == 0)                                                                                \
+				{                                                                                                                \
+					edgeScanline->rightXFixed = edgeXFixed;                                                                      \
+					edgeScanline->leftXFixed = edgeXFixed;                                                                       \
+					edgeScanline->rightInterpolants[OVERLAY_RIGHT_U] = edgeOverlayU;                                             \
+					edgeScanline->rightInterpolants[OVERLAY_LEFT_U] = edgeOverlayU;                                              \
+					edgeScanline->rightInterpolants[OVERLAY_RIGHT_V] = edgeOverlayV;                                             \
+					edgeScanline->rightInterpolants[OVERLAY_LEFT_V] = edgeOverlayV;                                              \
+					edgeScanline->populated = 1;                                                                                 \
+				}                                                                                                                \
+				else if (edgeXFixed < edgeScanline->leftXFixed)                                                                  \
+				{                                                                                                                \
+					edgeScanline->leftXFixed = edgeXFixed;                                                                       \
+					edgeScanline->rightInterpolants[OVERLAY_LEFT_U] = edgeOverlayU;                                              \
+					edgeScanline->rightInterpolants[OVERLAY_LEFT_V] = edgeOverlayV;                                              \
+				}                                                                                                                \
+				else if (edgeXFixed > edgeScanline->rightXFixed)                                                                 \
+				{                                                                                                                \
+					edgeScanline->rightXFixed = edgeXFixed;                                                                      \
+					edgeScanline->rightInterpolants[OVERLAY_RIGHT_U] = edgeOverlayU;                                             \
+					edgeScanline->rightInterpolants[OVERLAY_RIGHT_V] = edgeOverlayV;                                             \
+				}                                                                                                                \
+			}                                                                                                                    \
+			edgeScanline++;                                                                                                      \
+			edgeXFixed += edgeXStep;                                                                                             \
+			edgeOverlayU += edgeOverlayUStep;                                                                                    \
+			edgeOverlayV += edgeOverlayVStep;                                                                                    \
+			edgeY++;                                                                                                             \
+		} while (edgeY < edgeEndY && edgeY <= Toy2::g_screenClipBottom);                                                         \
+	doneLabel:;                                                                                                                  \
+	} while (0)
+
+	// FUNCTION: TOY2 0x0046D7B0 [PROVISIONAL]
+	void UnkRenderAPI25(SoftwareRenderItem* item)
+	{
+		// Select how the overlay texture combines with this polygon.
+		int32_t overlayMode;
+		if (item->renderFlags & SOFTWARE_RENDER_NO_OVERLAY)
+			overlayMode = OVERLAY_MODE_NONE;
+		else if (Toy2::g_levelFileIndex == 15 || Toy2::g_levelFileIndex == 11)
+			overlayMode = OVERLAY_MODE_ADDITIVE;
+		else if (Toy2::g_levelFileIndex == 7 || Toy2::g_levelFileIndex == 8)
+			overlayMode = OVERLAY_MODE_BLEND_50;
+		else if (Toy2::g_levelFileIndex == 9)
+			overlayMode = ((uint16_t*)g_softwareTextureData[item->textureIndex])[((item->vertices[0].v >> 8) & k_upperByteMask) + (item->vertices[0].u >> 16)]
+					== OVERLAY_MARKER_TEXEL
+				? OVERLAY_MODE_ADDITIVE
+				: OVERLAY_MODE_LIT;
+		else
+			overlayMode = OVERLAY_MODE_LIT;
+
+		// Find the rows that the polygon covers.
+		int32_t topY = item->vertices[0].y;
+		int32_t bottomY = topY;
+		if (item->vertices[1].y < topY)
+			topY = item->vertices[1].y;
+		else if (item->vertices[1].y > bottomY)
+			bottomY = item->vertices[1].y;
+
+		if (item->vertices[2].y < topY)
+			topY = item->vertices[2].y;
+		else if (item->vertices[2].y > bottomY)
+			bottomY = item->vertices[2].y;
+
+		if (item->renderFlags & SOFTWARE_RENDER_QUAD)
+		{
+			if (item->vertices[3].y < topY)
+				topY = item->vertices[3].y;
+			else if (item->vertices[3].y > bottomY)
+				bottomY = item->vertices[3].y;
+		}
+
+		if (topY < Toy2::g_screenClipTop)
+			topY = Toy2::g_screenClipTop;
+		if (bottomY > Toy2::g_screenClipBottom)
+			bottomY = Toy2::g_screenClipBottom;
+
+		int32_t scanlineCount = bottomY - topY + 1;
+		ScanlineScratch* scanline = &g_scanlineScratch[topY];
+		ClearScanlineFlags(scanline, scanlineCount);
+
+		// Walk the edges into the scanline table.
+		const SoftwareOverlayItem* overlayItem = (const SoftwareOverlayItem*)item;
+		if (overlayMode == OVERLAY_MODE_NONE)
+		{
+			RASTERIZE_LIT_EDGE(&item->vertices[0], &item->vertices[1], litEdge01Done);
+			RASTERIZE_LIT_EDGE(&item->vertices[1], &item->vertices[2], litEdge12Done);
+			if ((item->renderFlags & SOFTWARE_RENDER_QUAD) == 0)
+			{
+				RASTERIZE_LIT_EDGE(&item->vertices[2], &item->vertices[0], litEdge20Done);
+			}
+			else
+			{
+				RASTERIZE_LIT_EDGE(&item->vertices[2], &item->vertices[3], litEdge23Done);
+				RASTERIZE_LIT_EDGE(&item->vertices[3], &item->vertices[0], litEdge30Done);
+			}
+		}
+		else if (overlayMode > OVERLAY_MODE_LIT)
+		{
+			RASTERIZE_OVERLAY_EDGE(&item->vertices[0], &item->vertices[1], overlayItem->overlayUV[0], overlayItem->overlayUV[1], overlayEdge01Done);
+			RASTERIZE_OVERLAY_EDGE(&item->vertices[1], &item->vertices[2], overlayItem->overlayUV[1], overlayItem->overlayUV[2], overlayEdge12Done);
+			if ((item->renderFlags & SOFTWARE_RENDER_QUAD) == 0)
+			{
+				RASTERIZE_OVERLAY_EDGE(&item->vertices[2], &item->vertices[0], overlayItem->overlayUV[2], overlayItem->overlayUV[0], overlayEdge20Done);
+			}
+			else
+			{
+				RASTERIZE_OVERLAY_EDGE(&item->vertices[2], &item->vertices[3], overlayItem->overlayUV[2], overlayItem->overlayUV[3], overlayEdge23Done);
+				RASTERIZE_OVERLAY_EDGE(&item->vertices[3], &item->vertices[0], overlayItem->overlayUV[3], overlayItem->overlayUV[0], overlayEdge30Done);
+			}
+		}
+		else
+		{
+			RASTERIZE_LIT_OVERLAY_EDGE(&item->vertices[0], &item->vertices[1], overlayItem->overlayUV[0], overlayItem->overlayUV[1], litOverlayEdge01Done);
+			RASTERIZE_LIT_OVERLAY_EDGE(&item->vertices[1], &item->vertices[2], overlayItem->overlayUV[1], overlayItem->overlayUV[2], litOverlayEdge12Done);
+			if ((item->renderFlags & SOFTWARE_RENDER_QUAD) == 0)
+			{
+				RASTERIZE_LIT_OVERLAY_EDGE(&item->vertices[2], &item->vertices[0], overlayItem->overlayUV[2], overlayItem->overlayUV[0], litOverlayEdge20Done);
+			}
+			else
+			{
+				RASTERIZE_LIT_OVERLAY_EDGE(&item->vertices[2], &item->vertices[3], overlayItem->overlayUV[2], overlayItem->overlayUV[3], litOverlayEdge23Done);
+				RASTERIZE_LIT_OVERLAY_EDGE(&item->vertices[3], &item->vertices[0], overlayItem->overlayUV[3], overlayItem->overlayUV[0], litOverlayEdge30Done);
+			}
+		}
+
+		uint16_t* overlay = (uint16_t*)g_softwareTextureData[OVERLAY_TEXTURE_INDEX];
+		uint16_t* texture = (uint16_t*)g_softwareTextureData[item->textureIndex];
+		uint16_t* rowStart = (uint16_t*)g_lockedBackBuffer + g_backBufferPitchPixels * topY + Toy2::g_screenClipLeft;
+		if (overlayMode == OVERLAY_MODE_NONE)
+		{
+			// Add the lit texture to the back buffer.
+			do
+			{
+				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
+				{
+					int32_t leftX = scanline->leftXFixed >> 10;
+					int32_t rightX = scanline->rightXFixed >> 10;
+					if (leftX != rightX)
+					{
+						int32_t width = rightX - leftX;
+						int32_t u = scanline->leftInterpolants[0];
+						int32_t v = scanline->leftInterpolants[1];
+						int32_t blue = scanline->leftInterpolants[2];
+						int32_t green = scanline->leftInterpolants[3];
+						int32_t red = scanline->leftInterpolants[4];
+						int32_t uStep = (scanline->rightInterpolants[0] - u) / width;
+						int32_t vStep = (scanline->rightInterpolants[1] - v) / width;
+						int32_t blueStep = (scanline->rightInterpolants[2] - blue) / width;
+						int32_t greenStep = (scanline->rightInterpolants[3] - green) / width;
+						int32_t redStep = (scanline->rightInterpolants[4] - red) / width;
+						int32_t pixelCount = width;
+						uint16_t* pixel = rowStart;
+						if (leftX < Toy2::g_screenClipLeft)
+						{
+							int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
+							u += clippedPixels * uStep;
+							v += clippedPixels * vStep;
+							blue += clippedPixels * blueStep;
+							red += clippedPixels * redStep;
+							green += clippedPixels * greenStep;
+							if (rightX == Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_softWindowWidth - 1;
+							else
+							{
+								pixelCount = Toy2::g_softWindowWidth;
+								if (rightX <= Toy2::g_screenClipRight)
+									pixelCount = rightX - Toy2::g_screenClipLeft;
+							}
+						}
+						else
+						{
+							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
+							if (rightX == Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_screenClipRight - leftX;
+							else if (rightX > Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_screenClipRight - leftX + 1;
+						}
+
+						for (; pixelCount > 0; pixelCount--)
+						{
+							uint16_t texel = texture[((v >> 8) & k_upperByteMask) + (u >> 16)];
+							uint32_t destinationPixel = *pixel;
+							uint32_t litTexel = (uint16_t)(g_greenRampFull[((texel >> 5) & 0x3F) + (green >> 15)] + g_redRampFull[(texel >> 11) + (blue >> 16)]
+								+ g_blueRampFull[(texel & 0x1F) + (red >> 16)]);
+							ADD_SATURATED_565(destinationPixel, litTexel, *pixel);
+							v += vStep;
+							u += uStep;
+							blue += blueStep;
+							green += greenStep;
+							red += redStep;
+							pixel++;
+						}
+					}
+				}
+				scanline++;
+				rowStart += g_backBufferPitchPixels;
+				scanlineCount--;
+			} while (scanlineCount != 0);
+			return;
+		}
+
+		if (overlayMode == OVERLAY_MODE_ADDITIVE)
+		{
+			// Add the overlay texture to the back buffer.
+			do
+			{
+				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
+				{
+					int32_t leftX = scanline->leftXFixed >> 10;
+					int32_t rightX = scanline->rightXFixed >> 10;
+					if (leftX != rightX)
+					{
+						int32_t overlayU = scanline->rightInterpolants[OVERLAY_LEFT_U];
+						int32_t overlayV = scanline->rightInterpolants[OVERLAY_LEFT_V];
+						int32_t width = rightX - leftX;
+						int32_t overlayUStep = (scanline->rightInterpolants[OVERLAY_RIGHT_U] - overlayU) / width;
+						int32_t overlayVStep = (scanline->rightInterpolants[OVERLAY_RIGHT_V] - overlayV) / width;
+						int32_t pixelCount = width;
+						uint16_t* pixel = rowStart;
+						if (leftX < Toy2::g_screenClipLeft)
+						{
+							overlayU += overlayUStep * (Toy2::g_screenClipLeft - leftX);
+							overlayV += overlayVStep * (Toy2::g_screenClipLeft - leftX);
+							if (rightX > Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_softWindowWidth - 1;
+							else
+								pixelCount = rightX - Toy2::g_screenClipLeft;
+						}
+						else
+						{
+							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
+							if (rightX == Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_screenClipRight - leftX;
+							else if (rightX > Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_screenClipRight - leftX + 1;
+						}
+
+						for (; pixelCount > 0; pixelCount--)
+						{
+							uint32_t overlayTexel = overlay[((overlayV >> 8) & k_upperByteMask) + (overlayU >> 16)];
+							uint32_t destinationPixel = *pixel;
+							ADD_SATURATED_565(destinationPixel, overlayTexel, *pixel);
+							overlayU += overlayUStep;
+							overlayV += overlayVStep;
+							pixel++;
+						}
+					}
+				}
+				scanline++;
+				rowStart += g_backBufferPitchPixels;
+				scanlineCount--;
+			} while (scanlineCount != 0);
+			return;
+		}
+
+		if (overlayMode == OVERLAY_MODE_BLEND_50)
+		{
+			// Average the overlay texture with the back buffer.
+			do
+			{
+				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
+				{
+					int32_t leftX = scanline->leftXFixed >> 10;
+					int32_t rightX = scanline->rightXFixed >> 10;
+					if (leftX != rightX)
+					{
+						int32_t overlayU = scanline->rightInterpolants[OVERLAY_LEFT_U];
+						int32_t overlayV = scanline->rightInterpolants[OVERLAY_LEFT_V];
+						int32_t width = rightX - leftX;
+						int32_t overlayUStep = (scanline->rightInterpolants[OVERLAY_RIGHT_U] - overlayU) / width;
+						int32_t overlayVStep = (scanline->rightInterpolants[OVERLAY_RIGHT_V] - overlayV) / width;
+						int32_t pixelCount = width;
+						uint16_t* pixel = rowStart;
+						if (leftX < Toy2::g_screenClipLeft)
+						{
+							overlayU += overlayUStep * (Toy2::g_screenClipLeft - leftX);
+							overlayV += overlayVStep * (Toy2::g_screenClipLeft - leftX);
+							if (rightX > Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_softWindowWidth - 1;
+							else
+								pixelCount = rightX - Toy2::g_screenClipLeft;
+						}
+						else
+						{
+							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
+							if (rightX == Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_screenClipRight - leftX;
+							else if (rightX > Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_screenClipRight - leftX + 1;
+						}
+
+						for (; pixelCount > 0; pixelCount--)
+						{
+							*pixel =
+								(overlay[((overlayV >> 8) & k_upperByteMask) + (overlayU >> 16)] >> 1 & RGB565_HALF_MASK) + (*pixel >> 1 & RGB565_HALF_MASK);
+							overlayU += overlayUStep;
+							overlayV += overlayVStep;
+							pixel++;
+						}
+					}
+				}
+				scanline++;
+				rowStart += g_backBufferPitchPixels;
+				scanlineCount--;
+			} while (scanlineCount != 0);
+			return;
+		}
+
+		// Write the lit texture plus the overlay texture.
+		do
+		{
+			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
+			{
+				int32_t leftX = scanline->leftXFixed >> 10;
+				int32_t rightX = scanline->rightXFixed >> 10;
+				if (leftX == rightX)
+				{
+					uint16_t texel = texture[((scanline->leftInterpolants[1] >> 8) & k_upperByteMask) + (scanline->leftInterpolants[0] >> 16)];
+					uint32_t litTexel = (uint16_t)(g_greenRampFull[((texel >> 5) & 0x3F) + (scanline->leftInterpolants[3] >> 15)]
+						+ g_redRampFull[(texel >> 11) + (scanline->leftInterpolants[2] >> 16)]
+						+ g_blueRampFull[(texel & 0x1F) + (scanline->leftInterpolants[4] >> 16)]);
+					uint32_t overlayTexel =
+						overlay[((scanline->rightInterpolants[OVERLAY_LEFT_V] >> 8) & k_upperByteMask) + (scanline->rightInterpolants[OVERLAY_LEFT_U] >> 16)];
+					ADD_SATURATED_565(overlayTexel, litTexel, rowStart[leftX - Toy2::g_screenClipLeft]);
+				}
+				else
+				{
+					int32_t width = rightX - leftX;
+					int32_t u = scanline->leftInterpolants[0];
+					int32_t v = scanline->leftInterpolants[1];
+					int32_t blue = scanline->leftInterpolants[2];
+					int32_t green = scanline->leftInterpolants[3];
+					int32_t red = scanline->leftInterpolants[4];
+					int32_t overlayU = scanline->rightInterpolants[OVERLAY_LEFT_U];
+					int32_t overlayV = scanline->rightInterpolants[OVERLAY_LEFT_V];
+					int32_t uStep = (scanline->rightInterpolants[0] - u) / width;
+					int32_t vStep = (scanline->rightInterpolants[1] - v) / width;
+					int32_t blueStep = (scanline->rightInterpolants[2] - blue) / width;
+					int32_t greenStep = (scanline->rightInterpolants[3] - green) / width;
+					int32_t redStep = (scanline->rightInterpolants[4] - red) / width;
+					int32_t overlayUStep = (scanline->rightInterpolants[OVERLAY_RIGHT_U] - overlayU) / width;
+					int32_t overlayVStep = (scanline->rightInterpolants[OVERLAY_RIGHT_V] - overlayV) / width;
+					int32_t pixelCount;
+					uint16_t* pixel = rowStart;
+					if (leftX < Toy2::g_screenClipLeft)
+					{
+						int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
+						u += clippedPixels * uStep;
+						v += clippedPixels * vStep;
+						blue += clippedPixels * blueStep;
+						green += clippedPixels * greenStep;
+						red += clippedPixels * redStep;
+						overlayU += overlayUStep * clippedPixels;
+						overlayV += overlayVStep * clippedPixels;
+						pixelCount = Toy2::g_softWindowWidth;
+						if (rightX <= Toy2::g_screenClipRight)
+							pixelCount = rightX - Toy2::g_screenClipLeft + 1;
+					}
+					else
+					{
+						pixel = rowStart + leftX - Toy2::g_screenClipLeft;
+						if (rightX <= Toy2::g_screenClipRight)
+							pixelCount = width + 1;
+						else
+							pixelCount = Toy2::g_screenClipRight - leftX + 1;
+					}
+
+					do
+					{
+						uint16_t texel = texture[((v >> 8) & k_upperByteMask) + (u >> 16)];
+						uint32_t litTexel = (uint16_t)(g_greenRampFull[((texel >> 5) & 0x3F) + (green >> 15)] + g_redRampFull[(texel >> 11) + (blue >> 16)]
+							+ g_blueRampFull[(texel & 0x1F) + (red >> 16)]);
+						uint32_t overlayTexel = overlay[((overlayV >> 8) & k_upperByteMask) + (overlayU >> 16)];
+						ADD_SATURATED_565(overlayTexel, litTexel, *pixel);
+						pixel++;
+						v += vStep;
+						u += uStep;
+						green += greenStep;
+						blue += blueStep;
+						red += redStep;
+						overlayU += overlayUStep;
+						overlayV += overlayVStep;
+						pixelCount--;
+					} while (pixelCount > 0);
+				}
+			}
+			scanline++;
+			rowStart += g_backBufferPitchPixels;
+			scanlineCount--;
+		} while (scanlineCount != 0);
+	}
+
+#undef RASTERIZE_OVERLAY_EDGE
+#undef RASTERIZE_LIT_OVERLAY_EDGE
+#undef RASTERIZE_LIT_EDGE
+#undef ADD_SATURATED_565
+
 	// FUNCTION: TOY2 0x00471520 [PROVISIONAL]
 	void RasterizeTexturedRect8(SoftwareRenderItem* item)
 	{
