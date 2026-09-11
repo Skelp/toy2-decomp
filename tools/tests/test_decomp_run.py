@@ -116,7 +116,7 @@ class WrapperTests(unittest.TestCase):
     def test_a_writer_cannot_push_because_every_push_url_is_rewritten(self):
         self.make_repo()
         writer = ('cat > /dev/null; git config --get-all url.writer-push-disabled://.pushinsteadof'
-                  ' > pushguard.txt; echo "# Decomp expert"')
+                  ' > pushguard.txt; git log --oneline -1; echo "# Decomp expert"')
         result = self.run_tool("campaigns", "run", "--check", "--live", "--writer", writer)
         self.assertIn("check: live ok", result.stdout)
         guard = (self.root / "pushguard.txt").read_text(encoding="utf-8").split()
