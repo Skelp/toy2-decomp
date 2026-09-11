@@ -142,3 +142,12 @@ include the compiled score or the evidence that rejected the model.
 - Ruled out: 3 59.13% ambient check on `data[riderIndex].y` instead of `.x`, plus `targetY` written inline. Same score. The retail displacement `[eax+ecx*4-4]` with ecx=active*3 decodes to data[active-1].y, so `.y` is the correct field. The inline `targetY` gave the same code as the local.
 - Ruled out: 4 58.08% rebuilt the path-bounds logic as `if (progress==0 && cur>target) {dec; ps=0} else { if (==segLen) {cur<count-2 ? adv : ps=moving} else if (>segLen) {cur<count-2 ? adv : clamp} if (<0) {...} }`. The compiler did not share the step-back block or the advance block, so the score fell.
 - Result note: no attempt raised the score
+
+<!-- campaign-id: 8d9a90c5-daaa-453e-8546-c84958c77c9b -->
+## 2026-09-11 | SoftwareRenderer | 0x00461D20
+
+- Mode: refinement.
+- Ruled out: 2 40.32% texel index `((v >> 8) & k_upperByteMask) + (rowU >> k_fixedPointShift)` in all 8 loops: compiles to sar/and, not the retail `xor edx,edx; mov dh,byte [v+2]`; keep `((v >> 16) & 0xFF) * 0x100`
+- Ruled out: 3 66.04% subtractive loops: destinationPixel and sourcePixel as uint16_t. The offset-free loop now loads `mov dx,[ecx]` with no xor, as retail does, but the registers moved
+- Ruled out: 4 67.45% `uint16_t useSubtractive = flags & SOFTWARE_RENDER_SUBTRACTIVE; if (useSubtractive != 0)`: the compiler folded it back to `test dh,0x10`, so the code did not change. Stall.
+- Result note: no attempt raised the score
