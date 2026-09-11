@@ -1962,7 +1962,7 @@ case "$command" in
         ;;
     bc)
         # bc ADDRESS            build, compare, log the attempt, print the region index
-        # bc ADDRESS --hunk N   print one mismatch region from the saved diff (no build)
+        # bc ADDRESS --hunk N   print one mismatch region (or N,N,... several) from the saved diff (no build)
         # bc ADDRESS --hunks    print the region index from the saved diff (no build)
         # bc ADDRESS --compact  print the compact diff (changed lines only, no build)
         # bc ADDRESS --pack     print the orientation pack for a fresh batch (no build)
@@ -1981,7 +1981,7 @@ case "$command" in
         done
         set -- "${bc_args[@]}"
         if [[ $# -ne 1 ]]; then
-            echo "Usage: tools/decomp bc [--full | --hunks | --hunk N | --compact | --pack] <address>" >&2
+            echo "Usage: tools/decomp bc [--full | --hunks | --hunk N[,N...] | --compact | --pack] <address>" >&2
             exit 2
         fi
         if [[ ! $1 =~ ^0x[0-9A-Fa-f]{1,8}$ ]]; then
@@ -2001,6 +2001,15 @@ case "$command" in
                 exit
             fi
             saved_diff_line "$1"
+            # --hunk 3,7,9 prints several regions in one call; writers otherwise loop in
+            # the shell, which the harness permission check denies.
+            if [[ ${view[0]} == --hunk && ${view[1]} == *,* ]]; then
+                IFS=, read -ra hunk_numbers <<< "${view[1]}"
+                for hunk_number in "${hunk_numbers[@]}"; do
+                    python tools/decomp_diff.py "$diff_path" --hunk "$hunk_number" || exit $?
+                done
+                exit 0
+            fi
             exec python tools/decomp_diff.py "$diff_path" "${view[@]}"
         fi
         if ! build_game; then

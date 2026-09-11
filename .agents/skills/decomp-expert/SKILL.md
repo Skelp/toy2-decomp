@@ -16,9 +16,9 @@ the handoff TOOL line and stop.
 - `tools/decomp bc ADDR` builds, compares, logs one attempt, saves the diff and prints
   `attempt K/N raw X% (+d) best Y% (attempt k)` plus a region index
   (`N  0xADDR  -a +b  FILE:LINES`). It is the only command that consumes an attempt.
-- Then `bc` prints up to two regions changed since the last diff, each with its source
-  lines (tabs kept, ready for an edit anchor); `bc ADDR --hunk N` reads a region a `not
-  shown:` line names, without a build. A driver assignment already holds the pack.
+- Then `bc` prints up to two regions changed since the last diff with their source lines
+  (tabs kept); `bc ADDR --hunk 3,7` prints the regions a `not shown:` line names, no build.
+  The assignment holds the pack. You start at the repo root: no `cd`, no shell loops.
 - A failed build prints the errors and `bc: no attempt logged`; fix it and run the cycle
   again. Never pipe `bc` into `head` or `tail`: a closed pipe aborts the build.
 - A `header side effect:` line means your header edit moved an untouched function; make the

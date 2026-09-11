@@ -129,6 +129,18 @@ class AttemptTests(unittest.TestCase):
             (self.best_dir / f"{ADDRESS}.txt").read_text(encoding="utf-8"), similar(40)
         )
 
+    def test_a_restored_earlier_tree_is_not_logged_again(self):
+        self.make_repo()
+        self.edit_source("int a;\nint b;\n")
+        self.log(similar(40))
+        self.edit_source("int a;\nint b;\nint c;\n")
+        self.log(similar(38))
+        self.edit_source("int a;\nint b;\n")
+        lines = self.log(similar(40.5))
+        self.assertEqual(lines, ["source matches attempt 1 (score 40.00%); not logged"])
+        path = self.attempts_dir / f"{ADDRESS}.jsonl"
+        self.assertEqual(len(path.read_text().splitlines()), 2)
+
     def test_an_unchanged_source_tree_is_not_logged_again(self):
         self.make_repo()
         self.edit_source("int a;\nint b;\n")

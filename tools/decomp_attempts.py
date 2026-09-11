@@ -878,12 +878,10 @@ def save_best_patch(
     return path
 
 
-def unchanged_line(last: dict[str, object], count: int) -> str:
-    """Describe the last attempt that already measured the current source tree."""
-    return (
-        f"source unchanged since attempt {last.get('n', count)} "
-        f"(score {float(last['raw']):.2f}%); not logged"
-    )
+def unchanged_line(last: dict[str, object], count: int, latest: bool = True) -> str:
+    """Describe the attempt that already measured the current source tree."""
+    verb = "source unchanged since" if latest else "source matches"
+    return f"{verb} attempt {last.get('n', count)} (score {float(last['raw']):.2f}%); not logged"
 
 
 def log_attempt(
@@ -900,8 +898,12 @@ def log_attempt(
     rows = read_rows(address, attempts_directory(root))
     diff = source_diff(root)
     tree = source_tree(diff)
-    if rows and tree and rows[-1].get("tree") == tree:
-        return [unchanged_line(rows[-1], len(rows))]
+    # A restored earlier model (the best patch, a reverted idea) was already measured:
+    # logging it again would only spend an attempt, and a cleanup's cap, on a known score.
+    if rows and tree:
+        match = next((row for row in reversed(rows) if row.get("tree") == tree), None)
+        if match is not None:
+            return [unchanged_line(match, len(rows), latest=match is rows[-1])]
     raws = [float(row["raw"]) for row in rows]
     previous_best = max(raws, default=None)
     raws.append(raw)
