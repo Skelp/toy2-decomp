@@ -238,5 +238,16 @@ class StructureReportTests(unittest.TestCase):
         )
 
 
+class PlacementForAnnotatedTargetTests(unittest.TestCase):
+    def test_a_placement_that_differs_from_the_annotation_is_reported(self):
+        # both neighbours live in one file while the target is annotated in another
+        functions = {0x401000: ("FUNCTION", "B/Two.cpp", 0), 0x402000: ("FUNCTION", "A/One.cpp", 0),
+                     0x403000: ("FUNCTION", "B/Two.cpp", 0)}
+        line = decomp_evidence.placement_line(
+            0x402000, [0x401000, 0x402000, 0x403000], functions, ignore_own=True
+        )
+        self.assertEqual(line, "placement: src/B/Two.cpp (both neighbours)")
+
+
 if __name__ == "__main__":
     unittest.main()

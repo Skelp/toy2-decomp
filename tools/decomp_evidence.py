@@ -228,7 +228,8 @@ def resolve_padding_alignment(
 
 
 def placement_line(
-    address: int, addresses: list[int], functions: dict[int, tuple[str, str, int]]
+    address: int, addresses: list[int], functions: dict[int, tuple[str, str, int]],
+    ignore_own: bool = False,
 ) -> str:
     """Name the file where new code for an address belongs.
 
@@ -238,7 +239,7 @@ def placement_line(
     unannotated map entry between them) wins; else the address starts a block.
     """
     own = functions.get(address)
-    if own is not None and own[1]:
+    if not ignore_own and own is not None and own[1]:
         return f"placement: src/{own[1]} (annotated)"
     if not addresses or address < addresses[0] or address > addresses[-1]:
         return "placement: outside the mapped range; choose the file from retail source paths"
@@ -618,9 +619,16 @@ def main() -> int:
         owner = functions.get(neighbor, ("", "", 0))[1]
         where = f"src/{owner}" if owner else ""
         print(f"{marker} 0x{neighbor:08X}  {name:<50} {neighbor_state:<11} {where}".rstrip())
-    if not functions.get(address, ("", "", 0))[1]:
-        # An annotated target would only repeat the file of the ">" row above.
+    owner_file = functions.get(address, ("", "", 0))[1]
+    if not owner_file:
         print(placement_line(address, addresses, functions))
+    else:
+        # An annotated target repeats its own file, unless the retail block around it
+        # says the annotation sits in the wrong one: then the file is the work to do.
+        line = placement_line(address, addresses, functions, ignore_own=True)
+        wanted = line[len("placement: src/"):].split(" (")[0] if line.startswith("placement: src/") else ""
+        if wanted and wanted != owner_file:
+            print(f"placement: src/{wanted}; the annotation sits in src/{owner_file}")
 
     section("callers (x-refs to this function)")
     callers = run_ghidra(["x-ref", "to", f"0x{address:08X}"])
