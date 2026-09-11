@@ -28,15 +28,15 @@ tools/decomp campaigns finish --mode MODE --target ADDRESS --note TEXT --message
 git push origin agent/continuous
 ```
 
-`campaigns start` saves the baseline that `validate` and `record` compare
-against, so run it before the first edit. `bc` builds, compares one function,
-logs the attempt and prints a region index; read regions with
-`bc ADDRESS --hunk N` (no rebuild), never the diff files; `bc ADDRESS --pack`
-prints the orientation pack a batch starts from. `campaigns finish` stages `src`
-and the map, runs `validate` (the only gate), records the ledger row and commits
-source, ledger and scoreboard together, because a commit preserves progress;
-push after every campaign. `tools/decomp campaigns run --count N` runs this loop
-with headless writers, because a script spends no tokens between batches.
+`campaigns start` saves the baseline that `validate` and `record` compare against,
+so run it before the first edit. `bc` builds, compares one function, logs the
+attempt and prints a region index; read regions with `bc ADDRESS --hunk N` (no
+rebuild), never the diff files; `bc ADDRESS --pack` prints a batch's orientation
+pack. `campaigns finish` stages `src` and the map, runs `validate` (the only gate),
+records the ledger row and commits source, ledger and scoreboard together, because
+a commit preserves progress; push after every campaign. `campaigns run --count N`
+runs this loop with headless Claude Code or Codex writers (`--check --live` first,
+`--status` to watch), because a script spends no tokens between batches.
 
 ## Select work
 

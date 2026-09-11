@@ -265,9 +265,12 @@ class AttemptTests(unittest.TestCase):
         })
         self.assertEqual(attempts.writer_usage(text), {
             "cost": 0.25, "input": 5, "cache_write": 7, "cache_read": 11, "output": 13,
-            "turns": 9, "api_ms": 1200, "denials": 1, "error": 0, "result": "a\nb",
+            "reasoning": 0, "turns": 9, "api_ms": 1200, "denials": 1, "error": 0,
+            "message": "", "result": "a\nb",
         })
-        self.assertEqual(attempts.writer_usage("not json")["cost"], 0.0)
+        self.assertIsNone(attempts.writer_usage("not json")["cost"])
+        self.assertEqual(attempts.usage_row(attempts.writer_usage(text)),
+                         "0.2500\t5\t7\t11\t13\t0\t9\t1200\t1\t0")
 
     def test_writer_failure_names_a_run_that_did_no_work(self):
         ran = attempts.writer_usage(json.dumps({"num_turns": 3, "result": "done"}))
@@ -281,6 +284,215 @@ class AttemptTests(unittest.TestCase):
                          "the writer reported an error: Invalid API key")
         self.assertEqual(attempts.writer_failure(attempts.writer_usage(""), 0),
                          "the writer ran no turn")
+
+    def test_writer_failure_reports_the_exact_message_and_a_fix(self):
+        fields = attempts.writer_usage("", "text")
+        self.assertEqual(attempts.writer_failure(fields, 1, "warn\nError: Not logged in\n"),
+                         "the writer exited with status 1: Error: Not logged in")
+        failure = attempts.writer_failure(fields, 1, "Error: Not logged in")
+        self.assertEqual(attempts.failure_fix(failure, "codex", {}),
+                         ("log in: codex login", "codex login"))
+        quota = "the writer reported an error: 429: You've hit your usage limit"
+        self.assertIn("--harness claude", attempts.failure_fix(quota, "codex", {})[0])
+        network = "the writer reported an error: stream disconnected before completion"
+        self.assertIn("network_access", attempts.failure_fix(
+            network, "claude", {"CODEX_SANDBOX_NETWORK_DISABLED": "1"})[0])
+        self.assertEqual(attempts.failure_fix("the writer timed out", "claude", {})[1],
+                         "tools/decomp campaigns run --check --live --harness claude")
+
+    def test_codex_usage_sums_turns_and_reads_the_final_message_file(self):
+        events = [
+            {"type": "thread.started", "thread_id": "t"}, {"type": "turn.started"},
+            {"type": "item.completed", "item": {"type": "agent_message", "text": "I will run it."}},
+            {"type": "item.completed", "item": {"type": "command_execution", "exit_code": 0,
+                                                "aggregated_output": "579f56e Refine\n"}},
+            {"type": "item.completed", "item": {"type": "command_execution", "exit_code": 1,
+                                                "aggregated_output": "touch: Read-only file system"}},
+            {"type": "item.completed", "item": {"type": "agent_message", "text": "done"}},
+            {"type": "turn.completed", "usage": {
+                "input_tokens": 34985, "cached_input_tokens": 27648,
+                "cache_write_input_tokens": 0, "output_tokens": 98, "reasoning_output_tokens": 7}},
+        ]
+        text = "\n".join(json.dumps(event) for event in events) + "\nnot json\n"
+        fields = attempts.writer_usage(text, "codex-jsonl", "# 0x00401000 A - batch 1\n")
+        self.assertEqual(fields, {
+            "cost": None, "input": 7337, "cache_write": 0, "cache_read": 27648, "output": 98,
+            "reasoning": 7, "turns": 3, "api_ms": None, "denials": 1, "error": 0,
+            "message": "", "result": "# 0x00401000 A - batch 1"})
+        self.assertEqual(attempts.usage_row(fields), "\t7337\t0\t27648\t98\t7\t3\t\t1\t0")
+        self.assertEqual(attempts.writer_usage(text, "codex-jsonl")["result"], "done")
+
+    def test_codex_usage_names_a_failed_turn_with_the_provider_message(self):
+        body = json.dumps({"type": "error", "status": 400, "error": {
+            "type": "invalid_request_error", "message": "The 'x' model is not supported."}})
+        events = [
+            {"type": "item.completed", "item": {"type": "error", "message": "metadata warning"}},
+            {"type": "turn.started"}, {"type": "error", "message": body},
+            {"type": "turn.failed", "error": {"message": body}},
+        ]
+        fields = attempts.writer_usage("\n".join(map(json.dumps, events)), "codex-jsonl")
+        self.assertEqual((fields["error"], fields["turns"], fields["message"]),
+                         (1, 0, "400: The 'x' model is not supported."))
+        self.assertEqual(attempts.writer_failure(fields, 1),
+                         "the writer exited with status 1: 400: The 'x' model is not supported.")
+        self.assertEqual(attempts.handoff_text(fields), "")
+
+    def test_live_verdict_reports_context_denials_and_the_skill(self):
+        fields = attempts.writer_usage(json.dumps({
+            "num_turns": 2, "total_cost_usd": 0.088, "result": "579f56e x\n# Decomp expert",
+            "usage": {"input_tokens": 4, "cache_creation_input_tokens": 8023,
+                      "cache_read_input_tokens": 7889, "output_tokens": 117}}))
+        verdict = attempts.live_verdict(fields, 0, "", "579f56e", "claude", 6)
+        self.assertEqual(verdict, ("ok", "2 turns, context about 8.0k tokens per turn, 0 denials,"
+                                         " $0.09, 6 s, skill seen", "", ""))
+        fields["denials"] = 1
+        self.assertEqual(attempts.live_verdict(fields, 0, "", "579f56e", "claude", 6)[0], "FAIL")
+        self.assertEqual(attempts.live_verdict(fields, 127, "", "", "codex", 0),
+                         ("FAIL", "the writer command was not found",
+                          "install codex or pass --harness claude", "command -v codex"))
+
+    def test_detect_harness_prefers_the_session_then_the_path(self):
+        detect = attempts.detect_harness
+        never = lambda name: False  # noqa: E731
+        self.assertEqual(detect({"CLAUDECODE": "1"}, never)[0], "claude")
+        self.assertEqual(detect({"CODEX_THREAD_ID": "t"}, never),
+                         ("codex", "a Codex shell: CODEX_THREAD_ID is set"))
+        both = {"CLAUDECODE": "1", "CODEX_SESSION_ID": "s"}
+        self.assertEqual(detect(both, never, ["bash", "codex", "claude"])[0], "codex")
+        self.assertEqual(detect(both, never, ["bash"])[0], "claude")
+        self.assertEqual(detect({}, lambda name: name == "codex")[0], "codex")
+        self.assertEqual(detect({}, lambda name: True)[0], "claude")
+        self.assertEqual(detect({}, never)[0], "")
+
+    def test_writer_commands_come_from_one_place(self):
+        self.make_repo()
+        claude = attempts.writer_command("claude", self.root)
+        self.assertEqual(claude, "claude -p --tools Bash --system-prompt-file "
+                         ".agents/skills/decomp-expert/SKILL.md --strict-mcp-config "
+                         "--setting-sources project --permission-mode dontAsk "
+                         "--no-session-persistence --output-format json --effort xhigh")
+        codex = attempts.writer_command("codex", self.root, "medium", "gpt-x")
+        for part in ("codex exec --ephemeral --ignore-user-config --disable apps --disable plugins",
+                     "-s workspace-write -C", f"--add-dir {self.root}",
+                     "model_reasoning_effort=medium", "-m gpt-x", "tool_output_token_limit=12000",
+                     'developer_instructions=$(cat .agents/skills/decomp-expert/SKILL.md)',
+                     '-o "$DECOMP_WRITER_LAST" -'):
+            self.assertIn(part, codex)
+        self.assertNotIn("dangerously", codex)
+        # The user config is ignored, but its model is kept unless --model names one.
+        home = self.root / "codex-home"
+        home.mkdir()
+        (home / "config.toml").write_text('model = "gpt-user"\n[projects."/x"]\ntrust_level = "t"\n')
+        with mock.patch.dict(os.environ, {"CODEX_HOME": str(home)}):
+            self.assertIn("-m gpt-user", attempts.writer_command("codex", self.root))
+            self.assertIn("-m gpt-x", attempts.writer_command("codex", self.root, "", "gpt-x"))
+        self.assertEqual(attempts.codex_extra_dirs(self.root),
+                         [Path(self.root.resolve() / ".git")])
+        resolve = attempts.resolve_writer
+        self.assertEqual(resolve("auto", "--writer", "codex exec -", "", "", "", self.root)[:3],
+                         ("codex", "--writer sets the writer command", "codex-jsonl"))
+        self.assertEqual(resolve("auto", "--writer", "my-writer x", "", "", "", self.root)[2],
+                         "text")
+        self.assertEqual(resolve("claude", "DECOMP_HARNESS", "", "", "high", "", self.root)[1:3],
+                         ("DECOMP_HARNESS=claude", "claude-json"))
+
+    def test_events_and_state_record_every_operator_line(self):
+        code, text = self.run_main("event", "batch", "batch 1: attempts 2-3", "--field",
+                                   "best=85.28", "--field", "address=0x0041C640", "--field",
+                                   "range=2-3", "--set", "phase=batch", "--set", "batch=1",
+                                   "--state", "--reset")
+        self.assertEqual((code, text), (0, "batch 1: attempts 2-3\n"))
+        runs = self.root / "build" / "decomp-runs"
+        record = json.loads((runs / "events.jsonl").read_text(encoding="utf-8"))
+        self.assertEqual(sorted(record), ["event", "fields", "text", "ts"])
+        self.assertRegex(record["ts"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+        self.assertEqual(record["fields"], {"best": 85.28, "address": "0x0041C640", "range": "2-3"})
+        state = json.loads((runs / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual((state["phase"], state["batch"], state["last_event"]),
+                         ("batch", 1, "batch 1: attempts 2-3"))
+        # Only the run that owns state.json appends; --check and --dry-run only print.
+        code, text = self.run_main("event", "attempt", "  attempt 3: raw 1.00%", "--json")
+        self.assertEqual(json.loads(text)["event"], "attempt")
+        self.assertEqual(len((runs / "events.jsonl").read_text().splitlines()), 1)
+        self.run_main("event", "attempt", "  attempt 4: raw 2.00%", "--state")
+        self.assertEqual(len((runs / "events.jsonl").read_text().splitlines()), 2)
+
+    def test_final_line_maps_each_stop_to_its_exit_code(self):
+        self.assertEqual(attempts.EXIT_CODES, {"done": 0, "review": 1, "usage": 2, "check": 2,
+                                               "writer": 3, "interrupted": 130})
+        self.assertEqual(attempts.final_line("writer", "quota", "codex login"),
+                         (3, "run: exit 3 (quota); next: codex login"))
+        code, text = self.run_main("final", "--kind", "interrupted", "--reason", "interrupted",
+                                   "--next", "git diff --stat -- src", "--state")
+        self.assertEqual((code, text), (130, "run: exit 130 (interrupted); next: "
+                                             "git diff --stat -- src\n"))
+        state = json.loads((self.root / "build/decomp-runs/state.json").read_text())
+        self.assertEqual((state["phase"], state["exit_code"]), ("stopped", 130))
+
+    def test_status_names_a_live_run_and_a_stale_one(self):
+        live = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)",
+                                 "decomp-status-test"])
+        self.addCleanup(live.wait)
+        self.addCleanup(live.kill)
+        dead = subprocess.Popen(["true"])
+        dead.wait()
+        (self.attempts_dir).mkdir(parents=True)
+        (self.attempts_dir / f"{ADDRESS}.jsonl").write_text(
+            "".join(json.dumps({"n": n, "raw": raw}) + "\n" for n, raw in ((1, 50.0), (2, 61.5))))
+        state = {"pid": live.pid, "started": "2026-09-11T10:00:00Z", "harness": "codex",
+                 "phase": "batch", "campaign": 1, "count": 2, "target": ADDRESS, "name": "A::B",
+                 "mode": "refinement", "batch": 1, "baseline": 50.0, "best": 61.5,
+                 "attempts": 2, "last_event": "  attempt 2: raw 61.50% (best 61.50%)",
+                 "log": "build/decomp-runs/x.jsonl", "updated": "2026-09-11T10:05:00Z"}
+        self.run_main("event", "state", "--state", "--reset",
+                      *[item for key, value in state.items() for item in ("--set", f"{key}={value}")])
+        report = attempts.run_status(self.root)
+        self.assertTrue(report["alive"])
+        self.assertIn(f"run: pid {live.pid} alive, codex, phase batch", report["lines"][0])
+        self.assertIn("campaign 1/2: 0x00401000 A::B refinement, batch 1", report["lines"])
+        self.assertIn("attempts: 1 50.00%, 2 61.50%", report["lines"])
+        self.assertIn(f"stop: kill -TERM {live.pid}", report["lines"][0])
+        self.assertEqual(self.run_main("run-status", "--busy")[1],
+                         f"run pid {live.pid} is still going\ttools/decomp campaigns run --status\n")
+        self.assertEqual(self.run_main("run-status", "--busy", "--self", str(live.pid))[1], "")
+        self.run_main("event", "state", "--state", "--set", f"pid={dead.pid}")
+        report = attempts.run_status(self.root)
+        self.assertEqual((report["alive"], report["stale"]), (False, True))
+        self.assertIn("not alive; stale state (phase batch", report["lines"][0])
+        self.assertIn("; next: tools/decomp campaigns run --check", report["lines"][0])
+        self.assertEqual(self.run_main("run-status", "--busy")[1], "")
+        code, text = self.run_main("run-status", "--json")
+        self.assertEqual((json.loads(text)["stale"], json.loads(text)["next"]),
+                         (True, "tools/decomp campaigns run --check"))
+        # A writer the dead run left behind comes first: it can still edit src.
+        self.run_main("event", "state", "--state", "--set", f"writer_pid={live.pid}")
+        self.assertEqual(attempts.run_status(self.root)["next"], f"kill -TERM {live.pid}")
+        self.assertEqual(self.run_main("run-status", "--busy")[1],
+                         f"writer pid {live.pid} of a dead run is still going\tkill -TERM {live.pid}\n")
+        # Then the campaign it left active, with the best patch named.
+        self.run_main("event", "state", "--state", "--set", "writer_pid=")
+        (self.root / "build" / "decomp-campaign-state.json").write_text("{}", encoding="utf-8")
+        self.best_dir.mkdir(parents=True)
+        (self.best_dir / f"{ADDRESS}.patch").write_text("diff\n", encoding="utf-8")
+        report = attempts.run_status(self.root)
+        self.assertEqual(report["next"], 'tools/decomp campaigns abort --reason "campaigns run died"')
+        self.assertIn(f"best patch: build/decomp-cache/best/{ADDRESS}.patch", report["lines"])
+
+    def test_a_reused_pid_or_a_finished_run_blocks_nothing(self):
+        live = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+        self.addCleanup(live.wait)
+        self.addCleanup(live.kill)
+        self.run_main("event", "state", "--state", "--reset", "--set", f"pid={live.pid}",
+                      "--set", "phase=batch")
+        state = json.loads((self.root / "build/decomp-runs/state.json").read_text())
+        self.assertEqual(state["pid_start"], attempts.process_start(live.pid))
+        self.assertTrue(attempts.run_status(self.root)["alive"])
+        self.assertFalse(attempts.pid_alive(live.pid, "1"))
+        self.run_main("final", "--kind", "done", "--reason", "done", "--next", "x", "--state")
+        self.assertEqual(self.run_main("run-status", "--busy")[1], "")
+        self.assertEqual([attempts.is_run_log(name) for name in (
+            "candidates.json", "check-live.json", "0x0041C640.prompt", "0x0041C640-batch1.json")],
+            [False, False, False, True])
 
     def test_handoff_text_keeps_the_final_message_from_its_title(self):
         result = "Done.\n```\n# 0x00401000 A::B - batch 1 (refinement)\nBEST: 60%\n```"

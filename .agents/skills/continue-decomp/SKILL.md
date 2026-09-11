@@ -41,11 +41,13 @@ Repeat until the user stops you or the stop rule fires:
 
 Without an orchestrating model: `tools/decomp campaigns run --count N` runs
 steps 1-4 and the stop rule below as a script with headless `decomp-expert`
-writers, prints one line per batch and per campaign, and logs to
-`build/decomp-runs/` (`--push` pushes each commit). A writer that does no work
-stops the run without a `no-source` row. Prefer it for unattended work: a
-script spends no tokens between batches, and a model watching a campaign
-spends the most.
+writers (Claude Code or Codex, `--harness auto`), prints one line per attempt,
+batch and campaign, and logs to `build/decomp-runs/` (`--push` pushes each
+commit). Run `--check --live` first, start the run in the background and read
+`--status` instead of the logs; the last line names the exit code and the next
+command. A writer that does no work stops the run without a `no-source` row.
+Prefer it for unattended work: a script spends no tokens between batches, and
+a model watching a campaign spends the most.
 
 Stop rule: three consecutive `no-source` results across two different
 families. Report the numbers and ask the user before continuing.

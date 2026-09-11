@@ -539,51 +539,368 @@ handoff() {
 }
 
 run_usage() {
-    echo "Usage: tools/decomp campaigns run [--count N] [--mode auto|refinement|coverage]" \
-        "[--address ADDR] [--batch N] [--budget N] [--writer CMD] [--trailer TEXT] [--push]"
+    cat <<'EOF'
+Usage: tools/decomp campaigns run [--count N] [--mode auto|refinement|coverage]
+         [--address ADDR] [--batch N] [--budget N] [--harness auto|claude|codex]
+         [--effort LEVEL] [--model M] [--writer CMD] [--writer-format FORMAT]
+         [--trailer TEXT] [--push] [--json]
+       tools/decomp campaigns run --check [--live] | --dry-run [--count N] | --status [--json]
+--check prints one line per check; --live adds one minimal writer call. --dry-run
+prints the next N campaigns and starts nothing. --status reads
+build/decomp-runs/state.json from any shell. --json prints the JSON events of
+build/decomp-runs/events.jsonl instead of text lines.
+--harness defaults to DECOMP_HARNESS, else auto: the Claude Code or Codex session
+the command runs in, else the first of claude, codex on PATH. --effort defaults:
+claude xhigh, codex high. --writer CMD (or DECOMP_WRITER) replaces the built-in
+command; --writer-format claude-json|codex-jsonl|text says how to read its output.
+Exit: 0 done; 1 stopped for review (finish failed twice, stop rule, tool error);
+2 usage or check failure; 3 writer or harness failure (missing binary, auth,
+network, quota, timeout, no attempt logged); 130 interrupted.
+A run takes minutes per campaign: start it in the background (docs/decomp-agent.md)
+and watch --status. Stop it with kill -TERM PID: a background run ignores Ctrl-C,
+and kill -9 leaves the writer running.
+EOF
 }
 
-# The lean headless writer: the decomp-expert skill is its whole system prompt,
-# the assignment arrives on stdin and the project allow list is its only grant.
-default_writer="claude -p --tools Bash --system-prompt-file .agents/skills/decomp-expert/SKILL.md \
---strict-mcp-config --setting-sources project --permission-mode dontAsk \
---no-session-persistence --output-format json --effort xhigh"
+# Print one operator line and append it to build/decomp-runs/events.jsonl as a
+# JSON event (--json prints the event instead of the line). During a run, --set
+# fields also go into state.json, which --status reads from another shell. A
+# failed logger never hides the line.
+run_emit() {
+    python tools/decomp_attempts.py event "$@" ${run_json:+--json} ${run_owns_state:+--state} \
+        || printf '%s\n' "$2"
+}
+
+# Record a phase change and other run fields in state.json; prints nothing.
+run_phase() {
+    local pairs=() pair
+    run_phase_name=$1
+    [[ -n $run_owns_state ]] || return 0
+    pairs=(--set "phase=$1")
+    shift
+    for pair in "$@"; do pairs+=(--set "$pair"); done
+    python tools/decomp_attempts.py event state "${pairs[@]}" --state || true
+}
+
+# Print the error line of a stopped run (it names the log and one next step) and
+# keep both for the final line. Return the exit status the run ends with.
+run_error() {
+    run_reason=$2 run_next=$3
+    run_emit error "error: $2; next: $3" --stderr --field "exit=$1"
+    return "$1"
+}
+
+# Print the final line "run: exit N (REASON); next: COMMAND" and return N.
+run_final() {
+    local code=0
+    run_final_done=1
+    python tools/decomp_attempts.py final --kind "$1" --reason "$2" --next "$3" \
+        ${run_json:+--json} ${run_owns_state:+--state} || code=$?
+    return "$code"
+}
+
+# An unexpected exit (a shell error under set -eu) stops the writer, settles the
+# campaign and still ends with a final line and state, so a supervisor never waits
+# on a run that is gone. The process exits 1, the code the final line names.
+run_on_exit() {
+    [[ -z ${run_final_done:-} ]] || return 0
+    run_reason="the driver stopped on a shell error (status $1); see the line above"
+    run_next="tools/decomp campaigns run --status"
+    run_settle
+    run_final review "$run_reason" "$run_next" || true
+    exit 1
+}
+
+# Resolve the harness and the writer command. tools/decomp_attempts.py writer is
+# the one place that defines the built-in commands.
+run_resolve() {
+    local lines=() from=$harness_from
+    [[ -z $writer_override ]] || from=$writer_from
+    mapfile -t lines < <(python tools/decomp_attempts.py --root "$ROOT" writer \
+        --harness "$harness_choice" --from="$from" --writer="$writer_override" \
+        --format="$writer_format" --effort="$effort" --model="$model")
+    harness=${lines[0]:-} harness_reason=${lines[1]:-} writer_format=${lines[2]:-text}
+    writer_binary=${lines[3]:-} writer=${lines[4]:-}
+    case $writer_format in
+        claude-json) suffix=.json ;;
+        codex-jsonl) suffix=.jsonl ;;
+        *) suffix=.txt ;;
+    esac
+}
+
+# One check line, "check: NAME ok|FAIL detail; fix: HINT". A run prints only the
+# failures; the first failure gives the reason and next step of the final line.
+run_check_line() {
+    local text="check: $1 $2 $3"
+    if [[ $2 == FAIL ]]; then
+        text+="${4:+; fix: $4}"
+        check_failed=$((check_failed + 1))
+        if [[ -z $check_reason ]]; then
+            check_reason="$1: $3" check_next=${5:-tools/decomp campaigns run --check}
+        fi
+    elif [[ -n $check_quiet ]]; then
+        return 0
+    fi
+    run_emit check "$text" --field "name=$1" --field "status=$2"
+}
+
+# The setup checks of --check and of the start of every run. check_harness is set
+# when no writer can start at all: a run then exits 3, not 2.
+run_checks() {
+    local version dirty missing="" item other=claude busy="" busy_next="" summary code=0
+    [[ $harness != claude ]] || other=codex
+    if [[ -n $harness ]]; then
+        run_check_line harness ok "$harness ($harness_reason)"
+    else
+        check_harness=1
+        run_check_line harness FAIL "$harness_reason" "install claude or codex, or pass --writer CMD" \
+            "command -v claude codex"
+    fi
+    if [[ -n $writer_binary ]] && command -v "$writer_binary" > /dev/null; then
+        version=""
+        if [[ $writer_binary == claude || $writer_binary == codex ]]; then
+            version=" $("$writer_binary" --version 2> /dev/null | head -n 1 || true)"
+        fi
+        run_check_line binary ok "$writer_binary$version ($(command -v "$writer_binary"))"
+        run_check_line writer ok "$writer_format: $writer"
+    elif [[ -n $harness ]]; then
+        check_harness=1
+        run_check_line binary FAIL "${writer_binary:-the writer} is not on PATH" \
+            "install it or pass --harness $other" "tools/decomp campaigns run --check --harness $other"
+    fi
+    if [[ -n ${CODEX_SANDBOX_NETWORK_DISABLED:-} ]]; then
+        check_harness=1
+        run_check_line network FAIL "this Codex sandbox blocks network, so no writer reaches its API" \
+            "set sandbox_workspace_write.network_access = true in ~/.codex/config.toml or run outside the sandbox" \
+            "tools/decomp campaigns run --check --live"
+    elif [[ $harness == codex ]]; then
+        run_check_line network ok "no Codex sandbox blocks the network"
+    else
+        run_check_line network skip "tested only by --live"
+    fi
+    if ! dirty=$(git status --porcelain -- src tools/Resources/functions_map.txt 2> /dev/null); then
+        run_check_line tree FAIL "$ROOT is not a git work tree" "run from a repository checkout" \
+            "git rev-parse --show-toplevel"
+    elif [[ -n $dirty ]]; then
+        run_check_line tree FAIL "$(wc -l <<< "$dirty") uncommitted changes under src or the function map" \
+            "commit or restore them" "git status --short -- src tools/Resources/functions_map.txt"
+    else
+        run_check_line tree ok "src and the function map match HEAD"
+    fi
+    for item in build/toy2.exe build/decomp-function-sizes.json; do
+        [[ -s $item ]] || missing+=" $item"
+    done
+    if [[ -n $missing ]]; then
+        run_check_line build FAIL "missing:$missing" "build it" "tools/decomp baseline"
+    else
+        run_check_line build ok "build/toy2.exe and build/decomp-function-sizes.json are present"
+    fi
+    if [[ -z $check_quiet ]]; then
+        run_select 1 reuse || code=$?
+        if ((code == 0)); then
+            run_check_line candidates ok \
+                "next: $run_address $run_name ($run_mode, subsystem $run_subsystem)"
+        elif ((code == 4)); then
+            run_check_line candidates FAIL "$select_error" "no work is left in the queue" \
+                "tools/decomp candidates --refine --yield --why"
+        else
+            run_check_line candidates FAIL "$select_error" "read the log" \
+                "tail -n 20 ${select_files}candidates.log"
+        fi
+        tried=()
+    fi
+    IFS=$'\t' read -r busy busy_next < <(python tools/decomp_attempts.py run-status --busy \
+        --self "$$" 2> /dev/null) || true
+    if [[ -n $busy ]]; then
+        run_check_line state FAIL "$busy" "let it end, or stop it with kill -TERM" "$busy_next"
+    elif [[ -f $campaign_state_file ]]; then
+        summary=$(python -c 'import json, sys; s = json.load(open(sys.argv[1]))
+print(", ".join(s.get("addresses") or []) or "-", "phase", s.get("phase", "started"))' \
+            "$campaign_state_file" 2> /dev/null || echo "$campaign_state_file")
+        run_check_line state FAIL "a campaign is active ($summary)" \
+            "finish it, or tools/decomp campaigns abort --reason TEXT" "tools/decomp campaigns status"
+    else
+        run_check_line state ok "no active campaign or run"
+    fi
+    if mkdir -p "$runs" 2> /dev/null && touch "$runs/.write-check" 2> /dev/null; then
+        rm -f "$runs/.write-check"
+        run_check_line logs ok "$runs is writable"
+    else
+        run_check_line logs FAIL "$runs is not writable" "check the permissions of build/" \
+            "ls -ld build $runs"
+    fi
+}
+
+# --check --live: one minimal writer call through the real writer command. It
+# shows turns, context size, denials and the exact error of a failed call.
+run_check_live() {
+    local out="$runs/check-live$suffix" prompt="$runs/check-live.prompt" status=0 head
+    local started=$SECONDS verdict="" detail="" fix="" next=""
+    head=$(git log -1 --format=%h 2> /dev/null || true)
+    printf '%s\n' "This is a setup check, not a batch: edit nothing and run no build." \
+        "Run exactly one shell command, git log --oneline -1, then reply with two lines:" \
+        "its output, and the first line of your instructions that starts with \"# \"." \
+        > "$prompt"
+    DECOMP_WRITER_TIMEOUT=${DECOMP_WRITER_TIMEOUT:-300} run_writer "$prompt" "$out" || status=$?
+    IFS=$'\t' read -r verdict detail fix next < <(python tools/decomp_attempts.py \
+        writer-usage "$out" --format "$writer_format" --harness "$harness" --live "$head" \
+        --status "$status" --seconds "$((SECONDS - started))") || true
+    [[ -n $next ]] || next="tail -n 20 $out"
+    run_usage_file
+    printf '%s\t%s\t-\tcheck\tnone\t-\t%s\t%s\n' "$(date -u +%FT%TZ)" "$harness" \
+        "$((SECONDS - started))" "$(python tools/decomp_attempts.py writer-usage "$out" \
+        --format "$writer_format")" >> "$runs/usage.tsv"
+    run_check_line live "${verdict:-FAIL}" "${detail:-no verdict} (log: $out)" "$fix" "$next"
+}
+
+# usage.tsv holds one row per writer run. A file with another header is kept
+# under a timestamped name, so every row of usage.tsv has the same columns.
+run_usage_file() {
+    local header=$'time\tharness\taddress\tbatch\tattempts\tbest\tseconds\tcost_usd\tinput'
+    header+=$'\tcache_write\tcache_read\toutput\treasoning\tturns\tapi_ms\tdenials\terror'
+    if [[ -s $runs/usage.tsv && $(head -n 1 "$runs/usage.tsv") != "$header" ]]; then
+        mv -f "$runs/usage.tsv" "$runs/usage-$(date -u +%Y%m%dT%H%M%SZ).tsv"
+    fi
+    [[ -s $runs/usage.tsv ]] || printf '%s\n' "$header" > "$runs/usage.tsv"
+}
 
 # Run the writer on one assignment. It runs in the background under wait, so
 # the INT/TERM trap of campaign_run can stop it: timeout moves the writer into
 # its own process group, which a Ctrl-C or a kill of the driver's group never
 # reaches. The session variables are dropped, so a driver started inside a
-# Claude Code session does not make the writer a child of that session.
+# Claude Code or Codex session does not make the writer part of that session.
+# With WATCH set, one line per logged attempt prints while the writer works.
+# writer_refs names a change of git refs: the driver, not the writer, commits.
 run_writer() {
-    local status=0
-    env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT -u CLAUDE_CODE_CHILD_SESSION \
-        -u CLAUDE_CODE_SESSION_ID -u CLAUDE_CODE_MESSAGING_SOCKET \
-        -u CLAUDE_CODE_MESSAGING_TOKEN -u CLAUDE_PID -u CLAUDE_EFFORT \
+    local status=0 last="${2%.*}.last.txt" refs
+    rm -f "$2" "$last"
+    refs=$(run_refs)
+    DECOMP_WRITER_LAST="$ROOT/$last" env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT \
+        -u CLAUDE_CODE_CHILD_SESSION -u CLAUDE_CODE_SESSION_ID -u CLAUDE_CODE_MESSAGING_SOCKET \
+        -u CLAUDE_CODE_MESSAGING_TOKEN -u CLAUDE_PID -u CLAUDE_EFFORT -u CODEX_THREAD_ID \
+        -u CODEX_SESSION_ID -u CODEX_CI \
         timeout --kill-after=60 "${DECOMP_WRITER_TIMEOUT:-2400}" bash -c "$writer" \
-        < "$1" > "$2" 2> "${2%.json}.stderr" &
+        < "$1" > "$2" 2> "${2%.*}.stderr" &
     writer_pid=$!
+    [[ -z $run_owns_state ]] || python tools/decomp_attempts.py event state --state \
+        --set "writer_pid=$writer_pid" || true
+    [[ -z ${3:-} ]] || run_watch
     wait "$writer_pid" || status=$?
     writer_pid=""
+    if [[ -n $watch_pid ]]; then
+        wait "$watch_pid" 2> /dev/null || true
+        watch_pid=""
+    fi
+    [[ -z $run_owns_state ]] || python tools/decomp_attempts.py event state --state \
+        --set "writer_pid=" || true
+    writer_refs=""
+    [[ $(run_refs) == "$refs" ]] \
+        || writer_refs="the writer changed git refs (HEAD ${refs%% *} -> $(git rev-parse --short HEAD))"
     return "$status"
 }
 
-# INT or TERM during a run: stop the writer (timeout passes the signal on to
-# its process group), abort a campaign still in its writer phase and exit, so
-# no orphaned writer keeps editing src after the driver is gone.
+# HEAD and a checksum of every branch, remote and tag ref: a commit, reset, branch
+# switch or push changes them.
+run_refs() {
+    printf '%s %s\n' "$(git rev-parse --short HEAD 2> /dev/null || true)" "$({
+        git symbolic-ref -q HEAD
+        git for-each-ref --format='%(objectname) %(refname)' refs/heads refs/remotes refs/tags
+    } 2> /dev/null | cksum)"
+}
+
+# Stop a campaign whose writer moved git refs, because the driver owns commits and
+# pushes; src is kept for review.
+run_guard_refs() {
+    [[ -n $writer_refs ]] || return 0
+    "$self" campaigns abort --reason "campaigns run: $writer_refs." > "$prefix-abort.log" 2>&1 || true
+    run_active=""
+    run_error 3 "$writer_refs; the driver owns commits, so campaign $run_address is aborted and src kept (log: $1)" \
+        "git reflog -5"
+}
+
+# Print "  attempt K: raw X% (best Y%)" for each attempt the writer logs. tail -F
+# waits on the attempt file and stops by itself when the writer process ends.
+run_watch() {
+    local file="build/decomp-attempts/$run_address.jsonl" best=$run_best line n raw
+    touch "$file"
+    tail -n "+$((run_attempts + 1))" -F --pid="$writer_pid" "$file" 2> /dev/null \
+        | while IFS= read -r line; do
+            [[ $line =~ \"n\":\ ([0-9]+) ]] || continue
+            n=${BASH_REMATCH[1]}
+            [[ $line =~ \"raw\":\ ([0-9.]+) ]] || continue
+            raw=$(run_math 'printf "%.2f", a' "${BASH_REMATCH[1]}")
+            best=$(run_math 'printf "%.2f", (a > b ? a : b)' "$raw" "$best")
+            run_emit attempt "  attempt $n: raw $raw% (best $best%)" --field "attempt=$n" \
+                --field "raw=$raw" --field "best=$best" --set "attempts=$n" --set "best=$best"
+        done &
+    watch_pid=$!
+}
+
+# A stop signal during a run: stop the writer, settle the campaign and exit 130, so
+# no writer keeps editing src after the driver is gone. bash runs the handler once
+# a foreground step (bc, finish) returns, so run_settle reports what it committed.
 run_interrupt() {
-    trap - INT TERM
+    trap - INT TERM HUP QUIT
+    run_reason="interrupted by SIG$1 in phase ${run_phase_name:-start}"
+    run_next="tools/decomp campaigns run --check"
+    run_settle
+    run_final interrupted "$run_reason" "$run_next" || true
+    exit 130
+}
+
+run_trap_signals() {
+    local signal
+    for signal in INT TERM HUP QUIT; do trap "run_interrupt $signal" "$signal"; done
+}
+
+# Hold stop signals until a step that must not stop half way ends; the caller then
+# acts on run_held.
+run_hold_signals() {
+    local signal
+    for signal in INT TERM HUP QUIT; do trap "run_held=$signal" "$signal"; done
+}
+
+# Stop the writer and its attempt watcher. timeout passes the TERM on to the
+# writer's process group, which a signal to the driver's group never reaches.
+run_stop_writer() {
     if [[ -n ${writer_pid:-} ]]; then
         kill -TERM "$writer_pid" 2> /dev/null || true
         wait "$writer_pid" 2> /dev/null || true
+        writer_pid=""
     fi
-    if [[ -n ${run_active:-} ]]; then
-        "$self" campaigns abort --reason "campaigns run was interrupted." > /dev/null 2>&1 || true
-        echo "run: interrupted; campaign on $run_active aborted; src kept for review" \
-            "(best patch: build/decomp-cache/best/$run_active.patch)" >&2
-    else
-        echo "run: interrupted; check tools/decomp campaigns status" >&2
+    [[ -z ${watch_pid:-} ]] || kill "$watch_pid" 2> /dev/null || true
+    watch_pid=""
+}
+
+# Settle a run that stops early: stop the writer, abort the campaign this run
+# started and did not end, and add to run_reason what is left (the commits of the
+# run, changed src, the best patch). run_next becomes the one command to run next.
+run_settle() {
+    local made=0 changed=0 log
+    run_stop_writer
+    if [[ -n ${run_active:-} && -f $campaign_state_file ]] &&
+        grep -q "\"$run_active\"" "$campaign_state_file" 2> /dev/null; then
+        log="$runs/$run_active-abort.log"
+        if "$self" campaigns abort --reason "campaigns run stopped early." > "$log" 2>&1; then
+            run_reason+="; campaign $run_active aborted"
+        else
+            run_reason+="; campaign $run_active is still active (log: $log)"
+            run_next="tools/decomp campaigns status"
+            return 0
+        fi
     fi
-    exit 130
+    [[ -z ${run_head:-} ]] || made=$(git rev-list --count "$run_head..HEAD" 2> /dev/null || echo 0)
+    changed=$(git status --porcelain -- src tools/Resources/functions_map.txt 2> /dev/null | wc -l || true)
+    if ((made > 0)); then
+        run_reason+="; the run made $made commits, last $(git rev-parse --short HEAD)"
+        run_next="git push origin $(git branch --show-current)"
+    fi
+    if ((changed > 0)); then
+        run_reason+="; src has $changed changed paths"
+        [[ -z ${run_active:-} || ! -s build/decomp-cache/best/$run_active.patch ]] \
+            || run_reason+=", best model in build/decomp-cache/best/$run_active.patch"
+        run_next="git status --short -- src tools/Resources/functions_map.txt"
+    fi
 }
 
 # Read the attempt log of the current target into run_attempts, run_best,
@@ -601,23 +918,38 @@ print(s["attempts"], "%.2f" % (s["best_raw"] or 0), s["best_attempt"] or 0,
 
 run_math() { awk -v a="$2" -v b="${3:-0}" "BEGIN { $1 }"; }
 
+# Name the spend of a writer run: dollars when the harness reports them (claude),
+# else thousands of tokens (codex reports no cost).
+run_spend() {
+    if [[ $writer_format == claude-json ]]; then
+        run_math 'printf "$%.2f", a' "$1"
+    else
+        run_math 'printf "%.0fk tokens", a / 1000' "$2"
+    fi
+}
+
 # Append one usage.tsv row and print the batch verdict line.
 run_account() {
-    local label=$1 json=$2 first=$3 seconds=$4 previous_best=$5 fields range
+    local label=$1 out=$2 first=$3 seconds=$4 previous_best=$5 fields range batch_cost
+    local batch_tokens denials denied="permission denials" note=""
     range="$first-$run_attempts"
     ((run_attempts >= first)) || range="none"
-    fields=$(python tools/decomp_attempts.py writer-usage "$json")
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$run_address" "$label" \
-        "$range" "$run_best" "$seconds" "$fields" >> "$runs/usage.tsv"
-    local batch_cost denials
+    fields=$(python tools/decomp_attempts.py writer-usage "$out" --format "$writer_format")
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$harness" "$run_address" \
+        "$label" "$range" "$run_best" "$seconds" "$fields" >> "$runs/usage.tsv"
     batch_cost=$(cut -f1 <<< "$fields")
-    denials=$(cut -f8 <<< "$fields")
-    cost=$(run_math 'printf "%.4f", a + b' "$cost" "$batch_cost")
-    printf '%s: attempts %s, best %s%% (%s), %s min, $%.2f%s%s\n' "$label" "$range" \
-        "$run_best" "$(run_math 'printf "%+.2f", a - b' "$run_best" "$previous_best")" \
-        "$(run_math 'printf "%.1f", a / 60' "$seconds")" "$batch_cost" \
-        "$( ((denials > 0)) && echo ", $denials permission denials")" \
-        "$( ((writer_status != 0)) && echo ", writer exit $writer_status")"
+    batch_tokens=$(awk -F'\t' '{ print $2 + $3 + $4 + $5 }' <<< "$fields")
+    denials=$(cut -f9 <<< "$fields")
+    cost=$(run_math 'printf "%.4f", a + b' "$cost" "${batch_cost:-0}")
+    tokens=$((tokens + batch_tokens))
+    [[ $writer_format != codex-jsonl ]] || denied="sandbox errors"
+    ((${denials:-0} == 0)) || note+=", $denials $denied"
+    ((writer_status == 0)) || note+=", writer exit $writer_status"
+    run_emit batch "$label: attempts $range, best $run_best% ($(run_math 'printf "%+.2f", a - b' \
+        "$run_best" "$previous_best")), $(run_math 'printf "%.1f", a / 60' "$seconds") min,\
+ $(run_spend "${batch_cost:-0}" "$batch_tokens")$note" --field "label=$label" \
+        --field "attempts=$range" --field "best=$run_best" --field "seconds=$seconds" \
+        --set "best=$run_best" --set "attempts=$run_attempts"
 }
 
 # The batch assignment ends with the orientation pack, so the writer spends no
@@ -655,86 +987,153 @@ run_message() {
         echo "$subject"
         echo
         echo "$baseline% -> $1% in $run_attempts attempts across $writer_runs writer runs" \
-            "(tools/decomp campaigns run)."
+            "(tools/decomp campaigns run, $harness writer)."
         [[ -z $trailer ]] || printf '\n%s\n' "$trailer"
     } > "$prefix.msg"
 }
 
 run_finish() {
     local note="campaigns run: $baseline% -> $1% in $run_attempts attempts"
-    note+=", $writer_runs writer runs; stopped: $stop"
+    note+=", $writer_runs $harness writer runs; stopped: $stop"
     finish_log="$prefix-finish$2.log"
     rm -f build/decomp-diffs/validate.log
+    run_phase finish "log=$finish_log"
     "$self" campaigns finish --mode "$run_mode" --target "$run_address" --note "$note" \
         --message "$prefix.msg" > "$finish_log" 2>&1
 }
 
-# One campaign: select, start, writer batches, then a validated commit or a
-# no-source record. Set run_result and run_family for the stop rule. Return 3
-# when no candidate is left, 1 on a fatal error or a writer that did no work.
-run_campaign() {
-    local index=$1 started=$SECONDS cost=0 writer_runs=0 stop="" batch=0 broken=""
-    local run_mode=$mode run_address run_name run_state run_size run_source run_subsystem
-    local run_attempts run_best run_best_at run_last run_stalled run_limit writer_status=0
-    local row fields=() pick=() baseline baseline_attempts prefix final bytes="+0.00" sha="-"
-    local finish_log json
-    if [[ -n $(git status --porcelain -- src tools/Resources/functions_map.txt) ]]; then
-        echo "error: src or the function map has uncommitted changes; commit or restore them" >&2
-        return 1
-    fi
+# Choose the target of campaign INDEX: run_address, run_name, run_state, run_size,
+# run_source, run_subsystem and run_mode. With REUSE (--check, --dry-run) each
+# queue is ranked once; a run ranks again for every campaign, after the last commit.
+# Return 1 when candidates fails and 4 when no target is eligible.
+run_select() {
+    local index=$1 reuse=${2:-} row fields=() pick=() list queue=()
+    run_mode=$mode select_error=""
     if [[ -n $address ]]; then
-        if ! "$self" candidates --refine --json --limit 0 > "$runs/candidates.json" \
-            2> "$runs/candidates.log" || ! "$self" candidates --coverage --json --limit 0 \
-            > "$runs/coverage.json" 2>> "$runs/candidates.log"; then
-            echo "error: candidates failed; see $runs/candidates.log" >&2
+        if ! "$self" candidates --refine --json --limit 0 > "${select_files}candidates.json" \
+            2> "${select_files}candidates.log" || ! "$self" candidates --coverage --json --limit 0 \
+            > "${select_files}coverage.json" 2>> "${select_files}candidates.log"; then
+            select_error="candidates failed (log: ${select_files}candidates.log)"
             return 1
         fi
-        pick=("$runs/candidates.json" "$runs/coverage.json" --address "$address")
+        pick=("${select_files}candidates.json" "${select_files}coverage.json" --address "$address")
     else
         if [[ $run_mode == auto ]]; then
             run_mode=refinement
-            ((index % 3 == 0)) && run_mode=coverage
+            ((index % 3 != 0)) || run_mode=coverage
         fi
-        local queue=(--refine --yield)
-        [[ $run_mode == coverage ]] && queue=(--coverage)
-        "$self" candidates "${queue[@]}" --json --limit 25 > "$runs/candidates.json" \
-            2> "$runs/candidates.log" || { echo "error: candidates failed; see $runs/candidates.log" >&2; return 1; }
-        pick=("$runs/candidates.json")
-        [[ $run_mode == coverage ]] && pick+=(--coverage)
+        queue=(--refine --yield) list="${select_files}candidates.json"
+        if [[ $run_mode == coverage ]]; then
+            queue=(--coverage) list="${select_files}coverage.json"
+        fi
+        if [[ -z $reuse || $ranked != *" $run_mode "* ]]; then
+            if ! "$self" candidates "${queue[@]}" --json --limit 25 > "$list" \
+                2> "${select_files}candidates.log"; then
+                select_error="candidates failed (log: ${select_files}candidates.log)"
+                return 1
+            fi
+            ranked+=" $run_mode "
+        fi
+        pick=("$list")
+        [[ $run_mode != coverage ]] || pick+=(--coverage)
         for row in "${tried[@]}"; do pick+=(--skip "$row"); done
     fi
     if ! row=$(python tools/decomp_attempts.py pick "${pick[@]}"); then
-        echo "campaign $index: no eligible ${address:-$run_mode} target; run stopped" >&2
-        return 3
+        select_error="no eligible ${address:-$run_mode} target"
+        return 4
     fi
     mapfile -t fields <<< "$row"
     run_address=${fields[0]} run_name=${fields[1]} run_state=${fields[2]}
     run_size=${fields[3]} run_source=${fields[4]} run_subsystem=${fields[5]}
     if [[ $run_mode == auto ]]; then
         run_mode=refinement
-        [[ $run_state == STUB || $run_state == NOT_STARTED ]] && run_mode=coverage
+        [[ $run_state != STUB && $run_state != NOT_STARTED ]] || run_mode=coverage
     fi
     tried+=("$run_address")
+}
+
+# Record a no-source campaign with the models its writers tried, so no writer
+# retests them, and commit the record.
+run_record() {
+    local models=() model_args=() model
+    mapfile -t models < <(python tools/decomp_attempts.py tried \
+        "build/decomp-cache/handoff/$run_address.md")
+    ((${#models[@]} > 0)) || models=("no writer model scored above the $baseline% baseline")
+    for model in "${models[@]}"; do model_args+=(--model "$model"); done
+    if ! "$self" campaigns record --result no-source --note "no attempt raised the score" \
+        "${model_args[@]}" > "$prefix-record.log" 2>&1; then
+        run_error 1 "the no-source record failed (log: $prefix-record.log)" \
+            "tail -n 20 $prefix-record.log"
+        return
+    fi
+    {
+        echo "Record no-source campaign on $run_name"
+        [[ -z $trailer ]] || printf '\n%s\n' "$trailer"
+    } > "$prefix.msg"
+    if ! { git add tools/Resources/campaign-ledger.jsonl tools/Resources/scoreboard.tsv \
+        .notes/source-models.md && git commit -q -F "$prefix.msg"; }; then
+        run_error 1 "the no-source commit failed" "git status --short"
+        return
+    fi
+}
+
+# One campaign: select, start, writer batches, then a validated commit or a
+# no-source record. Set run_result and run_family for the stop rule. Return 0 on
+# a result, 1 on a fatal error, 3 on a writer failure and 4 when no target is left;
+# run_error keeps the reason and next step of every stop for the final line.
+run_campaign() {
+    local index=$1 started=$SECONDS cost=0 tokens=0 writer_runs=0 stop="" batch=0 broken=""
+    local broken_fix="" broken_next="" failure=() said line code
+    local run_mode=$mode run_address run_name run_state run_size run_source run_subsystem
+    local run_attempts run_best run_best_at run_last run_stalled run_limit writer_status=0
+    local baseline baseline_attempts prefix final bytes="+0.00" sha="-" finish_log json
+    if [[ -n $(git status --porcelain -- src tools/Resources/functions_map.txt) ]]; then
+        run_error 1 "src or the function map has uncommitted changes before campaign $index" \
+            "git status --short -- src tools/Resources/functions_map.txt"
+        return
+    fi
+    run_phase select "campaign=$index" "target=" "name=" "baseline=" "batch=0"
+    run_select "$index" || {
+        code=$?
+        if ((code == 4)); then
+            run_reason="$select_error after $done_count campaigns"
+            run_next="tools/decomp candidates --refine --yield --why"
+            run_emit stop "campaign $index: $select_error; run stopped"
+            return 4
+        fi
+        run_error 1 "$select_error" "tail -n 20 ${select_files}candidates.log"
+        return
+    }
     run_family=$run_subsystem
     prefix="$runs/$run_address"
     rm -f "$prefix"-* "$prefix.msg"
     # A handoff left by an interrupted run numbers attempts of another baseline.
     rm -f "build/decomp-cache/handoff/$run_address.md"
+    run_phase baseline "target=$run_address" "name=$run_name" "mode=$run_mode" \
+        "subsystem=$run_subsystem" "log=$prefix-start.log"
+    # Set before the start, so a signal held back until the start returns aborts it.
+    run_active=$run_address
     if ! "$self" campaigns start --mode "$run_mode" --address "$run_address" \
         --subsystem "$run_subsystem" > "$prefix-start.log" 2>&1; then
-        echo "error: campaigns start failed for $run_address; see $prefix-start.log" >&2
-        return 1
+        run_active=""
+        run_error 1 "campaigns start failed for $run_address (log: $prefix-start.log)" \
+            "tail -n 20 $prefix-start.log"
+        return
     fi
-    run_active=$run_address
+    run_phase baseline "log=$prefix-bc.log"
     if ! "$self" bc "$run_address" > "$prefix-bc.log" 2>&1; then
         run_active=""
         "$self" campaigns abort --reason "The baseline bc failed." > /dev/null 2>&1
-        echo "error: the baseline bc of $run_address failed; see $prefix-bc.log" >&2
-        return 1
+        run_error 1 "the baseline bc of $run_address failed (log: $prefix-bc.log)" \
+            "tail -n 30 $prefix-bc.log"
+        return
     fi
-    run_read_stats || return 1
+    run_read_stats || { run_error 1 "the attempt log of $run_address is unreadable" \
+        "python tools/decomp_attempts.py stats --address $run_address"; return; }
     baseline=$run_best baseline_attempts=$run_attempts
-    echo "campaign $index: $run_address $run_name $run_mode, baseline $baseline%"
+    run_emit campaign "campaign $index: $run_address $run_name $run_mode, baseline $baseline%" \
+        --field "campaign=$index" --field "address=$run_address" --field "mode=$run_mode" \
+        --set "baseline=$baseline" --set "best=$run_best" --set "attempts=$run_attempts"
     local first last before_attempts before_best batch_started
     while true; do
         if ((run_stalled)); then stop="stalled"; break; fi
@@ -743,18 +1142,27 @@ run_campaign() {
         first=$((run_attempts + 1)) last=$((run_attempts + batch_size))
         ((last > run_limit)) && last=$run_limit
         before_attempts=$run_attempts before_best=$run_best batch_started=$SECONDS
-        json="$prefix-batch$batch.json"
+        json="$prefix-batch$batch$suffix"
         run_batch_prompt "$first" "$last" > "$prefix-batch$batch.prompt"
+        run_phase batch "batch=$batch" "log=$json"
         writer_status=0
-        run_writer "$prefix-batch$batch.prompt" "$json" || writer_status=$?
-        run_read_stats || return 1
+        run_writer "$prefix-batch$batch.prompt" "$json" watch || writer_status=$?
+        run_read_stats || { run_error 1 "the attempt log of $run_address is unreadable" \
+            "python tools/decomp_attempts.py stats --address $run_address"; return; }
         run_account "batch $batch" "$json" "$first" "$((SECONDS - batch_started))" "$before_best"
-        python tools/decomp_attempts.py writer-usage "$json" --handoff \
+        run_guard_refs "$json" || return
+        python tools/decomp_attempts.py writer-usage "$json" --format "$writer_format" --handoff \
             | handoff "$run_address" > /dev/null 2>&1 || true
         if ((run_attempts == before_attempts)); then
-            broken=$(python tools/decomp_attempts.py writer-usage "$json" --failure "$writer_status")
-            echo "batch $batch: no new attempt${broken:+ ($broken)}; the writer said:"
-            python tools/decomp_attempts.py writer-usage "$json" --result 3 | sed 's/^/  /'
+            mapfile -t failure < <(python tools/decomp_attempts.py writer-usage "$json" \
+                --format "$writer_format" --harness "$harness" --failure "$writer_status")
+            broken=${failure[0]:-} broken_fix=${failure[1]:-} broken_next=${failure[2]:-}
+            run_emit batch "batch $batch: no new attempt${broken:+ ($broken)}; the writer said:"
+            said=$(python tools/decomp_attempts.py writer-usage "$json" --format "$writer_format" \
+                --result 3)
+            while IFS= read -r line; do
+                [[ -z $line ]] || run_emit batch "  $line"
+            done <<< "$said"
             stop="no new attempt"; break
         fi
         if run_math 'exit !(a - b < 0.5)' "$run_best" "$before_best"; then
@@ -762,25 +1170,28 @@ run_campaign() {
         fi
     done
     # Restore the best compiled tree: the tree the writer left may hold a worse model.
-    git checkout -q -- src tools/Resources/functions_map.txt || return 1
+    git checkout -q -- src tools/Resources/functions_map.txt \
+        || { run_error 1 "git checkout of src failed" "git status --short -- src"; return; }
     if [[ -s build/decomp-cache/best/$run_address.patch ]] &&
         ! git apply build/decomp-cache/best/"$run_address".patch; then
-        echo "error: the best patch of $run_address does not apply; the tree is at HEAD" >&2
-        return 1
+        run_error 1 "the best patch of $run_address does not apply; the tree is at HEAD" \
+            "git apply --check build/decomp-cache/best/$run_address.patch"
+        return
     fi
-    final=$run_best run_active=""
+    final=$run_best
     if run_math 'exit !(a > b)' "$final" "$baseline"; then
         run_message "$final"
         if ! run_finish "$final" 1; then
             if [[ -n $broken ]]; then
-                echo "error: finish failed and $broken, so no repair runs;" \
-                    "the tree is left for review (log: $prefix-finish1.log)" >&2
-                return 1
+                run_error 3 "finish failed and $broken, so no repair runs; the tree is left for review (log: $prefix-finish1.log)" \
+                    "tail -n 30 $prefix-finish1.log"
+                return
             fi
             local problems
             problems=$(python tools/decomp_attempts.py failures build/decomp-diffs/validate.log)
             [[ -n $problems ]] || problems=$(grep -E '^error: ' "$prefix-finish1.log" | tail -n 5)
-            echo "finish: failed; one repair run for: $(head -n 1 <<< "$problems")"
+            run_emit finish "finish: failed; one repair run for: $(head -n 1 <<< "$problems")" \
+                --field "log=$prefix-finish1.log"
             {
                 echo "REPAIR target $run_address $run_name ($run_mode). campaigns finish failed with:"
                 printf '%s\n' "$problems"
@@ -789,19 +1200,22 @@ run_campaign() {
             } > "$prefix-repair.prompt"
             before_attempts=$run_attempts before_best=$run_best batch_started=$SECONDS
             writer_status=0 writer_runs=$((writer_runs + 1))
-            run_writer "$prefix-repair.prompt" "$prefix-repair.json" || writer_status=$?
-            run_read_stats || return 1
-            run_account "repair" "$prefix-repair.json" "$((before_attempts + 1))" \
+            run_phase repair "log=$prefix-repair$suffix"
+            run_writer "$prefix-repair.prompt" "$prefix-repair$suffix" watch || writer_status=$?
+            run_read_stats || { run_error 1 "the attempt log of $run_address is unreadable" \
+                "python tools/decomp_attempts.py stats --address $run_address"; return; }
+            run_account "repair" "$prefix-repair$suffix" "$((before_attempts + 1))" \
                 "$((SECONDS - batch_started))" "$before_best"
+            run_guard_refs "$prefix-repair$suffix" || return
             ((run_attempts > before_attempts)) && final=$run_last
             run_message "$final"
             if ! run_finish "$final" 2; then
-                echo "error: finish failed twice; the tree is left as is for review" \
-                    "(log: $prefix-finish2.log)" >&2
-                return 1
+                run_error 1 "finish failed twice; the tree is left as is for review (log: $prefix-finish2.log)" \
+                    "tail -n 30 $prefix-finish2.log"
+                return
             fi
         fi
-        sha=$(sed -n 's/^finished: //p' "$finish_log")
+        sha=$(sed -n 's/^finished: //p' "$finish_log") run_active=""
         bytes=$(grep -oE 'campaign: [-+][0-9.]+ code' "$finish_log" | grep -oE '[-+][0-9.]+')
         bytes=${bytes:-+0.00} run_result=source
         committed=$((committed + 1))
@@ -810,47 +1224,69 @@ run_campaign() {
         # row would skip the target later and count toward the stop rule.
         broken=${broken:-the writer logged no attempt}
         "$self" campaigns abort --reason "campaigns run: $broken." > "$prefix-abort.log" 2>&1
-        echo "error: campaign $index: $run_address: $broken; campaign aborted, run stopped" \
-            "(logs: $prefix-*)" >&2
-        return 1
+        run_active=""
+        run_error 3 "campaign $index: $run_address: $broken${broken_fix:+; $broken_fix}; campaign aborted (logs: $prefix-*)" \
+            "${broken_next:-tools/decomp campaigns run --check --live --harness $harness}"
+        return
     else
-        # No attempt raised the score: record the tried models so no writer retests them.
-        local models=() model_args=() model
-        mapfile -t models < <(python tools/decomp_attempts.py tried \
-            "build/decomp-cache/handoff/$run_address.md")
-        ((${#models[@]} > 0)) || models=("no writer model scored above the $baseline% baseline")
-        for model in "${models[@]}"; do model_args+=(--model "$model"); done
-        if ! "$self" campaigns record --result no-source --note "no attempt raised the score" \
-            "${model_args[@]}" > "$prefix-record.log" 2>&1; then
-            echo "error: the no-source record failed; see $prefix-record.log" >&2
-            return 1
-        fi
-        {
-            echo "Record no-source campaign on $run_name"
-            [[ -z $trailer ]] || printf '\n%s\n' "$trailer"
-        } > "$prefix.msg"
-        git add tools/Resources/campaign-ledger.jsonl tools/Resources/scoreboard.tsv \
-            .notes/source-models.md && git commit -q -F "$prefix.msg" \
-            || { echo "error: the no-source commit failed" >&2; return 1; }
-        sha=$(git rev-parse --short HEAD) run_result=no-source
+        # A stop signal waits until the record is committed, so no record is left
+        # without its commit.
+        run_phase record "log=$prefix-record.log"
+        code=0
+        run_hold_signals
+        run_record || code=$?
+        run_trap_signals
+        [[ -z $run_held ]] || run_interrupt "$run_held"
+        ((code == 0)) || return "$code"
+        sha=$(git rev-parse --short HEAD) run_result=no-source run_active=""
         rm -f "build/decomp-cache/handoff/$run_address.md" "build/decomp-attempts/$run_address.jsonl"
     fi
     if ((push)) && ! git push -q origin agent/continuous; then
-        echo "error: git push failed after commit $sha" >&2
-        return 1
+        run_error 1 "git push failed after commit $sha" "git push origin agent/continuous"
+        return
     fi
     local minutes
     minutes=$(run_math 'printf "%.1f", a / 60' "$((SECONDS - started))")
-    printf 'campaign %s: %s %s %s %s%% -> %s%% (%s B), %s attempts, %s min, $%.2f, commit %s\n' \
-        "$index" "$run_address" "$run_name" "$run_mode" "$baseline" "$final" "$bytes" \
-        "$run_attempts" "$minutes" "$cost" "$sha"
+    run_emit campaign "campaign $index: $run_address $run_name $run_mode $baseline% -> $final% ($bytes B), $run_attempts attempts, $minutes min, $(run_spend "$cost" "$tokens"), commit $sha" \
+        --field "campaign=$index" --field "address=$run_address" --field "result=$run_result" \
+        --field "final=$final" --field "bytes=$bytes" --field "commit=$sha" --set "best=$final"
     total_cost=$(run_math 'printf "%.4f", a + b' "$total_cost" "$cost")
+    total_tokens=$((total_tokens + tokens))
     total_bytes=$(run_math 'printf "%+.2f", a + b' "$total_bytes" "$bytes")
     total_attempts=$((total_attempts + run_attempts)) done_count=$((done_count + 1))
     if [[ -n $broken ]]; then
-        echo "error: $broken; run stopped after campaign $index" >&2
-        return 1
+        run_error 3 "$broken${broken_fix:+; $broken_fix}; run stopped after campaign $index (log: $json)" \
+            "${broken_next:-tools/decomp campaigns run --check --live --harness $harness}"
+        return
     fi
+}
+
+# --dry-run: the next campaigns as a run would select them; nothing starts.
+run_dry_run() {
+    local index code planned=0
+    if [[ -z $harness ]]; then
+        run_final writer "$harness_reason" "tools/decomp campaigns run --check"
+        return
+    fi
+    run_emit harness "harness: $harness ($harness_reason), budget $budget, batch $batch_size" \
+        --field "harness=$harness" --field "budget=$budget" --field "batch=$batch_size"
+    for ((index = 1; index <= count; index++)); do
+        code=0
+        run_select "$index" reuse || code=$?
+        if ((code == 4)); then
+            run_emit dry-run "dry-run $index: $select_error"
+            break
+        elif ((code != 0)); then
+            run_final review "$select_error" "tail -n 20 ${select_files}candidates.log"
+            return
+        fi
+        planned=$((planned + 1))
+        run_emit dry-run "dry-run $index: $run_address $run_name $run_mode, subsystem $run_subsystem" \
+            --field "campaign=$index" --field "address=$run_address" --field "name=$run_name" \
+            --field "mode=$run_mode" --field "subsystem=$run_subsystem"
+    done
+    run_final done "dry run of $planned campaigns; nothing started; $run_background" \
+        "tools/decomp campaigns run --count $count --harness $harness"
 }
 
 # campaigns run: the whole loop of AGENTS.md without an orchestrating model. The
@@ -858,76 +1294,161 @@ run_campaign() {
 # finishes or records no-source; logs go to build/decomp-runs/.
 campaign_run() {
     local count=1 mode=auto address="" batch_size=4 budget=12 trailer="" push=0
-    local writer="${DECOMP_WRITER:-$default_writer}" self="$ROOT/tools/decomp"
-    local runs=build/decomp-runs tried=() committed=0 total_cost=0 total_bytes=+0.00
-    local total_attempts=0 run_started=$SECONDS index status=0 done_count=0
-    local writer_pid="" run_active="" run_result="" run_family="" families=()
+    local self="$ROOT/tools/decomp" runs=build/decomp-runs tried=() committed=0 total_cost=0
+    local total_tokens=0 total_bytes=+0.00 total_attempts=0 run_started=$SECONDS index status=0
+    local done_count=0 writer_pid="" watch_pid="" run_active="" run_result="" run_family=""
+    local families=() harness_choice=${DECOMP_HARNESS:-auto} harness_from=auto
+    local writer_override=${DECOMP_WRITER:-} writer_from=DECOMP_WRITER writer_format=""
+    local effort="" model="" action=run live=0 run_json="" run_owns_state="" run_phase_name=""
+    local run_reason="" run_next="" harness="" harness_reason="" writer="" writer_binary=""
+    local suffix=.json ranked=" " select_error="" check_failed=0 check_harness=0
+    local check_quiet="" check_reason="" check_next="" kind problem="" other other_next
+    local select_files=$runs/ run_head="" run_held="" writer_refs="" code=0
+    local run_background="a run takes minutes per campaign, so start it in the background"
+    [[ -z ${DECOMP_HARNESS:-} ]] || harness_from=DECOMP_HARNESS
     # printf and awk must write and read "0.25", whatever the user's locale.
     export LC_NUMERIC=C
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help) run_usage; return 0 ;;
             --push) push=1; shift; continue ;;
+            --check|--dry-run|--status) action=${1#--}; shift; continue ;;
+            --live) live=1; shift; continue ;;
+            --json) run_json=1; shift; continue ;;
         esac
-        [[ $# -ge 2 ]] || { echo "error: run argument $1 needs a value" >&2; return 2; }
+        if [[ $# -lt 2 ]]; then
+            run_final usage "run argument $1 needs a value" "tools/decomp campaigns run --help"
+            return
+        fi
         case "$1" in
             --count) count="$2" ;;
             --mode) mode="$2" ;;
             --address) address="$2" ;;
             --batch) batch_size="$2" ;;
             --budget) budget="$2" ;;
-            --writer) writer="$2" ;;
+            --harness) harness_choice="$2" harness_from=--harness ;;
+            --effort) effort="$2" ;;
+            --model) model="$2" ;;
+            --writer) writer_override="$2" writer_from=--writer ;;
+            --writer-format) writer_format="$2" ;;
             --trailer) trailer="$2" ;;
-            *) echo "error: unknown run argument: $1" >&2; run_usage >&2; return 2 ;;
+            *) run_final usage "unknown run argument $1" "tools/decomp campaigns run --help"
+               return ;;
         esac
         shift 2
     done
-    if [[ ! $count =~ ^[1-9][0-9]*$ || ! $batch_size =~ ^[1-9][0-9]*$ ]]; then
-        echo "error: --count and --batch need positive whole numbers" >&2
-        return 2
-    fi
+    [[ $count =~ ^[1-9][0-9]*$ && $batch_size =~ ^[1-9][0-9]*$ ]] \
+        || problem="--count and --batch need positive whole numbers"
     # The baseline bc is attempt 1, so a budget below 2 leaves the writer nothing.
-    if [[ ! $budget =~ ^[0-9]+$ ]] || ((budget < 2)); then
-        echo "error: --budget needs a whole number of 2 or more (the baseline bc is attempt 1)" >&2
-        return 2
-    fi
-    if [[ $mode != auto && $mode != refinement && $mode != coverage ]]; then
-        echo "error: --mode must be auto, refinement or coverage" >&2
-        return 2
-    fi
-    if [[ -n $address ]]; then
-        [[ $address =~ ^0x[0-9A-Fa-f]{1,8}$ ]] || { echo "error: --address needs an address such as 0x00401230" >&2; return 2; }
+    [[ $budget =~ ^[0-9]+$ ]] && ((budget >= 2)) \
+        || problem="--budget needs a whole number of 2 or more (the baseline bc is attempt 1)"
+    [[ $mode =~ ^(auto|refinement|coverage)$ ]] || problem="--mode must be auto, refinement or coverage"
+    [[ $harness_choice =~ ^(auto|claude|codex)$ ]] || problem="--harness must be auto, claude or codex"
+    [[ -z $writer_format || $writer_format =~ ^(claude-json|codex-jsonl|text)$ ]] \
+        || problem="--writer-format must be claude-json, codex-jsonl or text"
+    [[ -z $effort || $effort =~ ^[a-z]+$ ]] || problem="--effort needs a level such as high"
+    if [[ -n $address && ! $address =~ ^0x[0-9A-Fa-f]{1,8}$ ]]; then
+        problem="--address needs an address such as 0x00401230"
+    elif [[ -n $address ]]; then
         address=$(printf '0x%08X' "$address") count=1
     fi
-    if ((push)) && [[ $(git branch --show-current) != agent/continuous ]]; then
-        echo "error: --push pushes agent/continuous; check out that branch first" >&2
-        return 2
+    if ((push)) && [[ $(git branch --show-current 2> /dev/null) != agent/continuous ]]; then
+        problem="--push pushes agent/continuous; check out that branch first"
     fi
+    if [[ -n $problem ]]; then
+        run_final usage "$problem" "tools/decomp campaigns run --help"
+        return
+    fi
+    if [[ $action == status ]]; then
+        python tools/decomp_attempts.py run-status ${run_json:+--json}
+        return
+    fi
+    mkdir -p "$runs" 2> /dev/null || true
+    run_resolve
+    # --check and --dry-run may run beside a live run, so they keep their own queue files.
+    [[ $action == run ]] || select_files=$runs/check-
+    if [[ $action == dry-run ]]; then
+        run_dry_run
+        return
+    fi
+    if [[ $action == check ]]; then
+        run_checks || true
+        if ((live && check_harness)); then
+            run_check_line live FAIL "skipped: the writer cannot start" "fix the checks above"
+        elif ((live)); then
+            run_check_live || true
+        fi
+        if ((check_failed)); then
+            run_final check "$check_failed failed: $check_reason" "$check_next"
+            return
+        fi
+        run_final done "all checks passed; $run_background" \
+            "tools/decomp campaigns run --count 3 --harness $harness"
+        return
+    fi
+    # A run: refuse to take over the state of a run that is still going, then
+    # own state.json and check the setup before the first campaign.
+    IFS=$'\t' read -r other other_next < <(python tools/decomp_attempts.py run-status --busy \
+        --self "$$" 2> /dev/null) || true
+    if [[ -n $other ]]; then
+        run_final check "$other" "$other_next"
+        return
+    fi
+    run_owns_state=1 run_phase_name=check
+    trap 'run_on_exit $?' EXIT
+    run_trap_signals
+    python tools/decomp_attempts.py event state --state --reset --set "pid=$$" \
+        --set "started=$(date -u +%FT%TZ)" --set "harness=$harness" --set "phase=check" \
+        --set "campaign=0" --set "count=$count" --set "writer=$writer" || true
+    check_quiet=1
+    run_checks || true
+    if ((check_harness)); then
+        run_final writer "harness failure: $check_reason" "$check_next"
+        return
+    elif ((check_failed)); then
+        run_final check "$check_failed failed: $check_reason" "$check_next"
+        return
+    fi
+    run_head=$(git rev-parse HEAD 2> /dev/null || true)
+    run_emit harness "harness: $harness ($harness_reason)" --field "harness=$harness" \
+        --field "format=$writer_format" --field "writer=$writer"
     # bc reads the budget from here, in the driver and inside the writer alike.
     export DECOMP_BUDGET=$budget
-    mkdir -p "$runs"
-    [[ -s $runs/usage.tsv ]] || printf '%s\n' "time	address	batch	attempts	best	seconds	cost_usd	input	cache_write	cache_read	output	turns	api_ms	denials	error" > "$runs/usage.tsv"
-    trap run_interrupt INT TERM
+    run_usage_file
     for ((index = 1; index <= count; index++)); do
         run_result=""
-        run_campaign "$index" || { status=$?; break; }
+        # A campaign left active on an error stays for review; no later stop aborts it.
+        run_campaign "$index" || { status=$?; run_active=""; break; }
         # continue-decomp stop rule: three consecutive no-source results across
         # two families mean the queue needs a person, not more writer runs.
         if [[ $run_result == no-source ]]; then families+=("$run_family"); else families=(); fi
         if ((${#families[@]} >= 3)) &&
             (($(printf '%s\n' "${families[@]}" | sort -u | wc -l) >= 2)); then
-            echo "run: stop rule: ${#families[@]} consecutive no-source results in" \
-                "$(printf '%s\n' "${families[@]}" | sort -u | wc -l) families; ask the user"
+            run_reason="stop rule: ${#families[@]} consecutive no-source results in"
+            run_reason+=" $(printf '%s\n' "${families[@]}" | sort -u | wc -l) families; ask the user"
+            run_next="tools/decomp campaigns summary" status=1
             break
         fi
     done
-    trap - INT TERM
-    printf 'run: %s campaigns, %s with a gain, %s B, %s attempts, %s min, $%.2f\n' \
-        "$done_count" "$committed" "$total_bytes" \
-        "$total_attempts" "$(run_math 'printf "%.1f", a / 60' "$((SECONDS - run_started))")" \
-        "$total_cost"
-    ((status == 3)) && status=0
-    return "$status"
+    trap - INT TERM HUP QUIT
+    run_emit summary "$(printf 'run: %s campaigns, %s with a gain, %s B, %s attempts, %s min, %s' \
+        "$done_count" "$committed" "$total_bytes" "$total_attempts" \
+        "$(run_math 'printf "%.1f", a / 60' "$((SECONDS - run_started))")" \
+        "$(run_spend "$total_cost" "$total_tokens")")" --field "campaigns=$done_count" \
+        --field "gains=$committed" --field "bytes=$total_bytes" --field "attempts=$total_attempts"
+    case $status in
+        0)
+            kind=done run_reason="done: $done_count campaigns, $committed with a gain"
+            run_next="tools/decomp campaigns run --count $count --harness $harness"
+            if ((committed > 0 && !push)); then
+                run_next="git push origin $(git branch --show-current)"
+            fi
+            ;;
+        4) kind=done ;;
+        3) kind=writer ;;
+        *) kind=review ;;
+    esac
+    run_final "$kind" "$run_reason" "$run_next"
 }
 
 experiment() {
@@ -1079,6 +1600,7 @@ bc (repeat) -> campaigns finish (validate --staged, record, commit) -> push.
     --note "new evidence that clears a zero-yield penalty"
   tools/decomp campaigns status | summary | abort --reason TEXT | add-target
   tools/decomp campaigns run --count 3 [--mode auto] [--push]  # no model needed
+  tools/decomp campaigns run --check --live | --dry-run | --status  # --help: exit codes
 
 Output is bounded: `candidates` and `discover` show 10 rows (`--limit 0` or
 `--all` for all), `evidence` 12 rows per category (`--full` for all), `bc`
