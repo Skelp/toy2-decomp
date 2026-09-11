@@ -110,6 +110,7 @@ namespace Toy2
 
 		const int16_t ACTOR_FLAG_VISIBLE = 0x1;
 		const uint32_t MOVEMENT_UPDATE_WITHOUT_INPUT = 0x8;
+		const uint32_t MOVEMENT_GRAPPLE_CONTROLLED = 0x10;
 		const uint32_t ACTION_STATE_AIR_CONTROL = 0x1;
 		const uint32_t ACTION_STATE_SPIN_HOVER = 0x2;
 		const uint32_t ACTION_STATE_LEDGE_CLIMB = 0x4;
@@ -553,11 +554,12 @@ namespace Toy2
 				g_spinHoverTimer = 0;
 			}
 
-			bool cameraActive = Camera::g_scriptedCameraState != 0;
+			uint32_t cameraLock = Camera::g_scriptedCameraState != 0 ? MOVEMENT_UPDATE_WITHOUT_INPUT : 0;
 			TickGunFire(buzz);
-			uint32_t movementLocks = TickGroundSlam(buzz);
+			uint32_t movementLocks = TickGroundSlam(buzz) | cameraLock;
 			TickSpinHover(buzz);
 
+			// Traversal handlers: the first active one owns this frame's movement.
 			int32_t traversalState = HandleZipline(buzz);
 			if (traversalState == TRAVERSAL_INACTIVE)
 				traversalState = HandleSwing(buzz);
@@ -566,7 +568,7 @@ namespace Toy2
 
 			if (traversalState == TRAVERSAL_INACTIVE)
 			{
-				movementLocks |= HandleLedgeClimb(buzz) | (cameraActive ? MOVEMENT_UPDATE_WITHOUT_INPUT : 0);
+				movementLocks |= HandleLedgeClimb(buzz);
 				if (g_airborneTimer < 0)
 				{
 					buzz->actorFlags |= ACTOR_FLAG_LOCK_FACING;
@@ -579,46 +581,54 @@ namespace Toy2
 				}
 
 				if (g_grappleState == GRAPPLE_PULLING)
+					movementLocks = MOVEMENT_GRAPPLE_CONTROLLED;
+
+				if (movementLocks != 0)
 				{
-					movementLocks = 0;
+					// Locked movement: clear the locked axes; apply gravity only when input is ignored.
+					if ((movementLocks & MOVEMENT_LOCK_LATERAL) != 0)
+						buzz->velocity.lateral = 0;
+					if ((movementLocks & MOVEMENT_LOCK_VERTICAL) != 0)
+						buzz->velocity.vertical = 0;
+					if ((movementLocks & MOVEMENT_LOCK_FORWARD) != 0)
+						buzz->velocity.forward = 0;
+					if ((movementLocks & MOVEMENT_UPDATE_WITHOUT_INPUT) != 0)
+					{
+						UpdateJumpAndGravity(buzz, movementRates.verticalAcceleration, 0);
+						traversalState = TRAVERSAL_UPDATE_WITHOUT_INPUT;
+					}
+					else
+					{
+						traversalState = TRAVERSAL_HANDLED;
+					}
 				}
-				else if (movementLocks == 0)
+				else
 				{
+					// Free movement: jump, gravity and facing from player input.
 					if (g_movementLockTimer > 0)
 					{
 						g_movementLockTimer -= Renderer::g_frameDelta;
 						buzz->velocity.lateral = 0;
 						buzz->velocity.forward = 0;
 					}
-					if (g_gravityBootsTimer == 0)
-						UpdateJumpAndGravity(buzz, movementRates.verticalAcceleration, 0);
-					else
+					if (g_gravityBootsTimer != 0)
 						Camera::UpdateGravityBoots(buzz);
+					else
+						UpdateJumpAndGravity(buzz, movementRates.verticalAcceleration, 0);
 					traversalState = TRAVERSAL_UPDATE_MOVEMENT;
-				}
-
-				if ((movementLocks & MOVEMENT_LOCK_LATERAL) != 0)
-					buzz->velocity.lateral = 0;
-				if ((movementLocks & MOVEMENT_LOCK_VERTICAL) != 0)
-					buzz->velocity.vertical = 0;
-				if ((movementLocks & MOVEMENT_LOCK_FORWARD) != 0)
-					buzz->velocity.forward = 0;
-				if ((movementLocks & MOVEMENT_UPDATE_WITHOUT_INPUT) != 0)
-				{
-					UpdateJumpAndGravity(buzz, movementRates.verticalAcceleration, 0);
-					traversalState = TRAVERSAL_UPDATE_WITHOUT_INPUT;
 				}
 			}
 
-			if (traversalState == TRAVERSAL_UPDATE_MOVEMENT || traversalState == TRAVERSAL_UPDATE_WITHOUT_INPUT)
+			// Horizontal movement: facing input (or no input) plus slippery-surface drift.
+			if (traversalState != TRAVERSAL_HANDLED)
 			{
 				int32_t forwardInput;
 				if (traversalState == TRAVERSAL_UPDATE_WITHOUT_INPUT)
 					forwardInput = 0;
-				else if (g_rocketBootsTimer == 0)
-					forwardInput = UpdateFacing(buzz, &movementRates);
-				else
+				else if (g_rocketBootsTimer != 0)
 					forwardInput = Camera::UpdateRocketBoots(buzz, &movementRates);
+				else
+					forwardInput = UpdateFacing(buzz, &movementRates);
 
 				if (g_slipperySurfaceState != 0 && movementRates.forwardAcceleration != 0)
 				{
