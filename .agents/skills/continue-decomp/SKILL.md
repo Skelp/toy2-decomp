@@ -26,9 +26,15 @@ Repeat until the user stops you or the stop rule fires:
 
 1. Pick the top credible row (AGENTS.md "Select work"); every third campaign
    take a coverage row.
-2. `tools/decomp campaigns start --mode MODE --address ADDRESS --subsystem NAME`.
-3. Reconstruct under the attempt budget (`decomp-expert`).
-4. `validate`, `campaigns record`, commit, push. Commit every validated gain.
+2. `tools/decomp campaigns start --mode MODE --address ADDRESS --subsystem NAME`,
+   then `tools/decomp bc ADDRESS` once: attempt 1 is the baseline.
+3. Reconstruct under the attempt budget (`decomp-expert`), inline or in
+   fresh-context batches of four attempts. A batch opens with
+   `tools/decomp bc ADDRESS --pack` and ends by writing the handoff file; run
+   the next batch while the last one gained half a point and budget remains.
+4. `tools/decomp campaigns finish --mode MODE --target ADDRESS --note TEXT
+   --message FILE` validates, records and commits; then push. Commit every
+   validated gain.
 5. After each result read `tools/decomp campaigns summary`. Do not react to a
    low number with tool work; switch queue or family instead.
 
