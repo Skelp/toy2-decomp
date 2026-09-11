@@ -1179,12 +1179,10 @@ namespace Toy2
 						Levels::DeactivateAmbientEmitter(trigger->ambientEmitterId, 1);
 						g_replacedLinkId = trigger->replacementLinkId;
 						g_linkReplacementTimer = 24;
-						uint32_t mask;
 						if (trigger->objectGroupSelector == 0)
-							mask = (g_objectGroupMask >> 2 & 4) + (g_objectGroupMask & 12) * 2 + (g_objectGroupMask & ~28);
+							UpdateObjectGroups((g_objectGroupMask >> 2 & 4) + (g_objectGroupMask & 12) * 2 + (g_objectGroupMask & ~28));
 						else
-							mask = trigger->objectGroupSelector ^ g_objectGroupMask;
-						UpdateObjectGroups(mask);
+							UpdateObjectGroups(trigger->objectGroupSelector ^ g_objectGroupMask);
 					}
 				}
 				for (int32_t buttonIndex = 0; buttonIndex < 4; buttonIndex++)
@@ -1214,13 +1212,19 @@ namespace Toy2
 				int32_t scale = Numerics::g_sinCosLUT[(g_drainLinkScalePhase + 0x155) & 0xFFF] >> 2;
 				Nu3D::Link::SetScaleFromFixedOffsets(91, scale, scale, scale);
 			}
-			else if (g_waterLevel > -64000 && g_drainLinkScalePhase != 0)
+			if (g_waterLevel > -64000 && g_drainLinkScalePhase != 0)
 			{
 				g_drainLinkScalePhase -= Renderer::g_frameDelta * 2;
-				if (g_drainLinkScalePhase < 1)
+				if (g_drainLinkScalePhase <= 0)
+				{
 					g_drainLinkScalePhase = 0;
-				int32_t scale = Numerics::g_sinCosLUT[(g_drainLinkScalePhase + 0x155) & 0xFFF] >> 2;
-				Nu3D::Link::SetScaleFromFixedOffsets(91, scale, scale, scale);
+					Nu3D::Link::SetScaleFromFixedOffsets(91, 0, 0, 0);
+				}
+				else
+				{
+					int32_t scale = Numerics::g_sinCosLUT[(g_drainLinkScalePhase + 0x155) & 0xFFF] >> 2;
+					Nu3D::Link::SetScaleFromFixedOffsets(91, scale, scale, scale);
+				}
 			}
 
 			UpdateObjectReplacement();
@@ -1288,9 +1292,8 @@ namespace Toy2
 			{
 				if (g_platform17RotationPhase == 1)
 					Platform::SetRotationAngles(23, 0, 0x3AE, 0);
-				int32_t angle = Numerics::g_sinCosLUT[g_platform17RotationPhase & 0xFFF] / 18;
-				Nu3D::Link::SetRotationRelative8bit(25, 0, angle, 0);
-				Nu3D::Link::SetRotationRelative8bit(26, 0, angle, 0);
+				Nu3D::Link::SetRotationRelative8bit(25, 0, Numerics::g_sinCosLUT[g_platform17RotationPhase & 0xFFF] / 18, 0);
+				Nu3D::Link::SetRotationRelative8bit(26, 0, Numerics::g_sinCosLUT[g_platform17RotationPhase & 0xFFF] / 18, 0);
 				if (g_platform17RotationPhase < 0x400)
 					g_platform17RotationPhase += Renderer::g_frameDelta * 16;
 			}
@@ -1298,9 +1301,8 @@ namespace Toy2
 			{
 				if (g_platform16RotationPhase == 1)
 					Platform::SetRotationAngles(22, 0, -0x424, 0);
-				int32_t angle = Numerics::g_sinCosLUT[g_platform16RotationPhase & 0xFFF] * -2 / 33;
-				Nu3D::Link::SetRotationRelative8bit(28, 0, angle, 0);
-				Nu3D::Link::SetRotationRelative8bit(90, 0, angle, 0);
+				Nu3D::Link::SetRotationRelative8bit(28, 0, Numerics::g_sinCosLUT[g_platform16RotationPhase & 0xFFF] * -2 / 33, 0);
+				Nu3D::Link::SetRotationRelative8bit(90, 0, Numerics::g_sinCosLUT[g_platform16RotationPhase & 0xFFF] * -2 / 33, 0);
 				if (g_platform16RotationPhase < 0x400)
 					g_platform16RotationPhase += Renderer::g_frameDelta * 16;
 			}
@@ -1479,21 +1481,25 @@ namespace Toy2
 
 			if (Sector::g_activeSectorIndex != 4)
 			{
-				Levels::RecordData* flareRecords = Levels::g_recordData[19];
+				// Record coordinates are stored in 1/32 world units.
+				const int32_t FLARE_POSITION_SCALE = 0x20;
 				int32_t nearestDistanceSquared = INT_MAX;
 				int32_t nearestFlareIndex = 0;
-				for (int32_t flareIndex = 0; flareIndex < flareRecords->recordCount; flareIndex++)
+				for (int32_t flareIndex = 0; flareIndex < Levels::g_recordData[19]->recordCount; flareIndex++)
 				{
-					Vector3I* flare = &flareRecords->data[flareIndex];
-					int32_t cameraOffsetY = (Camera::g_renderCameraTransform.pos.y - flare->y * 0x20) >> 8;
-					int32_t cameraOffsetZ = (Camera::g_renderCameraTransform.pos.z - flare->z * 0x20) >> 8;
-					int32_t cameraOffsetX = (Camera::g_renderCameraTransform.pos.x - flare->x * 0x20) >> 8;
+					Vector3I* flare = &Levels::g_recordData[19]->data[flareIndex];
+					int32_t flareX = flare->x * FLARE_POSITION_SCALE;
+					int32_t flareY = flare->y * FLARE_POSITION_SCALE;
+					int32_t flareZ = flare->z * FLARE_POSITION_SCALE;
+					int32_t cameraOffsetY = (Camera::g_renderCameraTransform.pos.y - flareY) >> 8;
+					int32_t cameraOffsetZ = (Camera::g_renderCameraTransform.pos.z - flareZ) >> 8;
+					int32_t cameraOffsetX = (Camera::g_renderCameraTransform.pos.x - flareX) >> 8;
 					if (cameraOffsetY * cameraOffsetY + cameraOffsetZ * cameraOffsetZ + cameraOffsetX * cameraOffsetX < 1000000)
 					{
-						Renderer::LensFlare::RegisterLight(flare->x * 0x20, flare->y * 0x20, flare->z * 0x20, 0x20, 0x20, 0x20, 0x80);
-						int32_t buzzOffsetY = (g_buzzActor.posAngles.pos.y - flare->y * 0x20 - 0x2000) >> 8;
-						int32_t buzzOffsetZ = (g_buzzActor.posAngles.pos.z - flare->z * 0x20) >> 8;
-						int32_t buzzOffsetX = (g_buzzActor.posAngles.pos.x - flare->x * 0x20) >> 8;
+						Renderer::LensFlare::RegisterLight(flareX, flareY, flareZ, 0x20, 0x20, 0x20, 0x80);
+						int32_t buzzOffsetY = (g_buzzActor.posAngles.pos.y - flareY - 0x2000) >> 8;
+						int32_t buzzOffsetZ = (g_buzzActor.posAngles.pos.z - flareZ) >> 8;
+						int32_t buzzOffsetX = (g_buzzActor.posAngles.pos.x - flareX) >> 8;
 						int32_t distanceSquared = buzzOffsetY * buzzOffsetY + buzzOffsetZ * buzzOffsetZ + buzzOffsetX * buzzOffsetX;
 						if (distanceSquared < nearestDistanceSquared)
 						{
@@ -1504,16 +1510,15 @@ namespace Toy2
 				}
 				if (nearestDistanceSquared < 0x10000)
 				{
-					Vector3I* nearestFlare = &flareRecords->data[nearestFlareIndex];
 					Lighting::DynamicLight* light = &Lighting::g_lightingState.dynamicLights[1];
-					light->position.x = nearestFlare->x << 5;
-					light->position.y = nearestFlare->y << 5;
-					light->position.z = nearestFlare->z << 5;
+					light->position.x = Levels::g_recordData[19]->data[nearestFlareIndex].x << 5;
+					light->position.y = Levels::g_recordData[19]->data[nearestFlareIndex].y << 5;
+					light->position.z = Levels::g_recordData[19]->data[nearestFlareIndex].z << 5;
 					light->colour.r = 0x7F;
 					light->colour.g = 0x7F;
 					light->colour.b = 0x7F;
 					light->lifetime = 1;
-					light->sourceId = reinterpret_cast<int32_t>(nearestFlare);
+					light->sourceId = reinterpret_cast<int32_t>(&Levels::g_recordData[19]->data[nearestFlareIndex]);
 				}
 				else
 				{
@@ -1527,30 +1532,42 @@ namespace Toy2
 				g_sector5IconPhase = (g_sector5IconPhase + Renderer::g_frameDelta * 8) & 0xFFF;
 			}
 
+			// Captive critter: a critter near the platform ring drops to the floor or moves out of the ring.
+			const int32_t CAPTIVE_FLOOR_OFFSET = 0x3C00;
+			const int32_t CAPTIVE_SNAP_OFFSET = 0x3400;
+			const int32_t CAPTIVE_RING_RADIUS_SQUARED = 490000;
+			const int32_t CAPTIVE_RING_RADIUS = 700;
+			const uint32_t ANGLE_MASK = 0xFFF;
+			const uint32_t QUARTER_TURN = 0x400;
 			Actor::Toy2Actor* captive = &Actor::g_creatureActors[31];
-			int32_t captiveY = captive->pos.y;
-			if ((captive->actorFlags & Actor::ACTOR_FLAG_ACTIVE) != 0 && captive->pos.y > MoveableObject::g_objects[1].position.y - 0x3C00)
+			if ((captive->actorFlags & Actor::ACTOR_FLAG_ACTIVE) != 0 && captive->pos.y > MoveableObject::g_objects[1].position.y - CAPTIVE_FLOOR_OFFSET)
 			{
 				int32_t offsetX = (MoveableObject::g_objects[1].position.x - captive->pos.x) >> 5;
 				int32_t offsetZ = (MoveableObject::g_objects[1].position.z - captive->pos.z) >> 5;
-				if (offsetX * offsetX + offsetZ * offsetZ < 490000 && captive->pos.y >= MoveableObject::g_objects[1].position.y - 0x3400)
+				if (offsetX * offsetX + offsetZ * offsetZ < CAPTIVE_RING_RADIUS_SQUARED)
 				{
-					captiveY = MoveableObject::g_objects[1].position.y - 0x3C00;
-					uint32_t captiveAngle = Nu3D::Math::CartesianToFixedAngle(offsetX, offsetZ);
-					captive->pos.x = MoveableObject::g_objects[1].position.x - (Numerics::g_sinCosLUT[captiveAngle & 0xFFF] * 700 >> 9);
-					captive->pos.z = MoveableObject::g_objects[1].position.z - (Numerics::g_sinCosLUT[(captiveAngle + 0x400) & 0xFFF] * 700 >> 9);
+					if (captive->pos.y < MoveableObject::g_objects[1].position.y - CAPTIVE_SNAP_OFFSET)
+					{
+						captive->pos.y = MoveableObject::g_objects[1].position.y - CAPTIVE_FLOOR_OFFSET;
+					}
+					else
+					{
+						uint32_t captiveAngle = Nu3D::Math::CartesianToFixedAngle(offsetX, offsetZ) & ANGLE_MASK;
+						captive->pos.x = MoveableObject::g_objects[1].position.x - (Numerics::g_sinCosLUT[captiveAngle] * CAPTIVE_RING_RADIUS >> 9);
+						captive->pos.z = MoveableObject::g_objects[1].position.z
+							- (Numerics::g_sinCosLUT[(captiveAngle + QUARTER_TURN) & ANGLE_MASK] * CAPTIVE_RING_RADIUS >> 9);
+					}
 				}
 			}
-			captive->pos.y = captiveY;
 
 			if (Sector::g_currentSectorIndex == 4)
 			{
 				g_sector4ParticleTimer -= Renderer::g_frameDelta;
-				if (g_sector4ParticleTimer < 1)
+				if (g_sector4ParticleTimer <= 0)
 				{
 					g_sector4ParticleTimer = 60;
 					g_sector4ParticlePositionIndex += 3;
-					if (g_sector4ParticlePositionIndex > 11)
+					if (g_sector4ParticlePositionIndex >= 12)
 						g_sector4ParticlePositionIndex = 0;
 					Vector3I* particlePosition =
 						reinterpret_cast<Vector3I*>(reinterpret_cast<uint8_t*>(g_sector4ParticlePositions) + g_sector4ParticlePositionIndex * 4);
