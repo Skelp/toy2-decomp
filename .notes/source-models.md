@@ -447,3 +447,24 @@ Format the new file, and the region you edited. Before formatting a whole old
 file, check `clang-format --output-replacements-xml` on it, or compare the line
 counts, and if it is not clean leave it alone: the reformat is its own change and
 does not belong in a structure campaign.
+
+## Do not merge two retail objects into one file
+
+Sep 12, Renderer.Sprite structure campaign. Retail links 0x004B6300 through
+0x004B9210 as one contiguous block, and the repository held it as three files:
+Renderer/Sprite.cpp, Renderer/RenderEntry.cpp and six functions of
+Renderer/Renderer.cpp. The addresses say one object, so the campaign moved all
+of them into Sprite.cpp. Every function compiled and linked, and fourteen
+scores fell: 0x004B6300 from 100 to 33 percent, 0x004B62C0 from 100 to 87,
+0x004B8460 from 100 to 90, and eleven more by one or two points.
+
+The include additions alone are harmless: with only the eight new `#include`
+lines and no moved code, 0x004B6300, 0x004B62C0 and 0x004B8460 all stay exact.
+The cost comes from the merge itself. MSVC pools the floating-point and the
+string literals of one object, so a larger object holds a different pool, and
+every instruction that reads a pooled constant reads a different address.
+
+So a structure campaign extracts a run into a file of its own; it does not
+merge two files whose runs sit next to each other. The extractions of the same
+day (SoftwareRenderer, Toy2.cpp, Collision.cpp: nineteen new files) moved no
+score at all, because each new object holds one run and its own pool.
