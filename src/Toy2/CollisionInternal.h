@@ -102,5 +102,47 @@ namespace Toy2
 		STATIC_ASSERT(sizeof(CollisionTreeGroup) == 0x0C);
 		STATIC_ASSERT(sizeof(CollisionGridCell) == 0x14);
 		STATIC_ASSERT(sizeof(CollisionStepMotion) == 0x0E);
+
+		struct CollisionNormal
+		{
+			Vector3I16 direction;
+			int16_t reserved;
+		};
+		STATIC_ASSERT(sizeof(CollisionNormal) == 0x08);
+		STATIC_ASSERT(offsetof(CollisionNormal, reserved) == 0x06);
+
+		// One motion tested against the collision mesh. The sweep solver fills the
+		// nearest hit and the mesh query reads it back.
+		struct CollisionSweep
+		{
+			Vector3I start;
+			int32_t reservedStart;
+			Vector3I end;
+			int32_t reservedEnd;
+			int32_t nearestFraction;
+			int32_t startDistance;
+			int32_t endDistance;
+			uint32_t contactFlags;
+			PackedCollisionFace* face;
+			CollisionNormal hitNormal;
+			MathScratchVector movement; // unit direction (value) and length (scalar) of the sweep
+		};
+
+		// The fraction a sweep reports when nothing was hit.
+		const uint32_t COLLISION_NO_CONTACT = 0xFFFFFFFF;
+
+		// A platform that moving bodies may stand on.
+		const int16_t PLATFORM_FLAG_COLLISION_SUPPORT = 0x1;
+
+		// The sweep solver and the mesh query both round toward zero this way.
+		static __forceinline int32_t ShiftTowardZero(int32_t value, int32_t bits) { return (value + ((value >> 31) & ((1 << bits) - 1))) >> bits; }
+
+		// Entry points the two units call across the split.
+		int32_t SweepWallSegments(CollisionSweep* sweep, const Vector3I* start, const Vector3I* movement, int32_t radius);
+	}
+
+	namespace Platform
+	{
+		void AdvancePartialMotion(int32_t frameScale, int32_t collisionScale, int32_t skipMotion);
 	}
 }
