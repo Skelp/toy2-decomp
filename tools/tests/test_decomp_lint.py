@@ -344,6 +344,22 @@ class BaselineTests(unittest.TestCase):
         _, stale = lint.apply_baseline([], [entry])
         self.assertEqual(stale, [entry])
 
+    def test_a_row_with_no_owner_follows_its_content_to_another_file(self):
+        """A macro that repeats another is owned by its content, not by its file.
+
+        A structure campaign moves such a macro, and its baselined debt must move
+        with it: a row keyed by the old path could never carry it again."""
+        body = "\n".join(f"\tint32_t value{index} = {index}; \\" for index in range(10))[:-2]
+        source = f"#define FIRST() \\\n{body}\n\n#define SECOND() \\\n{body}\n"
+        finding = next(item for item in findings_for(source)
+                       if item.rule == "repeated-macro-body")
+        self.assertEqual(finding.owner_address, "")
+        _, rule, subject, fingerprint = finding.baseline_key
+        entry = lint.BaselineEntry("src/Old.cpp", rule, subject, fingerprint, "src/Old.cpp")
+        classified, stale = lint.apply_baseline([finding], [entry])
+        self.assertTrue(classified[0].legacy)
+        self.assertEqual(stale, [])
+
 
 class CrossFileTests(unittest.TestCase):
     def repeated_type_findings(self, sources: dict[str, str]) -> list[lint.Finding]:

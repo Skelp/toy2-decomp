@@ -73,6 +73,12 @@ SUPPRESSIBLE_RULES = {"anonymous-buffer-view", "typed-byte-roundtrip"}
 # is not source debt, so naming a value in one function never blocks a campaign on
 # the literals of another, and un-naming a value never counts as removed debt.
 ADVISORY_RULES = {"unnamed-constant"}
+# A repeated macro body names two macros of one file, and a structure campaign moves
+# both together, so the debt is the same debt in its new file. Its baseline row keeps
+# its identity across the move: the path stays out of the key. A rule that names one
+# file's own copy of something, such as repeated-private-type, is not in this set,
+# because a copy in another file is another copy.
+PATH_AGNOSTIC_RULES = {"repeated-macro-body"}
 # Values too common to need a name; the unnamed-constant rule skips them.
 PLAIN_VALUES = {0, 1, -1, 2}
 MACRO_REPEAT_LINES = 8
@@ -239,7 +245,9 @@ class Finding:
 
     @property
     def baseline_key(self) -> tuple[str, str, str, str]:
-        owner = self.owner_address.lower() if self.owner_address else self.relative_path
+        if self.owner_address:
+            return self.owner_address.lower(), self.rule, self.subject, self.fingerprint
+        owner = "" if self.rule in PATH_AGNOSTIC_RULES else self.relative_path
         return owner, self.rule, self.subject, self.fingerprint
 
     @property
@@ -282,7 +290,10 @@ class BaselineEntry:
 
     @property
     def key(self) -> tuple[str, str, str, str]:
-        return self.owner, self.rule, self.subject, self.fingerprint
+        # The path of a PATH_AGNOSTIC_RULES row is informational, so a macro that moves
+        # to another file keeps the row that already holds its debt.
+        owner = "" if self.rule in PATH_AGNOSTIC_RULES else self.owner
+        return owner, self.rule, self.subject, self.fingerprint
 
 
 def _macro_definition_lines(text: str) -> set[int]:
