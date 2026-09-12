@@ -1618,6 +1618,241 @@ namespace Toy2
 		}
 	}
 
+	namespace Levels
+	{
+		// Record type of the pickup render records, as g_type63CullDistance also states.
+		const int32_t RECORD_TYPE_PICKUPS = 63;
+	}
+
+	namespace Gadget
+	{
+		// FUNCTION: TOY2 0x004A2080 [PROVISIONAL]
+		void InitLevelUnlockGeometry()
+		{
+			Actor::g_coinTokenAwarded = 0;
+			Actor::g_coinQuestHintTimer = 200;
+			Actor::g_periodicHintSoundTimer = 250;
+			Actor::g_itemReturnHintSoundTimer = 150;
+			Actor::g_rotatingHintIndex = -1;
+			Actor::g_rotatingHintSoundTimer = 100;
+
+			LevelUnlockInfo* levelUnlock = &g_levelUnlockInfo[g_levelFileIndex - 1];
+			if ((g_unlocks & levelUnlock->unlockFlag) == 0)
+			{
+				g_unlockNodeState = levelUnlock->modelNodeIndex;
+				if (g_unlockNodeState != 0)
+				{
+					HideModelNode(9, g_unlockNodeState);
+					if (g_unlockNodeState == 1)
+					{
+						HideModelNode(9, 0x0B);
+						HideModelNode(9, 0x0C);
+						HideModelNode(9, 0x0F);
+					}
+				}
+			}
+			else
+			{
+				int32_t linkId;
+				if (g_levelFileIndex == 1)
+					linkId = 0x46;
+				else if (g_levelFileIndex == 4)
+					linkId = 0x6D;
+				else if (g_levelFileIndex == 7)
+					linkId = 0x3F;
+				else if (g_levelFileIndex == 10)
+					linkId = 0x6F;
+				else if (g_levelFileIndex == 13)
+					linkId = 0x3F;
+
+				Nu3D::Link::SetScaleFromFixedOffsets(linkId, 0, 0, 0);
+				Levels::RecordData* pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
+				Collectables::PickupRecord* pickup = reinterpret_cast<Collectables::PickupRecord*>(pickupRecords + 1);
+				for (int32_t pickupIndex = 0; pickupIndex < pickupRecords->recordCount; pickup++, pickupIndex++)
+				{
+					if (pickup->objectIndex == linkId)
+					{
+						pickup->position.y = INT_MIN;
+						break;
+					}
+				}
+				g_unlockNodeState = 0;
+			}
+
+			Levels::RecordData* pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
+			UnlockGeometryEntry* entries;
+			Collectables::PickupRecord* pickup;
+			int32_t pickupIndex;
+
+			if ((g_unlocks & 1) != 0)
+			{
+				ApplyUnlockToGeometry(g_unlockBit1Geometry, 8);
+				pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
+			}
+			else
+			{
+				entries = g_unlockBit1Geometry;
+				while (entries->levelIndex != 0xFF)
+				{
+					if (entries->levelIndex == g_levelFileIndex)
+					{
+						pickup = reinterpret_cast<Collectables::PickupRecord*>(pickupRecords + 1);
+						for (pickupIndex = 0; pickupIndex < pickupRecords->recordCount; pickup++, pickupIndex++)
+						{
+							if (pickup->objectIndex == entries->unlockedLinkId)
+							{
+								Nu3D::Link::SetScaleFromFixedOffsets(entries->unlockedLinkId, 0x1000, 0x1000, 0x1000);
+								pickup->facingAngle = 0;
+								pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
+								break;
+							}
+						}
+					}
+					entries++;
+				}
+			}
+
+			if ((g_unlocks & 2) != 0)
+			{
+				ApplyUnlockToGeometry(g_unlockBit2Geometry, 4);
+				pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
+			}
+			else
+			{
+				entries = g_unlockBit2Geometry;
+				while (entries->levelIndex != 0xFF)
+				{
+					if (entries->levelIndex == g_levelFileIndex)
+					{
+						pickup = reinterpret_cast<Collectables::PickupRecord*>(pickupRecords + 1);
+						for (pickupIndex = 0; pickupIndex < pickupRecords->recordCount; pickup++, pickupIndex++)
+						{
+							if (pickup->objectIndex == entries->unlockedLinkId)
+							{
+								Nu3D::Link::SetScaleFromFixedOffsets(entries->unlockedLinkId, 0x1000, 0x1000, 0x1000);
+								pickup->facingAngle = 0;
+								pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
+								break;
+							}
+						}
+					}
+					entries++;
+				}
+			}
+
+			if ((g_unlocks & 4) != 0)
+			{
+				ApplyUnlockToGeometry(g_unlockBit4Geometry, 4);
+				pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
+			}
+			else
+			{
+				entries = g_unlockBit4Geometry;
+				while (entries->levelIndex != 0xFF)
+				{
+					if (entries->levelIndex == g_levelFileIndex)
+					{
+						pickup = reinterpret_cast<Collectables::PickupRecord*>(pickupRecords + 1);
+						for (pickupIndex = 0; pickupIndex < pickupRecords->recordCount; pickup++, pickupIndex++)
+						{
+							if (pickup->objectIndex == entries->unlockedLinkId)
+							{
+								Nu3D::Link::SetScaleFromFixedOffsets(entries->unlockedLinkId, 0x1000, 0x1000, 0x1000);
+								pickup->facingAngle = 0;
+								pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
+								break;
+							}
+						}
+					}
+					entries++;
+				}
+			}
+
+			if ((g_unlocks & 8) != 0)
+			{
+				ApplyUnlockToGeometry(g_unlockBit8Geometry, 4);
+				pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
+			}
+			else
+			{
+				entries = g_unlockBit8Geometry;
+				while (entries->levelIndex != 0xFF)
+				{
+					if (entries->levelIndex == g_levelFileIndex)
+					{
+						pickup = reinterpret_cast<Collectables::PickupRecord*>(pickupRecords + 1);
+						for (pickupIndex = 0; pickupIndex < pickupRecords->recordCount; pickup++, pickupIndex++)
+						{
+							if (pickup->objectIndex == entries->unlockedLinkId)
+							{
+								Nu3D::Link::SetScaleFromFixedOffsets(entries->unlockedLinkId, 0x1000, 0x1000, 0x1000);
+								pickup->facingAngle = 0;
+								pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
+								break;
+							}
+						}
+					}
+					entries++;
+				}
+			}
+
+			if ((g_unlocks & 0x10) != 0)
+			{
+				ApplyUnlockToGeometry(g_unlockBit16Geometry, 4);
+				return;
+			}
+
+			entries = g_unlockBit16Geometry;
+			while (entries->levelIndex != 0xFF)
+			{
+				if (entries->levelIndex == g_levelFileIndex)
+				{
+					pickup = reinterpret_cast<Collectables::PickupRecord*>(pickupRecords + 1);
+					for (pickupIndex = 0; pickupIndex < pickupRecords->recordCount; pickup++, pickupIndex++)
+					{
+						if (pickup->objectIndex == entries->unlockedLinkId)
+						{
+							Nu3D::Link::SetScaleFromFixedOffsets(entries->unlockedLinkId, 0x0C00, 0x0C00, 0x0C00);
+							pickup->facingAngle = 0;
+							pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
+							break;
+						}
+					}
+				}
+				entries++;
+			}
+		}
+
+		// FUNCTION: TOY2 0x004A27A0 [PROVISIONAL]
+		void ApplyUnlockToGeometry(const UnlockGeometryEntry* entries, int32_t scale)
+		{
+			while (entries->levelIndex != 0xFF)
+			{
+				if (entries->levelIndex == g_levelFileIndex)
+				{
+					Nu3D::Link::SetScaleFromFixedOffsets(entries->lockedLinkId, 0, 0, 0);
+					int32_t fixedScale = scale << 10;
+					Nu3D::Link::SetScaleFromFixedOffsets(entries->unlockedLinkId, fixedScale, fixedScale, fixedScale);
+					Platform::DisableCollision(entries->platformIndex);
+
+					Levels::RecordData* pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
+					int32_t pickupCount = pickupRecords->recordCount;
+					Collectables::PickupRecord* pickup = reinterpret_cast<Collectables::PickupRecord*>(pickupRecords + 1);
+					for (int32_t pickupIndex = 0; pickupIndex < pickupCount; pickup++, pickupIndex++)
+					{
+						if (pickup->objectIndex == entries->unlockedLinkId)
+						{
+							pickup->facingAngle = 0x1F;
+							break;
+						}
+					}
+				}
+
+				entries++;
+			}
+		}
+	}
+
 	namespace CreatureBehaviour
 	{
 		union BeamVector

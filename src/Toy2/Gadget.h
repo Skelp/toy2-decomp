@@ -28,6 +28,7 @@ namespace Toy2
 		extern UnlockGeometryEntry g_unlockBit16Geometry[];
 		extern int32_t g_unlockNodeState;
 
+		void InitLevelUnlockGeometry();
 		void ApplyUnlockToGeometry(const UnlockGeometryEntry* entries, int32_t scale);
 
 		STATIC_ASSERT(sizeof(LevelUnlockInfo) == 0x2);
