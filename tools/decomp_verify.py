@@ -468,6 +468,7 @@ def classify_lint_debt_change(
     head_entries: list[decomp_lint.BaselineEntry],
     staged_findings: list[decomp_lint.Finding],
     staged_entries: list[decomp_lint.BaselineEntry],
+    staged_names: dict[str, set[str]] | None = None,
 ) -> LintDebtChange:
     head_findings, _ = decomp_lint.apply_baseline(head_findings, head_entries)
     classified, stale = decomp_lint.apply_baseline(staged_findings, staged_entries)
@@ -479,11 +480,25 @@ def classify_lint_debt_change(
         for finding in head_findings
         if finding.legacy
         and not finding.suppressed
-        # Advice is not debt: un-naming a value would remove its findings.
         and not finding.advisory
         and finding.baseline_key not in staged_finding_keys
         and finding.baseline_key not in staged_entry_keys
     }
+    # An advisory finding counts as removed only when the staged file still
+    # declares the name it asked for. Deleting the declaration makes the same
+    # finding disappear and is the opposite of a fix, so the name has to survive.
+    names = staged_names or {}
+    for finding in head_findings:
+        if (
+            not finding.advisory
+            or finding.suppressed
+            or not finding.name
+            or finding.baseline_key in staged_finding_keys
+            or finding.baseline_key in staged_entry_keys
+            or finding.name not in names.get(finding.relative_path, set())
+        ):
+            continue
+        removed.setdefault(finding.baseline_key, finding.severity)
     new_errors = {
         finding.baseline_key
         for finding in classified
@@ -498,13 +513,15 @@ def classify_lint_debt_change(
 
 
 def read_lint_debt_change() -> LintDebtChange:
+    staged_units = decomp_lint.target_units(True, [])
     return classify_lint_debt_change(
         decomp_lint.scan_units(
             decomp_lint.target_units(False, [], revision="HEAD")
         ),
         decomp_lint.read_baseline(revision="HEAD"),
-        decomp_lint.scan_units(decomp_lint.target_units(True, [])),
+        decomp_lint.scan_units(staged_units),
         decomp_lint.read_baseline(staged=True),
+        decomp_lint.declared_names(staged_units),
     )
 
 

@@ -229,6 +229,7 @@ class Finding:
     owner_address: str = ""
     subject: str = ""
     fingerprint: str = ""
+    name: str = ""
     legacy: bool = False
     suppressed: bool = False
 
@@ -579,6 +580,7 @@ def _allowed_rules(text: str) -> dict[int, set[str]]:
 def _add_finding(
     findings: list[Finding], path: Path, text: str, owners: list[Owner], allowed: dict[int, set[str]],
     *, offset: int, rule: str, severity: str, detail: str, subject: str, excerpt: str,
+    name: str = "",
 ) -> None:
     line, column = _line_column(text, offset)
     owner = _owner_at(owners, line)
@@ -598,6 +600,7 @@ def _add_finding(
             owner_address=owner.address,
             subject=subject,
             fingerprint=_fingerprint(excerpt),
+            name=name,
             suppressed=suppressed,
         )
     )
@@ -1156,7 +1159,7 @@ def check_unnamed_constants(
                 findings, path, text, owners, allowed, offset=first.start(),
                 rule="unnamed-constant", severity="warning",
                 detail=f"literal {first.group(0)} ({len(matches)} use(s)) stands where this file writes {name}",
-                subject=str(value), excerpt=str(value),
+                subject=str(value), excerpt=str(value), name=name,
             )
     return findings
 
@@ -1628,6 +1631,26 @@ def scan_units(units: list[SourceUnit], *, cross_file: bool = True) -> list[Find
     if cache is not None:
         _save_scan(cache, findings)
     return findings
+
+
+def declared_names(units: list[SourceUnit]) -> dict[str, set[str]]:
+    """Return the constant, enum and #define names each unit declares.
+
+    validate reads this to tell a named literal from a deleted declaration: both
+    make an advisory unnamed-constant finding disappear, and only the first is a
+    fix."""
+
+    declared: dict[str, set[str]] = {}
+    for unit in units:
+        relative = unit.path.resolve()
+        try:
+            key = relative.relative_to(ROOT).as_posix()
+        except ValueError:
+            key = unit.path.as_posix()
+        declared[key] = {
+            name for name, _, _, _ in _named_constants(_mask_source(unit.text))
+        }
+    return declared
 
 
 def read_baseline(

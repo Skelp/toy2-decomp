@@ -651,6 +651,25 @@ class QualityRuleTests(unittest.TestCase):
                       found["0x00402000", "3"].detail)
         self.assertIn("(1 use(s))", found["0x00402000", "5"].detail)
         self.assertTrue(found["0x00402000", "61"].advisory)
+        # validate reads the name to tell a named literal from a deleted
+        # declaration, so the finding has to carry it.
+        self.assertEqual(found["0x00402000", "3"].name, "PHASE_DEFEATED")
+
+    def test_declared_names_lists_what_each_unit_writes(self):
+        source = (
+            "enum Phase { PHASE_DEFEATED = 3 };\n#define SOUND_JUMP 0x3D\n"
+            "const int32_t STATE_RUN = 5;\n"
+            "// FUNCTION: TOY2 0x00401000\nvoid f(void)\n{\n"
+            "\tconst int32_t LOCAL_ONE = 7;\n}\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "a.cpp"
+            path.write_text(source, encoding="utf-8")
+            declared = lint.declared_names([lint.SourceUnit(path, source)])
+        self.assertEqual(
+            set(declared[path.as_posix()]),
+            {"PHASE_DEFEATED", "SOUND_JUMP", "STATE_RUN", "LOCAL_ONE"},
+        )
 
     def test_a_value_in_another_place_or_a_plain_value_does_not_warn(self):
         source = (

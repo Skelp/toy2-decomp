@@ -1441,20 +1441,41 @@ class ReportStampTests(unittest.TestCase):
 
 class LintDebtTests(unittest.TestCase):
     @staticmethod
-    def finding(rule: str, severity: str, legacy: bool, address: str = "0x00401000"):
+    def finding(rule: str, severity: str, legacy: bool, address: str = "0x00401000",
+                name: str = ""):
         return VERIFY.decomp_lint.Finding(
             Path("src/a.cpp"), 1, rule, severity, "x", "detail", owner_kind="function",
-            owner_address=address, subject=rule, fingerprint="f", legacy=legacy,
+            owner_address=address, subject=rule, fingerprint="f", name=name, legacy=legacy,
         )
 
-    def test_a_removed_baselined_warning_is_removed_debt_unless_it_is_advice(self):
+    def test_a_removed_baselined_warning_is_removed_debt(self):
         finding = self.finding("unexplained-helper", "warning", False)
         entry = VERIFY.decomp_lint.BaselineEntry(*finding.baseline_key, "src/a.cpp")
         change = VERIFY.classify_lint_debt_change([finding], [entry], [], [])
         self.assertEqual(change, VERIFY.LintDebtChange(removed_warnings=1))
-        advice = self.finding("unnamed-constant", "warning", False)
+
+    def test_named_advice_is_removed_debt_and_a_deleted_declaration_is_not(self):
+        advice = self.finding("unnamed-constant", "warning", False, name="SOUND_BUFFER_COUNT")
         entry = VERIFY.decomp_lint.BaselineEntry(*advice.baseline_key, "src/a.cpp")
-        self.assertEqual(VERIFY.classify_lint_debt_change([advice], [entry], [], []), VERIFY.LintDebtChange())
+        # The staged file still declares the name, so the literal was named.
+        self.assertEqual(
+            VERIFY.classify_lint_debt_change(
+                [advice], [entry], [], [], {"src/a.cpp": {"SOUND_BUFFER_COUNT"}}
+            ),
+            VERIFY.LintDebtChange(removed_warnings=1),
+        )
+        # The declaration is gone, so the finding disappeared without a fix.
+        self.assertEqual(
+            VERIFY.classify_lint_debt_change([advice], [entry], [], [], {"src/a.cpp": set()}),
+            VERIFY.LintDebtChange(),
+        )
+        # Older advice carries no name, so it cannot be credited either.
+        unnamed = self.finding("unnamed-constant", "warning", False)
+        entry = VERIFY.decomp_lint.BaselineEntry(*unnamed.baseline_key, "src/a.cpp")
+        self.assertEqual(
+            VERIFY.classify_lint_debt_change([unnamed], [entry], [], []),
+            VERIFY.LintDebtChange(),
+        )
 
     def test_legacy_debt_can_be_left_out(self):
         legacy = self.finding("magic-pointer", "error", True)
