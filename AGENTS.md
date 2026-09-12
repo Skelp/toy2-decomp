@@ -114,9 +114,9 @@ contiguous address block. New code goes where the `placement:` line of `tools/de
 evidence` names; a new file goes there and into CMakeLists.txt, in the same campaign. A
 split moves one complete retail block with its helpers and file-local data, keeps
 annotations and data order, and puts shared private types in `*Internal.h`. It is a
-`--mode structure` campaign: no target, no score change, layout deltas as warnings, only
-for a file `tools/decomp structure` marks split, at most one in ten. Keep a large
-initializer (a 160-byte string, or 32 elements and 256 bytes) in an `.inc` file.
+`--mode structure` campaign: no target, no score change, layout deltas as warnings, only for
+a split file or clean move of `tools/decomp structure [--moves]`, and first while a row
+remains. Keep a large initializer (160 bytes, or 32 elements and 256 bytes) in an `.inc` file.
 
 ## Validate and finish
 

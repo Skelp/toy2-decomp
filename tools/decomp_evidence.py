@@ -53,6 +53,9 @@ CORE_RANGE = (0x0048E730, 0x0049CAA0)
 CORE_FILE = "Toy2/Toy2.cpp"
 LARGE_FILE_LINES = 3000
 MIXED_FILE_RUNS = 10
+# A file that holds this many retail runs is not one translation unit, whatever
+# its length: MSVC links each object as one contiguous address block.
+SCATTERED_FILE_RUNS = 4
 ROW_LIMIT = 12
 DECOMP_HEAD = 80
 DECOMP_TAIL = 40
@@ -312,6 +315,16 @@ def structure_report(
         previous = source
     for run, following in zip(runs, runs[1:]):
         run["after"] = following["file"]
+    islands = [run for run in runs if run["before"] and run["before"] == run["after"]]
+    pairs = {(run["file"], run["before"]) for run in islands}
+    moves = [
+        # When each of two files holds an island inside the other, they interleave:
+        # a move would only swap the defect, because retail held more objects there
+        # than the repository has files. Such a pair needs a new file instead.
+        {"run": run, "host": run["before"],
+         "kind": "interleaved" if (run["before"], run["file"]) in pairs else "move"}
+        for run in islands
+    ]
     rows = []
     for source, row in files.items():
         path = source_root / source
@@ -321,14 +334,21 @@ def structure_report(
             "runs": row["runs"], "prefixes": sorted(row["prefixes"]),
         })
     for row in rows:
-        # The split rule of AGENTS.md: a large file that holds many retail runs.
-        row["split"] = row["lines"] > LARGE_FILE_LINES and row["runs"] > MIXED_FILE_RUNS
+        # The split rule of AGENTS.md: a file is not one translation unit when it is
+        # large and holds many retail runs, when it is scattered over several runs, or
+        # when it is large and holds one run that no single retail object explains.
+        row["split"] = (
+            (row["lines"] > LARGE_FILE_LINES and row["runs"] > MIXED_FILE_RUNS)
+            or row["runs"] > SCATTERED_FILE_RUNS
+            or (row["lines"] > LARGE_FILE_LINES and row["functions"] > 1)
+        )
     rows.sort(key=lambda row: (not row["split"], -row["runs"], -row["lines"], row["file"]))
     core_addresses = [address for address in names if core[0] <= address <= core[1]]
     large = [row["file"] for row in rows if row["lines"] > LARGE_FILE_LINES]
     wanted = f"src/{detail.removeprefix('src/')}" if detail else None
     return {
         "files": rows,
+        "moves": moves,
         **({"detail": {"file": wanted,
                        "runs": [run for run in runs if run["file"] == wanted]}}
            if wanted else {}),
@@ -339,6 +359,9 @@ def structure_report(
             "core_functions": len(core_addresses),
             "core_held": sum(owner.get(address) == core_file for address in core_addresses),
             "core_file": f"src/{core_file}",
+            "runs": len(runs),
+            "island_runs": len(moves),
+            "island_functions": sum(run["functions"] for run in (move["run"] for move in moves)),
         },
     }
 
@@ -351,12 +374,16 @@ def structure_main(argv: list[str]) -> int:
     parser.add_argument("file", nargs="?", help="one source file: print its runs in map order")
     parser.add_argument("--json", action="store_true", help="print the whole report as JSON")
     parser.add_argument("--all", action="store_true", help="list every file, not only the top 15")
+    parser.add_argument("--moves", action="store_true",
+                        help="list each run that sits inside another file's retail block")
     args = parser.parse_args(argv)
     report = structure_report(parse_map(), read_source_annotations(SOURCE_ROOT), SOURCE_ROOT,
                               detail=args.file)
     if args.json:
         print(json.dumps(report, indent=2))
         return 0
+    if args.moves:
+        return print_structure_moves(report)
     if args.file:
         return print_structure_detail(report)
     rows, totals = report["files"], report["totals"]
@@ -370,8 +397,29 @@ def structure_main(argv: list[str]) -> int:
     print(f"totals: {totals['files']} files, median runs {totals['median_runs']:g}, "
           f"{len(large)} over {LARGE_FILE_LINES} lines, {totals['core_file']} holds "
           f"{totals['core_held']} of {totals['core_functions']} retail toy2.cpp core functions")
-    print(f"split: over {LARGE_FILE_LINES} lines and over {MIXED_FILE_RUNS} retail runs; "
+    print(f"totals: {totals['runs']} runs, {totals['island_runs']} of them inside another "
+          f"file's block ({totals['island_functions']} functions; --moves)")
+    print(f"split: over {LARGE_FILE_LINES} lines, or over {SCATTERED_FILE_RUNS} retail runs; "
           "tools/decomp structure FILE prints one line per run")
+    return 0
+
+
+def print_structure_moves(report: dict[str, object]) -> int:
+    """List every run that sits inside one other file's retail block.
+
+    The same file follows and precedes such a run, so the retail object that holds
+    the neighbours holds these functions too: they belong in the neighbour's file."""
+    moves = report["moves"]
+    print(f"{'addresses':<21} {'funcs':>5}  {'file':<38} belongs in")
+    for move in moves:
+        run = move["run"]
+        note = "" if move["kind"] == "move" else "  (interleaved: needs a new file)"
+        print(f"0x{run['start']:08X}-0x{run['end']:08X} {run['functions']:>5}  "
+              f"{run['file']:<38} {move['host']}{note}")
+    clean = [move for move in moves if move["kind"] == "move"]
+    print(f"{len(clean)} clean moves ({sum(move['run']['functions'] for move in clean)} "
+          f"functions), {len(moves) - len(clean)} interleaved; "
+          "each move is a --mode structure campaign")
     return 0
 
 

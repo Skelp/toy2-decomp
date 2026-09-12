@@ -194,12 +194,43 @@ class StructureReportTests(unittest.TestCase):
         self.assertEqual(toy2["file"], "src/Toy2/Toy2.cpp")
         self.assertEqual((toy2["lines"], toy2["functions"], toy2["runs"]), (3001, 3, 2))
         self.assertEqual(toy2["prefixes"], ["Toy2", "Toy2::Ini"])
-        self.assertFalse(toy2["split"])
+        # Over 3000 lines with more than one function: no single retail object
+        # explains the file, so it is a split candidate on size alone.
+        self.assertTrue(toy2["split"])
+        self.assertFalse(report["files"][-1]["split"])
         totals = report["totals"]
         self.assertEqual(totals["files"], 3)
         self.assertEqual(totals["median_runs"], 1)
         self.assertEqual(totals["files_over_3000_lines"], ["src/Toy2/Toy2.cpp"])
         self.assertEqual((totals["core_held"], totals["core_functions"]), (2, 4))
+
+    def test_moves_name_the_host_file_and_separate_interleaved_pairs(self):
+        from pathlib import Path
+        import tempfile
+
+        from tools.decomp_annotations import Annotation
+
+        entries = [(0x401000, "A::One"), (0x401100, "B::Two"), (0x401200, "A::Three"),
+                   (0x401300, "C::Four"), (0x401400, "D::Five"), (0x401500, "C::Six"),
+                   (0x401600, "D::Seven"), (0x401700, "C::Eight")]
+        owners = {0x401000: "A.cpp", 0x401100: "B.cpp", 0x401200: "A.cpp",
+                  0x401300: "C.cpp", 0x401400: "D.cpp", 0x401500: "C.cpp",
+                  0x401600: "D.cpp", 0x401700: "C.cpp"}
+        annotations = [Annotation("function", hex(address), source, 1)
+                       for address, source in owners.items()]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("A.cpp", "B.cpp", "C.cpp", "D.cpp"):
+                (root / name).write_text("x\n", encoding="utf-8")
+            report = decomp_evidence.structure_report(entries, annotations, root)
+        moves = {(move["run"]["file"], move["host"], move["kind"]) for move in report["moves"]}
+        # B sits inside A's block and A holds no island of B: a clean move.
+        self.assertIn(("src/B.cpp", "src/A.cpp", "move"), moves)
+        # C and D each hold an island of the other, so neither move is safe.
+        self.assertIn(("src/D.cpp", "src/C.cpp", "interleaved"), moves)
+        self.assertIn(("src/C.cpp", "src/D.cpp", "interleaved"), moves)
+        self.assertEqual(report["totals"]["island_runs"], 4)
+        self.assertEqual(report["totals"]["island_functions"], 4)
 
     def test_a_split_candidate_outranks_a_small_file_and_lists_its_runs(self):
         from pathlib import Path
