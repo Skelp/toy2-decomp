@@ -183,7 +183,6 @@ src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_TEXTURED_EDGE_WITH_END	11
 0x0043e430	duplicated-block	12 lines	ec776ed69821	src/Toy2/Levels.cpp
 0x00452fc0	duplicated-block	12 lines	5d6f82a85557	src/Toy2/Levels.cpp
 0x0044f880	duplicated-block	13 lines	2b45305e0e52	src/Toy2/TextureConversion.cpp
-0x00433700	unnamed-constant	58	667be543b022	src/Toy2/Toy2.cpp
 0x0049b9e0	duplicated-block	13 lines	8ebd08a0b17f	src/Toy2/Toy2.cpp
 0x0047f250	duplicated-block	12 lines	a91efeb30b38	src/Toy2/Toy2.cpp
 0x0049d910	unstructured-control-flow	goto-count	77dd5e8ddf01	src/Toy2/Toy2.cpp
