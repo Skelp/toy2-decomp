@@ -347,3 +347,29 @@ first build of a split. They name every function the new data layout moved. A
 split whose band owns only BSS, or only whole `.data` blocks with nothing of
 Toy2.cpp's between them, passes; the sector run (`780bc48`) moved ten BSS
 globals and cost nothing. Sort the band's globals by section before deciding.
+
+## Codegen can pin a function to a large translation unit
+
+Campaign aborted on the 0x0047EF80-0x0047F6B0 profile run. `Toy2::ProfileCPU`
+matched exactly inside Toy2.cpp and fell to 25.12% in a 324-line unit of its own.
+The retail code reloads every loop counter from memory each iteration:
+
+```
+mov eax, [g_cpuProfileSampleIndex] / add eax, 1 / mov [g_cpuProfileSampleIndex], eax
+cmp dword ptr [g_cpuProfileSampleIndex], 0xa / jge ...
+call dword ptr [timeGetTime]
+```
+
+In the small unit VC6 keeps them in registers instead (`push esi` for the import
+thunk, `xor eax, eax` for the counter) and stops emitting a helper at 0x004CF7B9.
+Nothing in the source changed. Register pressure and the optimiser's view of the
+whole unit did.
+
+So a 100% match is evidence about the size of the retail unit, not only about the
+source text. When a split costs an exact match and the diff is register
+allocation, the function belonged to a large unit and the split is wrong. Check
+the score of every already-matched function of a band before moving it.
+
+This also supports the reading above: the toy2.cpp object really was one large
+shell, and its own functions have to stay together even while the subsystems it
+includes move out.
