@@ -231,3 +231,71 @@ No macro has users in two bands, so a split needs no `*Internal.h` for the
 macros: each band takes its own macros with it. Count the users transitively or
 the answer is wrong: a scan that skips `#define` lines reports
 BLEND25_LIT_TEXEL_555 as dead, and it is used by WRITE_BLEND25_TEXEL_555.
+
+## How to split a file that holds several retail bands
+
+Method of the five SoftwareRenderer campaigns (`01eb825` to `004a1c8`), which
+took the file from 11,666 lines and 15 retail runs to 5,706 lines and one
+namespace. Repeat it for the next mixed file.
+
+1. `tools/decomp structure FILE` names the bands. A band is one contiguous run
+   of the retail address order, so it is one retail object.
+2. Move whole blocks, comments included, and **keep the order the old file
+   held**. Ordering the new file by address instead changes which copy of a
+   duplicated block lint calls the owner, and every baseline row of the band
+   goes stale for no gain. Put data blocks before code blocks, because C++ has
+   to see a declaration before its use, and the old file held its data at the
+   top.
+3. A global goes with the band that writes it. Count the users per band first;
+   every SoftwareRenderer band except the back buffer owned all of its globals.
+   A global that two bands read needs an `extern`, and `SoftwareRenderer.h`
+   already held most of them.
+4. A record that two bands need goes to `*Internal.h`. RenderCommand,
+   ScanlineScratch and SoftwareRenderDispatchTable moved for that reason.
+5. A **constant enum that two bands spell stays in both files.** The
+   unnamed-constant rule resolves a name only inside the file that uses it, by
+   design, so a shared header would hide every bare literal that still stands
+   where one of those names belongs. Write the reason above the enum.
+6. Macros: the note above proves none crosses a band, but a macro and its
+   `#undef` sit around their user, so move all three together and put the
+   `#undef` after the whole function, not at the first `\t}`.
+7. A band that reaches into a second namespace takes that namespace with it.
+   The closing brace of a namespace belongs to the last block before it, so the
+   file a block leaves needs its brace back.
+8. Build one function of the band, then `validate --mode structure --staged`.
+   Layout deltas print as warnings; every one of the five campaigns changed no
+   score.
+
+## Retail source paths and the toy2.cpp span
+
+The retail binary quotes nine source paths, and the addresses that reference
+each one prove where that unit's code sits:
+
+| retail unit | assert sites | our file |
+| --- | --- | --- |
+| `toy2\toy2.cpp` | 0x490AC7, 0x4984A3, 0x498573, 0x49BB3F | Toy2/Toy2.cpp |
+| `toy2\Win95.cpp` | 0x4A64DE, 0x4A657D | Toy2/Win95.cpp |
+| `toy2\direct6.cpp` | 0x412B8A, 0x412BBE | Toy2/Direct6.cpp |
+| `toy2\modesel.cpp` | 0x4333DA | ModeSelect.cpp |
+| `nu3d\objcore.c` | 0x4B3024 | Nu3D/ObjCore.cpp |
+| `nu3d\world.c` | 0x4C41AA, 0x4C4285 | Nu3D/World.cpp |
+| `nu3d\hobjload.c` | 0x4CA3EA, 0x4CA806 | Nu3D/HObjLoad.cpp |
+| `nu3d\objload.c` | 13 sites, 0x4CB398 to 0x4CCA13 | Nu3D/ObjLoad.cpp |
+| `nu3d\fmv.c` | 10 sites, 0x4DB67B to 0x4DBB64 | Nu3D/FMV.cpp |
+
+Every site lands in the file whose name matches, so these nine placements are
+confirmed, not guessed. 0x4984A3 is the exception: it sits 0x29 bytes past the
+end of `SaveManager::SetLightShadowEffects`, whose retail body is 10 bytes, so
+it belongs to an **unmapped** function in the gap 0x49847A-0x498550. Run
+`tools/decomp discover` over that gap before using the site.
+
+**Open question for the next Toy2.cpp campaign.** The four toy2.cpp sites span
+0x4909E0 to 0x49BB3F. MSVC links one object as one contiguous block, so that
+whole span should be retail toy2.cpp; we currently split it across fifteen
+files, with Renderer, DevDraw and Renderer::Sprite holding 27 of its functions.
+No other retail unit has a site inside the span, so nothing contradicts the
+reading. Either those 27 functions are misfiled, or the retail link did not keep
+object order. Decide that before moving anything, because the span holds about
+44 KB of code. The three unmapped DevDraw functions inside it (0x490EE0,
+0x491F20, 0x492F70) have to be mapped first, or the contiguity test runs on
+incomplete data.
