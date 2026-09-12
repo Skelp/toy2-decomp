@@ -139,6 +139,74 @@ namespace Toy2
 
 		// Entry points the two units call across the split.
 		int32_t SweepWallSegments(CollisionSweep* sweep, const Vector3I* start, const Vector3I* movement, int32_t radius);
+		// One mesh of the collision world, as the query reads it.
+		struct CollisionMeshRecord
+		{
+			Vector3I origin;
+			int32_t platformIdx;
+			CollisionTreeGroup* collisionTree;
+			Vector3I boundsMin;
+			Vector3I boundsExt;
+			int16_t typeFlags;
+			uint16_t flags;
+			int32_t boundingSqRadius;
+		};
+
+		const int16_t COLLISION_MESH_STATIC_A = 6;
+		const int16_t COLLISION_MESH_STATIC_B = 7;
+		const uint16_t COLLISION_MESH_EXCLUDE_FROM_GRID = 0x400;
+		const uint16_t COLLISION_MESH_EXCLUDE_FROM_QUERY = 0x100;
+
+	}
+
+	// The workspace that the collision query fills: nine slots, each caching the
+	// meshes and the faces near one query position. ShadowGround.cpp reads the
+	// slots that Collision.cpp fills, so both units need the layout.
+	namespace Terrain
+	{
+		struct CollisionCachePosition
+		{
+			int32_t cachedPositionX;
+			uint8_t reserved[4];
+			int32_t cachedPositionZ;
+			uint8_t reserved2[12];
+		};
+
+		struct CollisionQueryBounds
+		{
+			Vector3I maximum;
+			Vector3I minimum;
+		};
+
+		struct CollisionWorkspaceSlot
+		{
+			union
+			{
+				CollisionCachePosition cachePosition;
+				CollisionQueryBounds queryBounds;
+			};
+			int16_t activeFrames;
+			uint8_t reserved3[2];
+			int32_t entryCount;
+			int16_t meshIndices[240];
+			Collision::PackedCollisionFace* faces[240];
+		};
+
+		struct CollisionWorkspace
+		{
+			CollisionWorkspaceSlot slots[9];
+		};
+
+		STATIC_ASSERT(sizeof(CollisionCachePosition) == 0x18);
+		STATIC_ASSERT(sizeof(CollisionQueryBounds) == 0x18);
+		STATIC_ASSERT(sizeof(CollisionWorkspaceSlot) == 0x5C0);
+		STATIC_ASSERT(offsetof(CollisionWorkspaceSlot, activeFrames) == 0x18);
+		STATIC_ASSERT(offsetof(CollisionWorkspaceSlot, entryCount) == 0x1C);
+		STATIC_ASSERT(offsetof(CollisionWorkspaceSlot, meshIndices) == 0x20);
+		STATIC_ASSERT(offsetof(CollisionWorkspaceSlot, faces) == 0x200);
+		STATIC_ASSERT(sizeof(CollisionWorkspace) == 0x33C0);
+
+		extern CollisionWorkspace* g_collisionWorkspace;
 	}
 
 	namespace Platform
