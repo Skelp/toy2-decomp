@@ -19,6 +19,10 @@ namespace Renderer
 	extern int32_t g_renderEntryFreeCount;
 	extern int32_t g_maxSimultaneousTextures;
 	extern float g_lodFactor;
+	extern int32_t g_srcBlendMode;
+	extern int32_t g_destBlendMode;
+	extern int32_t g_alphaBlendSrc;
+	extern int32_t g_alphaBlendDest;
 	extern Nu3D::Sprite g_instanceSpriteTemplate;
 }
 
