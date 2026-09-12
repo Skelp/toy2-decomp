@@ -2499,9 +2499,6 @@ namespace SoftwareRenderer
 		} while (scanlineCount != 0);
 	}
 
-#undef RASTERIZE_OVERLAY_EDGE
-#undef RASTERIZE_LIT_OVERLAY_EDGE
-#undef RASTERIZE_LIT_EDGE
 #undef ADD_SATURATED_565
 
 	// FUNCTION: TOY2 0x00471520 [PROVISIONAL]
@@ -5258,8 +5255,398 @@ namespace SoftwareRenderer
 	void UnkRenderAPI31(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x00474C80
 	void UnkRenderAPI33(SoftwareRenderItem* item) {}
-	// STUB: TOY2 0x00477EB0
-	void UnkRenderAPI34(SoftwareRenderItem* item) {}
+// Index into g_paletteColourOffsetTable of one interpolated colour, before the texel row.
+#define PALETTE_COLOUR_OFFSET(blue, green, red) (((blue) >> 12 & ~0x3F) + ((green) >> 15 & ~7) + ((red) >> 18))
+
+	// The 8-bit form of UnkRenderAPI13 (RGB555) and UnkRenderAPI25 (RGB565). It lights the
+	// texel through g_paletteColourOffsetTable and combines the overlay through the palette
+	// blend tables, so the three edge walks and the four span modes are the same.
+	// retail-duplicate: retail writes the overlay mode select and the row range scan into each renderer; UnkRenderAPI13 (0x0045E390) holds the RGB555 form.
+	// retail-duplicate: retail writes the left clip span setup into each span loop; RasterizeBlend75TexturedPolygon555 (0x0045B0B0) holds the RGB555 form.
+	// retail-duplicate: retail writes the row advance and the lit span setup into each renderer; UnkRenderAPI13 (0x0045E390) holds the RGB555 form.
+	// retail-duplicate: retail writes the row advance and the additive span setup into each renderer; UnkRenderAPI13 (0x0045E390) holds the RGB555 form.
+	// FUNCTION: TOY2 0x00477EB0 [PROVISIONAL]
+	void UnkRenderAPI34(SoftwareRenderItem* item)
+	{
+		// Select how the overlay texture combines with this polygon.
+		int32_t overlayMode;
+		// Untextured overlay: plain lit polygon.
+		if (item->renderFlags & SOFTWARE_RENDER_NO_OVERLAY)
+			overlayMode = OVERLAY_MODE_NONE;
+		// These levels add the overlay.
+		else if (Toy2::g_levelFileIndex == 15 || Toy2::g_levelFileIndex == 11)
+			overlayMode = OVERLAY_MODE_ADDITIVE;
+		// These levels blend the overlay at 50 percent.
+		else if (Toy2::g_levelFileIndex == 7 || Toy2::g_levelFileIndex == 8)
+			overlayMode = OVERLAY_MODE_BLEND_50;
+		// This level adds the overlay only where the first texel is the transparent entry.
+		else if (Toy2::g_levelFileIndex == 9)
+			overlayMode =
+				((uint8_t*)g_softwareTextureData[item->textureIndex])[((item->vertices[0].v >> 8) & k_upperByteMask)
+					+ (item->vertices[0].u >> k_fixedPointShift)]
+					== 0
+				? OVERLAY_MODE_ADDITIVE
+				: OVERLAY_MODE_LIT;
+		// Default: light the overlay.
+		else
+			overlayMode = OVERLAY_MODE_LIT;
+
+		// Find the rows that the polygon covers.
+		int32_t topY = item->vertices[0].y;
+		int32_t bottomY = topY;
+		// Vertex 1 extends the row range.
+		if (item->vertices[1].y < topY)
+			topY = item->vertices[1].y;
+		// Vertex 1 extends the bottom.
+		else if (item->vertices[1].y > bottomY)
+			bottomY = item->vertices[1].y;
+
+		// Vertex 2 extends the row range.
+		if (item->vertices[2].y < topY)
+			topY = item->vertices[2].y;
+		// Vertex 2 extends the bottom.
+		else if (item->vertices[2].y > bottomY)
+			bottomY = item->vertices[2].y;
+
+		// Quad: vertex 3 extends the row range.
+		if (item->renderFlags & SOFTWARE_RENDER_QUAD)
+		{
+			if (item->vertices[3].y < topY)
+				topY = item->vertices[3].y;
+			else if (item->vertices[3].y > bottomY)
+				bottomY = item->vertices[3].y;
+		}
+
+		// Clip the range to the screen top.
+		if (topY < Toy2::g_screenClipTop)
+			topY = Toy2::g_screenClipTop;
+		// Clip the range to the screen bottom.
+		if (bottomY > Toy2::g_screenClipBottom)
+			bottomY = Toy2::g_screenClipBottom;
+
+		int32_t scanlineCount = bottomY - topY + 1;
+		ScanlineScratch* scanline = &g_scanlineScratch[topY];
+		ClearScanlineFlags(scanline, scanlineCount);
+
+		// Walk the edges into the scanline table.
+		const SoftwareOverlayItem* overlayItem = (const SoftwareOverlayItem*)item;
+		// Lit edges without overlay coordinates.
+		if (overlayMode == OVERLAY_MODE_NONE)
+		{
+			RASTERIZE_LIT_EDGE(&item->vertices[0], &item->vertices[1], litEdge01Done8);
+			RASTERIZE_LIT_EDGE(&item->vertices[1], &item->vertices[2], litEdge12Done8);
+			if (item->renderFlags & SOFTWARE_RENDER_QUAD)
+			{
+				RASTERIZE_LIT_EDGE(&item->vertices[2], &item->vertices[3], litEdge23Done8);
+				RASTERIZE_LIT_EDGE(&item->vertices[3], &item->vertices[0], litEdge30Done8);
+			}
+			else
+			{
+				RASTERIZE_LIT_EDGE(&item->vertices[2], &item->vertices[0], litEdge20Done8);
+			}
+		}
+		// Overlay edges without lighting.
+		else if (overlayMode > OVERLAY_MODE_LIT)
+		{
+			RASTERIZE_OVERLAY_EDGE(&item->vertices[0], &item->vertices[1], overlayItem->overlayUV[0], overlayItem->overlayUV[1], overlayEdge01Done8);
+			RASTERIZE_OVERLAY_EDGE(&item->vertices[1], &item->vertices[2], overlayItem->overlayUV[1], overlayItem->overlayUV[2], overlayEdge12Done8);
+			if (item->renderFlags & SOFTWARE_RENDER_QUAD)
+			{
+				RASTERIZE_OVERLAY_EDGE(&item->vertices[2], &item->vertices[3], overlayItem->overlayUV[2], overlayItem->overlayUV[3], overlayEdge23Done8);
+				RASTERIZE_OVERLAY_EDGE(&item->vertices[3], &item->vertices[0], overlayItem->overlayUV[3], overlayItem->overlayUV[0], overlayEdge30Done8);
+			}
+			else
+			{
+				RASTERIZE_OVERLAY_EDGE(&item->vertices[2], &item->vertices[0], overlayItem->overlayUV[2], overlayItem->overlayUV[0], overlayEdge20Done8);
+			}
+		}
+		// Lit edges with overlay coordinates.
+		else
+		{
+			RASTERIZE_LIT_OVERLAY_EDGE(&item->vertices[0], &item->vertices[1], overlayItem->overlayUV[0], overlayItem->overlayUV[1], litOverlayEdge01Done8);
+			RASTERIZE_LIT_OVERLAY_EDGE(&item->vertices[1], &item->vertices[2], overlayItem->overlayUV[1], overlayItem->overlayUV[2], litOverlayEdge12Done8);
+			if (item->renderFlags & SOFTWARE_RENDER_QUAD)
+			{
+				RASTERIZE_LIT_OVERLAY_EDGE(&item->vertices[2], &item->vertices[3], overlayItem->overlayUV[2], overlayItem->overlayUV[3], litOverlayEdge23Done8);
+				RASTERIZE_LIT_OVERLAY_EDGE(&item->vertices[3], &item->vertices[0], overlayItem->overlayUV[3], overlayItem->overlayUV[0], litOverlayEdge30Done8);
+			}
+			else
+			{
+				RASTERIZE_LIT_OVERLAY_EDGE(&item->vertices[2], &item->vertices[0], overlayItem->overlayUV[2], overlayItem->overlayUV[0], litOverlayEdge20Done8);
+			}
+		}
+
+		uint8_t* overlay = (uint8_t*)g_softwareTextureData[OVERLAY_TEXTURE_INDEX];
+		uint8_t* texture = (uint8_t*)g_softwareTextureData[item->textureIndex];
+		uint8_t* rowStart = (uint8_t*)g_lockedBackBuffer + g_backBufferPitchPixels * topY + Toy2::g_screenClipLeft;
+		if (overlayMode == OVERLAY_MODE_NONE)
+		{
+			// Add the lit texture to the back buffer.
+			do
+			{
+				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
+				{
+					int32_t leftX = scanline->leftXFixed >> 10;
+					int32_t rightX = scanline->rightXFixed >> 10;
+					if (leftX != rightX)
+					{
+						int32_t u = scanline->leftInterpolants[0];
+						int32_t blue = scanline->leftInterpolants[2];
+						int32_t v = scanline->leftInterpolants[1];
+						int32_t red = scanline->leftInterpolants[4];
+						int32_t green = scanline->leftInterpolants[3];
+						int32_t width = rightX - leftX;
+						int32_t uStep = (scanline->rightInterpolants[0] - u) / width;
+						int32_t vStep = (scanline->rightInterpolants[1] - v) / width;
+						int32_t blueStep = (scanline->rightInterpolants[2] - blue) / width;
+						int32_t greenStep = (scanline->rightInterpolants[3] - green) / width;
+						int32_t redStep = (scanline->rightInterpolants[4] - red) / width;
+						int32_t pixelCount = width;
+						uint8_t* pixel;
+						if (leftX < Toy2::g_screenClipLeft)
+						{
+							int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
+							u += clippedPixels * uStep;
+							v += clippedPixels * vStep;
+							blue += clippedPixels * blueStep;
+							green += clippedPixels * greenStep;
+							red += clippedPixels * redStep;
+							pixel = rowStart;
+							if (rightX == Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_softWindowWidth - 1;
+							else
+							{
+								pixelCount = Toy2::g_softWindowWidth;
+								if (rightX <= Toy2::g_screenClipRight)
+									pixelCount = rightX - Toy2::g_screenClipLeft;
+							}
+						}
+						else
+						{
+							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
+							if (rightX == Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_screenClipRight - leftX;
+							else if (rightX > Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_screenClipRight - leftX + 1;
+						}
+
+						for (; pixelCount > 0; pixelCount--)
+						{
+							uint8_t texel = texture[((v >> 8) & k_upperByteMask) + (u >> k_fixedPointShift)];
+							*pixel =
+								g_additivePaletteTable[*pixel * 0x100 + g_paletteColourOffsetTable[PALETTE_COLOUR_OFFSET(blue, green, red) + texel * 0x200]];
+							u += uStep;
+							v += vStep;
+							blue += blueStep;
+							green += greenStep;
+							red += redStep;
+							pixel++;
+						}
+					}
+				}
+				rowStart += g_backBufferPitchPixels;
+				scanline++;
+				scanlineCount--;
+			} while (scanlineCount != 0);
+			return;
+		}
+
+		if (overlayMode == OVERLAY_MODE_ADDITIVE)
+		{
+			// Add the overlay texel to the back buffer.
+			do
+			{
+				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
+				{
+					int32_t leftX = scanline->leftXFixed >> 10;
+					int32_t rightX = scanline->rightXFixed >> 10;
+					if (leftX != rightX)
+					{
+						int32_t overlayU = scanline->rightInterpolants[OVERLAY_LEFT_U];
+						int32_t overlayV = scanline->rightInterpolants[OVERLAY_LEFT_V];
+						int32_t width = rightX - leftX;
+						int32_t overlayUStep = (scanline->rightInterpolants[OVERLAY_RIGHT_U] - overlayU) / width;
+						int32_t overlayVStep = (scanline->rightInterpolants[OVERLAY_RIGHT_V] - overlayV) / width;
+						int32_t pixelCount = width;
+						uint8_t* pixel;
+						if (leftX < Toy2::g_screenClipLeft)
+						{
+							overlayU += overlayUStep * (Toy2::g_screenClipLeft - leftX);
+							overlayV += overlayVStep * (Toy2::g_screenClipLeft - leftX);
+							pixel = rowStart;
+							if (rightX > Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_softWindowWidth - 1;
+							else
+								pixelCount = rightX - Toy2::g_screenClipLeft;
+						}
+						else
+						{
+							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
+							if (rightX == Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_screenClipRight - leftX;
+							else if (rightX > Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_screenClipRight - leftX + 1;
+						}
+
+						for (; pixelCount > 0; pixelCount--)
+						{
+							int32_t overlayRow = overlayU >> k_fixedPointShift;
+							overlayU += overlayUStep;
+							*pixel = g_additivePaletteTable[*pixel * 0x100 + overlay[((overlayV >> 8) & k_upperByteMask) + overlayRow]];
+							overlayV += overlayVStep;
+							pixel++;
+						}
+					}
+				}
+				rowStart += g_backBufferPitchPixels;
+				scanline++;
+				scanlineCount--;
+			} while (scanlineCount != 0);
+			return;
+		}
+
+		if (overlayMode == OVERLAY_MODE_BLEND_50)
+		{
+			// Average the overlay texel with the back buffer.
+			do
+			{
+				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
+				{
+					int32_t leftX = scanline->leftXFixed >> 10;
+					int32_t rightX = scanline->rightXFixed >> 10;
+					if (leftX != rightX)
+					{
+						int32_t overlayU = scanline->rightInterpolants[OVERLAY_LEFT_U];
+						int32_t overlayV = scanline->rightInterpolants[OVERLAY_LEFT_V];
+						int32_t width = rightX - leftX;
+						int32_t overlayUStep = (scanline->rightInterpolants[OVERLAY_RIGHT_U] - overlayU) / width;
+						int32_t overlayVStep = (scanline->rightInterpolants[OVERLAY_RIGHT_V] - overlayV) / width;
+						int32_t pixelCount = width;
+						uint8_t* pixel;
+						if (leftX < Toy2::g_screenClipLeft)
+						{
+							overlayU += overlayUStep * (Toy2::g_screenClipLeft - leftX);
+							overlayV += overlayVStep * (Toy2::g_screenClipLeft - leftX);
+							pixel = rowStart;
+							if (rightX > Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_softWindowWidth - 1;
+							else
+								pixelCount = rightX - Toy2::g_screenClipLeft;
+						}
+						else
+						{
+							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
+							if (rightX == Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_screenClipRight - leftX;
+							else if (rightX > Toy2::g_screenClipRight)
+								pixelCount = Toy2::g_screenClipRight - leftX + 1;
+						}
+
+						for (; pixelCount > 0; pixelCount--)
+						{
+							*pixel = g_paletteBlend50Table[*pixel * 0x100 + overlay[((overlayV >> 8) & k_upperByteMask) + (overlayU >> k_fixedPointShift)]];
+							overlayV += overlayVStep;
+							overlayU += overlayUStep;
+							pixel++;
+						}
+					}
+				}
+				rowStart += g_backBufferPitchPixels;
+				scanline++;
+				scanlineCount--;
+			} while (scanlineCount != 0);
+			return;
+		}
+
+		// Add the lit texel to the overlay texel.
+		do
+		{
+			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
+			{
+				int32_t leftX = scanline->leftXFixed >> 10;
+				int32_t rightX = scanline->rightXFixed >> 10;
+				if (leftX == rightX)
+				{
+					// A one pixel span takes the texture coordinates from the left edge and the
+					// colour from the right edge.
+					uint8_t texel = texture[((scanline->leftInterpolants[1] >> 8) & k_upperByteMask) + (scanline->leftInterpolants[0] >> k_fixedPointShift)];
+					uint8_t litTexel = g_paletteColourOffsetTable
+						[PALETTE_COLOUR_OFFSET(scanline->rightInterpolants[2], scanline->rightInterpolants[3], scanline->rightInterpolants[4]) + texel * 0x200];
+					uint8_t overlayTexel = overlay[((scanline->rightInterpolants[OVERLAY_LEFT_V] >> 8) & k_upperByteMask)
+						+ (scanline->rightInterpolants[OVERLAY_LEFT_U] >> k_fixedPointShift)];
+					rowStart[leftX - Toy2::g_screenClipLeft] = g_additivePaletteTable[overlayTexel * 0x100 + litTexel];
+				}
+				else
+				{
+					int32_t v = scanline->leftInterpolants[1];
+					int32_t red = scanline->leftInterpolants[4];
+					int32_t overlayV = scanline->rightInterpolants[OVERLAY_LEFT_V];
+					int32_t green = scanline->leftInterpolants[3];
+					int32_t width = rightX - leftX;
+					int32_t u = scanline->leftInterpolants[0];
+					int32_t overlayU = scanline->rightInterpolants[OVERLAY_LEFT_U];
+					int32_t uStep = (scanline->rightInterpolants[0] - u) / width;
+					int32_t blue = scanline->leftInterpolants[2];
+					int32_t vStep = (scanline->rightInterpolants[1] - v) / width;
+					int32_t blueStep = (scanline->rightInterpolants[2] - blue) / width;
+					int32_t greenStep = (scanline->rightInterpolants[3] - green) / width;
+					int32_t redStep = (scanline->rightInterpolants[4] - red) / width;
+					int32_t overlayUStep = (scanline->rightInterpolants[OVERLAY_RIGHT_U] - overlayU) / width;
+					int32_t overlayVStep = (scanline->rightInterpolants[OVERLAY_RIGHT_V] - overlayV) / width;
+					int32_t pixelCount;
+					uint8_t* pixel;
+					if (leftX < Toy2::g_screenClipLeft)
+					{
+						int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
+						u += clippedPixels * uStep;
+						v += clippedPixels * vStep;
+						blue += clippedPixels * blueStep;
+						green += clippedPixels * greenStep;
+						red += clippedPixels * redStep;
+						overlayU += overlayUStep * clippedPixels;
+						overlayV += overlayVStep * clippedPixels;
+						pixelCount = Toy2::g_softWindowWidth;
+						pixel = rowStart;
+						if (rightX <= Toy2::g_screenClipRight)
+							pixelCount = rightX - Toy2::g_screenClipLeft + 1;
+					}
+					else
+					{
+						pixel = rowStart + leftX - Toy2::g_screenClipLeft;
+						if (rightX <= Toy2::g_screenClipRight)
+							pixelCount = width + 1;
+						else
+							pixelCount = Toy2::g_screenClipRight - leftX + 1;
+					}
+
+					do
+					{
+						uint8_t texel = texture[((v >> 8) & k_upperByteMask) + (u >> k_fixedPointShift)];
+						uint8_t overlayTexel = overlay[((overlayV >> 8) & k_upperByteMask) + (overlayU >> k_fixedPointShift)];
+						*pixel =
+							g_additivePaletteTable[overlayTexel * 0x100 + g_paletteColourOffsetTable[PALETTE_COLOUR_OFFSET(blue, green, red) + texel * 0x200]];
+						v += vStep;
+						u += uStep;
+						blue += blueStep;
+						green += greenStep;
+						red += redStep;
+						overlayU += overlayUStep;
+						overlayV += overlayVStep;
+						pixelCount--;
+						pixel++;
+					} while (pixelCount > 0);
+				}
+			}
+			rowStart += g_backBufferPitchPixels;
+			scanline++;
+			scanlineCount--;
+		} while (scanlineCount != 0);
+	}
+
+#undef PALETTE_COLOUR_OFFSET
+#undef RASTERIZE_OVERLAY_EDGE
+#undef RASTERIZE_LIT_OVERLAY_EDGE
+#undef RASTERIZE_LIT_EDGE
 
 	// GLOBAL: TOY2 0x004FC880
 	uint8_t g_defaultSoftwarePalette[768] = {
