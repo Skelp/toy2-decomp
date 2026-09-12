@@ -54,37 +54,16 @@ src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_OVERLAY_EDGE	2180463adaec
 0x0045b0b0	duplicated-block	15 lines	9c96f5ef309e	src/SoftwareRenderer.cpp
 0x0045b0b0	duplicated-block	39 lines	dff6d200372c	src/SoftwareRenderer.cpp
 src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_TEXTURED_EDGE_WITH_END	64e79f1610e3	src/SoftwareRenderer.cpp
-0x0045bbc0	duplicated-block	20 lines	159b725655b9	src/SoftwareRenderer.cpp
-0x0045d110	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
-0x0045d110	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
-0x0045d110	duplicated-block	24 lines	c4365fc1e498	src/SoftwareRenderer.cpp
-0x0045c6b0	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
-0x0045c6b0	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
-0x0045c6b0	duplicated-block	25 lines	95a0e330df84	src/SoftwareRenderer.cpp
-0x00463090	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
-0x00463090	duplicated-block	24 lines	65293c6857a8	src/SoftwareRenderer.cpp
-0x00463090	duplicated-block	51 lines	b8dc63146998	src/SoftwareRenderer.cpp
 0x00463b80	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
 0x00463b80	duplicated-block	34 lines	cc04564a2adc	src/SoftwareRenderer.cpp
 0x00463b80	duplicated-block	39 lines	dff6d200372c	src/SoftwareRenderer.cpp
 0x00464690	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
 0x00464690	duplicated-block	22 lines #2	99e2e5020361	src/SoftwareRenderer.cpp
 0x00464690	duplicated-block	15 lines	ad5670b08a31	src/SoftwareRenderer.cpp
-0x00468430	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
-0x00468430	duplicated-block	30 lines	46f41b5acde8	src/SoftwareRenderer.cpp
-0x00468430	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
-0x00468430	duplicated-block	15 lines	b06d1fef5d27	src/SoftwareRenderer.cpp
-0x00468e90	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
-0x00468e90	duplicated-block	28 lines	01d2ab7f19ed	src/SoftwareRenderer.cpp
-0x00468e90	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
-0x00468e90	duplicated-block	13 lines	924e9588b5ad	src/SoftwareRenderer.cpp
 0x00476d00	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
-0x00476d00	duplicated-block	14 lines	c4d94301b6df	src/SoftwareRenderer.cpp
 0x00476340	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
 0x00476340	duplicated-block	24 lines	267e30a5057f	src/SoftwareRenderer.cpp
 0x00474190	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
-0x00474190	duplicated-block	24 lines	267e30a5057f	src/SoftwareRenderer.cpp
-0x00474190	duplicated-block	17 lines	c52efe8b3700	src/SoftwareRenderer.cpp
 0x00474190	duplicated-block	17 lines #2	f16078c607c3	src/SoftwareRenderer.cpp
 0x0047c8b0	duplicated-block	15 lines	e4a9bc798517	src/SoftwareRenderer.cpp
 0x004c17b0	duplicated-block	13 lines	72701525afaa	src/SoftwareRenderer.cpp
