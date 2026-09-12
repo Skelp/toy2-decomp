@@ -1207,7 +1207,9 @@ def check_repeated_macros(
         )
         findings.append(Finding(
             path, start, "repeated-macro-body", "warning", _line_text(text, start), detail,
-            subject=name, fingerprint=_fingerprint(f"{original}={name}"),
+            # The key names only the reported macro: parameterising or renaming the
+            # macro it shares lines with must not turn a baselined finding into new debt.
+            subject=name, fingerprint=_fingerprint(name),
             suppressed=_accepted(retail, used, start, end),
         ))
     return findings

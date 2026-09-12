@@ -842,3 +842,20 @@ class RetailDuplicateMeasurementTests(unittest.TestCase):
         found = self.duplicates("shared macro scored 38.10% at attempt 7")
         self.assertTrue(found)
         self.assertTrue(all(item.suppressed for item in found))
+
+
+class MacroBaselineKeyTests(unittest.TestCase):
+    """A baselined macro finding survives the counterpart being parameterised."""
+
+    def body(self, name: str, extra: str = "") -> str:
+        steps = "\\\n".join(f"\tstep{number}(edge);" for number in range(10))
+        return f"#define {name}(edge){extra} \\\n{steps}\n"
+
+    def test_the_key_names_only_the_reported_macro(self):
+        first = findings_for(self.body("SHARED_EDGE") + "\n" + self.body("COPY_EDGE"))
+        renamed = findings_for(self.body("SHARED_EDGE_WITH_END") + "\n" + self.body("COPY_EDGE"))
+        macro = [item for item in first if item.rule == "repeated-macro-body"]
+        after = [item for item in renamed if item.rule == "repeated-macro-body"]
+        self.assertTrue(macro and after)
+        self.assertEqual([item.subject for item in macro], [item.subject for item in after])
+        self.assertEqual([item.fingerprint for item in macro], [item.fingerprint for item in after])
