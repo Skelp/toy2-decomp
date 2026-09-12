@@ -34,7 +34,8 @@
       "Bash(tail:*)",
       "Bash(sort:*)",
       "Bash(uniq:*)",
-      "Bash(tr:*)"
+      "Bash(tr:*)",
+      "Bash(git clean:*)"
     ]
   }
 }
