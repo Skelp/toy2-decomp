@@ -83,6 +83,7 @@ set(TOY2_SOURCES
     src/SoftwareBackdrop.cpp
     src/SoftwareBackBuffer.cpp
     src/SoftwareDeviceQueue.cpp
+    src/SoftwareDeviceVertexBuffer.cpp
     src/SoftwareRenderer.h
     src/SoftwareRendererDefaultPalette.inc
 
