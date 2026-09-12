@@ -1054,8 +1054,8 @@ namespace SoftwareRenderer
 		(result) = (uint16_t)(blueSum | greenSum | redSum);                                \
 	} while (0)
 
-// Walks one edge with the texture UV and the three colour interpolants.
-#define RASTERIZE_LIT_EDGE(vertexA, vertexB, doneLabel)                                                                          \
+// Walks one edge with the texture UV and the three colour interpolants. The end row is inclusive when endOperator is <=.
+#define RASTERIZE_LIT_EDGE_WITH_END(vertexA, vertexB, doneLabel, endOperator)                                                    \
 	do                                                                                                                           \
 	{                                                                                                                            \
 		int32_t edgeY;                                                                                                           \
@@ -1176,9 +1176,11 @@ namespace SoftwareRenderer
 			edgeGreen += edgeGreenStep;                                                                                          \
 			edgeRed += edgeRedStep;                                                                                              \
 			edgeY++;                                                                                                             \
-		} while (edgeY < edgeEndY && edgeY <= Toy2::g_screenClipBottom);                                                         \
+		} while (edgeY endOperator edgeEndY && edgeY <= Toy2::g_screenClipBottom);                                               \
 	doneLabel:;                                                                                                                  \
 	} while (0)
+#define RASTERIZE_LIT_EDGE(vertexA, vertexB, doneLabel) RASTERIZE_LIT_EDGE_WITH_END(vertexA, vertexB, doneLabel, <)
+#define RASTERIZE_LIT_EDGE_INCLUSIVE(vertexA, vertexB, doneLabel) RASTERIZE_LIT_EDGE_WITH_END(vertexA, vertexB, doneLabel, <=)
 
 // Walks one edge with the lit texture interpolants plus the overlay UV; the end row is inclusive.
 #define RASTERIZE_LIT_OVERLAY_EDGE(vertexA, vertexB, overlayA, overlayB, doneLabel)                                              \
@@ -2128,8 +2130,197 @@ namespace SoftwareRenderer
 			height--;
 		} while (height != 0);
 	}
-	// STUB: TOY2 0x00467080
-	void UnkRenderAPI17(SoftwareRenderItem* item) {}
+	// The RGB565 green ramp holds two entries for each green level of a texel, so the green
+	// interpolant keeps one more fraction bit than the red and the blue interpolants.
+	const int32_t k_green565RampShift = 15;
+	// Texel value that the colour key makes transparent in RGB565 (pure green).
+	const uint16_t COLOUR_KEY_TEXEL_565 = 0x7C0;
+
+// Sets the inclusive row range that the polygon covers, clipped to the screen top and the
+// screen bottom. The first three vertices and, for a quad, the fourth vertex extend the range.
+#define CLIP_POLYGON_ROW_RANGE(item, topY, bottomY) \
+	int32_t topY = (item)->vertices[0].y;           \
+	int32_t bottomY = topY;                         \
+	if ((item)->vertices[1].y < topY)               \
+		topY = (item)->vertices[1].y;               \
+	else if ((item)->vertices[1].y > bottomY)       \
+		bottomY = (item)->vertices[1].y;            \
+	if ((item)->vertices[2].y < topY)               \
+		topY = (item)->vertices[2].y;               \
+	else if ((item)->vertices[2].y > bottomY)       \
+		bottomY = (item)->vertices[2].y;            \
+	if ((item)->renderFlags & SOFTWARE_RENDER_QUAD) \
+	{                                               \
+		if ((item)->vertices[3].y < topY)           \
+			topY = (item)->vertices[3].y;           \
+		else if ((item)->vertices[3].y > bottomY)   \
+			bottomY = (item)->vertices[3].y;        \
+	}                                               \
+	if (topY < Toy2::g_screenClipTop)               \
+		topY = Toy2::g_screenClipTop;               \
+	if (bottomY > Toy2::g_screenClipBottom)         \
+	bottomY = Toy2::g_screenClipBottom
+
+// Sets up one lit, textured span of the RGB565 back buffer: the texture UV and the three
+// colour interpolants at the left end of the span, their steps across the span, and the first
+// pixel with the pixel count that the left clip and the right clip leave. It reads spanRow,
+// rowStart, leftX and rightX of the span loop, and it declares width, u, v, red, green, blue,
+// their steps, pixel and pixelCount for the loop that writes the pixels. rightClipTest with
+// testTrueCount and testFalseCount hold the order in which each span mode tests the right
+// clip, which is the order that retail compiled.
+#define LIT_TEXTURED_SPAN_SETUP_565(rightClipTest, testTrueCount, testFalseCount) \
+	int32_t width = rightX - leftX;                                               \
+	int32_t u = spanRow->leftInterpolants[0];                                     \
+	int32_t v = spanRow->leftInterpolants[1];                                     \
+	int32_t red = spanRow->leftInterpolants[2];                                   \
+	int32_t green = spanRow->leftInterpolants[3];                                 \
+	int32_t blue = spanRow->leftInterpolants[4];                                  \
+	int32_t uStep = (spanRow->rightInterpolants[0] - u) / width;                  \
+	int32_t vStep = (spanRow->rightInterpolants[1] - v) / width;                  \
+	int32_t redStep = (spanRow->rightInterpolants[2] - red) / width;              \
+	int32_t greenStep = (spanRow->rightInterpolants[3] - green) / width;          \
+	int32_t blueStep = (spanRow->rightInterpolants[4] - blue) / width;            \
+	int32_t pixelCount;                                                           \
+	uint16_t* pixel;                                                              \
+	if (leftX < Toy2::g_screenClipLeft)                                           \
+	{                                                                             \
+		int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;                   \
+		u += clippedPixels * uStep;                                               \
+		v += clippedPixels * vStep;                                               \
+		red += clippedPixels * redStep;                                           \
+		green += clippedPixels * greenStep;                                       \
+		blue += clippedPixels * blueStep;                                         \
+		pixel = rowStart;                                                         \
+		pixelCount = Toy2::g_softWindowWidth;                                     \
+		if (rightX <= Toy2::g_screenClipRight)                                    \
+			pixelCount = rightX - Toy2::g_screenClipLeft + 1;                     \
+	}                                                                             \
+	else                                                                          \
+	{                                                                             \
+		pixel = rowStart + leftX - Toy2::g_screenClipLeft;                        \
+		if (rightX rightClipTest Toy2::g_screenClipRight)                         \
+			pixelCount = testTrueCount;                                           \
+		else                                                                      \
+			pixelCount = testFalseCount;                                          \
+	}
+
+	// Draws a Gouraud lit, textured triangle or quad into the RGB565 back buffer.
+	// FUNCTION: TOY2 0x00467080 [PROVISIONAL]
+	void UnkRenderAPI17(SoftwareRenderItem* item)
+	{
+		// Find the rows that the polygon covers.
+		CLIP_POLYGON_ROW_RANGE(item, topY, bottomY);
+
+		int32_t scanlineCount = bottomY - topY + 1;
+		ScanlineScratch* scanline = &g_scanlineScratch[topY];
+		ClearScanlineFlags(scanline, scanlineCount);
+
+		// Walk the edges into the scanline table.
+		RASTERIZE_LIT_EDGE_INCLUSIVE(&item->vertices[0], &item->vertices[1], litEdge01DoneTextured565);
+		RASTERIZE_LIT_EDGE_INCLUSIVE(&item->vertices[1], &item->vertices[2], litEdge12DoneTextured565);
+		if (item->renderFlags & SOFTWARE_RENDER_QUAD)
+		{
+			RASTERIZE_LIT_EDGE_INCLUSIVE(&item->vertices[2], &item->vertices[3], litEdge23DoneTextured565);
+			RASTERIZE_LIT_EDGE_INCLUSIVE(&item->vertices[3], &item->vertices[0], litEdge30DoneTextured565);
+		}
+		else
+		{
+			RASTERIZE_LIT_EDGE_INCLUSIVE(&item->vertices[2], &item->vertices[0], litEdge20DoneTextured565);
+		}
+
+		uint16_t* texture = (uint16_t*)g_softwareTextureData[item->textureIndex];
+		uint16_t* rowStart = (uint16_t*)g_lockedBackBuffer + g_backBufferPitchPixels * topY + Toy2::g_screenClipLeft;
+		ScanlineScratch* spanRow = scanline;
+		int32_t rowsLeft = scanlineCount;
+		if (item->renderFlags & SOFTWARE_RENDER_COLOUR_KEY)
+		{
+			// Hold the back buffer where the texel is the colour key.
+			do
+			{
+				if (spanRow->populated != 0 && spanRow->leftXFixed <= Toy2::g_screenClipRightFixed && spanRow->rightXFixed >= Toy2::g_screenClipLeftFixed)
+				{
+					int32_t leftX = spanRow->leftXFixed >> 10;
+					int32_t rightX = spanRow->rightXFixed >> 10;
+					if (leftX == rightX)
+					{
+						uint16_t texel = texture[(spanRow->leftInterpolants[0] >> k_fixedPointShift) + (spanRow->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
+						if (texel != COLOUR_KEY_TEXEL_565)
+						{
+							rowStart[leftX - Toy2::g_screenClipLeft] =
+								g_greenRampFull[((texel >> 5) & 0x3F) + (spanRow->leftInterpolants[3] >> k_green565RampShift)]
+								+ g_redRampFull[(texel >> 11) + (spanRow->leftInterpolants[2] >> k_fixedPointShift)]
+								+ g_blueRampFull[(texel & k_fiveBitChannelMask) + (spanRow->leftInterpolants[4] >> k_fixedPointShift)];
+						}
+					}
+					else
+					{
+						LIT_TEXTURED_SPAN_SETUP_565(>, Toy2::g_screenClipRight - leftX + 1, width + 1);
+
+						do
+						{
+							uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
+							if (texel != COLOUR_KEY_TEXEL_565)
+							{
+								*pixel = g_greenRampFull[((texel >> 5) & 0x3F) + (green >> k_green565RampShift)]
+									+ g_redRampFull[(texel >> 11) + (red >> k_fixedPointShift)]
+									+ g_blueRampFull[(texel & k_fiveBitChannelMask) + (blue >> k_fixedPointShift)];
+							}
+							u += uStep;
+							v += vStep;
+							green += greenStep;
+							red += redStep;
+							blue += blueStep;
+							pixelCount--;
+							pixel++;
+						} while (pixelCount > 0);
+					}
+				}
+				spanRow++;
+				rowsLeft--;
+				rowStart += g_backBufferPitchPixels;
+			} while (rowsLeft != 0);
+			return;
+		}
+
+		// Write every texel of the span.
+		do
+		{
+			if (spanRow->populated != 0 && spanRow->leftXFixed <= Toy2::g_screenClipRightFixed && spanRow->rightXFixed >= Toy2::g_screenClipLeftFixed)
+			{
+				int32_t leftX = spanRow->leftXFixed >> 10;
+				int32_t rightX = spanRow->rightXFixed >> 10;
+				if (leftX == rightX)
+				{
+					uint16_t texel = texture[(spanRow->leftInterpolants[0] >> k_fixedPointShift) + (spanRow->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
+					rowStart[leftX - Toy2::g_screenClipLeft] = g_greenRampFull[((texel >> 5) & 0x3F) + (spanRow->leftInterpolants[3] >> k_green565RampShift)]
+						+ g_redRampFull[(texel >> 11) + (spanRow->leftInterpolants[2] >> k_fixedPointShift)]
+						+ g_blueRampFull[(texel & k_fiveBitChannelMask) + (spanRow->leftInterpolants[4] >> k_fixedPointShift)];
+				}
+				else
+				{
+					LIT_TEXTURED_SPAN_SETUP_565(<=, width + 1, Toy2::g_screenClipRight - leftX + 1);
+
+					do
+					{
+						uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
+						*pixel = g_greenRampFull[((texel >> 5) & 0x3F) + (green >> k_green565RampShift)]
+							+ g_redRampFull[(texel >> 11) + (red >> k_fixedPointShift)]
+							+ g_blueRampFull[(texel & k_fiveBitChannelMask) + (blue >> k_fixedPointShift)];
+						v += vStep;
+						u += uStep;
+						red += redStep;
+						green += greenStep;
+						blue += blueStep;
+						pixelCount--;
+						pixel++;
+					} while (pixelCount > 0);
+				}
+			}
+			spanRow++;
+			rowStart += g_backBufferPitchPixels;
+			rowsLeft--;
+		} while (rowsLeft != 0);
+	}
 	// STUB: TOY2 0x00469900
 	void UnkRenderAPI18(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x0046AC60
@@ -5658,6 +5849,8 @@ namespace SoftwareRenderer
 #undef RASTERIZE_OVERLAY_EDGE
 #undef RASTERIZE_LIT_OVERLAY_EDGE
 #undef RASTERIZE_LIT_EDGE
+#undef RASTERIZE_LIT_EDGE_INCLUSIVE
+#undef RASTERIZE_LIT_EDGE_WITH_END
 
 	// GLOBAL: TOY2 0x004FC880
 	uint8_t g_defaultSoftwarePalette[768] = {
