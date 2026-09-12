@@ -157,6 +157,7 @@ set(TOY2_SOURCES
     src/Toy2/Win95.cpp
     src/Toy2/Win95.h
     src/Toy2/Buzz.cpp
+    src/Toy2/Gadgets.cpp
     src/Toy2/Buzz.h
     src/Toy2/BuzzAnimationEvents.inc
     src/Toy2/BuzzAnimationStates.inc

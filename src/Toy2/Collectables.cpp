@@ -99,12 +99,10 @@ namespace Toy2
 						int32_t distanceX = (Camera::g_renderCameraTransform.pos.x - position.x) >> 8;
 						int32_t distanceY = (Camera::g_renderCameraTransform.pos.y - position.y) >> 8;
 						int32_t distanceZ = (Camera::g_renderCameraTransform.pos.z - position.z) >> 8;
-						int32_t distanceSquared =
-							distanceZ * distanceZ + distanceY * distanceY + distanceX * distanceX;
+						int32_t distanceSquared = distanceZ * distanceZ + distanceY * distanceY + distanceX * distanceX;
 						if (distanceSquared < 0x90000 && distanceSquared + 1 != 0)
 						{
-							Nu3D::Particles::ParticleInstance* particle =
-								Nu3D::Particles::SpawnFromPreset(position.x, position.y, position.z, 0x29, 9);
+							Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(position.x, position.y, position.z, 0x29, 9);
 							particle->rotSpeed = *g_randDatBufferPtr - 0x80;
 							g_randDatBufferPtr++;
 							particle->lifetime = (*g_randDatBufferPtr & 0xF) * 2 + 0x18;
@@ -166,141 +164,138 @@ namespace Toy2
 				int8_t removalMode = pickup->linkId >= 0x30;
 				switch (pickupType)
 				{
-				case 0:
-					HUD::g_slideTimers[1] = 0xB4;
-					g_buzzActor.health += 4;
-					if (g_buzzActor.health > 0xE)
-						g_buzzActor.health = 0xE;
-					break;
-				case 1:
-					CosmicShield(pickup);
-					removalMode = 0;
-					break;
-				case 2:
-				{
-					for (int32_t tokenIndex = 0; tokenIndex < 5; tokenIndex++)
-					{
-						if (g_tokenStates[tokenIndex].linkId == pickup->linkId)
+					case 0:
+						HUD::g_slideTimers[1] = 0xB4;
+						g_buzzActor.health += 4;
+						if (g_buzzActor.health > 0xE)
+							g_buzzActor.health = 0xE;
+						break;
+					case 1:
+						CosmicShield(pickup);
+						removalMode = 0;
+						break;
+					case 2: {
+						for (int32_t tokenIndex = 0; tokenIndex < 5; tokenIndex++)
 						{
-							g_tokenStates[tokenIndex].active = 2;
-							g_tokenStates[tokenIndex].timer = 0;
-							g_tokenCollectionState = TOKEN_COLLECTION_STATE_START;
-							SaveManager::g_save0Data.tokens[g_levelFileIndex] |= 1 << tokenIndex;
-							break;
+							if (g_tokenStates[tokenIndex].linkId == pickup->linkId)
+							{
+								g_tokenStates[tokenIndex].active = 2;
+								g_tokenStates[tokenIndex].timer = 0;
+								g_tokenCollectionState = TOKEN_COLLECTION_STATE_START;
+								SaveManager::g_save0Data.tokens[g_levelFileIndex] |= 1 << tokenIndex;
+								break;
+							}
 						}
+						break;
 					}
-					break;
-				}
-				case 3:
-					HUD::g_slideTimers[0] = 0xB4;
-					if (g_buzzActor.lives < 9)
-						g_buzzActor.lives++;
-					break;
-				case 4:
-					Token(pickup->linkId);
-					removalMode = 2;
-					break;
-				case 5:
-					Buzz::ActivateRocketBoots(pickup);
-					break;
-				case 6:
-				{
-					g_grappleCharges += 5;
-					g_discLauncherAmmo = 0;
-					if (g_grappleCharges > 10)
-						g_grappleCharges = 10;
-					if (g_gadgetRespawnTimer > 0)
-					{
-						g_respawningGadgetPickup->position.y = g_respawningGadgetPickupY;
-						g_gadgetRespawnTimer = 0;
-						Nu3D::Link::SetScaleFromFixedOffsets(g_respawningGadgetPickup->linkId, 0x1000, 0x1000, 0x1000);
-						int32_t gadgetX = g_respawningGadgetPickup->position.x;
-						int32_t gadgetY = g_respawningGadgetPickup->position.y;
-						int32_t gadgetZ = g_respawningGadgetPickup->position.z;
-						int32_t cameraZ = (Camera::g_renderCameraTransform.pos.z - gadgetZ * 0x20) >> 8;
-						int32_t cameraY = (Camera::g_renderCameraTransform.pos.y - gadgetY * 0x20) >> 8;
-						int32_t cameraX = (Camera::g_renderCameraTransform.pos.x - gadgetX * 0x20) >> 8;
-						int32_t cameraDistance = cameraZ * cameraZ;
-						cameraDistance += cameraY * cameraY;
-						cameraDistance += cameraX * cameraX;
-						if (cameraDistance < 0x90000 && cameraDistance + 1 != 0)
-							Particles::SpawnCollectSparkle(gadgetX * 0x20, gadgetY * 0x20, gadgetZ * 0x20, 0x32);
+					case 3:
+						HUD::g_slideTimers[0] = 0xB4;
+						if (g_buzzActor.lives < 9)
+							g_buzzActor.lives++;
+						break;
+					case 4:
+						Token(pickup->linkId);
+						removalMode = 2;
+						break;
+					case 5:
+						Buzz::ActivateRocketBoots(pickup);
+						break;
+					case 6: {
+						g_grappleCharges += 5;
+						g_discLauncherAmmo = 0;
+						if (g_grappleCharges > 10)
+							g_grappleCharges = 10;
+						if (g_gadgetRespawnTimer > 0)
+						{
+							g_respawningGadgetPickup->position.y = g_respawningGadgetPickupY;
+							g_gadgetRespawnTimer = 0;
+							Nu3D::Link::SetScaleFromFixedOffsets(g_respawningGadgetPickup->linkId, 0x1000, 0x1000, 0x1000);
+							int32_t gadgetX = g_respawningGadgetPickup->position.x;
+							int32_t gadgetY = g_respawningGadgetPickup->position.y;
+							int32_t gadgetZ = g_respawningGadgetPickup->position.z;
+							int32_t cameraZ = (Camera::g_renderCameraTransform.pos.z - gadgetZ * 0x20) >> 8;
+							int32_t cameraY = (Camera::g_renderCameraTransform.pos.y - gadgetY * 0x20) >> 8;
+							int32_t cameraX = (Camera::g_renderCameraTransform.pos.x - gadgetX * 0x20) >> 8;
+							int32_t cameraDistance = cameraZ * cameraZ;
+							cameraDistance += cameraY * cameraY;
+							cameraDistance += cameraX * cameraX;
+							if (cameraDistance < 0x90000 && cameraDistance + 1 != 0)
+								Particles::SpawnCollectSparkle(gadgetX * 0x20, gadgetY * 0x20, gadgetZ * 0x20, 0x32);
+						}
+						g_gadgetRespawnTimer = 400;
+						g_respawningGadgetPickupY = pickup->position.y;
+						g_respawningGadgetPickup = pickup;
+						Nu3D::Link::SetScaleFromFixedOffsets(pickup->linkId, 0, 0, 0);
+						break;
 					}
-					g_gadgetRespawnTimer = 400;
-					g_respawningGadgetPickupY = pickup->position.y;
-					g_respawningGadgetPickup = pickup;
-					Nu3D::Link::SetScaleFromFixedOffsets(pickup->linkId, 0, 0, 0);
-					break;
-				}
-				case 7:
-				{
-					g_discLauncherAmmo += 10;
-					g_grappleCharges = 0;
-					if (g_discLauncherAmmo > 30)
-						g_discLauncherAmmo = 30;
-					if (g_gadgetRespawnTimer > 0)
-					{
-						g_respawningGadgetPickup->position.y = g_respawningGadgetPickupY;
-						g_gadgetRespawnTimer = 0;
-						Nu3D::Link::SetScaleFromFixedOffsets(g_respawningGadgetPickup->linkId, 0x1000, 0x1000, 0x1000);
-						int32_t gadgetX = g_respawningGadgetPickup->position.x;
-						int32_t gadgetY = g_respawningGadgetPickup->position.y;
-						int32_t gadgetZ = g_respawningGadgetPickup->position.z;
-						int32_t cameraZ = (Camera::g_renderCameraTransform.pos.z - gadgetZ * 0x20) >> 8;
-						int32_t cameraY = (Camera::g_renderCameraTransform.pos.y - gadgetY * 0x20) >> 8;
-						int32_t cameraX = (Camera::g_renderCameraTransform.pos.x - gadgetX * 0x20) >> 8;
-						int32_t cameraDistance = cameraZ * cameraZ;
-						cameraDistance += cameraY * cameraY;
-						cameraDistance += cameraX * cameraX;
-						if (cameraDistance < 0x90000 && cameraDistance + 1 != 0)
-							Particles::SpawnCollectSparkle(gadgetX * 0x20, gadgetY * 0x20, gadgetZ * 0x20, 0x32);
+					case 7: {
+						g_discLauncherAmmo += 10;
+						g_grappleCharges = 0;
+						if (g_discLauncherAmmo > 30)
+							g_discLauncherAmmo = 30;
+						if (g_gadgetRespawnTimer > 0)
+						{
+							g_respawningGadgetPickup->position.y = g_respawningGadgetPickupY;
+							g_gadgetRespawnTimer = 0;
+							Nu3D::Link::SetScaleFromFixedOffsets(g_respawningGadgetPickup->linkId, 0x1000, 0x1000, 0x1000);
+							int32_t gadgetX = g_respawningGadgetPickup->position.x;
+							int32_t gadgetY = g_respawningGadgetPickup->position.y;
+							int32_t gadgetZ = g_respawningGadgetPickup->position.z;
+							int32_t cameraZ = (Camera::g_renderCameraTransform.pos.z - gadgetZ * 0x20) >> 8;
+							int32_t cameraY = (Camera::g_renderCameraTransform.pos.y - gadgetY * 0x20) >> 8;
+							int32_t cameraX = (Camera::g_renderCameraTransform.pos.x - gadgetX * 0x20) >> 8;
+							int32_t cameraDistance = cameraZ * cameraZ;
+							cameraDistance += cameraY * cameraY;
+							cameraDistance += cameraX * cameraX;
+							if (cameraDistance < 0x90000 && cameraDistance + 1 != 0)
+								Particles::SpawnCollectSparkle(gadgetX * 0x20, gadgetY * 0x20, gadgetZ * 0x20, 0x32);
+						}
+						g_gadgetRespawnTimer = 400;
+						g_respawningGadgetPickupY = pickup->position.y;
+						g_respawningGadgetPickup = pickup;
+						Nu3D::Link::SetScaleFromFixedOffsets(pickup->linkId, 0, 0, 0);
+						break;
 					}
-					g_gadgetRespawnTimer = 400;
-					g_respawningGadgetPickupY = pickup->position.y;
-					g_respawningGadgetPickup = pickup;
-					Nu3D::Link::SetScaleFromFixedOffsets(pickup->linkId, 0, 0, 0);
-					break;
-				}
-				case 8:
-					ActivateGravityBoots();
-					if (g_gadgetRespawnTimer > 0)
-					{
-						g_respawningGadgetPickup->position.y = g_respawningGadgetPickupY;
-						g_gadgetRespawnTimer = 0;
-						Nu3D::Link::SetScaleFromFixedOffsets(g_respawningGadgetPickup->linkId, 0x1000, 0x1000, 0x1000);
-						position.x = g_respawningGadgetPickup->position.x * 0x20;
-						position.y = g_respawningGadgetPickup->position.y * 0x20;
-						position.z = g_respawningGadgetPickup->position.z * 0x20;
-						int32_t cameraZ = (Camera::g_renderCameraTransform.pos.z - position.z) >> 8;
-						int32_t cameraY = (Camera::g_renderCameraTransform.pos.y - position.y) >> 8;
-						int32_t cameraX = (Camera::g_renderCameraTransform.pos.x - position.x) >> 8;
-						int32_t cameraDistance = cameraZ * cameraZ;
-						cameraDistance += cameraY * cameraY;
-						cameraDistance += cameraX * cameraX;
-						if (cameraDistance < 0x90000 && cameraDistance + 1 != 0)
-							Particles::SpawnCollectSparkle(position.x, position.y, position.z, 0x32);
-					}
-					g_gadgetRespawnTimer = 400;
-					g_respawningGadgetPickupY = pickup->position.y;
-					g_respawningGadgetPickup = pickup;
-					Nu3D::Link::SetScaleFromFixedOffsets(pickup->linkId, 0, 0, 0);
-					break;
-				case 9:
-					g_specialPickupCount++;
-					break;
-				case 10:
-					g_poweredLaserCharge = 0x4B0;
-					break;
-				case 0x10:
-					HUD::g_slideTimers[2] = 0xB4;
-					if (g_buzzActor.coinsCollected < 99)
-						g_buzzActor.coinsCollected++;
-					if (g_buzzActor.coinsCollected == 50)
-						AudioManager::PlaySoundEffect(0x4F, 0);
-					break;
-				case -1:
-					Gadget::g_unlockNodeState = -Gadget::g_unlockNodeState;
-					break;
+					case 8:
+						ActivateGravityBoots();
+						if (g_gadgetRespawnTimer > 0)
+						{
+							g_respawningGadgetPickup->position.y = g_respawningGadgetPickupY;
+							g_gadgetRespawnTimer = 0;
+							Nu3D::Link::SetScaleFromFixedOffsets(g_respawningGadgetPickup->linkId, 0x1000, 0x1000, 0x1000);
+							position.x = g_respawningGadgetPickup->position.x * 0x20;
+							position.y = g_respawningGadgetPickup->position.y * 0x20;
+							position.z = g_respawningGadgetPickup->position.z * 0x20;
+							int32_t cameraZ = (Camera::g_renderCameraTransform.pos.z - position.z) >> 8;
+							int32_t cameraY = (Camera::g_renderCameraTransform.pos.y - position.y) >> 8;
+							int32_t cameraX = (Camera::g_renderCameraTransform.pos.x - position.x) >> 8;
+							int32_t cameraDistance = cameraZ * cameraZ;
+							cameraDistance += cameraY * cameraY;
+							cameraDistance += cameraX * cameraX;
+							if (cameraDistance < 0x90000 && cameraDistance + 1 != 0)
+								Particles::SpawnCollectSparkle(position.x, position.y, position.z, 0x32);
+						}
+						g_gadgetRespawnTimer = 400;
+						g_respawningGadgetPickupY = pickup->position.y;
+						g_respawningGadgetPickup = pickup;
+						Nu3D::Link::SetScaleFromFixedOffsets(pickup->linkId, 0, 0, 0);
+						break;
+					case 9:
+						g_specialPickupCount++;
+						break;
+					case 10:
+						g_poweredLaserCharge = 0x4B0;
+						break;
+					case 0x10:
+						HUD::g_slideTimers[2] = 0xB4;
+						if (g_buzzActor.coinsCollected < 99)
+							g_buzzActor.coinsCollected++;
+						if (g_buzzActor.coinsCollected == 50)
+							AudioManager::PlaySoundEffect(0x4F, 0);
+						break;
+					case -1:
+						Gadget::g_unlockNodeState = -Gadget::g_unlockNodeState;
+						break;
 				}
 
 				pickupSound = -1;
@@ -404,12 +399,10 @@ namespace Toy2
 			if (g_tokenCollectionState == TOKEN_COLLECTION_STATE_CUTSCENE)
 			{
 				Camera::g_cutsceneDuration = 1000;
-				uint32_t angleDelta =
-					(Camera::g_renderCameraTransform.rotation.euler.angles.yaw - g_buzzActor.posAngles.angles.yaw - 0x800) & 0xFFF;
+				uint32_t angleDelta = (Camera::g_renderCameraTransform.rotation.euler.angles.yaw - g_buzzActor.posAngles.angles.yaw - 0x800) & 0xFFF;
 				if (angleDelta > 0x7FF)
 					angleDelta -= 0x1000;
-				g_buzzActor.posAngles.angles.yaw =
-					(g_buzzActor.posAngles.angles.yaw + Renderer::g_frameDelta * static_cast<int32_t>(angleDelta) / 16) & 0xFFF;
+				g_buzzActor.posAngles.angles.yaw = (g_buzzActor.posAngles.angles.yaw + Renderer::g_frameDelta * static_cast<int32_t>(angleDelta) / 16) & 0xFFF;
 				g_buzzActor.facingAngle = g_buzzActor.posAngles.angles.yaw;
 				return;
 			}
@@ -424,12 +417,10 @@ namespace Toy2
 					AudioManager::PlaySoundEffect(0x33, &g_buzzActor.posAngles.pos);
 					g_tokenLaunchVerticalVelocity = g_buzzActor.velocity.vertical;
 				}
-				uint32_t angleDelta =
-					(Camera::g_renderCameraTransform.rotation.euler.angles.yaw - g_buzzActor.posAngles.angles.yaw - 0x800) & 0xFFF;
+				uint32_t angleDelta = (Camera::g_renderCameraTransform.rotation.euler.angles.yaw - g_buzzActor.posAngles.angles.yaw - 0x800) & 0xFFF;
 				if (angleDelta > 0x7FF)
 					angleDelta -= 0x1000;
-				g_buzzActor.posAngles.angles.yaw =
-					(g_buzzActor.posAngles.angles.yaw + Renderer::g_frameDelta * static_cast<int32_t>(angleDelta) / 16) & 0xFFF;
+				g_buzzActor.posAngles.angles.yaw = (g_buzzActor.posAngles.angles.yaw + Renderer::g_frameDelta * static_cast<int32_t>(angleDelta) / 16) & 0xFFF;
 				g_buzzActor.facingAngle = g_buzzActor.posAngles.angles.yaw;
 			}
 
@@ -751,26 +742,6 @@ namespace Toy2
 			g_tokenStates[tokenIndex].active = 0;
 			*g_tokenStates[tokenIndex].verticalPosition = INT_MIN;
 			Nu3D::Link::SetScaleFromFixedOffsets(g_tokenStates[tokenIndex].linkId, 0, 0, 0);
-		}
-
-		// FUNCTION: TOY2 0x004A50D0 [MATCHED]
-		void CosmicShield(Buzz::GadgetPickup* pickup)
-		{
-			if (g_activeCosmicShieldPickup != 0)
-			{
-				g_activeCosmicShieldPickup->position.y = g_savedCosmicShieldPickupY;
-				Nu3D::Link::SetScaleFromFixedOffsets(g_activeCosmicShieldPickup->linkId, 0x2000, 0x2000, 0x2000);
-				Nu3D::Link::SetPositionRawAndCommit(g_activeCosmicShieldPickup->linkId,
-					g_activeCosmicShieldPickup->position.x,
-					g_activeCosmicShieldPickup->position.y,
-					g_activeCosmicShieldPickup->position.z);
-				g_activeCosmicShieldPickup = 0;
-			}
-
-			g_savedCosmicShieldPickupY = pickup->position.y;
-			g_activeCosmicShieldPickup = pickup;
-			g_buzzActor.cosmicShieldTimer = 900;
-			Nu3D::Link::SetScaleFromFixedOffsets(pickup->linkId, 0x3000, 0x3000, 0x3000);
 		}
 
 		// FUNCTION: TOY2 0x004CD110 [MATCHED]
