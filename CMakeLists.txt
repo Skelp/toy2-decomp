@@ -240,6 +240,9 @@ set(TOY2_SOURCES
     src/Nu3D/Nu3D.cpp
     src/Nu3D/Profiler.cpp
     src/Nu3D/BmpDataNode.h
+    src/Nu3D/BmpDataNodeInternal.h
+    src/Nu3D/BmpNodePool.cpp
+    src/Nu3D/TextureSurface.cpp
     src/Nu3D/BmpDataNode.cpp
     src/Nu3D/Patch.h
     src/Nu3D/Patch.cpp
