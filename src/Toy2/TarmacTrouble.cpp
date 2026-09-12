@@ -142,6 +142,10 @@ namespace Toy2
 		// GLOBAL: TOY2 0x0052FFEC
 		int32_t g_platformBobAngle;
 
+		// The link scale that means no change, and the first of the four button links.
+		const int32_t LINK_SCALE_ONE = 0x1000;
+		const int32_t BUTTON_LINK_FIRST = 0x36;
+
 		// FUNCTION: TOY2 0x0042D710 [MATCHED]
 		int32_t PressLightPuzzleButton(int32_t buttonIndex)
 		{
@@ -156,7 +160,7 @@ namespace Toy2
 					g_lightPuzzleState = (g_lightPuzzleState & LIGHT_PUZZLE_BUTTON_0_MASK) | LIGHT_PUZZLE_BOTTOM_0;
 					g_pressedButtonLink = 0x4C;
 					g_buttonResetTimer = 12;
-					Nu3D::Link::SetScaleFromFixedOffsets(0x50, 0x1000, 0x1000, 0x1000);
+					Nu3D::Link::SetScaleFromFixedOffsets(0x50, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 					Nu3D::Link::SetScaleFromFixedOffsets(g_pressedButtonLink, 0, 0, 0);
 					break;
 				case 1:
@@ -167,7 +171,7 @@ namespace Toy2
 					g_lightPuzzleState = (g_lightPuzzleState & LIGHT_PUZZLE_BUTTON_1_MASK) | LIGHT_PUZZLE_BOTTOM_1;
 					g_pressedButtonLink = 0x4D;
 					g_buttonResetTimer = 12;
-					Nu3D::Link::SetScaleFromFixedOffsets(0x51, 0x1000, 0x1000, 0x1000);
+					Nu3D::Link::SetScaleFromFixedOffsets(0x51, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 					Nu3D::Link::SetScaleFromFixedOffsets(g_pressedButtonLink, 0, 0, 0);
 					break;
 				case 2:
@@ -178,7 +182,7 @@ namespace Toy2
 					g_lightPuzzleState = (g_lightPuzzleState & LIGHT_PUZZLE_BUTTON_2_MASK) | LIGHT_PUZZLE_BOTTOM_2;
 					g_pressedButtonLink = 0x4E;
 					g_buttonResetTimer = 12;
-					Nu3D::Link::SetScaleFromFixedOffsets(0x52, 0x1000, 0x1000, 0x1000);
+					Nu3D::Link::SetScaleFromFixedOffsets(0x52, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 					Nu3D::Link::SetScaleFromFixedOffsets(g_pressedButtonLink, 0, 0, 0);
 					break;
 				case 3:
@@ -189,7 +193,7 @@ namespace Toy2
 					g_lightPuzzleState = (g_lightPuzzleState & LIGHT_PUZZLE_BUTTON_3_MASK) | LIGHT_PUZZLE_BOTTOM_3;
 					g_pressedButtonLink = 0x4F;
 					g_buttonResetTimer = 12;
-					Nu3D::Link::SetScaleFromFixedOffsets(0x53, 0x1000, 0x1000, 0x1000);
+					Nu3D::Link::SetScaleFromFixedOffsets(0x53, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 					Nu3D::Link::SetScaleFromFixedOffsets(g_pressedButtonLink, 0, 0, 0);
 					break;
 			}
@@ -201,45 +205,45 @@ namespace Toy2
 		{
 			if ((g_lightPuzzleState & LIGHT_PUZZLE_BOTTOM_3) != 0)
 			{
-				Nu3D::Link::SetScaleFromFixedOffsets(0x2B, 0x1000, 0x1000, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x2B, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				Nu3D::Link::SetScaleFromFixedOffsets(0x23, 0, 0, 0);
 			}
 			else
 			{
-				Nu3D::Link::SetScaleFromFixedOffsets(0x23, 0x1000, 0x1000, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x23, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				Nu3D::Link::SetScaleFromFixedOffsets(0x2B, 0, 0, 0);
 			}
 
 			if ((g_lightPuzzleState & LIGHT_PUZZLE_BOTTOM_2) != 0)
 			{
-				Nu3D::Link::SetScaleFromFixedOffsets(0x2C, 0x1000, 0x1000, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x2C, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				Nu3D::Link::SetScaleFromFixedOffsets(0x24, 0, 0, 0);
 			}
 			else
 			{
-				Nu3D::Link::SetScaleFromFixedOffsets(0x24, 0x1000, 0x1000, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x24, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				Nu3D::Link::SetScaleFromFixedOffsets(0x2C, 0, 0, 0);
 			}
 
 			if ((g_lightPuzzleState & LIGHT_PUZZLE_BOTTOM_1) != 0)
 			{
-				Nu3D::Link::SetScaleFromFixedOffsets(0x33, 0x1000, 0x1000, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x33, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				Nu3D::Link::SetScaleFromFixedOffsets(0x25, 0, 0, 0);
 			}
 			else
 			{
-				Nu3D::Link::SetScaleFromFixedOffsets(0x25, 0x1000, 0x1000, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x25, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				Nu3D::Link::SetScaleFromFixedOffsets(0x33, 0, 0, 0);
 			}
 
 			if ((g_lightPuzzleState & LIGHT_PUZZLE_BOTTOM_0) != 0)
 			{
-				Nu3D::Link::SetScaleFromFixedOffsets(0x34, 0x1000, 0x1000, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x34, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				Nu3D::Link::SetScaleFromFixedOffsets(0x26, 0, 0, 0);
 			}
 			else
 			{
-				Nu3D::Link::SetScaleFromFixedOffsets(0x26, 0x1000, 0x1000, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x26, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				Nu3D::Link::SetScaleFromFixedOffsets(0x34, 0, 0, 0);
 			}
 		}
@@ -249,45 +253,45 @@ namespace Toy2
 		{
 			if ((g_lightPuzzleState & LIGHT_PUZZLE_TOP_3) != 0)
 			{
-				Nu3D::Link::SetScaleFromFixedOffsets(0x27, 0x1000, 0x1000, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x27, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				Nu3D::Link::SetScaleFromFixedOffsets(0x1F, 0, 0, 0);
 			}
 			else
 			{
-				Nu3D::Link::SetScaleFromFixedOffsets(0x1F, 0x1000, 0x1000, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x1F, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				Nu3D::Link::SetScaleFromFixedOffsets(0x27, 0, 0, 0);
 			}
 
 			if ((g_lightPuzzleState & LIGHT_PUZZLE_TOP_2) != 0)
 			{
-				Nu3D::Link::SetScaleFromFixedOffsets(0x28, 0x1000, 0x1000, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x28, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				Nu3D::Link::SetScaleFromFixedOffsets(0x20, 0, 0, 0);
 			}
 			else
 			{
-				Nu3D::Link::SetScaleFromFixedOffsets(0x20, 0x1000, 0x1000, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x20, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				Nu3D::Link::SetScaleFromFixedOffsets(0x28, 0, 0, 0);
 			}
 
 			if ((g_lightPuzzleState & LIGHT_PUZZLE_TOP_1) != 0)
 			{
-				Nu3D::Link::SetScaleFromFixedOffsets(0x29, 0x1000, 0x1000, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x29, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				Nu3D::Link::SetScaleFromFixedOffsets(0x21, 0, 0, 0);
 			}
 			else
 			{
-				Nu3D::Link::SetScaleFromFixedOffsets(0x21, 0x1000, 0x1000, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x21, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				Nu3D::Link::SetScaleFromFixedOffsets(0x29, 0, 0, 0);
 			}
 
 			if ((g_lightPuzzleState & LIGHT_PUZZLE_TOP_0) != 0)
 			{
-				Nu3D::Link::SetScaleFromFixedOffsets(0x2A, 0x1000, 0x1000, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x2A, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				Nu3D::Link::SetScaleFromFixedOffsets(0x22, 0, 0, 0);
 			}
 			else
 			{
-				Nu3D::Link::SetScaleFromFixedOffsets(0x22, 0x1000, 0x1000, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x22, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				Nu3D::Link::SetScaleFromFixedOffsets(0x2A, 0, 0, 0);
 			}
 		}
@@ -306,10 +310,10 @@ namespace Toy2
 				affectedLightCount += PressLightPuzzleButton(*g_randDatBufferPtr++ & 3);
 			} while ((g_lightPuzzleState & LIGHT_PUZZLE_TOP_ROW) == (g_lightPuzzleState & LIGHT_PUZZLE_BOTTOM_ROW) * 0x10 || affectedLightCount < 6);
 
-			Nu3D::Link::SetScaleFromFixedOffsets(0x4C, 0x1000, 0x1000, 0x1000);
-			Nu3D::Link::SetScaleFromFixedOffsets(0x4D, 0x1000, 0x1000, 0x1000);
-			Nu3D::Link::SetScaleFromFixedOffsets(0x4E, 0x1000, 0x1000, 0x1000);
-			Nu3D::Link::SetScaleFromFixedOffsets(0x4F, 0x1000, 0x1000, 0x1000);
+			Nu3D::Link::SetScaleFromFixedOffsets(0x4C, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
+			Nu3D::Link::SetScaleFromFixedOffsets(0x4D, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
+			Nu3D::Link::SetScaleFromFixedOffsets(0x4E, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
+			Nu3D::Link::SetScaleFromFixedOffsets(0x4F, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 			Nu3D::Link::SetScaleFromFixedOffsets(0x50, 0, 0, 0);
 			Nu3D::Link::SetScaleFromFixedOffsets(0x51, 0, 0, 0);
 			Nu3D::Link::SetScaleFromFixedOffsets(0x52, 0, 0, 0);
@@ -322,10 +326,10 @@ namespace Toy2
 			UpdateBottomPuzzleLights();
 			UpdateTopPuzzleLights();
 
-			for (int32_t linkId = 0x36; linkId < 0x3A; linkId++)
+			for (int32_t linkId = BUTTON_LINK_FIRST; linkId < BUTTON_LINK_FIRST + 4; linkId++)
 			{
-				if (linkId == g_remainingButtonPresses + 0x36)
-					Nu3D::Link::SetScaleFromFixedOffsets(linkId, 0x1000, 0x1000, 0x1000);
+				if (linkId == g_remainingButtonPresses + BUTTON_LINK_FIRST)
+					Nu3D::Link::SetScaleFromFixedOffsets(linkId, LINK_SCALE_ONE, LINK_SCALE_ONE, LINK_SCALE_ONE);
 				else
 					Nu3D::Link::SetScaleFromFixedOffsets(linkId, 0, 0, 0);
 			}
@@ -586,7 +590,6 @@ namespace Toy2
 		// Tarmac Trouble interaction constants.
 		const int32_t ANGLE_MASK = 0xFFF;
 		const int32_t ANGLE_QUARTER = 0x400;
-		const int32_t LINK_SCALE_ONE = 0x1000;
 		const int32_t PUZZLE_FOCUS_LINK = 0x74;
 		const int32_t PUZZLE_CUTSCENE_DURATION = 300;
 		const int32_t SMITH_TRIGGER_DISTANCE = 300;
@@ -597,7 +600,6 @@ namespace Toy2
 		const int32_t FLARE_RECORD_SET = 0x28;
 		const int32_t FOOTING_PUZZLE_BUTTON_0 = 0x20;
 		const int32_t FOOTING_PUZZLE_BUTTON_3 = 0x23;
-		const int32_t BUTTON_LINK_FIRST = 0x36;
 		const int32_t CUTSCENE_CAMERA_RAISE = 0x8000;
 		const int32_t RAIN_SPAWN_HEIGHT = 0x8000;
 		const int32_t RAIN_SCATTER = 0x100;
