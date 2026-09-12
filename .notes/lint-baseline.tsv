@@ -189,3 +189,7 @@ src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_TEXTURED_EDGE_WITH_END	11
 0x0049d910	unstructured-control-flow	goto-count	77dd5e8ddf01	src/Toy2/Toy2.cpp
 0x004909e0	duplicated-block	14 lines	c70c3c420627	src/Toy2/Toy2.cpp
 0x00498550	duplicated-block	17 lines	3f4ddd75a27d	src/Toy2/Toy2.cpp
+0x00477eb0	duplicated-block	28 lines	f94c906120a7	src/SoftwareRenderer.cpp
+0x00477eb0	duplicated-block	14 lines	511c52a83e3e	src/SoftwareRenderer.cpp
+0x00477eb0	duplicated-block	15 lines	8cd3d6f69a13	src/SoftwareRenderer.cpp
+0x00477eb0	duplicated-block	31 lines	73e56ab08c0c	src/SoftwareRenderer.cpp

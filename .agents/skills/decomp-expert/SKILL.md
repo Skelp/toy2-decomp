@@ -26,8 +26,8 @@ the handoff TOOL line and stop.
 - A `lint:` line is a new finding validate will reject: fix the declared type or field. A
   legacy cast whose shared declaration cannot change stays inline; note it under OPEN (it
   stays PROVISIONAL). Never move a cast into a local or macro to pass the lint. A
-  `duplicated-block` line names copied source: share it in a file-local macro or static
-  helper, or write `// retail-duplicate: REASON` above the one block retail repeats.
+  `duplicated-block` line names copied source: share it in a file-local macro or helper;
+  `// retail-duplicate: shared FORM scored X% at attempt N` accepts one only with that measurement.
 - The best tree is `build/decomp-cache/best/ADDR.patch`; restore it, new files included, with
   `git checkout -- src CMakeLists.txt && git clean -fdq src && git apply build/decomp-cache/best/ADDR.patch`;
   bc on a measured tree names its attempt; `tools/decomp evidence ADDR --decomp-range A:B` prints lines A-B.

@@ -626,7 +626,7 @@ class QualityRuleTests(unittest.TestCase):
 
     def test_a_retail_duplicate_comment_accepts_a_repeated_macro(self):
         source = (macro("BLEND25", 8)
-                  + "// retail-duplicate: retail writes one edge walk for each blend\n"
+                  + "// retail-duplicate: shared macro scored 38.10% at attempt 7\n"
                   + macro("BLEND50", 8))
         found = [item for item in findings_for(source) if item.rule == "repeated-macro-body"]
         self.assertEqual([item.suppressed for item in found], [True])
@@ -732,7 +732,7 @@ class DuplicatedBlockTests(unittest.TestCase):
     def test_a_retail_duplicate_comment_accepts_a_copy(self):
         body = walk(14)
         source = (function("0x00401000", "drawFirst", body)
-                  + "// retail-duplicate: retail walks each edge in the body\n"
+                  + "// retail-duplicate: shared helper scored 40.00% at attempt 3\n"
                   + function("0x00402000", "drawSecond", body))
         found = [item for item in findings_for(source) if item.rule == "duplicated-block"]
         self.assertEqual([item.suppressed for item in found], [True])
@@ -740,13 +740,13 @@ class DuplicatedBlockTests(unittest.TestCase):
     def test_one_comment_accepts_one_copy(self):
         body = walk(14)
         source = (function("0x00401000", "drawFirst", body)
-                  + "// retail-duplicate: retail walks each edge in the body\n"
+                  + "// retail-duplicate: shared helper scored 40.00% at attempt 3\n"
                   + function("0x00402000", "drawSecond", body + "\tmid(edge);\n" + body))
         found = [item for item in findings_for(source) if item.rule == "duplicated-block"]
         self.assertEqual([item.suppressed for item in found], [True, False])
 
     def test_a_comment_over_one_block_does_not_accept_a_copy_outside_it(self):
-        guard = ("\t// retail-duplicate: retail states this guard in each mode\n"
+        guard = ("\t// retail-duplicate: shared guard scored 12.50% at attempt 2\n"
                  "\t{\n\t\tedge.ready = 1;\n\t}\n")
         source = (function("0x00401000", "drawFirst", walk(14))
                   + function("0x00402000", "drawSecond", guard + walk(14)))
@@ -801,7 +801,7 @@ class DuplicatedBlockTests(unittest.TestCase):
         body = walk(14)
         source = function("0x00401000", "drawFirst", body) + function("0x00402000", "drawSecond", body)
         accepted = source.replace("// FUNCTION: TOY2 0x00402000",
-                                  "// retail-duplicate: retail walks each edge\n// FUNCTION: TOY2 0x00402000")
+                                  "// retail-duplicate: shared macro scored 9.00% at attempt 4\n// FUNCTION: TOY2 0x00402000")
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "probe.cpp"
             for text, expected in ((source, 1), (accepted, 0)):
@@ -816,3 +816,29 @@ class DuplicatedBlockTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RetailDuplicateMeasurementTests(unittest.TestCase):
+    """The marker accepts a copy only when its reason cites the shared form's score."""
+
+    BODY = "\n".join(f"\tstep{number}(scale{number});" for number in range(14))
+
+    def source(self, reason: str) -> str:
+        return (
+            "// FUNCTION: TOY2 0x00401000\nvoid first()\n{\n" + self.BODY + "\n}\n\n"
+            "// FUNCTION: TOY2 0x00402000\nvoid second()\n{\n"
+            + f"\t// retail-duplicate: {reason}\n" + self.BODY + "\n}\n"
+        )
+
+    def duplicates(self, reason: str):
+        return [item for item in findings_for(self.source(reason)) if item.rule == "duplicated-block"]
+
+    def test_a_reason_without_a_measurement_does_not_accept(self):
+        found = self.duplicates("retail writes the walk into each renderer")
+        self.assertTrue(found)
+        self.assertFalse(any(item.suppressed for item in found), [item.detail for item in found])
+
+    def test_a_reason_naming_the_shared_attempt_accepts(self):
+        found = self.duplicates("shared macro scored 38.10% at attempt 7")
+        self.assertTrue(found)
+        self.assertTrue(all(item.suppressed for item in found))

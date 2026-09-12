@@ -80,9 +80,14 @@ DUPLICATE_RULE = "duplicated-block"
 # Twelve normalized lines are longer than any idiom a file repeats by itself (a
 # clamp, a swap, a loop header), so a run this long is copied source.
 DUPLICATE_BLOCK_LINES = 12
-# Retail does repeat some code, a per-edge walk for example. This comment above the
-# block or the macro states that, and accepts both duplication rules for it.
-RETAIL_DUPLICATE_RE = re.compile(r"//\s*retail-duplicate:\s*(.{8,})\s*$", re.IGNORECASE)
+# Retail repeating a block is no reason to repeat the source: a macro or an __inline
+# helper compiles to the same code. So this comment accepts a duplicate only when its
+# reason cites the attempt where the shared form lost score, for example
+# "// retail-duplicate: shared macro scored 38.10% at attempt 7 (41.56% apart)".
+RETAIL_DUPLICATE_RE = re.compile(
+    r"//\s*retail-duplicate:\s*(?=.*\bshared\b)(?=.*\battempt\s*\d+)(?=.*\d+(?:\.\d+)?\s*%)(.{8,})\s*$",
+    re.IGNORECASE,
+)
 # Longer operators first, so "==" is not read as "=".
 OPERATORS = ("==", "!=", "<=", ">=", "<<", ">>", "&&", "||", "+=", "-=", "*=", "/=", "&=",
              "|=", "^=", "=", "<", ">", "+", "-", "*", "/", "%", "&", "|", "^")
@@ -131,7 +136,8 @@ RULE_HELP = {
         "Two macros in one file have the same body of 8 or more lines, or one holds a run "
         "of 8 or more code lines (a blank line, a brace and a comment do not count) that "
         "the other states too. Keep one macro and give it a parameter; the preprocessed "
-        "code stays identical. Write '// retail-duplicate: REASON' above the later #define "
+        "code stays identical. Accept it only with '// retail-duplicate: shared FORM scored "
+        "X% at attempt N' above the later #define, which names the measurement "
         "when retail really repeats the code."
     ),
     "duplicated-block": (
