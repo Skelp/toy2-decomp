@@ -296,6 +296,12 @@ set(TOY2_SOURCES
     src/Renderer/Glue.h
 
     # NGNLoader
+    src/NGNLoader/TextureData.cpp
+    src/NGNLoader/TextureLookup.cpp
+    src/NGNLoader/TextureStore.cpp
+    src/NGNLoader/PortalPools.cpp
+    src/NGNLoader/NGNImage.cpp
+    src/NGNLoader/NGNLoaderInternal.h
     src/NGNLoader/NGNLoader.cpp
     src/NGNLoader/NGNLoader.h
     src/NGNLoader/NGNTypes.h
