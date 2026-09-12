@@ -14,6 +14,44 @@ namespace SoftwareRenderer
 	extern void* g_lockedBackBuffer;
 	extern int32_t g_levelFileIndex;
 
+	// One scanline of a polygon that the rasterizer bands fill. The band that
+	// walks the edges writes the left and right ends here, and the row loop reads
+	// them back. ClearScanlineFlags empties the table between polygons.
+	struct ScanlineScratch
+	{
+		union
+		{
+			int32_t populated;
+			uint8_t populatedByte;
+		};
+		int32_t leftXFixed;
+		int32_t leftInterpolants[5];
+		int32_t rightXFixed;
+		int32_t rightInterpolants[11];
+	};
+	STATIC_ASSERT(sizeof(ScanlineScratch) == 0x4c);
+	STATIC_ASSERT(offsetof(ScanlineScratch, leftXFixed) == 0x4);
+	STATIC_ASSERT(offsetof(ScanlineScratch, rightXFixed) == 0x1c);
+
+	// One rasterizer set. The pixel format picks the table, and the render state
+	// of an item picks the entry. RenderSoftwareFrame walks the buckets and calls
+	// through the selected table, so both the band that fills the tables and the
+	// band that reads them need the record.
+	typedef void (*SoftwareRenderCallback)(SoftwareRenderItem* item);
+	typedef void (*SoftwareSolidQuadCallback)(const PointI* point0, const PointI* point1, const PointI* point2, const PointI* point3, uint32_t colourPair);
+
+	struct SoftwareRenderDispatchTable
+	{
+		SoftwareRenderCallback highPriority;
+		SoftwareSolidQuadCallback solidQuad;
+		SoftwareRenderCallback additive;
+		SoftwareRenderCallback subtractive;
+		SoftwareRenderCallback colourOffset[4];
+		SoftwareRenderCallback defaultCallback[4];
+		SoftwareRenderCallback flag80;
+	};
+	STATIC_ASSERT(sizeof(SoftwareRenderDispatchTable) == 0x34);
+
 	// A queued render command for the software rasterizer. QueueRenderCommand enqueues
 	// transformed vertices (3 for a triangle, 4 for a quad when vertexCount is
 	// 4) and RasterizeRenderCommand dequeues and rasterizes one. Stride 0x9C, capacity 1024

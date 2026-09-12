@@ -19,9 +19,6 @@
 namespace SoftwareRenderer
 {
 
-	// GLOBAL: TOY2 0x00830C60
-	int32_t g_backBufferClearComplete;
-
 	// GLOBAL: TOY2 0x00559C40
 	int32_t g_skipOddSoftwareFrames;
 
@@ -31,9 +28,6 @@ namespace SoftwareRenderer
 	// Active base of the 4096 software-render depth buckets.
 	// GLOBAL: TOY2 0x0087E50C
 	SoftwareRenderItem* g_softwareRenderBucketStorage[4096];
-
-	// GLOBAL: TOY2 0x00504D34
-	SoftwareRenderItem** g_softwareRenderBuckets = g_softwareRenderBucketStorage;
 
 	// GLOBAL: TOY2 0x00839280
 	int32_t g_softwareRenderItemCount;
@@ -99,22 +93,6 @@ namespace SoftwareRenderer
 
 	// GLOBAL: TOY2 0x00DE20A8
 	int32_t g_renderCommandCount;
-
-	struct ScanlineScratch
-	{
-		union
-		{
-			int32_t populated;
-			uint8_t populatedByte;
-		};
-		int32_t leftXFixed;
-		int32_t leftInterpolants[5];
-		int32_t rightXFixed;
-		int32_t rightInterpolants[11];
-	};
-	STATIC_ASSERT(sizeof(ScanlineScratch) == 0x4c);
-	STATIC_ASSERT(offsetof(ScanlineScratch, leftXFixed) == 0x4);
-	STATIC_ASSERT(offsetof(ScanlineScratch, rightXFixed) == 0x1c);
 
 	// GLOBAL: TOY2 0x008393E0
 	ScanlineScratch g_scanlineScratch[1024];
@@ -315,11 +293,6 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x009F6010
 	int32_t g_disableSortedPrimitiveSubmission;
 
-	// Heap buffer allocated by InitSoftwareRenderer (malloc'd, ~1.25MB) and
-	// released by Destroy on shutdown.
-	// GLOBAL: TOY2 0x0084CBE0
-	void* g_softwareRendererBuffer;
-
 	// Locked primary surface pointer and pitch, captured by
 	// InitialisePrimarySurface and read by PresentFrame when blitting.
 	// GLOBAL: TOY2 0x00E4D7B4
@@ -361,45 +334,6 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00A4CC78
 	void* g_colourScaleTables;
 
-	// GLOBAL: TOY2 0x00882910
-	int32_t g_bitsPerPixel;
-
-	// GLOBAL: TOY2 0x00703E20
-	uint16_t g_blueRampFull[64];
-
-	// GLOBAL: TOY2 0x00703EA0
-	uint16_t g_greenRampFull[128];
-
-	// GLOBAL: TOY2 0x00703FA0
-	uint16_t g_redRampFull[64];
-
-	// GLOBAL: TOY2 0x00704028
-	uint16_t g_blueRampLow[64];
-
-	// GLOBAL: TOY2 0x007040A8
-	uint16_t g_blueRampHigh[64];
-
-	// GLOBAL: TOY2 0x00704128
-	uint16_t g_blueRampMedium[64];
-
-	// GLOBAL: TOY2 0x007041A8
-	uint16_t g_greenRampLow[128];
-
-	// GLOBAL: TOY2 0x007042A8
-	uint16_t g_greenRampHigh[128];
-
-	// GLOBAL: TOY2 0x007043A8
-	uint16_t g_greenRampMedium[128];
-
-	// GLOBAL: TOY2 0x007044A8
-	uint16_t g_redRampLow[64];
-
-	// GLOBAL: TOY2 0x00704528
-	uint16_t g_redRampHigh[64];
-
-	// GLOBAL: TOY2 0x007045A8
-	uint16_t g_redRampMedium[64];
-
 	// GLOBAL: TOY2 0x0084D0E8
 	int32_t g_softwareRendererBufferBlockCount;
 
@@ -428,37 +362,8 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00500C00
 	int32_t g_unusedSoftwareRendererConfigD;
 
-	// Back-buffer surface state used by the software frame drain. The surface
-	// pointer is the retail `d3dappi.lpBackBuffer` member. The locked pointer is
-	// valid only between Lock and Unlock. The pitch is in pixels.
-	// GLOBAL: TOY2 0x00534558
-	void* g_lockedBackBuffer;
-
-	// GLOBAL: TOY2 0x00882778
-	int32_t g_backBufferPitchPixels;
-
-	// Counts deferred frame clears. Initialisation sets it to two, and the first
-	// successful clear consumes one count.
-	// GLOBAL: TOY2 0x00500C04
-	int32_t g_pendingBackBufferClears;
-
 	// GLOBAL: TOY2 0x008827A0
 	void* g_softwareTextureData[64];
-
-	typedef void (*SoftwareRenderCallback)(SoftwareRenderItem* item);
-	typedef void (*SoftwareSolidQuadCallback)(const PointI* point0, const PointI* point1, const PointI* point2, const PointI* point3, uint32_t colourPair);
-
-	struct SoftwareRenderDispatchTable
-	{
-		SoftwareRenderCallback highPriority;
-		SoftwareSolidQuadCallback solidQuad;
-		SoftwareRenderCallback additive;
-		SoftwareRenderCallback subtractive;
-		SoftwareRenderCallback colourOffset[4];
-		SoftwareRenderCallback defaultCallback[4];
-		SoftwareRenderCallback flag80;
-	};
-	STATIC_ASSERT(sizeof(SoftwareRenderDispatchTable) == 0x34);
 
 	// FUNCTION: TOY2 0x0045DB80 [PROVISIONAL]
 	void RasterizeTexturedRect555(SoftwareRenderItem* item)
@@ -5649,123 +5554,6 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x00704E68
 	SoftwareRenderDispatchTable* g_softwareRenderDispatch;
 
-	// FUNCTION: TOY2 0x0047C8B0 [PROVISIONAL]
-	void BuildColourRampTables()
-	{
-		if (g_bitsPerPixel == 16)
-		{
-			int32_t source = -12;
-			int32_t tableIndex = 0;
-			do
-			{
-				int32_t level = source;
-				if (source < 0)
-					level = 0;
-				else if (source > 31)
-					level = 31;
-
-				g_redRampFull[tableIndex] = (uint16_t)(level << 11);
-				g_redRampLow[tableIndex] = (uint16_t)((level * 10 / 32) << 11);
-				g_redRampMedium[tableIndex] = (uint16_t)((level * 17 / 32) << 11);
-				g_redRampHigh[tableIndex] = (uint16_t)((level * 25 / 32) << 11);
-				++tableIndex;
-				++source;
-			} while (source + 12 < 64);
-
-			source = -24;
-			tableIndex = 0;
-			do
-			{
-				int32_t level = source;
-				if (source < 0)
-					level = 0;
-				else if (source > 63)
-					level = 63;
-
-				g_greenRampFull[tableIndex] = (uint16_t)(level << 5);
-				g_greenRampLow[tableIndex] = (uint16_t)((level * 18 / 64) << 5);
-				g_greenRampMedium[tableIndex] = (uint16_t)((level * 33 / 64) << 5);
-				g_greenRampHigh[tableIndex] = (uint16_t)((level * 49 / 64) << 5);
-				++tableIndex;
-				++source;
-			} while (source + 24 < 128);
-
-			source = -12;
-			tableIndex = 0;
-			do
-			{
-				int32_t level = source;
-				if (source < 0)
-					level = 0;
-				else if (source > 31)
-					level = 31;
-
-				g_blueRampFull[tableIndex] = (uint16_t)level;
-				g_blueRampLow[tableIndex] = (uint16_t)(level * 10 / 32);
-				g_blueRampMedium[tableIndex] = (uint16_t)(level * 17 / 32);
-				g_blueRampHigh[tableIndex] = (uint16_t)(level * 25 / 32);
-				++tableIndex;
-				++source;
-			} while (source + 12 < 64);
-		}
-		else
-		{
-			int32_t source = -12;
-			int32_t tableIndex = 0;
-			do
-			{
-				int32_t level = source;
-				if (source < 0)
-					level = 0;
-				else if (source > 31)
-					level = 31;
-
-				g_redRampFull[tableIndex] = (uint16_t)(level << 10);
-				g_redRampLow[tableIndex] = (uint16_t)((level * 10 / 32) << 10);
-				g_redRampMedium[tableIndex] = (uint16_t)((level * 17 / 32) << 10);
-				g_redRampHigh[tableIndex] = (uint16_t)((level * 25 / 32) << 10);
-				++tableIndex;
-				++source;
-			} while (source + 12 < 64);
-
-			source = -12;
-			tableIndex = 0;
-			do
-			{
-				int32_t level = source;
-				if (source < 0)
-					level = 0;
-				else if (source > 31)
-					level = 31;
-
-				g_greenRampFull[tableIndex] = (uint16_t)(level << 5);
-				g_greenRampLow[tableIndex] = (uint16_t)((level * 10 / 32) << 5);
-				g_greenRampMedium[tableIndex] = (uint16_t)((level * 17 / 32) << 5);
-				g_greenRampHigh[tableIndex] = (uint16_t)((level * 25 / 32) << 5);
-				++tableIndex;
-				++source;
-			} while (source + 12 < 64);
-
-			source = -12;
-			tableIndex = 0;
-			do
-			{
-				int32_t level = source;
-				if (source < 0)
-					level = 0;
-				else if (source > 31)
-					level = 31;
-
-				g_blueRampFull[tableIndex] = (uint16_t)level;
-				g_blueRampLow[tableIndex] = (uint16_t)(level * 10 / 32);
-				g_blueRampMedium[tableIndex] = (uint16_t)(level * 17 / 32);
-				g_blueRampHigh[tableIndex] = (uint16_t)(level * 25 / 32);
-				++tableIndex;
-				++source;
-			} while (source + 12 < 64);
-		}
-	}
-
 	// Render-buffer double-buffering state. SwapRenderBuffer toggles
 	// g_currentRenderBuffer between the two contiguous render buffers
 	// (g_renderBufferB follows g_renderBufferA at +0x3C420) and derives
@@ -5943,92 +5731,6 @@ namespace SoftwareRenderer
 
 	// FUNCTION: TOY2 0x004C1E60 [MATCHED]
 	void InitialisePrimarySurface_T() { InitialisePrimarySurface(); }
-
-	// FUNCTION: TOY2 0x0047D0F0 [MATCHED]
-	void Destroy()
-	{
-		Logger::Log("QUIT : Destroying software renderer.\n");
-		if (g_softwareRendererBuffer)
-		{
-			free(g_softwareRendererBuffer);
-		}
-	}
-
-	// FUNCTION: TOY2 0x0047D120 [PROVISIONAL]
-	void ClearBackBufferOnce()
-	{
-		if (g_backBufferClearComplete != 0)
-			return;
-
-		uint32_t* pixel = static_cast<uint32_t*>(g_lockedBackBuffer);
-		if (g_bitsPerPixel == 8)
-		{
-			int32_t rowPadding = (g_backBufferPitchPixels - Toy2::g_destRectWidth) / 4;
-			int32_t rowWidth = Toy2::g_destRectWidth / 4;
-			int32_t row = Toy2::g_destRectHeight;
-			do
-			{
-				int32_t count = rowWidth;
-				do
-					*pixel++ = 0;
-				while (--count != 0);
-
-				uint8_t* nextRow = reinterpret_cast<uint8_t*>(pixel) + rowPadding;
-				pixel = reinterpret_cast<uint32_t*>(nextRow);
-			} while (--row != 0);
-		}
-		else
-		{
-			int32_t rowPadding = (g_backBufferPitchPixels - Toy2::g_destRectWidth) / 2;
-			int32_t rowWidth = Toy2::g_destRectWidth / 2;
-			int32_t row = Toy2::g_destRectHeight;
-			do
-			{
-				int32_t count = rowWidth;
-				do
-					*pixel++ = 0;
-				while (--count != 0);
-
-				uint8_t* nextRow = reinterpret_cast<uint8_t*>(pixel) + rowPadding;
-				pixel = reinterpret_cast<uint32_t*>(nextRow);
-			} while (--row != 0);
-		}
-
-		g_backBufferClearComplete = 1;
-		g_pendingBackBufferClears--;
-	}
-
-	// FUNCTION: TOY2 0x0047D540 [PROVISIONAL]
-	void FillRect32(uint32_t* dest, int32_t width, int32_t height, int32_t rowPaddingBytes, uint32_t value)
-	{
-		do
-		{
-			int32_t count = width;
-			do
-				*dest++ = value;
-			while (--count != 0);
-
-			uint8_t* nextRow = reinterpret_cast<uint8_t*>(dest) + rowPaddingBytes;
-			dest = reinterpret_cast<uint32_t*>(nextRow);
-		} while (--height != 0);
-	}
-
-	// FUNCTION: TOY2 0x0047D650 [MATCHED]
-	void ClearScanlineFlags(ScanlineScratch* scanline, int32_t count)
-	{
-		__asm
-		{
-			push edi
-			mov edi, scanline
-			mov ecx, count
-		clearNext:
-			mov byte ptr [edi], 0
-			add edi, 04ch
-			dec ecx
-			jne clearNext
-			pop edi
-		}
-	}
 
 	// FUNCTION: TOY2 0x004C1E70 [MATCHED]
 	void CommitZoom()
@@ -6410,40 +6112,6 @@ namespace SoftwareRenderer
 		}
 
 		return 0;
-	}
-
-	// FUNCTION: TOY2 0x0047C800 [PROVISIONAL]
-	void LockBackBuffer()
-	{
-		DDSURFACEDESC surfaceDesc;
-		memset(&surfaceDesc, 0, sizeof(surfaceDesc));
-		surfaceDesc.dwSize = sizeof(surfaceDesc);
-
-		HRESULT result;
-		do
-		{
-			result = d3dappi.lpBackBuffer->Lock(NULL, &surfaceDesc, 0, NULL);
-		} while (result == DDERR_WASSTILLDRAWING);
-
-		if (result == DD_OK)
-		{
-			g_lockedBackBuffer = surfaceDesc.lpSurface;
-			return;
-		}
-
-		g_lockedBackBuffer = NULL;
-		Logger::Log("SOFT : ERROR - Failed to lock back buffer - %s.\n", D3DAppErrorToString(result));
-	}
-
-	// FUNCTION: TOY2 0x0047C870 [MATCHED]
-	void UnlockBackBuffer()
-	{
-		HRESULT result = d3dappi.lpBackBuffer->Unlock(NULL);
-		g_lockedBackBuffer = NULL;
-		if (result != DD_OK)
-		{
-			Logger::Log("SOFT : ERROR - Failed to unlock back buffer - %s.\n", D3DAppErrorToString(result));
-		}
 	}
 
 	// FUNCTION: TOY2 0x004BCC40 [MATCHED]
@@ -6976,134 +6644,6 @@ namespace SoftwareRenderer
 				break;
 		}
 		g_reverseDepthSortEnabled = 0;
-	}
-
-	// FUNCTION: TOY2 0x0047D210 [PROVISIONAL]
-	void RenderSoftwareFrame(int32_t displayMaxX, int32_t clearValue)
-	{
-		DDSURFACEDESC surfaceDesc;
-		memset(&surfaceDesc, 0, sizeof(surfaceDesc));
-		surfaceDesc.dwSize = sizeof(surfaceDesc);
-
-		HRESULT result;
-		do
-		{
-			result = d3dappi.lpBackBuffer->Lock(NULL, &surfaceDesc, 0, NULL);
-		} while (result == DDERR_WASSTILLDRAWING);
-
-		if (result == DD_OK)
-		{
-			g_lockedBackBuffer = surfaceDesc.lpSurface;
-		}
-		else
-		{
-			g_lockedBackBuffer = NULL;
-			Logger::Log("SOFT : ERROR - Failed to lock back buffer - %s.\n", D3DAppErrorToString(result));
-		}
-
-		if (Nu3D::Camera::g_cameraTintRed != 0x80 && g_renderMode == RENDERMODE_SOFTWARE && g_bitsPerPixel != 8)
-		{
-			int32_t rowSkip = (g_backBufferPitchPixels - Toy2::g_destRectWidth) / 2;
-			int32_t rowWidth = Toy2::g_destRectWidth / 2;
-			uint32_t* pixel = static_cast<uint32_t*>(g_lockedBackBuffer);
-			for (int32_t row = Toy2::g_destRectHeight; row != 0; row--)
-			{
-				for (int32_t count = rowWidth; count != 0; count--)
-				{
-					*pixel++ = 0;
-				}
-				uint8_t* nextRow = reinterpret_cast<uint8_t*>(pixel) + rowSkip;
-				pixel = reinterpret_cast<uint32_t*>(nextRow);
-			}
-		}
-		else
-		{
-			if (g_pendingBackBufferClears != 0 && g_backBufferClearComplete == 0)
-			{
-				uint32_t* pixel = static_cast<uint32_t*>(g_lockedBackBuffer);
-				if (g_bitsPerPixel == 8)
-				{
-					int32_t rowSkip = (g_backBufferPitchPixels - Toy2::g_destRectWidth) / 4;
-					int32_t rowWidth = Toy2::g_destRectWidth / 4;
-					for (int32_t row = Toy2::g_destRectHeight; row != 0; row--)
-					{
-						for (int32_t count = rowWidth; count != 0; count--)
-						{
-							*pixel++ = 0;
-						}
-						uint8_t* nextRow = reinterpret_cast<uint8_t*>(pixel) + rowSkip;
-						pixel = reinterpret_cast<uint32_t*>(nextRow);
-					}
-				}
-				else
-				{
-					int32_t rowSkip = (g_backBufferPitchPixels - Toy2::g_destRectWidth) / 2;
-					int32_t rowWidth = Toy2::g_destRectWidth / 2;
-					for (int32_t row = Toy2::g_destRectHeight; row != 0; row--)
-					{
-						for (int32_t count = rowWidth; count != 0; count--)
-						{
-							*pixel++ = 0;
-						}
-						uint8_t* nextRow = reinterpret_cast<uint8_t*>(pixel) + rowSkip;
-						pixel = reinterpret_cast<uint32_t*>(nextRow);
-					}
-				}
-				g_backBufferClearComplete = 1;
-				g_pendingBackBufferClears--;
-			}
-
-			for (int32_t bucket = 4095; bucket >= 0; bucket--)
-			{
-				SoftwareRenderItem* item = g_softwareRenderBuckets[bucket];
-				while (item != NULL)
-				{
-					uint16_t flags = item->renderFlags;
-					SoftwareRenderCallback callback = NULL;
-					if (flags & 0x8000)
-					{
-						callback = g_softwareRenderDispatch->highPriority;
-					}
-					else if (flags & 0x80)
-					{
-						g_softwareRenderDispatch->flag80(item);
-					}
-					else
-					{
-						int32_t kind = (flags >> 9) & 3;
-						if ((flags & SOFTWARE_RENDER_SUBTRACTIVE) && g_softwareRenderDispatch->subtractive != NULL)
-						{
-							callback = g_softwareRenderDispatch->subtractive;
-						}
-						else if ((flags & SOFTWARE_RENDER_ADDITIVE) && g_softwareRenderDispatch->additive != NULL)
-						{
-							callback = g_softwareRenderDispatch->additive;
-						}
-						else if ((flags & SOFTWARE_RENDER_COLOUR_OFFSET) && g_softwareRenderDispatch->colourOffset[kind] != NULL)
-						{
-							callback = g_softwareRenderDispatch->colourOffset[kind];
-						}
-						else
-						{
-							callback = g_softwareRenderDispatch->defaultCallback[kind];
-						}
-					}
-					if (callback != NULL)
-					{
-						callback(item);
-					}
-					item = item->next;
-				}
-			}
-		}
-
-		result = d3dappi.lpBackBuffer->Unlock(NULL);
-		g_lockedBackBuffer = NULL;
-		if (result != DD_OK)
-		{
-			Logger::Log("SOFT : ERROR - Failed to unlock back buffer - %s.\n", D3DAppErrorToString(result));
-		}
-		D3DAppShowBackBuffer();
 	}
 
 #define NU_FMIN(a, b) ((a) < (b) ? (a) : (b))
