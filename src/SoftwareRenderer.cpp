@@ -2756,7 +2756,12 @@ namespace SoftwareRenderer
 
 #undef RASTERIZE_SOLID_EDGE
 
-#define RASTERIZE_BLEND25_555_EDGE(vertexA, vertexB, doneLabel)                                                                  \
+	// The blended polygons walk their own edges. RASTERIZE_LIT_EDGE_WITH_END carries a
+	// third interpolant through the same slots, and folding this walk into the pointer
+	// form of RASTERIZE_TEXTURED_EDGE_EXCLUSIVE moved 0x0045A5C0 from 48.19% to 27.86%,
+	// so retail states the walk twice.
+	// retail-duplicate: shared RASTERIZE_TEXTURED_EDGE_EXCLUSIVE form scored 27.86% at attempt 8, against 48.19% for this form
+#define RASTERIZE_UV_EDGE(vertexA, vertexB, doneLabel)                                                                           \
 	do                                                                                                                           \
 	{                                                                                                                            \
 		int32_t edgeY;                                                                                                           \
@@ -2877,16 +2882,16 @@ namespace SoftwareRenderer
 		ScanlineScratch* scanline = &g_scanlineScratch[topY];
 		ClearScanlineFlags(scanline, scanlineCount);
 
-		RASTERIZE_BLEND25_555_EDGE(&item->vertices[0], &item->vertices[1], edge01DoneBlend25_555);
-		RASTERIZE_BLEND25_555_EDGE(&item->vertices[1], &item->vertices[2], edge12DoneBlend25_555);
+		RASTERIZE_UV_EDGE(&item->vertices[0], &item->vertices[1], edge01DoneBlend25_555);
+		RASTERIZE_UV_EDGE(&item->vertices[1], &item->vertices[2], edge12DoneBlend25_555);
 		if ((item->renderFlags & SOFTWARE_RENDER_QUAD) == 0)
 		{
-			RASTERIZE_BLEND25_555_EDGE(&item->vertices[2], &item->vertices[0], edge20DoneBlend25_555);
+			RASTERIZE_UV_EDGE(&item->vertices[2], &item->vertices[0], edge20DoneBlend25_555);
 		}
 		else
 		{
-			RASTERIZE_BLEND25_555_EDGE(&item->vertices[2], &item->vertices[3], edge23DoneBlend25_555);
-			RASTERIZE_BLEND25_555_EDGE(&item->vertices[3], &item->vertices[0], edge30DoneBlend25_555);
+			RASTERIZE_UV_EDGE(&item->vertices[2], &item->vertices[3], edge23DoneBlend25_555);
+			RASTERIZE_UV_EDGE(&item->vertices[3], &item->vertices[0], edge30DoneBlend25_555);
 		}
 
 		uint16_t* texture = (uint16_t*)g_softwareTextureData[item->textureIndex];
@@ -2958,98 +2963,6 @@ namespace SoftwareRenderer
 			scanlineCount--;
 		} while (scanlineCount != 0);
 	}
-
-#undef RASTERIZE_BLEND25_555_EDGE
-
-#define RASTERIZE_BLEND50_555_EDGE(vertexA, vertexB, doneLabel)                                                                  \
-	do                                                                                                                           \
-	{                                                                                                                            \
-		int32_t edgeY;                                                                                                           \
-		int32_t edgeEndY;                                                                                                        \
-		int32_t edgeX;                                                                                                           \
-		int32_t edgeU;                                                                                                           \
-		int32_t edgeV;                                                                                                           \
-		int32_t edgeHeight;                                                                                                      \
-		int32_t edgeXStep;                                                                                                       \
-		int32_t edgeUStep;                                                                                                       \
-		int32_t edgeVStep;                                                                                                       \
-		int32_t edgeXFixed;                                                                                                      \
-		int32_t clippedRows;                                                                                                     \
-		ScanlineScratch* edgeScanline;                                                                                           \
-		if ((vertexA)->y < (vertexB)->y)                                                                                         \
-		{                                                                                                                        \
-			if ((vertexA)->y > Toy2::g_screenClipBottom || (vertexB)->y < Toy2::g_screenClipTop)                                 \
-				goto doneLabel;                                                                                                  \
-			edgeY = (vertexA)->y;                                                                                                \
-			edgeEndY = (vertexB)->y;                                                                                             \
-			edgeX = (vertexA)->x;                                                                                                \
-			edgeHeight = edgeEndY - edgeY;                                                                                       \
-			edgeXStep = ((vertexB)->x - edgeX) * 0x400 / edgeHeight;                                                             \
-			edgeU = (vertexA)->u;                                                                                                \
-			edgeV = (vertexA)->v;                                                                                                \
-			edgeUStep = ((vertexB)->u - edgeU) / edgeHeight;                                                                     \
-			edgeVStep = ((vertexB)->v - edgeV) / edgeHeight;                                                                     \
-		}                                                                                                                        \
-		else                                                                                                                     \
-		{                                                                                                                        \
-			if ((vertexB)->y >= (vertexA)->y || (vertexB)->y > Toy2::g_screenClipBottom || (vertexA)->y < Toy2::g_screenClipTop) \
-				goto doneLabel;                                                                                                  \
-			edgeY = (vertexB)->y;                                                                                                \
-			edgeEndY = (vertexA)->y;                                                                                             \
-			edgeX = (vertexB)->x;                                                                                                \
-			edgeHeight = edgeEndY - edgeY;                                                                                       \
-			edgeXStep = ((vertexA)->x - edgeX) * 0x400 / edgeHeight;                                                             \
-			edgeU = (vertexB)->u;                                                                                                \
-			edgeV = (vertexB)->v;                                                                                                \
-			edgeUStep = ((vertexA)->u - edgeU) / edgeHeight;                                                                     \
-			edgeVStep = ((vertexA)->v - edgeV) / edgeHeight;                                                                     \
-		}                                                                                                                        \
-		edgeXFixed = edgeX * 0x400 + 0x200;                                                                                      \
-		if (edgeY < Toy2::g_screenClipTop)                                                                                       \
-		{                                                                                                                        \
-			clippedRows = Toy2::g_screenClipTop - edgeY;                                                                         \
-			edgeXFixed += edgeXStep * clippedRows;                                                                               \
-			edgeU += edgeUStep * clippedRows;                                                                                    \
-			edgeV += edgeVStep * clippedRows;                                                                                    \
-			edgeY = Toy2::g_screenClipTop;                                                                                       \
-		}                                                                                                                        \
-		edgeScanline = &g_scanlineScratch[edgeY];                                                                                \
-		do                                                                                                                       \
-		{                                                                                                                        \
-			if (g_skipOddScanlines == 0 || (edgeY & 1) == 0)                                                                     \
-			{                                                                                                                    \
-				if (edgeScanline->populated == 0)                                                                                \
-				{                                                                                                                \
-					edgeScanline->rightXFixed = edgeXFixed;                                                                      \
-					edgeScanline->leftXFixed = edgeXFixed;                                                                       \
-					edgeScanline->rightInterpolants[0] = edgeU;                                                                  \
-					edgeScanline->leftInterpolants[0] = edgeU;                                                                   \
-					edgeScanline->rightInterpolants[1] = edgeV;                                                                  \
-					edgeScanline->leftInterpolants[1] = edgeV;                                                                   \
-					edgeScanline->populated = 1;                                                                                 \
-				}                                                                                                                \
-				else if (edgeXFixed < edgeScanline->leftXFixed)                                                                  \
-				{                                                                                                                \
-					edgeScanline->leftXFixed = edgeXFixed;                                                                       \
-					edgeScanline->leftInterpolants[0] = edgeU;                                                                   \
-					edgeScanline->leftInterpolants[1] = edgeV;                                                                   \
-				}                                                                                                                \
-				else if (edgeXFixed > edgeScanline->rightXFixed)                                                                 \
-				{                                                                                                                \
-					edgeScanline->rightXFixed = edgeXFixed;                                                                      \
-					edgeScanline->rightInterpolants[0] = edgeU;                                                                  \
-					edgeScanline->rightInterpolants[1] = edgeV;                                                                  \
-				}                                                                                                                \
-			}                                                                                                                    \
-			edgeScanline++;                                                                                                      \
-			edgeXFixed += edgeXStep;                                                                                             \
-			edgeU += edgeUStep;                                                                                                  \
-			edgeV += edgeVStep;                                                                                                  \
-			edgeY++;                                                                                                             \
-		} while (edgeY < edgeEndY && edgeY <= Toy2::g_screenClipBottom);                                                         \
-	doneLabel:;                                                                                                                  \
-	} while (0)
-
 	// FUNCTION: TOY2 0x0045A5C0 [PROVISIONAL]
 	void RasterizeBlend50TexturedPolygon555(SoftwareRenderItem* item)
 	{
@@ -3082,16 +2995,16 @@ namespace SoftwareRenderer
 		ScanlineScratch* scanline = &g_scanlineScratch[topY];
 		ClearScanlineFlags(scanline, scanlineCount);
 
-		RASTERIZE_BLEND50_555_EDGE(&item->vertices[0], &item->vertices[1], edge01DoneBlend50_555);
-		RASTERIZE_BLEND50_555_EDGE(&item->vertices[1], &item->vertices[2], edge12DoneBlend50_555);
+		RASTERIZE_UV_EDGE(&item->vertices[0], &item->vertices[1], edge01DoneBlend50_555);
+		RASTERIZE_UV_EDGE(&item->vertices[1], &item->vertices[2], edge12DoneBlend50_555);
 		if ((item->renderFlags & SOFTWARE_RENDER_QUAD) == 0)
 		{
-			RASTERIZE_BLEND50_555_EDGE(&item->vertices[2], &item->vertices[0], edge20DoneBlend50_555);
+			RASTERIZE_UV_EDGE(&item->vertices[2], &item->vertices[0], edge20DoneBlend50_555);
 		}
 		else
 		{
-			RASTERIZE_BLEND50_555_EDGE(&item->vertices[2], &item->vertices[3], edge23DoneBlend50_555);
-			RASTERIZE_BLEND50_555_EDGE(&item->vertices[3], &item->vertices[0], edge30DoneBlend50_555);
+			RASTERIZE_UV_EDGE(&item->vertices[2], &item->vertices[3], edge23DoneBlend50_555);
+			RASTERIZE_UV_EDGE(&item->vertices[3], &item->vertices[0], edge30DoneBlend50_555);
 		}
 
 		uint16_t* texture = (uint16_t*)g_softwareTextureData[item->textureIndex];
@@ -3203,98 +3116,6 @@ namespace SoftwareRenderer
 			scanlineCount--;
 		} while (scanlineCount != 0);
 	}
-
-#undef RASTERIZE_BLEND50_555_EDGE
-
-#define RASTERIZE_BLEND75_555_EDGE(vertexA, vertexB, doneLabel)                                                                  \
-	do                                                                                                                           \
-	{                                                                                                                            \
-		int32_t edgeY;                                                                                                           \
-		int32_t edgeEndY;                                                                                                        \
-		int32_t edgeX;                                                                                                           \
-		int32_t edgeU;                                                                                                           \
-		int32_t edgeV;                                                                                                           \
-		int32_t edgeHeight;                                                                                                      \
-		int32_t edgeXStep;                                                                                                       \
-		int32_t edgeUStep;                                                                                                       \
-		int32_t edgeVStep;                                                                                                       \
-		int32_t edgeXFixed;                                                                                                      \
-		int32_t clippedRows;                                                                                                     \
-		ScanlineScratch* edgeScanline;                                                                                           \
-		if ((vertexA)->y < (vertexB)->y)                                                                                         \
-		{                                                                                                                        \
-			if ((vertexA)->y > Toy2::g_screenClipBottom || (vertexB)->y < Toy2::g_screenClipTop)                                 \
-				goto doneLabel;                                                                                                  \
-			edgeY = (vertexA)->y;                                                                                                \
-			edgeEndY = (vertexB)->y;                                                                                             \
-			edgeX = (vertexA)->x;                                                                                                \
-			edgeHeight = edgeEndY - edgeY;                                                                                       \
-			edgeXStep = ((vertexB)->x - edgeX) * 0x400 / edgeHeight;                                                             \
-			edgeU = (vertexA)->u;                                                                                                \
-			edgeV = (vertexA)->v;                                                                                                \
-			edgeUStep = ((vertexB)->u - edgeU) / edgeHeight;                                                                     \
-			edgeVStep = ((vertexB)->v - edgeV) / edgeHeight;                                                                     \
-		}                                                                                                                        \
-		else                                                                                                                     \
-		{                                                                                                                        \
-			if ((vertexB)->y >= (vertexA)->y || (vertexB)->y > Toy2::g_screenClipBottom || (vertexA)->y < Toy2::g_screenClipTop) \
-				goto doneLabel;                                                                                                  \
-			edgeY = (vertexB)->y;                                                                                                \
-			edgeEndY = (vertexA)->y;                                                                                             \
-			edgeX = (vertexB)->x;                                                                                                \
-			edgeHeight = edgeEndY - edgeY;                                                                                       \
-			edgeXStep = ((vertexA)->x - edgeX) * 0x400 / edgeHeight;                                                             \
-			edgeU = (vertexB)->u;                                                                                                \
-			edgeV = (vertexB)->v;                                                                                                \
-			edgeUStep = ((vertexA)->u - edgeU) / edgeHeight;                                                                     \
-			edgeVStep = ((vertexA)->v - edgeV) / edgeHeight;                                                                     \
-		}                                                                                                                        \
-		edgeXFixed = edgeX * 0x400 + 0x200;                                                                                      \
-		if (edgeY < Toy2::g_screenClipTop)                                                                                       \
-		{                                                                                                                        \
-			clippedRows = Toy2::g_screenClipTop - edgeY;                                                                         \
-			edgeXFixed += edgeXStep * clippedRows;                                                                               \
-			edgeU += edgeUStep * clippedRows;                                                                                    \
-			edgeV += edgeVStep * clippedRows;                                                                                    \
-			edgeY = Toy2::g_screenClipTop;                                                                                       \
-		}                                                                                                                        \
-		edgeScanline = &g_scanlineScratch[edgeY];                                                                                \
-		do                                                                                                                       \
-		{                                                                                                                        \
-			if (g_skipOddScanlines == 0 || (edgeY & 1) == 0)                                                                     \
-			{                                                                                                                    \
-				if (edgeScanline->populated == 0)                                                                                \
-				{                                                                                                                \
-					edgeScanline->rightXFixed = edgeXFixed;                                                                      \
-					edgeScanline->leftXFixed = edgeXFixed;                                                                       \
-					edgeScanline->rightInterpolants[0] = edgeU;                                                                  \
-					edgeScanline->leftInterpolants[0] = edgeU;                                                                   \
-					edgeScanline->rightInterpolants[1] = edgeV;                                                                  \
-					edgeScanline->leftInterpolants[1] = edgeV;                                                                   \
-					edgeScanline->populated = 1;                                                                                 \
-				}                                                                                                                \
-				else if (edgeXFixed < edgeScanline->leftXFixed)                                                                  \
-				{                                                                                                                \
-					edgeScanline->leftXFixed = edgeXFixed;                                                                       \
-					edgeScanline->leftInterpolants[0] = edgeU;                                                                   \
-					edgeScanline->leftInterpolants[1] = edgeV;                                                                   \
-				}                                                                                                                \
-				else if (edgeXFixed > edgeScanline->rightXFixed)                                                                 \
-				{                                                                                                                \
-					edgeScanline->rightXFixed = edgeXFixed;                                                                      \
-					edgeScanline->rightInterpolants[0] = edgeU;                                                                  \
-					edgeScanline->rightInterpolants[1] = edgeV;                                                                  \
-				}                                                                                                                \
-			}                                                                                                                    \
-			edgeScanline++;                                                                                                      \
-			edgeXFixed += edgeXStep;                                                                                             \
-			edgeU += edgeUStep;                                                                                                  \
-			edgeV += edgeVStep;                                                                                                  \
-			edgeY++;                                                                                                             \
-		} while (edgeY < edgeEndY && edgeY <= Toy2::g_screenClipBottom);                                                         \
-	doneLabel:;                                                                                                                  \
-	} while (0)
-
 	// FUNCTION: TOY2 0x0045B0B0 [PROVISIONAL]
 	void RasterizeBlend75TexturedPolygon555(SoftwareRenderItem* item)
 	{
@@ -3327,16 +3148,16 @@ namespace SoftwareRenderer
 		ScanlineScratch* scanline = &g_scanlineScratch[topY];
 		ClearScanlineFlags(scanline, scanlineCount);
 
-		RASTERIZE_BLEND75_555_EDGE(&item->vertices[0], &item->vertices[1], edge01DoneBlend75_555);
-		RASTERIZE_BLEND75_555_EDGE(&item->vertices[1], &item->vertices[2], edge12DoneBlend75_555);
+		RASTERIZE_UV_EDGE(&item->vertices[0], &item->vertices[1], edge01DoneBlend75_555);
+		RASTERIZE_UV_EDGE(&item->vertices[1], &item->vertices[2], edge12DoneBlend75_555);
 		if ((item->renderFlags & SOFTWARE_RENDER_QUAD) == 0)
 		{
-			RASTERIZE_BLEND75_555_EDGE(&item->vertices[2], &item->vertices[0], edge20DoneBlend75_555);
+			RASTERIZE_UV_EDGE(&item->vertices[2], &item->vertices[0], edge20DoneBlend75_555);
 		}
 		else
 		{
-			RASTERIZE_BLEND75_555_EDGE(&item->vertices[2], &item->vertices[3], edge23DoneBlend75_555);
-			RASTERIZE_BLEND75_555_EDGE(&item->vertices[3], &item->vertices[0], edge30DoneBlend75_555);
+			RASTERIZE_UV_EDGE(&item->vertices[2], &item->vertices[3], edge23DoneBlend75_555);
+			RASTERIZE_UV_EDGE(&item->vertices[3], &item->vertices[0], edge30DoneBlend75_555);
 		}
 
 		uint16_t* texture = (uint16_t*)g_softwareTextureData[item->textureIndex];
@@ -3409,7 +3230,7 @@ namespace SoftwareRenderer
 		} while (scanlineCount != 0);
 	}
 
-#undef RASTERIZE_BLEND75_555_EDGE
+#undef RASTERIZE_UV_EDGE
 
 #define RASTERIZE_TEXTURED_EDGE_WITH_END(vertexA, vertexB, doneLabel, endOperator)                                               \
 	do                                                                                                                           \
