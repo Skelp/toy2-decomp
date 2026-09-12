@@ -15,6 +15,16 @@
 
 namespace AudioManager
 {
+	enum
+	{
+		WAVE_NAME_LENGTH = 256,
+		SOUND_BUFFER_COUNT = 768,
+		LOOPING_SOUND_CHANNEL_COUNT = 32,
+		MAX_SFX_LEVEL_ID = 16,
+		SOUND_VOLUME_MAX = 128,
+		SFX_VOLUME_SCALE = 256,
+	};
+
 	// GLOBAL: TOY2 0x005282CC
 	int32_t g_curTrackIndex;
 
@@ -97,16 +107,16 @@ namespace AudioManager
 	LPGUID g_deviceGuids[16];
 
 	// GLOBAL: TOY2 0x00830E58
-	int16_t g_loopingSoundChannels[32][5];
+	int16_t g_loopingSoundChannels[LOOPING_SOUND_CHANNEL_COUNT][5];
 
 	// GLOBAL: TOY2 0x00725294
-	void* g_loopingSoundOwners[768];
+	void* g_loopingSoundOwners[SOUND_BUFFER_COUNT];
 
 	// GLOBAL: TOY2 0x00726230
 	int32_t g_loadedBufferCount;
 
 	// GLOBAL: TOY2 0x00726338
-	LPDIRECTSOUNDBUFFER g_dsBuffers[768];
+	LPDIRECTSOUNDBUFFER g_dsBuffers[SOUND_BUFFER_COUNT];
 
 	// GLOBAL: TOY2 0x00726334
 	DWORD g_soundWriteCursor;
@@ -518,11 +528,11 @@ namespace AudioManager
 			g_directSound = NULL;
 			ResetChannelsTable();
 			g_loadedBufferCount = 0;
-			for (i = 0; i < 768; i++)
+			for (i = 0; i < SOUND_BUFFER_COUNT; i++)
 			{
 				g_dsBuffers[i] = NULL;
 			}
-			for (i = 0; i < 768; i++)
+			for (i = 0; i < SOUND_BUFFER_COUNT; i++)
 			{
 				g_loopingSoundOwners[i] = NULL;
 			}
@@ -588,6 +598,22 @@ namespace AudioManager
 	// GLOBAL: TOY2 0x004FCDC0
 	int32_t g_currentSfxLevelId = 1;
 
+	// Clears every sound buffer slot, its owner and every looping channel pair.
+#define CLEAR_SOUND_BUFFER_TABLES()                   \
+	for (i = 0; i < SOUND_BUFFER_COUNT; i++)          \
+	{                                                 \
+		g_dsBuffers[i] = NULL;                        \
+	}                                                 \
+	for (i = 0; i < SOUND_BUFFER_COUNT; i++)          \
+	{                                                 \
+		g_loopingSoundOwners[i] = NULL;               \
+	}                                                 \
+	for (i = 0; i < LOOPING_SOUND_CHANNEL_COUNT; i++) \
+	{                                                 \
+		g_loopingSoundChannels[i][0] = -1;            \
+		g_loopingSoundChannels[i][1] = -1;            \
+	}
+
 	// FUNCTION: TOY2 0x0047EDE0 [PROVISIONAL]
 	void Init()
 	{
@@ -595,11 +621,11 @@ namespace AudioManager
 		ResetChannelsTable();
 
 		int32_t i;
-		for (i = 0; i < 768; i++)
+		for (i = 0; i < SOUND_BUFFER_COUNT; i++)
 		{
 			g_dsBuffers[i] = NULL;
 		}
-		for (i = 0; i < 768; i++)
+		for (i = 0; i < SOUND_BUFFER_COUNT; i++)
 		{
 			g_loopingSoundOwners[i] = NULL;
 		}
@@ -638,19 +664,7 @@ namespace AudioManager
 						}
 					}
 
-					for (i = 0; i < 768; i++)
-					{
-						g_dsBuffers[i] = NULL;
-					}
-					for (i = 0; i < 768; i++)
-					{
-						g_loopingSoundOwners[i] = NULL;
-					}
-					for (i = 0; i < 32; i++)
-					{
-						g_loopingSoundChannels[i][0] = -1;
-						g_loopingSoundChannels[i][1] = -1;
-					}
+					CLEAR_SOUND_BUFFER_TABLES()
 				}
 
 				SoundPackDescriptor* pack = &g_primarySoundPacks[0];
@@ -786,7 +800,7 @@ namespace AudioManager
 	// FUNCTION: TOY2 0x0047EC20 [PROVISIONAL]
 	void LoadSfxPackForLevel(int32_t levelId)
 	{
-		char waveName[256];
+		char waveName[WAVE_NAME_LENGTH];
 		if (g_audioInitialized != 0)
 		{
 			if (IsStreamActive())
@@ -813,19 +827,7 @@ namespace AudioManager
 					}
 				}
 
-				for (i = 0; i < 768; i++)
-				{
-					g_dsBuffers[i] = NULL;
-				}
-				for (i = 0; i < 768; i++)
-				{
-					g_loopingSoundOwners[i] = NULL;
-				}
-				for (i = 0; i < 32; i++)
-				{
-					g_loopingSoundChannels[i][0] = -1;
-					g_loopingSoundChannels[i][1] = -1;
-				}
+				CLEAR_SOUND_BUFFER_TABLES()
 			}
 		}
 
@@ -845,7 +847,7 @@ namespace AudioManager
 
 		if (levelId > 0)
 		{
-			if (levelId <= 16)
+			if (levelId <= MAX_SFX_LEVEL_ID)
 			{
 				pack = &g_primarySoundPacks[levelId];
 				soundName = pack->soundNames;
@@ -862,7 +864,7 @@ namespace AudioManager
 				}
 			}
 
-			if (levelId <= 16)
+			if (levelId <= MAX_SFX_LEVEL_ID)
 			{
 				pack = &g_secondarySoundPacks[levelId];
 				soundName = pack->soundNames;
@@ -974,7 +976,7 @@ namespace AudioManager
 		if (soundId != -1)
 		{
 			int32_t freeIndex = -1;
-			for (int32_t i = 0; i < 32; i++)
+			for (int32_t i = 0; i < LOOPING_SOUND_CHANNEL_COUNT; i++)
 			{
 				if (g_loopingSoundChannels[i][0] == soundId)
 				{
@@ -1372,7 +1374,7 @@ namespace AudioManager
 			chan += 5;
 			ownerp++;
 			i++;
-		} while (chan < &g_loopingSoundChannels[32][0]);
+		} while (chan < &g_loopingSoundChannels[LOOPING_SOUND_CHANNEL_COUNT][0]);
 
 		if (foundIndex != -1)
 		{
@@ -1422,7 +1424,7 @@ namespace AudioManager
 				}
 				p += 5;
 				j++;
-			} while (p < &g_loopingSoundChannels[32][0]);
+			} while (p < &g_loopingSoundChannels[LOOPING_SOUND_CHANNEL_COUNT][0]);
 
 			if (freeIndex != -1)
 			{
@@ -1448,7 +1450,7 @@ namespace AudioManager
 	// FUNCTION: TOY2 0x0047D930 [PROVISIONAL]
 	int32_t RestartLoopingSound(int32_t soundId)
 	{
-		char waveName[256];
+		char waveName[WAVE_NAME_LENGTH];
 		DWORD status;
 		if (g_audioInitialized == 0)
 		{
@@ -1484,19 +1486,7 @@ namespace AudioManager
 				{
 					ReleaseAllBuffers();
 					int32_t i;
-					for (i = 0; i < 768; i++)
-					{
-						g_dsBuffers[i] = NULL;
-					}
-					for (i = 0; i < 768; i++)
-					{
-						g_loopingSoundOwners[i] = NULL;
-					}
-					for (i = 0; i < 32; i++)
-					{
-						g_loopingSoundChannels[i][0] = -1;
-						g_loopingSoundChannels[i][1] = -1;
-					}
+					CLEAR_SOUND_BUFFER_TABLES()
 				}
 			}
 
@@ -1504,7 +1494,7 @@ namespace AudioManager
 			if (levelId > 0)
 			{
 				LoadSoundPack(g_primarySoundPacks, levelId);
-				if (levelId <= 16)
+				if (levelId <= MAX_SFX_LEVEL_ID)
 				{
 					SoundPackDescriptor* pack = &g_secondarySoundPacks[levelId];
 					char** soundName = pack->soundNames;
@@ -1556,7 +1546,7 @@ namespace AudioManager
 	// FUNCTION: TOY2 0x004A3BC0 [TOOL]
 	void ResetChannelsTable()
 	{
-		for (int32_t i = 0; i < 32; i++)
+		for (int32_t i = 0; i < LOOPING_SOUND_CHANNEL_COUNT; i++)
 			g_loopingSoundChannels[i][0] = -1;
 	}
 
@@ -1592,7 +1582,7 @@ namespace AudioManager
 				}
 			}
 			p += 5;
-		} while (p < &g_loopingSoundChannels[32][1]);
+		} while (p < &g_loopingSoundChannels[LOOPING_SOUND_CHANNEL_COUNT][1]);
 	}
 
 	// FUNCTION: TOY2 0x004A3E60 [PROVISIONAL]
@@ -1610,7 +1600,7 @@ namespace AudioManager
 				}
 				chan += 5;
 				i++;
-			} while (chan < &g_loopingSoundChannels[32][0]);
+			} while (chan < &g_loopingSoundChannels[LOOPING_SOUND_CHANNEL_COUNT][0]);
 			return 0;
 		found:
 			if ((IsEffectPlaying(g_loopingSoundChannels[i][0]) & 1) != 0)
@@ -2056,16 +2046,6 @@ namespace AudioManager
 		return status;
 	}
 
-	enum
-	{
-		WAVE_NAME_LENGTH = 256,
-		SOUND_BUFFER_COUNT = 768,
-		LOOPING_SOUND_CHANNEL_COUNT = 32,
-		MAX_SFX_LEVEL_ID = 16,
-		SOUND_VOLUME_MAX = 128,
-		SFX_VOLUME_SCALE = 256,
-	};
-
 	// FUNCTION: TOY2 0x0047DE50 [PROVISIONAL]
 	int32_t PlaySoundBuffer(int32_t soundIndex, int32_t leftVolume, int32_t rightVolume, void* owner, int32_t unused, int32_t looping)
 	{
@@ -2129,19 +2109,7 @@ namespace AudioManager
 									g_loopingSoundOwners[i] = NULL;
 								}
 							}
-							for (i = 0; i < SOUND_BUFFER_COUNT; i++)
-							{
-								g_dsBuffers[i] = NULL;
-							}
-							for (i = 0; i < SOUND_BUFFER_COUNT; i++)
-							{
-								g_loopingSoundOwners[i] = NULL;
-							}
-							for (i = 0; i < LOOPING_SOUND_CHANNEL_COUNT; i++)
-							{
-								g_loopingSoundChannels[i][0] = -1;
-								g_loopingSoundChannels[i][1] = -1;
-							}
+							CLEAR_SOUND_BUFFER_TABLES()
 						}
 					}
 
