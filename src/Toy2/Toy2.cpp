@@ -4898,27 +4898,62 @@ namespace Toy2
 			SAVE_MENU_EXIT
 		};
 
+		enum SaveMenuOption
+		{
+			SAVE_OPTION_LOAD,
+			SAVE_OPTION_SAVE,
+			SAVE_OPTION_MAIN_MENU
+		};
+
+		const int32_t slotCount = 8;
+		const int32_t inputRepeatDelay = 30;
+		const int32_t blinkPeriod = 20;
+		// A selected item is hidden while blinkTimer is at or above blinkOnPoint.
+		const int32_t blinkOnPoint = 10;
+		const int32_t slotRowPitch = 23;
+		const int32_t slotRowTop = 33;
+		const int32_t promptRowPitch = 25;
+		const int32_t promptRowTop = 28;
+		const int32_t textCenterX = 256;
+		const int32_t titleRowTop = 25;
+		const int32_t slotTitleRowTop = 3;
+		const int32_t loadOptionRowY = 75;
+		const int32_t saveOptionRowY = 100;
+		const int32_t mainMenuOptionRowY = 125;
+		const int32_t fileNameSize = 256;
+		const int32_t descriptionSize = 256;
+		// The menu starts at the neutral tint and fades to black before it exits.
+		const int32_t neutralTintLevel = 128;
+		const int32_t tintFadeInRate = 12;
+		const int32_t tintFadeOutRate = 6;
+		const int32_t menuSoundPitch = 0x1200;
+		const int32_t menuSoundVolume = 0x50;
+		const int32_t progressFieldMask = 0xff;
+
 		int32_t finished = 0;
-		int32_t result = 0;
 		int32_t state = SAVE_MENU_OPTIONS;
-		int32_t selectedItem = 0;
-		int32_t inputDelay = 30;
-		int32_t blinkTimer = 20;
+		int32_t selectedOption = SAVE_OPTION_LOAD;
+		int32_t result = 0;
 		RGBA clearColor;
 		clearColor.value = 0;
 
 		Nu3D::Camera::g_cameraTintRed = 0;
 		Nu3D::Camera::g_cameraTintGreen = 0;
 		Nu3D::Camera::g_cameraTintBlue = 0;
-		Nu3D::Camera::SetTint(128, 128, 128, 12);
+		Nu3D::Camera::SetTint(neutralTintLevel, neutralTintLevel, neutralTintLevel, tintFadeInRate);
+
+		int32_t inputDelay = inputRepeatDelay;
+		int32_t blinkTimer = blinkPeriod;
+		int32_t selectedSlot = 0;
 
 		if (postGameSave)
 			state = SAVE_MENU_SAVE;
 
-		int32_t slotXOffsets[8];
-		for (int32_t slot = 0; slot < 8; ++slot)
+		int32_t slotXOffsets[slotCount];
+		for (int32_t slot = 0; slot < slotCount; ++slot)
 		{
-			char fileName[256];
+			char* slotDescription = g_saveSlotDescriptions[slot];
+			char fileName[fileNameSize];
 			sprintf(fileName, "Toy2%02d.sav", slot + 1);
 
 			FILE* file = fopen(fileName, "rb");
@@ -4926,18 +4961,19 @@ namespace Toy2
 			{
 				int32_t descriptionLength;
 				fread(&descriptionLength, 1, 4, file);
-				if (descriptionLength && g_saveSlotDescriptions[slot])
+				if (descriptionLength && slotDescription)
 				{
-					fread(g_saveSlotDescriptions[slot], 1, descriptionLength, file);
-					g_saveSlotDescriptions[slot][descriptionLength] = '\0';
+					fread(slotDescription, 1, descriptionLength, file);
+					slotDescription[descriptionLength] = '\0';
 				}
 				fclose(file);
 			}
-			else
+			else if (slotDescription)
 			{
-				g_saveSlotDescriptions[slot][0] = '\0';
+				slotDescription[0] = '\0';
 			}
 
+			// The slots sit on a cosine arc, so each row has its own horizontal offset.
 			slotXOffsets[slot] = (int32_t)(cos(slot * 0.642699062824249f - 1.0f) * 80.0);
 		}
 
@@ -4986,7 +5022,7 @@ namespace Toy2
 
 			if (Renderer::BeginScene())
 			{
-				SoftwareRenderer::g_backBufferClearComplete = 0;
+				Renderer::g_parallaxCurHorizScroll = 0.0f;
 				Renderer::g_parallaxHorizOffset = 0.0f;
 				Renderer::g_parallaxTexHeightRatio = 1.0f;
 				Renderer::g_parallaxTexWidthRatio = 1.0f;
@@ -4995,60 +5031,65 @@ namespace Toy2
 				switch (state)
 				{
 					case SAVE_MENU_OPTIONS: {
-						SoftwareRenderer::g_backBufferClearComplete = 0;
+						Renderer::g_parallaxCurHorizScroll = 0.0f;
 						if (NGNLoader::GetTextureDataIndex(g_sectorBackdropTexTable.primary[1]))
 							g_nextBackdropId = g_sectorBackdropTexTable.primary[1];
 						else if (NGNLoader::GetTextureDataIndex(g_sectorBackdropTexTable.secondary[0]))
 							g_nextBackdropId = g_sectorBackdropTexTable.secondary[0];
 						g_hasBackdrop = 1;
 
-						Renderer::DrawFormattedText(256, 25, "load / save options");
-						if (selectedItem != 0 || blinkTimer >= 10)
-							Renderer::DrawFormattedText(256, 75, "load game");
-						if (selectedItem != 1 || blinkTimer >= 10)
-							Renderer::DrawFormattedText(256, 100, "save game");
-						if (selectedItem != 2 || blinkTimer >= 10)
-							Renderer::DrawFormattedText(256, 125, "main menu");
+						Renderer::DrawFormattedText(textCenterX, titleRowTop, "load / save options");
+						if (selectedOption != SAVE_OPTION_LOAD || blinkTimer < blinkOnPoint)
+							Renderer::DrawFormattedText(textCenterX, loadOptionRowY, "load game");
+						if (selectedOption != SAVE_OPTION_SAVE || blinkTimer < blinkOnPoint)
+							Renderer::DrawFormattedText(textCenterX, saveOptionRowY, "save game");
+						if (selectedOption != SAVE_OPTION_MAIN_MENU || blinkTimer < blinkOnPoint)
+							Renderer::DrawFormattedText(textCenterX, mainMenuOptionRowY, "main menu");
 
 						if (inputDelay <= 0)
 						{
-							if ((InputManager::g_curButtonsPressed & INPUT_UP) && ! (InputManager::g_prevButtonsPressed & INPUT_UP) && selectedItem != 0)
+							if (selectedOption != SAVE_OPTION_LOAD && (InputManager::g_curButtonsPressed & INPUT_UP) != 0
+								&& ((InputManager::g_prevButtonsPressed & INPUT_UP) ^ InputManager::g_curButtonsPressed) != 0)
 							{
-								--selectedItem;
-								AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 0x50, 0x50);
+								--selectedOption;
+								AudioManager::PlayOneShotSoundGlobal(1, menuSoundPitch, menuSoundVolume, menuSoundVolume);
 							}
-							if ((InputManager::g_curButtonsPressed & INPUT_DOWN) && ! (InputManager::g_prevButtonsPressed & INPUT_DOWN) && selectedItem < 2)
+							if (selectedOption < SAVE_OPTION_MAIN_MENU && (InputManager::g_curButtonsPressed & INPUT_DOWN) != 0
+								&& ((InputManager::g_prevButtonsPressed & INPUT_DOWN) ^ InputManager::g_curButtonsPressed) != 0)
 							{
-								++selectedItem;
-								AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 0x50, 0x50);
+								++selectedOption;
+								AudioManager::PlayOneShotSoundGlobal(1, menuSoundPitch, menuSoundVolume, menuSoundVolume);
 							}
 
 							if (InputManager::g_curButtonsPressed & INPUT_JUMP)
 							{
-								if (selectedItem == 0)
-									state = SAVE_MENU_LOAD;
-								else if (selectedItem == 1)
-									state = SAVE_MENU_SAVE;
-								else
+								switch (selectedOption)
 								{
-									AudioManager::PlayOneShotSoundGlobal(2, 0x1200, 0x50, 0x50);
-									state = SAVE_MENU_EXIT;
-									Nu3D::Camera::SetTint(0, 0, 0, 6);
-								}
-
-								if (selectedItem < 2)
-								{
-									selectedItem = 0;
-									inputDelay = 30;
-									AudioManager::PlayOneShotSoundGlobal(0, 0x1200, 0x50, 0x50);
+									case SAVE_OPTION_LOAD:
+										state = SAVE_MENU_LOAD;
+										selectedSlot = 0;
+										inputDelay = inputRepeatDelay;
+										AudioManager::PlayOneShotSoundGlobal(0, menuSoundPitch, menuSoundVolume, menuSoundVolume);
+										break;
+									case SAVE_OPTION_SAVE:
+										state = SAVE_MENU_SAVE;
+										selectedSlot = 0;
+										inputDelay = inputRepeatDelay;
+										AudioManager::PlayOneShotSoundGlobal(0, menuSoundPitch, menuSoundVolume, menuSoundVolume);
+										break;
+									default:
+										AudioManager::PlayOneShotSoundGlobal(2, menuSoundPitch, menuSoundVolume, menuSoundVolume);
+										state = SAVE_MENU_EXIT;
+										Nu3D::Camera::SetTint(0, 0, 0, tintFadeOutRate);
+										break;
 								}
 							}
 
 							if (InputManager::g_curButtonsPressed & INPUT_CANCEL)
 							{
-								AudioManager::PlayOneShotSoundGlobal(2, 0x1200, 0x50, 0x50);
+								AudioManager::PlayOneShotSoundGlobal(2, menuSoundPitch, menuSoundVolume, menuSoundVolume);
 								state = SAVE_MENU_EXIT;
-								Nu3D::Camera::SetTint(0, 0, 0, 6);
+								Nu3D::Camera::SetTint(0, 0, 0, tintFadeOutRate);
 							}
 						}
 						break;
@@ -5062,42 +5103,46 @@ namespace Toy2
 							g_nextBackdropId = g_sectorBackdropTexTable.secondary[0];
 						g_hasBackdrop = 1;
 
-						Renderer::DrawFormattedText(256, 3, "select slot to load");
-						for (int32_t slot = 0; slot < 8; ++slot)
+						Renderer::DrawFormattedText(textCenterX, slotTitleRowTop, "select slot to load");
+						int32_t slot;
+						for (slot = 0; slot < slotCount; ++slot)
 						{
-							if (slot != selectedItem || blinkTimer >= 10)
+							if (slot != selectedSlot || blinkTimer < blinkOnPoint)
 							{
 								if (g_saveSlotDescriptions[slot][0])
-									Renderer::DrawFormattedText(slotXOffsets[slot] + 256, slot * 23 + 33, "%s", g_saveSlotDescriptions[slot]);
+									Renderer::DrawFormattedText(
+										slotXOffsets[slot] + textCenterX, slot * slotRowPitch + slotRowTop, "%s", g_saveSlotDescriptions[slot]);
 								else
-									Renderer::DrawFormattedText(slotXOffsets[slot] + 256, slot * 23 + 33, "empty slot");
+									Renderer::DrawFormattedText(slotXOffsets[slot] + textCenterX, slot * slotRowPitch + slotRowTop, "empty slot");
 							}
 						}
-						Renderer::DrawFormattedText(256, 228, "jump:select  cancel:menu");
+						Renderer::DrawFormattedText(textCenterX, slot * promptRowPitch + promptRowTop, "jump:select  cancel:menu");
 
-						if ((InputManager::g_curButtonsPressed & INPUT_UP) && ! (InputManager::g_prevButtonsPressed & INPUT_UP) && selectedItem != 0)
+						if ((InputManager::g_curButtonsPressed & INPUT_UP) != 0
+							&& ((InputManager::g_prevButtonsPressed & INPUT_UP) ^ InputManager::g_curButtonsPressed) != 0 && selectedSlot != 0)
 						{
-							--selectedItem;
-							AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 0x50, 0x50);
+							--selectedSlot;
+							AudioManager::PlayOneShotSoundGlobal(1, menuSoundPitch, menuSoundVolume, menuSoundVolume);
 						}
-						if ((InputManager::g_curButtonsPressed & INPUT_DOWN) && ! (InputManager::g_prevButtonsPressed & INPUT_DOWN) && selectedItem < 7)
+						if ((InputManager::g_curButtonsPressed & INPUT_DOWN) != 0
+							&& ((InputManager::g_prevButtonsPressed & INPUT_DOWN) ^ InputManager::g_curButtonsPressed) != 0 && selectedSlot < slotCount - 1)
 						{
-							++selectedItem;
-							AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 0x50, 0x50);
+							++selectedSlot;
+							AudioManager::PlayOneShotSoundGlobal(1, menuSoundPitch, menuSoundVolume, menuSoundVolume);
 						}
 
 						if (inputDelay <= 0)
 						{
-							if ((InputManager::g_curButtonsPressed & INPUT_JUMP) && g_saveSlotDescriptions[selectedItem][0])
+							if ((InputManager::g_curButtonsPressed & INPUT_JUMP) && g_saveSlotDescriptions[selectedSlot][0])
 							{
-								int32_t saveNumber = selectedItem + 1;
-								char fileName[256];
+								int32_t saveNumber = selectedSlot + 1;
+								char fileName[fileNameSize];
 								sprintf(fileName, "Toy2%02d.sav", saveNumber);
 								FILE* file = fopen(fileName, "rb");
 								if (file)
 								{
 									int32_t descriptionLength;
-									char description[256];
+									char description[descriptionSize];
 									fread(&descriptionLength, 1, 4, file);
 									if (descriptionLength)
 									{
@@ -5112,16 +5157,16 @@ namespace Toy2
 								}
 
 								state = SAVE_MENU_EXIT;
-								Nu3D::Camera::SetTint(0, 0, 0, 6);
-								AudioManager::PlayOneShotSoundGlobal(0, 0x1200, 0x50, 0x50);
+								Nu3D::Camera::SetTint(0, 0, 0, tintFadeOutRate);
+								AudioManager::PlayOneShotSoundGlobal(0, menuSoundPitch, menuSoundVolume, menuSoundVolume);
 								result = 1;
 							}
 
 							if (InputManager::g_curButtonsPressed & INPUT_CANCEL)
 							{
-								AudioManager::PlayOneShotSoundGlobal(2, 0x1200, 0x50, 0x50);
-								inputDelay = 30;
+								inputDelay = inputRepeatDelay;
 								state = SAVE_MENU_OPTIONS;
+								AudioManager::PlayOneShotSoundGlobal(2, menuSoundPitch, menuSoundVolume, menuSoundVolume);
 							}
 						}
 						break;
@@ -5135,28 +5180,35 @@ namespace Toy2
 							g_nextBackdropId = g_sectorBackdropTexTable.secondary[0];
 						g_hasBackdrop = 1;
 
-						Renderer::DrawFormattedText(256, 3, "select slot to save");
-						for (int32_t slot = 0; slot < 8; ++slot)
+						Renderer::DrawFormattedText(textCenterX, slotTitleRowTop, "select slot to save");
+						int32_t slot;
+						for (slot = 0; slot < slotCount; ++slot)
 						{
-							if (slot != selectedItem || blinkTimer >= 10)
+							if (slot != selectedSlot || blinkTimer < blinkOnPoint)
 							{
 								if (g_saveSlotDescriptions[slot][0])
-									Renderer::DrawFormattedText(slotXOffsets[slot] + 256, slot * 23 + 33, "%s", g_saveSlotDescriptions[slot]);
+									Renderer::DrawFormattedText(
+										slotXOffsets[slot] + textCenterX, slot * slotRowPitch + slotRowTop, "%s", g_saveSlotDescriptions[slot]);
 								else
-									Renderer::DrawFormattedText(slotXOffsets[slot] + 256, slot * 23 + 33, "empty slot");
+									Renderer::DrawFormattedText(slotXOffsets[slot] + textCenterX, slot * slotRowPitch + slotRowTop, "empty slot");
 							}
 						}
-						Renderer::DrawFormattedText(256, 228, postGameSave ? "jump:save  cancel:continue" : "jump:select  cancel:menu");
+						if (postGameSave)
+							Renderer::DrawFormattedText(textCenterX, slot * promptRowPitch + promptRowTop, "jump:save  cancel:continue");
+						else
+							Renderer::DrawFormattedText(textCenterX, slot * promptRowPitch + promptRowTop, "jump:select  cancel:menu");
 
-						if ((InputManager::g_curButtonsPressed & INPUT_UP) && ! (InputManager::g_prevButtonsPressed & INPUT_UP) && selectedItem != 0)
+						if ((InputManager::g_curButtonsPressed & INPUT_UP) != 0
+							&& ((InputManager::g_prevButtonsPressed & INPUT_UP) ^ InputManager::g_curButtonsPressed) != 0 && selectedSlot != 0)
 						{
-							--selectedItem;
-							AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 0x50, 0x50);
+							--selectedSlot;
+							AudioManager::PlayOneShotSoundGlobal(1, menuSoundPitch, menuSoundVolume, menuSoundVolume);
 						}
-						if ((InputManager::g_curButtonsPressed & INPUT_DOWN) && ! (InputManager::g_prevButtonsPressed & INPUT_DOWN) && selectedItem < 7)
+						if ((InputManager::g_curButtonsPressed & INPUT_DOWN) != 0
+							&& ((InputManager::g_prevButtonsPressed & INPUT_DOWN) ^ InputManager::g_curButtonsPressed) != 0 && selectedSlot < slotCount - 1)
 						{
-							++selectedItem;
-							AudioManager::PlayOneShotSoundGlobal(1, 0x1200, 0x50, 0x50);
+							++selectedSlot;
+							AudioManager::PlayOneShotSoundGlobal(1, menuSoundPitch, menuSoundVolume, menuSoundVolume);
 						}
 
 						if (inputDelay <= 0)
@@ -5164,48 +5216,50 @@ namespace Toy2
 							if (InputManager::g_curButtonsPressed & INPUT_JUMP)
 							{
 								int32_t progress = ComputeTokenProgress();
-								char description[256];
-								sprintf(description, "TOK %d LEV %d", (progress >> 16) & 0xff, progress & 0xff);
-								SaveManager::SaveToFile(selectedItem + 1, description);
+								char description[descriptionSize];
+								sprintf(description, "TOK %d LEV %d", (progress >> 16) & progressFieldMask, progress & progressFieldMask);
+								SaveManager::SaveToFile(selectedSlot + 1, description);
 								state = SAVE_MENU_EXIT;
-								Nu3D::Camera::SetTint(0, 0, 0, 6);
+								Nu3D::Camera::SetTint(0, 0, 0, tintFadeOutRate);
 
-								for (int32_t slot = 0; slot < 8; ++slot)
+								for (int32_t slot = 0; slot < slotCount; ++slot)
 								{
-									char fileName[256];
+									char* slotDescription = g_saveSlotDescriptions[slot];
+									char fileName[fileNameSize];
 									sprintf(fileName, "Toy2%02d.sav", slot + 1);
 									FILE* file = fopen(fileName, "rb");
 									if (file)
 									{
 										int32_t descriptionLength;
 										fread(&descriptionLength, 1, 4, file);
-										if (descriptionLength && g_saveSlotDescriptions[slot])
+										if (descriptionLength && slotDescription)
 										{
-											fread(g_saveSlotDescriptions[slot], 1, descriptionLength, file);
-											g_saveSlotDescriptions[slot][descriptionLength] = '\0';
+											fread(slotDescription, 1, descriptionLength, file);
+											slotDescription[descriptionLength] = '\0';
 										}
 										fclose(file);
 									}
-									else
+									else if (slotDescription)
 									{
-										g_saveSlotDescriptions[slot][0] = '\0';
+										slotDescription[0] = '\0';
 									}
 								}
-								AudioManager::PlayOneShotSoundGlobal(0, 0x1200, 0x50, 0x50);
+								AudioManager::PlayOneShotSoundGlobal(0, menuSoundPitch, menuSoundVolume, menuSoundVolume);
 							}
 
 							if (InputManager::g_curButtonsPressed & INPUT_CANCEL)
 							{
-								AudioManager::PlayOneShotSoundGlobal(2, 0x1200, 0x50, 0x50);
 								if (postGameSave)
 								{
+									AudioManager::PlayOneShotSoundGlobal(2, menuSoundPitch, menuSoundVolume, menuSoundVolume);
 									state = SAVE_MENU_EXIT;
-									Nu3D::Camera::SetTint(0, 0, 0, 6);
+									Nu3D::Camera::SetTint(0, 0, 0, tintFadeOutRate);
 								}
 								else
 								{
-									inputDelay = 30;
+									inputDelay = inputRepeatDelay;
 									state = SAVE_MENU_OPTIONS;
+									AudioManager::PlayOneShotSoundGlobal(2, menuSoundPitch, menuSoundVolume, menuSoundVolume);
 								}
 							}
 						}
@@ -5228,7 +5282,7 @@ namespace Toy2
 				inputDelay -= Renderer::g_frameDelta;
 			blinkTimer -= Renderer::g_frameDelta;
 			if (blinkTimer < 0)
-				blinkTimer += 20;
+				blinkTimer += blinkPeriod;
 		}
 
 		return result;
