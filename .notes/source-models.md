@@ -407,3 +407,43 @@ was much faster than compiling to find them one error at a time. Method:
 
 Toy2.cpp, Collision.cpp and Buzz.cpp all needed such a header. Write it in the
 first split of a file, not the third.
+
+## Screen a band before splitting: three tests, in this order
+
+Two aborts and one near-miss produced these. Run all three before the first edit.
+
+1. **Initialised data.** Sort the band's globals by section. Uninitialised ones move
+   free. Moving an initialised definition reorders the build's `.data` and costs
+   other functions their unannotated displacements.
+2. **Read-only data inside the functions.** A band whose bodies hold string
+   literals or float constants takes that `.rdata` with it, which shifts every
+   annotated table that follows in the file it leaves. The 0x004A1CE0-0x004A28B0
+   quest run carries three dialogue lines and cost 1,566 bytes of `.data` evidence;
+   aborted for that reason.
+3. **Already-exact functions.** A smaller unit changes register allocation. Check
+   each one, and split the run by namespace to leave behind the ones that regress.
+
+`tools/decomp structure FILE --json` plus the block parser gives all three in one
+pass. The screen is cheap; a failed campaign is not.
+
+## Replace moved code with its declaration *in place*
+
+`10107a9`, the particle split. The caller left behind needs prototypes for what
+moved. Putting them at the head of Actor.cpp cost six exact functions their match
+and 2,726 bytes of `.data` evidence. Putting them in the empty namespace block the
+move left behind cost nothing. A declaration emits no code, but VC6 lays out the
+frames and the data of a unit differently when one appears earlier in it. This is
+the same effect the TarmacTrouble note records, and it is not small.
+
+So: a move leaves a hole, and the declaration goes in the hole.
+
+## Do not clang-format a file that was not format-clean
+
+Same campaign. `clang-format -i src/Toy2/Actor.cpp` rewrote 580 lines the split
+never touched, and the commit read +914/-204 instead of a balanced move. Every
+other split in the series is balanced, so those files were clean.
+
+Format the new file, and the region you edited. Before formatting a whole old
+file, check `clang-format --output-replacements-xml` on it, or compare the line
+counts, and if it is not clean leave it alone: the reformat is its own change and
+does not belong in a structure campaign.
