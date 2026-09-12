@@ -880,6 +880,9 @@ namespace Toy2
 {
 	namespace CreatureBehaviour
 	{
+		// Angles are 12 bits, so this masks one turn.
+		const int32_t ANGLE_MASK = 0xFFF;
+
 		// FUNCTION: TOY2 0x00422660 [PROVISIONAL]
 		void BBuggy(Actor::Toy2Actor::ActorBehaviourContext* context)
 		{
@@ -940,9 +943,9 @@ namespace Toy2
 					AudioManager::PlaySoundEffect(2, &actor->pos);
 					Vector3I beamOffset = { 0, 0, 0 };
 					Vector3I beamPosition = {
-						actor->pos.x + (Numerics::g_sinCosLUT[actor->yawAngle & 0xFFF] >> 2),
+						actor->pos.x + (Numerics::g_sinCosLUT[actor->yawAngle & ANGLE_MASK] >> 2),
 						actor->pos.y - 0x1000,
-						actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle + 0x400) & 0xFFF] >> 2),
+						actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle + 0x400) & ANGLE_MASK] >> 2),
 					};
 					SpawnBeamShot(0, actor->yawAngle, 0, &beamPosition, &beamOffset, 4, 0);
 
@@ -950,7 +953,7 @@ namespace Toy2
 					{
 						int32_t attackAngle =
 							Nu3D::Math::CartesianToFixedAngle(g_buzzActor.posAngles.pos.x - actor->pos.x, g_buzzActor.posAngles.pos.z - actor->pos.z);
-						if (((attackAngle - (uint16_t)actor->yawAngle + 0x20) & 0xFFF) < 0x40)
+						if (((attackAngle - (uint16_t)actor->yawAngle + 0x20) & ANGLE_MASK) < 0x40)
 						{
 							Buzz::HandleDamage(attackAngle, 2);
 							Lighting::SpawnLight(g_buzzActor.posAngles.pos.x,
@@ -984,9 +987,9 @@ namespace Toy2
 					AudioManager::PlaySoundEffect(0x4C, &actor->pos);
 					actor->previousActorPhase = 400;
 					Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnInstance(
-						actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x800) & 0xFFF] >> 2),
+						actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x800) & ANGLE_MASK] >> 2),
 						actor->pos.y - 0x2000,
-						actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x400) & 0xFFF] >> 2),
+						actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x400) & ANGLE_MASK] >> 2),
 						0,
 						-2,
 						0,
@@ -1030,9 +1033,9 @@ namespace Toy2
 				if (effectMode != 0)
 				{
 					Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(
-						actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle + 0x680) & 0xFFF] >> 1),
+						actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle + 0x680) & ANGLE_MASK] >> 1),
 						actor->pos.y - 0x800,
-						actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x580) & 0xFFF] >> 1),
+						actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x580) & ANGLE_MASK] >> 1),
 						0x2A,
 						0xA);
 					particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
@@ -1042,9 +1045,9 @@ namespace Toy2
 						particle->velZ = 0x100;
 					}
 
-					particle = Nu3D::Particles::SpawnFromPreset(actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x680) & 0xFFF] >> 1),
+					particle = Nu3D::Particles::SpawnFromPreset(actor->pos.x + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x680) & ANGLE_MASK] >> 1),
 						actor->pos.y - 0x800,
-						actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x280) & 0xFFF] >> 1),
+						actor->pos.z + (Numerics::g_sinCosLUT[(actor->yawAngle - 0x280) & ANGLE_MASK] >> 1),
 						0x2A,
 						0xA);
 					particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
@@ -1060,9 +1063,9 @@ namespace Toy2
 			if (actor->primaryAnimIdx == 2 && g_framePulseOutputs.sevenTick != 0)
 			{
 				Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(
-					actor->pos.x - Numerics::g_sinCosLUT[actor->yawAngle & 0xFFF] / 3,
+					actor->pos.x - Numerics::g_sinCosLUT[actor->yawAngle & ANGLE_MASK] / 3,
 					actor->pos.y - 0x2000,
-					actor->pos.z - Numerics::g_sinCosLUT[(actor->yawAngle + 0x400) & 0xFFF] / 3,
+					actor->pos.z - Numerics::g_sinCosLUT[(actor->yawAngle + 0x400) & ANGLE_MASK] / 3,
 					0x11,
 					0xA);
 				particle->rotSpeed = *g_randDatBufferPtr++ - 0x80;
