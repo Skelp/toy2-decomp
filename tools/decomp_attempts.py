@@ -1085,8 +1085,12 @@ def main(argv: list[str] | None = None) -> int:
             row = mapped_row(args.address, args.root)
         if row is None:
             return 1
+        # The seventh field is the score ceiling: `campaigns run` turns it into
+        # the score validate demands of a coverage body. A forced target that no
+        # queue lists has no ceiling, so it reports a full one.
         fields = (canonical_address(str(row["address"])), row.get("name"), row.get("state"),
-                  row.get("size") or 0, row.get("source") or "", subsystem_of(row))
+                  row.get("size") or 0, row.get("source") or "", subsystem_of(row),
+                  row.get("score_ceiling") or 1)
         print("\n".join(str(field) for field in fields))
         return 0
     if args.command == "cleanup-todo":

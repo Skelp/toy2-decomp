@@ -133,7 +133,7 @@ class CandidateTests(unittest.TestCase):
         self.assertLess(retried.expected_bytes_per_minute, fresh.expected_bytes_per_minute)
         self.assertLess(retried.rank, fresh.rank)
 
-    def test_yield_estimate_penalizes_oversized_and_blocked_coverage(self):
+    def test_yield_estimate_penalizes_blocked_coverage_and_not_size(self):
         small = make(0x401000, "N::Small", size=1000, state="STUB", source="N.cpp")
         oversized = make(
             0x402000, "N::Oversized", size=13000, state="STUB", source="N.cpp"
@@ -148,7 +148,11 @@ class CandidateTests(unittest.TestCase):
         )
         for item in (small, oversized, blocked):
             candidates.estimate_yield(item, "coverage")
-        self.assertGreater(small.expected_bytes_per_minute, oversized.expected_bytes_per_minute)
+        # The 14 coverage campaigns of Sep 8-12 retained 0.35-0.65 of a body's
+        # unresolved bytes whatever its size, and the three 13 KB bodies took
+        # fewer minutes than the 5-6 KB ones, so size alone must not rank a
+        # large body below a small one. A declared blocker still sinks a row.
+        self.assertGreater(oversized.expected_bytes_per_minute, small.expected_bytes_per_minute)
         self.assertGreater(small.expected_bytes_per_minute, blocked.expected_bytes_per_minute)
 
     def test_refinement_yield_penalizes_a_large_gate_deficit(self):

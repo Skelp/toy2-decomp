@@ -149,9 +149,9 @@ class WrapperTests(unittest.TestCase):
         lines = result.stdout.splitlines()
         self.assertEqual(lines[:4], [
             "harness: custom (--writer sets the writer command), budget 12, batch 4",
-            "dry-run 1: 0x00401000 A::f1 refinement, subsystem a",
-            "dry-run 2: 0x00402000 A::f2 refinement, subsystem a",
-            "dry-run 3: 0x00403000 A::f3 coverage, subsystem a"])
+            "dry-run 1: 0x00401000 A::f1 coverage, subsystem a",
+            "dry-run 2: 0x00402000 A::f2 coverage, subsystem a",
+            "dry-run 3: 0x00403000 A::f3 refinement, subsystem a"])
         self.assertTrue(lines[-1].endswith("so start it in the background); next: tools/decomp"
                                            " campaigns run --count 3 --harness custom"))
 

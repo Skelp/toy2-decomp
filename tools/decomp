@@ -1200,7 +1200,7 @@ run_finish() {
 }
 
 # Choose the target of campaign INDEX: run_address, run_name, run_state, run_size,
-# run_source, run_subsystem and run_mode. With REUSE (--check, --dry-run) each
+# run_source, run_subsystem, run_ceiling and run_mode. With REUSE (--check, --dry-run) each
 # queue is ranked once; a run ranks again for every campaign, after the last commit.
 # Return 1 when candidates fails and 4 when no target is eligible.
 run_select() {
@@ -1222,8 +1222,12 @@ run_select() {
         pick=("$list" --address "$address")
     else
         if [[ $run_mode == auto ]]; then
-            run_mode=refinement
-            ((index % 3 != 0)) || run_mode=coverage
+            # Ledger of Sep 11-12, 26 campaigns: coverage returned 27,139 bytes
+            # in 259 minutes (105 per minute) and refinement 2,539 in 291 (8.7),
+            # so coverage takes two slots in three and refinement keeps the third
+            # for terminal status and debt removal.
+            run_mode=coverage
+            ((index % 3 != 0)) || run_mode=refinement
         fi
         queue=(--refine --yield) list="${select_files}candidates.json"
         if [[ $run_mode == coverage ]]; then
@@ -1248,6 +1252,7 @@ run_select() {
     mapfile -t fields <<< "$row"
     run_address=${fields[0]} run_name=${fields[1]} run_state=${fields[2]}
     run_size=${fields[3]} run_source=${fields[4]} run_subsystem=${fields[5]}
+    run_ceiling=${fields[6]:-1}
     if [[ $run_mode == auto ]]; then
         run_mode=refinement
         [[ $run_state != STUB && $run_state != NOT_STARTED ]] || run_mode=coverage
@@ -1258,12 +1263,12 @@ run_select() {
 # Record a no-source campaign with the models its writers tried, so no writer
 # retests them, and commit the record.
 run_record() {
-    local models=() model_args=() model
+    local models=() model_args=() model note=${1:-no attempt raised the score}
     mapfile -t models < <(python tools/decomp_attempts.py tried \
         "build/decomp-cache/handoff/$run_address.md")
     ((${#models[@]} > 0)) || models=("no writer model scored above the $baseline% baseline")
     for model in "${models[@]}"; do model_args+=(--model "$model"); done
-    if ! "$self" campaigns record --result no-source --note "no attempt raised the score" \
+    if ! "$self" campaigns record --result no-source --note "$note" \
         "${model_args[@]}" > "$prefix-record.log" 2>&1; then
         run_error 1 "the no-source record failed (log: $prefix-record.log)" \
             "tail -n 20 $prefix-record.log"
@@ -1287,8 +1292,9 @@ run_record() {
 run_campaign() {
     local index=$1 started=$SECONDS cost=0 tokens=0 writer_runs=0 stop="" batch=0 broken=""
     local broken_fix="" broken_next="" failure=() said line code
-    local run_mode=$mode run_address run_name run_state run_size run_source run_subsystem
+    local run_mode=$mode run_address run_name run_state run_size run_source run_subsystem run_ceiling
     local run_attempts run_best run_best_at run_last run_stalled run_limit run_cleanups writer_status=0
+    local below_bar=0 bar=0
     local cleanup_kept="" cleanup_before=0
     local baseline baseline_attempts prefix final bytes="+0.00" sha="-" finish_log json
     if [[ -n $(git status --porcelain -- src tools/Resources/functions_map.txt) ]]; then
@@ -1335,6 +1341,9 @@ run_campaign() {
     run_read_stats || { run_error 1 "the attempt log of $run_address is unreadable" \
         "python tools/decomp_attempts.py stats --address $run_address"; return; }
     baseline=$run_best baseline_attempts=$run_attempts
+    # The score validate demands of a coverage body: a quarter of the score
+    # ceiling for a body of 2,048 bytes or more, half of it below that size.
+    bar=$(run_math 'printf "%.2f", (b >= 2048 ? 25 : 50) * a' "${run_ceiling:-1}" "$run_size")
     run_emit campaign "campaign $index: $run_address $run_name $run_mode, baseline $baseline%" \
         --field "campaign=$index" --field "address=$run_address" --field "mode=$run_mode" \
         --field "baseline=$baseline" --set "baseline=$baseline" --set "best=$run_best" \
@@ -1373,6 +1382,13 @@ run_campaign() {
         if run_math 'exit !(a - b < 0.5)' "$run_best" "$before_best"; then
             stop="batch gain under 0.5"; break
         fi
+        # A coverage body still under half the bar after two batches does not
+        # reach it, and validate rejects the commit: stop paying writers. Run 18
+        # stalled at 6.38% and run 22 at 16.96% of a 25% bar, for 83 minutes.
+        if [[ $run_mode == coverage ]] && ((batch >= 2)) &&
+            run_math 'exit !(a < b / 2)' "$run_best" "$bar"; then
+            stop="under half the provisional bar"; below_bar=1; break
+        fi
     done
     if ((cleanup)) && [[ -z $broken ]] && run_math 'exit !(a > b)' "$run_best" "$baseline"; then
         run_cleanup || return
@@ -1387,7 +1403,14 @@ run_campaign() {
         return
     fi
     final=$run_best
-    if run_math 'exit !(a > b)' "$final" "$baseline"; then
+    # validate rejects a coverage body under the provisional bar, so its finish
+    # and the repair run after it both fail. Record no-source instead of paying
+    # for them: a repair writer removes debt, it does not raise a score.
+    if [[ $run_mode == coverage ]] && ((!below_bar)) && run_math 'exit !(a < b)' "$final" "$bar"; then
+        below_bar=1
+        run_emit finish "finish: skipped; $final% is under the provisional bar of $bar%"
+    fi
+    if ((!below_bar)) && run_math 'exit !(a > b)' "$final" "$baseline"; then
         run_message "$final"
         local finished=0
         run_finish "$final" 1 && finished=1
@@ -1448,7 +1471,12 @@ run_campaign() {
         run_phase record "log=$prefix-record.log"
         code=0
         run_hold_signals
-        run_record || code=$?
+        if ((below_bar)); then
+            run_record "reached $final%, under the provisional bar of $bar% for a $run_size-byte body" \
+                || code=$?
+        else
+            run_record || code=$?
+        fi
         run_trap_signals
         [[ -z $run_held ]] || run_interrupt "$run_held"
         ((code == 0)) || return "$code"

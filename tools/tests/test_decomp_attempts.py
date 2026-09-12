@@ -300,7 +300,7 @@ class AttemptTests(unittest.TestCase):
         code, text = self.run_main("pick", str(empty), "--address", "0x401000")
         self.assertEqual(code, 0)
         self.assertEqual(text.splitlines(), [
-            "0x00401000", "Toy2::Barn::Update", "STUB", "0", "Toy2/Barn.cpp", "Barn"])
+            "0x00401000", "Toy2::Barn::Update", "STUB", "0", "Toy2/Barn.cpp", "Barn", "1"])
         code, text = self.run_main("pick", str(empty))
         self.assertEqual((code, text), (1, ""))
 

@@ -885,15 +885,23 @@ def estimate_yield(candidate: Candidate, queue: str | None) -> None:
             current_match = candidate.match or 0.0
             confidence = 0.15 * max(0.1, current_match / 0.5)
     else:
-        expected_minutes = min(60.0, max(6.0, 5.0 + candidate.size / 180.0))
+        # Calibrated against the 14 coverage campaigns of Sep 8-12. A complete
+        # body retains 0.39-0.65 of its unresolved bytes and a large body is no
+        # worse than a small one: the four bodies of 2,096-3,274 bytes retained
+        # 0.39-0.56 (mean 0.49) and the six over 3,000 retained 0.35-0.65 with
+        # two total failures (mean 0.38). The old cliff above 3,000 bytes (0.025)
+        # ranked the queue's most productive work last. Size barely predicts
+        # minutes: the three 13 KB bodies took 17-32 minutes and the 5-6 KB ones
+        # 37-84, so the estimate stays nearly flat.
+        expected_minutes = min(45.0, max(12.0, 18.0 + candidate.size / 500.0))
         if candidate.size <= 600:
             confidence = 0.42
         elif candidate.size <= 1500:
             confidence = 0.28
         elif candidate.size <= 3000:
-            confidence = 0.16
+            confidence = 0.45
         else:
-            confidence = 0.025
+            confidence = 0.38
         nearby = candidate.nearby_provisional_scores
         if nearby:
             average = sum(nearby) / len(nearby)
