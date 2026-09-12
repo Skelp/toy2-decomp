@@ -197,3 +197,20 @@ The two routes both make the source worse:
 So 0x0047E5B0 keeps one legacy error and stays out of terminal status. The same
 sentinel reaches PlaySoundBuffer 0x0047DE50, whose magic-pointer error has the same
 cause and the same verdict.
+
+## Moving a constant declaration can move a stack frame
+
+TarmacTrouble.cpp, campaign `8f774ef`. The unnamed-constant fixes needed
+LINK_SCALE_ONE and BUTTON_LINK_FIRST above their earliest use, which sat 400
+lines above the declarations. Moving the whole 33-line constants block to the
+head of the namespace built and read well, and it cost `Toy2::TarmacTrouble::Init`
+(0x0042E600) 6.73 points, 94.23% to 87.50%. The diff is only stack slots,
+`[esp + 0x30]` against `[esp + 0x40]`, in a function whose text did not change.
+A declaration emits no code, so VC6 laid out that frame differently for a
+reason the source does not state.
+
+Method: move the least source possible. Put the one or two declarations a fix
+needs immediately above the earliest function that uses them and leave the
+rest of the block alone. The same move in SoftwareRenderer.cpp (`34fa172`) and
+AudioManager.cpp (`6a2c5c3`) changed no score, so the effect is not general;
+check every function of the file after any declaration move.
