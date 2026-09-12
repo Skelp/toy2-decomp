@@ -456,6 +456,27 @@ namespace AudioManager
 		}
 	}
 
+	// Stops one sound buffer when it is playing, releases it and clears its slot and
+	// its looping owner. Both release paths state this body.
+#define STOP_AND_RELEASE_SOUND_BUFFER()       \
+	DWORD status;                             \
+	DWORD playing;                            \
+	if (g_audioInitialized == 0)              \
+	{                                         \
+		playing = 0;                          \
+	}                                         \
+	else                                      \
+	{                                         \
+		g_dsResult = buf->GetStatus(&status); \
+		playing = status;                     \
+	}                                         \
+	if ((playing & 1) == 1)                   \
+	{                                         \
+		g_dsBuffers[i]->Stop();               \
+	}                                         \
+	g_dsBuffers[i]->Release();                \
+	g_dsBuffers[i] = NULL;                    \
+	g_loopingSoundOwners[i] = NULL;
 	// FUNCTION: TOY2 0x0047E7D0 [MATCHED]
 	void ReleaseAllBuffers()
 	{
@@ -466,30 +487,13 @@ namespace AudioManager
 				LPDIRECTSOUNDBUFFER buf = g_dsBuffers[i];
 				if (buf != NULL)
 				{
-					DWORD status;
-					DWORD playing;
-					if (g_audioInitialized == 0)
-					{
-						playing = 0;
-					}
-					else
-					{
-						g_dsResult = buf->GetStatus(&status);
-						playing = status;
-					}
-					if ((playing & 1) == 1)
-					{
-						g_dsBuffers[i]->Stop();
-					}
-					g_dsBuffers[i]->Release();
-					g_dsBuffers[i] = NULL;
-					g_loopingSoundOwners[i] = NULL;
+					STOP_AND_RELEASE_SOUND_BUFFER();
 				}
 			}
 		}
 	}
 
-	// FUNCTION: TOY2 0x0047E850 [PROVISIONAL]
+	// FUNCTION: TOY2 0x0047E850 [MATCHED]
 	void ReleaseBuffers()
 	{
 		if (g_audioInitialized != 0)
@@ -503,24 +507,7 @@ namespace AudioManager
 					LPDIRECTSOUNDBUFFER buf = g_dsBuffers[i];
 					if (buf != NULL)
 					{
-						DWORD status;
-						DWORD playing;
-						if (g_audioInitialized == 0)
-						{
-							playing = 0;
-						}
-						else
-						{
-							g_dsResult = buf->GetStatus(&status);
-							playing = status;
-						}
-						if ((playing & 1) == 1)
-						{
-							g_dsBuffers[i]->Stop();
-						}
-						g_dsBuffers[i]->Release();
-						g_dsBuffers[i] = NULL;
-						g_loopingSoundOwners[i] = NULL;
+						STOP_AND_RELEASE_SOUND_BUFFER();
 					}
 				}
 			}
@@ -543,6 +530,8 @@ namespace AudioManager
 			g_audioInitialized = 0;
 		}
 	}
+
+#undef STOP_AND_RELEASE_SOUND_BUFFER
 
 	// FUNCTION: TOY2 0x0047E3C0 [PROVISIONAL]
 	BOOL CALLBACK Enumerate(LPGUID lpGuid, LPCSTR lpcstrDescription, LPCSTR lpcstrModule, LPVOID lpContext)
@@ -1211,8 +1200,7 @@ namespace AudioManager
 				}
 				else
 				{
-					PlayLoopingSound3D(
-						(void*)(int32_t)preset.baseFrequency, (encodedSoundIndex & 0x7fff) - 1, frequency, leftVolume, rightVolume);
+					PlayLoopingSound3D((void*)(int32_t)preset.baseFrequency, (encodedSoundIndex & 0x7fff) - 1, frequency, leftVolume, rightVolume);
 				}
 			}
 			else if (selectedSoundIndex > 0)
@@ -1974,8 +1962,8 @@ namespace AudioManager
 					DSBUFFERDESC desc;
 					memset(&desc, 0, sizeof(desc));
 					desc.dwSize = sizeof(desc);
-					desc.dwFlags = DSBCAPS_CTRLFREQUENCY | DSBCAPS_CTRLPAN | DSBCAPS_CTRLVOLUME
-						| DSBCAPS_CTRLPOSITIONNOTIFY | DSBCAPS_GLOBALFOCUS | DSBCAPS_GETCURRENTPOSITION2;
+					desc.dwFlags = DSBCAPS_CTRLFREQUENCY | DSBCAPS_CTRLPAN | DSBCAPS_CTRLVOLUME | DSBCAPS_CTRLPOSITIONNOTIFY | DSBCAPS_GLOBALFOCUS
+						| DSBCAPS_GETCURRENTPOSITION2;
 					g_streamBufferBytes = g_streamFillBytes << 4;
 					desc.dwBufferBytes = g_streamBufferBytes;
 					desc.lpwfxFormat = waveFormat;
@@ -1991,8 +1979,7 @@ namespace AudioManager
 							g_streamNotifications[0].hEventNotify = g_streamFillEvent;
 							for (int32_t index = 1; index < 16; index++)
 							{
-								g_streamNotifications[index].dwOffset =
-									g_streamNotifications[index - 1].dwOffset + g_streamFillBytes;
+								g_streamNotifications[index].dwOffset = g_streamNotifications[index - 1].dwOffset + g_streamFillBytes;
 								g_streamNotifications[index].hEventNotify = g_streamFillEvent;
 							}
 							g_streamNotifications[15].dwOffset--;
@@ -2004,9 +1991,7 @@ namespace AudioManager
 							DWORD bufferBytes1;
 							void* bufferData2;
 							DWORD bufferBytes2;
-							if (g_dsPrimaryBuffer->Lock(
-									0, g_streamBufferBytes, &bufferData1, &bufferBytes1, &bufferData2, &bufferBytes2, 0)
-								== DS_OK)
+							if (g_dsPrimaryBuffer->Lock(0, g_streamBufferBytes, &bufferData1, &bufferBytes1, &bufferData2, &bufferBytes2, 0) == DS_OK)
 							{
 								uint32_t bytesRead;
 								WaveReadFile(g_waveMmioHandle, bufferBytes1, bufferData1, &g_streamDataChunk, &bytesRead);
@@ -2018,8 +2003,7 @@ namespace AudioManager
 										{
 											g_streamReachedEnd = 1;
 										}
-										uint8_t silence =
-											static_cast<WAVEFORMATEX*>(g_waveFormatHandle)->wBitsPerSample == 8 ? 0x80 : 0;
+										uint8_t silence = static_cast<WAVEFORMATEX*>(g_waveFormatHandle)->wBitsPerSample == 8 ? 0x80 : 0;
 										memset(static_cast<uint8_t*>(bufferData1) + bytesRead, silence, bufferBytes1 - bytesRead);
 									}
 									else
@@ -2028,8 +2012,11 @@ namespace AudioManager
 										do
 										{
 											Wave::SeekToChunk(&g_waveMmioHandle, &g_streamDataChunk, &g_streamParentChunk);
-											WaveReadFile(g_waveMmioHandle, bufferBytes1 - filledBytes,
-												static_cast<uint8_t*>(bufferData1) + filledBytes, &g_streamDataChunk, &bytesRead);
+											WaveReadFile(g_waveMmioHandle,
+												bufferBytes1 - filledBytes,
+												static_cast<uint8_t*>(bufferData1) + filledBytes,
+												&g_streamDataChunk,
+												&bytesRead);
 											filledBytes += bytesRead;
 										} while (filledBytes < bufferBytes1);
 									}

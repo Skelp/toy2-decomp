@@ -1,6 +1,5 @@
 # owner	rule	subject	fingerprint	path
 0x0047e5b0	magic-pointer	integer-pointer	3f95d3272f3c	src/AudioManager/AudioManager.cpp
-0x0047e850	duplicated-block	14 lines	d7c75818ca37	src/AudioManager/AudioManager.cpp
 0x0047ec20	duplicated-block	23 lines	6460388a8c28	src/AudioManager/AudioManager.cpp
 0x00412ff0	duplicated-block	12 lines	8da46c5f9c5e	src/AudioManager/AudioManager.cpp
 0x0047de50	magic-pointer	integer-pointer	3f95d3272f3c	src/AudioManager/AudioManager.cpp
