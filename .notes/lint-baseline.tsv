@@ -32,8 +32,8 @@
 0x0045db80	duplicated-block	14 lines	a2168a2c9f97	src/SoftwareRenderer.cpp
 0x0045db80	duplicated-block	15 lines #2	b4ef275913f5	src/SoftwareRenderer.cpp
 0x0045db80	duplicated-block	15 lines #3	b4ef275913f5	src/SoftwareRenderer.cpp
-src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_LIT_OVERLAY_EDGE	fa3c5f4e877c	src/SoftwareRenderer.cpp
-src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_OVERLAY_EDGE	0a51ce8d280c	src/SoftwareRenderer.cpp
+src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_LIT_OVERLAY_EDGE	dc95f9c2e493	src/SoftwareRenderer.cpp
+src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_OVERLAY_EDGE	2180463adaec	src/SoftwareRenderer.cpp
 0x0045e390	duplicated-block	26 lines	1b6ab6db13dc	src/SoftwareRenderer.cpp
 0x00461d20	duplicated-block	33 lines	c654dd92c457	src/SoftwareRenderer.cpp
 0x00461d20	unnamed-constant	255	3028f51407d8	src/SoftwareRenderer.cpp
@@ -60,22 +60,22 @@ src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_OVERLAY_EDGE	0a51ce8d280c
 0x00471520	duplicated-block	15 lines #4	75292b28033d	src/SoftwareRenderer.cpp
 0x004776c0	duplicated-block	21 lines	56cc8658dd78	src/SoftwareRenderer.cpp
 0x004776c0	duplicated-block	14 lines	0c11997af2cf	src/SoftwareRenderer.cpp
-src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_BLEND25_555_EDGE	6e272c97febb	src/SoftwareRenderer.cpp
+src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_BLEND25_555_EDGE	e57825b167c4	src/SoftwareRenderer.cpp
 0x00459ab0	duplicated-block	22 lines	19c06cc05c55	src/SoftwareRenderer.cpp
 0x00459ab0	duplicated-block	13 lines	47eb47da77eb	src/SoftwareRenderer.cpp
 0x00459ab0	duplicated-block	14 lines	d694d99a1084	src/SoftwareRenderer.cpp
 0x00459ab0	duplicated-block	14 lines #2	ce44818c4253	src/SoftwareRenderer.cpp
-src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_BLEND50_555_EDGE	7863025be09d	src/SoftwareRenderer.cpp
+src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_BLEND50_555_EDGE	95259a21a6ce	src/SoftwareRenderer.cpp
 0x0045a5c0	duplicated-block	22 lines	19c06cc05c55	src/SoftwareRenderer.cpp
 0x0045a5c0	duplicated-block	14 lines	342849e28ddf	src/SoftwareRenderer.cpp
 0x0045a5c0	duplicated-block	14 lines #2	ea35be3ca62b	src/SoftwareRenderer.cpp
 0x0045a5c0	duplicated-block	14 lines #3	751477bd27ea	src/SoftwareRenderer.cpp
-src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_BLEND75_555_EDGE	d7d32fe640b1	src/SoftwareRenderer.cpp
+src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_BLEND75_555_EDGE	e580ea373dfc	src/SoftwareRenderer.cpp
 0x0045b0b0	duplicated-block	22 lines	19c06cc05c55	src/SoftwareRenderer.cpp
 0x0045b0b0	duplicated-block	14 lines	1badcc3939cd	src/SoftwareRenderer.cpp
 0x0045b0b0	duplicated-block	15 lines	9c96f5ef309e	src/SoftwareRenderer.cpp
 0x0045b0b0	duplicated-block	39 lines	dff6d200372c	src/SoftwareRenderer.cpp
-src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_TEXTURED_EDGE_WITH_END	119b31aa7012	src/SoftwareRenderer.cpp
+src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_TEXTURED_EDGE_WITH_END	64e79f1610e3	src/SoftwareRenderer.cpp
 0x0045bbc0	duplicated-block	20 lines	159b725655b9	src/SoftwareRenderer.cpp
 0x0045d110	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
 0x0045d110	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
