@@ -278,8 +278,8 @@ namespace Toy2
 			MoveableObject::InitTable(g_moveableObjectInitTable.entries);
 			Collectables::LoadTokenTable(reinterpret_cast<const Collectables::TokenDialogueValue*>(&g_tokenDialogueValues));
 
-			g_environmentSurfaceY = 0x4400;
-			g_previousBuzzEnvironmentY = 0x4400;
+			g_environmentSurfaceY = POOL_SURFACE_Y;
+			g_previousBuzzEnvironmentY = POOL_SURFACE_Y;
 			g_environmentTintRed = 0x50;
 			g_environmentTintGreen = 0x60;
 			g_environmentTintBlue = 0x80;
@@ -310,8 +310,8 @@ namespace Toy2
 			g_targetLaunchPadDepression = 0;
 			g_launchPadDepression = 0;
 			g_launchPadIsRising = 0;
-			g_firstTreeScaleY = 0x1000;
-			g_secondTreeScaleY = 0x1000;
+			g_firstTreeScaleY = TREE_FULL_SCALE;
+			g_secondTreeScaleY = TREE_FULL_SCALE;
 			g_fallingTreeRoll = 0;
 			g_fallingTreePitch = 0;
 			g_treeSwayAngle = 0xC00;
