@@ -9,7 +9,6 @@
 0x0040d2d0	duplicated-block	20 lines	c963b9255833	src/D3DApp/d3dapp.cpp
 0x00415ae0	duplicated-block	25 lines	80325f1c1fb4	src/InputManager.cpp
 0x004f572c	magic-pointer	integer-pointer	8644029423fd	src/ModeSelect.cpp
-0x004b46b0	duplicated-block	14 lines	37d5dad85c02	src/Nu3D/Font.cpp
 0x004b53d0	duplicated-block	17 lines	befc6a1eb07b	src/Nu3D/Font.cpp
 0x004c2be0	duplicated-block	20 lines	1894c1d52db5	src/Nu3D/Light.cpp
 0x004cbc90	unstructured-control-flow	goto-count	4c11133ca3eb	src/Nu3D/ObjLoad.cpp

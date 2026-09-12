@@ -486,6 +486,22 @@ namespace Nu3D
 		return (clipDY2 & clipDY1 & clipDX2 & clipDX1) & 0x80000000;
 	}
 
+	// Writes the second glyph triangle and draws both triangles of one glyph quad.
+	// DrawUnscaledGlyph and DrawScaledGlyph state the same tail.
+#define EMIT_GLYPH_TRIANGLES()                                                                                                                        \
+	g_textVertices[2].uv.x = glyph->uvMaxX;                                                                                                           \
+	g_textVertices[2].uv.y = glyph->uvMaxY;                                                                                                           \
+	g_textVertices[3].position = g_textVertices[0].position;                                                                                          \
+	g_textVertices[3].uv = g_textVertices[0].uv;                                                                                                      \
+	g_textVertices[4] = g_textVertices[2];                                                                                                            \
+	g_textVertices[5].position.x = (float)g_textCursorX;                                                                                              \
+	g_textVertices[5].position.y = g_textVertices[2].position.y;                                                                                      \
+	g_textVertices[5].uv.x = glyph->uvMinX;                                                                                                           \
+	g_textVertices[5].uv.y = glyph->uvMaxY;                                                                                                           \
+	Renderer::DrawSingleTexturedTriangle(                                                                                                             \
+		g_textVertices, g_currentFontTexIndex, g_fontRenderFlags | Renderer::RENDER_Z | Renderer::RENDER_CULL_NONE | Renderer::RENDER_ALPHA_DEFAULT); \
+	Renderer::DrawSingleTexturedTriangle(                                                                                                             \
+		&g_textVertices[3], g_currentFontTexIndex, g_fontRenderFlags | Renderer::RENDER_Z | Renderer::RENDER_CULL_NONE | Renderer::RENDER_ALPHA_DEFAULT);
 	// FUNCTION: TOY2 0x004B4DE0 [EFFECTIVE]
 	int32_t Font::DrawUnscaledGlyph(char c)
 	{
@@ -509,22 +525,7 @@ namespace Nu3D
 
 			g_textVertices[2].position.x = (float)(glyph->width + g_textCursorX - 1);
 			g_textVertices[2].position.y = (float)glyph->height + yTop - 1.0f;
-			g_textVertices[2].uv.x = glyph->uvMaxX;
-			g_textVertices[2].uv.y = glyph->uvMaxY;
-
-			g_textVertices[3].position = g_textVertices[0].position;
-			g_textVertices[3].uv = g_textVertices[0].uv;
-			g_textVertices[4] = g_textVertices[2];
-			g_textVertices[5].position.x = (float)g_textCursorX;
-			g_textVertices[5].position.y = g_textVertices[2].position.y;
-			g_textVertices[5].uv.x = glyph->uvMinX;
-			g_textVertices[5].uv.y = glyph->uvMaxY;
-
-			Renderer::DrawSingleTexturedTriangle(
-				g_textVertices, g_currentFontTexIndex, g_fontRenderFlags | Renderer::RENDER_Z | Renderer::RENDER_CULL_NONE | Renderer::RENDER_ALPHA_DEFAULT);
-			Renderer::DrawSingleTexturedTriangle(&g_textVertices[3],
-				g_currentFontTexIndex,
-				g_fontRenderFlags | Renderer::RENDER_Z | Renderer::RENDER_CULL_NONE | Renderer::RENDER_ALPHA_DEFAULT);
+			EMIT_GLYPH_TRIANGLES();
 			return glyph->width;
 		}
 		return 0;
@@ -653,7 +654,7 @@ namespace Nu3D
 		return (clipDY2 & clipDY1 & clipDX2 & clipDX1) & 0x80000000;
 	}
 
-	// FUNCTION: TOY2 0x004B46B0 [PROVISIONAL]
+	// FUNCTION: TOY2 0x004B46B0 [MATCHED]
 	int32_t Font::DrawScaledGlyph(char c)
 	{
 		LPDIRECT3DDEVICE3 device = DrawingDevice::GetD3DDevice();
@@ -678,27 +679,13 @@ namespace Nu3D
 
 			g_textVertices[2].position.x = (float)(g_textCursorX - 1) + scaledWidth;
 			g_textVertices[2].position.y = yTop - 1.0f + scaledHeight;
-			g_textVertices[2].uv.x = glyph->uvMaxX;
-			g_textVertices[2].uv.y = glyph->uvMaxY;
-
-			g_textVertices[3].position = g_textVertices[0].position;
-			g_textVertices[3].uv = g_textVertices[0].uv;
-			g_textVertices[4] = g_textVertices[2];
-			g_textVertices[5].position.x = (float)g_textCursorX;
-			g_textVertices[5].position.y = g_textVertices[2].position.y;
-			g_textVertices[5].uv.x = glyph->uvMinX;
-			g_textVertices[5].uv.y = glyph->uvMaxY;
-
-			Renderer::DrawSingleTexturedTriangle(
-				g_textVertices, g_currentFontTexIndex, g_fontRenderFlags | Renderer::RENDER_Z | Renderer::RENDER_CULL_NONE | Renderer::RENDER_ALPHA_DEFAULT);
-			Renderer::DrawSingleTexturedTriangle(&g_textVertices[3],
-				g_currentFontTexIndex,
-				g_fontRenderFlags | Renderer::RENDER_Z | Renderer::RENDER_CULL_NONE | Renderer::RENDER_ALPHA_DEFAULT);
+			EMIT_GLYPH_TRIANGLES();
 			return (int32_t)scaledWidth;
 		}
 		return 0;
 	}
 
+#undef EMIT_GLYPH_TRIANGLES
 	// FUNCTION: TOY2 0x004B4880 [PROVISIONAL]
 	int32_t Font::DrawClippedScaledGlyph(char c)
 	{
