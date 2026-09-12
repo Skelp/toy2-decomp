@@ -194,4 +194,23 @@ namespace Toy2
 	extern uint8_t g_nearbyEffectRecordIndices[256];
 }
 
+namespace Toy2
+{
+	// State the shell defines and LevelEntry.cpp reads, and the two entry points
+	// the two units call across the split.
+	extern int16_t g_pauseMenuState;
+	extern int16_t g_pauseMenuSelection;
+	extern int16_t g_pauseMenuBlinkTimer;
+	extern int32_t g_previousLevelObjectiveProgress;
+	extern int32_t g_hudActorAnimationFrame;
+	extern int32_t g_cameraIdleTimer;
+	int32_t EnterLevel(int32_t levelIndex);
+
+	namespace Lighting
+	{
+		void InitBuzzLight();
+		void UpdateBuzzLight();
+	}
+}
+
 #endif
