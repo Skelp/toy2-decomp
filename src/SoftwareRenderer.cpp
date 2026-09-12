@@ -5258,6 +5258,13 @@ namespace SoftwareRenderer
 // Index into g_paletteColourOffsetTable of one interpolated colour, before the texel row.
 #define PALETTE_COLOUR_OFFSET(blue, green, red) (((blue) >> 12 & ~0x3F) + ((green) >> 15 & ~7) + ((red) >> 18))
 
+	// The palette combine tables are square: one row for each destination colour, and the
+	// colour offset table holds a light level pair for each texel.
+	enum
+	{
+		PALETTE_COMBINE_TABLE_STRIDE = 0x100,
+		PALETTE_COLOUR_OFFSET_STRIDE = 0x200
+	};
 	// The 8-bit form of UnkRenderAPI13 (RGB555) and UnkRenderAPI25 (RGB565). It lights the
 	// texel through g_paletteColourOffsetTable and combines the overlay through the palette
 	// blend tables, so the three edge walks and the four span modes are the same.
@@ -5377,6 +5384,8 @@ namespace SoftwareRenderer
 		}
 
 		uint8_t* overlay = (uint8_t*)g_softwareTextureData[OVERLAY_TEXTURE_INDEX];
+		uint8_t* blend50Table = g_paletteBlend50Table;
+		uint8_t* additiveTable = g_additivePaletteTable;
 		uint8_t* texture = (uint8_t*)g_softwareTextureData[item->textureIndex];
 		uint8_t* rowStart = (uint8_t*)g_lockedBackBuffer + g_backBufferPitchPixels * topY + Toy2::g_screenClipLeft;
 		if (overlayMode == OVERLAY_MODE_NONE)
@@ -5386,8 +5395,8 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX != rightX)
 					{
 						int32_t u = scanline->leftInterpolants[0];
@@ -5433,8 +5442,8 @@ namespace SoftwareRenderer
 						for (; pixelCount > 0; pixelCount--)
 						{
 							uint8_t texel = texture[((v >> 8) & k_upperByteMask) + (u >> k_fixedPointShift)];
-							*pixel =
-								g_additivePaletteTable[*pixel * 0x100 + g_paletteColourOffsetTable[PALETTE_COLOUR_OFFSET(blue, green, red) + texel * 0x200]];
+							*pixel = additiveTable[*pixel * PALETTE_COMBINE_TABLE_STRIDE
+								+ g_paletteColourOffsetTable[PALETTE_COLOUR_OFFSET(blue, green, red) + texel * PALETTE_COLOUR_OFFSET_STRIDE]];
 							u += uStep;
 							v += vStep;
 							blue += blueStep;
@@ -5458,8 +5467,8 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX != rightX)
 					{
 						int32_t overlayU = scanline->rightInterpolants[OVERLAY_LEFT_U];
@@ -5492,7 +5501,7 @@ namespace SoftwareRenderer
 						{
 							int32_t overlayRow = overlayU >> k_fixedPointShift;
 							overlayU += overlayUStep;
-							*pixel = g_additivePaletteTable[*pixel * 0x100 + overlay[((overlayV >> 8) & k_upperByteMask) + overlayRow]];
+							*pixel = additiveTable[*pixel * PALETTE_COMBINE_TABLE_STRIDE + overlay[((overlayV >> 8) & k_upperByteMask) + overlayRow]];
 							overlayV += overlayVStep;
 							pixel++;
 						}
@@ -5512,8 +5521,8 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX != rightX)
 					{
 						int32_t overlayU = scanline->rightInterpolants[OVERLAY_LEFT_U];
@@ -5544,7 +5553,8 @@ namespace SoftwareRenderer
 
 						for (; pixelCount > 0; pixelCount--)
 						{
-							*pixel = g_paletteBlend50Table[*pixel * 0x100 + overlay[((overlayV >> 8) & k_upperByteMask) + (overlayU >> k_fixedPointShift)]];
+							*pixel = blend50Table[*pixel * PALETTE_COMBINE_TABLE_STRIDE
+								+ overlay[((overlayV >> 8) & k_upperByteMask) + (overlayU >> k_fixedPointShift)]];
 							overlayV += overlayVStep;
 							overlayU += overlayUStep;
 							pixel++;
@@ -5563,18 +5573,19 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX == rightX)
 				{
 					// A one pixel span takes the texture coordinates from the left edge and the
 					// colour from the right edge.
 					uint8_t texel = texture[((scanline->leftInterpolants[1] >> 8) & k_upperByteMask) + (scanline->leftInterpolants[0] >> k_fixedPointShift)];
 					uint8_t litTexel = g_paletteColourOffsetTable
-						[PALETTE_COLOUR_OFFSET(scanline->rightInterpolants[2], scanline->rightInterpolants[3], scanline->rightInterpolants[4]) + texel * 0x200];
+						[PALETTE_COLOUR_OFFSET(scanline->rightInterpolants[2], scanline->rightInterpolants[3], scanline->rightInterpolants[4])
+							+ texel * PALETTE_COLOUR_OFFSET_STRIDE];
 					uint8_t overlayTexel = overlay[((scanline->rightInterpolants[OVERLAY_LEFT_V] >> 8) & k_upperByteMask)
 						+ (scanline->rightInterpolants[OVERLAY_LEFT_U] >> k_fixedPointShift)];
-					rowStart[leftX - Toy2::g_screenClipLeft] = g_additivePaletteTable[overlayTexel * 0x100 + litTexel];
+					rowStart[leftX - Toy2::g_screenClipLeft] = additiveTable[overlayTexel * PALETTE_COMBINE_TABLE_STRIDE + litTexel];
 				}
 				else
 				{
@@ -5623,8 +5634,8 @@ namespace SoftwareRenderer
 					{
 						uint8_t texel = texture[((v >> 8) & k_upperByteMask) + (u >> k_fixedPointShift)];
 						uint8_t overlayTexel = overlay[((overlayV >> 8) & k_upperByteMask) + (overlayU >> k_fixedPointShift)];
-						*pixel =
-							g_additivePaletteTable[overlayTexel * 0x100 + g_paletteColourOffsetTable[PALETTE_COLOUR_OFFSET(blue, green, red) + texel * 0x200]];
+						*pixel = additiveTable[overlayTexel * PALETTE_COMBINE_TABLE_STRIDE
+							+ g_paletteColourOffsetTable[PALETTE_COLOUR_OFFSET(blue, green, red) + texel * PALETTE_COLOUR_OFFSET_STRIDE]];
 						v += vStep;
 						u += uStep;
 						blue += blueStep;
