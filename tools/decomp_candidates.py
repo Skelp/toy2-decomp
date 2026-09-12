@@ -103,6 +103,8 @@ class Candidate:
     namespace: str = ""
     lint_errors: int = 0
     lint_warnings: int = 0
+    lint_advisory: int = 0
+    lint_legacy: int = 0
     nearby_provisional_scores: tuple[float, ...] = ()
     deferred_reason: str = ""
     declared_dependencies: tuple[int, ...] = ()
@@ -135,6 +137,17 @@ class Candidate:
     @property
     def source_debt(self) -> bool:
         return bool(self.lint_errors or self.lint_warnings)
+
+    @property
+    def quality_findings(self) -> int:
+        """Every unsuppressed finding a quality campaign can remove.
+
+        Advisory findings count here and nowhere else. They do not block
+        validate and they must not change terminal status, but the owner asked
+        for them to be fixed, so the quality queue has to see them.
+        """
+
+        return self.lint_errors + self.lint_warnings + self.lint_advisory
 
     @property
     def binary_terminal(self) -> bool:
@@ -404,8 +417,8 @@ def parse_address(value: str) -> int:
     return int(value, 16)
 
 
-def read_lint_findings() -> dict[int, tuple[int, int]]:
-    """Count blocking and advisory plausibility findings per retail address."""
+def read_lint_findings() -> dict[int, tuple[int, int, int, int]]:
+    """Count blocking, advisory and baselined findings per retail address."""
 
     try:
         from tools import decomp_lint
@@ -415,24 +428,30 @@ def read_lint_findings() -> dict[int, tuple[int, int]]:
     units = decomp_lint.target_units(False, [])
     findings = decomp_lint.scan_units(units)
     findings, _ = decomp_lint.apply_baseline(findings, decomp_lint.read_baseline())
-    counts: dict[int, tuple[int, int]] = {}
+    counts: dict[int, tuple[int, int, int, int]] = {}
     for finding in findings:
-        if not finding.owner_address or finding.suppressed or finding.advisory:
+        if not finding.owner_address or finding.suppressed:
             continue
         address = int(finding.owner_address, 16)
-        errors, warnings = counts.get(address, (0, 0))
-        if finding.severity == "error":
+        errors, warnings, advisory, legacy = counts.get(address, (0, 0, 0, 0))
+        if finding.advisory:
+            advisory += 1
+        elif finding.severity == "error":
             errors += 1
         else:
             warnings += 1
-        counts[address] = errors, warnings
+        if finding.legacy:
+            legacy += 1
+        counts[address] = errors, warnings, advisory, legacy
     return counts
 
 
 def read_lint_errors() -> dict[int, int]:
     """Compatibility view used by older tooling tests."""
 
-    return {address: errors for address, (errors, _) in read_lint_findings().items()}
+    return {
+        address: counts[0] for address, counts in read_lint_findings().items()
+    }
 
 
 def build_candidates() -> list[Candidate]:
@@ -498,8 +517,10 @@ def build_candidates() -> list[Candidate]:
                 ),
                 siblings=reconstructed_per_namespace.get(namespace, 0),
                 namespace=namespace,
-                lint_errors=lint_findings.get(address, (0, 0))[0],
-                lint_warnings=lint_findings.get(address, (0, 0))[1],
+                lint_errors=lint_findings.get(address, (0, 0, 0, 0))[0],
+                lint_warnings=lint_findings.get(address, (0, 0, 0, 0))[1],
+                lint_advisory=lint_findings.get(address, (0, 0, 0, 0))[2],
+                lint_legacy=lint_findings.get(address, (0, 0, 0, 0))[3],
                 nearby_provisional_scores=tuple(nearby_scores),
                 deferred_reason=deferral.reason,
                 declared_dependencies=deferral.blocked_by,
@@ -758,6 +779,13 @@ def score(candidate: Candidate) -> None:
     if candidate.lint_warnings:
         rank += min(candidate.lint_warnings, 10) * 0.5
         reasons.append(f"{candidate.lint_warnings} plausibility warning(s)")
+    if candidate.lint_advisory:
+        # Advisory findings do not move the rank, because they do not block
+        # validate and every other queue reads the same rank. The quality queue
+        # orders on them directly.
+        reasons.append(f"{candidate.lint_advisory} advisory finding(s)")
+    if candidate.lint_legacy:
+        reasons.append(f"{candidate.lint_legacy} finding(s) already in the baseline")
 
     if candidate.size and candidate.size <= LEAF_MAX_SIZE:
         rank += 30.0
@@ -994,7 +1022,7 @@ def select(
             continue
         if exclude_capped and candidate.tool_artifact and queue != "refinement":
             continue
-        if debt_only and not (candidate.lint_errors or candidate.lint_warnings):
+        if debt_only and not candidate.quality_findings:
             continue
         if (
             queue is None
@@ -1026,6 +1054,23 @@ def select(
                 item.map_defect,
                 -item.expected_bytes_per_minute,
                 item.active_penalty_attempts,
+                -item.rank,
+                item.address,
+            )
+        )
+    elif debt_only:
+        # Owner policy of Sep 12: source quality comes before further
+        # reconstruction, so this queue leads with the debt a campaign can
+        # remove on its own. A body under half match cannot finish acceptable
+        # on a rename alone, because validate wants 50 percent or a gain, so it
+        # sorts last; above the bar the most findings per campaign come first.
+        chosen.sort(
+            key=lambda item: (
+                item.map_defect,
+                (item.match or 0.0) < 0.5,
+                item.lint_legacy >= item.quality_findings,
+                -item.quality_findings,
+                -(item.match or 0.0),
                 -item.rank,
                 item.address,
             )

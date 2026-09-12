@@ -147,13 +147,33 @@ class WrapperTests(unittest.TestCase):
                                env=self.plain_env())
         self.assertEqual(result.returncode, 0, result.stdout)
         lines = result.stdout.splitlines()
+        # Owner policy of Sep 12: the quality queue comes first, so every slot it
+        # can fill is a refinement. This fake queue answers every question with
+        # the same three rows, so all three campaigns are quality work.
         self.assertEqual(lines[:4], [
             "harness: custom (--writer sets the writer command), budget 12, batch 4",
-            "dry-run 1: 0x00401000 A::f1 coverage, subsystem a",
-            "dry-run 2: 0x00402000 A::f2 coverage, subsystem a",
+            "dry-run 1: 0x00401000 A::f1 refinement, subsystem a",
+            "dry-run 2: 0x00402000 A::f2 refinement, subsystem a",
             "dry-run 3: 0x00403000 A::f3 refinement, subsystem a"])
         self.assertTrue(lines[-1].endswith("so start it in the background); next: tools/decomp"
                                            " campaigns run --count 3 --harness custom"))
+
+    def test_an_empty_quality_queue_falls_back_to_the_coverage_rotation(self):
+        rows = [{"address": f"0x0040{n}000", "name": f"A::f{n}", "state": "FUNCTION", "size": 64,
+                 "source": "a.cpp", "work_target": True, "dependency_ready": True}
+                for n in (1, 2, 3)]
+        # --quality answers with nothing, which is what a clean tree looks like.
+        self.write_candidates(
+            "import json, sys\n"
+            f"rows = {rows!r}\n"
+            "print(json.dumps([] if '--quality' in sys.argv else rows))\n")
+        result = self.run_tool("campaigns", "run", "--dry-run", "--count", "3", "--writer", "true",
+                               env=self.plain_env())
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(result.stdout.splitlines()[1:4], [
+            "dry-run 1: 0x00401000 A::f1 coverage, subsystem a",
+            "dry-run 2: 0x00402000 A::f2 coverage, subsystem a",
+            "dry-run 3: 0x00403000 A::f3 refinement, subsystem a"])
 
     def test_a_hangup_during_a_run_ends_it_with_exit_130_and_a_final_state(self):
         self.make_repo()

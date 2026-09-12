@@ -1204,7 +1204,7 @@ run_finish() {
 # queue is ranked once; a run ranks again for every campaign, after the last commit.
 # Return 1 when candidates fails and 4 when no target is eligible.
 run_select() {
-    local index=$1 reuse=${2:-} row fields=() pick=() list queue=()
+    local index=$1 reuse=${2:-} row fields=() pick=() list queue=() run_quality=0 ranked_key
     run_mode=$mode select_error=""
     if [[ -n $address ]]; then
         # The source state of the target names its one queue: a FUNCTION is refinement,
@@ -1222,33 +1222,50 @@ run_select() {
         pick=("$list" --address "$address")
     else
         if [[ $run_mode == auto ]]; then
-            # Ledger of Sep 11-12, 26 campaigns: coverage returned 27,139 bytes
-            # in 259 minutes (105 per minute) and refinement 2,539 in 291 (8.7),
-            # so coverage takes two slots in three and refinement keeps the third
-            # for terminal status and debt removal.
-            run_mode=coverage
-            ((index % 3 != 0)) || run_mode=refinement
+            # Owner policy of Sep 12: source quality and structure come before
+            # further reconstruction. The quality queue therefore takes every
+            # slot it can fill, and the rotation below runs only once that queue
+            # is empty. The cost is measured and accepted: the Sep 11-12 ledger
+            # gives coverage 105 bytes per minute against refinement's 8.7.
+            run_quality=1 run_mode=refinement
         fi
-        queue=(--refine --yield) list="${select_files}candidates.json"
-        if [[ $run_mode == coverage ]]; then
-            queue=(--coverage) list="${select_files}coverage.json"
-        fi
-        if [[ -z $reuse || $ranked != *" $run_mode "* ]]; then
-            if ! "$self" candidates "${queue[@]}" --json --limit 25 > "$list" \
-                2> "${select_files}candidates.log"; then
-                select_error="candidates failed (log: ${select_files}candidates.log)"
-                return 1
-            fi
-            ranked+=" $run_mode "
-        fi
-        pick=("$list")
-        [[ $run_mode != coverage ]] || pick+=(--coverage)
-        for row in "${tried[@]}"; do pick+=(--skip "$row"); done
     fi
-    if ! row=$(python tools/decomp_attempts.py pick "${pick[@]}"); then
+    # Two passes at most: the quality queue, then the rotation it falls back to.
+    while true; do
+        if [[ -z $address ]]; then
+            queue=(--refine --yield) list="${select_files}candidates.json"
+            if ((run_quality)); then
+                queue=(--quality) list="${select_files}quality.json"
+            elif [[ $run_mode == coverage ]]; then
+                queue=(--coverage) list="${select_files}coverage.json"
+            fi
+            ranked_key=$run_mode
+            ((!run_quality)) || ranked_key=quality
+            if [[ -z $reuse || $ranked != *" $ranked_key "* ]]; then
+                if ! "$self" candidates "${queue[@]}" --json --limit 25 > "$list" \
+                    2> "${select_files}candidates.log"; then
+                    select_error="candidates failed (log: ${select_files}candidates.log)"
+                    return 1
+                fi
+                ranked+=" $ranked_key "
+            fi
+            pick=("$list")
+            [[ $run_mode != coverage ]] || pick+=(--coverage)
+            for row in "${tried[@]}"; do pick+=(--skip "$row"); done
+        fi
+        if row=$(python tools/decomp_attempts.py pick "${pick[@]}"); then
+            break
+        fi
+        if ((run_quality)); then
+            # The quality queue is empty, so reconstruction resumes. Coverage
+            # keeps two slots in three, the rates T-21 measured.
+            run_quality=0 run_mode=coverage
+            ((index % 3 != 0)) || run_mode=refinement
+            continue
+        fi
         select_error="no eligible ${address:-$run_mode} target"
         return 4
-    fi
+    done
     mapfile -t fields <<< "$row"
     run_address=${fields[0]} run_name=${fields[1]} run_state=${fields[2]}
     run_size=${fields[3]} run_source=${fields[4]} run_subsystem=${fields[5]}

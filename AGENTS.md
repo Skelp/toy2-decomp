@@ -35,23 +35,23 @@ rebuild), never the diff files; `bc ADDRESS --pack` prints a batch's orientation
 pack. `campaigns finish` stages `src`, the map and the lint baseline pruned of
 debt the campaign removed, runs `validate` (the only gate), records the ledger row
 and commits source, ledger and scoreboard together, because a commit preserves
-progress; push after every campaign. `campaigns run --count N`
-runs this loop with headless Claude Code or Codex writers (`--check --live` first,
-`--status` to watch), because a script spends no tokens between batches.
+progress; push after every campaign. `campaigns run --count N` runs this loop with
+headless Claude Code or Codex writers (`--check --live` first, `--status` to
+watch), because a script spends no tokens between batches.
 
 ## Select work
 
-Take the top row of `candidates --refine --yield --why` or, every third
-campaign, the top dependency-ready row of `candidates --coverage --why`. Skip a
-row only for a reason you write into the record note. Skip a row whose last
-source result retained under 25 bytes unless a `campaigns evidence` row names
-new evidence for it. A row marked `map defect` goes to `tools/decomp discover`
-and `evidence --unmapped` first, because reccmp scores a function across its
-map gap. Large bodies and functions below 50 percent are allowed; they hold most
-of the remaining bytes. One target, or up to three related functions in one
-subsystem, or one family anchor plus siblings that share a source form. The
-rank is unresolved retail bytes, then evidence readiness, dependency impact and
-source debt; the estimate columns order the queue and are never a reason to stop.
+Quality and structure come first, so take the top `candidates --quality --why` row,
+where advisory findings count as debt, until it is empty; then take `candidates --refine
+--yield --why`, or every third campaign the top dependency-ready row of `candidates
+--coverage --why`. Skip a row only for a reason in the record note, or when its last
+source result kept under 25 bytes and no `campaigns evidence` row names new evidence. A
+`map defect` row goes to `tools/decomp discover` and `evidence --unmapped` first,
+because reccmp scores a function across its map gap. Large bodies and functions below 50
+percent are allowed: they hold most remaining bytes. One target, up to three related
+functions in one subsystem, or a family anchor plus siblings that share a source form.
+Rank is unresolved retail bytes, then evidence readiness, dependency impact and source
+debt; the estimate columns order the queue and never a reason to stop.
 
 ## Budget
 
