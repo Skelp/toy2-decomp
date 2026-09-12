@@ -148,7 +148,7 @@ namespace Nu3D
 							pitchCosine = 0x4000;
 						}
 						verticalVelocity = -pitchSine / velocityDivisor;
-						int32_t yaw = particle->yawAngle + 0x400;
+						int32_t yaw = particle->yawAngle + ANGLE_QUARTER_TURN;
 						particle->velX = (Numerics::g_sinCosLUT[particle->yawAngle] * pitchCosine >> 14) / velocityDivisor;
 						particle->velZ = (Numerics::g_sinCosLUT[yaw & ANGLE_MASK] * pitchCosine >> 14) / velocityDivisor;
 						verticalAcceleration = 0;
@@ -1134,7 +1134,7 @@ namespace Nu3D
 		// FUNCTION: TOY2 0x00410850 [MATCHED]
 		void SpawnBreakBurst(ParticleInstance* source, uint8_t flags)
 		{
-			int32_t spawnY = source->height * 0x20 + source->pos.y;
+			int32_t spawnY = source->height * PARTICLE_HEIGHT_SCALE + source->pos.y;
 			int32_t burstType;
 			int32_t finalType;
 			if ((flags & 1) == 0)
@@ -1192,7 +1192,7 @@ namespace Nu3D
 					SpawnBreakBurst(particle, 1);
 					return;
 				case 3: {
-					int32_t spawnY = particle->height * 0x20 + particle->pos.y;
+					int32_t spawnY = particle->height * PARTICLE_HEIGHT_SCALE + particle->pos.y;
 					int32_t particleCount = 5;
 					do
 					{
@@ -1242,7 +1242,7 @@ namespace Nu3D
 					return;
 				}
 				case 7: {
-					int32_t spawnY = particle->height * 0x20 + particle->pos.y;
+					int32_t spawnY = particle->height * PARTICLE_HEIGHT_SCALE + particle->pos.y;
 					int32_t particleCount = 3;
 					do
 					{
@@ -1256,7 +1256,7 @@ namespace Nu3D
 					return;
 				}
 				case 8: {
-					int32_t spawnY = particle->height * 0x20 + particle->pos.y;
+					int32_t spawnY = particle->height * PARTICLE_HEIGHT_SCALE + particle->pos.y;
 					int32_t particleCount = 5;
 					do
 					{
@@ -1286,7 +1286,7 @@ namespace Nu3D
 					return;
 				}
 				case 10:
-					SpawnFromPreset(particle->pos.x, particle->height * 0x20 + particle->pos.y, particle->pos.z, 0x78, 2);
+					SpawnFromPreset(particle->pos.x, particle->height * PARTICLE_HEIGHT_SCALE + particle->pos.y, particle->pos.z, 0x78, 2);
 					return;
 				case 11: {
 					ParticleInstance* spawned = SpawnFromPreset(particle->pos.x, particle->pos.y, particle->pos.z, 0x75, 0x1C);
