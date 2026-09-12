@@ -2204,6 +2204,23 @@ namespace SoftwareRenderer
 			pixelCount = testFalseCount;                                          \
 	}
 
+// Combines one texel with the interpolated light of a span into an RGB565 pixel. Each ramp
+// table holds the lit value of every level of one channel, so one table read lights a channel.
+#define LIT_TEXEL_565(texel, red, green, blue)                                                                                                   \
+	(g_greenRampFull[(((texel) >> 5) & 0x3F) + ((green) >> k_green565RampShift)] + g_redRampFull[((texel) >> 11) + ((red) >> k_fixedPointShift)] \
+		+ g_blueRampFull[((texel) & k_fiveBitChannelMask) + ((blue) >> k_fixedPointShift)])
+
+// Steps the texture UV, the three colour interpolants and the destination of a lit, textured
+// span on by one pixel. It reads the names that LIT_TEXTURED_SPAN_SETUP_565 declares.
+#define ADVANCE_LIT_TEXTURED_SPAN_565() \
+	u += uStep;                         \
+	v += vStep;                         \
+	red += redStep;                     \
+	green += greenStep;                 \
+	blue += blueStep;                   \
+	pixelCount--;                       \
+	pixel++
+
 	// Draws a Gouraud lit, textured triangle or quad into the RGB565 back buffer.
 	// FUNCTION: TOY2 0x00467080 [PROVISIONAL]
 	void UnkRenderAPI17(SoftwareRenderItem* item)
@@ -2212,8 +2229,7 @@ namespace SoftwareRenderer
 		CLIP_POLYGON_ROW_RANGE(item, topY, bottomY);
 
 		int32_t scanlineCount = bottomY - topY + 1;
-		ScanlineScratch* scanline = &g_scanlineScratch[topY];
-		ClearScanlineFlags(scanline, scanlineCount);
+		ClearScanlineFlags(&g_scanlineScratch[topY], scanlineCount);
 
 		// Walk the edges into the scanline table.
 		RASTERIZE_LIT_EDGE_INCLUSIVE(&item->vertices[0], &item->vertices[1], litEdge01DoneTextured565);
@@ -2230,7 +2246,7 @@ namespace SoftwareRenderer
 
 		uint16_t* texture = (uint16_t*)g_softwareTextureData[item->textureIndex];
 		uint16_t* rowStart = (uint16_t*)g_lockedBackBuffer + g_backBufferPitchPixels * topY + Toy2::g_screenClipLeft;
-		ScanlineScratch* spanRow = scanline;
+		ScanlineScratch* spanRow = &g_scanlineScratch[topY];
 		int32_t rowsLeft = scanlineCount;
 		if (item->renderFlags & SOFTWARE_RENDER_COLOUR_KEY)
 		{
@@ -2247,9 +2263,7 @@ namespace SoftwareRenderer
 						if (texel != COLOUR_KEY_TEXEL_565)
 						{
 							rowStart[leftX - Toy2::g_screenClipLeft] =
-								g_greenRampFull[((texel >> 5) & 0x3F) + (spanRow->leftInterpolants[3] >> k_green565RampShift)]
-								+ g_redRampFull[(texel >> 11) + (spanRow->leftInterpolants[2] >> k_fixedPointShift)]
-								+ g_blueRampFull[(texel & k_fiveBitChannelMask) + (spanRow->leftInterpolants[4] >> k_fixedPointShift)];
+								LIT_TEXEL_565(texel, spanRow->leftInterpolants[2], spanRow->leftInterpolants[3], spanRow->leftInterpolants[4]);
 						}
 					}
 					else
@@ -2261,17 +2275,9 @@ namespace SoftwareRenderer
 							uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 							if (texel != COLOUR_KEY_TEXEL_565)
 							{
-								*pixel = g_greenRampFull[((texel >> 5) & 0x3F) + (green >> k_green565RampShift)]
-									+ g_redRampFull[(texel >> 11) + (red >> k_fixedPointShift)]
-									+ g_blueRampFull[(texel & k_fiveBitChannelMask) + (blue >> k_fixedPointShift)];
+								*pixel = LIT_TEXEL_565(texel, red, green, blue);
 							}
-							u += uStep;
-							v += vStep;
-							green += greenStep;
-							red += redStep;
-							blue += blueStep;
-							pixelCount--;
-							pixel++;
+							ADVANCE_LIT_TEXTURED_SPAN_565();
 						} while (pixelCount > 0);
 					}
 				}
@@ -2292,9 +2298,8 @@ namespace SoftwareRenderer
 				if (leftX == rightX)
 				{
 					uint16_t texel = texture[(spanRow->leftInterpolants[0] >> k_fixedPointShift) + (spanRow->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
-					rowStart[leftX - Toy2::g_screenClipLeft] = g_greenRampFull[((texel >> 5) & 0x3F) + (spanRow->leftInterpolants[3] >> k_green565RampShift)]
-						+ g_redRampFull[(texel >> 11) + (spanRow->leftInterpolants[2] >> k_fixedPointShift)]
-						+ g_blueRampFull[(texel & k_fiveBitChannelMask) + (spanRow->leftInterpolants[4] >> k_fixedPointShift)];
+					rowStart[leftX - Toy2::g_screenClipLeft] =
+						LIT_TEXEL_565(texel, spanRow->leftInterpolants[2], spanRow->leftInterpolants[3], spanRow->leftInterpolants[4]);
 				}
 				else
 				{
@@ -2303,16 +2308,8 @@ namespace SoftwareRenderer
 					do
 					{
 						uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
-						*pixel = g_greenRampFull[((texel >> 5) & 0x3F) + (green >> k_green565RampShift)]
-							+ g_redRampFull[(texel >> 11) + (red >> k_fixedPointShift)]
-							+ g_blueRampFull[(texel & k_fiveBitChannelMask) + (blue >> k_fixedPointShift)];
-						v += vStep;
-						u += uStep;
-						red += redStep;
-						green += greenStep;
-						blue += blueStep;
-						pixelCount--;
-						pixel++;
+						*pixel = LIT_TEXEL_565(texel, red, green, blue);
+						ADVANCE_LIT_TEXTURED_SPAN_565();
 					} while (pixelCount > 0);
 				}
 			}
