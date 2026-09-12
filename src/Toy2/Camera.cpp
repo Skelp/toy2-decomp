@@ -437,35 +437,38 @@ namespace Toy2
 			g_cutsceneCamera.roll = 0;
 		}
 
+		// Cancels the scripted cutscene camera: clears the two debug marker particles,
+		// returns Buzz and the gameplay camera to their gameplay values and zeroes the
+		// three link scales the cutscene set.
+#define CANCEL_SCRIPTED_CAMERA()                                                    \
+	if (g_cameraMarkerParticle != (Nu3D::Particles::ParticleInstance*)-1)           \
+	{                                                                               \
+		g_cameraMarkerParticle->lifetime = 1;                                       \
+		g_cameraMarkerParticle = (Nu3D::Particles::ParticleInstance*)-1;            \
+	}                                                                               \
+	if (g_targetMarkerParticle != (Nu3D::Particles::ParticleInstance*)-1)           \
+	{                                                                               \
+		g_targetMarkerParticle->lifetime = 1;                                       \
+		g_targetMarkerParticle = (Nu3D::Particles::ParticleInstance*)-1;            \
+	}                                                                               \
+	g_buzzActor.actorFlags |= 1;                                                    \
+	g_gameplayCamera.roll = g_buzzActor.posAngles.angles.yaw;                       \
+	g_buzzActor.facingAngle = g_buzzActor.posAngles.angles.yaw;                     \
+	g_gameplayCamera.position.view.pos.y = g_buzzActor.posAngles.pos.y - 0x3000;    \
+	g_gameplayCamera.angles.yaw = 0x4B0;                                            \
+	g_gameplayCamera.target.view.visorAimAngles.pitch = 0;                          \
+	g_gameplayCamera.position.view.lookAt.x = g_gameplayCamera.position.view.pos.x; \
+	g_gameplayCamera.state.fields.modeTransitionState = 0;                          \
+	g_scriptedCameraState = 0;                                                      \
+	Nu3D::Link::SetScaleFromFixedOffsets(0x2D, 0, 0, 0);                            \
+	Nu3D::Link::SetScaleFromFixedOffsets(0x2E, 0, 0, 0);                            \
+	Nu3D::Link::SetScaleFromFixedOffsets(0x2F, 0, 0, 0);
 		// FUNCTION: TOY2 0x004020F0 [EFFECTIVE]
 		void BeginScriptedCutsceneAtPoint(Vector3I* focusPosition, int32_t duration, int32_t cameraDistance)
 		{
 			if (g_scriptedCameraState != 0)
 			{
-				if (g_cameraMarkerParticle != (Nu3D::Particles::ParticleInstance*)-1)
-				{
-					g_cameraMarkerParticle->lifetime = 1;
-					g_cameraMarkerParticle = (Nu3D::Particles::ParticleInstance*)-1;
-				}
-				if (g_targetMarkerParticle != (Nu3D::Particles::ParticleInstance*)-1)
-				{
-					g_targetMarkerParticle->lifetime = 1;
-					g_targetMarkerParticle = (Nu3D::Particles::ParticleInstance*)-1;
-				}
-
-				g_buzzActor.actorFlags |= 1;
-				g_gameplayCamera.roll = g_buzzActor.posAngles.angles.yaw;
-				g_buzzActor.facingAngle = g_buzzActor.posAngles.angles.yaw;
-				g_gameplayCamera.position.view.pos.y = g_buzzActor.posAngles.pos.y - 0x3000;
-				g_gameplayCamera.angles.yaw = 0x4B0;
-				g_gameplayCamera.target.view.visorAimAngles.pitch = 0;
-				g_gameplayCamera.position.view.lookAt.x = g_gameplayCamera.position.view.pos.x;
-				g_gameplayCamera.state.fields.modeTransitionState = 0;
-				g_scriptedCameraState = 0;
-
-				Nu3D::Link::SetScaleFromFixedOffsets(0x2D, 0, 0, 0);
-				Nu3D::Link::SetScaleFromFixedOffsets(0x2E, 0, 0, 0);
-				Nu3D::Link::SetScaleFromFixedOffsets(0x2F, 0, 0, 0);
+				CANCEL_SCRIPTED_CAMERA();
 			}
 
 			g_gameplayStateFlags |= 1;
@@ -487,35 +490,12 @@ namespace Toy2
 			InitCutsceneCamera(&g_cutsceneFocusPosition, &g_cutsceneCameraPosition);
 		}
 
-		// FUNCTION: TOY2 0x00402290 [PROVISIONAL]
+		// FUNCTION: TOY2 0x00402290 [EFFECTIVE]
 		void BeginScriptedCutsceneOnBuzz(int32_t duration)
 		{
 			if (g_scriptedCameraState != 0)
 			{
-				if (g_cameraMarkerParticle != (Nu3D::Particles::ParticleInstance*)-1)
-				{
-					g_cameraMarkerParticle->lifetime = 1;
-					g_cameraMarkerParticle = (Nu3D::Particles::ParticleInstance*)-1;
-				}
-				if (g_targetMarkerParticle != (Nu3D::Particles::ParticleInstance*)-1)
-				{
-					g_targetMarkerParticle->lifetime = 1;
-					g_targetMarkerParticle = (Nu3D::Particles::ParticleInstance*)-1;
-				}
-
-				g_buzzActor.actorFlags |= 1;
-				g_gameplayCamera.roll = g_buzzActor.posAngles.angles.yaw;
-				g_buzzActor.facingAngle = g_buzzActor.posAngles.angles.yaw;
-				g_gameplayCamera.position.view.pos.y = g_buzzActor.posAngles.pos.y - 0x3000;
-				g_gameplayCamera.angles.yaw = 0x4B0;
-				g_gameplayCamera.target.view.visorAimAngles.pitch = 0;
-				g_gameplayCamera.position.view.lookAt.x = g_gameplayCamera.position.view.pos.x;
-				g_gameplayCamera.state.fields.modeTransitionState = 0;
-				g_scriptedCameraState = 0;
-
-				Nu3D::Link::SetScaleFromFixedOffsets(0x2D, 0, 0, 0);
-				Nu3D::Link::SetScaleFromFixedOffsets(0x2E, 0, 0, 0);
-				Nu3D::Link::SetScaleFromFixedOffsets(0x2F, 0, 0, 0);
+				CANCEL_SCRIPTED_CAMERA();
 			}
 
 			g_gameplayStateFlags |= GAMEPLAY_STATE_CUTSCENE_ACTIVE;
@@ -537,6 +517,7 @@ namespace Toy2
 			InitCutsceneCamera(&g_cutsceneFocusPosition, &g_cutsceneCameraPosition);
 		}
 
+#undef CANCEL_SCRIPTED_CAMERA
 		// FUNCTION: TOY2 0x00403640 [PROVISIONAL]
 		void SmoothToTarget(CameraState* camera)
 		{
