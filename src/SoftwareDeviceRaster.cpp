@@ -52,6 +52,33 @@ namespace SoftwareRenderer
 	// GLOBAL: TOY2 0x004DDB58
 	extern const double k_textureCoordinateScale = 256.0;
 
+	// The texture walk that every textured span sets up: 8.8 fixed-point u and v at
+	// the left end of the span, clamped to the texture, and the step that carries
+	// them to the right end.
+#define SPAN_SETUP_TEXTURE_WALK()                                                                  \
+	int32_t textureU = (int32_t)(edgeB->uv.x * k_textureCoordinateScale);                          \
+	if (textureU > k_textureCoordinateFixedMax)                                                    \
+		textureU = k_textureCoordinateFixedMax;                                                    \
+	textureU <<= k_textureCoordinateShift;                                                         \
+	int32_t textureVValue = (int32_t)(edgeB->uv.y * k_textureCoordinateScale);                     \
+	if (textureVValue > k_textureCoordinateFixedMax)                                               \
+		textureVValue = k_textureCoordinateFixedMax;                                               \
+	int32_t textureV = (k_textureCoordinateMax - textureVValue) << k_textureCoordinateShift;       \
+	int32_t farTextureU = (int32_t)(edgeA->uv.x * k_textureCoordinateScale);                       \
+	if (farTextureU > k_textureCoordinateMax)                                                      \
+		farTextureU = k_textureCoordinateMax;                                                      \
+	farTextureU <<= k_textureCoordinateShift;                                                      \
+	if (farTextureU > k_textureCoordinateFixedMax)                                                 \
+		farTextureU = k_textureCoordinateFixedMax;                                                 \
+	int32_t stepTextureU = (farTextureU - textureU) / width;                                       \
+	int32_t farTextureVValue = (int32_t)(edgeA->uv.y * k_textureCoordinateScale);                  \
+	if (farTextureVValue > k_textureCoordinateMax)                                                 \
+		farTextureVValue = k_textureCoordinateMax;                                                 \
+	int32_t farTextureV = (k_textureCoordinateMax - farTextureVValue) << k_textureCoordinateShift; \
+	if (farTextureV > k_textureCoordinateFixedMax)                                                 \
+		farTextureV = k_textureCoordinateFixedMax;                                                 \
+	int32_t stepTextureV = (farTextureV - textureV) / width;
+
 	// FUNCTION: TOY2 0x004C4340 [MATCHED]
 	void UnpackColourChannels(uint32_t colour, int32_t* red, int32_t* green, int32_t* blue)
 	{
@@ -116,31 +143,7 @@ namespace SoftwareRenderer
 			int32_t endX = (int32_t)edgeA->position.x;
 			destRow += startX;
 
-			int32_t textureU = (int32_t)(edgeB->uv.x * k_textureCoordinateScale);
-			if (textureU > k_textureCoordinateFixedMax)
-				textureU = k_textureCoordinateFixedMax;
-			textureU <<= k_textureCoordinateShift;
-
-			int32_t textureVValue = (int32_t)(edgeB->uv.y * k_textureCoordinateScale);
-			if (textureVValue > k_textureCoordinateFixedMax)
-				textureVValue = k_textureCoordinateFixedMax;
-			int32_t textureV = (k_textureCoordinateMax - textureVValue) << k_textureCoordinateShift;
-
-			int32_t farTextureU = (int32_t)(edgeA->uv.x * k_textureCoordinateScale);
-			if (farTextureU > k_textureCoordinateMax)
-				farTextureU = k_textureCoordinateMax;
-			farTextureU <<= k_textureCoordinateShift;
-			if (farTextureU > k_textureCoordinateFixedMax)
-				farTextureU = k_textureCoordinateFixedMax;
-			int32_t stepTextureU = (farTextureU - textureU) / width;
-
-			int32_t farTextureVValue = (int32_t)(edgeA->uv.y * k_textureCoordinateScale);
-			if (farTextureVValue > k_textureCoordinateMax)
-				farTextureVValue = k_textureCoordinateMax;
-			int32_t farTextureV = (k_textureCoordinateMax - farTextureVValue) << k_textureCoordinateShift;
-			if (farTextureV > k_textureCoordinateFixedMax)
-				farTextureV = k_textureCoordinateFixedMax;
-			int32_t stepTextureV = (farTextureV - textureV) / width;
+			SPAN_SETUP_TEXTURE_WALK();
 
 			if (startX & 1)
 			{
@@ -239,31 +242,7 @@ namespace SoftwareRenderer
 			int32_t endX = (int32_t)edgeA->position.x;
 			destRow += startX;
 
-			int32_t textureU = (int32_t)(edgeB->uv.x * k_textureCoordinateScale);
-			if (textureU > k_textureCoordinateFixedMax)
-				textureU = k_textureCoordinateFixedMax;
-			textureU <<= k_textureCoordinateShift;
-
-			int32_t textureVValue = (int32_t)(edgeB->uv.y * k_textureCoordinateScale);
-			if (textureVValue > k_textureCoordinateFixedMax)
-				textureVValue = k_textureCoordinateFixedMax;
-			int32_t textureV = (k_textureCoordinateMax - textureVValue) << k_textureCoordinateShift;
-
-			int32_t farTextureU = (int32_t)(edgeA->uv.x * k_textureCoordinateScale);
-			if (farTextureU > k_textureCoordinateMax)
-				farTextureU = k_textureCoordinateMax;
-			farTextureU <<= k_textureCoordinateShift;
-			if (farTextureU > k_textureCoordinateFixedMax)
-				farTextureU = k_textureCoordinateFixedMax;
-			int32_t stepTextureU = (farTextureU - textureU) / width;
-
-			int32_t farTextureVValue = (int32_t)(edgeA->uv.y * k_textureCoordinateScale);
-			if (farTextureVValue > k_textureCoordinateMax)
-				farTextureVValue = k_textureCoordinateMax;
-			int32_t farTextureV = (k_textureCoordinateMax - farTextureVValue) << k_textureCoordinateShift;
-			if (farTextureV > k_textureCoordinateFixedMax)
-				farTextureV = k_textureCoordinateFixedMax;
-			int32_t stepTextureV = (farTextureV - textureV) / width;
+			SPAN_SETUP_TEXTURE_WALK();
 
 			if (startX & 1)
 			{
@@ -363,122 +342,15 @@ namespace SoftwareRenderer
 		int32_t edgeBGreen,
 		int32_t edgeBBlue)
 	{
-		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
-		if (width == 0)
-		{
-			return;
-		}
-
-		int32_t farRed;
-		int32_t farGreen;
-		int32_t farBlue;
-		if (width < 0)
-		{
-			farRed = edgeBRed;
-			farGreen = edgeBGreen;
-			farBlue = edgeBBlue;
-			edgeBRed = edgeARed;
-			edgeBGreen = edgeAGreen;
-			edgeBBlue = edgeABlue;
-			Nu3D::VertexTL* swap = edgeA;
-			edgeA = edgeB;
-			edgeB = swap;
-			width = -width;
-		}
-		else
-		{
-			farRed = edgeARed;
-			farGreen = edgeAGreen;
-			farBlue = edgeABlue;
-		}
-
-		if (width > 0)
-		{
-			int32_t stepRed = (farRed - edgeBRed) / width;
-			int32_t stepGreen = (farGreen - edgeBGreen) / width;
-			int32_t stepBlue = (farBlue - edgeBBlue) / width;
-
-			destRow += (int32_t)edgeB->position.x;
-
-			int32_t textureU = (int32_t)(edgeB->uv.x * k_textureCoordinateScale);
-			if (textureU > k_textureCoordinateFixedMax)
-			{
-				textureU = k_textureCoordinateFixedMax;
-			}
-			textureU <<= k_textureCoordinateShift;
-
-			int32_t textureVValue = (int32_t)(edgeB->uv.y * k_textureCoordinateScale);
-			if (textureVValue > k_textureCoordinateFixedMax)
-			{
-				textureVValue = k_textureCoordinateFixedMax;
-			}
-			int32_t textureV = (k_textureCoordinateMax - textureVValue) << k_textureCoordinateShift;
-
-			int32_t farTextureU = (int32_t)(edgeA->uv.x * k_textureCoordinateScale);
-			if (farTextureU > k_textureCoordinateMax)
-			{
-				farTextureU = k_textureCoordinateMax;
-			}
-			farTextureU <<= k_textureCoordinateShift;
-			if (farTextureU > k_textureCoordinateFixedMax)
-			{
-				farTextureU = k_textureCoordinateFixedMax;
-			}
-			int32_t stepTextureU = (farTextureU - textureU) / width;
-
-			int32_t farTextureVValue = (int32_t)(edgeA->uv.y * k_textureCoordinateScale);
-			if (farTextureVValue > k_textureCoordinateMax)
-			{
-				farTextureVValue = k_textureCoordinateMax;
-			}
-			int32_t farTextureV = (k_textureCoordinateMax - farTextureVValue) << k_textureCoordinateShift;
-			if (farTextureV > k_textureCoordinateFixedMax)
-			{
-				farTextureV = k_textureCoordinateFixedMax;
-			}
-			int32_t stepTextureV = (farTextureV - textureV) / width;
-
-			do
-			{
-				int32_t textureIndex = ((textureV >> k_textureCoordinateShift) & k_lowerByteMask) * k_textureDimension
-					+ ((textureU >> k_textureCoordinateShift) & k_lowerByteMask);
-				uint32_t texel = texData[textureIndex];
-				if (texel > k_rgbMask)
-				{
-					uint32_t pixel = *(const uint32_t*)destRow;
-
-					int32_t blue = (int32_t)(pixel & k_fiveBitChannelMask) + g_colourScaleTable3[(edgeBBlue & k_upperByteMask) + (texel & k_lowerByteMask)];
-					if (blue >= k_fiveBitChannelLimit)
-					{
-						blue = k_fiveBitChannelMask;
-					}
-
-					int32_t green =
-						(int32_t)((pixel >> 5) & k_fiveBitChannelMask) + g_colourScaleTable3[(edgeBGreen & k_upperByteMask) + ((texel >> 8) & k_lowerByteMask)];
-					if (green >= k_fiveBitChannelLimit)
-					{
-						green = k_fiveBitChannelMask;
-					}
-
-					int32_t red =
-						(int32_t)((pixel >> 10) & k_fiveBitChannelMask) + g_colourScaleTable3[(edgeBRed & k_upperByteMask) + ((texel >> 16) & k_lowerByteMask)];
-					if (red >= k_fiveBitChannelLimit)
-					{
-						red = k_fiveBitChannelMask;
-					}
-
-					*destRow = (uint16_t)((red << 10) + (green << 5) + blue);
-				}
-
-				destRow++;
-				textureU += stepTextureU;
-				textureV += stepTextureV;
-				edgeBRed += stepRed;
-				edgeBGreen += stepGreen;
-				edgeBBlue += stepBlue;
-				width--;
-			} while (width != 0);
-		}
+#define SPAN_UNPACK_RED(value) (((value) >> 10) & k_fiveBitChannelMask)
+#define SPAN_UNPACK_GREEN(value) (((value) >> 5) & k_fiveBitChannelMask)
+#define SPAN_SHIFT_RED(component) ((component) << 10)
+#define SPAN_SHIFT_GREEN(component) ((component) << 5)
+#include "SoftwareDeviceRasterTexturedAdditiveSpan.inc"
+#undef SPAN_SHIFT_GREEN
+#undef SPAN_SHIFT_RED
+#undef SPAN_UNPACK_GREEN
+#undef SPAN_UNPACK_RED
 	}
 
 	// FUNCTION: TOY2 0x004C4E00 [PROVISIONAL]
@@ -493,79 +365,15 @@ namespace SoftwareRenderer
 		int32_t edgeBGreen,
 		int32_t edgeBBlue)
 	{
-		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
-		if (width == 0)
-		{
-			return;
-		}
-
-		// The caller does not order the endpoints. Keep the one with the smaller x
-		// in edgeB and its colours in the edgeB accumulators, so the walk below
-		// always runs to increasing columns. farRed/Green/Blue hold the other end.
-		int32_t farRed;
-		int32_t farGreen;
-		int32_t farBlue;
-		if (width < 0)
-		{
-			farRed = edgeBRed;
-			farGreen = edgeBGreen;
-			farBlue = edgeBBlue;
-			edgeBRed = edgeARed;
-			edgeBGreen = edgeAGreen;
-			edgeBBlue = edgeABlue;
-			edgeB = edgeA;
-			width = -width;
-		}
-		else
-		{
-			farRed = edgeARed;
-			farGreen = edgeAGreen;
-			farBlue = edgeABlue;
-		}
-
-		if (width > 0)
-		{
-			int32_t stepRed = (farRed - edgeBRed) / width;
-			int32_t stepGreen = (farGreen - edgeBGreen) / width;
-			int32_t stepBlue = (farBlue - edgeBBlue) / width;
-
-			destRow += (int32_t)edgeB->position.x;
-
-			do
-			{
-				// Retail reads a full dword through the 16-bit cursor and keeps only
-				// the low pixel. The upper half is discarded by the channel masks.
-				uint32_t pixel = *(const uint32_t*)destRow;
-
-				int32_t channel = (int32_t)(pixel & 0x1f) + (int32_t)((uint32_t)edgeBBlue >> 11);
-				if (channel >= 0x20)
-				{
-					channel = 0x1f;
-				}
-				int32_t out = channel;
-
-				channel = (int32_t)((pixel >> 5) & 0x1f) + (int32_t)((uint32_t)edgeBGreen >> 11);
-				if (channel >= 0x20)
-				{
-					channel = 0x1f;
-				}
-				out += channel << 5;
-
-				channel = (int32_t)((pixel >> 10) & 0x1f) + (int32_t)((uint32_t)edgeBRed >> 11);
-				if (channel >= 0x20)
-				{
-					channel = 0x1f;
-				}
-
-				*destRow = (uint16_t)((channel << 10) + out);
-				destRow++;
-
-				edgeBRed += stepRed;
-				edgeBGreen += stepGreen;
-				edgeBBlue += stepBlue;
-				width--;
-			} while (width != 0);
-		}
+#define SPAN_UNPACK_RED(value) (((value) >> 10) & 0x1f)
+#define SPAN_UNPACK_GREEN(value) (((value) >> 5) & 0x1f)
+#define SPAN_SHIFT_RED(component) ((component) << 10)
+#define SPAN_SHIFT_GREEN(component) ((component) << 5)
+#include "SoftwareDeviceRasterAdditiveSpan.inc"
+#undef SPAN_SHIFT_GREEN
+#undef SPAN_SHIFT_RED
+#undef SPAN_UNPACK_GREEN
+#undef SPAN_UNPACK_RED
 	}
 
 	// FUNCTION: TOY2 0x004C4F30 [PROVISIONAL]
@@ -580,79 +388,15 @@ namespace SoftwareRenderer
 		int32_t edgeBGreen,
 		int32_t edgeBBlue)
 	{
-		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
-		if (width == 0)
-		{
-			return;
-		}
-
-		// The caller does not order the endpoints. Keep the one with the smaller x
-		// in edgeB and its colours in the edgeB accumulators, so the walk below
-		// always runs to increasing columns. farRed/Green/Blue hold the other end.
-		int32_t farRed;
-		int32_t farGreen;
-		int32_t farBlue;
-		if (width < 0)
-		{
-			farRed = edgeBRed;
-			farGreen = edgeBGreen;
-			farBlue = edgeBBlue;
-			edgeBRed = edgeARed;
-			edgeBGreen = edgeAGreen;
-			edgeBBlue = edgeABlue;
-			edgeB = edgeA;
-			width = -width;
-		}
-		else
-		{
-			farRed = edgeARed;
-			farGreen = edgeAGreen;
-			farBlue = edgeABlue;
-		}
-
-		if (width > 0)
-		{
-			int32_t stepRed = (farRed - edgeBRed) / width;
-			int32_t stepGreen = (farGreen - edgeBGreen) / width;
-			int32_t stepBlue = (farBlue - edgeBBlue) / width;
-
-			destRow += (int32_t)edgeB->position.x;
-
-			do
-			{
-				// Retail reads a full dword through the 16-bit cursor and keeps only
-				// the low pixel. The upper half is discarded by the channel masks.
-				uint32_t pixel = *(const uint32_t*)destRow;
-
-				int32_t channel = (int32_t)(pixel & 0x1f) + (int32_t)((uint32_t)edgeBBlue >> 11);
-				if (channel >= 0x20)
-				{
-					channel = 0x1f;
-				}
-				int32_t out = channel;
-
-				channel = (int32_t)((pixel >> 6) & 0x1f) + (int32_t)((uint32_t)edgeBGreen >> 11);
-				if (channel >= 0x20)
-				{
-					channel = 0x1f;
-				}
-				out += channel << 6;
-
-				channel = (int32_t)((pixel >> 11) & 0x1f) + (int32_t)((uint32_t)edgeBRed >> 11);
-				if (channel >= 0x20)
-				{
-					channel = 0x1f;
-				}
-
-				*destRow = (uint16_t)((channel << 11) + out);
-				destRow++;
-
-				edgeBRed += stepRed;
-				edgeBGreen += stepGreen;
-				edgeBBlue += stepBlue;
-				width--;
-			} while (width != 0);
-		}
+#define SPAN_UNPACK_RED(value) (((value) >> 11) & 0x1f)
+#define SPAN_UNPACK_GREEN(value) (((value) >> 6) & 0x1f)
+#define SPAN_SHIFT_RED(component) ((component) << 11)
+#define SPAN_SHIFT_GREEN(component) ((component) << 6)
+#include "SoftwareDeviceRasterAdditiveSpan.inc"
+#undef SPAN_SHIFT_GREEN
+#undef SPAN_SHIFT_RED
+#undef SPAN_UNPACK_GREEN
+#undef SPAN_UNPACK_RED
 	}
 
 	// FUNCTION: TOY2 0x004C5060 [PROVISIONAL]
@@ -667,122 +411,15 @@ namespace SoftwareRenderer
 		int32_t edgeBGreen,
 		int32_t edgeBBlue)
 	{
-		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
-		if (width == 0)
-		{
-			return;
-		}
-
-		int32_t farRed;
-		int32_t farGreen;
-		int32_t farBlue;
-		if (width < 0)
-		{
-			farRed = edgeBRed;
-			farGreen = edgeBGreen;
-			farBlue = edgeBBlue;
-			edgeBRed = edgeARed;
-			edgeBGreen = edgeAGreen;
-			edgeBBlue = edgeABlue;
-			Nu3D::VertexTL* swap = edgeA;
-			edgeA = edgeB;
-			edgeB = swap;
-			width = -width;
-		}
-		else
-		{
-			farRed = edgeARed;
-			farGreen = edgeAGreen;
-			farBlue = edgeABlue;
-		}
-
-		if (width > 0)
-		{
-			int32_t stepRed = (farRed - edgeBRed) / width;
-			int32_t stepGreen = (farGreen - edgeBGreen) / width;
-			int32_t stepBlue = (farBlue - edgeBBlue) / width;
-
-			destRow += (int32_t)edgeB->position.x;
-
-			int32_t textureU = (int32_t)(edgeB->uv.x * k_textureCoordinateScale);
-			if (textureU > k_textureCoordinateFixedMax)
-			{
-				textureU = k_textureCoordinateFixedMax;
-			}
-			textureU <<= k_textureCoordinateShift;
-
-			int32_t textureVValue = (int32_t)(edgeB->uv.y * k_textureCoordinateScale);
-			if (textureVValue > k_textureCoordinateFixedMax)
-			{
-				textureVValue = k_textureCoordinateFixedMax;
-			}
-			int32_t textureV = (k_textureCoordinateMax - textureVValue) << k_textureCoordinateShift;
-
-			int32_t farTextureU = (int32_t)(edgeA->uv.x * k_textureCoordinateScale);
-			if (farTextureU > k_textureCoordinateMax)
-			{
-				farTextureU = k_textureCoordinateMax;
-			}
-			farTextureU <<= k_textureCoordinateShift;
-			if (farTextureU > k_textureCoordinateFixedMax)
-			{
-				farTextureU = k_textureCoordinateFixedMax;
-			}
-			int32_t stepTextureU = (farTextureU - textureU) / width;
-
-			int32_t farTextureVValue = (int32_t)(edgeA->uv.y * k_textureCoordinateScale);
-			if (farTextureVValue > k_textureCoordinateMax)
-			{
-				farTextureVValue = k_textureCoordinateMax;
-			}
-			int32_t farTextureV = (k_textureCoordinateMax - farTextureVValue) << k_textureCoordinateShift;
-			if (farTextureV > k_textureCoordinateFixedMax)
-			{
-				farTextureV = k_textureCoordinateFixedMax;
-			}
-			int32_t stepTextureV = (farTextureV - textureV) / width;
-
-			do
-			{
-				int32_t textureIndex = ((textureV >> k_textureCoordinateShift) & k_lowerByteMask) * k_textureDimension
-					+ ((textureU >> k_textureCoordinateShift) & k_lowerByteMask);
-				uint32_t texel = texData[textureIndex];
-				if (texel > k_rgbMask)
-				{
-					uint32_t pixel = *(const uint32_t*)destRow;
-
-					int32_t blue = (int32_t)(pixel & k_fiveBitChannelMask) + g_colourScaleTable3[(edgeBBlue & k_upperByteMask) + (texel & k_lowerByteMask)];
-					if (blue >= k_fiveBitChannelLimit)
-					{
-						blue = k_fiveBitChannelMask;
-					}
-
-					int32_t green =
-						(int32_t)((pixel >> 6) & k_fiveBitChannelMask) + g_colourScaleTable3[(edgeBGreen & k_upperByteMask) + ((texel >> 8) & k_lowerByteMask)];
-					if (green >= k_fiveBitChannelLimit)
-					{
-						green = k_fiveBitChannelMask;
-					}
-
-					int32_t red =
-						(int32_t)((pixel >> 11) & k_fiveBitChannelMask) + g_colourScaleTable3[(edgeBRed & k_upperByteMask) + ((texel >> 16) & k_lowerByteMask)];
-					if (red >= k_fiveBitChannelLimit)
-					{
-						red = k_fiveBitChannelMask;
-					}
-
-					*destRow = (uint16_t)((red << 11) + (green << 6) + blue);
-				}
-
-				destRow++;
-				textureU += stepTextureU;
-				textureV += stepTextureV;
-				edgeBRed += stepRed;
-				edgeBGreen += stepGreen;
-				edgeBBlue += stepBlue;
-				width--;
-			} while (width != 0);
-		}
+#define SPAN_UNPACK_RED(value) (((value) >> 11) & k_fiveBitChannelMask)
+#define SPAN_UNPACK_GREEN(value) (((value) >> 6) & k_fiveBitChannelMask)
+#define SPAN_SHIFT_RED(component) ((component) << 11)
+#define SPAN_SHIFT_GREEN(component) ((component) << 6)
+#include "SoftwareDeviceRasterTexturedAdditiveSpan.inc"
+#undef SPAN_SHIFT_GREEN
+#undef SPAN_SHIFT_RED
+#undef SPAN_UNPACK_GREEN
+#undef SPAN_UNPACK_RED
 	}
 
 	// FUNCTION: TOY2 0x004C5280 [PROVISIONAL]
@@ -797,122 +434,15 @@ namespace SoftwareRenderer
 		int32_t edgeBGreen,
 		int32_t edgeBBlue)
 	{
-		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
-		if (width == 0)
-		{
-			return;
-		}
-
-		int32_t farRed;
-		int32_t farGreen;
-		int32_t farBlue;
-		if (width < 0)
-		{
-			farRed = edgeBRed;
-			farGreen = edgeBGreen;
-			farBlue = edgeBBlue;
-			edgeBRed = edgeARed;
-			edgeBGreen = edgeAGreen;
-			edgeBBlue = edgeABlue;
-			Nu3D::VertexTL* swap = edgeA;
-			edgeA = edgeB;
-			edgeB = swap;
-			width = -width;
-		}
-		else
-		{
-			farRed = edgeARed;
-			farGreen = edgeAGreen;
-			farBlue = edgeABlue;
-		}
-
-		if (width > 0)
-		{
-			int32_t stepRed = (farRed - edgeBRed) / width;
-			int32_t stepGreen = (farGreen - edgeBGreen) / width;
-			int32_t stepBlue = (farBlue - edgeBBlue) / width;
-
-			destRow += (int32_t)edgeB->position.x;
-
-			int32_t textureU = (int32_t)(edgeB->uv.x * k_textureCoordinateScale);
-			if (textureU > k_textureCoordinateFixedMax)
-			{
-				textureU = k_textureCoordinateFixedMax;
-			}
-			textureU <<= k_textureCoordinateShift;
-
-			int32_t textureVValue = (int32_t)(edgeB->uv.y * k_textureCoordinateScale);
-			if (textureVValue > k_textureCoordinateFixedMax)
-			{
-				textureVValue = k_textureCoordinateFixedMax;
-			}
-			int32_t textureV = (k_textureCoordinateMax - textureVValue) << k_textureCoordinateShift;
-
-			int32_t farTextureU = (int32_t)(edgeA->uv.x * k_textureCoordinateScale);
-			if (farTextureU > k_textureCoordinateMax)
-			{
-				farTextureU = k_textureCoordinateMax;
-			}
-			farTextureU <<= k_textureCoordinateShift;
-			if (farTextureU > k_textureCoordinateFixedMax)
-			{
-				farTextureU = k_textureCoordinateFixedMax;
-			}
-			int32_t stepTextureU = (farTextureU - textureU) / width;
-
-			int32_t farTextureVValue = (int32_t)(edgeA->uv.y * k_textureCoordinateScale);
-			if (farTextureVValue > k_textureCoordinateMax)
-			{
-				farTextureVValue = k_textureCoordinateMax;
-			}
-			int32_t farTextureV = (k_textureCoordinateMax - farTextureVValue) << k_textureCoordinateShift;
-			if (farTextureV > k_textureCoordinateFixedMax)
-			{
-				farTextureV = k_textureCoordinateFixedMax;
-			}
-			int32_t stepTextureV = (farTextureV - textureV) / width;
-
-			do
-			{
-				int32_t textureIndex = ((textureV >> k_textureCoordinateShift) & k_lowerByteMask) * k_textureDimension
-					+ ((textureU >> k_textureCoordinateShift) & k_lowerByteMask);
-				uint32_t texel = texData[textureIndex];
-				if (texel > k_rgbMask)
-				{
-					uint16_t pixel = *destRow;
-
-					int32_t channel = (pixel & k_fiveBitChannelMask) - g_colourScaleTable3[(edgeBBlue & k_upperByteMask) + (texel & k_lowerByteMask)];
-					if (channel < 0)
-					{
-						channel = 0;
-					}
-					int32_t out = channel;
-
-					channel = ((pixel >> 5) & k_fiveBitChannelMask) - g_colourScaleTable3[(edgeBGreen & k_upperByteMask) + ((texel >> 8) & k_lowerByteMask)];
-					if (channel < 0)
-					{
-						channel = 0;
-					}
-					out += channel << 5;
-
-					channel = ((pixel >> 10) & k_fiveBitChannelMask) - g_colourScaleTable3[(edgeBRed & k_upperByteMask) + ((texel >> 16) & k_lowerByteMask)];
-					if (channel < 0)
-					{
-						channel = 0;
-					}
-
-					*destRow = (uint16_t)((channel << 10) + out);
-				}
-
-				destRow++;
-				textureU += stepTextureU;
-				textureV += stepTextureV;
-				edgeBRed += stepRed;
-				edgeBGreen += stepGreen;
-				edgeBBlue += stepBlue;
-				width--;
-			} while (width != 0);
-		}
+#define SPAN_UNPACK_RED(value) (((value) >> 10) & k_fiveBitChannelMask)
+#define SPAN_UNPACK_GREEN(value) (((value) >> 5) & k_fiveBitChannelMask)
+#define SPAN_SHIFT_RED(component) ((component) << 10)
+#define SPAN_SHIFT_GREEN(component) ((component) << 5)
+#include "SoftwareDeviceRasterTexturedSubtractiveSpan.inc"
+#undef SPAN_SHIFT_GREEN
+#undef SPAN_SHIFT_RED
+#undef SPAN_UNPACK_GREEN
+#undef SPAN_UNPACK_RED
 	}
 
 	// FUNCTION: TOY2 0x004C5490 [PROVISIONAL]
@@ -927,77 +457,15 @@ namespace SoftwareRenderer
 		int32_t edgeBGreen,
 		int32_t edgeBBlue)
 	{
-		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
-		if (width == 0)
-		{
-			return;
-		}
-
-		// The caller does not order the endpoints. Keep the one with the smaller x
-		// in edgeB and its colours in the edgeB accumulators, so the walk below
-		// always runs to increasing columns. farRed/Green/Blue hold the other end.
-		int32_t farRed;
-		int32_t farGreen;
-		int32_t farBlue;
-		if (width < 0)
-		{
-			farRed = edgeBRed;
-			farGreen = edgeBGreen;
-			farBlue = edgeBBlue;
-			edgeBRed = edgeARed;
-			edgeBGreen = edgeAGreen;
-			edgeBBlue = edgeABlue;
-			edgeB = edgeA;
-			width = -width;
-		}
-		else
-		{
-			farRed = edgeARed;
-			farGreen = edgeAGreen;
-			farBlue = edgeABlue;
-		}
-
-		if (width > 0)
-		{
-			int32_t stepRed = (farRed - edgeBRed) / width;
-			int32_t stepGreen = (farGreen - edgeBGreen) / width;
-			int32_t stepBlue = (farBlue - edgeBBlue) / width;
-
-			destRow += (int32_t)edgeB->position.x;
-
-			do
-			{
-				uint16_t pixel = *destRow;
-
-				int32_t channel = (pixel & 0x1f) - ((uint16_t)edgeBBlue >> 11);
-				if (channel < 0)
-				{
-					channel = 0;
-				}
-				int32_t out = channel;
-
-				channel = ((pixel >> 5) & 0x1f) - ((uint16_t)edgeBGreen >> 11);
-				if (channel < 0)
-				{
-					channel = 0;
-				}
-				out += channel << 5;
-
-				channel = ((pixel >> 10) & 0x1f) - ((uint16_t)edgeBRed >> 11);
-				if (channel < 0)
-				{
-					channel = 0;
-				}
-
-				*destRow = (uint16_t)((channel << 10) + out);
-				destRow++;
-
-				edgeBRed += stepRed;
-				edgeBGreen += stepGreen;
-				edgeBBlue += stepBlue;
-				width--;
-			} while (width != 0);
-		}
+#define SPAN_UNPACK_RED(value) (((value) >> 10) & 0x1f)
+#define SPAN_UNPACK_GREEN(value) (((value) >> 5) & 0x1f)
+#define SPAN_SHIFT_RED(component) ((component) << 10)
+#define SPAN_SHIFT_GREEN(component) ((component) << 5)
+#include "SoftwareDeviceRasterSubtractiveSpan.inc"
+#undef SPAN_SHIFT_GREEN
+#undef SPAN_SHIFT_RED
+#undef SPAN_UNPACK_GREEN
+#undef SPAN_UNPACK_RED
 	}
 
 	// FUNCTION: TOY2 0x004C55B0 [PROVISIONAL]
@@ -1012,77 +480,15 @@ namespace SoftwareRenderer
 		int32_t edgeBGreen,
 		int32_t edgeBBlue)
 	{
-		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
-		if (width == 0)
-		{
-			return;
-		}
-
-		// The caller does not order the endpoints. Keep the one with the smaller x
-		// in edgeB and its colours in the edgeB accumulators, so the walk below
-		// always runs to increasing columns. farRed/Green/Blue hold the other end.
-		int32_t farRed;
-		int32_t farGreen;
-		int32_t farBlue;
-		if (width < 0)
-		{
-			farRed = edgeBRed;
-			farGreen = edgeBGreen;
-			farBlue = edgeBBlue;
-			edgeBRed = edgeARed;
-			edgeBGreen = edgeAGreen;
-			edgeBBlue = edgeABlue;
-			edgeB = edgeA;
-			width = -width;
-		}
-		else
-		{
-			farRed = edgeARed;
-			farGreen = edgeAGreen;
-			farBlue = edgeABlue;
-		}
-
-		if (width > 0)
-		{
-			int32_t stepRed = (farRed - edgeBRed) / width;
-			int32_t stepGreen = (farGreen - edgeBGreen) / width;
-			int32_t stepBlue = (farBlue - edgeBBlue) / width;
-
-			destRow += (int32_t)edgeB->position.x;
-
-			do
-			{
-				uint16_t pixel = *destRow;
-
-				int32_t channel = (pixel & 0x1f) - ((uint16_t)edgeBBlue >> 11);
-				if (channel < 0)
-				{
-					channel = 0;
-				}
-				int32_t out = channel;
-
-				channel = ((pixel >> 6) & 0x1f) - ((uint16_t)edgeBGreen >> 11);
-				if (channel < 0)
-				{
-					channel = 0;
-				}
-				out += channel << 6;
-
-				channel = ((pixel >> 11) & 0x1f) - ((uint16_t)edgeBRed >> 11);
-				if (channel < 0)
-				{
-					channel = 0;
-				}
-
-				*destRow = (uint16_t)((channel << 11) + out);
-				destRow++;
-
-				edgeBRed += stepRed;
-				edgeBGreen += stepGreen;
-				edgeBBlue += stepBlue;
-				width--;
-			} while (width != 0);
-		}
+#define SPAN_UNPACK_RED(value) (((value) >> 11) & 0x1f)
+#define SPAN_UNPACK_GREEN(value) (((value) >> 6) & 0x1f)
+#define SPAN_SHIFT_RED(component) ((component) << 11)
+#define SPAN_SHIFT_GREEN(component) ((component) << 6)
+#include "SoftwareDeviceRasterSubtractiveSpan.inc"
+#undef SPAN_SHIFT_GREEN
+#undef SPAN_SHIFT_RED
+#undef SPAN_UNPACK_GREEN
+#undef SPAN_UNPACK_RED
 	}
 
 	// FUNCTION: TOY2 0x004C56D0 [PROVISIONAL]
@@ -1097,122 +503,15 @@ namespace SoftwareRenderer
 		int32_t edgeBGreen,
 		int32_t edgeBBlue)
 	{
-		int32_t width = (int32_t)edgeA->position.x - (int32_t)edgeB->position.x;
-		if (width == 0)
-		{
-			return;
-		}
-
-		int32_t farRed;
-		int32_t farGreen;
-		int32_t farBlue;
-		if (width < 0)
-		{
-			farRed = edgeBRed;
-			farGreen = edgeBGreen;
-			farBlue = edgeBBlue;
-			edgeBRed = edgeARed;
-			edgeBGreen = edgeAGreen;
-			edgeBBlue = edgeABlue;
-			Nu3D::VertexTL* swap = edgeA;
-			edgeA = edgeB;
-			edgeB = swap;
-			width = -width;
-		}
-		else
-		{
-			farRed = edgeARed;
-			farGreen = edgeAGreen;
-			farBlue = edgeABlue;
-		}
-
-		if (width > 0)
-		{
-			int32_t stepRed = (farRed - edgeBRed) / width;
-			int32_t stepGreen = (farGreen - edgeBGreen) / width;
-			int32_t stepBlue = (farBlue - edgeBBlue) / width;
-
-			destRow += (int32_t)edgeB->position.x;
-
-			int32_t textureU = (int32_t)(edgeB->uv.x * k_textureCoordinateScale);
-			if (textureU > k_textureCoordinateFixedMax)
-			{
-				textureU = k_textureCoordinateFixedMax;
-			}
-			textureU <<= k_textureCoordinateShift;
-
-			int32_t textureVValue = (int32_t)(edgeB->uv.y * k_textureCoordinateScale);
-			if (textureVValue > k_textureCoordinateFixedMax)
-			{
-				textureVValue = k_textureCoordinateFixedMax;
-			}
-			int32_t textureV = (k_textureCoordinateMax - textureVValue) << k_textureCoordinateShift;
-
-			int32_t farTextureU = (int32_t)(edgeA->uv.x * k_textureCoordinateScale);
-			if (farTextureU > k_textureCoordinateMax)
-			{
-				farTextureU = k_textureCoordinateMax;
-			}
-			farTextureU <<= k_textureCoordinateShift;
-			if (farTextureU > k_textureCoordinateFixedMax)
-			{
-				farTextureU = k_textureCoordinateFixedMax;
-			}
-			int32_t stepTextureU = (farTextureU - textureU) / width;
-
-			int32_t farTextureVValue = (int32_t)(edgeA->uv.y * k_textureCoordinateScale);
-			if (farTextureVValue > k_textureCoordinateMax)
-			{
-				farTextureVValue = k_textureCoordinateMax;
-			}
-			int32_t farTextureV = (k_textureCoordinateMax - farTextureVValue) << k_textureCoordinateShift;
-			if (farTextureV > k_textureCoordinateFixedMax)
-			{
-				farTextureV = k_textureCoordinateFixedMax;
-			}
-			int32_t stepTextureV = (farTextureV - textureV) / width;
-
-			do
-			{
-				int32_t textureIndex = ((textureV >> k_textureCoordinateShift) & k_lowerByteMask) * k_textureDimension
-					+ ((textureU >> k_textureCoordinateShift) & k_lowerByteMask);
-				uint32_t texel = texData[textureIndex];
-				if (texel > k_rgbMask)
-				{
-					uint16_t pixel = *destRow;
-
-					int32_t channel = (pixel & k_fiveBitChannelMask) - g_colourScaleTable3[(edgeBBlue & k_upperByteMask) + (texel & k_lowerByteMask)];
-					if (channel < 0)
-					{
-						channel = 0;
-					}
-					int32_t out = channel;
-
-					channel = ((pixel >> 6) & k_fiveBitChannelMask) - g_colourScaleTable3[(edgeBGreen & k_upperByteMask) + ((texel >> 8) & k_lowerByteMask)];
-					if (channel < 0)
-					{
-						channel = 0;
-					}
-					out += channel << 6;
-
-					channel = (pixel >> 11) - g_colourScaleTable3[(edgeBRed & k_upperByteMask) + ((texel >> 16) & k_lowerByteMask)];
-					if (channel < 0)
-					{
-						channel = 0;
-					}
-
-					*destRow = (uint16_t)((channel << 11) + out);
-				}
-
-				destRow++;
-				textureU += stepTextureU;
-				textureV += stepTextureV;
-				edgeBRed += stepRed;
-				edgeBGreen += stepGreen;
-				edgeBBlue += stepBlue;
-				width--;
-			} while (width != 0);
-		}
+#define SPAN_UNPACK_RED(value) ((value) >> 11)
+#define SPAN_UNPACK_GREEN(value) (((value) >> 6) & k_fiveBitChannelMask)
+#define SPAN_SHIFT_RED(component) ((component) << 11)
+#define SPAN_SHIFT_GREEN(component) ((component) << 6)
+#include "SoftwareDeviceRasterTexturedSubtractiveSpan.inc"
+#undef SPAN_SHIFT_GREEN
+#undef SPAN_SHIFT_RED
+#undef SPAN_UNPACK_GREEN
+#undef SPAN_UNPACK_RED
 	}
 
 	// FUNCTION: TOY2 0x004C58E0 [PROVISIONAL]
@@ -1264,43 +563,7 @@ namespace SoftwareRenderer
 
 			destRow += (int32_t)edgeB->position.x;
 
-			int32_t textureU = (int32_t)(edgeB->uv.x * k_textureCoordinateScale);
-			if (textureU > k_textureCoordinateFixedMax)
-			{
-				textureU = k_textureCoordinateFixedMax;
-			}
-			textureU <<= k_textureCoordinateShift;
-
-			int32_t textureVValue = (int32_t)(edgeB->uv.y * k_textureCoordinateScale);
-			if (textureVValue > k_textureCoordinateFixedMax)
-			{
-				textureVValue = k_textureCoordinateFixedMax;
-			}
-			int32_t textureV = (k_textureCoordinateMax - textureVValue) << k_textureCoordinateShift;
-
-			int32_t farTextureU = (int32_t)(edgeA->uv.x * k_textureCoordinateScale);
-			if (farTextureU > k_textureCoordinateMax)
-			{
-				farTextureU = k_textureCoordinateMax;
-			}
-			farTextureU <<= k_textureCoordinateShift;
-			if (farTextureU > k_textureCoordinateFixedMax)
-			{
-				farTextureU = k_textureCoordinateFixedMax;
-			}
-			int32_t stepTextureU = (farTextureU - textureU) / width;
-
-			int32_t farTextureVValue = (int32_t)(edgeA->uv.y * k_textureCoordinateScale);
-			if (farTextureVValue > k_textureCoordinateMax)
-			{
-				farTextureVValue = k_textureCoordinateMax;
-			}
-			int32_t farTextureV = (k_textureCoordinateMax - farTextureVValue) << k_textureCoordinateShift;
-			if (farTextureV > k_textureCoordinateFixedMax)
-			{
-				farTextureV = k_textureCoordinateFixedMax;
-			}
-			int32_t stepTextureV = (farTextureV - textureV) / width;
+			SPAN_SETUP_TEXTURE_WALK();
 
 			do
 			{
@@ -1918,4 +1181,6 @@ namespace SoftwareRenderer
 		}
 		RasterizeQuadSpans(command, commandTexData);
 	}
+#undef SPAN_SETUP_TEXTURE_WALK
+
 }
