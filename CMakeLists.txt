@@ -141,6 +141,8 @@ set(TOY2_SOURCES
     src/Toy2/MoveableObject.cpp
     src/Toy2/Screens.cpp
     src/Toy2/Toy2.cpp
+    src/Toy2/Toy2Internal.h
+    src/Toy2/Sector.cpp
     src/Toy2/Toy2.h
     src/Toy2/MoveableObjectInternal.h
     src/Toy2/PoleRecord.h
