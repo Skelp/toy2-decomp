@@ -249,6 +249,7 @@ set(TOY2_SOURCES
     src/Renderer/RendererInternal.h
     src/Renderer/RenderEntry.cpp
     src/Renderer/RenderState.cpp
+    src/Renderer/RenderModifiers.cpp
     src/Renderer/DevDraw.cpp
     src/Renderer/TexturedQuad.h
     src/Renderer/RenderType.h
