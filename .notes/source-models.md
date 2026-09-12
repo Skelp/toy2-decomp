@@ -167,3 +167,10 @@ include the compiled score or the evidence that rejected the model.
 - Ruled out: 3 43.52% hoist the span locals (leftX, rightX, width, u..blue, five steps, pixelCount, pixel) to function scope via DECLARE_LIT_TEXTURED_SPAN_LOCALS so both row loops share one home each; large regression, also perturbed the edge loops; reverted
 - Ruled out: 4 55.70% declare edgeXStep after edgeRedStep in RASTERIZE_LIT_EDGE_WITH_END (retail's xStep slot 0x30 sits above the step slots 0x1c-0x2c); no codegen change at all - declaration order is inert for this macro; reverted
 - Result note: no attempt raised the score
+
+<!-- campaign-id: da75d232-6cec-44b1-a07b-4e1281bfea8c -->
+## 2026-09-12 | Collision | 0x00486520
+
+- Mode: coverage.
+- Ruled out: per-face ground/ceiling resolve with the workspace slot loop, 16.96% at attempt 5
+- Result note: second attempt on this body; coverage stalled at 16.96% of a 4,979-byte function (needs 25% of the ceiling)
