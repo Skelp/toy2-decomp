@@ -284,6 +284,22 @@ namespace Renderer
 			}
 		}
 
+		// Writes the three shared vertices of a sprite triangle into the locked buffer.
+		// RenderTriangleSprite and RenderQuadSpriteFromVerts state the same twelve lines.
+#define FILL_SPRITE_TRIANGLE_VERTICES()               \
+	lockedData[0].position = sprite->position;        \
+	lockedData[0].coords.x = sprite->uvBottomLeft.x;  \
+	lockedData[0].coords.y = sprite->uvBottomLeft.y;  \
+	lockedData[0].diffuse = sprite->color;            \
+	lockedData[1].position = sprite->triVerts[0];     \
+	lockedData[1].coords.x = sprite->uvTopLeft.x;     \
+	lockedData[1].coords.y = sprite->uvTopLeft.y;     \
+	lockedData[1].diffuse = sprite->color;            \
+	lockedData[2].position = sprite->triVerts[1];     \
+	lockedData[2].coords.x = sprite->uvBottomRight.x; \
+	lockedData[2].coords.y = sprite->uvBottomRight.y; \
+	lockedData[2].diffuse = sprite->color;
+
 		// FUNCTION: TOY2 0x004B7FC0 [MATCHED]
 		void RenderTriangleSprite(Nu3D::Sprite* sprite)
 		{
@@ -292,20 +308,7 @@ namespace Renderer
 
 			if (DrawingAPI::LockVertexBuffer(g_FVF_152_Buffer.vertexBuffer, 0x801, (LPVOID*)&lockedData, 0) == 0)
 			{
-				lockedData[0].position = sprite->position;
-				lockedData[0].coords.x = sprite->uvBottomLeft.x;
-				lockedData[0].coords.y = sprite->uvBottomLeft.y;
-				lockedData[0].diffuse = sprite->color;
-
-				lockedData[1].position = sprite->triVerts[0];
-				lockedData[1].coords.x = sprite->uvTopLeft.x;
-				lockedData[1].coords.y = sprite->uvTopLeft.y;
-				lockedData[1].diffuse = sprite->color;
-
-				lockedData[2].position = sprite->triVerts[1];
-				lockedData[2].coords.x = sprite->uvBottomRight.x;
-				lockedData[2].coords.y = sprite->uvBottomRight.y;
-				lockedData[2].diffuse = sprite->color;
+				FILL_SPRITE_TRIANGLE_VERTICES();
 
 				DrawingAPI::UnlockVertexBuffer(g_FVF_152_Buffer.vertexBuffer);
 
@@ -335,7 +338,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B8160 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004B8160 [MATCHED]
 		void RenderQuadSpriteFromVerts(Nu3D::Sprite* sprite)
 		{
 			LPDIRECT3DVERTEXBUFFER destBuffer = g_FVF_14C_Buffer_1.vertexBuffer;
@@ -343,20 +346,7 @@ namespace Renderer
 
 			if (DrawingAPI::LockVertexBuffer(g_FVF_152_Buffer.vertexBuffer, 0x801, (LPVOID*)&lockedData, 0) == 0)
 			{
-				lockedData[0].position = sprite->position;
-				lockedData[0].coords.x = sprite->uvBottomLeft.x;
-				lockedData[0].coords.y = sprite->uvBottomLeft.y;
-				lockedData[0].diffuse = sprite->color;
-
-				lockedData[1].position = sprite->triVerts[0];
-				lockedData[1].coords.x = sprite->uvTopLeft.x;
-				lockedData[1].coords.y = sprite->uvTopLeft.y;
-				lockedData[1].diffuse = sprite->color;
-
-				lockedData[2].position = sprite->triVerts[1];
-				lockedData[2].coords.x = sprite->uvBottomRight.x;
-				lockedData[2].coords.y = sprite->uvBottomRight.y;
-				lockedData[2].diffuse = sprite->color;
+				FILL_SPRITE_TRIANGLE_VERTICES();
 
 				lockedData[3].position = sprite->triVerts[2];
 				lockedData[3].coords.x = sprite->uvTopRight.x;
@@ -390,6 +380,8 @@ namespace Renderer
 				}
 			}
 		}
+
+#undef FILL_SPRITE_TRIANGLE_VERTICES
 
 		// FUNCTION: TOY2 0x004B8330 [PROVISIONAL]
 		void RenderType10(Nu3D::Sprite* sprite)
@@ -670,6 +662,25 @@ namespace Renderer
 			}
 		}
 
+		// Reads the texture of a sprite sheet and computes the corners of one tile.
+		// Five sheet draw functions state the same lookup.
+#define LOOK_UP_SPRITE_SHEET_UVS()                                                                        \
+	textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);                                   \
+	if (textureDataIndex != 0)                                                                            \
+	{                                                                                                     \
+		NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);           \
+		uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;                            \
+		uvTopLeft.y = (float)sheet->tiles[tileIndex].y / (int32_t)bitmapHeight;                           \
+		uvBottomRight.x = ((float)sheet->tileWidth + sheet->tiles[tileIndex].x) / (int32_t)bitmapWidth;   \
+		uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight; \
+	}
+
+		// Fills a colour with the camera tint of this frame, fully opaque.
+#define FILL_COLOUR_FROM_CAMERA_TINT(colour)             \
+	colour.r = (uint8_t)Nu3D::Camera::g_cameraTintRed;   \
+	colour.g = (uint8_t)Nu3D::Camera::g_cameraTintGreen; \
+	colour.b = (uint8_t)Nu3D::Camera::g_cameraTintBlue;  \
+	colour.a = 255
 		// FUNCTION: TOY2 0x004946A0 [EFFECTIVE]
 		int16_t DrawTiledFixed(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex)
 		{
@@ -681,22 +692,10 @@ namespace Renderer
 			uint32_t bitmapHeight;
 			if (sheet)
 			{
-				textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
-				if (textureDataIndex != 0)
-				{
-					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
-
-					uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;
-					uvTopLeft.y = (float)sheet->tiles[tileIndex].y / (int32_t)bitmapHeight;
-					uvBottomRight.x = ((float)sheet->tileWidth + sheet->tiles[tileIndex].x) / (int32_t)bitmapWidth;
-					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
-				}
+				LOOK_UP_SPRITE_SHEET_UVS();
 
 				RGBA color;
-				color.r = (uint8_t)Nu3D::Camera::g_cameraTintRed;
-				color.g = (uint8_t)Nu3D::Camera::g_cameraTintGreen;
-				color.b = (uint8_t)Nu3D::Camera::g_cameraTintBlue;
-				color.a = 255;
+				FILL_COLOUR_FROM_CAMERA_TINT(color);
 
 				Queue2DSprite(xPos * (1.0f / 320.0f),
 					yPos * (1.0f / g_virtualScreenHeight),
@@ -711,7 +710,7 @@ namespace Renderer
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x00494820 [PROVISIONAL]
+		// FUNCTION: TOY2 0x00494820 [EFFECTIVE]
 		int16_t DrawTile(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex)
 		{
 			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
@@ -722,22 +721,10 @@ namespace Renderer
 			uint32_t bitmapHeight;
 			if (sheet)
 			{
-				textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
-				if (textureDataIndex != 0)
-				{
-					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
-
-					uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;
-					uvTopLeft.y = (float)sheet->tiles[tileIndex].y / (int32_t)bitmapHeight;
-					uvBottomRight.x = ((float)sheet->tileWidth + sheet->tiles[tileIndex].x) / (int32_t)bitmapWidth;
-					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
-				}
+				LOOK_UP_SPRITE_SHEET_UVS();
 
 				RGBA color;
-				color.r = (uint8_t)Nu3D::Camera::g_cameraTintRed;
-				color.g = (uint8_t)Nu3D::Camera::g_cameraTintGreen;
-				color.b = (uint8_t)Nu3D::Camera::g_cameraTintBlue;
-				color.a = 255;
+				FILL_COLOUR_FROM_CAMERA_TINT(color);
 
 				Queue2DSprite(xPos * (1.0f / g_virtualScreenWidth),
 					yPos * (1.0f / g_virtualScreenHeight),
@@ -763,22 +750,10 @@ namespace Renderer
 			uint32_t bitmapHeight;
 			if (sheet)
 			{
-				textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
-				if (textureDataIndex != 0)
-				{
-					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
-
-					uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;
-					uvTopLeft.y = (float)sheet->tiles[tileIndex].y / (int32_t)bitmapHeight;
-					uvBottomRight.x = ((float)sheet->tileWidth + sheet->tiles[tileIndex].x) / (int32_t)bitmapWidth;
-					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
-				}
+				LOOK_UP_SPRITE_SHEET_UVS();
 
 				RGBA color;
-				color.r = (uint8_t)Nu3D::Camera::g_cameraTintRed;
-				color.g = (uint8_t)Nu3D::Camera::g_cameraTintGreen;
-				color.b = (uint8_t)Nu3D::Camera::g_cameraTintBlue;
-				color.a = 255;
+				FILL_COLOUR_FROM_CAMERA_TINT(color);
 				float normalizedClipLeft = (float)clipLeft / g_virtualScreenWidth;
 				float normalizedClipRight = (float)clipRight / g_virtualScreenWidth;
 				float normalizedX = (float)xPos * (1.0f / g_virtualScreenWidth);
@@ -816,6 +791,38 @@ namespace Renderer
 			}
 		}
 
+		// Turns the blend bits of a sprite flag word into an alpha value and render flags.
+		// alphaOut names the alpha byte each caller fills.
+#define DECODE_SPRITE_BLEND_MODE(alphaOut)                                             \
+	blendMode = flags & 96;                                                            \
+	if (blendMode != 0)                                                                \
+	{                                                                                  \
+		if (blendMode != 32)                                                           \
+		{                                                                              \
+			if (blendMode != 64)                                                       \
+			{                                                                          \
+				*alphaOut = 255 - (uint8_t)((flags >> 8) & 0xFF);                      \
+				renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT; \
+			}                                                                          \
+			else                                                                       \
+			{                                                                          \
+				*alphaOut = 255;                                                       \
+				renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_ALT;     \
+			}                                                                          \
+		}                                                                              \
+		else                                                                           \
+		{                                                                              \
+			*alphaOut = 255;                                                           \
+			renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_CUSTOM;      \
+		}                                                                              \
+	}                                                                                  \
+	else                                                                               \
+	{                                                                                  \
+		*alphaOut = 128;                                                               \
+		renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT;         \
+	}
+
+#undef FILL_COLOUR_FROM_CAMERA_TINT
 		// FUNCTION: TOY2 0x00493A60 [MATCHED]
 		int16_t DrawTinted(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue, uint32_t flags)
 		{
@@ -854,33 +861,7 @@ namespace Renderer
 				if (! alpha)
 					alpha = (uint8_t*)&sheetIndex;
 
-				blendMode = flags & 96;
-				if (blendMode != 0)
-				{
-					if (blendMode != 32)
-					{
-						if (blendMode != 64)
-						{
-							*alpha = 255 - (uint8_t)((flags >> 8) & 0xFF);
-							renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT;
-						}
-						else
-						{
-							*alpha = 255;
-							renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_ALT;
-						}
-					}
-					else
-					{
-						*alpha = 255;
-						renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_CUSTOM;
-					}
-				}
-				else
-				{
-					*alpha = 128;
-					renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT;
-				}
+				DECODE_SPRITE_BLEND_MODE(alpha);
 
 				inverseHeight = 1.0f / g_virtualScreenHeight;
 				inverseWidth = 1.0f / g_virtualScreenWidth;
@@ -897,6 +878,12 @@ namespace Renderer
 			return 1;
 		}
 
+		// Fills a colour from three channel values, fully opaque.
+#define FILL_OPAQUE_COLOUR(colour, redValue, greenValue, blueValue) \
+	colour.a = 255;                                                 \
+	colour.r = redValue;                                            \
+	colour.g = greenValue;                                          \
+	colour.b = blueValue
 		// FUNCTION: TOY2 0x00493DC0 [MATCHED]
 		int16_t DrawColouredFixed(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue)
 		{
@@ -909,21 +896,9 @@ namespace Renderer
 			RGBA color;
 			if (sheet)
 			{
-				textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
-				if (textureDataIndex != 0)
-				{
-					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
+				LOOK_UP_SPRITE_SHEET_UVS();
 
-					uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;
-					uvTopLeft.y = (float)sheet->tiles[tileIndex].y / (int32_t)bitmapHeight;
-					uvBottomRight.x = ((float)sheet->tileWidth + sheet->tiles[tileIndex].x) / (int32_t)bitmapWidth;
-					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
-				}
-
-				color.a = 255;
-				color.r = red;
-				color.g = green;
-				color.b = blue;
+				FILL_OPAQUE_COLOUR(color, red, green, blue);
 				Queue2DSprite((float)xPos * (1.0f / 320.0f),
 					(float)yPos * (1.0f / g_virtualScreenHeight),
 					(float)sheet->tileWidth * (1.0f / 320.0f),
@@ -937,7 +912,7 @@ namespace Renderer
 			return 1;
 		}
 
-		// FUNCTION: TOY2 0x00493C30 [PROVISIONAL]
+		// FUNCTION: TOY2 0x00493C30 [MATCHED]
 		int16_t DrawColoured(int16_t xPos, int16_t yPos, int16_t sheetIndex, int16_t tileIndex, uint8_t red, uint8_t green, uint8_t blue)
 		{
 			SpriteSheet* sheet = g_spriteSheets[sheetIndex];
@@ -949,21 +924,9 @@ namespace Renderer
 			RGBA color;
 			if (sheet)
 			{
-				textureDataIndex = NGNLoader::GetTextureDataIndex(sheet->texIndex);
-				if (textureDataIndex != 0)
-				{
-					NGNLoader::RetrieveTextureData(textureDataIndex, &bitmapWidth, &bitmapHeight, 0, 0, 0);
+				LOOK_UP_SPRITE_SHEET_UVS();
 
-					uvTopLeft.x = (float)sheet->tiles[tileIndex].x / (int32_t)bitmapWidth;
-					uvTopLeft.y = (float)sheet->tiles[tileIndex].y / (int32_t)bitmapHeight;
-					uvBottomRight.x = ((float)sheet->tileWidth + sheet->tiles[tileIndex].x) / (int32_t)bitmapWidth;
-					uvBottomRight.y = ((float)sheet->tileHeight + sheet->tiles[tileIndex].y) / (int32_t)bitmapHeight;
-				}
-
-				color.a = 255;
-				color.r = red;
-				color.g = green;
-				color.b = blue;
+				FILL_OPAQUE_COLOUR(color, red, green, blue);
 				Queue2DSprite((float)xPos * (1.0f / g_virtualScreenWidth),
 					(float)yPos * (1.0f / g_virtualScreenHeight),
 					(float)sheet->tileWidth * (1.0f / g_virtualScreenWidth),
@@ -977,6 +940,9 @@ namespace Renderer
 			return 1;
 		}
 
+#undef LOOK_UP_SPRITE_SHEET_UVS
+
+#undef FILL_OPAQUE_COLOUR
 		// FUNCTION: TOY2 0x0049D2D0 [EFFECTIVE]
 		void QueueSegment(Vector3I* start, Vector3I* delta, int32_t red, int32_t green, int32_t blue)
 		{
@@ -1102,33 +1068,7 @@ namespace Renderer
 				if (! alphaPtr)
 					alphaPtr = (uint8_t*)&red;
 
-				blendMode = flags & 96;
-				if (blendMode != 0)
-				{
-					if (blendMode != 32)
-					{
-						if (blendMode != 64)
-						{
-							*alphaPtr = 255 - (uint8_t)((flags >> 8) & 0xFF);
-							renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT;
-						}
-						else
-						{
-							*alphaPtr = 255;
-							renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_ALT;
-						}
-					}
-					else
-					{
-						*alphaPtr = 255;
-						renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_CUSTOM;
-					}
-				}
-				else
-				{
-					*alphaPtr = 128;
-					renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT;
-				}
+				DECODE_SPRITE_BLEND_MODE(alphaPtr);
 
 				inverseHeight = 1.0f / g_virtualScreenHeight;
 				inverseWidth = 1.0f / g_virtualScreenWidth;
@@ -1197,33 +1137,7 @@ namespace Renderer
 				if (! alpha)
 					alpha = (uint8_t*)&red;
 
-				blendMode = flags & 96;
-				if (blendMode != 0)
-				{
-					if (blendMode != 32)
-					{
-						if (blendMode != 64)
-						{
-							*alpha = 255 - (uint8_t)((flags >> 8) & 0xFF);
-							renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT;
-						}
-						else
-						{
-							*alpha = 255;
-							renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_ALT;
-						}
-					}
-					else
-					{
-						*alpha = 255;
-						renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_CUSTOM;
-					}
-				}
-				else
-				{
-					*alpha = 128;
-					renderFlags = RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT;
-				}
+				DECODE_SPRITE_BLEND_MODE(alpha);
 
 				inverseHeight = 1.0f / g_virtualScreenHeight;
 				Queue2DSprite((float)xPos * (1.0f / 320.0f),
@@ -1238,6 +1152,8 @@ namespace Renderer
 			}
 			return 1;
 		}
+
+#undef DECODE_SPRITE_BLEND_MODE
 
 		// FUNCTION: TOY2 0x004B6300 [MATCHED]
 		void ResetQueue()
