@@ -807,9 +807,21 @@ def cleanup_todo(path: Path, address: str, limit: int = 15) -> list[str]:
     ]
 
 
+# Rules whose findings never fail a gate. A repair prompt that leads with these
+# sends the writer to a file the campaign never touched: run 23 spent 15.9 minutes
+# and $4.42 on nineteen advisory lines before reaching the three that blocked it.
+ADVISORY_LINT_RULES = ("unnamed-constant",)
+
+
 def failure_lines(log: str) -> list[str]:
-    """Return the validate problems and lint findings of a validate log."""
+    """Return the validate problems and lint findings that fail the gate.
+
+    An advisory warning is dropped, because only a new error and a new
+    non-advisory warning stop `validate`. If nothing else remains the advisory
+    lines come back, so a caller never receives an empty problem list.
+    """
     found: list[str] = []
+    advisory: list[str] = []
     inside = False
     for line in log.splitlines():
         if line.strip() == "validation failed:":
@@ -817,9 +829,13 @@ def failure_lines(log: str) -> list[str]:
             continue
         inside = inside and line.startswith("- ")
         if inside or re.search(r": (error|warning): |^lint: failed", line):
-            if line not in found:
+            if line in found or line in advisory:
+                continue
+            if not inside and any(f"warning: [{rule}]" in line for rule in ADVISORY_LINT_RULES):
+                advisory.append(line)
+            else:
                 found.append(line)
-    return found[:40]
+    return (found or advisory)[:40]
 
 
 def clear_attempts(addresses: list[str], directory: Path = ATTEMPTS_DIR) -> None:

@@ -288,6 +288,32 @@ class AttemptTests(unittest.TestCase):
         self.assertEqual(attempts.subsystem_of(rows[1]), "B")
         self.assertEqual(attempts.subsystem_of(rows[2]), "Barn")
 
+    def test_failure_lines_drop_advisory_findings_but_keep_them_when_alone(self):
+        log = "\n".join([
+            "src/A/Audio.cpp:534:20: warning: [unnamed-constant] literal 768 stands where",
+            "src/R.cpp:1332:1: warning: [repeated-macro-body] macro 'X' holds 11 of its lines",
+            "src/R.cpp:1957:1: warning: [duplicated-block] 12 lines repeat the block at 1354",
+            "lint: failed: 3 new warning(s) count as errors here",
+        ])
+        lines = attempts.failure_lines(log)
+        self.assertNotIn(
+            "src/A/Audio.cpp:534:20: warning: [unnamed-constant] literal 768 stands where", lines)
+        self.assertEqual(len(lines), 3)
+        self.assertTrue(any("repeated-macro-body" in line for line in lines))
+        self.assertTrue(any("duplicated-block" in line for line in lines))
+        advisory_only = "src/A/Audio.cpp:534:20: warning: [unnamed-constant] literal 768 here"
+        self.assertEqual(attempts.failure_lines(advisory_only), [advisory_only])
+
+    def test_failure_lines_keep_the_validation_failed_block(self):
+        log = "\n".join([
+            "validation failed:",
+            "- 0x00486520: target finishes below 50% similarity",
+            "src/A.cpp:5:1: warning: [unnamed-constant] literal 7 stands where",
+        ])
+        lines = attempts.failure_lines(log)
+        self.assertIn("- 0x00486520: target finishes below 50% similarity", lines)
+        self.assertEqual(len(lines), 1)
+
     def test_pick_describes_a_forced_target_from_the_map_and_source(self):
         (self.root / "tools" / "Resources").mkdir(parents=True)
         (self.root / "tools" / "Resources" / "functions_map.txt").write_text(
