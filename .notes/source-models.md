@@ -174,3 +174,26 @@ include the compiled score or the evidence that rejected the model.
 - Mode: coverage.
 - Ruled out: per-face ground/ceiling resolve with the workspace slot loop, 16.96% at attempt 5
 - Result note: second attempt on this body; coverage stalled at 16.96% of a 4,979-byte function (needs 25% of the ceiling)
+
+## AudioManager::LoadSoundEffect 0x0047E5B0 — magic-pointer finding is not fixable (2026-09-12)
+
+Ruled out: changing the declared type of `g_loopingSoundOwners`.
+
+The finding is the `(void*)1` sentinel this function stores into
+`g_loopingSoundOwners[index * 6 + i]` to mark a sound effect slot that is in use but
+has no actor owner. The declared type `void* [768]` is already correct: the array is
+compared against real owner pointers (`g_loopingSoundOwners[chan[0]] == owner`, and
+the same at the looping scan) and is aliased as `void**`. So the rule's remedy, to
+correct the declared type, does not apply.
+
+The two routes both make the source worse:
+
+- Naming the sentinel keeps the cast in the named constant's own initialiser, so the
+  rule fires again; `magic-pointer` is not in SUPPRESSIBLE_RULES, so no comment can
+  accept it either.
+- Declaring the array as an integer type forces a cast at every comparison and
+  assignment site, about twenty of them, in functions that match exactly today.
+
+So 0x0047E5B0 keeps one legacy error and stays out of terminal status. The same
+sentinel reaches PlaySoundBuffer 0x0047DE50, whose magic-pointer error has the same
+cause and the same verdict.
