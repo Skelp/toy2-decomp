@@ -144,6 +144,8 @@ namespace Toy2
 	{
 		extern int32_t g_hasZoneData;
 		extern int32_t g_type63CullDistance;
+		// Record type of the pickup render records.
+		const int32_t RECORD_TYPE_PICKUPS = 63;
 	}
 
 	extern int32_t g_forcedFacingActive;
@@ -368,7 +370,7 @@ namespace Toy2
 					Nu3D::Link::SetScaleFromFixedOffsets(entries->unlockedLinkId, fixedScale, fixedScale, fixedScale);
 					Platform::DisableCollision(entries->platformIndex);
 
-					Levels::RecordData* pickupRecords = Levels::g_recordData[63];
+					Levels::RecordData* pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
 					int32_t pickupCount = pickupRecords->recordCount;
 					Collectables::PickupRecord* pickup = reinterpret_cast<Collectables::PickupRecord*>(pickupRecords + 1);
 					for (int32_t pickupIndex = 0; pickupIndex < pickupCount; pickup++, pickupIndex++)
@@ -425,7 +427,7 @@ namespace Toy2
 					linkId = 0x3F;
 
 				Nu3D::Link::SetScaleFromFixedOffsets(linkId, 0, 0, 0);
-				Levels::RecordData* pickupRecords = Levels::g_recordData[63];
+				Levels::RecordData* pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
 				Collectables::PickupRecord* pickup = reinterpret_cast<Collectables::PickupRecord*>(pickupRecords + 1);
 				for (int32_t pickupIndex = 0; pickupIndex < pickupRecords->recordCount; pickup++, pickupIndex++)
 				{
@@ -438,7 +440,7 @@ namespace Toy2
 				g_unlockNodeState = 0;
 			}
 
-			Levels::RecordData* pickupRecords = Levels::g_recordData[63];
+			Levels::RecordData* pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
 			UnlockGeometryEntry* entries;
 			Collectables::PickupRecord* pickup;
 			int32_t pickupIndex;
@@ -446,7 +448,7 @@ namespace Toy2
 			if ((g_unlocks & 1) != 0)
 			{
 				ApplyUnlockToGeometry(g_unlockBit1Geometry, 8);
-				pickupRecords = Levels::g_recordData[63];
+				pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
 			}
 			else
 			{
@@ -462,7 +464,7 @@ namespace Toy2
 							{
 								Nu3D::Link::SetScaleFromFixedOffsets(entries->unlockedLinkId, 0x1000, 0x1000, 0x1000);
 								pickup->facingAngle = 0;
-								pickupRecords = Levels::g_recordData[63];
+								pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
 								break;
 							}
 						}
@@ -474,7 +476,7 @@ namespace Toy2
 			if ((g_unlocks & 2) != 0)
 			{
 				ApplyUnlockToGeometry(g_unlockBit2Geometry, 4);
-				pickupRecords = Levels::g_recordData[63];
+				pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
 			}
 			else
 			{
@@ -490,7 +492,7 @@ namespace Toy2
 							{
 								Nu3D::Link::SetScaleFromFixedOffsets(entries->unlockedLinkId, 0x1000, 0x1000, 0x1000);
 								pickup->facingAngle = 0;
-								pickupRecords = Levels::g_recordData[63];
+								pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
 								break;
 							}
 						}
@@ -502,7 +504,7 @@ namespace Toy2
 			if ((g_unlocks & 4) != 0)
 			{
 				ApplyUnlockToGeometry(g_unlockBit4Geometry, 4);
-				pickupRecords = Levels::g_recordData[63];
+				pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
 			}
 			else
 			{
@@ -518,7 +520,7 @@ namespace Toy2
 							{
 								Nu3D::Link::SetScaleFromFixedOffsets(entries->unlockedLinkId, 0x1000, 0x1000, 0x1000);
 								pickup->facingAngle = 0;
-								pickupRecords = Levels::g_recordData[63];
+								pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
 								break;
 							}
 						}
@@ -530,7 +532,7 @@ namespace Toy2
 			if ((g_unlocks & 8) != 0)
 			{
 				ApplyUnlockToGeometry(g_unlockBit8Geometry, 4);
-				pickupRecords = Levels::g_recordData[63];
+				pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
 			}
 			else
 			{
@@ -546,7 +548,7 @@ namespace Toy2
 							{
 								Nu3D::Link::SetScaleFromFixedOffsets(entries->unlockedLinkId, 0x1000, 0x1000, 0x1000);
 								pickup->facingAngle = 0;
-								pickupRecords = Levels::g_recordData[63];
+								pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
 								break;
 							}
 						}
@@ -573,7 +575,7 @@ namespace Toy2
 						{
 							Nu3D::Link::SetScaleFromFixedOffsets(entries->unlockedLinkId, 0x0C00, 0x0C00, 0x0C00);
 							pickup->facingAngle = 0;
-							pickupRecords = Levels::g_recordData[63];
+							pickupRecords = Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS];
 							break;
 						}
 					}
@@ -3095,11 +3097,14 @@ namespace Toy2
 			return PackScreenPoint(screenX, screenY);
 		}
 
+		// Record index that ends a sector portal list.
+		const uint8_t kPortalListEnd = 0xFF;
+
 		// FUNCTION: TOY2 0x0043F3D0 [PROVISIONAL]
 		void FloodVisibility(Levels::PortalZone* portalZone, int32_t minX, int32_t maxX, int32_t minY, int32_t maxY, int32_t depth)
 		{
 			Levels::PortalEntry* entry = portalZone->entries;
-			while (entry->recordIdx != 0xFF)
+			while (entry->recordIdx != kPortalListEnd)
 			{
 				Levels::PortalRecord* portal = reinterpret_cast<Levels::PortalRecord*>(Levels::g_recordData[entry->recordIdx]);
 				ZoneRenderData& zone = g_zoneRenderData[entry->categoryIdx];
@@ -3227,8 +3232,6 @@ namespace Toy2
 		// GLOBAL: TOY2 0x00555368
 		Vector3I g_portalIntersectionPoint;
 
-		// Record index that ends a sector portal list.
-		const uint8_t kPortalListEnd = 0xFF;
 		// Half size of the box around a portal that Buzz must be in (world >> 7 units).
 		const int32_t kPortalNearRange = 0x4000;
 		// Edge tolerance for the portal polygon test.
@@ -3414,7 +3417,7 @@ namespace Toy2
 				if (cameraSector >= 0 && g_currentSectorIndex >= 0)
 				{
 					Levels::PortalEntry* entry = Levels::g_portalZones[g_currentSectorIndex].entries;
-					if (entry->recordIdx != 0xFF)
+					if (entry->recordIdx != Portal::kPortalListEnd)
 					{
 						bool sectorNotFound = true;
 						do
@@ -3425,7 +3428,7 @@ namespace Toy2
 								sectorNotFound = false;
 							}
 							entry++;
-						} while (entry->recordIdx != 0xFF);
+						} while (entry->recordIdx != Portal::kPortalListEnd);
 						if (! sectorNotFound)
 							selectedSector = cameraSector;
 					}
@@ -3573,7 +3576,6 @@ namespace Toy2
 		TEXTURE_SIZE_UNKNOWN = 0xFF,
 		NEARBY_EFFECT_LIST_END = 0xFF,
 		RECORD_TYPE_EFFECTS = 59,
-		RECORD_TYPE_PICKUPS = 63,
 		SPRITE_FLAGS_BLENDED = 0xC40,
 		PICKUP_DISTANCE_BIAS = 100,
 		BEAM_QUEUE_SIZE = 100,
@@ -3739,10 +3741,10 @@ namespace Toy2
 				};
 				STATIC_ASSERT(sizeof(PickupRenderRecord) == 0x10);
 
-				if (Levels::g_recordData[RECORD_TYPE_PICKUPS] != 0)
+				if (Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS] != 0)
 				{
-					PickupRenderRecord* pickup = reinterpret_cast<PickupRenderRecord*>(Levels::g_recordData[RECORD_TYPE_PICKUPS] + 1);
-					for (int32_t pickupIndex = 0; pickupIndex < Levels::g_recordData[RECORD_TYPE_PICKUPS]->recordCount; ++pickupIndex, ++pickup)
+					PickupRenderRecord* pickup = reinterpret_cast<PickupRenderRecord*>(Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS] + 1);
+					for (int32_t pickupIndex = 0; pickupIndex < Levels::g_recordData[Levels::RECORD_TYPE_PICKUPS]->recordCount; ++pickupIndex, ++pickup)
 					{
 						// Offset the animation phase of each pickup.
 						tileIndex += PICKUP_TILE_STEP;
