@@ -1139,6 +1139,55 @@ namespace SoftwareRenderer
 	if (bottomY > Toy2::g_screenClipBottom)         \
 	bottomY = Toy2::g_screenClipBottom
 
+// Clips one span to the screen left and the screen right: the first pixel of the span with the
+// count of the pixels that the row holds. It reads width, leftX, rightX and rowStart of the span
+// loop. declareSpanPixel declares the pointer, named pixel, that the span writes, because the
+// back buffer holds 16 bit pixels in the true colour modes and 8 bit pixels in the palette modes.
+// advanceClippedSpan steps the interpolants over the pixels that the left clip drops, because
+// each span mode holds its own set of them and steps them in the order that retail compiled.
+// A span that the left clip cuts drops the last pixel of the row, so its count stays one below
+// the width of the window.
+#define CLIP_SPAN_TO_SCREEN(declareSpanPixel, advanceClippedSpan) \
+	int32_t pixelCount = width;                                   \
+	declareSpanPixel;                                             \
+	if (leftX < Toy2::g_screenClipLeft)                           \
+	{                                                             \
+		int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;   \
+		advanceClippedSpan;                                       \
+		if (rightX == Toy2::g_screenClipRight)                    \
+			pixelCount = Toy2::g_softWindowWidth - 1;             \
+		else                                                      \
+		{                                                         \
+			pixelCount = Toy2::g_softWindowWidth;                 \
+			if (rightX <= Toy2::g_screenClipRight)                \
+				pixelCount = rightX - Toy2::g_screenClipLeft;     \
+		}                                                         \
+	}                                                             \
+	else                                                          \
+	{                                                             \
+		pixel = rowStart + leftX - Toy2::g_screenClipLeft;        \
+		if (rightX == Toy2::g_screenClipRight)                    \
+			pixelCount = Toy2::g_screenClipRight - leftX;         \
+		else if (rightX > Toy2::g_screenClipRight)                \
+			pixelCount = Toy2::g_screenClipRight - leftX + 1;     \
+	}
+
+// Declares the texture UV and the three colour interpolants at the left end of one lit span with
+// their steps across the span. It reads spanRow, leftX and rightX of the span loop, and declares
+// width, u, v, red, green, blue and their steps for the loop that writes the pixels.
+#define LIT_SPAN_INTERPOLANTS()                                          \
+	int32_t width = rightX - leftX;                                      \
+	int32_t u = spanRow->leftInterpolants[0];                            \
+	int32_t v = spanRow->leftInterpolants[1];                            \
+	int32_t red = spanRow->leftInterpolants[2];                          \
+	int32_t green = spanRow->leftInterpolants[3];                        \
+	int32_t blue = spanRow->leftInterpolants[4];                         \
+	int32_t uStep = (spanRow->rightInterpolants[0] - u) / width;         \
+	int32_t vStep = (spanRow->rightInterpolants[1] - v) / width;         \
+	int32_t redStep = (spanRow->rightInterpolants[2] - red) / width;     \
+	int32_t greenStep = (spanRow->rightInterpolants[3] - green) / width; \
+	int32_t blueStep = (spanRow->rightInterpolants[4] - blue) / width
+
 // Sets up one lit, textured span of the back buffer: the texture UV and the three
 // colour interpolants at the left end of the span, their steps across the span, and the first
 // pixel with the pixel count that the left clip and the right clip leave. It reads spanRow,
@@ -1147,17 +1196,7 @@ namespace SoftwareRenderer
 // testTrueCount and testFalseCount hold the order in which each span mode tests the right
 // clip, which is the order that retail compiled.
 #define LIT_TEXTURED_SPAN_SETUP(rightClipTest, testTrueCount, testFalseCount) \
-	int32_t width = rightX - leftX;                                           \
-	int32_t u = spanRow->leftInterpolants[0];                                 \
-	int32_t v = spanRow->leftInterpolants[1];                                 \
-	int32_t red = spanRow->leftInterpolants[2];                               \
-	int32_t green = spanRow->leftInterpolants[3];                             \
-	int32_t blue = spanRow->leftInterpolants[4];                              \
-	int32_t uStep = (spanRow->rightInterpolants[0] - u) / width;              \
-	int32_t vStep = (spanRow->rightInterpolants[1] - v) / width;              \
-	int32_t redStep = (spanRow->rightInterpolants[2] - red) / width;          \
-	int32_t greenStep = (spanRow->rightInterpolants[3] - green) / width;      \
-	int32_t blueStep = (spanRow->rightInterpolants[4] - blue) / width;        \
+	LIT_SPAN_INTERPOLANTS();                                                  \
 	int32_t pixelCount;                                                       \
 	uint16_t* pixel;                                                          \
 	if (leftX < Toy2::g_screenClipLeft)                                       \
@@ -1309,8 +1348,116 @@ namespace SoftwareRenderer
 		DRAW_LIT_TEXTURED_ROWS(LIT_TEXEL_555);
 	}
 
-	// STUB: TOY2 0x004560E0
-	void UnkRenderAPI6(SoftwareRenderItem* item) {}
+	// Masks that clear the low bits of every RGB555 channel, so a divide holds each channel
+	// inside its own field instead of bleeding into the channel below it.
+	const uint16_t k_rgb555HalfMask = 0x7BDE;
+	const uint16_t k_rgb555QuarterMask = 0x739C;
+
+// Combines one texel with the interpolated light of a span at a quarter of its intensity. The Low
+// ramp tables hold every level of one channel at a quarter, so one table read lights a channel and
+// scales it at the same time.
+#define LIT_TEXEL_555_QUARTER(texel, red, green, blue)                                                                                                       \
+	(g_greenRampLow[(((texel) >> 5) & k_fiveBitChannelMask) + ((green) >> k_fixedPointShift)] + g_redRampLow[((texel) >> 10) + ((red) >> k_fixedPointShift)] \
+		+ g_blueRampLow[((texel) & k_fiveBitChannelMask) + ((blue) >> k_fixedPointShift)])
+
+// Adds a quarter of the lit texel to three quarters of the pixel that the back buffer holds.
+#define BLEND25_LIT_TEXEL_555(destination, texel, red, green, blue) \
+	(LIT_TEXEL_555_QUARTER(texel, red, green, blue) + ((destination) & k_rgb555HalfMask) / 2 + ((destination) & k_rgb555QuarterMask) / 4)
+
+// Sets up one lit span that blends with the back buffer: the interpolants at the left end of the
+// span with their steps, then the first pixel with the pixel count that the clip leaves. It reads
+// spanRow, rowStart, leftX and rightX of the span loop.
+#define LIT_BLENDED_SPAN_SETUP()                                                                                                            \
+	LIT_SPAN_INTERPOLANTS();                                                                                                                \
+	CLIP_SPAN_TO_SCREEN(uint16_t* pixel = rowStart, u += clippedPixels * uStep; v += clippedPixels * vStep; red += clippedPixels * redStep; \
+		green += clippedPixels * greenStep;                                                                                                 \
+		blue += clippedPixels * blueStep)
+
+// Steps the texture UV, the three colour interpolants and the destination of a lit, blended span
+// on by one pixel. The loop header steps the count. It reads the names that
+// LIT_BLENDED_SPAN_SETUP declares.
+#define ADVANCE_LIT_BLENDED_SPAN() \
+	u += uStep;                    \
+	v += vStep;                    \
+	red += redStep;                \
+	green += greenStep;            \
+	blue += blueStep;              \
+	pixel++
+
+// Blends one lit texel into the pixel that the back buffer holds.
+#define WRITE_BLEND25_TEXEL_555() *pixel = BLEND25_LIT_TEXEL_555(*pixel, texel, red, green, blue)
+
+// Blends one lit texel into the pixel that the back buffer holds, except where the texel is the
+// colour key, which holds the pixel that the back buffer already states.
+#define WRITE_BLEND25_TEXEL_555_COLOUR_KEY() \
+	if (texel != COLOUR_KEY_TEXEL_555)       \
+	WRITE_BLEND25_TEXEL_555()
+
+// Draws every row of a lit polygon that the scanline table holds and blends the texels of each
+// span with the back buffer. writeBlendedTexel names the statement that blends one texel into the
+// pixel it holds; it reads texel, red, green and blue. A colour key mode wraps that statement in
+// the test that holds the back buffer where the texel is the key.
+#define DRAW_LIT_BLENDED_ROWS(writeBlendedTexel)                                                                                                   \
+	do                                                                                                                                             \
+	{                                                                                                                                              \
+		if (spanRow->populated != 0 && spanRow->leftXFixed <= Toy2::g_screenClipRightFixed && spanRow->rightXFixed >= Toy2::g_screenClipLeftFixed) \
+		{                                                                                                                                          \
+			int32_t leftX = spanRow->leftXFixed >> 10;                                                                                             \
+			int32_t rightX = spanRow->rightXFixed >> 10;                                                                                           \
+			if (leftX != rightX)                                                                                                                   \
+			{                                                                                                                                      \
+				LIT_BLENDED_SPAN_SETUP();                                                                                                          \
+				for (; pixelCount > 0; pixelCount--)                                                                                               \
+				{                                                                                                                                  \
+					uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];                                                    \
+					writeBlendedTexel;                                                                                                             \
+					ADVANCE_LIT_BLENDED_SPAN();                                                                                                    \
+				}                                                                                                                                  \
+			}                                                                                                                                      \
+		}                                                                                                                                          \
+		spanRow++;                                                                                                                                 \
+		rowStart += g_backBufferPitchPixels;                                                                                                       \
+		rowsLeft--;                                                                                                                                \
+	} while (rowsLeft != 0)
+
+	// Draws a Gouraud lit, textured triangle or quad into the RGB555 back buffer at a quarter of its
+	// intensity, over three quarters of the pixel that the back buffer holds.
+	// FUNCTION: TOY2 0x004560E0 [PROVISIONAL]
+	void UnkRenderAPI6(SoftwareRenderItem* item)
+	{
+		// Find the rows that the polygon covers.
+		CLIP_POLYGON_ROW_RANGE(item, topY, bottomY);
+
+		int32_t scanlineCount = bottomY - topY + 1;
+		ClearScanlineFlags(&g_scanlineScratch[topY], scanlineCount);
+
+		// Walk the edges into the scanline table.
+		RASTERIZE_LIT_EDGE(&item->vertices[0], &item->vertices[1], litEdge01DoneBlend25_555);
+		RASTERIZE_LIT_EDGE(&item->vertices[1], &item->vertices[2], litEdge12DoneBlend25_555);
+		if (item->renderFlags & SOFTWARE_RENDER_QUAD)
+		{
+			RASTERIZE_LIT_EDGE(&item->vertices[2], &item->vertices[3], litEdge23DoneBlend25_555);
+			RASTERIZE_LIT_EDGE(&item->vertices[3], &item->vertices[0], litEdge30DoneBlend25_555);
+		}
+		else
+		{
+			RASTERIZE_LIT_EDGE(&item->vertices[2], &item->vertices[0], litEdge20DoneBlend25_555);
+		}
+
+		uint16_t* texture = (uint16_t*)g_softwareTextureData[item->textureIndex];
+		uint16_t* rowStart = (uint16_t*)g_lockedBackBuffer + g_backBufferPitchPixels * topY + Toy2::g_screenClipLeft;
+		ScanlineScratch* spanRow = &g_scanlineScratch[topY];
+		int32_t rowsLeft = scanlineCount;
+		if (item->renderFlags & SOFTWARE_RENDER_COLOUR_KEY)
+		{
+			// Hold the back buffer where the texel is the colour key.
+			DRAW_LIT_BLENDED_ROWS(WRITE_BLEND25_TEXEL_555_COLOUR_KEY());
+			return;
+		}
+
+		// Blend every texel of the span.
+		DRAW_LIT_BLENDED_ROWS(WRITE_BLEND25_TEXEL_555());
+	}
 	// STUB: TOY2 0x00457440
 	void UnkRenderAPI7(SoftwareRenderItem* item) {}
 	// STUB: TOY2 0x00458770
@@ -1783,33 +1930,10 @@ namespace SoftwareRenderer
 						int32_t blueStep = (scanline->rightInterpolants[2] - blue) / width;
 						int32_t greenStep = (scanline->rightInterpolants[3] - green) / width;
 						int32_t redStep = (scanline->rightInterpolants[4] - red) / width;
-						int32_t pixelCount = width;
-						uint16_t* pixel = rowStart;
-						if (leftX < Toy2::g_screenClipLeft)
-						{
-							int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
-							u += clippedPixels * uStep;
-							v += clippedPixels * vStep;
+						CLIP_SPAN_TO_SCREEN(uint16_t* pixel = rowStart, u += clippedPixels * uStep; v += clippedPixels * vStep;
 							blue += clippedPixels * blueStep;
 							red += clippedPixels * redStep;
-							green += clippedPixels * greenStep;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_softWindowWidth - 1;
-							else
-							{
-								pixelCount = Toy2::g_softWindowWidth;
-								if (rightX <= Toy2::g_screenClipRight)
-									pixelCount = rightX - Toy2::g_screenClipLeft;
-							}
-						}
-						else
-						{
-							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX;
-							else if (rightX > Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX + 1;
-						}
+							green += clippedPixels * greenStep);
 
 						for (; pixelCount > 0; pixelCount--)
 						{
@@ -2499,33 +2623,10 @@ namespace SoftwareRenderer
 						int32_t blueStep = (scanline->rightInterpolants[2] - blue) / width;
 						int32_t greenStep = (scanline->rightInterpolants[3] - green) / width;
 						int32_t redStep = (scanline->rightInterpolants[4] - red) / width;
-						int32_t pixelCount = width;
-						uint16_t* pixel = rowStart;
-						if (leftX < Toy2::g_screenClipLeft)
-						{
-							int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
-							u += clippedPixels * uStep;
-							v += clippedPixels * vStep;
+						CLIP_SPAN_TO_SCREEN(uint16_t* pixel = rowStart, u += clippedPixels * uStep; v += clippedPixels * vStep;
 							blue += clippedPixels * blueStep;
 							red += clippedPixels * redStep;
-							green += clippedPixels * greenStep;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_softWindowWidth - 1;
-							else
-							{
-								pixelCount = Toy2::g_softWindowWidth;
-								if (rightX <= Toy2::g_screenClipRight)
-									pixelCount = rightX - Toy2::g_screenClipLeft;
-							}
-						}
-						else
-						{
-							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX;
-							else if (rightX > Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX + 1;
-						}
+							green += clippedPixels * greenStep);
 
 						for (; pixelCount > 0; pixelCount--)
 						{
@@ -3280,30 +3381,7 @@ namespace SoftwareRenderer
 						int32_t v = scanline->leftInterpolants[1];
 						int32_t uStep = (scanline->rightInterpolants[0] - u) / width;
 						int32_t vStep = (scanline->rightInterpolants[1] - v) / width;
-						int32_t pixelCount = width;
-						uint16_t* pixel = rowStart;
-						if (leftX < Toy2::g_screenClipLeft)
-						{
-							int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
-							u += clippedPixels * uStep;
-							v += clippedPixels * vStep;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_softWindowWidth - 1;
-							else
-							{
-								pixelCount = Toy2::g_softWindowWidth;
-								if (rightX <= Toy2::g_screenClipRight)
-									pixelCount = rightX - Toy2::g_screenClipLeft;
-							}
-						}
-						else
-						{
-							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX;
-							else if (rightX > Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX + 1;
-						}
+						CLIP_SPAN_TO_SCREEN(uint16_t* pixel = rowStart, u += clippedPixels * uStep; v += clippedPixels * vStep);
 
 						for (; pixelCount > 0; pixelCount--)
 						{
@@ -3338,30 +3416,7 @@ namespace SoftwareRenderer
 					int32_t v = scanline->leftInterpolants[1];
 					int32_t uStep = (scanline->rightInterpolants[0] - u) / width;
 					int32_t vStep = (scanline->rightInterpolants[1] - v) / width;
-					int32_t pixelCount = width;
-					uint16_t* pixel = rowStart;
-					if (leftX < Toy2::g_screenClipLeft)
-					{
-						int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
-						v += clippedPixels * vStep;
-						u += clippedPixels * uStep;
-						if (rightX == Toy2::g_screenClipRight)
-							pixelCount = Toy2::g_softWindowWidth - 1;
-						else
-						{
-							pixelCount = Toy2::g_softWindowWidth;
-							if (rightX <= Toy2::g_screenClipRight)
-								pixelCount = rightX - Toy2::g_screenClipLeft;
-						}
-					}
-					else
-					{
-						pixel = rowStart + leftX - Toy2::g_screenClipLeft;
-						if (rightX == Toy2::g_screenClipRight)
-							pixelCount = Toy2::g_screenClipRight - leftX;
-						else if (rightX > Toy2::g_screenClipRight)
-							pixelCount = Toy2::g_screenClipRight - leftX + 1;
-					}
+					CLIP_SPAN_TO_SCREEN(uint16_t* pixel = rowStart, v += clippedPixels * vStep; u += clippedPixels * uStep);
 
 					for (; pixelCount > 0; pixelCount--)
 					{
@@ -3776,31 +3831,7 @@ namespace SoftwareRenderer
 						int32_t v = scanline->leftInterpolants[1];
 						int32_t uStep = (scanline->rightInterpolants[0] - u) / width;
 						int32_t vStep = (scanline->rightInterpolants[1] - v) / width;
-						int32_t pixelCount = width;
-						uint16_t* pixel;
-						if (leftX < Toy2::g_screenClipLeft)
-						{
-							int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
-							u += clippedPixels * uStep;
-							v += clippedPixels * vStep;
-							pixel = rowStart;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_softWindowWidth - 1;
-							else
-							{
-								pixelCount = Toy2::g_softWindowWidth;
-								if (rightX <= Toy2::g_screenClipRight)
-									pixelCount = rightX - Toy2::g_screenClipLeft;
-							}
-						}
-						else
-						{
-							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX;
-							else if (rightX > Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX + 1;
-						}
+						CLIP_SPAN_TO_SCREEN(uint16_t* pixel, u += clippedPixels * uStep; v += clippedPixels * vStep; pixel = rowStart);
 
 						for (; pixelCount > 0; pixelCount--)
 						{
@@ -3835,31 +3866,7 @@ namespace SoftwareRenderer
 					int32_t v = scanline->leftInterpolants[1];
 					int32_t uStep = (scanline->rightInterpolants[0] - u) / width;
 					int32_t vStep = (scanline->rightInterpolants[1] - v) / width;
-					int32_t pixelCount = width;
-					uint16_t* pixel;
-					if (leftX < Toy2::g_screenClipLeft)
-					{
-						int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
-						u += clippedPixels * uStep;
-						v += clippedPixels * vStep;
-						pixel = rowStart;
-						if (rightX == Toy2::g_screenClipRight)
-							pixelCount = Toy2::g_softWindowWidth - 1;
-						else
-						{
-							pixelCount = Toy2::g_softWindowWidth;
-							if (rightX <= Toy2::g_screenClipRight)
-								pixelCount = rightX - Toy2::g_screenClipLeft;
-						}
-					}
-					else
-					{
-						pixel = rowStart + leftX - Toy2::g_screenClipLeft;
-						if (rightX == Toy2::g_screenClipRight)
-							pixelCount = Toy2::g_screenClipRight - leftX;
-						else if (rightX > Toy2::g_screenClipRight)
-							pixelCount = Toy2::g_screenClipRight - leftX + 1;
-					}
+					CLIP_SPAN_TO_SCREEN(uint16_t* pixel, u += clippedPixels * uStep; v += clippedPixels * vStep; pixel = rowStart);
 
 					for (; pixelCount > 0; pixelCount--)
 					{
@@ -4603,31 +4610,7 @@ namespace SoftwareRenderer
 						int32_t v = scanline->leftInterpolants[1];
 						int32_t uStep = (scanline->rightInterpolants[0] - u) / width;
 						int32_t vStep = (scanline->rightInterpolants[1] - v) / width;
-						int32_t pixelCount = width;
-						uint16_t* pixel;
-						if (leftX < Toy2::g_screenClipLeft)
-						{
-							int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
-							u += clippedPixels * uStep;
-							v += clippedPixels * vStep;
-							pixel = rowStart;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_softWindowWidth - 1;
-							else
-							{
-								pixelCount = Toy2::g_softWindowWidth;
-								if (rightX <= Toy2::g_screenClipRight)
-									pixelCount = rightX - Toy2::g_screenClipLeft;
-							}
-						}
-						else
-						{
-							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX;
-							else if (rightX > Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX + 1;
-						}
+						CLIP_SPAN_TO_SCREEN(uint16_t* pixel, u += clippedPixels * uStep; v += clippedPixels * vStep; pixel = rowStart);
 
 						for (; pixelCount > 0; pixelCount--)
 						{
@@ -4662,31 +4645,7 @@ namespace SoftwareRenderer
 					int32_t v = scanline->leftInterpolants[1];
 					int32_t uStep = (scanline->rightInterpolants[0] - u) / width;
 					int32_t vStep = (scanline->rightInterpolants[1] - v) / width;
-					int32_t pixelCount = width;
-					uint16_t* pixel;
-					if (leftX < Toy2::g_screenClipLeft)
-					{
-						int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
-						u += clippedPixels * uStep;
-						v += clippedPixels * vStep;
-						pixel = rowStart;
-						if (rightX == Toy2::g_screenClipRight)
-							pixelCount = Toy2::g_softWindowWidth - 1;
-						else
-						{
-							pixelCount = Toy2::g_softWindowWidth;
-							if (rightX <= Toy2::g_screenClipRight)
-								pixelCount = rightX - Toy2::g_screenClipLeft;
-						}
-					}
-					else
-					{
-						pixel = rowStart + leftX - Toy2::g_screenClipLeft;
-						if (rightX == Toy2::g_screenClipRight)
-							pixelCount = Toy2::g_screenClipRight - leftX;
-						else if (rightX > Toy2::g_screenClipRight)
-							pixelCount = Toy2::g_screenClipRight - leftX + 1;
-					}
+					CLIP_SPAN_TO_SCREEN(uint16_t* pixel, u += clippedPixels * uStep; v += clippedPixels * vStep; pixel = rowStart);
 
 					for (; pixelCount > 0; pixelCount--)
 					{
@@ -4765,31 +4724,7 @@ namespace SoftwareRenderer
 						int32_t v = scanline->leftInterpolants[1];
 						int32_t uStep = (scanline->rightInterpolants[0] - u) / width;
 						int32_t vStep = (scanline->rightInterpolants[1] - v) / width;
-						int32_t pixelCount = width;
-						uint16_t* pixel;
-						if (leftX < Toy2::g_screenClipLeft)
-						{
-							int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
-							u += clippedPixels * uStep;
-							v += clippedPixels * vStep;
-							pixel = rowStart;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_softWindowWidth - 1;
-							else
-							{
-								pixelCount = Toy2::g_softWindowWidth;
-								if (rightX <= Toy2::g_screenClipRight)
-									pixelCount = rightX - Toy2::g_screenClipLeft;
-							}
-						}
-						else
-						{
-							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX;
-							else if (rightX > Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX + 1;
-						}
+						CLIP_SPAN_TO_SCREEN(uint16_t* pixel, u += clippedPixels * uStep; v += clippedPixels * vStep; pixel = rowStart);
 
 						for (; pixelCount > 0; pixelCount--)
 						{
@@ -4822,31 +4757,7 @@ namespace SoftwareRenderer
 					int32_t v = scanline->leftInterpolants[1];
 					int32_t uStep = (scanline->rightInterpolants[0] - u) / width;
 					int32_t vStep = (scanline->rightInterpolants[1] - v) / width;
-					int32_t pixelCount = width;
-					uint16_t* pixel;
-					if (leftX < Toy2::g_screenClipLeft)
-					{
-						int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
-						v += clippedPixels * vStep;
-						u += clippedPixels * uStep;
-						pixel = rowStart;
-						if (rightX == Toy2::g_screenClipRight)
-							pixelCount = Toy2::g_softWindowWidth - 1;
-						else
-						{
-							pixelCount = Toy2::g_softWindowWidth;
-							if (rightX <= Toy2::g_screenClipRight)
-								pixelCount = rightX - Toy2::g_screenClipLeft;
-						}
-					}
-					else
-					{
-						pixel = rowStart + leftX - Toy2::g_screenClipLeft;
-						if (rightX == Toy2::g_screenClipRight)
-							pixelCount = Toy2::g_screenClipRight - leftX;
-						else if (rightX > Toy2::g_screenClipRight)
-							pixelCount = Toy2::g_screenClipRight - leftX + 1;
-					}
+					CLIP_SPAN_TO_SCREEN(uint16_t* pixel, v += clippedPixels * vStep; u += clippedPixels * uStep; pixel = rowStart);
 
 					for (; pixelCount > 0; pixelCount--)
 					{
@@ -5652,34 +5563,10 @@ namespace SoftwareRenderer
 						int32_t blueStep = (scanline->rightInterpolants[2] - blue) / width;
 						int32_t greenStep = (scanline->rightInterpolants[3] - green) / width;
 						int32_t redStep = (scanline->rightInterpolants[4] - red) / width;
-						int32_t pixelCount = width;
-						uint8_t* pixel;
-						if (leftX < Toy2::g_screenClipLeft)
-						{
-							int32_t clippedPixels = Toy2::g_screenClipLeft - leftX;
-							u += clippedPixels * uStep;
-							v += clippedPixels * vStep;
-							blue += clippedPixels * blueStep;
+						CLIP_SPAN_TO_SCREEN(uint8_t* pixel, u += clippedPixels * uStep; v += clippedPixels * vStep; blue += clippedPixels * blueStep;
 							green += clippedPixels * greenStep;
 							red += clippedPixels * redStep;
-							pixel = rowStart;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_softWindowWidth - 1;
-							else
-							{
-								pixelCount = Toy2::g_softWindowWidth;
-								if (rightX <= Toy2::g_screenClipRight)
-									pixelCount = rightX - Toy2::g_screenClipLeft;
-							}
-						}
-						else
-						{
-							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX;
-							else if (rightX > Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX + 1;
-						}
+							pixel = rowStart);
 
 						for (; pixelCount > 0; pixelCount--)
 						{

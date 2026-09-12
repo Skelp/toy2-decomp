@@ -62,9 +62,6 @@ src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_OVERLAY_EDGE	2180463adaec
 0x004776c0	duplicated-block	14 lines	0c11997af2cf	src/SoftwareRenderer.cpp
 src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_BLEND25_555_EDGE	e57825b167c4	src/SoftwareRenderer.cpp
 0x00459ab0	duplicated-block	22 lines	19c06cc05c55	src/SoftwareRenderer.cpp
-0x00459ab0	duplicated-block	13 lines	47eb47da77eb	src/SoftwareRenderer.cpp
-0x00459ab0	duplicated-block	14 lines	d694d99a1084	src/SoftwareRenderer.cpp
-0x00459ab0	duplicated-block	14 lines #2	ce44818c4253	src/SoftwareRenderer.cpp
 src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_BLEND50_555_EDGE	95259a21a6ce	src/SoftwareRenderer.cpp
 0x0045a5c0	duplicated-block	22 lines	19c06cc05c55	src/SoftwareRenderer.cpp
 0x0045a5c0	duplicated-block	14 lines	342849e28ddf	src/SoftwareRenderer.cpp
@@ -90,7 +87,6 @@ src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_TEXTURED_EDGE_WITH_END	64
 0x00463b80	duplicated-block	34 lines	cc04564a2adc	src/SoftwareRenderer.cpp
 0x00463b80	duplicated-block	39 lines	dff6d200372c	src/SoftwareRenderer.cpp
 0x00464690	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
-0x00464690	duplicated-block	35 lines	71ac9af81324	src/SoftwareRenderer.cpp
 0x00464690	duplicated-block	22 lines #2	99e2e5020361	src/SoftwareRenderer.cpp
 0x00464690	duplicated-block	15 lines	ad5670b08a31	src/SoftwareRenderer.cpp
 0x00468430	duplicated-block	22 lines	b0491e57dde0	src/SoftwareRenderer.cpp
@@ -189,5 +185,4 @@ src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_TEXTURED_EDGE_WITH_END	64
 0x004909e0	duplicated-block	14 lines	c70c3c420627	src/Toy2/Toy2.cpp
 0x00498550	duplicated-block	17 lines	3f4ddd75a27d	src/Toy2/Toy2.cpp
 0x00477eb0	duplicated-block	28 lines	f94c906120a7	src/SoftwareRenderer.cpp
-0x00477eb0	duplicated-block	14 lines	511c52a83e3e	src/SoftwareRenderer.cpp
 0x00477eb0	duplicated-block	31 lines	73e56ab08c0c	src/SoftwareRenderer.cpp
