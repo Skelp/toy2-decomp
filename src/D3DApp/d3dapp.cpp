@@ -4,6 +4,15 @@
 #include "Toy2/Direct6.h"
 #include "Toy2/Win95.h"
 
+// Releases one interface and clears the pointer. The create and destroy paths
+// state this form twenty two times.
+#define RELEASE_AND_CLEAR(pointer) \
+	if (pointer)                   \
+	{                              \
+		pointer->Release();        \
+		pointer = NULL;            \
+	}
+
 // GLOBAL: TOY2 0x0050AF64
 BOOL bIgnoreWM_SIZE = FALSE;
 
@@ -96,11 +105,7 @@ BOOL D3DAppCreate(DWORD flags, HWND hwnd, D3DAppInfo** d3dApp)
 	Logger::Log("SYSTEM : OnlySystemMemory status %s.\n", d3dappi.bOnlySystemMemory ? "SYSTEM MEMORY ONLY" : "VIDEO MEMORY ONLY");
 	d3dappi.bIsPrimary = PC.DD->isPrimaryDisplay;
 
-	if (d3dappi.lpDD)
-	{
-		d3dappi.lpDD->Release();
-		d3dappi.lpDD = NULL;
-	}
+	RELEASE_AND_CLEAR(d3dappi.lpDD);
 
 	HRESULT result;
 	{
@@ -190,11 +195,7 @@ BOOL D3DAppCreate(DWORD flags, HWND hwnd, D3DAppInfo** d3dApp)
 	{
 		ATTEMPT(D3DAppICreateZBuffer(width, height));
 
-		if (d3dappi.lpD3DDevice)
-		{
-			d3dappi.lpD3DDevice->Release();
-			d3dappi.lpD3DDevice = NULL;
-		}
+		RELEASE_AND_CLEAR(d3dappi.lpD3DDevice);
 
 		if (PC.D3D->isHardwareAccelerated && ! d3dappi.bBackBufferInVideo)
 			Logger::LogLn("Could not fit the rendering surfaces in video memory for this hardware device.\n");
@@ -272,16 +273,8 @@ BOOL D3DAppCreate(DWORD flags, HWND hwnd, D3DAppInfo** d3dApp)
 	return TRUE;
 
 exit_with_error:
-	if (g_windowData.fontMaskSurface)
-	{
-		g_windowData.fontMaskSurface->Release();
-		g_windowData.fontMaskSurface = NULL;
-	}
-	if (g_windowData.fontSurface)
-	{
-		g_windowData.fontSurface->Release();
-		g_windowData.fontSurface = NULL;
-	}
+	RELEASE_AND_CLEAR(g_windowData.fontMaskSurface);
+	RELEASE_AND_CLEAR(g_windowData.fontSurface);
 	if (g_d3dAppFont)
 	{
 		DeleteObject(g_d3dAppFont);
@@ -293,36 +286,12 @@ exit_with_error:
 		d3dappi.lpD3DViewport->Release();
 		d3dappi.lpD3DViewport = NULL;
 	}
-	if (d3dappi.lpD3DDevice)
-	{
-		d3dappi.lpD3DDevice->Release();
-		d3dappi.lpD3DDevice = NULL;
-	}
-	if (d3dappi.lpZBuffer)
-	{
-		d3dappi.lpZBuffer->Release();
-		d3dappi.lpZBuffer = NULL;
-	}
-	if (lpPalette)
-	{
-		lpPalette->Release();
-		lpPalette = NULL;
-	}
-	if (lpClipper)
-	{
-		lpClipper->Release();
-		lpClipper = NULL;
-	}
-	if (d3dappi.lpBackBuffer)
-	{
-		d3dappi.lpBackBuffer->Release();
-		d3dappi.lpBackBuffer = NULL;
-	}
-	if (d3dappi.lpFrontBuffer)
-	{
-		d3dappi.lpFrontBuffer->Release();
-		d3dappi.lpFrontBuffer = NULL;
-	}
+	RELEASE_AND_CLEAR(d3dappi.lpD3DDevice);
+	RELEASE_AND_CLEAR(d3dappi.lpZBuffer);
+	RELEASE_AND_CLEAR(lpPalette);
+	RELEASE_AND_CLEAR(lpClipper);
+	RELEASE_AND_CLEAR(d3dappi.lpBackBuffer);
+	RELEASE_AND_CLEAR(d3dappi.lpFrontBuffer);
 	if (PC.fullscreenMode)
 	{
 		bIgnoreWM_SIZE = TRUE;
@@ -335,16 +304,8 @@ exit_with_error:
 			Logger::LogDDError("d3dappi.lpDD->SetCooperativeLevel(hwnd, 0x00000008l)", result);
 		bIgnoreWM_SIZE = FALSE;
 	}
-	if (d3dappi.lpD3D)
-	{
-		d3dappi.lpD3D->Release();
-		d3dappi.lpD3D = NULL;
-	}
-	if (d3dappi.lpDD)
-	{
-		d3dappi.lpDD->Release();
-		d3dappi.lpDD = NULL;
-	}
+	RELEASE_AND_CLEAR(d3dappi.lpD3D);
+	RELEASE_AND_CLEAR(d3dappi.lpDD);
 	return FALSE;
 }
 
@@ -654,22 +615,14 @@ int32_t D3DAppWindowProc(WPARAM* stopProcessing, LPARAM* result, HWND hWnd, UINT
 	return TRUE;
 }
 
-// FUNCTION: TOY2 0x0040D2D0 [PROVISIONAL]
+// FUNCTION: TOY2 0x0040D2D0 [EFFECTIVE]
 BOOL D3DAppDestroy()
 {
 	d3dappi.bRenderingIsOK = FALSE;
 	d3dappi.hwnd = NULL;
 
-	if (g_windowData.fontMaskSurface)
-	{
-		g_windowData.fontMaskSurface->Release();
-		g_windowData.fontMaskSurface = NULL;
-	}
-	if (g_windowData.fontSurface)
-	{
-		g_windowData.fontSurface->Release();
-		g_windowData.fontSurface = NULL;
-	}
+	RELEASE_AND_CLEAR(g_windowData.fontMaskSurface);
+	RELEASE_AND_CLEAR(g_windowData.fontSurface);
 	if (g_d3dAppFont)
 	{
 		DeleteObject(g_d3dAppFont);
@@ -696,36 +649,12 @@ BOOL D3DAppDestroy()
 		D3DAppIReleaseAllTextures();
 	}
 
-	if (d3dappi.lpD3DDevice)
-	{
-		d3dappi.lpD3DDevice->Release();
-		d3dappi.lpD3DDevice = NULL;
-	}
-	if (d3dappi.lpZBuffer)
-	{
-		d3dappi.lpZBuffer->Release();
-		d3dappi.lpZBuffer = NULL;
-	}
-	if (lpPalette)
-	{
-		lpPalette->Release();
-		lpPalette = NULL;
-	}
-	if (lpClipper)
-	{
-		lpClipper->Release();
-		lpClipper = NULL;
-	}
-	if (d3dappi.lpBackBuffer)
-	{
-		d3dappi.lpBackBuffer->Release();
-		d3dappi.lpBackBuffer = NULL;
-	}
-	if (d3dappi.lpFrontBuffer)
-	{
-		d3dappi.lpFrontBuffer->Release();
-		d3dappi.lpFrontBuffer = NULL;
-	}
+	RELEASE_AND_CLEAR(d3dappi.lpD3DDevice);
+	RELEASE_AND_CLEAR(d3dappi.lpZBuffer);
+	RELEASE_AND_CLEAR(lpPalette);
+	RELEASE_AND_CLEAR(lpClipper);
+	RELEASE_AND_CLEAR(d3dappi.lpBackBuffer);
+	RELEASE_AND_CLEAR(d3dappi.lpFrontBuffer);
 
 	if (PC.fullscreenMode)
 	{
@@ -741,16 +670,8 @@ BOOL D3DAppDestroy()
 		bIgnoreWM_SIZE = FALSE;
 	}
 
-	if (d3dappi.lpD3D)
-	{
-		d3dappi.lpD3D->Release();
-		d3dappi.lpD3D = NULL;
-	}
-	if (d3dappi.lpDD)
-	{
-		d3dappi.lpDD->Release();
-		d3dappi.lpDD = NULL;
-	}
+	RELEASE_AND_CLEAR(d3dappi.lpD3D);
+	RELEASE_AND_CLEAR(d3dappi.lpDD);
 
 	return TRUE;
 }
@@ -2087,3 +2008,5 @@ char* D3DAppErrorToString(HRESULT error)
 			return "Unrecognized error value.";
 	}
 }
+
+#undef RELEASE_AND_CLEAR
