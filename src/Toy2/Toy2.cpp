@@ -91,8 +91,14 @@ namespace Renderer
 
 	namespace Beam
 	{
-		void DrawSegmentedBeam(uint32_t spriteSheetIndex, int32_t width, int32_t segmentLength,
-			const Vector4I* position, const Vector4I* direction, uint32_t red, uint32_t green, uint32_t blue);
+		void DrawSegmentedBeam(uint32_t spriteSheetIndex,
+			int32_t width,
+			int32_t segmentLength,
+			const Vector4I* position,
+			const Vector4I* direction,
+			uint32_t red,
+			uint32_t green,
+			uint32_t blue);
 	}
 }
 
@@ -678,7 +684,6 @@ namespace Toy2
 	}
 
 	extern int32_t g_hudActorAnimationFrame;
-
 
 	// GLOBAL: TOY2 0x004F5C9C
 	char g_saveGamePrompt[] = "SAVE GAME?";
@@ -3372,10 +3377,7 @@ namespace Toy2
 			};
 		};
 
-		static __forceinline int32_t ShiftFixedTowardZero(int32_t value, int32_t bits)
-		{
-			return (value + ((value >> 31) & ((1 << bits) - 1))) >> bits;
-		}
+		static __forceinline int32_t ShiftFixedTowardZero(int32_t value, int32_t bits) { return (value + ((value >> 31) & ((1 << bits) - 1))) >> bits; }
 
 		STATIC_ASSERT(sizeof(SectorZoneRenderData) == sizeof(ZoneRenderData));
 		STATIC_ASSERT(offsetof(SectorZoneRenderData, viewAngleX) == 0xC);
@@ -3423,7 +3425,7 @@ namespace Toy2
 							}
 							entry++;
 						} while (entry->recordIdx != 0xFF);
-						if (!sectorNotFound)
+						if (! sectorNotFound)
 							selectedSector = cameraSector;
 					}
 				}
@@ -3518,12 +3520,12 @@ namespace Toy2
 				scratch->normalizedLeft.z += scratch->normalizedRight.z;
 
 				const Matrix3x3I16& rotation = Animation::g_nextKeyframeRotation.matrix;
-				Portal::g_portalIntersectionPoint.x = ShiftFixedTowardZero(rotation.m00 * scratch->normalizedLeft.x
-					+ rotation.m10 * scratch->normalizedLeft.y + rotation.m20 * scratch->normalizedLeft.z, 12);
-				Portal::g_portalIntersectionPoint.y = ShiftFixedTowardZero(rotation.m01 * scratch->normalizedLeft.x
-					+ rotation.m11 * scratch->normalizedLeft.y + rotation.m21 * scratch->normalizedLeft.z, 12);
-				Portal::g_portalIntersectionPoint.z = ShiftFixedTowardZero(rotation.m02 * scratch->normalizedLeft.x
-					+ rotation.m12 * scratch->normalizedLeft.y + rotation.m22 * scratch->normalizedLeft.z, 12);
+				Portal::g_portalIntersectionPoint.x = ShiftFixedTowardZero(
+					rotation.m00 * scratch->normalizedLeft.x + rotation.m10 * scratch->normalizedLeft.y + rotation.m20 * scratch->normalizedLeft.z, 12);
+				Portal::g_portalIntersectionPoint.y = ShiftFixedTowardZero(
+					rotation.m01 * scratch->normalizedLeft.x + rotation.m11 * scratch->normalizedLeft.y + rotation.m21 * scratch->normalizedLeft.z, 12);
+				Portal::g_portalIntersectionPoint.z = ShiftFixedTowardZero(
+					rotation.m02 * scratch->normalizedLeft.x + rotation.m12 * scratch->normalizedLeft.y + rotation.m22 * scratch->normalizedLeft.z, 12);
 
 				Vector3I& direction = Portal::g_portalIntersectionPoint;
 				int16_t yaw = (int16_t)-Nu3D::Math::CartesianToFixedAngle(direction.x, direction.z);
@@ -3538,11 +3540,9 @@ namespace Toy2
 				viewAngles.y = yaw;
 				viewAngles.z = 0;
 
-				int32_t leftYaw = Nu3D::Math::CartesianToFixedAngle(scratch->rightEdge.x, 0xA0)
-					- Nu3D::Math::CartesianToFixedAngle(scratch->leftEdge.x, 0xA0);
+				int32_t leftYaw = Nu3D::Math::CartesianToFixedAngle(scratch->rightEdge.x, 0xA0) - Nu3D::Math::CartesianToFixedAngle(scratch->leftEdge.x, 0xA0);
 				zone.viewAngleX = (int16_t)(Numerics::g_sinCosLUT[leftYaw & 0xFFF] * 3 >> 2);
-				int32_t topPitch = Nu3D::Math::CartesianToFixedAngle(scratch->rightEdge.y, 0xA0)
-					- Nu3D::Math::CartesianToFixedAngle(scratch->leftEdge.y, 0xA0);
+				int32_t topPitch = Nu3D::Math::CartesianToFixedAngle(scratch->rightEdge.y, 0xA0) - Nu3D::Math::CartesianToFixedAngle(scratch->leftEdge.y, 0xA0);
 				zone.viewAngleY = (int16_t)(Numerics::g_sinCosLUT[topPitch & 0xFFF] * 3 >> 2);
 				zone.viewAngleX += (int16_t)Nu3D::Math::CartesianToFixedAngle(scratch->rightEdge.x, 0xA0)
 					- (int16_t)Nu3D::Math::CartesianToFixedAngle(scratch->leftEdge.x, 0xA0);
@@ -4887,6 +4887,29 @@ namespace Toy2
 		return result;
 	}
 
+	// Applies the debug view keys: F3 and F4 zoom the software renderer out and in,
+	// F5 and F6 remove and add a detail level. Three frame loops state this block.
+#define PROCESS_DEBUG_VIEW_KEYS()           \
+	if (InputManager::IsKeyPressed(DIK_F3)) \
+	{                                       \
+		SoftwareRenderer::ZoomOut();        \
+		g_extraControlsUnused = 15;         \
+	}                                       \
+	if (InputManager::IsKeyPressed(DIK_F4)) \
+	{                                       \
+		SoftwareRenderer::ZoomIn();         \
+		g_extraControlsUnused = 15;         \
+	}                                       \
+	if (InputManager::IsKeyPressed(DIK_F5)) \
+	{                                       \
+		Graphics::RemoveDetailLevel();      \
+		g_extraControlsUnused = 15;         \
+	}                                       \
+	if (InputManager::IsKeyPressed(DIK_F6)) \
+	{                                       \
+		Graphics::AddDetailLevel();         \
+		g_extraControlsUnused = 15;         \
+	}
 	// FUNCTION: TOY2 0x0049B9E0 [PROVISIONAL]
 	int32_t TickSaveMenuMachine(int32_t postGameSave)
 	{
@@ -4986,26 +5009,7 @@ namespace Toy2
 				Logger::GetErrorHandler("C:\\projects\\toy2\\toy2.cpp", 0x123E)(&SaveManager::g_emptyString);
 			}
 
-			if (InputManager::IsKeyPressed(DIK_F3))
-			{
-				SoftwareRenderer::ZoomOut();
-				g_extraControlsUnused = 15;
-			}
-			if (InputManager::IsKeyPressed(DIK_F4))
-			{
-				SoftwareRenderer::ZoomIn();
-				g_extraControlsUnused = 15;
-			}
-			if (InputManager::IsKeyPressed(DIK_F5))
-			{
-				Graphics::RemoveDetailLevel();
-				g_extraControlsUnused = 15;
-			}
-			if (InputManager::IsKeyPressed(DIK_F6))
-			{
-				Graphics::AddDetailLevel();
-				g_extraControlsUnused = 15;
-			}
+			PROCESS_DEBUG_VIEW_KEYS();
 
 			InputManager::UpdateButtonStates();
 			if (g_inputSuppressFrames)
@@ -5700,8 +5704,8 @@ namespace Toy2
 						Nu3D::Camera::SetTint(0, 0, 0, 12);
 
 					// This retail condition is unreachable because the frame count cannot satisfy both limits.
-					if ((InputManager::g_curButtonsPressed & (INPUT_CANCEL | INPUT_SPIN | INPUT_JUMP | INPUT_FIRE)) != 0
-						&& caseOneFadeFrames < 0 && caseOneFadeFrames > 23)
+					if ((InputManager::g_curButtonsPressed & (INPUT_CANCEL | INPUT_SPIN | INPUT_JUMP | INPUT_FIRE)) != 0 && caseOneFadeFrames < 0
+						&& caseOneFadeFrames > 23)
 					{
 						caseOneFadeFrames = 24;
 					}
@@ -6219,14 +6223,8 @@ namespace Toy2
 		SetBkColor(screenText->deviceContext, 0);
 		SetBkMode(screenText->deviceContext, OPAQUE);
 		SetRect(&screenText->sourceRect, 0, 0, screenText->width, screenText->height);
-		screenText->drawResult = ExtTextOutA(screenText->deviceContext,
-			0,
-			0,
-			ETO_OPAQUE,
-			&screenText->sourceRect,
-			screenText->text,
-			screenText->textLength,
-			NULL);
+		screenText->drawResult =
+			ExtTextOutA(screenText->deviceContext, 0, 0, ETO_OPAQUE, &screenText->sourceRect, screenText->text, screenText->textLength, NULL);
 		screenText->releaseResult = screenText->surface->ReleaseDC(screenText->deviceContext);
 
 		if (g_screenTextQueue.count < 32)
@@ -6249,11 +6247,8 @@ namespace Toy2
 			{
 				screenText->status = 1;
 				g_screenTextLineY = 8;
-				d3dappi.lpBackBuffer->BltFast(screenText->screenX,
-					screenText->screenY,
-					screenText->surface,
-					&screenText->sourceRect,
-					DDBLTFAST_SRCCOLORKEY | DDBLTFAST_WAIT);
+				d3dappi.lpBackBuffer->BltFast(
+					screenText->screenX, screenText->screenY, screenText->surface, &screenText->sourceRect, DDBLTFAST_SRCCOLORKEY | DDBLTFAST_WAIT);
 			}
 
 			queue->entries[queue->current] = NULL;
@@ -6974,29 +6969,7 @@ namespace Toy2
 			Logger::GetErrorHandler("C:\\projects\\toy2\\toy2.cpp", 4670)("");
 		}
 
-		if (InputManager::IsKeyPressed(DIK_F3))
-		{
-			SoftwareRenderer::ZoomOut();
-			g_extraControlsUnused = 15;
-		}
-
-		if (InputManager::IsKeyPressed(DIK_F4))
-		{
-			SoftwareRenderer::ZoomIn();
-			g_extraControlsUnused = 15;
-		}
-
-		if (InputManager::IsKeyPressed(DIK_F5))
-		{
-			Graphics::RemoveDetailLevel();
-			g_extraControlsUnused = 15;
-		}
-
-		if (InputManager::IsKeyPressed(DIK_F6))
-		{
-			Graphics::AddDetailLevel();
-			g_extraControlsUnused = 15;
-		}
+		PROCESS_DEBUG_VIEW_KEYS();
 
 		InputManager::UpdateButtonStates();
 
@@ -7021,7 +6994,7 @@ namespace Toy2
 		}
 	}
 
-	// FUNCTION: TOY2 0x00498550 [PROVISIONAL]
+	// FUNCTION: TOY2 0x00498550 [MATCHED]
 	void ProcessMiscEvents()
 	{
 		ProcessWndEvents();
@@ -7031,26 +7004,7 @@ namespace Toy2
 			Logger::GetErrorHandler("C:\\projects\\toy2\\toy2.cpp", 0x123E)(&SaveManager::g_emptyString);
 		}
 
-		if (InputManager::IsKeyPressed(DIK_F3))
-		{
-			SoftwareRenderer::ZoomOut();
-			g_extraControlsUnused = 15;
-		}
-		if (InputManager::IsKeyPressed(DIK_F4))
-		{
-			SoftwareRenderer::ZoomIn();
-			g_extraControlsUnused = 15;
-		}
-		if (InputManager::IsKeyPressed(DIK_F5))
-		{
-			Graphics::RemoveDetailLevel();
-			g_extraControlsUnused = 15;
-		}
-		if (InputManager::IsKeyPressed(DIK_F6))
-		{
-			Graphics::AddDetailLevel();
-			g_extraControlsUnused = 15;
-		}
+		PROCESS_DEBUG_VIEW_KEYS();
 
 		InputManager::UpdateButtonStates();
 		if (g_inputSuppressFrames != 0)
@@ -7061,6 +7015,8 @@ namespace Toy2
 		UpdateAudioChannels();
 		SoftwareRenderer::g_backBufferClearComplete = 0;
 	}
+
+#undef PROCESS_DEBUG_VIEW_KEYS
 
 	// FUNCTION: TOY2 0x0047CBA0 [PROVISIONAL]
 	void InitSoftWindow(int32_t width, int32_t height)
