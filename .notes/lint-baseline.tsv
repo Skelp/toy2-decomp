@@ -99,8 +99,6 @@ src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_TEXTURED_EDGE_WITH_END	64
 0x004c4370	unnamed-constant	65280	52df1422f88f	src/SoftwareRenderer.cpp
 0x004c4370	unnamed-constant	65536	1260ebb2e483	src/SoftwareRenderer.cpp
 0x004c4370	duplicated-block	13 lines	0933048a0e3c	src/SoftwareRenderer.cpp
-0x004c48e0	duplicated-block	42 lines	923df35201e7	src/SoftwareRenderer.cpp
-0x004c4a60	duplicated-block	43 lines	460d8475d55e	src/SoftwareRenderer.cpp
 0x004c4be0	duplicated-block	31 lines	b9a243226dad	src/SoftwareRenderer.cpp
 0x004c4be0	duplicated-block	22 lines	7e845a82fbb9	src/SoftwareRenderer.cpp
 0x004c4e00	duplicated-block	22 lines	97942471daae	src/SoftwareRenderer.cpp
@@ -115,21 +113,6 @@ src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_TEXTURED_EDGE_WITH_END	64
 0x004c55b0	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
 0x004c56d0	duplicated-block	67 lines	714ace7e1a25	src/SoftwareRenderer.cpp
 0x004c58e0	duplicated-block	62 lines	67bec9a3a518	src/SoftwareRenderer.cpp
-0x004c5ac0	duplicated-block	13 lines	24207f9f922f	src/SoftwareRenderer.cpp
-0x004c5ac0	unnamed-constant	255	3028f51407d8	src/SoftwareRenderer.cpp
-0x004c5ac0	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
-0x004c5d80	duplicated-block	29 lines	7518ca96bfbe	src/SoftwareRenderer.cpp
-0x004c5d80	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
-0x004c5f00	duplicated-block	39 lines	18cc5540e602	src/SoftwareRenderer.cpp
-0x004c5f00	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
-0x004c6080	duplicated-block	59 lines	c686d2e41ab2	src/SoftwareRenderer.cpp
-0x004c6080	unnamed-constant	255	3028f51407d8	src/SoftwareRenderer.cpp
-0x004c6080	unnamed-constant	31	632667547e7c	src/SoftwareRenderer.cpp
-0x004c8930	duplicated-block	130 lines	c8cc8283f572	src/SoftwareRenderer.cpp
-0x004c8930	duplicated-block	67 lines	a1612bcd240d	src/SoftwareRenderer.cpp
-0x004c6340	duplicated-block	34 lines	07296aaac57f	src/SoftwareRenderer.cpp
-0x004c6340	duplicated-block	44 lines	17073e805b1c	src/SoftwareRenderer.cpp
-0x004c6b80	duplicated-block	108 lines	d87a542deec2	src/SoftwareRenderer.cpp
 0x004c6b80	duplicated-block	16 lines	01553768825b	src/SoftwareRenderer.cpp
 0x004c6b80	duplicated-block	76 lines	61049ad7d2fc	src/SoftwareRenderer.cpp
 0x004c7630	duplicated-block	172 lines	a4ba0de67e59	src/SoftwareRenderer.cpp
