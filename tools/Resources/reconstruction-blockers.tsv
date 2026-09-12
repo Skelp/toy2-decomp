@@ -2,6 +2,7 @@
 0x004076F0	-	Needs the actor command opcodes and behavior callback contract.	indirect-dispatch
 0x004398B0	-	Needs the particle record layout and screen-state globals.	layout
 0x0043C750	-	Needs names and roles for the animation-track metadata fields.	layout
+0x00486520	-	Two coverage campaigns stalled far below the provisional bar (6.38% in run 18, 16.96% in run 22); needs the per-mesh ground/ceiling contract before another try.	semantic
 0x00490EE0	-	Needs a caller or data reference to establish the ABI.	abi
 0x00491F20	-	Needs a caller or data reference to establish the ABI.	abi
 0x00492F70	-	Needs evidence for its ten-argument render interface.	abi
