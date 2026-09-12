@@ -18,12 +18,9 @@
 0x00495060	duplicated-block	21 lines	e7e1f805f125	src/Renderer/DevDraw.cpp
 0x004b7d60	duplicated-block	28 lines	6767e8bae662	src/Renderer/Sprite.cpp
 0x004b8160	duplicated-block	15 lines	d6807cc69776	src/Renderer/Sprite.cpp
-0x004b8e60	duplicated-block	18 lines	59c6794341e7	src/Renderer/Sprite.cpp
-0x004b8f40	duplicated-block	18 lines	59c6794341e7	src/Renderer/Sprite.cpp
 0x00494820	duplicated-block	19 lines	ac35fcd5ea62	src/Renderer/Sprite.cpp
 0x004949b0	duplicated-block	19 lines	ac35fcd5ea62	src/Renderer/Sprite.cpp
 0x00493c30	duplicated-block	19 lines	5399ae298fdc	src/Renderer/Sprite.cpp
-0x0049d7a0	duplicated-block	13 lines	7f1e5e9e3eb5	src/Renderer/Sprite.cpp
 0x004942d0	duplicated-block	13 lines	57f98d58eaaa	src/Renderer/Sprite.cpp
 0x004942d0	duplicated-block	16 lines	c66e4a159359	src/Renderer/Sprite.cpp
 0x0045db80	unnamed-constant	255	3028f51407d8	src/SoftwareRenderer.cpp

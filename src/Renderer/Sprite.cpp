@@ -540,6 +540,27 @@ namespace Renderer
 			}
 		}
 
+// Fills the fields that every queued sprite shares and puts the sprite in its bucket.
+// QueueGroundAlignedSprite, QueueQuadSprite and QueueBillboardSprite state the same
+// sixteen lines after the sprite type, so one macro holds them.
+#define FILL_QUEUED_SPRITE_FIELDS()                         \
+	sprite->position = *position;                           \
+	sprite->trigIndex = trigIndex;                          \
+	sprite->width = width;                                  \
+	sprite->height = height;                                \
+	sprite->uvTopLeft = *uvTopLeft;                         \
+	sprite->uvBottomLeft.x = uvTopLeft->x;                  \
+	sprite->uvBottomLeft.y = uvBottomRight->y;              \
+	sprite->uvTopRight.x = uvBottomRight->x;                \
+	sprite->uvTopRight.y = uvTopLeft->y;                    \
+	sprite->uvBottomRight = *uvBottomRight;                 \
+	sprite->textureIndex = textureIndex;                    \
+	modulatedColor = ApplyGammaCorrection(modulatedColor);  \
+	sprite->color = modulatedColor;                         \
+	sprite->renderFlags = flags;                            \
+	Nu3D::Viewport::GetViewClipRect(&sprite->viewportRect); \
+	Nu3D::Sprite::InsertIntoBucket(sprite);
+
 		// FUNCTION: TOY2 0x004B8A30 [MATCHED]
 		void QueueGroundAlignedSprite(Vector3F* position,
 			int32_t trigIndex,
@@ -557,22 +578,7 @@ namespace Renderer
 
 				Nu3D::Sprite* sprite = &g_spriteBuffer3D[--g_spriteBuffer3DCount];
 				sprite->type = RENDER_GROUND_ALIGNED_SPRITE;
-				sprite->position = *position;
-				sprite->trigIndex = trigIndex;
-				sprite->width = width;
-				sprite->height = height;
-				sprite->uvTopLeft = *uvTopLeft;
-				sprite->uvBottomLeft.x = uvTopLeft->x;
-				sprite->uvBottomLeft.y = uvBottomRight->y;
-				sprite->uvTopRight.x = uvBottomRight->x;
-				sprite->uvTopRight.y = uvTopLeft->y;
-				sprite->uvBottomRight = *uvBottomRight;
-				sprite->textureIndex = textureIndex;
-				modulatedColor = ApplyGammaCorrection(modulatedColor);
-				sprite->color = modulatedColor;
-				sprite->renderFlags = flags;
-				Nu3D::Viewport::GetViewClipRect(&sprite->viewportRect);
-				Nu3D::Sprite::InsertIntoBucket(sprite);
+				FILL_QUEUED_SPRITE_FIELDS();
 			}
 			else
 			{
@@ -580,7 +586,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B8E60 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004B8E60 [MATCHED]
 		void QueueQuadSprite(Vector3F* position,
 			int32_t trigIndex,
 			float width,
@@ -597,22 +603,7 @@ namespace Renderer
 
 				Nu3D::Sprite* sprite = &g_spriteBuffer3D[--g_spriteBuffer3DCount];
 				sprite->type = RENDER_QUADSPRITE;
-				sprite->position = *position;
-				sprite->trigIndex = trigIndex;
-				sprite->width = width;
-				sprite->height = height;
-				sprite->uvTopLeft = *uvTopLeft;
-				sprite->uvBottomLeft.x = uvTopLeft->x;
-				sprite->uvBottomLeft.y = uvBottomRight->y;
-				sprite->uvTopRight.x = uvBottomRight->x;
-				sprite->uvTopRight.y = uvTopLeft->y;
-				sprite->uvBottomRight = *uvBottomRight;
-				sprite->textureIndex = textureIndex;
-				modulatedColor = ApplyGammaCorrection(modulatedColor);
-				sprite->color = modulatedColor;
-				sprite->renderFlags = flags;
-				Nu3D::Viewport::GetViewClipRect(&sprite->viewportRect);
-				Nu3D::Sprite::InsertIntoBucket(sprite);
+				FILL_QUEUED_SPRITE_FIELDS();
 			}
 			else
 			{
@@ -620,7 +611,7 @@ namespace Renderer
 			}
 		}
 
-		// FUNCTION: TOY2 0x004B8F40 [PROVISIONAL]
+		// FUNCTION: TOY2 0x004B8F40 [MATCHED]
 		void QueueBillboardSprite(Vector3F* position,
 			int32_t trigIndex,
 			float width,
@@ -637,28 +628,15 @@ namespace Renderer
 
 				Nu3D::Sprite* sprite = &g_spriteBuffer3D[--g_spriteBuffer3DCount];
 				sprite->type = RENDER_BILLBOARD_SPRITE;
-				sprite->position = *position;
-				sprite->trigIndex = trigIndex;
-				sprite->width = width;
-				sprite->height = height;
-				sprite->uvTopLeft = *uvTopLeft;
-				sprite->uvBottomLeft.x = uvTopLeft->x;
-				sprite->uvBottomLeft.y = uvBottomRight->y;
-				sprite->uvTopRight.x = uvBottomRight->x;
-				sprite->uvTopRight.y = uvTopLeft->y;
-				sprite->uvBottomRight = *uvBottomRight;
-				sprite->textureIndex = textureIndex;
-				modulatedColor = ApplyGammaCorrection(modulatedColor);
-				sprite->color = modulatedColor;
-				sprite->renderFlags = flags;
-				Nu3D::Viewport::GetViewClipRect(&sprite->viewportRect);
-				Nu3D::Sprite::InsertIntoBucket(sprite);
+				FILL_QUEUED_SPRITE_FIELDS();
 			}
 			else
 			{
 				Logger::DebugLog("sprite buffer underrun");
 			}
 		}
+
+#undef FILL_QUEUED_SPRITE_FIELDS
 
 		// FUNCTION: TOY2 0x004B9100 [MATCHED]
 		void QueueQuadSpriteFromVerts(Vector3F* verts, Vector2F* uvTopLeft, Vector2F* uvBottomRight, int32_t textureIndex, RGBA color, int32_t flags)
@@ -1055,15 +1033,7 @@ namespace Renderer
 				uvTopLeft.y = 0.0f;
 				uvBottomRight.x = 1.0f;
 				uvBottomRight.y = 1.0f;
-				Queue2DSprite(0.0f,
-					0.0f,
-					1.0f,
-					1.0f,
-					&uvTopLeft,
-					&uvBottomRight,
-					0,
-					fadeColor,
-					RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT);
+				Queue2DSprite(0.0f, 0.0f, 1.0f, 1.0f, &uvTopLeft, &uvBottomRight, 0, fadeColor, RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT);
 			}
 
 			if (*remaining > duration - 25)
@@ -1076,15 +1046,7 @@ namespace Renderer
 				uvTopLeft.y = 0.0f;
 				uvBottomRight.x = 1.0f;
 				uvBottomRight.y = 1.0f;
-				Queue2DSprite(0.0f,
-					0.0f,
-					1.0f,
-					1.0f,
-					&uvTopLeft,
-					&uvBottomRight,
-					0,
-					fadeColor,
-					RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT);
+				Queue2DSprite(0.0f, 0.0f, 1.0f, 1.0f, &uvTopLeft, &uvBottomRight, 0, fadeColor, RENDER_ZWRITE | RENDER_CULL_NONE | RENDER_ALPHA_DEFAULT);
 			}
 		}
 
@@ -1454,8 +1416,7 @@ namespace Renderer
 				{
 					for (int32_t indexOffset = 0; indexOffset < primitive->header[headerIndex].indexCount; indexOffset += 3)
 					{
-						DrawingAPI::DrawIndexedPrimitiveVB(
-							D3DPT_LINESTRIP, destBuffer, primitive->header[headerIndex].indices + indexOffset, 3, drawFlags);
+						DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_LINESTRIP, destBuffer, primitive->header[headerIndex].indices + indexOffset, 3, drawFlags);
 					}
 					continue;
 				}
@@ -1466,19 +1427,13 @@ namespace Renderer
 						g_submittedTriangleCount += primitive->header[headerIndex].indexCount / 3;
 						if (g_drawingTransparentBuckets == 0)
 						{
-							DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLELIST,
-								destBuffer,
-								primitive->header[headerIndex].indices,
-								primitive->header[headerIndex].indexCount,
-								drawFlags);
+							DrawingAPI::DrawIndexedPrimitiveVB(
+								D3DPT_TRIANGLELIST, destBuffer, primitive->header[headerIndex].indices, primitive->header[headerIndex].indexCount, drawFlags);
 						}
 						else
 						{
-							SoftwareRenderer::SubmitTriangleList(renderFlags,
-								destBuffer,
-								entry,
-								primitive->header[headerIndex].indices,
-								primitive->header[headerIndex].indexCount);
+							SoftwareRenderer::SubmitTriangleList(
+								renderFlags, destBuffer, entry, primitive->header[headerIndex].indices, primitive->header[headerIndex].indexCount);
 						}
 						break;
 
@@ -1486,19 +1441,13 @@ namespace Renderer
 						g_submittedTriangleCount += primitive->header[headerIndex].indexCount >> 1;
 						if (g_drawingTransparentBuckets == 0)
 						{
-							DrawingAPI::DrawIndexedPrimitiveVB(D3DPT_TRIANGLESTRIP,
-								destBuffer,
-								primitive->header[headerIndex].indices,
-								primitive->header[headerIndex].indexCount,
-								drawFlags);
+							DrawingAPI::DrawIndexedPrimitiveVB(
+								D3DPT_TRIANGLESTRIP, destBuffer, primitive->header[headerIndex].indices, primitive->header[headerIndex].indexCount, drawFlags);
 						}
 						else
 						{
-							SoftwareRenderer::SubmitTriangleStrip(renderFlags,
-								destBuffer,
-								entry,
-								primitive->header[headerIndex].indices,
-								primitive->header[headerIndex].indexCount);
+							SoftwareRenderer::SubmitTriangleStrip(
+								renderFlags, destBuffer, entry, primitive->header[headerIndex].indices, primitive->header[headerIndex].indexCount);
 						}
 						break;
 
