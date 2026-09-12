@@ -130,6 +130,7 @@ set(TOY2_SOURCES
     src/Toy2/AirportInfiltration.cpp
     src/Toy2/TarmacTrouble.cpp
     src/Toy2/FinalShowdown.cpp
+    src/Toy2/Cfg.cpp
     src/Toy2/Ini.cpp
     src/Toy2/MoveableObject.cpp
     src/Toy2/Toy2.cpp
