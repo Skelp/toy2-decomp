@@ -468,3 +468,25 @@ So a structure campaign extracts a run into a file of its own; it does not
 merge two files whose runs sit next to each other. The extractions of the same
 day (SoftwareRenderer, Toy2.cpp, Collision.cpp: nineteen new files) moved no
 score at all, because each new object holds one run and its own pool.
+
+## Moving data out of an object can cost score; moving code does not
+
+Sep 12, Toy2.Actor structure campaign. Four runs left Actor.cpp for files of
+their own, and the nine globals that only those runs read went with them, which
+is what retail holds. Eleven functions of five other files then lost score:
+0x00416F30 and 0x00418720 by 2.04 points, 0x00414720 by 0.56, and eight more by
+a tenth of a point or less. None of those files changed, and no header they
+include changed, so their machine code is the same.
+
+The cause is the comparison, not the code. Moving nine globals shifts the .bss,
+and reccmp names a data address when an operand happens to hold one, so a
+different set of immediates reads as a symbol and the diff changes.
+
+The same campaign passed with no score change at all once the data stayed in
+Actor.cpp and Toy2Internal.h stated the three values the new objects read.
+
+So: a structure campaign moves code first and leaves the data. Move a global
+only when the campaign has room to measure it, and expect the .bss shift to
+cost a point somewhere. Earlier campaigns of the same day moved data freely
+(Toy2.cpp, Renderer.cpp: 25 globals) and cost nothing, so the risk is a
+coincidence between an immediate and a data address, not a certainty.
