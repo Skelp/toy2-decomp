@@ -71,6 +71,8 @@ set(TOY2_SOURCES
     src/DrawingDevice.h
     src/DrawingDevice.cpp
 
+    src/ModeSelectInternal.h
+    src/DeviceEnumeration.cpp
     src/ModeSelect.cpp
     src/ModeSelect.h
 
@@ -165,6 +167,7 @@ set(TOY2_SOURCES
     src/Toy2/MoveableObjectInternal.h
     src/Toy2/PoleRecord.h
     src/Toy2/IniKeywords.inc
+    src/D3DApp/d3dwindow.cpp
     src/D3DApp/d3dapp.cpp
     src/D3DApp/d3dapp.h
     src/D3DApp/d3dappi.h
