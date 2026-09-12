@@ -91,7 +91,6 @@ src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_TEXTURED_EDGE_WITH_END	64
 0x00474190	duplicated-block	17 lines #2	f16078c607c3	src/SoftwareRenderer.cpp
 0x0047c8b0	duplicated-block	15 lines	e4a9bc798517	src/SoftwareRenderer.cpp
 0x004c17b0	duplicated-block	13 lines	72701525afaa	src/SoftwareRenderer.cpp
-0x004bc900	unnamed-constant	255	3028f51407d8	src/SoftwareRenderer.cpp
 0x004bc980	duplicated-block	16 lines	c40fd71b483c	src/SoftwareRenderer.cpp
 0x004c4640	unnamed-constant	8	fe5dbbcea5ce	src/SoftwareRenderer.cpp
 0x004c4640	unnamed-constant	255	3028f51407d8	src/SoftwareRenderer.cpp
