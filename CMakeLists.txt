@@ -80,6 +80,7 @@ set(TOY2_SOURCES
     src/SoftwareRenderer.cpp
     src/SoftwareRendererInternal.h
     src/SoftwareDeviceRaster.cpp
+    src/SoftwareBackdrop.cpp
     src/SoftwareRenderer.h
     src/SoftwareRendererDefaultPalette.inc
 

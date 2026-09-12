@@ -8,6 +8,12 @@
 // one of its translation units needs. The public header forward declares them.
 namespace SoftwareRenderer
 {
+	// The locked back buffer of the software device, and the level index that
+	// selects a palette. Every rasterizer band writes through the first and reads
+	// the second, so they stay private to the renderer.
+	extern void* g_lockedBackBuffer;
+	extern int32_t g_levelFileIndex;
+
 	// A queued render command for the software rasterizer. QueueRenderCommand enqueues
 	// transformed vertices (3 for a triangle, 4 for a quad when vertexCount is
 	// 4) and RasterizeRenderCommand dequeues and rasterizes one. Stride 0x9C, capacity 1024
