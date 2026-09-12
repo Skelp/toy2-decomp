@@ -144,7 +144,6 @@ src/SoftwareRenderer.cpp	repeated-macro-body	RASTERIZE_TEXTURED_EDGE_WITH_END	64
 0x0042a130	magic-pointer	integer-pointer	ad670f1d57ee	src/Toy2/AlsPenthouse.cpp
 0x00424490	magic-pointer	integer-pointer	e5674b7c679a	src/Toy2/BarnEncounter.cpp
 0x0041aa10	magic-pointer	integer-pointer	e5674b7c679a	src/Toy2/BombsAway.cpp
-0x004011d0	unnamed-constant	26	887309d048be	src/Toy2/Buzz.cpp
 0x004a0f80	duplicated-block	19 lines	b9bcb67bfa3d	src/Toy2/Collectables.cpp
 0x00485940	duplicated-block	24 lines	4b99874a5430	src/Toy2/Collision.cpp
 0x00488e10	duplicated-block	17 lines	d991d1420d79	src/Toy2/Collision.cpp
