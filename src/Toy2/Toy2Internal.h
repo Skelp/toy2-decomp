@@ -213,4 +213,36 @@ namespace Toy2
 	}
 }
 
+namespace Toy2
+{
+	// The shell that MainLoop.cpp holds, and the screens it drives.
+	extern int16_t g_pastInitialBoot;
+	extern int32_t g_quitToTitleFlag;
+	extern int16_t g_demoInputBuffer[2048];
+	extern Nu3D::Camera::ActiveCameraTransform g_pauseCameraTarget;
+	extern int32_t g_pauseCheatTimer;
+	void RenderHUD();
+	void UpdateFrameTimers();
+	int32_t ScreenDispatcher(int32_t index);
+	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId);
+	void UnlockAndPlayMovie(int32_t movieId, int32_t backgroundId, int32_t forcePlay);
+	void LoadPathBin();
+
+	namespace Cutscene
+	{
+		void Update();
+	}
+
+	namespace Game
+	{
+		void UpdateActors();
+		void ActorCollisionCheck();
+		void MainLoop();
+		void PauseLoop();
+		void MenuLoop();
+	}
+
+	int32_t Run(int32_t argCount, char** argList);
+}
+
 #endif

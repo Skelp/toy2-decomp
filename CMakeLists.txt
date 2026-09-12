@@ -144,6 +144,7 @@ set(TOY2_SOURCES
     src/Toy2/Toy2Internal.h
     src/Toy2/Sector.cpp
     src/Toy2/LevelEntry.cpp
+    src/Toy2/MainLoop.cpp
     src/Toy2/Toy2.h
     src/Toy2/MoveableObjectInternal.h
     src/Toy2/PoleRecord.h
