@@ -311,6 +311,10 @@ set(TOY2_SOURCES
     src/NGNLoader/NGNTypes.h
 
     # AudioManager
+    src/AudioManager/AudioManagerInternal.h
+    src/AudioManager/AudioStream.cpp
+    src/AudioManager/SoundSequences.cpp
+    src/AudioManager/SoundVoices.cpp
     src/AudioManager/AudioManager.cpp
     src/AudioManager/AudioManager.h
     src/AudioManager/DsVolTable.inc
