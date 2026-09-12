@@ -4,6 +4,7 @@
 #include "Toy2/Buzz.h"
 #include "Toy2/Actor.h"
 #include "Numerics.h"
+#include "Nu3D/Particles.h"
 
 // Declarations the units of the character share but that no public header
 // states: the action state flags, the masks that say which actions block which,
@@ -170,6 +171,78 @@ namespace Toy2
 			POLE_BOUNDARY_BOTTOM = 1,
 			POLE_BOUNDARY_TOP = 2,
 		};
+	}
+
+	namespace MoveableObject
+	{
+		void Update(Buzz::Toy2BuzzActor* buzz);
+	}
+
+	namespace Platform
+	{
+		extern int16_t g_contactPlatformIndices[32];
+		extern int32_t g_contactPlatformCount;
+		void AdvancePartialMotion(int32_t frameScale, int32_t collisionScale, int32_t skipMotion);
+		void UpdateBuzzPlatformMotion(int32_t queryIndex, int32_t collisionPass);
+	}
+
+	namespace Terrain
+	{
+		struct TerrainEdgeChain
+		{
+			TerrainEdgeChain* next;
+			uint16_t edgeCount;
+			uint16_t reserved;
+			Vector3I vertices[0];
+		};
+
+		STATIC_ASSERT(sizeof(TerrainEdgeChain) == 0x08);
+		STATIC_ASSERT(offsetof(TerrainEdgeChain, edgeCount) == 0x04);
+		STATIC_ASSERT(offsetof(TerrainEdgeChain, vertices) == 0x08);
+
+		extern uint8_t* g_terrainRelocationHeads[8];
+	}
+
+	namespace Buzz
+	{
+		enum SurfaceEffectStateMask
+		{
+			SURFACE_EFFECT_TYPE_MASK = 0xFFFF,
+		};
+
+		struct AnimationStateDefinition
+		{
+			uint8_t* eventTrack;
+			int32_t primaryAnimationIndex;
+			int32_t secondaryAnimationIndex;
+			int32_t frameAdvanceRate;
+			int32_t unusedFlags;
+		};
+
+		extern uint8_t g_animationEventData[0x3B0];
+		extern AnimationStateDefinition g_animationStateDefinitions[33];
+	}
+
+	// The environment tint and the aim particle that Buzz.cpp holds.
+	extern uint8_t g_environmentTintBlue;
+	extern uint8_t g_environmentTintGreen;
+	extern uint8_t g_environmentTintRed;
+	extern Nu3D::Particles::ParticleInstance* g_laserAimParticle;
+	extern int32_t g_idleAnimationState;
+	extern int32_t g_idleAnimationTimer;
+
+	namespace Buzz
+	{
+		struct StartPosition
+		{
+			Vector3I position;
+			int16_t yawAngle;
+			int16_t reserved;
+		};
+
+		STATIC_ASSERT(sizeof(StartPosition) == 0x10);
+
+		extern const StartPosition g_startPositions[17];
 	}
 }
 

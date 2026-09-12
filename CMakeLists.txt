@@ -176,6 +176,12 @@ set(TOY2_SOURCES
     src/Toy2/Direct6.h
     src/Toy2/Win95.cpp
     src/Toy2/Win95.h
+    src/Toy2/BuzzAnimation.cpp
+    src/Toy2/BuzzDamage.cpp
+    src/Toy2/BuzzParticles.cpp
+    src/Toy2/BuzzInit.cpp
+    src/Toy2/BuzzCollision.cpp
+    src/Toy2/BuzzContact.cpp
     src/Toy2/Buzz.cpp
     src/Toy2/BuzzMovement.cpp
     src/Toy2/BuzzInternal.h
@@ -193,6 +199,8 @@ set(TOY2_SOURCES
     src/Toy2/ActorAnimationFrameData.inc
     src/Toy2/BuzzLightPreset.h
     src/Toy2/Lighting.h
+    src/Toy2/LevelsInternal.h
+    src/Toy2/LevelPlay.cpp
     src/Toy2/Levels.cpp
     src/Toy2/Levels.h
     src/Toy2/Object.cpp
