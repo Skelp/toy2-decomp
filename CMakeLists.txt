@@ -245,6 +245,7 @@ set(TOY2_SOURCES
     # Renderer
     src/Renderer/Renderer.h
     src/Renderer/Renderer.cpp
+    src/Renderer/MenuText.cpp
     src/Renderer/DevDraw.cpp
     src/Renderer/TexturedQuad.h
     src/Renderer/RenderType.h
