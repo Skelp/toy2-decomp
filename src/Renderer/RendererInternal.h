@@ -24,6 +24,23 @@ namespace Renderer
 	extern int32_t g_alphaBlendSrc;
 	extern int32_t g_alphaBlendDest;
 	extern Nu3D::Sprite g_instanceSpriteTemplate;
+
+	// State one unit of the renderer holds and another reads.
+	extern int32_t g_deviceBlendShadeCaps;
+
+	// Entry points the units of the renderer call across the object boundary.
+	void DisableFog();
+	void FlushPrimitives();
+	void ResetRenderPools();
+	void InitResources();
+	int32_t ConvertRGBATo16Bit(RGBA color);
+}
+
+// The vertex entry points of the drawing device: DeviceScene.cpp holds them and
+// RenderResources.cpp installs them.
+namespace DrawingAPI
+{
+	void SetVertexAPIs(int32_t isSoftwareRendering);
 }
 
 #endif

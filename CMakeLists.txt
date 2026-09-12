@@ -264,6 +264,17 @@ set(TOY2_SOURCES
 
     # Renderer
     src/Renderer/Renderer.h
+    src/Renderer/Particles.cpp
+    src/Renderer/TintOverlay.cpp
+    src/Renderer/Beam.cpp
+    src/Renderer/LensFlare.cpp
+    src/Renderer/Parallax.cpp
+    src/Renderer/FrameDelay.cpp
+    src/Renderer/BitmapText.cpp
+    src/Renderer/DeviceScene.cpp
+    src/Renderer/RenderInit.cpp
+    src/Renderer/Primitives.cpp
+    src/Renderer/RenderResources.cpp
     src/Renderer/Renderer.cpp
     src/Renderer/MenuText.cpp
     src/Renderer/RendererInternal.h
