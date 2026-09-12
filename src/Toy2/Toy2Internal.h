@@ -222,7 +222,37 @@ namespace Toy2
 	extern Nu3D::Camera::ActiveCameraTransform g_pauseCameraTarget;
 	extern int32_t g_pauseCheatTimer;
 	void RenderHUD();
+	int32_t ShowCredits();
+	void ProfileCPU();
 	void UpdateFrameTimers();
+
+	// The pause menu of the head-up display. HUD.cpp holds the state and the two
+	// volume labels; Toy2.cpp opens the menu and rebuilds the labels, so both units
+	// need the page names and the labels.
+	enum PauseMenuState
+	{
+		PAUSE_MENU_MAIN = 0,
+		PAUSE_MENU_CAMERA = 1,
+		PAUSE_MENU_VOLUME = 2,
+		PAUSE_MENU_QUIT = 3,
+		PAUSE_MENU_SECRET = 4,
+	};
+
+	extern char g_pauseSoundVolumeText[16];
+	extern char g_pauseMusicVolumeText[16];
+
+	// The measured processor clock: SwitchGraphics.cpp holds it with the profile it
+	// feeds, and Toy2.cpp reads it when it reports the machine.
+	extern uint32_t g_cpuClockHz;
+
+	// Half the width of the perspective divide table. SoftWindow.cpp builds the
+	// table and holds the width; the render set-up of Toy2.cpp reads it.
+	extern int32_t g_perspectiveTableHalfWidth;
+
+	namespace PostGameRecap
+	{
+		void Tick();
+	}
 	int32_t ScreenDispatcher(int32_t index);
 	int32_t PlayMovieWithTransition(int32_t movieId, int32_t backgroundId);
 	void UnlockAndPlayMovie(int32_t movieId, int32_t backgroundId, int32_t forcePlay);

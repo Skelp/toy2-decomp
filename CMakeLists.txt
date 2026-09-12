@@ -145,6 +145,11 @@ set(TOY2_SOURCES
     src/Toy2/Ini.cpp
     src/Toy2/MoveableObject.cpp
     src/Toy2/Screens.cpp
+    src/Toy2/PostGame.cpp
+    src/Toy2/SaveSlots.cpp
+    src/Toy2/SoftWindow.cpp
+    src/Toy2/SwitchGraphics.cpp
+    src/Toy2/HUD.cpp
     src/Toy2/Toy2.cpp
     src/Toy2/Toy2Internal.h
     src/Toy2/Sector.cpp
