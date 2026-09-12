@@ -249,14 +249,10 @@ namespace SoftwareRenderer
 	int32_t g_bottomOffset = -1;
 
 	// GLOBAL: TOY2 0x005088E4
-	int32_t g_primaryBucketOffsets[16] = {
-		0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240
-	};
+	int32_t g_primaryBucketOffsets[16] = { 0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240 };
 
 	// GLOBAL: TOY2 0x00508924
-	int32_t g_secondaryBucketOffsets[16] = {
-		0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60
-	};
+	int32_t g_secondaryBucketOffsets[16] = { 0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60 };
 
 	// GLOBAL: TOY2 0x00B7FBBC
 	int32_t g_clipLeft;
@@ -371,6 +367,37 @@ namespace SoftwareRenderer
 		k_fiveBitChannelMask = 0x1f,
 		k_fiveBitChannelLimit = k_fiveBitChannelMask + 1,
 		k_colourScaleSubtableSize = 0x10000,
+	};
+
+	// Shift from 16.16 fixed point to the integer part.
+	const int32_t k_fixedPointShift = 16;
+
+	// Edge X values carry 10 fraction bits; the half unit centres a span on its pixel.
+	enum
+	{
+		SOLID_EDGE_X_FRACTION_BITS = 10,
+		SOLID_EDGE_X_ONE = 1 << SOLID_EDGE_X_FRACTION_BITS,
+		SOLID_EDGE_X_HALF = SOLID_EDGE_X_ONE / 2
+	};
+
+	const int32_t RGB555_RED_MASK = 0x7C00;
+	const int32_t RGB555_GREEN_MASK = 0x3E0;
+	const int32_t RGB555_BLUE_MASK = 0x1F;
+	// Channel mask of a pixel shifted right by one, for a 50 percent blend.
+	const int32_t RGB555_HALF_MASK = 0x3DEF;
+
+	const int32_t RGB565_RED_MASK = 0xF800;
+	const int32_t RGB565_GREEN_MASK = 0x7E0;
+	const int32_t RGB565_BLUE_MASK = 0x1F;
+	// Channel mask of a pixel shifted right by one, for a 50 percent blend.
+	const int32_t RGB565_HALF_MASK = 0x7BEF;
+
+	// The palette combine tables are square: one row for each destination colour, and the
+	// colour offset table holds a light level pair for each texel.
+	enum
+	{
+		PALETTE_COMBINE_TABLE_STRIDE = 0x100,
+		PALETTE_COLOUR_OFFSET_STRIDE = 0x200
 	};
 
 	// GLOBAL: TOY2 0x004DDAE0
@@ -566,9 +593,9 @@ namespace SoftwareRenderer
 		int32_t blueRampOffset;
 		if (useColourOffset != 0)
 		{
-			redRampOffset = item->vertices[0].blue >> 16;
-			greenRampOffset = item->vertices[0].green >> 16;
-			blueRampOffset = item->vertices[0].red >> 16;
+			redRampOffset = item->vertices[0].blue >> k_fixedPointShift;
+			greenRampOffset = item->vertices[0].green >> k_fixedPointShift;
+			blueRampOffset = item->vertices[0].red >> k_fixedPointShift;
 		}
 
 		int32_t right = item->vertices[2].x;
@@ -626,12 +653,12 @@ namespace SoftwareRenderer
 					int32_t remaining = width;
 					do
 					{
-						uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+						uint16_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 						if (texel != 0x3E0)
 						{
 							uint16_t destinationPixel = *destination;
 							uint16_t litTexel = g_redRampFull[(texel >> 10) + redRampOffset] + g_greenRampFull[((texel >> 5) & 0x1F) + greenRampOffset]
-								+ g_blueRampFull[(texel & 0x1F) + blueRampOffset];
+								+ g_blueRampFull[(texel & k_fiveBitChannelMask) + blueRampOffset];
 							uint16_t red = (destinationPixel & 0x7C00) + (litTexel & 0x7C00);
 							if (red > 0x7C00)
 								red = 0x7C00;
@@ -660,7 +687,7 @@ namespace SoftwareRenderer
 				int32_t remaining = rowWidth;
 				do
 				{
-					uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					uint16_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 					if (texel != 0x3E0)
 					{
 						uint16_t destinationPixel = *destination;
@@ -696,12 +723,12 @@ namespace SoftwareRenderer
 					int32_t remaining = width;
 					do
 					{
-						uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+						uint16_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 						if (texel != 0x3E0)
 						{
 							uint32_t destinationPixel = *destination;
 							uint32_t sourcePixel = g_redRampFull[(texel >> 10) + redRampOffset] + g_greenRampFull[((texel >> 5) & 0x1F) + greenRampOffset]
-								+ g_blueRampFull[(texel & 0x1F) + blueRampOffset];
+								+ g_blueRampFull[(texel & k_fiveBitChannelMask) + blueRampOffset];
 							int32_t red = (destinationPixel & 0x7C00) - (sourcePixel & 0x7C00);
 							if (red < 0x400)
 								red = 0;
@@ -730,7 +757,7 @@ namespace SoftwareRenderer
 				int32_t remaining = rowWidth;
 				do
 				{
-					uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					uint16_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 					if (texel != 0x3E0)
 					{
 						uint32_t destinationPixel = *destination;
@@ -767,12 +794,12 @@ namespace SoftwareRenderer
 					int32_t remaining = width;
 					do
 					{
-						uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+						uint16_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 						if (texel != 0x3E0)
 						{
 							uint16_t litTexel = g_redRampFull[(texel >> 10) + redRampOffset] + g_greenRampFull[((texel >> 5) & 0x1F) + greenRampOffset]
-								+ g_blueRampFull[(texel & 0x1F) + blueRampOffset];
-							*destination = (*destination >> 1 & 0x3DEF) + (litTexel >> 1 & 0x3DEF);
+								+ g_blueRampFull[(texel & k_fiveBitChannelMask) + blueRampOffset];
+							*destination = (*destination >> 1 & RGB555_HALF_MASK) + (litTexel >> 1 & RGB555_HALF_MASK);
 						}
 						destination++;
 						rowU += uStep;
@@ -791,9 +818,9 @@ namespace SoftwareRenderer
 				int32_t remaining = rowWidth;
 				do
 				{
-					uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					uint16_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 					if (texel != 0x3E0)
-						*destination = (*destination >> 1 & 0x3DEF) + (texel >> 1 & 0x3DEF);
+						*destination = (*destination >> 1 & RGB555_HALF_MASK) + (texel >> 1 & RGB555_HALF_MASK);
 					destination++;
 					rowU += uStep;
 					remaining--;
@@ -813,11 +840,11 @@ namespace SoftwareRenderer
 				int32_t remaining = width;
 				do
 				{
-					uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					uint16_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 					if (texel != 0x3E0)
 					{
 						*destination = g_redRampFull[(texel >> 10) + redRampOffset] + g_greenRampFull[((texel >> 5) & 0x1F) + greenRampOffset]
-							+ g_blueRampFull[(texel & 0x1F) + blueRampOffset];
+							+ g_blueRampFull[(texel & k_fiveBitChannelMask) + blueRampOffset];
 					}
 					destination++;
 					rowU += uStep;
@@ -836,7 +863,7 @@ namespace SoftwareRenderer
 			int32_t remaining = rowWidth;
 			do
 			{
-				uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+				uint16_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 				if (texel != 0x3E0)
 					*destination = texel;
 				destination++;
@@ -949,8 +976,8 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX != rightX)
 				{
 					if (leftX < Toy2::g_screenClipLeft)
@@ -982,9 +1009,6 @@ namespace SoftwareRenderer
 			rowStart += g_backBufferPitchPixels;
 		} while (scanlineCount != 0);
 	}
-
-	// Shift from 16.16 fixed point to the integer part.
-	const int32_t k_fixedPointShift = 16;
 
 // Walks one edge with the texture UV and the three colour interpolants. The end row is inclusive when endOperator is <=.
 #define RASTERIZE_LIT_EDGE_WITH_END(vertexA, vertexB, doneLabel, endOperator)                                                    \
@@ -1240,8 +1264,8 @@ namespace SoftwareRenderer
 	{                                                                                                                                              \
 		if (spanRow->populated != 0 && spanRow->leftXFixed <= Toy2::g_screenClipRightFixed && spanRow->rightXFixed >= Toy2::g_screenClipLeftFixed) \
 		{                                                                                                                                          \
-			int32_t leftX = spanRow->leftXFixed >> 10;                                                                                             \
-			int32_t rightX = spanRow->rightXFixed >> 10;                                                                                           \
+			int32_t leftX = spanRow->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;                                                                     \
+			int32_t rightX = spanRow->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;                                                                   \
 			if (leftX == rightX)                                                                                                                   \
 			{                                                                                                                                      \
 				uint16_t texel = texture[(spanRow->leftInterpolants[0] >> k_fixedPointShift) + (spanRow->leftInterpolants[1] >> 8 & 0xFFFFFF00)];  \
@@ -1277,8 +1301,8 @@ namespace SoftwareRenderer
 	{                                                                                                                                              \
 		if (spanRow->populated != 0 && spanRow->leftXFixed <= Toy2::g_screenClipRightFixed && spanRow->rightXFixed >= Toy2::g_screenClipLeftFixed) \
 		{                                                                                                                                          \
-			int32_t leftX = spanRow->leftXFixed >> 10;                                                                                             \
-			int32_t rightX = spanRow->rightXFixed >> 10;                                                                                           \
+			int32_t leftX = spanRow->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;                                                                     \
+			int32_t rightX = spanRow->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;                                                                   \
 			if (leftX == rightX)                                                                                                                   \
 			{                                                                                                                                      \
 				uint16_t texel = texture[(spanRow->leftInterpolants[0] >> k_fixedPointShift) + (spanRow->leftInterpolants[1] >> 8 & 0xFFFFFF00)];  \
@@ -1402,8 +1426,8 @@ namespace SoftwareRenderer
 	{                                                                                                                                              \
 		if (spanRow->populated != 0 && spanRow->leftXFixed <= Toy2::g_screenClipRightFixed && spanRow->rightXFixed >= Toy2::g_screenClipLeftFixed) \
 		{                                                                                                                                          \
-			int32_t leftX = spanRow->leftXFixed >> 10;                                                                                             \
-			int32_t rightX = spanRow->rightXFixed >> 10;                                                                                           \
+			int32_t leftX = spanRow->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;                                                                     \
+			int32_t rightX = spanRow->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;                                                                   \
 			if (leftX != rightX)                                                                                                                   \
 			{                                                                                                                                      \
 				LIT_BLENDED_SPAN_SETUP();                                                                                                          \
@@ -1478,12 +1502,6 @@ namespace SoftwareRenderer
 	const int32_t OVERLAY_TEXTURE_INDEX = 14;
 	// Level 9 texel that selects OVERLAY_MODE_ADDITIVE (pure green in RGB565).
 	const uint16_t OVERLAY_MARKER_TEXEL = 0x7C0;
-
-	const int32_t RGB565_RED_MASK = 0xF800;
-	const int32_t RGB565_GREEN_MASK = 0x7E0;
-	const int32_t RGB565_BLUE_MASK = 0x1F;
-	// Channel mask of a pixel shifted right by one, for a 50 percent blend.
-	const int32_t RGB565_HALF_MASK = 0x7BEF;
 
 	// rightInterpolants slots that hold the overlay UV at both ends of a span.
 	enum OverlayScanlineSlot
@@ -1772,12 +1790,6 @@ namespace SoftwareRenderer
 	// Level 9 texel that selects OVERLAY_MODE_ADDITIVE in UnkRenderAPI13 (pure green in RGB555).
 	const uint16_t OVERLAY_MARKER_TEXEL_555 = 0x3E0;
 
-	const int32_t RGB555_RED_MASK = 0x7C00;
-	const int32_t RGB555_GREEN_MASK = 0x3E0;
-	const int32_t RGB555_BLUE_MASK = 0x1F;
-	// Channel mask of a pixel shifted right by one, for a 50 percent blend.
-	const int32_t RGB555_HALF_MASK = 0x3DEF;
-
 // Adds two RGB555 pixels and clamps each channel at its maximum.
 #define ADD_SATURATED_555(first, second, result)                                           \
 	do                                                                                     \
@@ -1793,6 +1805,34 @@ namespace SoftwareRenderer
 			blueSum = RGB555_BLUE_MASK;                                                    \
 		(result) = (uint16_t)(blueSum | greenSum | redSum);                                \
 	} while (0)
+
+	// Sets up one overlay blend span: the step per pixel, the first pixel and the pixel
+	// count after the left and the right clip.
+#define CLIP_OVERLAY_BLEND_SPAN(pixelType)                                                    \
+	int32_t overlayU = scanline->rightInterpolants[OVERLAY_LEFT_U];                           \
+	int32_t overlayV = scanline->rightInterpolants[OVERLAY_LEFT_V];                           \
+	int32_t width = rightX - leftX;                                                           \
+	int32_t overlayUStep = (scanline->rightInterpolants[OVERLAY_RIGHT_U] - overlayU) / width; \
+	int32_t overlayVStep = (scanline->rightInterpolants[OVERLAY_RIGHT_V] - overlayV) / width; \
+	int32_t pixelCount = width;                                                               \
+	pixelType* pixel = rowStart;                                                              \
+	if (leftX < Toy2::g_screenClipLeft)                                                       \
+	{                                                                                         \
+		overlayU += overlayUStep * (Toy2::g_screenClipLeft - leftX);                          \
+		overlayV += overlayVStep * (Toy2::g_screenClipLeft - leftX);                          \
+		if (rightX > Toy2::g_screenClipRight)                                                 \
+			pixelCount = Toy2::g_softWindowWidth - 1;                                         \
+		else                                                                                  \
+			pixelCount = rightX - Toy2::g_screenClipLeft;                                     \
+	}                                                                                         \
+	else                                                                                      \
+	{                                                                                         \
+		pixel = rowStart + leftX - Toy2::g_screenClipLeft;                                    \
+		if (rightX == Toy2::g_screenClipRight)                                                \
+			pixelCount = Toy2::g_screenClipRight - leftX;                                     \
+		else if (rightX > Toy2::g_screenClipRight)                                            \
+			pixelCount = Toy2::g_screenClipRight - leftX + 1;                                 \
+	}
 
 	// FUNCTION: TOY2 0x0045E390 [PROVISIONAL]
 	void UnkRenderAPI13(SoftwareRenderItem* item)
@@ -1915,8 +1955,8 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX != rightX)
 					{
 						int32_t width = rightX - leftX;
@@ -1966,34 +2006,11 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX != rightX)
 					{
-						int32_t overlayU = scanline->rightInterpolants[OVERLAY_LEFT_U];
-						int32_t overlayV = scanline->rightInterpolants[OVERLAY_LEFT_V];
-						int32_t width = rightX - leftX;
-						int32_t overlayUStep = (scanline->rightInterpolants[OVERLAY_RIGHT_U] - overlayU) / width;
-						int32_t overlayVStep = (scanline->rightInterpolants[OVERLAY_RIGHT_V] - overlayV) / width;
-						int32_t pixelCount = width;
-						uint16_t* pixel = rowStart;
-						if (leftX < Toy2::g_screenClipLeft)
-						{
-							overlayU += overlayUStep * (Toy2::g_screenClipLeft - leftX);
-							overlayV += overlayVStep * (Toy2::g_screenClipLeft - leftX);
-							if (rightX > Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_softWindowWidth - 1;
-							else
-								pixelCount = rightX - Toy2::g_screenClipLeft;
-						}
-						else
-						{
-							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX;
-							else if (rightX > Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX + 1;
-						}
+						CLIP_OVERLAY_BLEND_SPAN(uint16_t)
 
 						for (; pixelCount > 0; pixelCount--)
 						{
@@ -2020,34 +2037,11 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX != rightX)
 					{
-						int32_t overlayU = scanline->rightInterpolants[OVERLAY_LEFT_U];
-						int32_t overlayV = scanline->rightInterpolants[OVERLAY_LEFT_V];
-						int32_t width = rightX - leftX;
-						int32_t overlayUStep = (scanline->rightInterpolants[OVERLAY_RIGHT_U] - overlayU) / width;
-						int32_t overlayVStep = (scanline->rightInterpolants[OVERLAY_RIGHT_V] - overlayV) / width;
-						int32_t pixelCount = width;
-						uint16_t* pixel = rowStart;
-						if (leftX < Toy2::g_screenClipLeft)
-						{
-							overlayU += overlayUStep * (Toy2::g_screenClipLeft - leftX);
-							overlayV += overlayVStep * (Toy2::g_screenClipLeft - leftX);
-							if (rightX > Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_softWindowWidth - 1;
-							else
-								pixelCount = rightX - Toy2::g_screenClipLeft;
-						}
-						else
-						{
-							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX;
-							else if (rightX > Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX + 1;
-						}
+						CLIP_OVERLAY_BLEND_SPAN(uint16_t)
 
 						for (; pixelCount > 0; pixelCount--)
 						{
@@ -2071,8 +2065,8 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX == rightX)
 				{
 					uint16_t texel = texture[((scanline->leftInterpolants[1] >> 8) & k_upperByteMask) + (scanline->leftInterpolants[0] >> k_fixedPointShift)];
@@ -2166,9 +2160,9 @@ namespace SoftwareRenderer
 		int32_t blueRampOffset;
 		if (useColourOffset != 0)
 		{
-			redRampOffset = item->vertices[0].blue >> 16;
+			redRampOffset = item->vertices[0].blue >> k_fixedPointShift;
 			greenRampOffset = item->vertices[0].green >> 15;
-			blueRampOffset = item->vertices[0].red >> 16;
+			blueRampOffset = item->vertices[0].red >> k_fixedPointShift;
 		}
 
 		int32_t right = item->vertices[2].x;
@@ -2225,12 +2219,12 @@ namespace SoftwareRenderer
 					int32_t remaining = width;
 					do
 					{
-						uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+						uint16_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 						if (texel != 0x7C0)
 						{
 							uint16_t destinationPixel = *destination;
 							uint16_t litTexel = g_redRampFull[(texel >> 11) + redRampOffset] + g_greenRampFull[((texel >> 5) & 0x3F) + greenRampOffset]
-								+ g_blueRampFull[(texel & 0x1F) + blueRampOffset];
+								+ g_blueRampFull[(texel & k_fiveBitChannelMask) + blueRampOffset];
 							uint32_t red = (destinationPixel & 0xF800) + (litTexel & 0xF800);
 							if (red > 0xF800)
 								red = 0xF800;
@@ -2259,7 +2253,7 @@ namespace SoftwareRenderer
 				int32_t remaining = width;
 				do
 				{
-					uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					uint16_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 					if (texel != 0x7C0)
 					{
 						uint16_t destinationPixel = *destination;
@@ -2295,12 +2289,12 @@ namespace SoftwareRenderer
 					int32_t remaining = width;
 					do
 					{
-						uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+						uint16_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 						if (texel != 0x7C0)
 						{
 							uint32_t destinationPixel = *destination;
 							uint32_t sourcePixel = g_redRampFull[(texel >> 11) + redRampOffset] + g_greenRampFull[((texel >> 5) & 0x3F) + greenRampOffset]
-								+ g_blueRampFull[(texel & 0x1F) + blueRampOffset];
+								+ g_blueRampFull[(texel & k_fiveBitChannelMask) + blueRampOffset];
 							int32_t red = (destinationPixel & 0xF800) - (sourcePixel & 0xF800);
 							if (red < 0x800)
 								red = 0;
@@ -2329,7 +2323,7 @@ namespace SoftwareRenderer
 				int32_t remaining = width;
 				do
 				{
-					uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					uint16_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 					if (texel != 0x7C0)
 					{
 						uint32_t destinationPixel = *destination;
@@ -2366,12 +2360,12 @@ namespace SoftwareRenderer
 					int32_t remaining = width;
 					do
 					{
-						uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+						uint16_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 						if (texel != 0x7C0)
 						{
 							uint16_t litTexel = g_redRampFull[(texel >> 11) + redRampOffset] + g_greenRampFull[((texel >> 5) & 0x3F) + greenRampOffset]
-								+ g_blueRampFull[(texel & 0x1F) + blueRampOffset];
-							*destination = (*destination >> 1 & 0x7BEF) + (litTexel >> 1 & 0x7BEF);
+								+ g_blueRampFull[(texel & k_fiveBitChannelMask) + blueRampOffset];
+							*destination = (*destination >> 1 & RGB565_HALF_MASK) + (litTexel >> 1 & RGB565_HALF_MASK);
 						}
 						destination++;
 						rowU += uStep;
@@ -2390,9 +2384,9 @@ namespace SoftwareRenderer
 				int32_t remaining = width;
 				do
 				{
-					uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					uint16_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 					if (texel != 0x7C0)
-						*destination = (*destination >> 1 & 0x7BEF) + (texel >> 1 & 0x7BEF);
+						*destination = (*destination >> 1 & RGB565_HALF_MASK) + (texel >> 1 & RGB565_HALF_MASK);
 					destination++;
 					rowU += uStep;
 					remaining--;
@@ -2412,11 +2406,11 @@ namespace SoftwareRenderer
 				int32_t remaining = width;
 				do
 				{
-					uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					uint16_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 					if (texel != 0x7C0)
 					{
 						*destination = g_redRampFull[(texel >> 11) + redRampOffset] + g_greenRampFull[((texel >> 5) & 0x3F) + greenRampOffset]
-							+ g_blueRampFull[(texel & 0x1F) + blueRampOffset];
+							+ g_blueRampFull[(texel & k_fiveBitChannelMask) + blueRampOffset];
 					}
 					destination++;
 					rowU += uStep;
@@ -2435,7 +2429,7 @@ namespace SoftwareRenderer
 			int32_t remaining = width;
 			do
 			{
-				uint16_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+				uint16_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 				if (texel != 0x7C0)
 					*destination = texel;
 				destination++;
@@ -2516,7 +2510,9 @@ namespace SoftwareRenderer
 		else if (Toy2::g_levelFileIndex == 7 || Toy2::g_levelFileIndex == 8)
 			overlayMode = OVERLAY_MODE_BLEND_50;
 		else if (Toy2::g_levelFileIndex == 9)
-			overlayMode = ((uint16_t*)g_softwareTextureData[item->textureIndex])[((item->vertices[0].v >> 8) & k_upperByteMask) + (item->vertices[0].u >> 16)]
+			overlayMode =
+				((uint16_t*)g_softwareTextureData[item->textureIndex])[((item->vertices[0].v >> 8) & k_upperByteMask)
+					+ (item->vertices[0].u >> k_fixedPointShift)]
 					== OVERLAY_MARKER_TEXEL
 				? OVERLAY_MODE_ADDITIVE
 				: OVERLAY_MODE_LIT;
@@ -2608,8 +2604,8 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX != rightX)
 					{
 						int32_t width = rightX - leftX;
@@ -2630,10 +2626,11 @@ namespace SoftwareRenderer
 
 						for (; pixelCount > 0; pixelCount--)
 						{
-							uint16_t texel = texture[((v >> 8) & k_upperByteMask) + (u >> 16)];
+							uint16_t texel = texture[((v >> 8) & k_upperByteMask) + (u >> k_fixedPointShift)];
 							uint32_t destinationPixel = *pixel;
-							uint32_t litTexel = (uint16_t)(g_greenRampFull[((texel >> 5) & 0x3F) + (green >> 15)] + g_redRampFull[(texel >> 11) + (blue >> 16)]
-								+ g_blueRampFull[(texel & 0x1F) + (red >> 16)]);
+							uint32_t litTexel = (uint16_t)(g_greenRampFull[((texel >> 5) & 0x3F) + (green >> 15)]
+								+ g_redRampFull[(texel >> 11) + (blue >> k_fixedPointShift)]
+								+ g_blueRampFull[(texel & k_fiveBitChannelMask) + (red >> k_fixedPointShift)]);
 							ADD_SATURATED_565(destinationPixel, litTexel, *pixel);
 							v += vStep;
 							u += uStep;
@@ -2658,38 +2655,15 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX != rightX)
 					{
-						int32_t overlayU = scanline->rightInterpolants[OVERLAY_LEFT_U];
-						int32_t overlayV = scanline->rightInterpolants[OVERLAY_LEFT_V];
-						int32_t width = rightX - leftX;
-						int32_t overlayUStep = (scanline->rightInterpolants[OVERLAY_RIGHT_U] - overlayU) / width;
-						int32_t overlayVStep = (scanline->rightInterpolants[OVERLAY_RIGHT_V] - overlayV) / width;
-						int32_t pixelCount = width;
-						uint16_t* pixel = rowStart;
-						if (leftX < Toy2::g_screenClipLeft)
-						{
-							overlayU += overlayUStep * (Toy2::g_screenClipLeft - leftX);
-							overlayV += overlayVStep * (Toy2::g_screenClipLeft - leftX);
-							if (rightX > Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_softWindowWidth - 1;
-							else
-								pixelCount = rightX - Toy2::g_screenClipLeft;
-						}
-						else
-						{
-							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX;
-							else if (rightX > Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX + 1;
-						}
+						CLIP_OVERLAY_BLEND_SPAN(uint16_t)
 
 						for (; pixelCount > 0; pixelCount--)
 						{
-							uint32_t overlayTexel = overlay[((overlayV >> 8) & k_upperByteMask) + (overlayU >> 16)];
+							uint32_t overlayTexel = overlay[((overlayV >> 8) & k_upperByteMask) + (overlayU >> k_fixedPointShift)];
 							uint32_t destinationPixel = *pixel;
 							ADD_SATURATED_565(destinationPixel, overlayTexel, *pixel);
 							overlayU += overlayUStep;
@@ -2712,39 +2686,16 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX != rightX)
 					{
-						int32_t overlayU = scanline->rightInterpolants[OVERLAY_LEFT_U];
-						int32_t overlayV = scanline->rightInterpolants[OVERLAY_LEFT_V];
-						int32_t width = rightX - leftX;
-						int32_t overlayUStep = (scanline->rightInterpolants[OVERLAY_RIGHT_U] - overlayU) / width;
-						int32_t overlayVStep = (scanline->rightInterpolants[OVERLAY_RIGHT_V] - overlayV) / width;
-						int32_t pixelCount = width;
-						uint16_t* pixel = rowStart;
-						if (leftX < Toy2::g_screenClipLeft)
-						{
-							overlayU += overlayUStep * (Toy2::g_screenClipLeft - leftX);
-							overlayV += overlayVStep * (Toy2::g_screenClipLeft - leftX);
-							if (rightX > Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_softWindowWidth - 1;
-							else
-								pixelCount = rightX - Toy2::g_screenClipLeft;
-						}
-						else
-						{
-							pixel = rowStart + leftX - Toy2::g_screenClipLeft;
-							if (rightX == Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX;
-							else if (rightX > Toy2::g_screenClipRight)
-								pixelCount = Toy2::g_screenClipRight - leftX + 1;
-						}
+						CLIP_OVERLAY_BLEND_SPAN(uint16_t)
 
 						for (; pixelCount > 0; pixelCount--)
 						{
-							*pixel =
-								(overlay[((overlayV >> 8) & k_upperByteMask) + (overlayU >> 16)] >> 1 & RGB565_HALF_MASK) + (*pixel >> 1 & RGB565_HALF_MASK);
+							*pixel = (overlay[((overlayV >> 8) & k_upperByteMask) + (overlayU >> k_fixedPointShift)] >> 1 & RGB565_HALF_MASK)
+								+ (*pixel >> 1 & RGB565_HALF_MASK);
 							overlayU += overlayUStep;
 							overlayV += overlayVStep;
 							pixel++;
@@ -2763,16 +2714,16 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX == rightX)
 				{
-					uint16_t texel = texture[((scanline->leftInterpolants[1] >> 8) & k_upperByteMask) + (scanline->leftInterpolants[0] >> 16)];
+					uint16_t texel = texture[((scanline->leftInterpolants[1] >> 8) & k_upperByteMask) + (scanline->leftInterpolants[0] >> k_fixedPointShift)];
 					uint32_t litTexel = (uint16_t)(g_greenRampFull[((texel >> 5) & 0x3F) + (scanline->leftInterpolants[3] >> 15)]
-						+ g_redRampFull[(texel >> 11) + (scanline->leftInterpolants[2] >> 16)]
-						+ g_blueRampFull[(texel & 0x1F) + (scanline->leftInterpolants[4] >> 16)]);
-					uint32_t overlayTexel =
-						overlay[((scanline->rightInterpolants[OVERLAY_LEFT_V] >> 8) & k_upperByteMask) + (scanline->rightInterpolants[OVERLAY_LEFT_U] >> 16)];
+						+ g_redRampFull[(texel >> 11) + (scanline->leftInterpolants[2] >> k_fixedPointShift)]
+						+ g_blueRampFull[(texel & k_fiveBitChannelMask) + (scanline->leftInterpolants[4] >> k_fixedPointShift)]);
+					uint32_t overlayTexel = overlay[((scanline->rightInterpolants[OVERLAY_LEFT_V] >> 8) & k_upperByteMask)
+						+ (scanline->rightInterpolants[OVERLAY_LEFT_U] >> k_fixedPointShift)];
 					ADD_SATURATED_565(overlayTexel, litTexel, rowStart[leftX - Toy2::g_screenClipLeft]);
 				}
 				else
@@ -2819,10 +2770,11 @@ namespace SoftwareRenderer
 
 					do
 					{
-						uint16_t texel = texture[((v >> 8) & k_upperByteMask) + (u >> 16)];
-						uint32_t litTexel = (uint16_t)(g_greenRampFull[((texel >> 5) & 0x3F) + (green >> 15)] + g_redRampFull[(texel >> 11) + (blue >> 16)]
-							+ g_blueRampFull[(texel & 0x1F) + (red >> 16)]);
-						uint32_t overlayTexel = overlay[((overlayV >> 8) & k_upperByteMask) + (overlayU >> 16)];
+						uint16_t texel = texture[((v >> 8) & k_upperByteMask) + (u >> k_fixedPointShift)];
+						uint32_t litTexel = (uint16_t)(g_greenRampFull[((texel >> 5) & 0x3F) + (green >> 15)]
+							+ g_redRampFull[(texel >> 11) + (blue >> k_fixedPointShift)]
+							+ g_blueRampFull[(texel & k_fiveBitChannelMask) + (red >> k_fixedPointShift)]);
+						uint32_t overlayTexel = overlay[((overlayV >> 8) & k_upperByteMask) + (overlayU >> k_fixedPointShift)];
 						ADD_SATURATED_565(overlayTexel, litTexel, *pixel);
 						pixel++;
 						v += vStep;
@@ -2913,11 +2865,11 @@ namespace SoftwareRenderer
 					int32_t remaining = width;
 					do
 					{
-						uint8_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+						uint8_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 						if (texel != 0)
 						{
-							uint8_t litTexel = g_paletteColourOffsetTable[colourOffsetIndex + texel * 0x200];
-							*destination = g_additivePaletteTable[*destination + litTexel * 0x100];
+							uint8_t litTexel = g_paletteColourOffsetTable[colourOffsetIndex + texel * PALETTE_COLOUR_OFFSET_STRIDE];
+							*destination = g_additivePaletteTable[*destination + litTexel * PALETTE_COMBINE_TABLE_STRIDE];
 						}
 						destination++;
 						rowU += uStep;
@@ -2936,9 +2888,9 @@ namespace SoftwareRenderer
 				int32_t remaining = rowWidth;
 				do
 				{
-					uint8_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					uint8_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 					if (texel != 0)
-						*destination = g_additivePaletteTable[*destination + texel * 0x100];
+						*destination = g_additivePaletteTable[*destination + texel * PALETTE_COMBINE_TABLE_STRIDE];
 					destination++;
 					rowU += uStep;
 					remaining--;
@@ -2960,11 +2912,11 @@ namespace SoftwareRenderer
 					int32_t remaining = width;
 					do
 					{
-						uint8_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+						uint8_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 						if (texel != 0)
 						{
-							uint8_t litTexel = g_paletteColourOffsetTable[colourOffsetIndex + texel * 0x200];
-							*destination = g_subtractivePaletteTable[*destination * 0x100 + litTexel];
+							uint8_t litTexel = g_paletteColourOffsetTable[colourOffsetIndex + texel * PALETTE_COLOUR_OFFSET_STRIDE];
+							*destination = g_subtractivePaletteTable[*destination * PALETTE_COMBINE_TABLE_STRIDE + litTexel];
 						}
 						destination++;
 						rowU += uStep;
@@ -2983,9 +2935,9 @@ namespace SoftwareRenderer
 				int32_t remaining = rowWidth;
 				do
 				{
-					uint8_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					uint8_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 					if (texel != 0)
-						*destination = g_subtractivePaletteTable[texel + *destination * 0x100];
+						*destination = g_subtractivePaletteTable[texel + *destination * PALETTE_COMBINE_TABLE_STRIDE];
 					destination++;
 					rowU += uStep;
 					remaining--;
@@ -3007,11 +2959,11 @@ namespace SoftwareRenderer
 					int32_t remaining = width;
 					do
 					{
-						uint8_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+						uint8_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 						if (texel != 0)
 						{
-							uint8_t litTexel = g_paletteColourOffsetTable[colourOffsetIndex + texel * 0x200];
-							*destination = g_paletteBlend50Table[*destination + litTexel * 0x100];
+							uint8_t litTexel = g_paletteColourOffsetTable[colourOffsetIndex + texel * PALETTE_COLOUR_OFFSET_STRIDE];
+							*destination = g_paletteBlend50Table[*destination + litTexel * PALETTE_COMBINE_TABLE_STRIDE];
 						}
 						destination++;
 						rowU += uStep;
@@ -3030,9 +2982,9 @@ namespace SoftwareRenderer
 				int32_t remaining = rowWidth;
 				do
 				{
-					uint8_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					uint8_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 					if (texel != 0)
-						*destination = g_paletteBlend50Table[*destination + texel * 0x100];
+						*destination = g_paletteBlend50Table[*destination + texel * PALETTE_COMBINE_TABLE_STRIDE];
 					destination++;
 					rowU += uStep;
 					remaining--;
@@ -3052,9 +3004,9 @@ namespace SoftwareRenderer
 				int32_t rowU = u;
 				do
 				{
-					uint8_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+					uint8_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 					if (texel != 0)
-						*destination = g_paletteColourOffsetTable[colourOffsetIndex + texel * 0x200];
+						*destination = g_paletteColourOffsetTable[colourOffsetIndex + texel * PALETTE_COLOUR_OFFSET_STRIDE];
 					destination++;
 					rowU += uStep;
 					remaining--;
@@ -3072,7 +3024,7 @@ namespace SoftwareRenderer
 			int32_t rowU = u;
 			do
 			{
-				uint8_t texel = texture[(rowU >> 16) + ((v >> 16) & 0xFF) * 0x100];
+				uint8_t texel = texture[(rowU >> k_fixedPointShift) + ((v >> k_fixedPointShift) & k_textureCoordinateMax) * k_textureDimension];
 				if (texel != 0)
 					*destination = texel;
 				destination++;
@@ -3084,14 +3036,6 @@ namespace SoftwareRenderer
 			height--;
 		} while (height != 0);
 	}
-	// Edge X values carry 10 fraction bits; the half unit centres a span on its pixel.
-	enum
-	{
-		SOLID_EDGE_X_FRACTION_BITS = 10,
-		SOLID_EDGE_X_ONE = 1 << SOLID_EDGE_X_FRACTION_BITS,
-		SOLID_EDGE_X_HALF = SOLID_EDGE_X_ONE / 2
-	};
-
 	// FUNCTION: TOY2 0x004776C0 [PROVISIONAL]
 	void RasterizeSolidQuad8(const PointI* point0, const PointI* point1, const PointI* point2, const PointI* point3, uint32_t colourPair)
 	{
@@ -3372,8 +3316,8 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX != rightX)
 					{
 						int32_t width = rightX - leftX;
@@ -3385,7 +3329,7 @@ namespace SoftwareRenderer
 
 						for (; pixelCount > 0; pixelCount--)
 						{
-							uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+							uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 							if (texel != 0x3E0)
 							{
 								*pixel = (*pixel & 0x7BDE) / 2 + (*pixel & 0x739C) / 4 + (texel & 0x739C) / 4;
@@ -3407,8 +3351,8 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX != rightX)
 				{
 					int32_t width = rightX - leftX;
@@ -3420,7 +3364,7 @@ namespace SoftwareRenderer
 
 					for (; pixelCount > 0; pixelCount--)
 					{
-						uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+						uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 						*pixel = (*pixel & 0x7BDE) / 2 + (*pixel & 0x739C) / 4 + (texel & 0x739C) / 4;
 						u += uStep;
 						v += vStep;
@@ -3577,8 +3521,8 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX != rightX)
 					{
 						int32_t width = rightX - leftX;
@@ -3611,9 +3555,9 @@ namespace SoftwareRenderer
 
 						for (; pixelCount > 0; pixelCount--)
 						{
-							uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+							uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 							if (texel != 0x3E0)
-								*pixel = (*pixel >> 1 & 0x3DEF) + (texel >> 1 & 0x3DEF);
+								*pixel = (*pixel >> 1 & RGB555_HALF_MASK) + (texel >> 1 & RGB555_HALF_MASK);
 							u += uStep;
 							v += vStep;
 							pixel++;
@@ -3631,8 +3575,8 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX != rightX)
 				{
 					int32_t width = rightX - leftX;
@@ -3665,8 +3609,8 @@ namespace SoftwareRenderer
 
 					for (; pixelCount > 0; pixelCount--)
 					{
-						uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
-						*pixel = (*pixel >> 1 & 0x3DEF) + (texel >> 1 & 0x3DEF);
+						uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
+						*pixel = (*pixel >> 1 & RGB555_HALF_MASK) + (texel >> 1 & RGB555_HALF_MASK);
 						u += uStep;
 						v += vStep;
 						pixel++;
@@ -3822,8 +3766,8 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX != rightX)
 					{
 						int32_t width = rightX - leftX;
@@ -3835,7 +3779,7 @@ namespace SoftwareRenderer
 
 						for (; pixelCount > 0; pixelCount--)
 						{
-							uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+							uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 							if (texel != 0x3E0)
 							{
 								*pixel = (texel & 0x7BDE) / 2 + (*pixel & 0x739C) / 4 + (texel & 0x739C) / 4;
@@ -3857,8 +3801,8 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX != rightX)
 				{
 					int32_t width = rightX - leftX;
@@ -3870,7 +3814,7 @@ namespace SoftwareRenderer
 
 					for (; pixelCount > 0; pixelCount--)
 					{
-						uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+						uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 						*pixel = (texel & 0x7BDE) / 2 + (*pixel & 0x739C) / 4 + (texel & 0x739C) / 4;
 						u += uStep;
 						v += vStep;
@@ -4027,11 +3971,11 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX == rightX)
 					{
-						uint16_t texel = texture[(scanline->leftInterpolants[0] >> 16) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
+						uint16_t texel = texture[(scanline->leftInterpolants[0] >> k_fixedPointShift) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
 						if (texel != 0x3E0)
 							rowStart[leftX - Toy2::g_screenClipLeft] = texel;
 					}
@@ -4064,7 +4008,7 @@ namespace SoftwareRenderer
 
 						do
 						{
-							uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+							uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 							if (texel != 0x3E0)
 								*pixel = texel;
 							u += uStep;
@@ -4085,12 +4029,12 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX == rightX)
 				{
 					rowStart[leftX - Toy2::g_screenClipLeft] =
-						texture[(scanline->leftInterpolants[0] >> 16) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
+						texture[(scanline->leftInterpolants[0] >> k_fixedPointShift) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
 				}
 				else
 				{
@@ -4122,7 +4066,7 @@ namespace SoftwareRenderer
 
 					do
 					{
-						*pixel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+						*pixel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 						u += uStep;
 						v += vStep;
 						pixelCount--;
@@ -4186,11 +4130,11 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX == rightX)
 				{
-					uint16_t texel = texture[(scanline->leftInterpolants[0] >> 16) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
+					uint16_t texel = texture[(scanline->leftInterpolants[0] >> k_fixedPointShift) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
 					if (texel != 0x3E0)
 					{
 						uint16_t& pixel = rowStart[leftX - Toy2::g_screenClipLeft];
@@ -4235,7 +4179,7 @@ namespace SoftwareRenderer
 
 					do
 					{
-						uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+						uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 						if (texel != 0x3E0)
 						{
 							int32_t red = (*pixel & 0x7C00) + (texel & 0x7C00);
@@ -4312,11 +4256,11 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX == rightX)
 				{
-					uint16_t texel = texture[(scanline->leftInterpolants[0] >> 16) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
+					uint16_t texel = texture[(scanline->leftInterpolants[0] >> k_fixedPointShift) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
 					if (texel != 0x3E0)
 					{
 						uint16_t& pixel = rowStart[leftX - Toy2::g_screenClipLeft];
@@ -4361,7 +4305,7 @@ namespace SoftwareRenderer
 
 					do
 					{
-						uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+						uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 						if (texel != 0x3E0)
 						{
 							int32_t red = (*pixel & 0x7C00) - (texel & 0x7C00);
@@ -4440,11 +4384,11 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX == rightX)
 					{
-						uint16_t texel = texture[(scanline->leftInterpolants[0] >> 16) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
+						uint16_t texel = texture[(scanline->leftInterpolants[0] >> k_fixedPointShift) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
 						if (texel != 0x7C0)
 							rowStart[leftX - Toy2::g_screenClipLeft] = texel;
 					}
@@ -4477,7 +4421,7 @@ namespace SoftwareRenderer
 
 						do
 						{
-							uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+							uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 							if (texel != 0x7C0)
 								*pixel = texel;
 							u += uStep;
@@ -4498,12 +4442,12 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX == rightX)
 				{
 					rowStart[leftX - Toy2::g_screenClipLeft] =
-						texture[(scanline->leftInterpolants[0] >> 16) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
+						texture[(scanline->leftInterpolants[0] >> k_fixedPointShift) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
 				}
 				else
 				{
@@ -4535,7 +4479,7 @@ namespace SoftwareRenderer
 
 					do
 					{
-						*pixel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+						*pixel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 						u += uStep;
 						v += vStep;
 						pixelCount--;
@@ -4601,8 +4545,8 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX != rightX)
 					{
 						int32_t width = rightX - leftX;
@@ -4614,7 +4558,7 @@ namespace SoftwareRenderer
 
 						for (; pixelCount > 0; pixelCount--)
 						{
-							uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+							uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 							if (texel != 0x7C0)
 							{
 								*pixel = (*pixel >> 2 & 0x39E7) + (texel & 0xE79C) / 4 + (*pixel & 0xF7DE) / 2;
@@ -4636,8 +4580,8 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX != rightX)
 				{
 					int32_t width = rightX - leftX;
@@ -4649,7 +4593,7 @@ namespace SoftwareRenderer
 
 					for (; pixelCount > 0; pixelCount--)
 					{
-						uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+						uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 						*pixel = (*pixel >> 2 & 0x39E7) + (texel & 0xE79C) / 4 + (*pixel & 0xF7DE) / 2;
 						u += uStep;
 						v += vStep;
@@ -4715,8 +4659,8 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX != rightX)
 					{
 						int32_t width = rightX - leftX;
@@ -4728,9 +4672,9 @@ namespace SoftwareRenderer
 
 						for (; pixelCount > 0; pixelCount--)
 						{
-							uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+							uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 							if (texel != 0x7C0)
-								*pixel = (*pixel >> 1 & 0x7BEF) + (texel >> 1 & 0x7BEF);
+								*pixel = (*pixel >> 1 & RGB565_HALF_MASK) + (texel >> 1 & RGB565_HALF_MASK);
 							u += uStep;
 							v += vStep;
 							pixel++;
@@ -4748,8 +4692,8 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX != rightX)
 				{
 					int32_t width = rightX - leftX;
@@ -4761,7 +4705,7 @@ namespace SoftwareRenderer
 
 					for (; pixelCount > 0; pixelCount--)
 					{
-						uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+						uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 						*pixel = (*pixel >> 1 & 0x7BCF) + (texel >> 1 & 0x7BCF);
 						u += uStep;
 						v += vStep;
@@ -4825,11 +4769,11 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX == rightX)
 				{
-					uint16_t texel = texture[(scanline->leftInterpolants[0] >> 16) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
+					uint16_t texel = texture[(scanline->leftInterpolants[0] >> k_fixedPointShift) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
 					if (texel != 0x7C0)
 					{
 						uint16_t& pixel = rowStart[leftX - Toy2::g_screenClipLeft];
@@ -4874,7 +4818,7 @@ namespace SoftwareRenderer
 
 					do
 					{
-						uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+						uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 						if (texel != 0x7C0)
 						{
 							int32_t red = (*pixel & 0xF800) - (texel & 0xF800);
@@ -4951,11 +4895,11 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX == rightX)
 				{
-					uint16_t texel = texture[(scanline->leftInterpolants[0] >> 16) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
+					uint16_t texel = texture[(scanline->leftInterpolants[0] >> k_fixedPointShift) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
 					if (texel != 0x7C0)
 					{
 						uint16_t& pixel = rowStart[leftX - Toy2::g_screenClipLeft];
@@ -5000,7 +4944,7 @@ namespace SoftwareRenderer
 
 					do
 					{
-						uint16_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+						uint16_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 						if (texel != 0x7C0)
 						{
 							int32_t red = (*pixel & 0xF800) + (texel & 0xF800);
@@ -5077,15 +5021,15 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX == rightX)
 				{
-					uint8_t texel = texture[(scanline->leftInterpolants[0] >> 16) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
+					uint8_t texel = texture[(scanline->leftInterpolants[0] >> k_fixedPointShift) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
 					if (texel != 0)
 					{
 						uint8_t& pixel = rowStart[leftX - Toy2::g_screenClipLeft];
-						pixel = g_additivePaletteTable[texel + pixel * 0x100];
+						pixel = g_additivePaletteTable[texel + pixel * PALETTE_COMBINE_TABLE_STRIDE];
 					}
 				}
 				else
@@ -5117,9 +5061,9 @@ namespace SoftwareRenderer
 
 					do
 					{
-						uint8_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+						uint8_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 						if (texel != 0)
-							*pixel = g_additivePaletteTable[texel + *pixel * 0x100];
+							*pixel = g_additivePaletteTable[texel + *pixel * PALETTE_COMBINE_TABLE_STRIDE];
 						u += uStep;
 						v += vStep;
 						pixel++;
@@ -5182,15 +5126,15 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX == rightX)
 				{
-					uint8_t texel = texture[(scanline->leftInterpolants[0] >> 16) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
+					uint8_t texel = texture[(scanline->leftInterpolants[0] >> k_fixedPointShift) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
 					if (texel != 0)
 					{
 						uint8_t& pixel = rowStart[leftX - Toy2::g_screenClipLeft];
-						pixel = g_subtractivePaletteTable[texel + pixel * 0x100];
+						pixel = g_subtractivePaletteTable[texel + pixel * PALETTE_COMBINE_TABLE_STRIDE];
 					}
 				}
 				else
@@ -5222,9 +5166,9 @@ namespace SoftwareRenderer
 
 					do
 					{
-						uint8_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+						uint8_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 						if (texel != 0)
-							*pixel = g_subtractivePaletteTable[texel + *pixel * 0x100];
+							*pixel = g_subtractivePaletteTable[texel + *pixel * PALETTE_COMBINE_TABLE_STRIDE];
 						u += uStep;
 						v += vStep;
 						pixel++;
@@ -5290,11 +5234,11 @@ namespace SoftwareRenderer
 			{
 				if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 				{
-					int32_t leftX = scanline->leftXFixed >> 10;
-					int32_t rightX = scanline->rightXFixed >> 10;
+					int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+					int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 					if (leftX == rightX)
 					{
-						uint8_t texel = texture[(scanline->leftInterpolants[0] >> 16) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
+						uint8_t texel = texture[(scanline->leftInterpolants[0] >> k_fixedPointShift) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
 						if (texel != 0)
 							rowStart[leftX - Toy2::g_screenClipLeft] = texel;
 					}
@@ -5327,7 +5271,7 @@ namespace SoftwareRenderer
 
 						do
 						{
-							uint8_t texel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+							uint8_t texel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 							if (texel != 0)
 								*pixel = texel;
 							u += uStep;
@@ -5348,12 +5292,12 @@ namespace SoftwareRenderer
 		{
 			if (scanline->populated != 0 && scanline->leftXFixed <= Toy2::g_screenClipRightFixed && scanline->rightXFixed >= Toy2::g_screenClipLeftFixed)
 			{
-				int32_t leftX = scanline->leftXFixed >> 10;
-				int32_t rightX = scanline->rightXFixed >> 10;
+				int32_t leftX = scanline->leftXFixed >> SOLID_EDGE_X_FRACTION_BITS;
+				int32_t rightX = scanline->rightXFixed >> SOLID_EDGE_X_FRACTION_BITS;
 				if (leftX == rightX)
 				{
 					rowStart[leftX - Toy2::g_screenClipLeft] =
-						texture[(scanline->leftInterpolants[0] >> 16) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
+						texture[(scanline->leftInterpolants[0] >> k_fixedPointShift) + (scanline->leftInterpolants[1] >> 8 & 0xFFFFFF00)];
 				}
 				else
 				{
@@ -5385,7 +5329,7 @@ namespace SoftwareRenderer
 
 					do
 					{
-						*pixel = texture[(u >> 16) + (v >> 8 & 0xFFFFFF00)];
+						*pixel = texture[(u >> k_fixedPointShift) + (v >> 8 & 0xFFFFFF00)];
 						u += uStep;
 						v += vStep;
 						pixelCount--;
@@ -5411,13 +5355,6 @@ namespace SoftwareRenderer
 // Index into g_paletteColourOffsetTable of one interpolated colour, before the texel row.
 #define PALETTE_COLOUR_OFFSET(blue, green, red) (((blue) >> 12 & ~0x3F) + ((green) >> 15 & ~7) + ((red) >> 18))
 
-	// The palette combine tables are square: one row for each destination colour, and the
-	// colour offset table holds a light level pair for each texel.
-	enum
-	{
-		PALETTE_COMBINE_TABLE_STRIDE = 0x100,
-		PALETTE_COLOUR_OFFSET_STRIDE = 0x200
-	};
 	// The 8-bit form of UnkRenderAPI13 (RGB555) and UnkRenderAPI25 (RGB565). It lights the
 	// texel through g_paletteColourOffsetTable and combines the overlay through the palette
 	// blend tables, so the three edge walks and the four span modes are the same.
@@ -5425,6 +5362,7 @@ namespace SoftwareRenderer
 	// retail-duplicate: retail writes the left clip span setup into each span loop; RasterizeBlend75TexturedPolygon555 (0x0045B0B0) holds the RGB555 form.
 	// retail-duplicate: retail writes the row advance and the lit span setup into each renderer; UnkRenderAPI13 (0x0045E390) holds the RGB555 form.
 	// retail-duplicate: retail writes the row advance and the additive span setup into each renderer; UnkRenderAPI13 (0x0045E390) holds the RGB555 form.
+	// retail-duplicate: retail writes the blend 50 span setup into each renderer; UnkRenderAPI13 (0x0045E390) holds the RGB555 form.
 	// FUNCTION: TOY2 0x00477EB0 [PROVISIONAL]
 	void UnkRenderAPI34(SoftwareRenderItem* item)
 	{
