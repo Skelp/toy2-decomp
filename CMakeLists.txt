@@ -183,6 +183,10 @@ set(TOY2_SOURCES
     src/Toy2/Buzz.h
     src/Toy2/BuzzAnimationEvents.inc
     src/Toy2/BuzzAnimationStates.inc
+    src/Toy2/Subtitles.cpp
+    src/Toy2/BoneAttachment.cpp
+    src/Toy2/Lighting.cpp
+    src/Toy2/QuestRewards.cpp
     src/Toy2/Actor.cpp
     src/Toy2/ActorParticles.cpp
     src/Toy2/Actor.h

@@ -256,6 +256,18 @@ namespace Toy2
 		void Tick();
 	}
 
+	// State that Actor.cpp holds and the objects split out of it read.
+	namespace Dialogue
+	{
+		extern char g_continuePrompt[];
+	}
+
+	namespace Lighting
+	{
+		extern int32_t g_lightBlendTimer;
+		extern int32_t g_selectedLightIndex;
+	}
+
 	// The measured processor clock: SwitchGraphics.cpp holds it with the profile it
 	// feeds, and Toy2.cpp reads it when it reports the machine.
 	extern uint32_t g_cpuClockHz;
