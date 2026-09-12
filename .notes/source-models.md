@@ -214,3 +214,20 @@ needs immediately above the earliest function that uses them and leave the
 rest of the block alone. The same move in SoftwareRenderer.cpp (`34fa172`) and
 AudioManager.cpp (`6a2c5c3`) changed no score, so the effect is not general;
 check every function of the file after any declaration move.
+
+## SoftwareRenderer.cpp macros do not cross a retail band
+
+Measured on `f7feb1a`, before planning the renderer split. The file defines 34
+object- and function-like macros. Counting users transitively, so a macro used
+only inside another macro's body inherits that macro's functions, every macro
+has all of its users inside one of the three address bands that hold 94 of the
+123 functions:
+
+- 32 macros belong to 0x00454D30-0x00477EB0, the rasterizer band.
+- TOY2_BUILD_COLOUR_SCALE_TABLE belongs to 0x004BC900-0x004C1FC0.
+- NU_FMIN sits outside all three and is already `#undef`ed beside its one use.
+
+No macro has users in two bands, so a split needs no `*Internal.h` for the
+macros: each band takes its own macros with it. Count the users transitively or
+the answer is wrong: a scan that skips `#define` lines reports
+BLEND25_LIT_TEXEL_555 as dead, and it is used by WRITE_BLEND25_TEXEL_555.
