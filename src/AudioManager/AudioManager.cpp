@@ -2069,10 +2069,20 @@ namespace AudioManager
 		return status;
 	}
 
+	enum
+	{
+		WAVE_NAME_LENGTH = 256,
+		SOUND_BUFFER_COUNT = 768,
+		LOOPING_SOUND_CHANNEL_COUNT = 32,
+		MAX_SFX_LEVEL_ID = 16,
+		SOUND_VOLUME_MAX = 128,
+		SFX_VOLUME_SCALE = 256,
+	};
+
 	// FUNCTION: TOY2 0x0047DE50 [PROVISIONAL]
 	int32_t PlaySoundBuffer(int32_t soundIndex, int32_t leftVolume, int32_t rightVolume, void* owner, int32_t unused, int32_t looping)
 	{
-		char waveName[256];
+		char waveName[WAVE_NAME_LENGTH];
 		DWORD status;
 		if (g_audioInitialized != 0)
 		{
@@ -2080,6 +2090,8 @@ namespace AudioManager
 			if (g_loopingSoundOwners[firstBuffer] != NULL)
 			{
 				g_dsResult = g_dsBuffers[firstBuffer]->GetStatus(&status);
+				// A lost buffer means the device was reset. Release every buffer and
+				// load the sound packs of the current level again.
 				if ((status & DSBSTATUS_BUFFERLOST) != 0)
 				{
 					int32_t bufferIndex = firstBuffer & SOUND_BUFFER_GROUP_MASK;
@@ -2093,8 +2105,8 @@ namespace AudioManager
 						}
 					}
 
-					int32_t levelId = g_currentSfxLevelId;
 					g_loadedSfxPackIndex = firstBuffer / 8;
+					int32_t levelId = g_currentSfxLevelId;
 					if (g_audioInitialized != 0)
 					{
 						if (IsStreamActive())
@@ -2107,7 +2119,7 @@ namespace AudioManager
 						if (g_audioInitialized != 0)
 						{
 							int32_t i;
-							for (i = 767; i >= 0; i--)
+							for (i = SOUND_BUFFER_COUNT - 1; i >= 0; i--)
 							{
 								if (g_dsBuffers[i] != NULL)
 								{
@@ -2130,15 +2142,15 @@ namespace AudioManager
 									g_loopingSoundOwners[i] = NULL;
 								}
 							}
-							for (i = 0; i < 768; i++)
+							for (i = 0; i < SOUND_BUFFER_COUNT; i++)
 							{
 								g_dsBuffers[i] = NULL;
 							}
-							for (i = 0; i < 768; i++)
+							for (i = 0; i < SOUND_BUFFER_COUNT; i++)
 							{
 								g_loopingSoundOwners[i] = NULL;
 							}
-							for (i = 0; i < 32; i++)
+							for (i = 0; i < LOOPING_SOUND_CHANNEL_COUNT; i++)
 							{
 								g_loopingSoundChannels[i][0] = -1;
 								g_loopingSoundChannels[i][1] = -1;
@@ -2162,7 +2174,7 @@ namespace AudioManager
 
 					if (levelId > 0)
 					{
-						if (levelId <= 16)
+						if (levelId <= MAX_SFX_LEVEL_ID)
 						{
 							pack = &g_primarySoundPacks[levelId];
 							soundName = pack->soundNames;
@@ -2179,7 +2191,7 @@ namespace AudioManager
 							}
 						}
 
-						if (levelId <= 16)
+						if (levelId <= MAX_SFX_LEVEL_ID)
 						{
 							pack = &g_secondarySoundPacks[levelId];
 							soundName = pack->soundNames;
@@ -2201,8 +2213,10 @@ namespace AudioManager
 					g_loadedSfxPackIndex = -1;
 				}
 
-				uint16_t frequency = g_soundFreqTable[soundIndex];
-				int32_t pan = (rightVolume - leftVolume) * 10000 / 128;
+				DWORD oldestPlayCursor = 0;
+				int32_t oldestBuffer = -1;
+				DWORD frequency = g_soundFreqTable[soundIndex];
+				int32_t pan = (rightVolume - leftVolume) * DSBPAN_RIGHT / SOUND_VOLUME_MAX;
 				if (pan > DSBPAN_RIGHT)
 				{
 					pan = DSBPAN_RIGHT;
@@ -2217,15 +2231,15 @@ namespace AudioManager
 				{
 					volume = leftVolume;
 				}
-				volume = g_dsVolTable[g_sfxVolume * volume / 256];
+				volume = g_dsVolTable[g_sfxVolume * volume / SFX_VOLUME_SCALE];
 
 				if (owner != NULL)
 				{
 					for (int32_t i = 0; i < 6; i++)
 					{
-						int32_t bufferIndex = firstBuffer + i;
-						if (g_loopingSoundOwners[bufferIndex] == owner)
+						if (g_loopingSoundOwners[firstBuffer + i] == owner)
 						{
+							int32_t bufferIndex = firstBuffer + i;
 							g_dsResult = g_dsBuffers[bufferIndex]->GetCurrentPosition(&g_soundPlayCursor, &g_soundWriteCursor);
 							if (g_dsResult == DS_OK)
 							{
@@ -2253,11 +2267,9 @@ namespace AudioManager
 					owner = (void*)1;
 				}
 
-				DWORD oldestPlayCursor = 0;
-				int32_t oldestBuffer = -1;
+				int32_t bufferIndex = firstBuffer;
 				for (int32_t i = 0; i < 6; i++)
 				{
-					int32_t bufferIndex = firstBuffer + i;
 					if (g_loopingSoundOwners[bufferIndex] != NULL)
 					{
 						g_dsResult = g_dsBuffers[bufferIndex]->GetCurrentPosition(&g_soundPlayCursor, &g_soundWriteCursor);
@@ -2280,15 +2292,17 @@ namespace AudioManager
 								g_loopingSoundOwners[bufferIndex] = owner;
 								return bufferIndex;
 							}
-							if (g_soundPlayCursor > oldestPlayCursor)
+							if (oldestPlayCursor < g_soundPlayCursor)
 							{
 								oldestPlayCursor = g_soundPlayCursor;
 								oldestBuffer = bufferIndex;
 							}
 						}
 					}
+					bufferIndex++;
 				}
 
+				// No free buffer: reuse the one that has played for the longest time.
 				if (oldestBuffer != -1)
 				{
 					g_dsBuffers[oldestBuffer]->SetFrequency(frequency);
