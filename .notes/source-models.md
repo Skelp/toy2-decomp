@@ -373,3 +373,37 @@ the score of every already-matched function of a band before moving it.
 This also supports the reading above: the toy2.cpp object really was one large
 shell, and its own functions have to stay together even while the subsystems it
 includes move out.
+
+## An exact function can pin itself while its band moves
+
+`de6ffed`, the sweep solver split. Five `Toy2::Collision` functions of the run
+0x00481140-0x00483EF0 moved; `Nu3D::Collision::IsPointInTriangle`, which sits in
+the same run, stayed and held its exact match. Moving it cost 100% to 83.33% on
+register allocation alone, the effect the profile abort recorded, and the
+different namespace already said it could be a second file inside one object.
+
+So a run does not have to move whole. Split it by namespace, check each exact
+function, and leave behind the ones a smaller unit would cost. Note the reason in
+the file header so the next writer does not "finish" the move.
+
+Aborted with it: the rest of the Collision.cpp run 0x00485680-0x00486310.
+`GatherTrianglesAtXZ` needs the whole private `Toy2::Terrain` record block, and
+moving that block would perturb the 36-function main run that holds 23 exact
+functions. Only the two `Toy2::Shadow` functions could move safely, about 110
+lines, which does not earn a unit yet.
+
+## A file with a shared private view needs its *Internal.h first
+
+`30fd420`, Buzz.cpp. The movement band needed 95 declarations from the file it
+left: the action state flags, the block masks, two level records and 21 pieces of
+movement state. Counting them first and generating `BuzzInternal.h` in one step
+was much faster than compiling to find them one error at a time. Method:
+
+1. Parse the file for namespace-scope declarations with the block parser.
+2. Keep the ones whose name appears in the moved text.
+3. Constants and enums move to the header, definitions stay and gain an `extern`.
+4. Watch the namespace of each one. The Buzz globals are declared in `Toy2`, not
+   `Toy2::Buzz`, and externs at the wrong depth link-fail rather than compile-fail.
+
+Toy2.cpp, Collision.cpp and Buzz.cpp all needed such a header. Write it in the
+first split of a file, not the third.
