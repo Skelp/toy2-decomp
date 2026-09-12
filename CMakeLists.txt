@@ -78,7 +78,12 @@ set(TOY2_SOURCES
     src/Random.cpp
 
     src/SoftwareRenderer.cpp
+    src/SoftwareRenderer555.cpp
+    src/SoftwareRenderer565.cpp
+    src/SoftwareRendererPalette.cpp
+    src/SoftwareRenderer8.cpp
     src/SoftwareRendererInternal.h
+    src/SoftwareRendererSpans.h
     src/SoftwareDeviceRaster.cpp
     src/SoftwareBackdrop.cpp
     src/SoftwareBackBuffer.cpp

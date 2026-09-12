@@ -77,6 +77,46 @@ namespace SoftwareRenderer
 	STATIC_ASSERT(offsetof(RenderCommand, texData) == 0x80);
 	STATIC_ASSERT(offsetof(RenderCommand, next) == 0x8c);
 	STATIC_ASSERT(offsetof(RenderCommand, useAlternateSpans) == 0x94);
+
+	// The rasterizer entry points of every pixel format. Retail holds one object for
+	// each format, and the three dispatch tables of SoftwareRenderer.cpp name all of
+	// them, so the file that holds the tables needs every format's names.
+	void RasterizeTexturedRect555(SoftwareRenderItem* item);
+	void RasterizeTexturedPolygon555(SoftwareRenderItem* item);
+	void RasterizeAdditiveTexturedPolygon555(SoftwareRenderItem* item);
+	void RasterizeSubtractiveTexturedPolygon555(SoftwareRenderItem* item);
+	void RasterizeBlend25TexturedPolygon555(SoftwareRenderItem* item);
+	void RasterizeBlend50TexturedPolygon555(SoftwareRenderItem* item);
+	void RasterizeBlend75TexturedPolygon555(SoftwareRenderItem* item);
+	void UnkRenderAPI5(SoftwareRenderItem* item);
+	void UnkRenderAPI6(SoftwareRenderItem* item);
+	void UnkRenderAPI7(SoftwareRenderItem* item);
+	void UnkRenderAPI8(SoftwareRenderItem* item);
+	void UnkRenderAPI13(SoftwareRenderItem* item);
+
+	void RasterizeTexturedRect565(SoftwareRenderItem* item);
+	void RasterizeTexturedPolygon565(SoftwareRenderItem* item);
+	void RasterizeAdditiveTexturedPolygon565(SoftwareRenderItem* item);
+	void RasterizeSubtractiveTexturedPolygon565(SoftwareRenderItem* item);
+	void RasterizeBlend25TexturedPolygon565(SoftwareRenderItem* item);
+	void RasterizeBlend50TexturedPolygon565(SoftwareRenderItem* item);
+	void RasterizeSolidQuad16(const PointI* point0, const PointI* point1, const PointI* point2, const PointI* point3, uint32_t colourPair);
+	void UnkRenderAPI17(SoftwareRenderItem* item);
+	void UnkRenderAPI18(SoftwareRenderItem* item);
+	void UnkRenderAPI19(SoftwareRenderItem* item);
+	void UnkRenderAPI20(SoftwareRenderItem* item);
+	void UnkRenderAPI24(SoftwareRenderItem* item);
+	void UnkRenderAPI25(SoftwareRenderItem* item);
+
+	void RasterizeTexturedRect8(SoftwareRenderItem* item);
+	void RasterizeTexturedPolygon8(SoftwareRenderItem* item);
+	void RasterizeAdditiveTexturedPolygon8(SoftwareRenderItem* item);
+	void RasterizeSubtractiveTexturedPolygon8(SoftwareRenderItem* item);
+	void RasterizeSolidQuad8(const PointI* point0, const PointI* point1, const PointI* point2, const PointI* point3, uint32_t colourPair);
+	void UnkRenderAPI30(SoftwareRenderItem* item);
+	void UnkRenderAPI31(SoftwareRenderItem* item);
+	void UnkRenderAPI33(SoftwareRenderItem* item);
+	void UnkRenderAPI34(SoftwareRenderItem* item);
 }
 
 #endif
