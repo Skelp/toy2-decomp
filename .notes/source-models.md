@@ -299,3 +299,51 @@ object order. Decide that before moving anything, because the span holds about
 44 KB of code. The three unmapped DevDraw functions inside it (0x490EE0,
 0x491F20, 0x492F70) have to be mapped first, or the contiguity test runs on
 incomplete data.
+
+## The retail link kept object order: proof, and what it does not settle
+
+Measured on `780bc48`. The retail binary quotes nine source paths. Each path's
+assert sites form one address interval, and the nine intervals do not cross:
+
+```
+direct6.cpp 0x412B8A-0x412BBE < modesel.cpp 0x4333DA < toy2.cpp 0x490AC7-0x49BB3F
+< Win95.cpp 0x4A64DE-0x4A657D < objcore.c 0x4B3024 < world.c 0x4C41AA-0x4C4285
+< hobjload.c 0x4CA3EA-0x4CA806 < objload.c 0x4CB398-0x4CCA13 < fmv.c 0x4DB67B-0x4DBB64
+```
+
+Zero crossings in eight adjacent pairs. So the linker placed each object as one
+contiguous block and did not interleave. **A run of `tools/decomp structure` is
+therefore an object boundary, and no source file crosses one.** Use that as a
+hard constraint when choosing a file for a function.
+
+It does **not** follow that one run is one source file. The toy2.cpp object spans
+0x4909E0-0x49BB3F, about 44 KB, and holds what we file as sprite rasterization,
+dev-draw vertex buffers, menu text, audio volume, save file IO, input polling and
+the main loop. Traveller's Tales did not write that as one file. An object holds
+several source files when a shell file includes them, or when the build compiles
+a group together. So:
+
+- Never merge functions into one file because they share a run.
+- Never keep a function in a file whose other functions sit in a different run.
+- Group inside a run by subsystem, which is what the reconstruction already does.
+
+`Toy2/Toy2.cpp` holds 35 runs, so it is at least 35 objects' worth of code. It has
+to shrink, one run at a time, and each run splits into one or more files.
+
+## A split that moves data hits the layout gate
+
+Campaign aborted on the 0x004398B0-0x0043A600 post-game run. Both ways regress:
+
+- Move the run's `.data` string tables with the code and the BSS that follows
+  them in Toy2.cpp shifts. 40-plus functions lose 0.3 to 13 points, all of it
+  unannotated displacement resolution: `mov word ptr [<OFFSET47>], bx` against
+  `mov word ptr [Toy2::HUD::g_slideAngles[3]], bx`. The instructions are the same.
+- Leave the tables behind and the six annotated strings at 0x004F5C9C-0x004F6860
+  lose 2,245 bytes of `.data` evidence, because the moved functions' own string
+  literals no longer sit beside them in the build's `.rdata`.
+
+Method for the next attempt: check `bc` for `header side effect` lines after the
+first build of a split. They name every function the new data layout moved. A
+split whose band owns only BSS, or only whole `.data` blocks with nothing of
+Toy2.cpp's between them, passes; the sector run (`780bc48`) moved ten BSS
+globals and cost nothing. Sort the band's globals by section before deciding.
