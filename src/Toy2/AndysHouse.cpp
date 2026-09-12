@@ -48,6 +48,12 @@ namespace Toy2
 			TIN_MAN_STATE_DEFEATED = 3,
 		};
 
+		// 12-bit angles, 0x1000 as the unit scale and world units of 32 link units are the
+		// Nu3D fixed-point conventions of this level.
+		const int32_t ANGLE_MASK = 0xFFF;
+		const int32_t SCALE_UNITY = 0x1000;
+		const int32_t WORLD_UNIT_SHIFT = 5;
+
 		struct LinkOrigin
 		{
 			Vector3I position;
@@ -281,7 +287,7 @@ namespace Toy2
 			Nu3D::Link::GetCurrentPosFixed(10, &g_horizontalLinkOrigins[0].position);
 			Nu3D::Link::GetCurrentPosFixed(16, &g_horizontalLinkOrigins[1].position);
 
-			Nu3D::Link::SetScaleFromFixedOffsets(21, 0, 0x1000, 0x1000);
+			Nu3D::Link::SetScaleFromFixedOffsets(21, 0, SCALE_UNITY, SCALE_UNITY);
 			Nu3D::Link::SnapToOtherLinkUsingScale(22, 21);
 			Platform::DisableCollision(8);
 			Platform::DisableCollision(14);
@@ -327,11 +333,11 @@ namespace Toy2
 					positionAngle = 0;
 				}
 
-				Nu3D::Link::SetRotationRelative8bit(linkId, 0, 0, rotationAngle & 0xFFF);
+				Nu3D::Link::SetRotationRelative8bit(linkId, 0, 0, rotationAngle & ANGLE_MASK);
 				Nu3D::Link::SetPositionRawAndCommit(linkId,
-					origin->position.x >> 5,
-					(origin->position.y >> 5) - (Numerics::g_sinCosLUT[(positionAngle + 0x400) & 0xFFF] >> 6) + 0x100,
-					origin->position.z >> 5);
+					origin->position.x >> WORLD_UNIT_SHIFT,
+					(origin->position.y >> WORLD_UNIT_SHIFT) - (Numerics::g_sinCosLUT[(positionAngle + 0x400) & ANGLE_MASK] >> 6) + 0x100,
+					origin->position.z >> WORLD_UNIT_SHIFT);
 			}
 		}
 
@@ -373,17 +379,23 @@ namespace Toy2
 					}
 				}
 
-				Nu3D::Link::SetRotationRelative8bit(linkId, 0, rotationAngle & 0xFFF, 0);
-				Nu3D::Link::SetScaleFromFixedOffsets(linkId, 0x1000, (Numerics::g_sinCosLUT[(scaleAngle + 0x400) & 0xFFF] >> 3) + 0xC00, 0x1000);
+				Nu3D::Link::SetRotationRelative8bit(linkId, 0, rotationAngle & ANGLE_MASK, 0);
+				Nu3D::Link::SetScaleFromFixedOffsets(linkId, SCALE_UNITY, (Numerics::g_sinCosLUT[(scaleAngle + 0x400) & ANGLE_MASK] >> 3) + 0xC00, SCALE_UNITY);
 			}
 		}
+
+		// A rolling toy stops in this phase once its bounce velocity is spent.
+		const int32_t TOY_ROLL_SETTLED_PHASE = 0x50;
+		// The launch pad throws Buzz along this heading.
+		const int32_t LAUNCH_PAD_YAW_ANGLE = 0x11E;
 
 		// FUNCTION: TOY2 0x00417680 [PROVISIONAL]
 		void Interactions()
 		{
+			Vector3I position;
 			if (Sector::g_activeSectorIndex == 1)
 			{
-				if (Actor::g_creatureActors[0].actorPhase != 0x50)
+				if (Actor::g_creatureActors[0].actorPhase != TOY_ROLL_SETTLED_PHASE)
 				{
 					Actor::g_creatureActors[0].creatureRam->defenseMode = 0;
 					g_firstToyRollVelocity += Renderer::g_frameDelta * 4;
@@ -394,25 +406,24 @@ namespace Toy2
 						g_firstToyRollVelocity = -(g_firstToyRollVelocity / 2);
 						AudioManager::PlaySoundEffect(0x32, &Actor::g_creatureActors[0].pos);
 						if (g_firstToyRollVelocity > -8)
-							Actor::g_creatureActors[0].actorPhase = 0x50;
+							Actor::g_creatureActors[0].actorPhase = TOY_ROLL_SETTLED_PHASE;
 					}
 				}
-				if (Actor::g_creatureActors[2].actorPhase != 0x50)
+				if (Actor::g_creatureActors[2].actorPhase != TOY_ROLL_SETTLED_PHASE)
 				{
 					Actor::g_creatureActors[2].creatureRam->defenseMode = 0;
 					g_secondToyRollVelocity += Renderer::g_frameDelta * 4;
-					Actor::g_creatureActors[2].rollAngle = (Actor::g_creatureActors[2].rollAngle - g_secondToyRollVelocity) & 0xFFF;
+					Actor::g_creatureActors[2].rollAngle = (Actor::g_creatureActors[2].rollAngle - g_secondToyRollVelocity) & ANGLE_MASK;
 					if (Actor::g_creatureActors[2].rollAngle < 0x900)
 					{
 						Actor::g_creatureActors[2].rollAngle = 0x900;
 						g_secondToyRollVelocity = -(g_secondToyRollVelocity / 2);
 						AudioManager::PlaySoundEffect(0x32, &Actor::g_creatureActors[2].pos);
 						if (g_secondToyRollVelocity > -8)
-							Actor::g_creatureActors[2].actorPhase = 0x50;
+							Actor::g_creatureActors[2].actorPhase = TOY_ROLL_SETTLED_PHASE;
 					}
 				}
-				if (Actor::g_creatureActors[0].creatureRam->defenseMode == 0
-					&& Actor::g_creatureActors[2].creatureRam->defenseMode == 0)
+				if (Actor::g_creatureActors[0].creatureRam->defenseMode == 0 && Actor::g_creatureActors[2].creatureRam->defenseMode == 0)
 				{
 					if (g_toyBoxLiftTimer == 0)
 					{
@@ -448,18 +459,17 @@ namespace Toy2
 					g_toyBoxLiftVelocity += Renderer::g_frameDelta * 0x10;
 					if (g_toyBoxLiftTimer <= 0)
 						g_toyBoxLiftTimer = -1;
-					Vector3I position;
 					Nu3D::Link::GetCurrentPosFixed(0x13, &position);
 					if (position.y > 0x11C00 && g_toyBoxLiftVelocity > 0)
 						g_toyBoxLiftVelocity = -(g_toyBoxLiftVelocity / 2);
 					position.y += g_toyBoxLiftVelocity * Renderer::g_frameDelta;
-					Nu3D::Link::SetPositionRawAndCommit(0x13, position.x >> 5, position.y >> 5, position.z >> 5);
+					Nu3D::Link::SetPositionRawAndCommit(0x13, position.x >> WORLD_UNIT_SHIFT, position.y >> WORLD_UNIT_SHIFT, position.z >> WORLD_UNIT_SHIFT);
 					Nu3D::Link::GetCurrentPosFixed(0x14, &position);
 					position.y += g_toyBoxLiftVelocity * Renderer::g_frameDelta;
-					Nu3D::Link::SetPositionRawAndCommit(0x14, position.x >> 5, position.y >> 5, position.z >> 5);
+					Nu3D::Link::SetPositionRawAndCommit(0x14, position.x >> WORLD_UNIT_SHIFT, position.y >> WORLD_UNIT_SHIFT, position.z >> WORLD_UNIT_SHIFT);
 					Nu3D::Link::GetCurrentPosFixed(0x1A, &position);
 					position.y = position.y * 4 + g_toyBoxLiftVelocity * Renderer::g_frameDelta;
-					Nu3D::Link::SetPositionRawAndCommit(0x1A, position.x >> 5, position.y >> 7, position.z >> 5);
+					Nu3D::Link::SetPositionRawAndCommit(0x1A, position.x >> WORLD_UNIT_SHIFT, position.y >> 7, position.z >> WORLD_UNIT_SHIFT);
 				}
 			}
 
@@ -485,36 +495,37 @@ namespace Toy2
 					g_retractablePlatformScale = 8;
 				}
 			}
-			else if (g_retractablePlatformScale < 0x1000)
+			else if (g_retractablePlatformScale < SCALE_UNITY)
 			{
 				g_retractablePlatformScale += Renderer::g_frameDelta * 0x40;
-				if (g_retractablePlatformScale > 0xFFF)
-					g_retractablePlatformScale = 0x1000;
-				Nu3D::Link::SetScaleFromFixedOffsets(0x15, g_retractablePlatformScale, 0x1000, 0x1000);
+				if (g_retractablePlatformScale > SCALE_UNITY - 1)
+					g_retractablePlatformScale = SCALE_UNITY;
+				Nu3D::Link::SetScaleFromFixedOffsets(0x15, g_retractablePlatformScale, SCALE_UNITY, SCALE_UNITY);
 				Nu3D::Link::SnapToOtherLinkUsingScale(0x16, 0x15);
 			}
 
 			if (Sector::g_activeSectorIndex == 4)
 			{
-				Vector3I effectPosition = { 0xB3E1A, 0x26720, -0x814C1 };
-				if (Nu3D::Math::IsWithinDistance(&effectPosition, &g_buzzActor.posAngles.pos, 0x280) != 0)
+				position.x = 0xB3E1A;
+				position.y = 0x26720;
+				position.z = -0x814C1;
+				if (Nu3D::Math::IsWithinDistance(&position, &g_buzzActor.posAngles.pos, 0x280) != 0)
 				{
 					// Spray one particle from the path origin toward a random path point every 64 ticks.
 					if (g_framePulseOutputs.sixtyFourTick != 0)
 					{
-						const int32_t PATH_TO_WORLD_SHIFT = 5;
 						const int32_t PATH_DELTA_SHIFT = 8;
 						const int32_t PARTICLE_VELOCITY_DIVISOR = 0x2000;
 						const int32_t PARTICLE_VERTICAL_DIVISOR = 64;
 						Levels::RecordData* path = Levels::g_recordData[0x16];
 						Vector3I* pathOrigin = path->data;
-						int32_t originX = pathOrigin->x << PATH_TO_WORLD_SHIFT;
-						int32_t originY = pathOrigin->y << PATH_TO_WORLD_SHIFT;
-						int32_t originZ = pathOrigin->z << PATH_TO_WORLD_SHIFT;
+						int32_t originX = pathOrigin->x << WORLD_UNIT_SHIFT;
+						int32_t originY = pathOrigin->y << WORLD_UNIT_SHIFT;
+						int32_t originZ = pathOrigin->z << WORLD_UNIT_SHIFT;
 						Vector3I* pathTarget = pathOrigin + g_ambientParticlePathPoint;
-						int32_t deltaX = (originX - (pathTarget->x << PATH_TO_WORLD_SHIFT)) >> PATH_DELTA_SHIFT;
-						int32_t deltaZ = (originZ - (pathTarget->z << PATH_TO_WORLD_SHIFT)) >> PATH_DELTA_SHIFT;
-						int32_t angle = (Nu3D::Math::CartesianToFixedAngle(deltaX, deltaZ) - 0x800) & 0xFFF;
+						int32_t deltaX = (originX - (pathTarget->x << WORLD_UNIT_SHIFT)) >> PATH_DELTA_SHIFT;
+						int32_t deltaZ = (originZ - (pathTarget->z << WORLD_UNIT_SHIFT)) >> PATH_DELTA_SHIFT;
+						int32_t angle = (Nu3D::Math::CartesianToFixedAngle(deltaX, deltaZ) - 0x800) & ANGLE_MASK;
 						int32_t distance = (int32_t)sqrt((double)(deltaX * deltaX + deltaZ * deltaZ));
 						int32_t speed = distance * 7 / 2;
 						int32_t verticalSpeed = -((distance << 12) / speed) * 0x80;
@@ -523,7 +534,7 @@ namespace Toy2
 							originZ,
 							Numerics::g_sinCosLUT[angle] * speed / PARTICLE_VELOCITY_DIVISOR,
 							verticalSpeed / PARTICLE_VERTICAL_DIVISOR,
-							Numerics::g_sinCosLUT[(angle + 0x400) & 0xFFF] * speed / PARTICLE_VELOCITY_DIVISOR,
+							Numerics::g_sinCosLUT[(angle + 0x400) & ANGLE_MASK] * speed / PARTICLE_VELOCITY_DIVISOR,
 							0x80,
 							0,
 							((int32_t)*g_randDatBufferPtr++ - 0x80) >> 2,
@@ -539,9 +550,9 @@ namespace Toy2
 						g_ambientParticlePositionIndex += 3;
 						if (g_ambientParticlePositionIndex == 9)
 							g_ambientParticlePositionIndex = 0;
-						Vector3I* position =
+						Vector3I* emitterPosition =
 							reinterpret_cast<Vector3I*>(reinterpret_cast<int32_t*>(g_ambientParticlePositions) + g_ambientParticlePositionIndex);
-						Nu3D::Particles::SpawnFromPreset(position->x, position->y - 0x800, position->z, 0x22, 2);
+						Nu3D::Particles::SpawnFromPreset(emitterPosition->x, emitterPosition->y - 0x800, emitterPosition->z, 0x22, 2);
 					}
 					for (int32_t i = 0; i < g_framePulseOutputs.twoTickCount; i++)
 					{
@@ -552,16 +563,17 @@ namespace Toy2
 						particle->lifetime = (*g_randDatBufferPtr++ & 0xF) + 0x20;
 					}
 				}
-				Vector3I hazardPosition = { 0xB74DC, 0x23F3E, -0x6634A };
-				int32_t hazardDistance = Nu3D::Math::IsWithinDistance(&hazardPosition, &g_buzzActor.posAngles.pos, 0x280);
+				position.x = 0xB74DC;
+				position.y = 0x23F3E;
+				position.z = -0x6634A;
+				int32_t hazardDistance = Nu3D::Math::IsWithinDistance(&position, &g_buzzActor.posAngles.pos, 0x280);
 				if (hazardDistance != 0)
 				{
 					if (hazardDistance < 900)
 						Buzz::HandleDamage(0, 2);
 					if (g_framePulseOutputs.eightTick != 0)
 					{
-						Nu3D::Particles::ParticleInstance* particle =
-							Nu3D::Particles::SpawnFromPreset(hazardPosition.x, hazardPosition.y, hazardPosition.z, 0x11, 10);
+						Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(position.x, position.y, position.z, 0x11, 10);
 						particle->rotSpeed = ((int32_t)*g_randDatBufferPtr++ - 0x80) >> 3;
 					}
 				}
@@ -617,15 +629,16 @@ namespace Toy2
 						g_polePosition.y = g_poleTargetHeight;
 					}
 					Levels::g_recordData[0x3D]->data[16].y = g_poleRecordHeightOffset + g_polePosition.y;
-					Nu3D::Link::SetPositionRawAndCommit(6, g_polePosition.x >> 5, g_polePosition.y >> 5, g_polePosition.z >> 5);
+					Nu3D::Link::SetPositionRawAndCommit(
+						6, g_polePosition.x >> WORLD_UNIT_SHIFT, g_polePosition.y >> WORLD_UNIT_SHIFT, g_polePosition.z >> WORLD_UNIT_SHIFT);
 					g_poleLiftVelocity += Renderer::g_frameDelta * 0x80 / 4;
 				}
-				g_verticalLinkRotationAngle = (g_verticalLinkRotationAngle + Renderer::g_frameDelta * 0x100) & 0xFFF;
+				g_verticalLinkRotationAngle = (g_verticalLinkRotationAngle + Renderer::g_frameDelta * 0x100) & ANGLE_MASK;
 				g_verticalLinkCycleAngle = (g_verticalLinkCycleAngle + Renderer::g_frameDelta * 0x40) & 0x1FFF;
 				UpdateVerticalLinkEffect(g_verticalLinkCycleAngle, 9, &g_verticalLinkOrigins[0], g_verticalLinkRotationAngle);
 				UpdateVerticalLinkEffect(g_verticalLinkCycleAngle + 0xAAA, 0x11, &g_verticalLinkOrigins[1], g_verticalLinkRotationAngle + 0x200);
 				UpdateVerticalLinkEffect(g_verticalLinkCycleAngle + 0x1555, 0x12, &g_verticalLinkOrigins[2], g_verticalLinkRotationAngle + 0x400);
-				g_horizontalLinkRotationAngle = (g_horizontalLinkRotationAngle + Renderer::g_frameDelta * 0x80) & 0xFFF;
+				g_horizontalLinkRotationAngle = (g_horizontalLinkRotationAngle + Renderer::g_frameDelta * 0x80) & ANGLE_MASK;
 				g_horizontalLinkCycleAngle = (g_horizontalLinkCycleAngle + Renderer::g_frameDelta * 0x40) & 0x1FFF;
 				UpdateHorizontalLinkEffect(g_horizontalLinkCycleAngle, 10, &g_horizontalLinkOrigins[0], g_horizontalLinkRotationAngle, 0xC);
 				UpdateHorizontalLinkEffect(g_horizontalLinkCycleAngle + 0x1000, 0x10, &g_horizontalLinkOrigins[1], g_horizontalLinkRotationAngle + 0x200, 0xD);
@@ -658,7 +671,11 @@ namespace Toy2
 					updateRace = false;
 				if (updateRace && HUD::g_challengeState == HUD::CHALLENGE_STATE_ACTIVE)
 				{
-					uint32_t checkpointMask = (uint32_t)g_buzzActor.posAngles.pos.z < 0xFFFE6000;
+					// Each bit marks one track band. A checkpoint counts only on the 0xF -> 0xE
+					// transition, so a pass in the other direction does not count.
+					uint32_t checkpointMask = 0;
+					if ((uint32_t)g_buzzActor.posAngles.pos.z < 0xFFFE6000)
+						checkpointMask = 1;
 					if (g_buzzActor.posAngles.pos.x > 0x2900)
 						checkpointMask |= 2;
 					if (g_buzzActor.posAngles.pos.x < 0x21000)
@@ -678,12 +695,12 @@ namespace Toy2
 				if (updateRace)
 				{
 					Levels::RecordData* racePath = Levels::g_recordData[0x1E];
-					int32_t deltaX = racePath->data[g_racePathPoint].x - (rcCar->pos.x >> 5);
-					int32_t deltaZ = racePath->data[g_racePathPoint].z - (rcCar->pos.z >> 5);
+					int32_t deltaX = racePath->data[g_racePathPoint].x - (rcCar->pos.x >> WORLD_UNIT_SHIFT);
+					int32_t deltaZ = racePath->data[g_racePathPoint].z - (rcCar->pos.z >> WORLD_UNIT_SHIFT);
 					if (deltaX * deltaX + deltaZ * deltaZ < 360000)
 					{
-						rcCar->boundary.x = racePath->data[g_racePathPoint].x << 5;
-						rcCar->boundary.z = racePath->data[g_racePathPoint].z << 5;
+						rcCar->boundary.x = racePath->data[g_racePathPoint].x << WORLD_UNIT_SHIFT;
+						rcCar->boundary.z = racePath->data[g_racePathPoint].z << WORLD_UNIT_SHIFT;
 						if (g_raceLap < 3)
 						{
 							g_racePathPoint++;
@@ -700,8 +717,8 @@ namespace Toy2
 							rcCar->actorPhase = 1;
 						}
 					}
-					rcCar->motionTargetPos.x = racePath->data[g_racePathPoint].x << 5;
-					rcCar->motionTargetPos.z = racePath->data[g_racePathPoint].z << 5;
+					rcCar->motionTargetPos.x = racePath->data[g_racePathPoint].x << WORLD_UNIT_SHIFT;
+					rcCar->motionTargetPos.z = racePath->data[g_racePathPoint].z << WORLD_UNIT_SHIFT;
 					if (g_raceCheckpointPassCount == 3)
 					{
 						Collectables::Activate(2, 0);
@@ -712,8 +729,9 @@ namespace Toy2
 
 			if (Sector::g_activeSectorIndex == 3)
 			{
+				// A positive bounce state compresses the launch pad, a negative state releases it.
 				int32_t bounceMagnitude = abs(g_launchPadBounceState);
-				Nu3D::Link::SetScaleFromFixedOffsets(0x17, 0x1000, bounceMagnitude * 0x80, 0x1000);
+				Nu3D::Link::SetScaleFromFixedOffsets(0x17, SCALE_UNITY, bounceMagnitude * 0x80, SCALE_UNITY);
 				Nu3D::Link::SetRotationRelative8bit(0x17, 0, 0, bounceMagnitude * 0x20);
 				bool updateBounce = true;
 				if (g_buzzActor.collisionFlags != 0 && g_footingType == 8)
@@ -728,30 +746,30 @@ namespace Toy2
 				}
 				else if (g_launchPadBounceState == 0)
 					updateBounce = false;
-				if (updateBounce && g_launchPadBounceState < 1)
-				{
-					g_launchPadBounceState += Renderer::g_frameDelta;
-					if (g_launchPadBounceState > 0)
-						g_launchPadBounceState = 0;
-				}
-				else if (updateBounce)
+				if (updateBounce && g_launchPadBounceState > 0)
 				{
 					g_launchPadBounceState += Renderer::g_frameDelta;
 					if (g_launchPadBounceState > 0x20)
 						g_launchPadBounceState = -0x20;
-					else if (g_launchPadBounceState > 6 && g_launchPadBounceState - Renderer::g_frameDelta < 7)
+					else if (g_launchPadBounceState > 6 && g_launchPadBounceState - Renderer::g_frameDelta <= 6)
 					{
 						Levels::DeactivateAmbientEmitter(0, 1);
 						g_groundSlamTimer = 0;
 						Buzz::Launch(-0x1280, 2);
 						AudioManager::PlaySoundEffect(0x1C, &g_buzzActor.posAngles.pos);
 						g_buzzActor.velocity.forward = Numerics::g_sinCosLUT[0x51E];
-						g_buzzActor.velocity.lateral = Numerics::g_sinCosLUT[0x11E];
+						g_buzzActor.velocity.lateral = Numerics::g_sinCosLUT[LAUNCH_PAD_YAW_ANGLE];
 						g_buzzActor.actorFlags |= Buzz::ACTOR_FLAG_LOCK_FACING | Buzz::ACTOR_FLAG_UNCONTROLLED_MOMENTUM;
-						g_buzzActor.posAngles.angles.yaw = 0x11E;
-						g_buzzActor.facingAngle = 0x11E;
+						g_buzzActor.posAngles.angles.yaw = LAUNCH_PAD_YAW_ANGLE;
+						g_buzzActor.facingAngle = LAUNCH_PAD_YAW_ANGLE;
 						Camera::g_cameraSmoothingDivisor = 0x40;
 					}
+				}
+				else if (updateBounce)
+				{
+					g_launchPadBounceState += Renderer::g_frameDelta;
+					if (g_launchPadBounceState > 0)
+						g_launchPadBounceState = 0;
 				}
 				Actor::CollectQuestReward(0x1E, 0x1D, 0xE10, 0x6E0, 0);
 			}
@@ -774,7 +792,7 @@ namespace Toy2
 			{
 				Actor::ItemReturnReward(0x1F, 0x19, g_missingEarDialogue, g_earRewardDialogue, g_shieldHintDialogue, 0x200, 0xA00);
 				Renderer::BlitTextureByIndexOffset(8, 0x80, 0x80, 0x40, 0x40, 0, (Numerics::g_sinCosLUT[g_shieldIconAngle] >> 11) & 0x3F, 0x40, 0);
-				g_shieldIconAngle = (g_shieldIconAngle + Renderer::g_frameDelta * 0x20) & 0xFFF;
+				g_shieldIconAngle = (g_shieldIconAngle + Renderer::g_frameDelta * 0x20) & ANGLE_MASK;
 			}
 			if (g_poleRecordOffset == 0x3C)
 			{
@@ -804,7 +822,7 @@ namespace Toy2
 					Camera::g_gameplayCamera.position.view.lookAt.y = UPPER_CAMERA_Y;
 				}
 			}
-			g_rotatingPlatformAngle = (g_rotatingPlatformAngle + Renderer::g_frameDelta * 0x20) & 0xFFF;
+			g_rotatingPlatformAngle = (g_rotatingPlatformAngle + Renderer::g_frameDelta * 0x20) & ANGLE_MASK;
 			Nu3D::Link::SetRotationRelative8bit(0xE, 0, g_rotatingPlatformAngle, 0);
 			if (Sector::g_activeSectorIndex != 2 && HUD::g_challengeState != 0 && (Actor::g_creatureActors[0x1D].actorFlags & Actor::ACTOR_FLAG_TARGETABLE) == 0
 				&& Collectables::g_tokenStates[2].active == 0)
@@ -892,11 +910,11 @@ namespace Toy2
 			else
 			{
 				RawLoader::CreatureListRam* creatureRam = actor->creatureRam;
-				int32_t deltaX = (g_buzzActor.posAngles.pos.x - actor->boundary.x) >> 5;
-				int32_t deltaZ = (g_buzzActor.posAngles.pos.z - actor->boundary.z) >> 5;
+				int32_t deltaX = (g_buzzActor.posAngles.pos.x - actor->boundary.x) >> AndysHouse::WORLD_UNIT_SHIFT;
+				int32_t deltaZ = (g_buzzActor.posAngles.pos.z - actor->boundary.z) >> AndysHouse::WORLD_UNIT_SHIFT;
 				int32_t boundAngle = creatureRam->boundAngle * 8;
 				int32_t boundSin = Numerics::g_sinCosLUT[boundAngle] >> 2;
-				int32_t boundCos = Numerics::g_sinCosLUT[(boundAngle + 0x400) & 0xFFF] >> 2;
+				int32_t boundCos = Numerics::g_sinCosLUT[(boundAngle + 0x400) & AndysHouse::ANGLE_MASK] >> 2;
 				int32_t boundHalfX = creatureRam->boundHalfX * 0x100;
 				int32_t boundHalfZ = creatureRam->boundHalfZ * 0x100;
 				if ((uint32_t)(((boundCos * deltaX - boundSin * deltaZ) >> 7) + boundHalfX) >= (uint32_t)(boundHalfX * 2)
@@ -913,7 +931,7 @@ namespace Toy2
 
 				int32_t particleX = actor->pos.x + Numerics::g_sinCosLUT[actor->yawAngle] * 2 / 3;
 				int32_t particleY = actor->pos.y - 0x5000;
-				int32_t particleZ = actor->pos.z + Numerics::g_sinCosLUT[(actor->yawAngle + 0x400) & 0xFFF] * 2 / 3;
+				int32_t particleZ = actor->pos.z + Numerics::g_sinCosLUT[(actor->yawAngle + 0x400) & AndysHouse::ANGLE_MASK] * 2 / 3;
 				if (g_framePulseOutputs.sevenTick != 0)
 				{
 					Nu3D::Particles::ParticleInstance* particle = Nu3D::Particles::SpawnFromPreset(particleX, particleY, particleZ, 0x11, 0xA);
