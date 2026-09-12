@@ -240,6 +240,21 @@ namespace Toy2
 
 	extern char g_pauseSoundVolumeText[16];
 	extern char g_pauseMusicVolumeText[16];
+	extern uint8_t g_pauseMenuEntryCounts[5];
+	extern int32_t g_pauseMusicVolume;
+	extern int32_t g_pauseSoundVolume;
+
+	// The level entry points of the last two levels. Toy2.cpp holds them and
+	// LevelVariables.cpp dispatches to them.
+	void InitialiseLevel16();
+	void InitialiseLevel17();
+	void HandleLevel16Interactions();
+	void HandleLevel17Interactions();
+
+	namespace GameOver
+	{
+		void Tick();
+	}
 
 	// The measured processor clock: SwitchGraphics.cpp holds it with the profile it
 	// feeds, and Toy2.cpp reads it when it reports the machine.

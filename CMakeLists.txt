@@ -145,6 +145,12 @@ set(TOY2_SOURCES
     src/Toy2/Ini.cpp
     src/Toy2/MoveableObject.cpp
     src/Toy2/Screens.cpp
+    src/Toy2/GameOver.cpp
+    src/Toy2/ScreenDispatch.cpp
+    src/Toy2/LevelGraphics.cpp
+    src/Toy2/LevelVariables.cpp
+    src/Toy2/MenuLoop.cpp
+    src/Toy2/FrameTimers.cpp
     src/Toy2/PostGame.cpp
     src/Toy2/SaveSlots.cpp
     src/Toy2/SoftWindow.cpp
